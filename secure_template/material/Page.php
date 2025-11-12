@@ -1,0 +1,16 @@
+<?php
+
+require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';
+$trimParameters = new TrimParameters();
+require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
+$translator = new Translator($trimParameters->lang());
+$lang = $trimParameters->lang();
+
+$content = "";
+
+
+// Now use this constant to include files from your src folder
+require_once SECURE_FOLDER_PATH . '/src/classes/Page.php';
+
+$page = new Page("Sangio Stuff", $content, $lang);
+$page->render();

@@ -1,0 +1,30 @@
+{
+    "footer": {
+        "language": "Langue",
+        "privacy": "Politique de confidentialité",
+        "terms": "Conditions d'utilisation"
+    },
+    "menu": {
+        "home": "Accueil",
+        "about": "À propos",
+        "contact": "Contact",
+        "terms": "Conditions d'utilisation",
+        "external1": "Google"
+    },
+    "home": {
+        "title": "Accueil",
+        "welcomeMessage": "Bienvenu sur notre website!"
+    },
+    "404": {
+        "pageNotFound": "Page non trouvée",
+        "message": "Désolé, la page que vous recherchez n'existe pas ou a été déplacée."
+    },
+    "privacy": {
+        "title": "Politique de confidentialité",
+        "content": "Ceci est la politique de confidentialité de notre site web. Nous respectons votre vie privée et nous nous engageons à protéger vos informations personnelles."
+    },
+    "termOfUse": {
+        "title": "Conditions d'utilisation",
+        "content": "Ce sont les conditions d'utilisation de notre site web. En utilisant notre site, vous acceptez ces conditions."
+    }
+}
