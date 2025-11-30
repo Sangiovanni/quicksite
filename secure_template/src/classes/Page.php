@@ -42,24 +42,27 @@ class Page {
         $header .= "</head>";
         $body = "<body>";
 
-        ob_start();
+        require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
+        require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 
-        // Include the menu
-        include_once SECURE_FOLDER_PATH.'/templates/menu.php';
-        $menu = ob_get_clean();
+        $translator = new Translator($this->lang);
+        $trimParameters = new TrimParameters();
 
-        $body .= $menu;
+        // Pass context with baseUrl and lang
+        $context = [
+            'baseUrl' => BASE_URL,
+            'lang' => MULTILINGUAL_SUPPORT ? $trimParameters->lang() : '',
+            'page' => $trimParameters->page(),
+            'id' => $trimParameters->id(),
+            'params' => $trimParameters->params()
+        ];
+
+        $renderer = new JsonToHtmlRenderer($translator, $context);
 
         // Render the main content
+        $body .= $renderer->renderMenu();
         $body .= $this->content;
-
-        ob_start();
-        // Include the footer
-        include_once SECURE_FOLDER_PATH.'/templates/footer.php';
-        $footer = ob_get_clean();
-        
-
-        $body .= $footer;
+        $body .= $renderer->renderFooter();
 
         // Include scripts
         if (!empty($this->scripts)) {

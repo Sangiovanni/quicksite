@@ -1,1 +1,1 @@
-<?php return ['home', 'privacy', 'terms', 'test']; ?>
+<?php return ['home', 'privacy', 'terms']; ?>

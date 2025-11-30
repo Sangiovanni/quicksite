@@ -1,0 +1,22 @@
+[
+  {
+    "tag": "h1",
+    "params": {},
+    "children": [
+      {
+        "textKey": "privacy.title"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "params": {
+      "class": "center"
+    },
+    "children": [
+      {
+        "textKey": "privacy.content"
+      }
+    ]
+  }
+]

@@ -11,28 +11,47 @@ class TrimParameters{
   private static $supportedRoute = ROUTES;
 
   public function __construct() {
-    $request_uri = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
+    $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+    $parsed_path = parse_url($request_uri, PHP_URL_PATH);
+    
+    // Handle malformed URLs or null results
+    if ($parsed_path === null || $parsed_path === false) {
+        // Redirect to home or set as 404
+        $this->page = 'home';
+        return;
+    }
+    
+    $request_uri = trim($parsed_path, '/');
     $folder = PUBLIC_FOLDER_SPACE;
     $request_uri = removePrefix($request_uri, $folder ? trim($folder, '/') . '/' : '');
-    $parts = explode('/', $request_uri);
-    if (count($parts) > 0 && $parts[0] !== '') {
-      if (in_array($parts[0], self::$supportedLangs)) {
-        if(MULTILINGUAL_SUPPORT){
-          $this->lang = array_shift($parts);
+    
+    // Filter out empty parts from multiple slashes
+    $parts = array_filter(explode('/', $request_uri), function($part) {
+        return $part !== '';
+    });
+    $parts = array_values($parts); // Re-index array
+    
+    if (count($parts) > 0) {
+        if (in_array($parts[0], self::$supportedLangs)) {
+            if(MULTILINGUAL_SUPPORT){
+                $this->lang = array_shift($parts);
+            }
         }
-      }
     }
-    if (count($parts) > 0 && $parts[0] !== '') {
-      if (in_array($parts[0], self::$supportedRoute)) {
-        $this->page = array_shift($parts);
-      }
-      else{
-        $this->page = '404';
-      }
+    
+    if (count($parts) > 0) {
+        if (in_array($parts[0], self::$supportedRoute)) {
+            $this->page = array_shift($parts);
+        }
+        else{
+            $this->page = '404';
+        }
     }
-    if(count($parts) > 0 && $parts[0] !== '') {
-      $this->id = array_shift($parts);
+    
+    if(count($parts) > 0) {
+        $this->id = array_shift($parts);
     }
+    
     $this->params = $parts;
   }
 

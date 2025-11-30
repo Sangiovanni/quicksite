@@ -26,7 +26,7 @@ class Translator {
             $fileTranslate = SECURE_FOLDER_PATH . "/translate/default.json";
         }
         if (!file_exists($fileTranslate)) {
-             $fileTranslate = PROJECT_ROOT . "/translate/default.json";
+             $fileTranslate = SECURE_FOLDER_PATH . "/translate/default.json";
         }
 
         $json = @file_get_contents($fileTranslate);

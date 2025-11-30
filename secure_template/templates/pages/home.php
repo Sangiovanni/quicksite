@@ -6,8 +6,12 @@ require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 $translator = new Translator($trimParameters->lang());
 $lang = $trimParameters->lang();
 
-$content = "<h1>".$translator->translate("home.title")."</h1>
-<div class='center'>".$translator->translate("home.welcomeMessage")."</div>";
+require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
+$renderer = new JsonToHtmlRenderer($translator);
+
+$content = $renderer->renderPage('home');
+
+
 
 
 // Now use this constant to include files from your src folder

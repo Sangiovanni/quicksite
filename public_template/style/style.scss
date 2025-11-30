@@ -204,6 +204,21 @@ select{
     cursor: pointer;
 }
 
+
+.logo{
+    text-align: center;
+    border-radius: 10px;
+    margin: 10px;
+}
+
+.logo img{
+    //background-color: var(--primary-color);
+    
+    border-radius: 10px;
+    height: 300px;
+    animation: 500ms ease 0s 1 slideInFromLeft;
+}
+
 .menu{
     background-color: var(--footer-background);
     padding: 20px;
@@ -213,7 +228,16 @@ select{
 }
 .menu-label{
     margin-right: 25px;
+    height: 30px;
+    text-align: center;
 }
+
+.menu-logo{
+    height: 30px;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
 
 .center{
     text-align: center;

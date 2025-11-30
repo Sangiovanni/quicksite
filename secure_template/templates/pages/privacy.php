@@ -5,9 +5,10 @@ $trimParameters = new TrimParameters();
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 $translator = new Translator($trimParameters->lang());
 $lang = $trimParameters->lang();
+require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
+$renderer = new JsonToHtmlRenderer($translator);
 
-$content = "<h1>".$translator->translate("privacy.title")."</h1>
-<div class='center'>".$translator->translate("privacy.content")."</div>";
+$content = $renderer->renderPage('privacy');
 
 
 // Now use this constant to include files from your src folder

@@ -1,0 +1,22 @@
+[
+  {
+    "tag": "h1",
+    "params": {},
+    "children": [
+      {
+        "textKey": "termOfUse.title"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "params": {
+      "class": "center"
+    },
+    "children": [
+      {
+        "textKey": "termOfUse.content"
+      }
+    ]
+  }
+]

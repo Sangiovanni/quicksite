@@ -1,0 +1,26 @@
+[
+  {
+    "tag": "h1",
+    "params": {},
+    "children": [{"textKey": "404.pageNotFound"}]
+  },
+  {
+    "tag": "div",
+    "params": {"class": "center"},
+    "children": [{"textKey": "404.message"}]
+  },
+  {
+    "tag": "div",
+    "params": {"class": "center"},
+    "children": [
+      {
+        "component": "img-dynamic",
+        "data": {
+          "src": "/pics/404.png",
+          "alt": "404 Image",
+          "class": "img-fluid"
+        }
+      }
+    ]
+  }
+]

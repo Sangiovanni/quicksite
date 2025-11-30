@@ -1,0 +1,45 @@
+[
+  {
+    "tag": "div",
+    "params": {"class": "logo"},
+    "children": [
+      {
+        "tag": "a",
+        "params": {"href": "{{baseUrl}}{{lang}}"},
+        "children": [
+          {
+            "tag": "img",
+            "params": {"src": "{{baseUrl}}/pics/logo.png"},
+            "children": null
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "params": {"class": "menu"},
+    "children": [
+      {
+        "component": "menu-link",
+        "data": {
+          "label": "menu.home",
+          "logo": null,
+          "path": "home",
+          "absoluteLink": null,
+          "target": "_self"
+        }
+      },
+      {
+        "component": "menu-link",
+        "data": {
+          "label": "menu.external1",
+          "logo": "google.png",
+          "path": null,
+          "absoluteLink": "https://www.google.com",
+          "target": "_blank"
+        }
+      }
+    ]
+  }
+]
