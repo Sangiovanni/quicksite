@@ -1,7 +1,11 @@
 <?php
 
-function is_valid_relative_path(string $path): bool
+function is_valid_relative_path(string $path, int $max_length = 255, int $max_depth = 10, bool $allow_empty = true): bool
 {
+    // 0. Special case: empty string is valid (represents root/current directory)
+    if ($path === '') {
+        return $allow_empty;
+    }
     // 1. Basic cleaning and normalization
     $normalized_path = trim($path);
     
@@ -10,33 +14,50 @@ function is_valid_relative_path(string $path): bool
     
     // Remove duplicate slashes (e.g., 'a//b' becomes 'a/b')
     $normalized_path = preg_replace('/\/+/', '/', $normalized_path);
+    
+    // 2. Length Check (filesystem limit - most systems allow 255-4096 chars)
+    if (strlen($normalized_path) > $max_length) {
+        return false;
+    }
 
-    // 2. Critical Security & Format Checks
+    // 3. Depth Check (number of directory levels)
+    $path_parts = explode('/', $normalized_path);
+    if (count($path_parts) > $max_depth) {
+        return false;
+    }
+
+    // 4. Critical Security & Format Checks
     
     // A. Check for directory traversal attempts ('../', '/../', or '..')
-    // A path should *never* contain '..' if it is meant to be relative and safe.
-    if (strpos($normalized_path, '..') !== false) {
+     if (strpos($normalized_path, '..') !== false) {
         // Log a security warning here if necessary
         return false;
     }
     
     // B. Check for absolute path indicators (leading slash)
-    // A relative path should not start with a slash.
     if (str_starts_with($normalized_path, '/')) {
         return false;
     }
+
+    // C. Check for reserved names (Windows-specific)
+    $reserved_names = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
+
+    foreach ($path_parts as $part) {
+        // Also check for empty parts (from double slashes that shouldn't exist after normalization)
+        if ($part === '' || in_array(strtoupper($part), $reserved_names)) {
+            return false;
+        }
+    }
     
-    // C. Check for invalid characters using a regular expression
-    // This regex allows letters, numbers, hyphens, underscores, dots (for file extensions), and forward slashes.
-    // Adjust this regex based on the strictest character set your file system allows.
-    // We explicitly exclude null bytes (\x00) and other control characters for security.
-    $valid_path_regex = '/^[a-zA-Z0-9_\-\.\/]+$/';
+    // D. Check for invalid characters using a regular expression
+    // Only allows: letters, numbers, hyphens, underscores
+    // Format: segment or segment/segment/segment...
+    $valid_path_regex = '/^[a-zA-Z0-9_\-]+([\/][a-zA-Z0-9_\-]+)*$/';
     if (!preg_match($valid_path_regex, $normalized_path)) {
         return false;
     }
 
-    // 3. Optional: Check for trailing slash (optional, but good practice for folder paths)
-    // If you expect 'some/path' not 'some/path/'
+    // E. Check for trailing slash
     if (str_ends_with($normalized_path, '/')) {
         return false;
     }
@@ -208,4 +229,16 @@ function cleanup_empty_source_chain(string $start_dir, string $stop_dir): void
         // Move up to the parent directory
         $current_dir = dirname($current_dir);
     }
+}
+
+/**
+ * Write .htaccess file with FallbackResource
+ * 
+ * @param string $htaccess_path Full path to .htaccess file
+ * @param string $fallback_resource Fallback resource path (e.g., '/app/index.php')
+ * @return bool Success
+ */
+function write_htaccess_fallback(string $htaccess_path, string $fallback_resource): bool {
+    $content = "RewriteEngine On\nFallbackResource " . $fallback_resource;
+    return file_put_contents($htaccess_path, $content, LOCK_EX) !== false;
 }

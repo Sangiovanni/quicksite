@@ -1,3 +1,1 @@
-
-
-<?php return ['movePublicRoot', 'moveSecureRoot', 'addRoute', 'deleteRoute', 'addMenuOption', 'deleteMenuOption', 'addFooterOption', 'deleteFooterOption']; ?>
+<?php return ['help', 'movePublicRoot', 'moveSecureRoot', 'addRoute', 'deleteRoute', 'getStructure', 'editStructure', 'getRoutes']; ?>

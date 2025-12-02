@@ -39,4 +39,7 @@ class TrimParametersManagement{
   public function params() {
     return $this->params;
   }
+  public function additionalParams() {
+      return $this->additionnalCommand;
+  }
 }

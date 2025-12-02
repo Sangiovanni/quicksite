@@ -57,5 +57,11 @@ if (!defined('SECURE_FOLDER_PATH')) {
 if (!defined('BASE_URL')) {
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
     $host = $_SERVER['HTTP_HOST'];
-    define('BASE_URL', $protocol . $host.DIRECTORY_SEPARATOR . PUBLIC_FOLDER_SPACE);
+    if(PUBLIC_FOLDER_SPACE !== ''){
+        $host .= DIRECTORY_SEPARATOR  . PUBLIC_FOLDER_SPACE.DIRECTORY_SEPARATOR ;
+    }
+    else{
+        $host .= DIRECTORY_SEPARATOR ;
+    }
+    define('BASE_URL', $protocol . $host);
 }

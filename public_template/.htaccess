@@ -1,2 +1,2 @@
 RewriteEngine On
-FallbackResource //index.php
+FallbackResource /index.php
