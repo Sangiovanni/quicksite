@@ -5,11 +5,11 @@
     "children": [
       {
         "tag": "a",
-        "params": {"href": "{{baseUrl}}{{lang}}"},
+        "params": {"href": "/"},
         "children": [
           {
             "tag": "img",
-            "params": {"src": "{{baseUrl}}/pics/logo.png"},
+            "params": {"src": "/assets/images/logo.png"},
             "children": null
           }
         ]

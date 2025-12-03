@@ -13,7 +13,7 @@ if (empty($urlSegments) || !isset($urlSegments[0])) {
 }
 
 $type = $urlSegments[0];
-$allowed_types = ['menu', 'footer', 'page'];
+$allowed_types = ['menu', 'footer', 'page', 'component'];
 
 if (!in_array($type, $allowed_types)) {
     ApiResponse::create(400, 'validation.invalid_format')
@@ -24,26 +24,31 @@ if (!in_array($type, $allowed_types)) {
         ->send();
 }
 
-// For pages, name is the second URL segment
-if ($type === 'page') {
+// For pages and components, name is the second URL segment
+if ($type === 'page' || $type === 'component') {
     if (!isset($urlSegments[1]) || empty($urlSegments[1])) {
         ApiResponse::create(400, 'validation.required')
-            ->withMessage("Page name required in URL for type=page")
-            ->withErrors([['field' => 'name', 'reason' => 'missing', 'usage' => 'GET /management/getStructure/page/{pageName}']])
+            ->withMessage("Name required in URL for type={$type}")
+            ->withErrors([['field' => 'name', 'reason' => 'missing', 'usage' => "GET /management/getStructure/{$type}/{name}"]])
             ->send();
     }
     
     $name = $urlSegments[1];
     
-    // Validate page exists
-    if (!in_array($name, ROUTES)) {
+    // Validate page exists (only for pages, not components)
+    if ($type === 'page' && !in_array($name, ROUTES)) {
         ApiResponse::create(404, 'route.not_found')
             ->withMessage("Page '{$name}' does not exist")
             ->withData(['available_routes' => ROUTES])
             ->send();
     }
     
-    $json_file = SECURE_FOLDER_PATH . '/templates/model/json/pages/' . $name . '.json';
+    // Build file path based on type
+    if ($type === 'page') {
+        $json_file = SECURE_FOLDER_PATH . '/templates/model/json/pages/' . $name . '.json';
+    } else { // component
+        $json_file = SECURE_FOLDER_PATH . '/templates/model/json/components/' . $name . '.json';
+    }
 } else {
     // For menu/footer, use the type directly
     $json_file = SECURE_FOLDER_PATH . '/templates/model/json/' . $type . '.json';

@@ -31,10 +31,17 @@ class ApiResponse {
             'validation.invalid_format' => 'Invalid format provided',
             'route.already_exists' => 'Route already exists',
             'route.invalid_name' => 'Invalid route name',
+            'asset.invalid_category' => 'Invalid asset category',        
+            'asset.invalid_filename' => 'Invalid filename',              
+            'asset.invalid_file_type' => 'Invalid file type',            
+            'asset.invalid_extension' => 'Invalid file extension',       
+            'asset.file_too_large' => 'File exceeds maximum size',       
+            'asset.upload_failed' => 'File upload failed',               
         ],
         404 => [
             'route.not_found' => 'Route not found',
             'file.not_found' => 'File not found',
+            'asset.not_found' => 'Asset file not found',                 
         ],
         409 => [
             'conflict.duplicate' => 'Resource already exists',
@@ -45,6 +52,8 @@ class ApiResponse {
             'server.file_write_failed' => 'Failed to write file',
             'server.directory_create_failed' => 'Failed to create directory',
             'server.internal_error' => 'Internal server error',
+            'asset.move_failed' => 'Failed to move uploaded file',       
+            'asset.delete_failed' => 'Failed to delete file',            
         ],
         503 => [
             'server.unavailable' => 'Service temporarily unavailable',

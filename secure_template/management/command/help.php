@@ -155,7 +155,7 @@ $commands = [
     ],
     
     'getStructure' => [
-        'description' => 'Retrieves the JSON structure for a page, menu, or footer',
+        'description' => 'Retrieves the JSON structure for a page, menu, footer, or component',
         'method' => 'GET',
         'url_structure' => '/management/getStructure/{type}/{name?}',
         'parameters' => [
@@ -164,86 +164,550 @@ $commands = [
                 'type' => 'string',
                 'description' => 'Type of structure to retrieve (URL segment)',
                 'example' => 'page',
-                'validation' => 'Must be one of: page, menu, footer'
+                'validation' => 'Must be one of: page, menu, footer, component'
             ],
             '{name}' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Page name (required only when type=page, as URL segment)',
+                'description' => 'Name (required for page/component, optional for menu/footer)',
                 'example' => 'home',
-                'validation' => 'Must be an existing route'
+                'validation' => 'Must be an existing route (for pages) or component name'
             ]
         ],
-        'example_get' => 'GET /management/getStructure/menu or GET /management/getStructure/page/home',
+        'example_get' => 'GET /management/getStructure/menu, GET /management/getStructure/page/home, or GET /management/getStructure/component/img-dynamic',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
             'message' => 'Structure retrieved successfully',
             'data' => [
-                'type' => 'page',
-                'name' => 'home',
-                'structure' => [...],
-                'file' => '/path/to/home.json'
+                'type' => 'component',
+                'name' => 'img-dynamic',
+                'structure' => {...},
+                'file' => '/path/to/img-dynamic.json'
             ]
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing type or name in URL',
-            '400.validation.invalid_format' => 'Invalid type (must be page/menu/footer)',
+            '400.validation.invalid_format' => 'Invalid type (must be page/menu/footer/component)',
             '404.route.not_found' => 'Page does not exist',
             '404.file.not_found' => 'Structure file not found',
             '500.server.file_write_failed' => 'Failed to read structure file',
             '500.server.internal_error' => 'Invalid JSON in structure file'
         ],
-        'notes' => 'Uses URL segments for parameters. For menu/footer: GET /getStructure/{type}. For pages: GET /getStructure/page/{pageName}.'
+        'notes' => 'Uses URL segments. For menu/footer: GET /getStructure/{type}. For pages/components: GET /getStructure/{type}/{name}. Components are reusable templates with {{placeholder}} syntax.'
     ],
-    
+
     'editStructure' => [
-        'description' => 'Updates the JSON structure for a page, menu, or footer',
+        'description' => 'Updates the JSON structure for a page, menu, footer, or component (creates component if new)',
         'method' => 'POST',
         'parameters' => [
             'type' => [
                 'required' => true,
                 'type' => 'string',
                 'description' => 'Type of structure to update',
-                'example' => 'page',
-                'validation' => 'Must be one of: page, menu, footer'
+                'example' => 'component',
+                'validation' => 'Must be one of: page, menu, footer, component'
             ],
             'name' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Page name (required only when type=page)',
-                'example' => 'home',
-                'validation' => 'Must be an existing route'
+                'description' => 'Name (required for page/component)',
+                'example' => 'img-dynamic',
+                'validation' => 'Must be existing route (pages) or alphanumeric/hyphens/underscores (components)'
             ],
             'structure' => [
                 'required' => true,
-                'type' => 'array',
-                'description' => 'Complete JSON structure (replaces existing)',
-                'example' => '[{"tag": "h1", "children": [{"textKey": "home.title"}]}]',
-                'validation' => 'Must be valid JSON array/object'
+                'type' => 'array/object',
+                'description' => 'Complete JSON structure (replaces existing). Array for pages/menu/footer, object for components',
+                'example' => '{"tag": "img", "params": {"src": "{{src}}"}, "children": null}',
+                'validation' => 'Must be valid JSON, max 10,000 nodes, max 50 levels deep'
             ]
         ],
-        'example_post' => 'POST /management/editStructure with body: {"type": "page", "name": "home", "structure": [...]}',
+        'example_post' => 'POST /management/editStructure with body: {"type": "component", "name": "button", "structure": {...}}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
             'message' => 'Structure updated successfully',
             'data' => [
-                'type' => 'page',
-                'name' => 'home',
-                'file' => '/path/to/home.json',
-                'structure_size' => 5
+                'type' => 'component',
+                'name' => 'button',
+                'file' => '/path/to/button.json',
+                'structure_size' => 1,
+                'node_count' => 3,
+                'created' => true
             ]
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing type, name, or structure parameter',
-            '400.validation.invalid_format' => 'Invalid type or structure format',
+            '400.validation.invalid_format' => 'Invalid type, structure format, too large, or too deeply nested',
             '404.route.not_found' => 'Page does not exist',
             '404.file.not_found' => 'Structure file not found',
             '500.server.file_write_failed' => 'Failed to write structure file',
             '500.server.internal_error' => 'Failed to encode structure to JSON'
         ],
-        'notes' => 'Completely replaces the existing structure. UI should retrieve current structure with getStructure, modify it, then send back via editStructure. For menu/footer editing, no translation key management - add textKeys manually to translation files.'
+        'notes' => 'Replaces existing structure. For components: creates new if doesn\'t exist. Components use {{placeholder}} for dynamic data. Pages/menu/footer are arrays of nodes, components are single objects. Security: max 10,000 nodes, max 50 levels deep.'
+    ],
+    
+    'getTranslation' => [
+        'description' => 'Retrieves translations for a single language',
+        'method' => 'GET',
+        'url_structure' => '/management/getTranslation/{lang}',
+        'parameters' => [
+            '{lang}' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Language code (URL segment)',
+                'example' => 'en',
+                'validation' => '2-3 lowercase letters'
+            ]
+        ],
+        'example_get' => 'GET /management/getTranslation/en',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Translation retrieved successfully',
+            'data' => [
+                'language' => 'en',
+                'translations' => {...},
+                'file' => '/path/to/en.json'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing language code in URL',
+            '400.validation.invalid_format' => 'Invalid language code format',
+            '404.file.not_found' => 'Translation file not found',
+            '500.server.file_write_failed' => 'Failed to read translation file'
+        ],
+        'notes' => 'Returns translations for a single language. Use this when editing one language at a time.'
+    ],
+    
+    'getTranslations' => [
+        'description' => 'Retrieves translations for all languages',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/getTranslations',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Translations retrieved successfully',
+            'data' => [
+                'translations' => {
+                    'en' => {...},
+                    'fr' => {...}
+                },
+                'languages' => ['en', 'fr'],
+                'multilingual_enabled' => true
+            ]
+        ],
+        'error_responses' => [
+            '404.file.not_found' => 'No translation files found'
+        ],
+        'notes' => 'Returns all translation files. Use getTranslation for single language operations.'
+    ],
+    
+    'editTranslation' => [
+        'description' => 'Updates translations for a single language',
+        'method' => 'POST',
+        'parameters' => [
+            'language' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Language code',
+                'example' => 'en',
+                'validation' => '2-3 lowercase letters'
+            ],
+            'translations' => [
+                'required' => true,
+                'type' => 'object',
+                'description' => 'Complete translation object (replaces existing)',
+                'example' => '{"menu": {"home": "Home"}, "footer": {...}}',
+                'validation' => 'Must be valid JSON object'
+            ]
+        ],
+        'example_post' => 'POST /management/editTranslation with body: {"language": "en", "translations": {...}}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Translations updated successfully',
+            'data' => [
+                'language' => 'en',
+                'file' => '/path/to/en.json'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing language or translations parameter',
+            '400.validation.invalid_format' => 'Invalid translation format',
+            '500.server.file_write_failed' => 'Failed to write translation file'
+        ],
+        'notes' => 'Completely replaces translation file for specified language.'
+    ],
+    
+    'getLangList' => [
+        'description' => 'Returns list of configured languages and multilingual settings',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/getLangList',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Language list retrieved successfully',
+            'data' => [
+                'multilingual_enabled' => true,
+                'languages' => ['en', 'fr'],
+                'default_language' => 'en',
+                'language_names' => {
+                    'en' => 'English',
+                    'fr' => 'Français'
+                }
+            ]
+        ],
+        'error_responses' => [],
+        'notes' => 'Returns configuration from config.php. Useful for UI language selectors.'
+    ],
+    
+    'addLang' => [
+        'description' => 'Adds a new language to the system',
+        'method' => 'POST',
+        'parameters' => [
+            'code' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Language code (ISO 639-1)',
+                'example' => 'es',
+                'validation' => '2-3 lowercase letters'
+            ],
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Language display name',
+                'example' => 'Español',
+                'validation' => 'Any string'
+            ]
+        ],
+        'example_post' => 'POST /management/addLang with body: {"code": "es", "name": "Español"}',
+        'success_response' => [
+            'status' => 201,
+            'code' => 'operation.success',
+            'message' => 'Language added successfully',
+            'data' => [
+                'code' => 'es',
+                'name' => 'Español',
+                'config_updated' => '/path/to/config.php',
+                'translation_file' => '/path/to/es.json',
+                'copied_from' => 'en'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing code or name parameter',
+            '400.validation.invalid_format' => 'Invalid language code format',
+            '409.conflict.duplicate' => 'Language already exists',
+            '500.server.file_write_failed' => 'Failed to update config or create translation file'
+        ],
+        'notes' => 'Updates config.php and creates translation file by copying from default language. Requires system reload to apply changes.'
+    ],
+    
+    'removeLang' => [
+        'description' => 'Removes a language from the system',
+        'method' => 'POST',
+        'parameters' => [
+            'code' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Language code to remove',
+                'example' => 'es',
+                'validation' => 'Must be an existing language (not default, not last)'
+            ]
+        ],
+        'example_post' => 'POST /management/removeLang with body: {"code": "es"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Language removed successfully',
+            'data' => [
+                'code' => 'es',
+                'config_updated' => '/path/to/config.php',
+                'translation_file_deleted' => true,
+                'remaining_languages' => ['en', 'fr']
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing code parameter',
+            '400.validation.invalid_format' => 'Cannot remove default or last language',
+            '404.route.not_found' => 'Language not found',
+            '500.server.file_write_failed' => 'Failed to update config'
+        ],
+        'notes' => 'Cannot remove default language or last remaining language. Updates config.php and deletes translation file.'
+    ],
+    
+    'getTranslationKeys' => [
+        'description' => 'Scans all JSON structures and extracts required translation keys',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/getTranslationKeys',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Translation keys extracted successfully',
+            'data' => [
+                'keys_by_source' => {
+                    'home' => ['home.title', 'home.welcomeMessage'],
+                    'menu' => ['menu.home', 'menu.about'],
+                    'footer' => ['footer.privacy', 'footer.terms']
+                },
+                'all_keys' => ['home.title', 'home.welcomeMessage', 'menu.home', ...],
+                'total_keys' => 15,
+                'scanned_files' => {
+                    'pages' => ['home', 'privacy', 'terms'],
+                    'menu' => true,
+                    'footer' => true
+                }
+            ]
+        ],
+        'error_responses' => [],
+        'notes' => 'Recursively scans all page JSONs, menu.json, and footer.json to extract textKey values. Ignores __RAW__ prefixed keys. Useful for identifying all translation keys that need to be defined.'
+    ],
+    
+    'validateTranslations' => [
+        'description' => 'Validates translation completeness by comparing required keys with existing translations',
+        'method' => 'GET',
+        'url_structure' => '/management/validateTranslations/{lang?}',
+        'parameters' => [
+            '{lang}' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Language code to validate (URL segment). If omitted, validates all languages',
+                'example' => 'en',
+                'validation' => '2-3 lowercase letters'
+            ]
+        ],
+        'example_get' => 'GET /management/validateTranslations (all languages) or GET /management/validateTranslations/fr (specific)',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Translation validation complete',
+            'data' => [
+                'validation_results' => {
+                    'en' => {
+                        'file_exists' => true,
+                        'file_valid' => true,
+                        'required_keys' => 15,
+                        'missing_keys' => [],
+                        'total_missing' => 0,
+                        'coverage_percent' => 100
+                    },
+                    'fr' => {
+                        'file_exists' => true,
+                        'file_valid' => true,
+                        'required_keys' => 15,
+                        'missing_keys' => ['menu.newpage', 'footer.copyright'],
+                        'total_missing' => 2,
+                        'coverage_percent' => 86.67
+                    }
+                },
+                'total_required_keys' => 15,
+                'languages_validated' => ['en', 'fr']
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.invalid_format' => 'Invalid language code format'
+        ],
+        'notes' => 'Compares keys from getTranslationKeys with actual translation files. Shows missing keys per language and coverage percentage. Use this to identify incomplete translations before deployment.'
+    ],
+    
+    'uploadAsset' => [
+        'description' => 'Uploads a file to the assets folder with validation and automatic naming',
+        'method' => 'POST',
+        'content_type' => 'multipart/form-data',
+        'parameters' => [
+            'category' => [
+                'required' => true,
+                'type' => 'query_string',
+                'description' => 'Asset category (in URL query string)',
+                'example' => 'images',
+                'validation' => 'Must be one of: images, scripts, font, audio, videos'
+            ],
+            'file' => [
+                'required' => true,
+                'type' => 'file',
+                'description' => 'File to upload (in multipart form data)',
+                'validation' => 'See size and type limits below'
+            ]
+        ],
+        'size_limits' => [
+            'images' => '5MB',
+            'scripts' => '1MB',
+            'font' => '2MB',
+            'audio' => '10MB',
+            'videos' => '50MB'
+        ],
+        'allowed_types' => [
+            'images' => 'JPEG, PNG, GIF, WebP, SVG',
+            'scripts' => 'JavaScript (.js)',
+            'font' => 'TTF, OTF, WOFF, WOFF2',
+            'audio' => 'MP3, WAV, OGG',
+            'videos' => 'MP4, WebM, OGV'
+        ],
+        'example_curl' => 'curl -F "file=@logo.png" "http://yoursite.com/management?command=uploadAsset&category=images"',
+        'success_response' => [
+            'status' => 201,
+            'code' => 'operation.success',
+            'message' => 'File uploaded successfully',
+            'data' => [
+                'filename' => 'logo.png',
+                'category' => 'images',
+                'path' => '/assets/images/logo.png',
+                'size' => 45678,
+                'mime_type' => 'image/png'
+            ]
+        ],
+        'error_responses' => [
+            '400.asset.invalid_category' => 'Invalid category',
+            '400.asset.upload_failed' => 'File upload error',
+            '400.asset.file_too_large' => 'File exceeds size limit',
+            '400.asset.invalid_file_type' => 'MIME type not allowed',
+            '400.asset.invalid_extension' => 'File extension not allowed',
+            '500.asset.move_failed' => 'Failed to save file'
+        ],
+        'notes' => 'Validates MIME type (actual content, not just extension). Sanitizes filename. Auto-renames if file exists (adds _1, _2, etc.). Use multipart/form-data encoding.'
+    ],
+    
+    'deleteAsset' => [
+        'description' => 'Deletes a file from the assets folder',
+        'method' => 'GET',
+        'parameters' => [
+            'category' => [
+                'required' => true,
+                'type' => 'query_string',
+                'description' => 'Asset category',
+                'example' => 'images',
+                'validation' => 'Must be one of: images, scripts, font, audio, videos'
+            ],
+            'filename' => [
+                'required' => true,
+                'type' => 'query_string',
+                'description' => 'Filename to delete',
+                'example' => 'logo.png',
+                'validation' => 'Must exist in specified category'
+            ]
+        ],
+        'example_get' => 'GET /management?command=deleteAsset&category=images&filename=logo.png',
+        'success_response' => [
+            'status' => 204,
+            'code' => 'operation.success',
+            'message' => 'File deleted successfully',
+            'data' => [
+                'filename' => 'logo.png',
+                'category' => 'images'
+            ]
+        ],
+        'error_responses' => [
+            '400.asset.invalid_category' => 'Invalid category',
+            '400.validation.required' => 'Missing filename',
+            '400.asset.invalid_filename' => 'Invalid filename (path traversal blocked)',
+            '404.asset.not_found' => 'File not found',
+            '500.asset.delete_failed' => 'Failed to delete file'
+        ],
+        'notes' => 'Includes path traversal protection. Only deletes files, not directories. Returns 204 on success.'
+    ],
+    
+    'listAssets' => [
+        'description' => 'Lists all files in assets folder, optionally filtered by category',
+        'method' => 'GET',
+        'parameters' => [
+            'category' => [
+                'required' => false,
+                'type' => 'query_string',
+                'description' => 'Filter by category (optional)',
+                'example' => 'images',
+                'validation' => 'If provided, must be one of: images, scripts, font, audio, videos'
+            ]
+        ],
+        'example_get' => 'GET /management?command=listAssets (all) or GET /management?command=listAssets&category=images (filtered)',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Assets retrieved for category images',
+            'data' => [
+                'assets' => {
+                    'images' => [
+                        {
+                            'filename' => 'logo.png',
+                            'size' => 45678,
+                            'modified' => '2025-12-03 10:30:15',
+                            'path' => '/assets/images/logo.png'
+                        },
+                        {
+                            'filename' => 'banner.jpg',
+                            'size' => 123456,
+                            'modified' => '2025-12-02 14:22:10',
+                            'path' => '/assets/images/banner.jpg'
+                        }
+                    ]
+                },
+                'total_categories' => 1,
+                'total_files' => 2
+            ]
+        ],
+        'error_responses' => [
+            '400.asset.invalid_category' => 'Invalid category'
+        ],
+        'notes' => 'Returns files sorted alphabetically. Excludes index.php files. Shows size in bytes and last modified timestamp.'
+    ],
+    'getStyles' => [
+        'description' => 'Retrieves the content of the main SCSS/CSS file',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management?command=getStyles',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Style file retrieved successfully',
+            'data' => [
+                'content' => '/* CSS content here */',
+                'file' => '/path/to/style.scss',
+                'size' => 12345,
+                'modified' => '2025-12-03 10:30:15'
+            ]
+        ],
+        'error_responses' => [
+            '404.file.not_found' => 'Style file not found',
+            '500.server.file_write_failed' => 'Failed to read style file'
+        ],
+        'notes' => 'Returns the complete content of style.scss. Use this to retrieve current styles before editing.'
+    ],
+    
+    'editStyles' => [
+        'description' => 'Updates the content of the main SCSS/CSS file',
+        'method' => 'POST',
+        'parameters' => [
+            'content' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Complete CSS/SCSS content (replaces existing file)',
+                'example' => 'body { margin: 0; }',
+                'validation' => 'Must be string, max 2MB'
+            ]
+        ],
+        'example_post' => 'POST /management/editStyles with body: {"content": "body { margin: 0; }"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Style file updated successfully',
+            'data' => [
+                'file' => '/path/to/style.scss',
+                'new_size' => 1234,
+                'old_size' => 1200,
+                'backup_content' => '/* old content */',
+                'modified' => '2025-12-03 10:35:20'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing content parameter',
+            '400.validation.invalid_format' => 'Content must be string or exceeds 2MB limit',
+            '404.file.not_found' => 'Style file not found',
+            '500.server.file_write_failed' => 'Failed to read or write style file'
+        ],
+        'notes' => 'Completely replaces style.scss content. Response includes backup_content for manual rollback if needed. Max size: 2MB. File locking prevents concurrent writes.'
     ],
     
     'help' => [
@@ -265,7 +729,7 @@ $commands = [
             'message' => 'Help documentation retrieved',
             'data' => [
                 'commands' => '...',
-                'total' => 8
+                'total' => 19
             ]
         ]
     ]
@@ -301,7 +765,22 @@ ApiResponse::create(200, 'operation.success')
         'commands' => $commands,
         'total' => count($commands),
         'base_url' => BASE_URL . '/management',
-        'usage' => 'All commands except "help" and "getRoutes" require POST with JSON body. Use GET /management/help/{commandName} for specific command help.',
-        'note' => 'Send parameters as JSON in request body, not as URL query parameters.'
+        'command_categories' => [
+            'folder_management' => ['movePublicRoot', 'moveSecureRoot'],
+            'route_management' => ['addRoute', 'deleteRoute', 'getRoutes'],
+            'structure_management' => ['getStructure', 'editStructure'],
+            'translation_management' => ['getTranslation', 'getTranslations', 'editTranslation', 'getTranslationKeys', 'validateTranslations'],
+            'language_management' => ['getLangList', 'addLang', 'removeLang'],
+            'asset_management' => ['uploadAsset', 'deleteAsset', 'listAssets'],
+            'style_management' => ['getStyles', 'editStyles'],
+            'documentation' => ['help']
+        ],
+        'usage' => 'GET commands: help, getRoutes, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, deleteAsset, listAssets, getStyles. POST commands: all others (movePublicRoot, moveSecureRoot, addRoute, deleteRoute, editStructure, editTranslation, addLang, removeLang, uploadAsset, editStyles).',
+        'note' => 'For GET commands with URL parameters, use URL segments (e.g., /getStructure/menu, /validateTranslations/en). For POST commands, send parameters as JSON in request body. For file uploads, use multipart/form-data encoding.',
+        'workflows' => [
+            'translation_workflow' => '1) getTranslationKeys to see required keys, 2) validateTranslations to find missing translations, 3) editTranslation to add them.',
+            'asset_workflow' => '1) listAssets to see existing files, 2) uploadAsset to add new files (auto-renames if exists), 3) deleteAsset to remove files.',
+            'style_workflow' => '1) getStyles to retrieve current CSS, 2) editStyles to update (response includes backup for rollback).'
+        ]
     ])
     ->send();

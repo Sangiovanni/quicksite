@@ -16,7 +16,7 @@
       {
         "component": "img-dynamic",
         "data": {
-          "src": "/pics/404.png",
+          "src": "/assets/images/404.png",
           "alt": "404 Image",
           "class": "img-fluid"
         }

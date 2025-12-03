@@ -196,6 +196,12 @@ class JsonToHtmlRenderer {
             error_log("Invalid attribute name: {$name}");
             return '';
         }
+    
+        // Block event handler attributes (XSS vector)
+        if (preg_match('/^on[a-z]+$/i', $name)) {
+            error_log("Event handler attributes not allowed: {$name}");
+            return '';
+        }
 
         if (is_array($value) && isset($value['condition'])) {
                 // Format: {"condition": "someKey", "value": "attrValue"}
@@ -213,6 +219,12 @@ class JsonToHtmlRenderer {
         // Handle null/empty values
         if ($value === null || $value === '') {
             return '';
+        }
+
+        $url_attributes = ['href', 'src', 'data', 'poster', 'action', 'formaction', 'cite', 'srcset'];
+        // Special handling for href and src attributes
+        if (in_array($name, $url_attributes, true) && is_string($value) && !empty($value)) {
+            $value = $this->processUrl($value);
         }
 
         // Convert value to string and escape
@@ -451,7 +463,7 @@ class JsonToHtmlRenderer {
             $linkChildren[] = [
                 'tag' => 'img',
                 'params' => [
-                    'src' => BASE_URL . '/pics/' . $data['logo'],
+                    'src' => BASE_URL . 'assets/images/' . $data['logo'],
                     'alt' => $data['label'] . ' Logo',
                     'class' => 'menu-logo'
                 ],
@@ -671,5 +683,39 @@ class JsonToHtmlRenderer {
         }
         
         return $url;
+    }
+
+    private function processUrl(string $url): string {
+        // Don't modify absolute URLs (http://, https://, //)
+        if (preg_match('/^(https?:)?\/\//i', $url)) {
+            return $url;
+        }
+    
+        // Block dangerous protocols
+        if (preg_match('/^(javascript|data|vbscript):/i', $url)) {
+            error_log("Dangerous URL protocol blocked: {$url}");
+            return '#'; // Safe fallback
+        }
+        
+        // Don't modify anchors, mailto, tel, etc.
+        if (preg_match('/^(#|mailto:|tel:)/i', $url)) {
+            return $url;
+        }
+        
+        // It's a relative URL - build the full URL
+        $fullUrl = BASE_URL;
+        
+        // Add language prefix if multilingual and not a static asset
+        if (MULTILINGUAL_SUPPORT && !empty($this->context['lang'])) {
+            // Don't add language to asset paths (/assets/, /style/)
+            if (!preg_match('/^\/(assets|style)\//i', $url)) {
+                $fullUrl .= $this->context['lang'] . '/';
+            }
+        }
+        
+        // Remove leading slash from URL (BASE_URL already has trailing slash)
+        $url = ltrim($url, '/');
+        
+        return $fullUrl . $url;
     }
 }

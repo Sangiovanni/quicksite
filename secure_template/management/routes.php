@@ -1,1 +1,1 @@
-<?php return ['help', 'movePublicRoot', 'moveSecureRoot', 'addRoute', 'deleteRoute', 'getStructure', 'editStructure', 'getRoutes']; ?>
+<?php return ['help', 'movePublicRoot', 'moveSecureRoot', 'addRoute', 'deleteRoute', 'getRoutes', 'getStructure', 'editStructure', 'getTranslation', 'getTranslations', 'editTranslation', 'getLangList', 'addLang', 'removeLang', 'getTranslationKeys', 'validateTranslations', 'uploadAsset', 'deleteAsset', 'listAssets', 'getStyles', 'editStyles']; ?>

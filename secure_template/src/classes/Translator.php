@@ -48,10 +48,9 @@ class Translator {
     /**
      * Retrieves a translation string using dot notation (e.g., 'footer.language').
      * @param string $key The key to lookup.
-     * @param string|null $default The default value if the key is not found.
      * @return string The translated string or the key/default if not found.
      */
-    public static function translate(string $key, string $default = "{translation missing}"): string {
+    public static function translate(string $key): string {
         if (self::$translations === null) {
             self::loadTranslations();
         }
@@ -62,8 +61,11 @@ class Translator {
 
         foreach ($keys as $segment) {
             if (!is_array($current) || !isset($current[$segment])) {
-                // Return default, or the key itself if no default is provided
-                return $default;
+                // Log missing translation for debugging
+                error_log("Missing translation key: {$key} for language: " . self::$lang);
+                
+                // Return key itself wrapped in marker if no default provided
+                return "{translation missing: {$key}}";
             }
             $current = $current[$segment];
         }

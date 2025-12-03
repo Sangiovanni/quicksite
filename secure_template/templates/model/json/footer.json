@@ -31,7 +31,7 @@
   },
   {
     "tag": "script",
-    "params": {"src": "{{baseUrl}}/scripts/scripts.js"},
+    "params": {"src": "/assets/scripts/scripts.js"},
     "children": null
   }
 ]
