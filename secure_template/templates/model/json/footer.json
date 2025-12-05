@@ -6,32 +6,47 @@
       {
         "tag": "div",
         "params": {"class": "footer-block"},
-        "children": [
+        "children":  [
           {
             "component": "footer-link",
             "data": {
+              "href": "/privacy",
               "label": "footer.privacy",
-              "path": "privacy",
-              "absoluteLink": null,
               "target": "_self"
             }
           },
           {
             "component": "footer-link",
             "data": {
+              "href": "/terms",
               "label": "footer.terms",
-              "path": "terms",
-              "absoluteLink": null,
               "target": "_self"
             }
           }
         ]
+      },
+      {
+        "tag": "div",
+        "params": {"class": "footer-block"},
+        "children": [
+          {
+            "component": "footer-link",
+            "data": {
+              "href": "../en/{{__current_page}}",
+              "label": "__RAW__English",
+              "target": "_self"
+            }
+          },
+          {
+            "component": "footer-link",
+            "data": {
+              "href": "../fr/{{__current_page}}",
+              "label": "__RAW__Français",
+              "target": "_self"
+            }
+          }        
+        ]
       }
     ]
-  },
-  {
-    "tag": "script",
-    "params": {"src": "/assets/scripts/scripts.js"},
-    "children": null
   }
 ]

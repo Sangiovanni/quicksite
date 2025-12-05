@@ -25,9 +25,9 @@ $renderer = new JsonToHtmlRenderer($translator);
 
 $content = $renderer->renderPage('{{ROUTE_NAME}}');
 
-require_once SECURE_FOLDER_PATH . '/src/classes/Page.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/PageManagement.php';
 
-$page = new Page("{{PAGE_TITLE}}", $content, $lang);
+$page = new PageManagement("{{PAGE_TITLE}}", $content, $lang);
 $page->render();
 
 PHP;

@@ -1,4 +1,5 @@
 [
+  
   {
     "tag": "div",
     "params": {"class": "logo"},
@@ -23,21 +24,23 @@
       {
         "component": "menu-link",
         "data": {
+          "href": "/",
           "label": "menu.home",
-          "logo": null,
-          "path": "home",
-          "absoluteLink": null,
-          "target": "_self"
+          "target": "_self",
+          "src": "/assets/images/home-icon.png",
+          "imgClass": "menu-logo",
+          "alt": "Home Icon"
         }
       },
       {
         "component": "menu-link",
         "data": {
+          "href": "https://www.google.com",
           "label": "menu.external1",
-          "logo": "google.png",
-          "path": null,
-          "absoluteLink": "https://www.google.com",
-          "target": "_blank"
+          "target": "_blank",
+          "src": "/assets/images/google.png",
+          "imgClass": "menu-logo",
+          "alt": "External Link Icon"
         }
       }
     ]

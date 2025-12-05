@@ -1,0 +1,65 @@
+<?php
+
+require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';
+$trimParameters = new TrimParameters();
+require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
+$translator = new Translator($trimParameters->lang());
+$lang = $trimParameters->lang();
+
+// System variables for {{__placeholder}} support
+$__current_page = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
+if (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED'])) {
+    $__current_page = preg_replace('/^(' . implode('|', CONFIG['LANGUAGES_SUPPORTED']) . ')\\//', '', $__current_page);
+} else {
+    $__current_page = preg_replace('/^(en|fr)\\//', '', $__current_page);
+}
+$__current_page = empty($__current_page) ? '' : $__current_page;
+$__lang = $lang;
+$__base_url = defined('BASE_URL') ? BASE_URL : '';
+$__public_folder = defined('PUBLIC_FOLDER_NAME') ? PUBLIC_FOLDER_NAME : 'public';
+$__current_route = basename(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
+
+// Helper function to process URLs (add language prefix, handle absolute URLs)
+if (!function_exists('processUrl')) {
+    function processUrl($url, $lang) {
+        // Don't modify absolute URLs (http://, https://, //)
+        if (preg_match('/^(https?:)?\/\//i', $url)) {
+            return $url;
+        }
+        
+        // Block dangerous protocols
+        if (preg_match('/^(javascript|data|vbscript):/i', $url)) {
+            return '#';
+        }
+        
+        // Don't modify anchors, mailto, tel, etc.
+        if (preg_match('/^(#|mailto:|tel:)/i', $url)) {
+            return $url;
+        }
+        
+        // Don't add language to asset paths
+        if (preg_match('/^\/(assets|style)\//i', $url)) {
+            return (defined('BASE_URL') ? BASE_URL : '') . ltrim($url, '/');
+        }
+        
+        // Build URL with language prefix
+        $fullUrl = defined('BASE_URL') ? BASE_URL : '';
+        if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT && !empty($lang)) {
+            $fullUrl .= $lang . '/';
+        }
+        $fullUrl .= ltrim($url, '/');
+        
+        return $fullUrl;
+    }
+}
+$content = '';
+$content .= "<h1>";
+$content .= htmlspecialchars($translator->translate('home.title'), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+$content .= "</h1>";
+$content .= "<div class=\"" . htmlspecialchars('center', ENT_QUOTES | ENT_HTML5, 'UTF-8') . "\">";
+$content .= htmlspecialchars($translator->translate('home.welcomeMessage'), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+$content .= "</div>";
+
+require_once SECURE_FOLDER_PATH . '/src/classes/Page.php';
+$page = new Page('Home', $content, $lang);
+$page->render();

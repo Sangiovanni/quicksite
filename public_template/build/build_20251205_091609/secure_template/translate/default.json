@@ -1,0 +1,30 @@
+{
+    "footer": {
+        "language": "language",
+        "privacy": "Privacy Policy",
+        "terms": "Terms of Use"
+    },
+    "menu": {
+        "home": "Home",
+        "about": "About",
+        "contact": "Contact",
+        "terms": "Terms of Use",
+        "external1": "Google"
+    },
+    "home": {
+        "title": "Home",
+        "welcomeMessage": "Welcome to our website!"
+    },
+    "404": {
+        "pageNotFound": "Page Not Found",
+        "message": "Sorry, the page you are looking for does not exist or has been moved."
+    },
+    "privacy": {
+        "title": "Privacy Policy",
+        "content": "This is the privacy policy of our website. We respect your privacy and are committed to protecting your personal information."
+    },
+    "termOfUse": {
+        "title": "Terms of Use",
+        "content": "These are the terms of use for our website. By using our site, you agree to these terms."
+    }
+}

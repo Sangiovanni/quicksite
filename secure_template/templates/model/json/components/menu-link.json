@@ -1,0 +1,28 @@
+{
+  "tag": "div",
+  "params": {
+    "class": "menu-label"
+  },
+  "children": [
+    {
+      "tag": "a",
+      "params": {
+        "href": "{{href}}",
+        "target": "{{target}}"
+      },
+      "children": [
+        {
+          "component": "img-dynamic",
+          "data": {
+            "src": "{{src}}",
+            "alt": "{{alt}}",
+            "class": "{{imgClass}}"
+          }
+        },
+        {
+          "textKey": "{{label}}"
+        }
+      ]
+    }
+  ]
+}

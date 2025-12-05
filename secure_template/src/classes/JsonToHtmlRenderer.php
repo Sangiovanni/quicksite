@@ -17,6 +17,7 @@ class JsonToHtmlRenderer {
 
     /**
      * @param Translator $translator Instance of Translator for text resolution
+     * @param array $context Context data (lang, page, etc.)
      */
     public function __construct($translator, $context = []) {
         $this->translator = $translator;
@@ -31,31 +32,55 @@ class JsonToHtmlRenderer {
      * @return string Rendered HTML
      */
     public function renderPage(string $pageName): string {
-        $jsonPath = SECURE_FOLDER_PATH . "/templates/model/json/pages/{$pageName}.json";
+        return $this->renderJsonFile("/templates/model/json/pages/{$pageName}.json");
+    }
+
+    /**
+     * Render menu - just load and render the JSON
+     */
+    public function renderMenu(): string {
+        return $this->renderJsonFile('/templates/model/json/menu.json');
+    }
+
+    /**
+     * Render footer - just load and render the JSON
+     */
+    public function renderFooter(): string {
+        return $this->renderJsonFile('/templates/model/json/footer.json');
+    }
+
+    /**
+     * Render JSON file
+     * 
+     * @param string $relativePath Path relative to SECURE_FOLDER_PATH
+     * @return string Rendered HTML
+     */
+    private function renderJsonFile(string $relativePath): string {
+        $jsonPath = SECURE_FOLDER_PATH . $relativePath;
         
         if (!file_exists($jsonPath)) {
-            error_log("Page JSON not found: {$jsonPath}");
-            return "<!-- Page JSON not found: {$pageName} -->";
+            error_log("JSON file not found: {$jsonPath}");
+            return "<!-- JSON not found: {$relativePath} -->";
         }
 
         $json = @file_get_contents($jsonPath);
         if ($json === false) {
-            error_log("Failed to read page JSON: {$jsonPath}");
-            return "<!-- Failed to read page JSON: {$pageName} -->";
+            error_log("Failed to read JSON: {$jsonPath}");
+            return "<!-- Failed to read JSON -->";
         }
 
-        $pageData = json_decode($json, true);
+        $data = json_decode($json, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            error_log("Invalid JSON in page: {$jsonPath} - " . json_last_error_msg());
-            return "<!-- Invalid JSON in page: {$pageName} -->";
+            error_log("Invalid JSON: {$jsonPath} - " . json_last_error_msg());
+            return "<!-- Invalid JSON -->";
         }
 
-        if (!is_array($pageData)) {
-            error_log("Page JSON must be an array: {$jsonPath}");
-            return "<!-- Page JSON must be an array: {$pageName} -->";
+        if (!is_array($data)) {
+            error_log("JSON must be an array: {$jsonPath}");
+            return "<!-- JSON must be an array -->";
         }
 
-        return $this->renderNodes($pageData);
+        return $this->renderNodes($data);
     }
 
     /**
@@ -84,17 +109,34 @@ class JsonToHtmlRenderer {
             return "<!-- Invalid node -->";
         }
 
-        // Check if it's a component
+        // ✅ Handle component node FIRST
         if (isset($node['component'])) {
-            return $this->renderComponent($node);
+            $componentName = $node['component'];
+            $componentData = $node['data'] ?? [];
+            
+            // Process placeholders in component data
+            $componentData = $this->processDataPlaceholders($componentData);
+            
+            // Load component template
+            $componentTemplate = $this->loadComponent($componentName);
+            if ($componentTemplate === null) {
+                error_log("Component not found: {$componentName}");
+                return "<!-- Component not found: {$componentName} -->";
+            }
+            
+            // Replace placeholders with data
+            $processedTemplate = $this->processComponentTemplate($componentTemplate, $componentData);
+            
+            // Render the processed template
+            return $this->renderNode($processedTemplate);
         }
 
-        // Check if it's a text node
+        // Handle text node
         if (isset($node['textKey'])) {
             return $this->renderTextNode($node);
         }
 
-        // Check if it's a tag node
+        // Handle tag node
         if (isset($node['tag'])) {
             return $this->renderTagNode($node);
         }
@@ -123,10 +165,7 @@ class JsonToHtmlRenderer {
         }
 
         // Use Translator::translate() which already uses htmlspecialchars
-        $translated = $this->translator->translate($textKey);
-        
-        // Additional escaping to be safe (translate should already escape)
-        return htmlspecialchars($translated, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        return htmlspecialchars($this->translator->translate($textKey), ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
 
     /**
@@ -144,7 +183,7 @@ class JsonToHtmlRenderer {
         }
 
         // Sanitize tag name (only allow alphanumeric and hyphen)
-        if (!preg_match('/^[a-z0-9]+$/i', $tag)) {
+        if (!preg_match('/^[a-z0-9-]+$/i', $tag)) {
             error_log("Invalid tag name: {$tag}");
             return "<!-- Invalid tag name -->";
         }
@@ -203,10 +242,11 @@ class JsonToHtmlRenderer {
             return '';
         }
 
+        // Handle conditional attributes
         if (is_array($value) && isset($value['condition'])) {
-                // Format: {"condition": "someKey", "value": "attrValue"}
-                if (empty($this->context[$value['condition']])) {
-                    return '';
+            // Format: {"condition": "someKey", "value": "attrValue"}
+            if (empty($this->context[$value['condition']])) {
+                return '';
             }
             $value = $value['value'];
         }
@@ -221,9 +261,9 @@ class JsonToHtmlRenderer {
             return '';
         }
 
-        $url_attributes = ['href', 'src', 'data', 'poster', 'action', 'formaction', 'cite', 'srcset'];
-        // Special handling for href and src attributes
-        if (in_array($name, $url_attributes, true) && is_string($value) && !empty($value)) {
+        // Special handling for URL attributes
+        $urlAttributes = ['href', 'src', 'data', 'poster', 'action', 'formaction', 'cite', 'srcset'];
+        if (in_array($name, $urlAttributes, true) && is_string($value) && !empty($value)) {
             $value = $this->processUrl($value);
         }
 
@@ -231,36 +271,6 @@ class JsonToHtmlRenderer {
         $escapedValue = htmlspecialchars((string)$value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         
         return ' ' . htmlspecialchars($name, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '="' . $escapedValue . '"';
-    }
-
-    /**
-     * Render a component (reusable template)
-     * 
-     * @param array $node Component node with 'component' and 'data'
-     * @return string Rendered HTML
-     */
-    private function renderComponent(array $node): string {
-        $componentName = $node['component'] ?? null;
-        $data = $node['data'] ?? [];
-
-        if (empty($componentName)) {
-            error_log("Component node missing 'component' property");
-            return "<!-- Missing component name -->";
-        }
-
-        // Load component template
-        $componentTemplate = $this->loadComponent($componentName);
-        
-        if ($componentTemplate === null) {
-            error_log("Component not found: {$componentName}");
-            return "<!-- Component not found: {$componentName} -->";
-        }
-
-        // Replace placeholders with data
-        $processedTemplate = $this->processComponentTemplate($componentTemplate, $data);
-
-        // Render the processed template
-        return $this->renderNode($processedTemplate);
     }
 
     /**
@@ -307,13 +317,11 @@ class JsonToHtmlRenderer {
      * @return mixed Processed template
      */
     private function processComponentTemplate($template, array $data) {
-        $allData = array_merge($this->context, $data);
-        
         if (is_string($template)) {
             // Replace {{placeholder}} with actual value
-            return preg_replace_callback('/\{\{(\w+)\}\}/', function($matches) use ($allData) {
+            return preg_replace_callback('/\{\{(\w+)\}\}/', function($matches) use ($data) {
                 $key = $matches[1];
-                return $allData[$key] ?? $matches[0]; // Keep placeholder if no data
+                return $data[$key] ?? $matches[0]; // Keep placeholder if no data
             }, $template);
         }
 
@@ -328,363 +336,64 @@ class JsonToHtmlRenderer {
         return $template;
     }
 
-    private function renderJsonFile(string $relativePath): string {
-        $jsonPath = SECURE_FOLDER_PATH . $relativePath;
-        
-        if (!file_exists($jsonPath)) {
-            error_log("JSON file not found: {$jsonPath}");
-            return "<!-- JSON not found: {$relativePath} -->";
-        }
-
-        $json = @file_get_contents($jsonPath);
-        if ($json === false) {
-            error_log("Failed to read JSON: {$jsonPath}");
-            return "<!-- Failed to read JSON -->";
-        }
-
-        $data = json_decode($json, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            error_log("Invalid JSON: {$jsonPath} - " . json_last_error_msg());
-            return "<!-- Invalid JSON -->";
-        }
-
-        if (!is_array($data)) {
-            error_log("JSON must be an array: {$jsonPath}");
-            return "<!-- JSON must be an array -->";
-        }
-
-        return $this->renderNodes($data);
-    }
-
-    public function setContext(array $context) {
-        $this->context = array_merge($this->context, $context);
-    }
-
     /**
-     * Render menu with dynamic URL processing
+     * Process system placeholders in component data
+     * Replaces {{__placeholder}} with actual values
+     * 
+     * @param mixed $data Component data
+     * @return mixed Processed data
      */
-    public function renderMenu(): string {
-        $menuJson = $this->loadMenuJson();
-        if ($menuJson === null) {
-            return "<!-- Menu JSON not found -->";
+    private function processDataPlaceholders($data) {
+        $systemPlaceholders = $this->getSystemPlaceholders();
+        
+        if (is_string($data)) {
+            // Replace all {{__placeholder}} occurrences
+            return preg_replace_callback('/\{\{(__\w+)\}\}/', function($matches) use ($systemPlaceholders) {
+                $key = $matches[1];
+                return $systemPlaceholders[$key] ?? $matches[0];
+            }, $data);
         }
         
-        // Process the menu structure
-        $processedMenu = $this->processMenuStructure($menuJson);
+        if (is_array($data)) {
+            $processed = [];
+            foreach ($data as $key => $value) {
+                $processed[$key] = $this->processDataPlaceholders($value);
+            }
+            return $processed;
+        }
         
-        return $this->renderNodes($processedMenu);
-    }
-
-    /**
-     * Load menu JSON file
-     */
-    private function loadMenuJson() {
-        $jsonPath = SECURE_FOLDER_PATH . '/templates/model/json/menu.json';
-        
-        if (!file_exists($jsonPath)) {
-            error_log("Menu JSON not found: {$jsonPath}");
-            return null;
-        }
-
-        $json = @file_get_contents($jsonPath);
-        if ($json === false) {
-            error_log("Failed to read menu JSON: {$jsonPath}");
-            return null;
-        }
-
-        $data = json_decode($json, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            error_log("Invalid menu JSON - " . json_last_error_msg());
-            return null;
-        }
-
         return $data;
     }
 
     /**
-     * Process menu structure to inject runtime data
+     * Get system placeholder values
+     * 
+     * @return array System placeholders
      */
-    private function processMenuStructure(array $menuStructure): array {
-    $processed = [];
-    
-    foreach ($menuStructure as $node) {
-        // Process placeholders in this node first
-        $processedNode = $this->processComponentTemplate($node, []);
-        
-        // Then check if it has children that need special processing
-        if (isset($processedNode['children'])) {
-            $processedChildren = [];
-            
-            foreach ($processedNode['children'] as $child) {
-                if (isset($child['component']) && $child['component'] === 'menu-link') {
-                    // Process menu link with runtime data
-                    $processedChildren[] = $this->processMenuLink($child);
-                } else {
-                    // Process other children for placeholders
-                    $processedChildren[] = $this->processComponentTemplate($child, []);
-                }
-            }
-            
-            $processedNode['children'] = $processedChildren;
+    private function getSystemPlaceholders(): array {
+        // Get current page from URL
+        $currentPage = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
+        // Remove language prefix if present
+        if (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED'])) {
+            $currentPage = preg_replace('/^(' . implode('|', CONFIG['LANGUAGES_SUPPORTED']) . ')\//', '', $currentPage);
         }
+        $currentPage = empty($currentPage) ? '' : $currentPage;
         
-        $processed[] = $processedNode;
-        }
-        
-        return $processed;
-    }
-
-    /**
-     * Process a single menu link with runtime URL logic
-     */
-    private function processMenuLink(array $linkNode): array {
-        $data = $linkNode['data'] ?? [];
-        
-        // Build the URL
-        $sep = '';
-        if (MULTILINGUAL_SUPPORT && !empty($this->context['lang'])) {
-            $sep = $this->context['lang'] . '/';
-        }
-        
-        $url = !empty($data['absoluteLink']) 
-            ? $data['absoluteLink'] 
-            : BASE_URL  . $sep . $data['path'];
-        
-        // Build rel attribute
-        $rel = '';
-        if (!empty($data['target']) && $data['target'] === '_blank') {
-            $rel = 'noopener noreferrer';
-        }
-        
-        // Build link children (img + text or just text)
-        $linkChildren = [];
-
-        if (!empty($data['logo'])) {
-            $linkChildren[] = [
-                'tag' => 'img',
-                'params' => [
-                    'src' => BASE_URL . 'assets/images/' . $data['logo'],
-                    'alt' => $data['label'] . ' Logo',
-                    'class' => 'menu-logo'
-                ],
-                'children' => null
-            ];
-        }
-
-        $linkChildren[] = ['textKey' => $data['label']];
-
-        // Return fully built structure (no component needed)
         return [
-            'tag' => 'div',
-            'params' => ['class' => 'menu-label'],
-            'children' => [
-                [
-                    'tag' => 'a',
-                    'params' => [
-                        'href' => $url,
-                        'target' => $data['target'] ?? '_self',
-                        'rel' => $rel
-                    ],
-                    'children' => $linkChildren
-                ]
-            ]
+            '__current_page' => $currentPage,
+            '__lang' => $this->context['lang'] ?? (defined('LANGUAGE_DEFAULT') ? LANGUAGE_DEFAULT : 'en'),
+            '__base_url' => defined('BASE_URL') ? BASE_URL : '',
+            '__public_folder' => defined('PUBLIC_FOLDER_NAME') ? PUBLIC_FOLDER_NAME : 'public',
+            '__current_route' => $this->context['page'] ?? 'home',
         ];
     }
 
     /**
-     * Render footer with dynamic URL processing and language switcher
+     * Process URL - convert relative URLs to absolute
+     * 
+     * @param string $url URL to process
+     * @return string Processed URL
      */
-    public function renderFooter(): string {
-        $footerJson = $this->loadFooterJson();
-        if ($footerJson === null) {
-            return "<!-- Footer JSON not found -->";
-        }
-        
-        // Process the footer structure
-        $processedFooter = $this->processFooterStructure($footerJson);
-        
-        return $this->renderNodes($processedFooter);
-    }
-
-    /**
-     * Load footer JSON file
-     */
-    private function loadFooterJson() {
-        $jsonPath = SECURE_FOLDER_PATH . '/templates/model/json/footer.json';
-        
-        if (!file_exists($jsonPath)) {
-            error_log("Footer JSON not found: {$jsonPath}");
-            return null;
-        }
-
-        $json = @file_get_contents($jsonPath);
-        if ($json === false) {
-            error_log("Failed to read footer JSON: {$jsonPath}");
-            return null;
-        }
-
-        $data = json_decode($json, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            error_log("Invalid footer JSON - " . json_last_error_msg());
-            return null;
-        }
-
-        return $data;
-    }
-
-    /**
-     * Process footer structure to inject runtime data
-     */
-    private function processFooterStructure(array $footerStructure): array {
-        $processed = [];
-        
-        foreach ($footerStructure as $node) {
-            // Process placeholders in this node first
-            $processedNode = $this->processComponentTemplate($node, []);
-            
-            // Special handling for footer div - inject language switcher if multilingual
-            if (isset($processedNode['tag']) && $processedNode['tag'] === 'div' && 
-                isset($processedNode['params']['class']) && $processedNode['params']['class'] === 'footer') {
-                
-                // Process footer links
-                if (isset($processedNode['children'][0]['children'])) {
-                    $footerBlock = $processedNode['children'][0];
-                    $processedLinks = [];
-                    
-                    foreach ($footerBlock['children'] as $child) {
-                        if (isset($child['component']) && $child['component'] === 'footer-link') {
-                            $processedLinks[] = $this->processFooterLink($child);
-                        } else {
-                            $processedLinks[] = $this->processComponentTemplate($child, []);
-                        }
-                    }
-                    
-                    $processedNode['children'][0]['children'] = $processedLinks;
-                }
-                
-                // Add language switcher block if multilingual
-                if (MULTILINGUAL_SUPPORT) {
-                    $langBlock = $this->buildLanguageSwitcher();
-                    $processedNode['children'][] = $langBlock;
-                }
-            }
-            
-            $processed[] = $processedNode;
-        }
-        
-        return $processed;
-    }
-
-    /**
-     * Process a single footer link with runtime URL logic
-     */
-    private function processFooterLink(array $linkNode): array {
-        $data = $linkNode['data'] ?? [];
-        
-        // Build the URL
-        $sep = '';
-        if (MULTILINGUAL_SUPPORT && !empty($this->context['lang'])) {
-            $sep = $this->context['lang'] . '/';
-        }
-        
-        $url = !empty($data['absoluteLink']) 
-            ? $data['absoluteLink'] 
-            : BASE_URL  . $sep . $data['path'];
-        
-        // Build rel attribute
-        $rel = '';
-        if (!empty($data['target']) && $data['target'] === '_blank') {
-            $rel = 'noopener noreferrer';
-        }
-        
-        // Return fully built structure
-        return [
-            'tag' => 'div',
-            'params' => [],
-            'children' => [
-                [
-                    'tag' => 'a',
-                    'params' => [
-                        'href' => $url,
-                        'class' => 'footer-option',
-                        'target' => $data['target'] ?? '_self',
-                        'rel' => $rel
-                    ],
-                    'children' => [
-                        ['textKey' => $data['label']]
-                    ]
-                ]
-            ]
-        ];
-    }
-
-    /**
-     * Build language switcher block from CONFIG
-     */
-    private function buildLanguageSwitcher(): array {
-        $langLinks = [];
-        
-        if (defined('CONFIG') && isset(CONFIG['LANGUAGES_NAME'])) {
-            foreach (CONFIG['LANGUAGES_NAME'] as $langCode => $langName) {
-                // Build URL for language switch using TrimParameters context
-                $url = $this->context['samePageUrlBase'] ?? BASE_URL;
-                
-                // Build the URL with proper language code
-                if (MULTILINGUAL_SUPPORT) {
-                    // Use the base URL and reconstruct with new language
-                    $url = $this->buildSamePageUrl($langCode);
-                }
-                
-                $langLinks[] = [
-                    'tag' => 'div',
-                    'params' => [],
-                    'children' => [
-                        [
-                            'tag' => 'a',
-                            'params' => [
-                                'href' => $url,
-                                'class' => 'footer-option'
-                            ],
-                            'children' => [
-                                ['textKey' => '__RAW__' . $langName] // Special marker for raw text
-                            ]
-                        ]
-                    ]
-                ];
-            }
-        }
-        
-        return [
-            'tag' => 'div',
-            'params' => ['class' => 'footer-block'],
-            'children' => $langLinks
-        ];
-    }
-
-    /**
-     * Build same page URL with different language
-     */
-    private function buildSamePageUrl(string $langCode): string {
-        $url = BASE_URL  . $langCode;
-        
-        // Add current page if not home
-        if (isset($this->context['page']) && $this->context['page'] !== 'home') {
-            $url .= '/' . $this->context['page'];
-        }
-        
-        // Add id if present
-        if (isset($this->context['id']) && !empty($this->context['id'])) {
-            $url .= '/' . $this->context['id'];
-        }
-        
-        // Add params if present
-        if (isset($this->context['params']) && !empty($this->context['params'])) {
-            $url .= '/' . implode('/', $this->context['params']);
-        }
-        
-        return $url;
-    }
-
     private function processUrl(string $url): string {
         // Don't modify absolute URLs (http://, https://, //)
         if (preg_match('/^(https?:)?\/\//i', $url)) {
@@ -703,10 +412,10 @@ class JsonToHtmlRenderer {
         }
         
         // It's a relative URL - build the full URL
-        $fullUrl = BASE_URL;
+        $fullUrl = defined('BASE_URL') ? BASE_URL : '';
         
         // Add language prefix if multilingual and not a static asset
-        if (MULTILINGUAL_SUPPORT && !empty($this->context['lang'])) {
+        if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT && !empty($this->context['lang'])) {
             // Don't add language to asset paths (/assets/, /style/)
             if (!preg_match('/^\/(assets|style)\//i', $url)) {
                 $fullUrl .= $this->context['lang'] . '/';
@@ -717,5 +426,14 @@ class JsonToHtmlRenderer {
         $url = ltrim($url, '/');
         
         return $fullUrl . $url;
+    }
+
+    /**
+     * Set context data
+     * 
+     * @param array $context Context data to merge
+     */
+    public function setContext(array $context) {
+        $this->context = array_merge($this->context, $context);
     }
 }
