@@ -1,0 +1,356 @@
+[
+  {
+    "name": "Valid: Remove de language",
+    "status_expected": 200,
+    "status_actual": 200,
+    "code_expected": "operation.success",
+    "code_actual": "operation.success",
+    "passed": true,
+    "payload": {
+      "code": "de"
+    }
+  },
+  {
+    "name": "Valid: Remove es language",
+    "status_expected": 200,
+    "status_actual": 200,
+    "code_expected": "operation.success",
+    "code_actual": "operation.success",
+    "passed": true,
+    "payload": {
+      "code": "es"
+    }
+  },
+  {
+    "name": "Valid: Remove pt language",
+    "status_expected": 200,
+    "status_actual": 200,
+    "code_expected": "operation.success",
+    "code_actual": "operation.success",
+    "passed": true,
+    "payload": {
+      "code": "pt"
+    }
+  },
+  {
+    "name": "Valid: Remove it language",
+    "status_expected": 200,
+    "status_actual": 200,
+    "code_expected": "operation.success",
+    "code_actual": "operation.success",
+    "passed": true,
+    "payload": {
+      "code": "it"
+    }
+  },
+  {
+    "name": "Valid: Remove zh language",
+    "status_expected": 200,
+    "status_actual": 200,
+    "code_expected": "operation.success",
+    "code_actual": "operation.success",
+    "passed": true,
+    "payload": {
+      "code": "zh"
+    }
+  },
+  {
+    "name": "Valid: Remove aa language",
+    "status_expected": 200,
+    "status_actual": 200,
+    "code_expected": "operation.success",
+    "code_actual": "operation.success",
+    "passed": true,
+    "payload": {
+      "code": "aa"
+    }
+  },
+  {
+    "name": "Valid: Remove ab language",
+    "status_expected": 200,
+    "status_actual": 404,
+    "code_expected": "operation.success",
+    "code_actual": "route.not_found",
+    "passed": false,
+    "payload": {
+      "code": "ab"
+    }
+  },
+  {
+    "name": "Valid: Remove ac language",
+    "status_expected": 200,
+    "status_actual": 404,
+    "code_expected": "operation.success",
+    "code_actual": "route.not_found",
+    "passed": false,
+    "payload": {
+      "code": "ac"
+    }
+  },
+  {
+    "name": "Valid: Remove ad language",
+    "status_expected": 200,
+    "status_actual": 404,
+    "code_expected": "operation.success",
+    "code_actual": "route.not_found",
+    "passed": false,
+    "payload": {
+      "code": "ad"
+    }
+  },
+  {
+    "name": "Valid: Remove ae language",
+    "status_expected": 200,
+    "status_actual": 404,
+    "code_expected": "operation.success",
+    "code_actual": "route.not_found",
+    "passed": false,
+    "payload": {
+      "code": "ae"
+    }
+  },
+  {
+    "name": "Protected: Cannot remove default language (en)",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.invalid_format",
+    "passed": true,
+    "payload": {
+      "code": "en"
+    }
+  },
+  {
+    "name": "Protected: Cannot remove 'default' (if it exists in config)",
+    "status_expected": 404,
+    "status_actual": 400,
+    "code_expected": "route.not_found",
+    "code_actual": "validation.invalid_format",
+    "passed": false,
+    "payload": {
+      "code": "default"
+    }
+  },
+  {
+    "name": "Invalid: Missing code parameter",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.required",
+    "code_actual": "validation.required",
+    "passed": true,
+    "payload": {}
+  },
+  {
+    "name": "Invalid: Empty code string",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.invalid_format",
+    "passed": true,
+    "payload": {
+      "code": ""
+    }
+  },
+  {
+    "name": "Invalid: Whitespace-only code",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.invalid_format",
+    "passed": true,
+    "payload": {
+      "code": "   "
+    }
+  },
+  {
+    "name": "Invalid: Code too short (1 char)",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.invalid_format",
+    "passed": true,
+    "payload": {
+      "code": "e"
+    }
+  },
+  {
+    "name": "Invalid: Code too long (4 chars)",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.invalid_format",
+    "passed": true,
+    "payload": {
+      "code": "engl"
+    }
+  },
+  {
+    "name": "Invalid: Code with uppercase",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.invalid_format",
+    "passed": true,
+    "payload": {
+      "code": "EN"
+    }
+  },
+  {
+    "name": "Invalid: Code with numbers",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.invalid_format",
+    "passed": true,
+    "payload": {
+      "code": "e1"
+    }
+  },
+  {
+    "name": "Invalid: Code with special chars",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.invalid_format",
+    "passed": true,
+    "payload": {
+      "code": "e-n"
+    }
+  },
+  {
+    "name": "Invalid: Code as integer",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.invalid_format",
+    "passed": true,
+    "payload": {
+      "code": 123
+    }
+  },
+  {
+    "name": "Invalid: Code as array",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.invalid_format",
+    "passed": true,
+    "payload": {
+      "code": [
+        "en"
+      ]
+    }
+  },
+  {
+    "name": "Invalid: Code as boolean",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.invalid_format",
+    "passed": true,
+    "payload": {
+      "code": true
+    }
+  },
+  {
+    "name": "Invalid: Code as null",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.required",
+    "passed": false,
+    "payload": {
+      "code": null
+    }
+  },
+  {
+    "name": "Invalid: Code as object",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.invalid_format",
+    "passed": true,
+    "payload": {
+      "code": {
+        "lang": "en"
+      }
+    }
+  },
+  {
+    "name": "Not Found: Remove non-existent language",
+    "status_expected": 404,
+    "status_actual": 404,
+    "code_expected": "route.not_found",
+    "code_actual": "route.not_found",
+    "passed": true,
+    "payload": {
+      "code": "xx"
+    }
+  },
+  {
+    "name": "Not Found: Remove another non-existent language",
+    "status_expected": 404,
+    "status_actual": 404,
+    "code_expected": "route.not_found",
+    "code_actual": "route.not_found",
+    "passed": true,
+    "payload": {
+      "code": "zz"
+    }
+  },
+  {
+    "name": "Security: Path traversal with ../",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.invalid_format",
+    "passed": true,
+    "payload": {
+      "code": "../"
+    }
+  },
+  {
+    "name": "Security: Path traversal with ..",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.invalid_format",
+    "passed": true,
+    "payload": {
+      "code": ".."
+    }
+  },
+  {
+    "name": "Security: Null byte injection",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.invalid_format",
+    "passed": true,
+    "payload": {
+      "code": "en\u0000"
+    }
+  },
+  {
+    "name": "Security: Forward slash",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.invalid_format",
+    "passed": true,
+    "payload": {
+      "code": "en/fr"
+    }
+  },
+  {
+    "name": "Security: Backslash",
+    "status_expected": 400,
+    "status_actual": 400,
+    "code_expected": "validation.invalid_format",
+    "code_actual": "validation.invalid_format",
+    "passed": true,
+    "payload": {
+      "code": "en\\fr"
+    }
+  }
+]

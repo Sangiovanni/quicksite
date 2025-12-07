@@ -136,6 +136,126 @@ $commands = [
         'notes' => 'Deletes both PHP template and JSON page structure. Updates routes.php automatically.'
     ],
     
+    'build' => [
+        'description' => 'Creates a production-ready build with compiled PHP files, removing management system and creating ZIP archive',
+        'method' => 'POST',
+        'parameters' => [
+            'public' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Custom name for public folder (default: public_template)',
+                'example' => 'public',
+                'validation' => 'Alphanumeric, hyphens, underscores only'
+            ],
+            'secure' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Custom name for secure folder (default: secure_template)',
+                'example' => 'secure',
+                'validation' => 'Alphanumeric, hyphens, underscores only'
+            ]
+        ],
+        'example_post' => 'POST /management/build with body: {"public": "public", "secure": "secure"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Build completed successfully',
+            'data' => [
+                'build_path' => '/path/to/build_20251206_143022',
+                'zip_file' => '/path/to/build_20251206_143022.zip',
+                'zip_size' => 1234567,
+                'timestamp' => '20251206_143022',
+                'original_size' => 2345678,
+                'compression_ratio' => '52.6%'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.invalid_format' => 'Invalid folder name format',
+            '500.server.file_write_failed' => 'Failed to create build directory or files',
+            '500.server.internal_error' => 'Build or compression failed'
+        ],
+        'notes' => 'Compiles JSON templates to PHP using JsonToPhpCompiler. Removes entire management/ folder and material/ folder. Sanitizes config.php (removes database credentials). Creates timestamped folder and ZIP. Page titles use translation system: $translator->translate("page.titles.{route}"). Includes processUrl() helper and system variables ($__current_page, $__lang, $__base_url). Components are inlined during compilation.'
+    ],
+    
+    'changeFavicon' => [
+        'description' => 'Updates the site favicon with a new image from assets/images folder (PNG only)',
+        'method' => 'POST',
+        'parameters' => [
+            'imageName' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Filename from assets/images folder (must be PNG)',
+                'example' => 'logo.png',
+                'validation' => 'Must exist in assets/images/, PNG format only'
+            ]
+        ],
+        'example_post' => 'POST /management/changeFavicon with body: {"imageName": "logo.png"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Favicon updated successfully',
+            'data' => [
+                'old_favicon' => '/assets/favicon.png',
+                'new_favicon' => '/assets/favicon.png',
+                'backup_created' => '/assets/images/favicon_backup_20251206_143022.png',
+                'source_image' => '/assets/images/logo.png'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing imageName parameter',
+            '400.validation.invalid_format' => 'Invalid filename (path traversal blocked)',
+            '400.asset.invalid_file_type' => 'File is not a PNG image (MIME type validation)',
+            '404.file.not_found' => 'Source image not found in assets/images/',
+            '500.server.file_write_failed' => 'Failed to copy or backup favicon'
+        ],
+        'notes' => 'Validates actual PNG MIME type, not just extension. Creates timestamped backup of old favicon. Uses basename() to prevent path traversal. Favicon must be in /assets/ root as favicon.png.'
+    ],
+    
+    'modifyTitle' => [
+        'description' => 'Updates page title in all translation files (page.titles.{route} structure)',
+        'method' => 'POST',
+        'parameters' => [
+            'route' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Route name to update title for',
+                'example' => 'home',
+                'validation' => 'Must be an existing route'
+            ],
+            'titles' => [
+                'required' => true,
+                'type' => 'object',
+                'description' => 'Object with language codes as keys and title strings as values',
+                'example' => '{"en": "Home - My Site", "fr": "Accueil - Mon Site"}',
+                'validation' => 'Must include all active languages, titles max 200 chars each'
+            ]
+        ],
+        'example_post' => 'POST /management/modifyTitle with body: {"route": "home", "titles": {"en": "Home - My Site", "fr": "Accueil - Mon Site"}}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Page titles updated successfully',
+            'data' => [
+                'route' => 'home',
+                'updated_languages' => ['en', 'fr'],
+                'titles' => {
+                    'en' => 'Home - My Site',
+                    'fr' => 'Accueil - Mon Site'
+                }
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing route or titles parameter',
+            '400.validation.invalid_format' => 'Titles must be object, title too long (>200 chars), or invalid language code',
+            '400.translation.missing_language' => 'Title not provided for all active languages',
+            '404.route.not_found' => 'Route does not exist',
+            '404.file.not_found' => 'Translation file not found for a language',
+            '500.server.file_write_failed' => 'Failed to write translation file',
+            '500.server.internal_error' => 'Invalid JSON in translation file'
+        ],
+        'notes' => 'Updates page.titles.{route} key in all language translation files. Creates nested page.titles object if not exists. Used by Page.php and PageManagement.php: $translator->translate("page.titles.{$route}"). Must provide titles for ALL active languages.'
+    ],
+    
     'getRoutes' => [
         'description' => 'Returns list of all available routes in the system',
         'method' => 'GET',
@@ -773,9 +893,11 @@ ApiResponse::create(200, 'operation.success')
             'language_management' => ['getLangList', 'addLang', 'removeLang'],
             'asset_management' => ['uploadAsset', 'deleteAsset', 'listAssets'],
             'style_management' => ['getStyles', 'editStyles'],
+            'site_customization' => ['changeFavicon', 'modifyTitle'],
+            'build_deployment' => ['build'],
             'documentation' => ['help']
         ],
-        'usage' => 'GET commands: help, getRoutes, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, deleteAsset, listAssets, getStyles. POST commands: all others (movePublicRoot, moveSecureRoot, addRoute, deleteRoute, editStructure, editTranslation, addLang, removeLang, uploadAsset, editStyles).',
+        'usage' => 'GET commands: help, getRoutes, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, deleteAsset, listAssets, getStyles. POST commands: all others (movePublicRoot, moveSecureRoot, addRoute, deleteRoute, editStructure, editTranslation, addLang, removeLang, uploadAsset, editStyles, build, changeFavicon, modifyTitle).',
         'note' => 'For GET commands with URL parameters, use URL segments (e.g., /getStructure/menu, /validateTranslations/en). For POST commands, send parameters as JSON in request body. For file uploads, use multipart/form-data encoding.',
         'workflows' => [
             'translation_workflow' => '1) getTranslationKeys to see required keys, 2) validateTranslations to find missing translations, 3) editTranslation to add them.',

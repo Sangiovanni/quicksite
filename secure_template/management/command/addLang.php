@@ -14,14 +14,46 @@ if (!isset($params['code']) || !isset($params['name'])) {
         ->send();
 }
 
-$langCode = $params['code'];
-$langName = $params['name'];
+// Validate parameter types (must be strings, not arrays/objects/etc)
+if (!is_string($params['code'])) {
+    ApiResponse::create(400, 'validation.invalid_format')
+        ->withMessage("Invalid parameter type")
+        ->withErrors([['field' => 'code', 'reason' => 'must be a string', 'received_type' => gettype($params['code'])]])
+        ->send();
+}
+
+if (!is_string($params['name'])) {
+    ApiResponse::create(400, 'validation.invalid_format')
+        ->withMessage("Invalid parameter type")
+        ->withErrors([['field' => 'name', 'reason' => 'must be a string', 'received_type' => gettype($params['name'])]])
+        ->send();
+}
+
+$langCode = trim($params['code']);
+$langName = trim($params['name']);
 
 // Validate language code format (2-3 lowercase letters)
 if (!preg_match('/^[a-z]{2,3}$/', $langCode)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage("Invalid language code format")
         ->withErrors([['field' => 'code', 'value' => $langCode, 'expected' => '2-3 lowercase letters (e.g., en, fr, es)']])
+        ->send();
+}
+
+// Validate language name length and content
+if (strlen($langName) === 0 || strlen($langName) > 100) {
+    ApiResponse::create(400, 'validation.invalid_format')
+        ->withMessage("Invalid language name length")
+        ->withErrors([['field' => 'name', 'reason' => 'must be between 1 and 100 characters']])
+        ->send();
+}
+
+// Validate language name contains only safe characters (letters, spaces, hyphens, apostrophes)
+// This prevents PHP code injection and filename issues
+if (!preg_match('/^[a-zA-Z\s\-\']+$/', $langName)) {
+    ApiResponse::create(400, 'validation.invalid_format')
+        ->withMessage("Invalid language name format")
+        ->withErrors([['field' => 'name', 'value' => $langName, 'expected' => 'Only letters, spaces, hyphens, and apostrophes allowed (e.g., English, Français, Español)']])
         ->send();
 }
 
@@ -52,45 +84,35 @@ if ($config_content === false) {
         ->send();
 }
 
-// Parse current config
-$current_config = require $config_path;
+// Parse current config (use include to get fresh copy, not cached by require)
+$get_fresh_config = function($path) {
+    return include $path;
+};
+$current_config = $get_fresh_config($config_path);
+
+if (!is_array($current_config)) {
+    ApiResponse::create(500, 'server.internal_error')
+        ->withMessage("Failed to parse configuration file")
+        ->send();
+}
 
 // Add new language
 $current_config['LANGUAGES_SUPPORTED'][] = $langCode;
 $current_config['LANGUAGES_NAME'][$langCode] = $langName;
 
-// Build new config file content
-$new_config_content = "<?php\n\nreturn [\n";
-foreach ($current_config as $key => $value) {
-    $new_config_content .= "    '{$key}' => ";
-    
-    if (is_bool($value)) {
-        $new_config_content .= $value ? 'true' : 'false';
-    } elseif (is_string($value)) {
-        $new_config_content .= "'" . addslashes($value) . "'";
-    } elseif (is_array($value)) {
-        if (array_keys($value) === range(0, count($value) - 1)) {
-            // Indexed array
-            $new_config_content .= '[' . implode(', ', array_map(fn($v) => "'" . addslashes($v) . "'", $value)) . ']';
-        } else {
-            // Associative array
-            $new_config_content .= "[\n";
-            foreach ($value as $k => $v) {
-                $new_config_content .= "        '{$k}' => '" . addslashes($v) . "',\n";
-            }
-            $new_config_content .= "    ]";
-        }
-    }
-    
-    $new_config_content .= ",\n";
-}
-$new_config_content .= "]; ?>\n";
+// Build new config file content using var_export for safety
+$new_config_content = "<?php\n\nreturn " . var_export($current_config, true) . ";\n";
 
 // Write updated config
 if (file_put_contents($config_path, $new_config_content, LOCK_EX) === false) {
     ApiResponse::create(500, 'server.file_write_failed')
         ->withMessage("Failed to write configuration file")
         ->send();
+}
+
+// Clear opcode cache if available
+if (function_exists('opcache_invalidate')) {
+    opcache_invalidate($config_path, true);
 }
 
 // --- CREATE TRANSLATION FILE ---

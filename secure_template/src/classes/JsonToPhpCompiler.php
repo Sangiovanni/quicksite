@@ -22,11 +22,14 @@ class JsonToPhpCompiler {
         // Add system variables for placeholders
         $output .= $this->generateSystemVariables();
         
+        // Generate title from translation using route name
+        $output .= "// Get page title from translation\n";
+        $output .= "\$pageTitle = \$translator->translate('page.titles.{$route}');\n\n";
         $output .= "\$content = '';\n";
         $output .= $this->compileNodes($structure);
         
         $output .= "\nrequire_once SECURE_FOLDER_PATH . '/src/classes/Page.php';\n";
-        $output .= "\$page = new Page(" . var_export($pageTitle, true) . ", \$content, \$lang);\n";
+        $output .= "\$page = new Page(\$pageTitle, \$content, \$lang);\n";
         $output .= "\$page->render();\n";
         
         return $output;

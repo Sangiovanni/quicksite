@@ -1,4 +1,12 @@
 {
+    "page": {
+        "titles": {
+        "home": "Home - Sangio Stuff",
+        "about": "About Us - Sangio Stuff",
+        "contact": "Contact - Sangio Stuff",
+        "404": "Page Not Found - Sangio Stuff"
+        }
+    },
     "footer": {
         "language": "language",
         "privacy": "Privacy Policy",

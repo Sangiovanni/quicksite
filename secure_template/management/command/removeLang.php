@@ -10,7 +10,15 @@ if (!isset($params['code'])) {
         ->send();
 }
 
-$langCode = $params['code'];
+// Validate parameter type (must be string, not array/object/etc)
+if (!is_string($params['code'])) {
+    ApiResponse::create(400, 'validation.invalid_format')
+        ->withMessage("Invalid parameter type")
+        ->withErrors([['field' => 'code', 'reason' => 'must be a string', 'received_type' => gettype($params['code'])]])
+        ->send();
+}
+
+$langCode = trim($params['code']);
 
 // Validate language code format
 if (!preg_match('/^[a-z]{2,3}$/', $langCode)) {
@@ -46,66 +54,54 @@ if (count(CONFIG['LANGUAGES_SUPPORTED']) === 1) {
         ->send();
 }
 
+// --- DELETE TRANSLATION FILE FIRST (safer - file can be recreated, config corruption is worse) ---
+$translation_file = SECURE_FOLDER_PATH . '/translate/' . $langCode . '.json';
+$deleted = false;
+
+if (file_exists($translation_file)) {
+    $deleted = unlink($translation_file);
+    if (!$deleted) {
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to delete translation file")
+            ->withData(['file' => $translation_file])
+            ->send();
+    }
+}
+
 // --- UPDATE CONFIG FILE ---
 $config_path = CONFIG_PATH;
 
-$config_content = file_get_contents($config_path);
-if ($config_content === false) {
-    ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage("Failed to read configuration file")
+// Read current config (use include to get fresh copy, not cached by require)
+$get_fresh_config = function($path) {
+    return include $path;
+};
+$current_config = $get_fresh_config($config_path);
+
+if (!is_array($current_config)) {
+    ApiResponse::create(500, 'server.internal_error')
+        ->withMessage("Failed to parse configuration file")
         ->send();
 }
 
-// Parse current config
-$current_config = require $config_path;
-
-// Remove language
+// Remove language from arrays
 $current_config['LANGUAGES_SUPPORTED'] = array_values(
     array_filter($current_config['LANGUAGES_SUPPORTED'], fn($lang) => $lang !== $langCode)
 );
 unset($current_config['LANGUAGES_NAME'][$langCode]);
 
-// Build new config file content (same logic as addLang)
-$new_config_content = "<?php\n\nreturn [\n";
-foreach ($current_config as $key => $value) {
-    $new_config_content .= "    '{$key}' => ";
-    
-    if (is_bool($value)) {
-        $new_config_content .= $value ? 'true' : 'false';
-    } elseif (is_string($value)) {
-        $new_config_content .= "'" . addslashes($value) . "'";
-    } elseif (is_array($value)) {
-        if (array_keys($value) === range(0, count($value) - 1)) {
-            $new_config_content .= '[' . implode(', ', array_map(fn($v) => "'" . addslashes($v) . "'", $value)) . ']';
-        } else {
-            $new_config_content .= "[\n";
-            foreach ($value as $k => $v) {
-                $new_config_content .= "        '{$k}' => '" . addslashes($v) . "',\n";
-            }
-            $new_config_content .= "    ]";
-        }
-    }
-    
-    $new_config_content .= ",\n";
-}
-$new_config_content .= "]; ?>\n";
+// Build new config file content using var_export for safety
+$new_config_content = "<?php\n\nreturn " . var_export($current_config, true) . ";\n";
 
-// Write updated config
+// Write updated config with exclusive lock
 if (file_put_contents($config_path, $new_config_content, LOCK_EX) === false) {
     ApiResponse::create(500, 'server.file_write_failed')
         ->withMessage("Failed to write configuration file")
         ->send();
 }
 
-// --- DELETE TRANSLATION FILE ---
-$translation_file = SECURE_FOLDER_PATH . '/translate/' . $langCode . '.json';
-$deleted = false;
-
-if (file_exists($translation_file)) {
-    $deleted = @unlink($translation_file);
-    if (!$deleted) {
-        error_log("Warning: Failed to delete translation file: {$translation_file}");
-    }
+// Clear opcode cache if available
+if (function_exists('opcache_invalidate')) {
+    opcache_invalidate($config_path, true);
 }
 
 // Success

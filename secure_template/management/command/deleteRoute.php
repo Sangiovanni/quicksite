@@ -10,7 +10,27 @@ if (!array_key_exists('route', $trimParametersManagement->params())) {
         ->send();
 }
 
+// Type validation
+if (!is_string($trimParametersManagement->params()['route'])) {
+    ApiResponse::create(400, 'validation.invalid_type')
+        ->withMessage('The route parameter must be a string.')
+        ->withErrors([
+            ['field' => 'route', 'reason' => 'invalid_type', 'expected' => 'string']
+        ])
+        ->send();
+}
+
 $route_name = $trimParametersManagement->params()['route'];
+
+// Length validation (consistent with addRoute, prevents DoS)
+if (strlen($route_name) < 1 || strlen($route_name) > 100) {
+    ApiResponse::create(400, 'validation.invalid_length')
+        ->withMessage('The route name must be between 1 and 100 characters.')
+        ->withErrors([
+            ['field' => 'route', 'value' => $route_name, 'min_length' => 1, 'max_length' => 100]
+        ])
+        ->send();
+}
 
 // Validate route name
 if (!is_valid_route_name($route_name)) {
@@ -84,18 +104,19 @@ if ($key !== false) {
 // Re-index array
 $current_routes = array_values($current_routes);
 
-$quoted_routes = array_map(function ($route) {
-    return "'" . str_replace("'", "\\'", $route) . "'";
-}, $current_routes);
-
-$routes_string = implode(', ', $quoted_routes);
-$new_file_content = "<?php return [" . $routes_string . "]; ?>";
+// Use var_export for safer array generation (prevents injection)
+$new_file_content = "<?php return " . var_export($current_routes, true) . "; ?>";
 
 if (file_put_contents($routes_file_path, $new_file_content, LOCK_EX) === false) {
     ApiResponse::create(500, 'server.file_write_failed')
         ->withMessage("Failed to update routes file")
         ->withData(['file' => $routes_file_path])
         ->send();
+}
+
+// Invalidate opcode cache for routes file
+if (function_exists('opcache_invalidate')) {
+    opcache_invalidate($routes_file_path, true);
 }
 
 // Success!

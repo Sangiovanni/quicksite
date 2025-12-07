@@ -4,39 +4,33 @@
 /**
  * Generate page template content for a new route
  * 
- * @param string $route_name The route name
- * @param string $page_title Optional page title (defaults to route name)
+ * @param string $route The route name
  * @return string The complete PHP page template content
  */
-function generate_page_template(string $route_name): string {
-    $page_title = ucwords(str_replace('-', ' ', $route_name));
-    
-    $template = <<<'PHP'
+function generate_page_template(string $route): string {
+    return <<<PHP
 <?php
 
 require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';
-$trimParameters = new TrimParameters();
+\$trimParameters = new TrimParameters();
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
-$translator = new Translator($trimParameters->lang());
-$lang = $trimParameters->lang();
+\$translator = new Translator(\$trimParameters->lang());
+\$lang = \$trimParameters->lang();
 
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
-$renderer = new JsonToHtmlRenderer($translator);
+\$renderer = new JsonToHtmlRenderer(\$translator, ['lang' => \$lang, 'page' => '{$route}']);
 
-$content = $renderer->renderPage('{{ROUTE_NAME}}');
+\$content = \$renderer->renderPage('{$route}');
 
 require_once SECURE_FOLDER_PATH . '/src/classes/PageManagement.php';
 
-$page = new PageManagement("{{PAGE_TITLE}}", $content, $lang);
-$page->render();
+// Get page title from translation
+\$pageTitle = \$translator->translate('page.titles.{$route}');
+
+\$page = new PageManagement(\$pageTitle, \$content, \$lang);
+\$page->render();
 
 PHP;
-
-    // Replace placeholders
-    $template = str_replace('{{ROUTE_NAME}}', $route_name, $template);
-    $template = str_replace('{{PAGE_TITLE}}', $page_title, $template);
-    
-    return $template;
 }
 
 /**

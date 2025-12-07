@@ -24,7 +24,7 @@ class PageManagement {
         $header .= '<html lang="' . htmlspecialchars($this->lang) . '">';
         $header .="<head>";
         $header .= "<title>" . htmlspecialchars($this->title) . "</title>";
-        $header .= '<link rel="icon" type="image/x-icon" href="' . BASE_URL . '/assets/images/favicon.png">';
+        $header .= '<link rel="icon" type="image/png" href="' . BASE_URL . '/assets/images/favicon.png">';
         $header .= '<link rel="stylesheet" href="' . BASE_URL . '/style/style.scss">';
         if (!empty($this->links)) {
             foreach ($this->links as $rel => $href) {

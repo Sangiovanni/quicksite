@@ -266,7 +266,7 @@ if (file_exists($page404JsonPath)) {
             ->send();
     }
     
-    $page404Php = $compiler->compilePage($page404Json, 'Page Not Found');
+    $page404Php = $compiler->compilePage($page404Json, '404');
     $page404FilePath = $buildFullPath . '/' . $buildSecureName . '/templates/pages/404.php';
     
     if (file_put_contents($page404FilePath, $page404Php) === false) {
@@ -297,7 +297,7 @@ foreach (ROUTES as $route) {
     // Use route name as title (capitalize first letter)
     $pageTitle = ucfirst(str_replace('-', ' ', $route));
     
-    $pagePhp = $compiler->compilePage($pageJson, $pageTitle);
+    $pagePhp = $compiler->compilePage($pageJson, $route);
     $pageFilePath = $buildFullPath . '/' . $buildSecureName . '/templates/pages/' . $route . '.php';
     
     if (file_put_contents($pageFilePath, $pagePhp) === false) {
