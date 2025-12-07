@@ -1,0 +1,57 @@
+# Test notebooks and results
+test_*.ipynb
+test_results_*.json
+uploaded_files_list.json
+
+# Documentation drafts (can be re-added later if needed)
+*_SECURITY_IMPROVEMENTS.md
+ADDROUTE_SECURITY_IMPROVEMENTS.md
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# Debug scripts
+debug_*.py
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Environment variables
+.env
+.env.local
+
+# Temporary files
+tmp/
+temp/
+*.tmp

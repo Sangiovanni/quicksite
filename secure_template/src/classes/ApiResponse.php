@@ -21,6 +21,7 @@ class ApiResponse {
             'operation.success' => 'Operation completed successfully',
         ],
         204 => [
+            'operation.success' => 'Operation completed successfully',
             'route.deleted' => 'Route deleted successfully',
             'menu.option.deleted' => 'Menu option deleted',
         ],

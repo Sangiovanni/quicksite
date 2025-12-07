@@ -1,20 +1,48 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 
-$category = $_GET['category'] ?? null;
+// Get parameters (works with GET, POST, or JSON)
+$params = $trimParametersManagement->params();
+$category = $params['category'] ?? null;
 
-// Validate category (optional - if not provided, list all)
-$validCategories = ['images', 'scripts', 'font', 'audio', 'videos'];
-if ($category !== null && !in_array($category, $validCategories)) {
-    ApiResponse::create(400, 'asset.invalid_category')
-        ->withMessage("Category must be one of: " . implode(', ', $validCategories))
-        ->withErrors([
-            ['field' => 'category', 'value' => $category, 'allowed' => $validCategories]
-        ])
-        ->send();
+// Validate category if provided
+$validCategories = require SECURE_FOLDER_PATH . '/management/config/assetCategories.php';
+
+// If category is provided, validate it
+if ($category !== null) {
+    // Type validation - category must be string
+    if (!is_string($category)) {
+        ApiResponse::create(400, 'validation.invalid_type')
+            ->withMessage('The category parameter must be a string.')
+            ->withErrors([
+                ['field' => 'category', 'reason' => 'invalid_type', 'expected' => 'string']
+            ])
+            ->send();
+    }
+
+    // Dynamic length validation based on longest valid category
+    $maxCategoryLength = max(array_map('strlen', $validCategories));
+    if (strlen($category) > $maxCategoryLength) {
+        ApiResponse::create(400, 'validation.invalid_length')
+            ->withMessage("The category parameter must not exceed {$maxCategoryLength} characters.")
+            ->withErrors([
+                ['field' => 'category', 'value' => $category, 'max_length' => $maxCategoryLength]
+            ])
+            ->send();
+    }
+
+    // Check if category is in whitelist
+    if (!in_array($category, $validCategories, true)) {
+        ApiResponse::create(400, 'validation.invalid_value')
+            ->withMessage("Category must be one of: " . implode(', ', $validCategories))
+            ->withErrors([
+                ['field' => 'category', 'value' => $category, 'allowed' => $validCategories]
+            ])
+            ->send();
+    }
 }
 
-$assetsPath = PUBLIC_FOLDER_PATH . '/assets/';
+$assetsPath = PUBLIC_FOLDER_ROOT . '/assets/';
 $result = [];
 
 // Determine which categories to scan
