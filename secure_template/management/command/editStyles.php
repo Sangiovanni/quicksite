@@ -12,19 +12,33 @@ if (!isset($params['content'])) {
 
 $newContent = $params['content'];
 
-// Validate content is a string
+// Type validation - content must be string
 if (!is_string($newContent)) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage("Content must be a string")
+    ApiResponse::create(400, 'validation.invalid_type')
+        ->withMessage('The content parameter must be a string.')
+        ->withErrors([
+            ['field' => 'content', 'reason' => 'invalid_type', 'expected' => 'string']
+        ])
+        ->send();
+}
+
+// Length validation - cannot be empty
+$contentSize = strlen($newContent);
+
+if ($contentSize === 0) {
+    ApiResponse::create(400, 'validation.invalid_length')
+        ->withMessage('Content cannot be empty')
+        ->withErrors([
+            ['field' => 'content', 'reason' => 'empty']
+        ])
         ->send();
 }
 
 // Validate file size (max 2MB)
-$contentSize = strlen($newContent);
 $maxSize = 2 * 1024 * 1024; // 2MB
 
 if ($contentSize > $maxSize) {
-    ApiResponse::create(400, 'validation.invalid_format')
+    ApiResponse::create(400, 'validation.invalid_length')
         ->withMessage("Content too large (max 2MB)")
         ->withData([
             'size' => $contentSize,
@@ -34,7 +48,31 @@ if ($contentSize > $maxSize) {
         ->send();
 }
 
-$styleFile = PUBLIC_FOLDER_PATH . '/style/style.scss';
+// SECURITY: Check for potentially dangerous CSS patterns
+// Note: This is basic protection. SCSS is compiled server-side, so we focus on obvious attacks
+$dangerousPatterns = [
+    'javascript:' => 'JavaScript protocol',
+    'expression(' => 'CSS expression (IE-specific JS)',
+    'behavior:' => 'CSS behavior (IE-specific)',
+    'vbscript:' => 'VBScript protocol',
+    '-moz-binding:' => 'XBL binding (Firefox-specific)',
+    '@import url("/' => 'Absolute path import (potential file access)',
+    '@import url(\'/' => 'Absolute path import (potential file access)',
+    'data:text/html' => 'Data URI with HTML',
+];
+
+foreach ($dangerousPatterns as $pattern => $description) {
+    if (stripos($newContent, $pattern) !== false) {
+        ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Content contains potentially dangerous CSS pattern')
+            ->withErrors([
+                ['field' => 'content', 'reason' => 'dangerous_pattern', 'pattern' => $description]
+            ])
+            ->send();
+    }
+}
+
+$styleFile = PUBLIC_FOLDER_ROOT . '/style/style.scss';
 
 // Check if file exists
 if (!file_exists($styleFile)) {

@@ -13,10 +13,32 @@ if (empty($urlSegments) || !isset($urlSegments[0])) {
 }
 
 $type = $urlSegments[0];
+
+// Type validation - type must be string
+if (!is_string($type)) {
+    ApiResponse::create(400, 'validation.invalid_type')
+        ->withMessage('The type parameter must be a string.')
+        ->withErrors([
+            ['field' => 'type', 'reason' => 'invalid_type', 'expected' => 'string']
+        ])
+        ->send();
+}
+
 $allowed_types = ['menu', 'footer', 'page', 'component'];
 
-if (!in_array($type, $allowed_types)) {
-    ApiResponse::create(400, 'validation.invalid_format')
+// Dynamic length validation for type
+$maxTypeLength = max(array_map('strlen', $allowed_types));
+if (strlen($type) > $maxTypeLength) {
+    ApiResponse::create(400, 'validation.invalid_length')
+        ->withMessage("The type parameter must not exceed {$maxTypeLength} characters.")
+        ->withErrors([
+            ['field' => 'type', 'value' => $type, 'max_length' => $maxTypeLength]
+        ])
+        ->send();
+}
+
+if (!in_array($type, $allowed_types, true)) {
+    ApiResponse::create(400, 'validation.invalid_value')
         ->withMessage("Invalid type. Must be one of: " . implode(', ', $allowed_types))
         ->withErrors([
             ['field' => 'type', 'value' => $type, 'allowed' => $allowed_types]
@@ -35,8 +57,49 @@ if ($type === 'page' || $type === 'component') {
     
     $name = $urlSegments[1];
     
+    // Type validation - name must be string
+    if (!is_string($name)) {
+        ApiResponse::create(400, 'validation.invalid_type')
+            ->withMessage('The name parameter must be a string.')
+            ->withErrors([
+                ['field' => 'name', 'reason' => 'invalid_type', 'expected' => 'string']
+            ])
+            ->send();
+    }
+    
+    // Length validation - max 100 characters for name
+    if (strlen($name) > 100) {
+        ApiResponse::create(400, 'validation.invalid_length')
+            ->withMessage("The name parameter must not exceed 100 characters.")
+            ->withErrors([
+                ['field' => 'name', 'value' => $name, 'max_length' => 100]
+            ])
+            ->send();
+    }
+    
+    // Check for path traversal attempts in name (BEFORE other validations)
+    if (strpos($name, '..') !== false || 
+        strpos($name, '/') !== false || 
+        strpos($name, '\\') !== false ||
+        strpos($name, "\0") !== false) {
+        ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Name contains invalid path characters')
+            ->withErrors([
+                ['field' => 'name', 'reason' => 'path_traversal_attempt']
+            ])
+            ->send();
+    }
+    
+    // Validate name format (alphanumeric, hyphens, underscores) for both pages and components
+    if (!preg_match('/^[a-zA-Z0-9_-]+$/', $name)) {
+        ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage("Invalid name format. Use only alphanumeric, hyphens, and underscores")
+            ->withErrors([['field' => 'name', 'value' => $name, 'type' => $type]])
+            ->send();
+    }
+    
     // Validate page exists (only for pages, not components)
-    if ($type === 'page' && !in_array($name, ROUTES)) {
+    if ($type === 'page' && !in_array($name, ROUTES, true)) {
         ApiResponse::create(404, 'route.not_found')
             ->withMessage("Page '{$name}' does not exist")
             ->withData(['available_routes' => ROUTES])
