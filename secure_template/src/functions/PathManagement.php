@@ -136,8 +136,8 @@ function recursive_move_template(string $source, string $destination, string $ex
 
     foreach ($moves as $move) {
         if ($move['type'] === 'dir') {
-            // Create subdirectories in the destination
-            if (!is_dir($move['target']) && !mkdir($move['target'], 0755)) {
+            // Create subdirectories in the destination (use recursive mode for safety)
+            if (!is_dir($move['target']) && !mkdir($move['target'], 0755, true)) {
                 // If directory creation fails, fail the whole operation
                 return false; 
             }

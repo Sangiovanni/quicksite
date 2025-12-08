@@ -19,4 +19,5 @@ return array (
   'DB_USER' => 'db user',
   'DB_PASS' => 'db password',
   'DB_CHARSET' => 'utf8mb4',
+  'MAX_BUILD_SIZE_MB' => 500,
 );

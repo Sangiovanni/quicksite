@@ -1,62 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
-
-/**
- * Recursively extract all textKey values from a JSON structure
- */
-function extractTextKeys($node, &$keys = []) {
-    if (!is_array($node)) {
-        return $keys;
-    }
-    
-    // Check if it's a text node
-    if (isset($node['textKey'])) {
-        $textKey = $node['textKey'];
-        
-        // Skip __RAW__ prefixed keys (they're not translations)
-        if (strpos($textKey, '__RAW__') !== 0) {
-            $keys[] = $textKey;
-        }
-    }
-    
-    // Check if it has children
-    if (isset($node['children']) && is_array($node['children'])) {
-        foreach ($node['children'] as $child) {
-            extractTextKeys($child, $keys);
-        }
-    }
-    
-    // Check if it's a component with data
-    if (isset($node['component']) && isset($node['data']) && is_array($node['data'])) {
-        // Check for label in component data (common in menu/footer)
-        if (isset($node['data']['label']) && is_string($node['data']['label'])) {
-            $keys[] = $node['data']['label'];
-        }
-    }
-    
-    return $keys;
-}
-
-/**
- * Load and parse a JSON structure file
- */
-function loadJsonStructure($filePath) {
-    if (!file_exists($filePath)) {
-        return null;
-    }
-    
-    $json = @file_get_contents($filePath);
-    if ($json === false) {
-        return null;
-    }
-    
-    $data = json_decode($json, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        return null;
-    }
-    
-    return $data;
-}
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 // --- SCAN ALL STRUCTURES ---
 
@@ -76,7 +20,7 @@ if (is_dir($pagesDir)) {
             $pageKeys = [];
             if (is_array($structure)) {
                 foreach ($structure as $node) {
-                    extractTextKeys($node, $pageKeys);
+                    extractTextKeys($node, $pageKeys, 0, 20); // Max 20 levels depth
                 }
             }
             
@@ -94,7 +38,7 @@ if ($menuStructure !== null) {
     $menuKeys = [];
     if (is_array($menuStructure)) {
         foreach ($menuStructure as $node) {
-            extractTextKeys($node, $menuKeys);
+            extractTextKeys($node, $menuKeys, 0, 20); // Max 20 levels depth
         }
     }
     $allKeys['menu'] = array_unique($menuKeys);
@@ -109,7 +53,7 @@ if ($footerStructure !== null) {
     $footerKeys = [];
     if (is_array($footerStructure)) {
         foreach ($footerStructure as $node) {
-            extractTextKeys($node, $footerKeys);
+            extractTextKeys($node, $footerKeys, 0, 20); // Max 20 levels depth
         }
     }
     $allKeys['footer'] = array_unique($footerKeys);

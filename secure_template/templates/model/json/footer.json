@@ -32,7 +32,7 @@
           {
             "component": "footer-link",
             "data": {
-              "href": "../en/{{__current_page}}",
+              "href": "{{__current_page;lang=en}}",
               "label": "__RAW__English",
               "target": "_self"
             }
@@ -40,7 +40,7 @@
           {
             "component": "footer-link",
             "data": {
-              "href": "../fr/{{__current_page}}",
+              "href": "{{__current_page;lang=fr}}",
               "label": "__RAW__Français",
               "target": "_self"
             }

@@ -22,9 +22,9 @@ class JsonToPhpCompiler {
         // Add system variables for placeholders
         $output .= $this->generateSystemVariables();
         
-        // Generate title from translation using route name
+        // Generate title from translation using page title parameter
         $output .= "// Get page title from translation\n";
-        $output .= "\$pageTitle = \$translator->translate('page.titles.{$route}');\n\n";
+        $output .= "\$pageTitle = \$translator->translate('page.titles.{$pageTitle}');\n\n";
         $output .= "\$content = '';\n";
         $output .= $this->compileNodes($structure);
         
@@ -61,19 +61,25 @@ class JsonToPhpCompiler {
      */
     private function generateSystemVariables(): string {
         $output = "// System variables for {{__placeholder}} support\n";
-        $output .= "\$__current_page = trim(parse_url(\$_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');\n";
+        $output .= "\$__current_page = trim(parse_url(\$_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');\n\n";
+        
+        // Remove PUBLIC_FOLDER_SPACE prefix
+        $output .= "if (defined('PUBLIC_FOLDER_SPACE') && PUBLIC_FOLDER_SPACE !== '') {\n";
+        $output .= "    \$__current_page = preg_replace('/^' . preg_quote(PUBLIC_FOLDER_SPACE, '/') . '\\\\\\\\/', '', \$__current_page);\n";
+        $output .= "}\n\n";
         
         // Remove language prefix
         $output .= "if (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED'])) {\n";
-        $output .= "    \$__current_page = preg_replace('/^(' . implode('|', CONFIG['LANGUAGES_SUPPORTED']) . ')\\\//', '', \$__current_page);\n";
+        $output .= "    \$__current_page = preg_replace('/^(' . implode('|', CONFIG['LANGUAGES_SUPPORTED']) . ')\\\\\\\\/', '', \$__current_page);\n";
         $output .= "} else {\n";
-        $output .= "    \$__current_page = preg_replace('/^(en|fr)\\\//', '', \$__current_page);\n";
-        $output .= "}\n";
+        $output .= "    \$__current_page = preg_replace('/^(en|fr)\\\\\\\\/', '', \$__current_page);\n";
+        $output .= "}\n\n";
         $output .= "\$__current_page = empty(\$__current_page) ? '' : \$__current_page;\n";
         $output .= "\$__lang = \$lang;\n";
         $output .= "\$__base_url = defined('BASE_URL') ? BASE_URL : '';\n";
         $output .= "\$__public_folder = defined('PUBLIC_FOLDER_NAME') ? PUBLIC_FOLDER_NAME : 'public';\n";
-        $output .= "\$__current_route = basename(parse_url(\$_SERVER['REQUEST_URI'], PHP_URL_PATH));\n\n";
+        $output .= "\$__current_route = basename(parse_url(\$_SERVER['REQUEST_URI'], PHP_URL_PATH));\n";
+        $output .= "\$__space = (defined('PUBLIC_FOLDER_SPACE') && PUBLIC_FOLDER_SPACE !== '') ? '/' . PUBLIC_FOLDER_SPACE : '';\n\n";
         
         // Add processUrl helper function WITH function_exists check
         $output .= <<<'PHP'
@@ -103,11 +109,49 @@ class JsonToPhpCompiler {
             // Build URL with language prefix
             $fullUrl = defined('BASE_URL') ? BASE_URL : '';
             if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT && !empty($lang)) {
-                $fullUrl .= $lang . '/';
+                // Don't add language if URL already starts with a language code
+                $supportedLangs = defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) ? CONFIG['LANGUAGES_SUPPORTED'] : ['en', 'fr'];
+                $langPattern = '/^\\/(' . implode('|', $supportedLangs) . ')(\\/|$)/';
+                if (!preg_match($langPattern, $url)) {
+                    $fullUrl .= $lang . '/';
+                }
             }
             $fullUrl .= ltrim($url, '/');
             
+            // If URL is now empty (was "/" for home), fullUrl already has proper ending
+            if (empty(ltrim($url, '/'))) {
+                // fullUrl already ends with trailing slash (from BASE_URL or lang/)
+                return $fullUrl;
+            }
+            
+            // Ensure trailing slash if URL is just language code
+            if (preg_match('/^(en|fr)$/i', ltrim($url, '/'))) {
+                $fullUrl .= '/';
+            }
+            
             return $fullUrl;
+        }
+    }
+    
+    // Helper function to build language switch URLs
+    if (!function_exists('buildLanguageSwitchUrl')) {
+        function buildLanguageSwitchUrl($targetLang) {
+            // Use TrimParameters to parse current URL and generate proper URL
+            require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';
+            $trimParams = new TrimParameters();
+            
+            // Check if current page is valid (not 404)
+            if ($trimParams->page() === '404') {
+                // Invalid route - redirect to home in target language
+                $url = defined('BASE_URL') ? BASE_URL : '';
+                if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) {
+                    $url .= $targetLang . '/';
+                }
+                return $url;
+            }
+            
+            // Valid route - use TrimParameters to build URL with target language
+            return $trimParams->samePageUrl($targetLang);
         }
     }
 
@@ -199,8 +243,11 @@ class JsonToPhpCompiler {
                     // Contains system placeholder - generate dynamic PHP
                     $phpValue = $this->convertPlaceholdersToPhp($attrValue);
                     
-                    if ($needsUrlProcessing) {
-                        // Wrap with processUrl function
+                    // Check if this is a buildLanguageSwitchUrl() call - these return complete URLs
+                    $isLanguageSwitch = strpos($phpValue, 'buildLanguageSwitchUrl(') !== false;
+                    
+                    if ($needsUrlProcessing && !$isLanguageSwitch) {
+                        // Wrap with processUrl function (but not for language switch URLs)
                         $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(processUrl(' . $phpValue . ', $__lang), ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
                     } else {
                         $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(' . $phpValue . ', ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
@@ -330,27 +377,41 @@ class JsonToPhpCompiler {
     
     /**
      * Convert system placeholders in string to PHP variable concatenation
+     * Handles both {{__placeholder}} and {{__placeholder;param=value}} syntax
      * Example: "/en/{{__current_page}}" becomes '"/en/" . $__current_page'
+     * Example: "{{__current_page;lang=en}}" becomes buildLanguageSwitchUrl('en')
      */
     private function convertPlaceholdersToPhp(string $value): string {
-        // Split by placeholders
-        $parts = preg_split('/(\{\{__\w+\}\})/', $value, -1, PREG_SPLIT_DELIM_CAPTURE);
+        // Split by placeholders (including those with parameters)
+        $parts = preg_split('/(\{\{__\w+(?:;[^}]+)?\}\})/', $value, -1, PREG_SPLIT_DELIM_CAPTURE);
         $phpParts = [];
         
         foreach ($parts as $part) {
             if (empty($part)) continue;
             
-            if (preg_match('/\{\{(__\w+)\}\}/', $part, $matches)) {
-                // System placeholder - convert to PHP variable
-                $phpParts[] = '$' . $matches[1];
+            if (preg_match('/\{\{(__\w+)(?:;([^}]+))?\}\}/', $part, $matches)) {
+                // System placeholder
+                $key = $matches[1];
+                $paramString = $matches[2] ?? '';
+                
+                // Special handling for __current_page with lang parameter
+                if ($key === '__current_page' && !empty($paramString) && strpos($paramString, 'lang=') !== false) {
+                    // Parse the lang parameter
+                    preg_match('/lang=(\w+)/', $paramString, $langMatch);
+                    $targetLang = $langMatch[1] ?? 'en';
+                    // Generate call to buildLanguageSwitchUrl function
+                    $phpParts[] = "buildLanguageSwitchUrl(" . var_export($targetLang, true) . ")";
+                } else {
+                    // Regular placeholder - convert to PHP variable
+                    $phpParts[] = '$' . $key;
+                }
             } else {
-                // Regular string - quote it
+                // Static string
                 $phpParts[] = var_export($part, true);
             }
         }
-        
-        // Join with concatenation operator
+
         return implode(' . ', $phpParts);
     }
-    
+
 }

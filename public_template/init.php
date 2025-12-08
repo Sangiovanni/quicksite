@@ -51,17 +51,17 @@ if(!defined('ROUTES')){
 
 if (!defined('SECURE_FOLDER_PATH')) {
     // This value comes directly from the config file, ensuring it's correct
-    define('SECURE_FOLDER_PATH', SERVER_ROOT .  SECURE_FOLDER_NAME);
+    define('SECURE_FOLDER_PATH', SERVER_ROOT . DIRECTORY_SEPARATOR . SECURE_FOLDER_NAME);
 }
 
 if (!defined('BASE_URL')) {
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
     $host = $_SERVER['HTTP_HOST'];
     if(PUBLIC_FOLDER_SPACE !== ''){
-        $host .= DIRECTORY_SEPARATOR  . PUBLIC_FOLDER_SPACE.DIRECTORY_SEPARATOR ;
+        $host .= '/' . PUBLIC_FOLDER_SPACE . '/';
     }
     else{
-        $host .= DIRECTORY_SEPARATOR ;
+        $host .= '/';
     }
     define('BASE_URL', $protocol . $host);
 }

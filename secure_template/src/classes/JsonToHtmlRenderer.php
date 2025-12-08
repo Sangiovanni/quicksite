@@ -338,7 +338,7 @@ class JsonToHtmlRenderer {
 
     /**
      * Process system placeholders in component data
-     * Replaces {{__placeholder}} with actual values
+     * Replaces {{__placeholder}} and {{__placeholder;param=value}} with actual values
      * 
      * @param mixed $data Component data
      * @return mixed Processed data
@@ -347,9 +347,16 @@ class JsonToHtmlRenderer {
         $systemPlaceholders = $this->getSystemPlaceholders();
         
         if (is_string($data)) {
-            // Replace all {{__placeholder}} occurrences
-            return preg_replace_callback('/\{\{(__\w+)\}\}/', function($matches) use ($systemPlaceholders) {
+            // Replace all {{__placeholder}} or {{__placeholder;params}} occurrences
+            return preg_replace_callback('/\{\{(__\w+)(?:;([^}]+))?\}\}/', function($matches) use ($systemPlaceholders) {
                 $key = $matches[1];
+                $params = isset($matches[2]) ? $this->parseParameters($matches[2]) : [];
+                
+                // Special handling for __current_page with lang parameter
+                if ($key === '__current_page' && isset($params['lang'])) {
+                    return $this->buildLanguageSwitchUrl($params['lang']);
+                }
+                
                 return $systemPlaceholders[$key] ?? $matches[0];
             }, $data);
         }
@@ -364,6 +371,50 @@ class JsonToHtmlRenderer {
         
         return $data;
     }
+    
+    /**
+     * Parse parameters from placeholder syntax: param1=value1;param2=value2
+     * 
+     * @param string $paramString Parameter string
+     * @return array Parsed parameters
+     */
+    private function parseParameters(string $paramString): array {
+        $params = [];
+        $pairs = explode(';', $paramString);
+        foreach ($pairs as $pair) {
+            if (strpos($pair, '=') !== false) {
+                list($k, $v) = explode('=', $pair, 2);
+                $params[trim($k)] = trim($v);
+            }
+        }
+        return $params;
+    }
+    
+    /**
+     * Build URL for language switching (current page in different language)
+     * Uses TrimParameters for proper route validation
+     * 
+     * @param string $targetLang Target language code
+     * @return string Complete URL with space prefix and language
+     */
+    private function buildLanguageSwitchUrl(string $targetLang): string {
+        // Use TrimParameters to parse current URL and generate proper URL
+        require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';
+        $trimParams = new TrimParameters();
+        
+        // Check if current page is valid (not 404)
+        if ($trimParams->page() === '404') {
+            // Invalid route - redirect to home in target language
+            $url = defined('BASE_URL') ? BASE_URL : '';
+            if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) {
+                $url .= $targetLang . '/';
+            }
+            return $url;
+        }
+        
+        // Valid route - use TrimParameters to build URL with target language
+        return $trimParams->samePageUrl($targetLang);
+    }
 
     /**
      * Get system placeholder values
@@ -373,11 +424,25 @@ class JsonToHtmlRenderer {
     private function getSystemPlaceholders(): array {
         // Get current page from URL
         $currentPage = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
+        
+        // Remove PUBLIC_FOLDER_SPACE prefix if present
+        if (defined('PUBLIC_FOLDER_SPACE') && PUBLIC_FOLDER_SPACE !== '') {
+            $currentPage = preg_replace('/^' . preg_quote(PUBLIC_FOLDER_SPACE, '/') . '\//', '', $currentPage);
+        }
+        
         // Remove language prefix if present
         if (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED'])) {
             $currentPage = preg_replace('/^(' . implode('|', CONFIG['LANGUAGES_SUPPORTED']) . ')\//', '', $currentPage);
         }
+        
+        // Keep empty for home page (will result in /lang/ with trailing slash)
         $currentPage = empty($currentPage) ? '' : $currentPage;
+        
+        // Build space prefix
+        $space = '';
+        if (defined('PUBLIC_FOLDER_SPACE') && PUBLIC_FOLDER_SPACE !== '') {
+            $space = '/' . PUBLIC_FOLDER_SPACE;
+        }
         
         return [
             '__current_page' => $currentPage,
@@ -385,6 +450,7 @@ class JsonToHtmlRenderer {
             '__base_url' => defined('BASE_URL') ? BASE_URL : '',
             '__public_folder' => defined('PUBLIC_FOLDER_NAME') ? PUBLIC_FOLDER_NAME : 'public',
             '__current_route' => $this->context['page'] ?? 'home',
+            '__space' => $space,
         ];
     }
 
@@ -418,12 +484,28 @@ class JsonToHtmlRenderer {
         if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT && !empty($this->context['lang'])) {
             // Don't add language to asset paths (/assets/, /style/)
             if (!preg_match('/^\/(assets|style)\//i', $url)) {
-                $fullUrl .= $this->context['lang'] . '/';
+                // Don't add language if URL already starts with a language code
+                $supportedLangs = defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) ? CONFIG['LANGUAGES_SUPPORTED'] : ['en', 'fr'];
+                $langPattern = '/^\/' . '(' . implode('|', $supportedLangs) . ')' . '(\/|$)/';
+                if (!preg_match($langPattern, $url)) {
+                    $fullUrl .= $this->context['lang'] . '/';
+                }
             }
         }
         
         // Remove leading slash from URL (BASE_URL already has trailing slash)
         $url = ltrim($url, '/');
+        
+        // If URL is now empty (was "/" for home), fullUrl already has proper ending
+        if (empty($url)) {
+            // fullUrl already ends with trailing slash (from BASE_URL or lang/)
+            return $fullUrl;
+        }
+        
+        // Ensure trailing slash if URL is just language code
+        if (preg_match('/^(en|fr)$/i', $url)) {
+            $url .= '/';
+        }
         
         return $fullUrl . $url;
     }

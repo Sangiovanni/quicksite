@@ -1,1 +1,0 @@
-<?php return ['home', 'privacy', 'terms']; ?>

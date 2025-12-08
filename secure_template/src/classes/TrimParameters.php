@@ -81,6 +81,11 @@ class TrimParameters{
       else{
           $url .= $this->page;
       }
+    } else {
+      // For home page, add trailing slash
+      if(MULTILINGUAL_SUPPORT){
+          $url .= '/';
+      }
     }
     if ($this->id !== null) {
       $url .= '/' . $this->id;

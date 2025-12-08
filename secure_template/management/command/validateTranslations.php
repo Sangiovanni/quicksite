@@ -1,52 +1,58 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 // Get URL segment for language (optional)
 $urlSegments = $trimParametersManagement->additionalParams();
 $targetLang = !empty($urlSegments) ? $urlSegments[0] : null;
 
 // Validate language if provided
-if ($targetLang !== null && !preg_match('/^[a-z]{2,3}$/', $targetLang)) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage("Invalid language code format")
-        ->send();
+if ($targetLang !== null) {
+    // Type validation
+    if (!is_string($targetLang)) {
+        ApiResponse::create(400, 'validation.invalid_type')
+            ->withMessage('The language parameter must be a string.')
+            ->withErrors([
+                ['field' => 'language', 'reason' => 'invalid_type', 'expected' => 'string']
+            ])
+            ->send();
+    }
+    
+    // Length validation (max 10 chars for locale codes)
+    if (strlen($targetLang) > 10) {
+        ApiResponse::create(400, 'validation.invalid_length')
+            ->withMessage('Language code must not exceed 10 characters')
+            ->withErrors([
+                ['field' => 'language', 'value' => $targetLang, 'max_length' => 10]
+            ])
+            ->send();
+    }
+    
+    // Format validation - supports ISO 639 and BCP 47 locale codes
+    if (!preg_match('/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/', $targetLang)) {
+        ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Invalid language code format')
+            ->withErrors([
+                ['field' => 'language', 'value' => $targetLang, 'expected' => 'ISO 639 or BCP 47 format (e.g., en, fr, en-US, zh-Hans)']
+            ])
+            ->send();
+    }
 }
 
 /**
- * Extract all textKeys from structures (same as getTranslationKeys)
+ * Extract all textKeys from structures (uses refactored utility function)
  */
 function extractAllKeys() {
     $allKeys = [];
-    
-    // Helper function
-    $extractTextKeys = function($node, &$keys = []) use (&$extractTextKeys) {
-        if (!is_array($node)) return $keys;
-        
-        if (isset($node['textKey']) && strpos($node['textKey'], '__RAW__') !== 0) {
-            $keys[] = $node['textKey'];
-        }
-        
-        if (isset($node['children']) && is_array($node['children'])) {
-            foreach ($node['children'] as $child) {
-                $extractTextKeys($child, $keys);
-            }
-        }
-        
-        if (isset($node['data']['label']) && is_string($node['data']['label'])) {
-            $keys[] = $node['data']['label'];
-        }
-        
-        return $keys;
-    };
     
     // Scan pages
     $pagesDir = SECURE_FOLDER_PATH . '/templates/model/json/pages';
     if (is_dir($pagesDir)) {
         foreach (glob($pagesDir . '/*.json') as $file) {
-            $structure = json_decode(@file_get_contents($file), true);
+            $structure = loadJsonStructure($file);
             if (is_array($structure)) {
                 foreach ($structure as $node) {
-                    $extractTextKeys($node, $allKeys);
+                    extractTextKeys($node, $allKeys, 0, 20);
                 }
             }
         }
@@ -54,19 +60,19 @@ function extractAllKeys() {
     
     // Scan menu
     $menuFile = SECURE_FOLDER_PATH . '/templates/model/json/menu.json';
-    $menuStructure = json_decode(@file_get_contents($menuFile), true);
+    $menuStructure = loadJsonStructure($menuFile);
     if (is_array($menuStructure)) {
         foreach ($menuStructure as $node) {
-            $extractTextKeys($node, $allKeys);
+            extractTextKeys($node, $allKeys, 0, 20);
         }
     }
     
     // Scan footer
     $footerFile = SECURE_FOLDER_PATH . '/templates/model/json/footer.json';
-    $footerStructure = json_decode(@file_get_contents($footerFile), true);
+    $footerStructure = loadJsonStructure($footerFile);
     if (is_array($footerStructure)) {
         foreach ($footerStructure as $node) {
-            $extractTextKeys($node, $allKeys);
+            extractTextKeys($node, $allKeys, 0, 20);
         }
     }
     

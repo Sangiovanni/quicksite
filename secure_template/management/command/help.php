@@ -3,48 +3,53 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 
 $commands = [
     'movePublicRoot' => [
-        'description' => 'Moves the public template folder to a new location and updates all references',
+        'description' => 'Moves all public folder content INTO a subdirectory within public_template and updates all references. Use empty destination to restore to root. Note: Management URL changes with the move (e.g., /web/management when moved to "web")',
         'method' => 'POST',
         'parameters' => [
             'destination' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Relative path from PUBLIC_FOLDER_ROOT (use empty string for root)',
-                'example' => 'subfolder/app',
-                'validation' => 'Max 255 chars, max 10 levels deep, alphanumeric/hyphens/underscores only'
+                'description' => 'Subdirectory path inside public_template (use empty string "" to move back to root)',
+                'example' => 'web or app/v1/public',
+                'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/hyphens/underscores/forward-slash only, empty allowed'
             ]
         ],
-        'example_post' => 'POST /management/movePublicRoot with body: {"destination": "subfolder/app"}',
+        'example_post' => 'POST /management/movePublicRoot with body: {"destination": "web"} or {"destination": ""}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
             'message' => 'Public root successfully moved',
             'data' => [
-                'old_path' => '/path/to/old',
-                'new_path' => '/path/to/new',
-                'destination' => 'subfolder/app'
+                'old_path' => 'C:/path/to/public_template',
+                'new_path' => 'C:/path/to/public_template/web',
+                'destination' => 'web',
+                'init_file_updated' => 'C:/path/to/public_template/web/init.php'
             ]
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing destination parameter',
-            '400.validation.invalid_format' => 'Invalid path format (max 255 chars, max 10 levels)',
-            '500.server.file_write_failed' => 'Failed to move or update files'
-        ]
+            '400.validation.invalid_type' => 'destination must be a string',
+            '400.validation.invalid_format' => 'Invalid path format (max 255 chars, max 5 levels)',
+            '409.conflict.same_path' => 'Source and destination are the same',
+            '423.locked' => 'Operation locked by another process',
+            '500.server.file_write_failed' => 'Failed to move files or update .htaccess/init.php'
+        ],
+        'notes' => 'Creates subdirectory INSIDE public_template, not a sibling folder. Updates PUBLIC_FOLDER_SPACE constant, both .htaccess files (main and management), and changes site access URL. After moving to "web", site becomes http://domain/web/ and management at http://domain/web/management. The gap between DocumentRoot and content folder is intentional for administrator configuration flexibility.'
     ],
     
     'moveSecureRoot' => [
-        'description' => 'Moves the secure template folder to a new single-level folder name and updates references',
+        'description' => 'Renames the secure folder itself at server root level (not a subdirectory). Updates SECURE_FOLDER_NAME constant. Management URL stays the same.',
         'method' => 'POST',
         'parameters' => [
             'destination' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Single folder name (no subdirectories allowed)',
-                'example' => 'secure_v2',
-                'validation' => 'Must be single folder name (no slashes), cannot be empty, max 255 chars, alphanumeric/hyphens/underscores only'
+                'description' => 'Single folder name only (no paths/slashes allowed, cannot be empty)',
+                'example' => 'app_backend or secure_v2',
+                'validation' => 'Max 255 chars, max 1 level (single folder name), alphanumeric/hyphens/underscores only, cannot be empty'
             ]
         ],
-        'example_post' => 'POST /management/moveSecureRoot with body: {"destination": "secure_v2"}',
+        'example_post' => 'POST /management/moveSecureRoot with body: {"destination": "app_backend"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -59,11 +64,14 @@ $commands = [
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing destination parameter',
-            '400.validation.invalid_format' => 'Must be single folder name (no subdirectories), cannot be empty',
+            '400.validation.invalid_type' => 'destination must be a string',
+            '400.validation.invalid_format' => 'Must be single folder name (no subdirectories/slashes), cannot be empty, max 255 chars',
+            '409.conflict.same_path' => 'Source and destination are the same',
             '409.conflict.duplicate' => 'A folder with this name already exists',
-            '500.server.file_write_failed' => 'Failed to move or update files'
+            '423.locked' => 'Operation locked by another process',
+            '500.server.file_write_failed' => 'Failed to rename folder or update init.php'
         ],
-        'notes' => 'Destination must be a single folder name. Cannot move to subdirectories. Checks for naming conflicts with sibling folders.'
+        'notes' => 'Renames the secure folder at server root level (e.g., secure_template → app_backend). Restricted to single folder name (no nesting) due to init.php path resolution. Management URL does NOT change. Uses file locking to prevent concurrent operations. Destination must be a single folder name. Cannot move to subdirectories. Checks for naming conflicts with sibling folders.'
     ],
     
     'addRoute' => [
@@ -137,25 +145,32 @@ $commands = [
     ],
     
     'build' => [
-        'description' => 'Creates a production-ready build with compiled PHP files, removing management system and creating ZIP archive',
+        'description' => 'Creates a production-ready build with compiled PHP files, optional folder renaming, config sanitization, and ZIP archive creation',
         'method' => 'POST',
         'parameters' => [
             'public' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Custom name for public folder (default: public_template)',
-                'example' => 'public',
-                'validation' => 'Alphanumeric, hyphens, underscores only'
+                'description' => 'Custom name/path for public folder (default: public_template)',
+                'example' => 'public or www/v1/public',
+                'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/hyphens/underscores/forward-slash only'
             ],
             'secure' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Custom name for secure folder (default: secure_template)',
-                'example' => 'secure',
-                'validation' => 'Alphanumeric, hyphens, underscores only'
+                'description' => 'Custom name for secure folder - single level only (default: secure_template)',
+                'example' => 'backend or app',
+                'validation' => 'Max 255 chars, max 1 level (single folder name), alphanumeric/hyphens/underscores only'
+            ],
+            'space' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'PUBLIC_FOLDER_SPACE - subdirectory inside public folder for all public files (default: empty string)',
+                'example' => '' or 'web or space/v1',
+                'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/hyphens/underscores/forward-slash only, empty allowed'
             ]
         ],
-        'example_post' => 'POST /management/build with body: {"public": "public", "secure": "secure"}',
+        'example_post' => 'POST /management/build with body: {"public": "www/public", "secure": "app", "space": "web"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -170,11 +185,15 @@ $commands = [
             ]
         ],
         'error_responses' => [
-            '400.validation.invalid_format' => 'Invalid folder name format',
-            '500.server.file_write_failed' => 'Failed to create build directory or files',
-            '500.server.internal_error' => 'Build or compression failed'
+            '400.validation.invalid_type' => 'Parameter must be a string',
+            '400.validation.invalid_format' => 'Invalid path format (check max depth and allowed characters)',
+            '400.validation.shared_parent' => 'Public and secure folders cannot share the same root directory (security requirement)',
+            '423.locked' => 'Build operation locked by another process',
+            '500.server.build_too_large' => 'Build exceeds maximum size limit',
+            '500.server.file_write_failed' => 'Failed to create build directory or copy files',
+            '500.server.internal_error' => 'Build compilation or ZIP creation failed'
         ],
-        'notes' => 'Compiles JSON templates to PHP using JsonToPhpCompiler. Removes entire management/ folder and material/ folder. Sanitizes config.php (removes database credentials). Creates timestamped folder and ZIP. Page titles use translation system: $translator->translate("page.titles.{route}"). Includes processUrl() helper and system variables ($__current_page, $__lang, $__base_url). Components are inlined during compilation.'
+        'notes' => 'Compiles JSON templates to PHP using JsonToPhpCompiler. Removes management/ and material/ folders. Sanitizes config.php (removes DB credentials). Creates timestamped build folder and ZIP. The "space" parameter controls PUBLIC_FOLDER_SPACE - when set (e.g., "web"), all public files go inside {public}/{space}/ creating access URL like http://site.com/web/. Public and secure folders MUST have different root directories for security. Secure folder restricted to single name (no nesting) for init.php compatibility. Uses file locking to prevent concurrent builds.'
     ],
     
     'changeFavicon' => [
@@ -212,48 +231,56 @@ $commands = [
     ],
     
     'modifyTitle' => [
-        'description' => 'Updates page title in all translation files (page.titles.{route} structure)',
+        'description' => 'Updates page title for a specific route and language in the translation file (page.titles.{route} structure)',
         'method' => 'POST',
         'parameters' => [
             'route' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Route name to update title for',
+                'description' => 'Route name to update title for (must exist in ROUTES)',
                 'example' => 'home',
-                'validation' => 'Must be an existing route'
+                'validation' => 'Max 100 chars, alphanumeric/hyphens/underscores only, must be existing route, path traversal blocked'
             ],
-            'titles' => [
+            'lang' => [
                 'required' => true,
-                'type' => 'object',
-                'description' => 'Object with language codes as keys and title strings as values',
-                'example' => '{"en": "Home - My Site", "fr": "Accueil - Mon Site"}',
-                'validation' => 'Must include all active languages, titles max 200 chars each'
+                'type' => 'string',
+                'description' => 'Language code (must be in supported languages)',
+                'example' => 'en',
+                'validation' => '2-char code, must be supported language'
+            ],
+            'title' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'New title text for the page',
+                'example' => 'Home - My Site',
+                'validation' => 'Max 200 chars, no null bytes'
             ]
         ],
-        'example_post' => 'POST /management/modifyTitle with body: {"route": "home", "titles": {"en": "Home - My Site", "fr": "Accueil - Mon Site"}}',
+        'example_post' => 'POST /management/modifyTitle with body: {"route": "home", "lang": "en", "title": "Home - My Site"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => 'Page titles updated successfully',
+            'message' => 'Page title updated successfully',
             'data' => [
                 'route' => 'home',
-                'updated_languages' => ['en', 'fr'],
-                'titles' => {
-                    'en' => 'Home - My Site',
-                    'fr' => 'Accueil - Mon Site'
-                }
+                'lang' => 'en',
+                'title' => 'Home - My Site',
+                'file_updated' => '/translate/en.json'
             ]
         ],
         'error_responses' => [
-            '400.validation.required' => 'Missing route or titles parameter',
-            '400.validation.invalid_format' => 'Titles must be object, title too long (>200 chars), or invalid language code',
-            '400.translation.missing_language' => 'Title not provided for all active languages',
-            '404.route.not_found' => 'Route does not exist',
-            '404.file.not_found' => 'Translation file not found for a language',
-            '500.server.file_write_failed' => 'Failed to write translation file',
+            '400.validation.missing_field' => 'Missing route, lang, or title parameter',
+            '400.validation.invalid_type' => 'route, lang, or title must be a string',
+            '400.validation.invalid_format' => 'Invalid characters in route (path traversal blocked)',
+            '400.validation.invalid_length' => 'route too long (>100) or title too long (>200 chars)',
+            '400.validation.invalid_lang' => 'Language not in supported languages list',
+            '404.validation.invalid_route' => 'Route does not exist in ROUTES',
+            '404.file.not_found' => 'Translation file not found for language',
+            '500.server.file_read_failed' => 'Failed to read translation file',
+            '500.server.file_write_failed' => 'Failed to write updated translation file',
             '500.server.internal_error' => 'Invalid JSON in translation file'
         ],
-        'notes' => 'Updates page.titles.{route} key in all language translation files. Creates nested page.titles object if not exists. Used by Page.php and PageManagement.php: $translator->translate("page.titles.{$route}"). Must provide titles for ALL active languages.'
+        'notes' => 'Updates ONE language at a time for single route. Updates page.titles.{route} key in the specified language translation file. Creates nested page.titles object if it doesn\'t exist. Used by Page.php: $translator->translate("page.titles.{$route}"). Route must exist in ROUTES constant, and language must be in supported languages list.'
     ],
     
     'getRoutes' => [
@@ -302,7 +329,7 @@ $commands = [
             'data' => [
                 'type' => 'component',
                 'name' => 'img-dynamic',
-                'structure' => {...},
+                'structure' => '(JSON structure object)',
                 'file' => '/path/to/img-dynamic.json'
             ]
         ],
@@ -388,7 +415,7 @@ $commands = [
             'message' => 'Translation retrieved successfully',
             'data' => [
                 'language' => 'en',
-                'translations' => {...},
+                'translations' => '(translation object)',
                 'file' => '/path/to/en.json'
             ]
         ],
@@ -411,10 +438,10 @@ $commands = [
             'code' => 'operation.success',
             'message' => 'Translations retrieved successfully',
             'data' => [
-                'translations' => {
-                    'en' => {...},
-                    'fr' => {...}
-                },
+                'translations' => [
+                    'en' => '(translation object)',
+                    'fr' => '(translation object)'
+                ],
                 'languages' => ['en', 'fr'],
                 'multilingual_enabled' => true
             ]
@@ -475,10 +502,10 @@ $commands = [
                 'multilingual_enabled' => true,
                 'languages' => ['en', 'fr'],
                 'default_language' => 'en',
-                'language_names' => {
+                'language_names' => [
                     'en' => 'English',
                     'fr' => 'Français'
-                }
+                ]
             ]
         ],
         'error_responses' => [],
@@ -569,18 +596,18 @@ $commands = [
             'code' => 'operation.success',
             'message' => 'Translation keys extracted successfully',
             'data' => [
-                'keys_by_source' => {
+                'keys_by_source' => [
                     'home' => ['home.title', 'home.welcomeMessage'],
                     'menu' => ['menu.home', 'menu.about'],
                     'footer' => ['footer.privacy', 'footer.terms']
-                },
-                'all_keys' => ['home.title', 'home.welcomeMessage', 'menu.home', ...],
+                ],
+                'all_keys' => ['home.title', 'home.welcomeMessage', 'menu.home', '...'],
                 'total_keys' => 15,
-                'scanned_files' => {
+                'scanned_files' => [
                     'pages' => ['home', 'privacy', 'terms'],
                     'menu' => true,
                     'footer' => true
-                }
+                ]
             ]
         ],
         'error_responses' => [],
@@ -606,24 +633,24 @@ $commands = [
             'code' => 'operation.success',
             'message' => 'Translation validation complete',
             'data' => [
-                'validation_results' => {
-                    'en' => {
+                'validation_results' => [
+                    'en' => [
                         'file_exists' => true,
                         'file_valid' => true,
                         'required_keys' => 15,
                         'missing_keys' => [],
                         'total_missing' => 0,
                         'coverage_percent' => 100
-                    },
-                    'fr' => {
+                    ],
+                    'fr' => [
                         'file_exists' => true,
                         'file_valid' => true,
                         'required_keys' => 15,
                         'missing_keys' => ['menu.newpage', 'footer.copyright'],
                         'total_missing' => 2,
                         'coverage_percent' => 86.67
-                    }
-                },
+                    ]
+                ],
                 'total_required_keys' => 15,
                 'languages_validated' => ['en', 'fr']
             ]
@@ -748,22 +775,22 @@ $commands = [
             'code' => 'operation.success',
             'message' => 'Assets retrieved for category images',
             'data' => [
-                'assets' => {
+                'assets' => [
                     'images' => [
-                        {
+                        [
                             'filename' => 'logo.png',
                             'size' => 45678,
                             'modified' => '2025-12-03 10:30:15',
                             'path' => '/assets/images/logo.png'
-                        },
-                        {
+                        ],
+                        [
                             'filename' => 'banner.jpg',
                             'size' => 123456,
                             'modified' => '2025-12-02 14:22:10',
                             'path' => '/assets/images/banner.jpg'
-                        }
+                        ]
                     ]
-                },
+                ],
                 'total_categories' => 1,
                 'total_files' => 2
             ]

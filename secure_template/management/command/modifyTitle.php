@@ -1,40 +1,75 @@
 <?php
 // filepath: c:\wamp64\www\template_vitrinne\secure_template\management\command\modifyTitle.php
 
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+
 /**
  * Modify Page Title Command
  * 
- * Updates the title for a specific page in all translation files
- * Requires: route (page route name), titles (object with lang => title)
+ * Updates the title for a specific page in a specific language
+ * Requires: route (page route name), lang (language code), title (new title text)
  */
 
 $params = $trimParametersManagement->params();
 
 // Get parameters
 $route = $params['route'] ?? null;
-$titles = $params['titles'] ?? null;
+$lang = $params['lang'] ?? null;
+$title = $params['title'] ?? null;
 
-// Validate route
+// Validate route parameter is present
 if (empty($route)) {
     ApiResponse::create(400, 'validation.missing_field')
         ->withMessage('route parameter is required')
         ->withData([
-            'required_fields' => ['route', 'titles']
+            'required_fields' => ['route', 'lang', 'title']
         ])
         ->send();
 }
 
-// Validate titles format
-if (empty($titles) || !is_array($titles)) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage('titles must be an object with language codes as keys')
+// Validate route is string
+if (!is_string($route)) {
+    ApiResponse::create(400, 'validation.invalid_type')
+        ->withMessage('route must be a string')
         ->withData([
-            'example' => [
-                'titles' => [
-                    'en' => 'New Title - Site Name',
-                    'fr' => 'Nouveau Titre - Nom du Site'
-                ]
-            ]
+            'field' => 'route',
+            'expected_type' => 'string',
+            'received_type' => gettype($route)
+        ])
+        ->send();
+}
+
+// Check for path traversal in route
+if (strpos($route, '..') !== false || strpos($route, '/') !== false || strpos($route, '\\') !== false || strpos($route, "\0") !== false) {
+    ApiResponse::create(400, 'validation.invalid_format')
+        ->withMessage('route contains invalid characters')
+        ->withData([
+            'field' => 'route',
+            'reason' => 'Path traversal characters not allowed'
+        ])
+        ->send();
+}
+
+// Validate route length
+if (strlen($route) > 100) {
+    ApiResponse::create(400, 'validation.invalid_length')
+        ->withMessage('route is too long')
+        ->withData([
+            'field' => 'route',
+            'max_length' => 100,
+            'received_length' => strlen($route)
+        ])
+        ->send();
+}
+
+// Validate route format (alphanumeric, hyphens, underscores)
+if (!preg_match('/^[a-zA-Z0-9_-]+$/', $route)) {
+    ApiResponse::create(400, 'validation.invalid_format')
+        ->withMessage('route contains invalid characters')
+        ->withData([
+            'field' => 'route',
+            'allowed' => 'Letters, numbers, hyphens, underscores',
+            'pattern' => '/^[a-zA-Z0-9_-]+$/'
         ])
         ->send();
 }
@@ -50,89 +85,180 @@ if (!in_array($route, ROUTES)) {
         ->send();
 }
 
-$updatedLanguages = [];
-$errors = [];
-
-// Update each language translation file
-foreach ($titles as $lang => $title) {
-    // Validate language is supported
-    if (!in_array($lang, CONFIG['LANGUAGES_SUPPORTED'])) {
-        $errors[] = "Language '{$lang}' is not supported";
-        continue;
-    }
-    
-    // Load translation file
-    $translationFile = SECURE_FOLDER_PATH . '/translations/' . $lang . '.json';
-    
-    if (!file_exists($translationFile)) {
-        $errors[] = "Translation file for '{$lang}' not found";
-        continue;
-    }
-    
-    $translationJson = @file_get_contents($translationFile);
-    if ($translationJson === false) {
-        $errors[] = "Failed to read translation file for '{$lang}'";
-        continue;
-    }
-    
-    $translations = json_decode($translationJson, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        $errors[] = "Invalid JSON in '{$lang}' translation file";
-        continue;
-    }
-    
-    // Ensure page.titles structure exists
-    if (!isset($translations['page'])) {
-        $translations['page'] = [];
-    }
-    if (!isset($translations['page']['titles'])) {
-        $translations['page']['titles'] = [];
-    }
-    
-    // Update the title
-    $translations['page']['titles'][$route] = $title;
-    
-    // Write back to file with pretty formatting
-    $updatedJson = json_encode($translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-    if ($updatedJson === false) {
-        $errors[] = "Failed to encode JSON for '{$lang}'";
-        continue;
-    }
-    
-    if (file_put_contents($translationFile, $updatedJson) === false) {
-        $errors[] = "Failed to write translation file for '{$lang}'";
-        continue;
-    }
-    
-    $updatedLanguages[] = $lang;
-}
-
-// Check if any updates succeeded
-if (empty($updatedLanguages)) {
-    ApiResponse::create(500, 'server.file_operation_failed')
-        ->withMessage('Failed to update any translation files')
+// Validate lang parameter is present
+if (empty($lang)) {
+    ApiResponse::create(400, 'validation.missing_field')
+        ->withMessage('lang parameter is required')
         ->withData([
-            'errors' => $errors
+            'required_fields' => ['route', 'lang', 'title']
         ])
         ->send();
 }
 
-// Success response (even if some languages failed)
-$response = ApiResponse::create(200, 'success.title_updated')
+// Validate language code is string
+if (!is_string($lang)) {
+    ApiResponse::create(400, 'validation.invalid_type')
+        ->withMessage('lang must be a string')
+        ->withData([
+            'field' => 'lang',
+            'expected_type' => 'string',
+            'received_type' => gettype($lang)
+        ])
+        ->send();
+}
+
+// Check for path traversal in language code
+if (strpos($lang, '..') !== false || strpos($lang, '/') !== false || strpos($lang, '\\') !== false || strpos($lang, "\0") !== false) {
+    ApiResponse::create(400, 'validation.invalid_format')
+        ->withMessage('lang contains invalid characters')
+        ->withData([
+            'field' => 'lang',
+            'reason' => 'Path traversal characters not allowed'
+        ])
+        ->send();
+}
+
+// Validate language code length
+if (strlen($lang) > 10) {
+    ApiResponse::create(400, 'validation.invalid_length')
+        ->withMessage('lang is too long')
+        ->withData([
+            'field' => 'lang',
+            'max_length' => 10,
+            'received_length' => strlen($lang)
+        ])
+        ->send();
+}
+
+// Validate language code format (2-3 lowercase letters, optional locale)
+if (!preg_match('/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/', $lang)) {
+    ApiResponse::create(400, 'validation.invalid_format')
+        ->withMessage('lang has invalid format')
+        ->withData([
+            'field' => 'lang',
+            'allowed' => '2-3 lowercase letters, optional locale (e.g., en, fr, en-US)',
+            'pattern' => '/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/'
+        ])
+        ->send();
+}
+
+// Validate language is supported
+if (!in_array($lang, CONFIG['LANGUAGES_SUPPORTED'])) {
+    ApiResponse::create(400, 'validation.unsupported_language')
+        ->withMessage('Language is not supported')
+        ->withData([
+            'provided_language' => $lang,
+            'supported_languages' => CONFIG['LANGUAGES_SUPPORTED']
+        ])
+        ->send();
+}
+
+// Validate title parameter is present
+if ($title === null || $title === '') {
+    ApiResponse::create(400, 'validation.missing_field')
+        ->withMessage('title parameter is required')
+        ->withData([
+            'required_fields' => ['route', 'lang', 'title']
+        ])
+        ->send();
+}
+
+// Validate title is string
+if (!is_string($title)) {
+    ApiResponse::create(400, 'validation.invalid_type')
+        ->withMessage('title must be a string')
+        ->withData([
+            'field' => 'title',
+            'expected_type' => 'string',
+            'received_type' => gettype($title)
+        ])
+        ->send();
+}
+
+// Validate title length (reasonable page title limit)
+if (strlen($title) > 200) {
+    ApiResponse::create(400, 'validation.invalid_length')
+        ->withMessage('title is too long')
+        ->withData([
+            'field' => 'title',
+            'max_length' => 200,
+            'received_length' => strlen($title)
+        ])
+        ->send();
+}
+
+// Load translation file
+$translationFile = SECURE_FOLDER_PATH . '/translate/' . $lang . '.json';
+
+if (!file_exists($translationFile)) {
+    ApiResponse::create(404, 'file.not_found')
+        ->withMessage('Translation file not found')
+        ->withData([
+            'language' => $lang,
+            'expected_file' => 'translate/' . $lang . '.json'
+        ])
+        ->send();
+}
+
+$translationJson = @file_get_contents($translationFile);
+if ($translationJson === false) {
+    ApiResponse::create(500, 'server.file_read_failed')
+        ->withMessage('Failed to read translation file')
+        ->withData([
+            'language' => $lang
+        ])
+        ->send();
+}
+
+$translations = json_decode($translationJson, true);
+if (json_last_error() !== JSON_ERROR_NONE) {
+    ApiResponse::create(500, 'server.invalid_json')
+        ->withMessage('Translation file contains invalid JSON')
+        ->withData([
+            'language' => $lang,
+            'json_error' => json_last_error_msg()
+        ])
+        ->send();
+}
+
+// Ensure page.titles structure exists
+if (!isset($translations['page'])) {
+    $translations['page'] = [];
+}
+if (!isset($translations['page']['titles'])) {
+    $translations['page']['titles'] = [];
+}
+
+// Update the title
+$translations['page']['titles'][$route] = $title;
+
+// Write back to file with pretty formatting
+$updatedJson = json_encode($translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+if ($updatedJson === false) {
+    ApiResponse::create(500, 'server.json_encode_failed')
+        ->withMessage('Failed to encode translation data')
+        ->withData([
+            'language' => $lang
+        ])
+        ->send();
+}
+
+if (file_put_contents($translationFile, $updatedJson) === false) {
+    ApiResponse::create(500, 'server.file_write_failed')
+        ->withMessage('Failed to write translation file')
+        ->withData([
+            'language' => $lang
+        ])
+        ->send();
+}
+
+// Success response
+ApiResponse::create(200, 'success.title_updated')
     ->withMessage('Page title updated successfully')
     ->withData([
         'route' => $route,
-        'updated_languages' => $updatedLanguages,
+        'language' => $lang,
+        'title' => $title,
         'translation_key' => 'page.titles.' . $route
-    ]);
-
-if (!empty($errors)) {
-    $response->withData([
-        'route' => $route,
-        'updated_languages' => $updatedLanguages,
-        'translation_key' => 'page.titles.' . $route,
-        'partial_errors' => $errors
-    ]);
-}
-
-$response->send();
+    ])
+    ->send();
