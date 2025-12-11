@@ -318,6 +318,16 @@ if (!copyDirectory(PUBLIC_FOLDER_ROOT . '/assets', $publicContentPath . '/assets
         ->send();
 }
 
+// Copy LICENSE file to build root (MIT License requirement)
+if (file_exists(SERVER_ROOT . '/LICENSE')) {
+    if (!copy(SERVER_ROOT . '/LICENSE', $buildFullPath . '/LICENSE')) {
+        release_build_lock();
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to copy LICENSE file")
+            ->send();
+    }
+}
+
 // Step 3: Copy secure folder files (selective)
 
 // Copy routes.php

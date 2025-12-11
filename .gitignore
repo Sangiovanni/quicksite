@@ -1,11 +1,5 @@
-# Test notebooks and results
-test_*.ipynb
-test_results_*.json
-uploaded_files_list.json
-
-# Documentation drafts (can be re-added later if needed)
-*_SECURITY_IMPROVEMENTS.md
-ADDROUTE_SECURITY_IMPROVEMENTS.md
+# Test directory (comprehensive test suite)
+tests/
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/

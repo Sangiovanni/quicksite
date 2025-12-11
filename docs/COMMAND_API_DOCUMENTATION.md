@@ -1,8 +1,32 @@
-# Template Vitrinne - Command API Documentation
+# Quicksite - Command API Documentation
+
+> ⚠️ **NOTICE (December 2024)**: This static documentation is outdated. Several commands have been renamed for consistency:
+> - `movePublicRoot` → `setPublicSpace`
+> - `moveSecureRoot` → `renameSecureFolder`  
+> - `changeFavicon` → `editFavicon`
+> - `modifyTitle` → `editTitle`
+> - `removeLang` → `deleteLang`
+> - **New**: `renamePublicFolder`
+>
+> **For up-to-date documentation, use the live API:**
+> ```bash
+> curl -H "Authorization: Bearer your_token" http://yoursite.local/management/help
+> ```
 
 Complete reference for all management commands with parameters, validation rules, and responses.
 
-## Table of Contents
+## Authentication
+
+All endpoints require Bearer token authentication:
+
+```bash
+curl -H "Authorization: Bearer your_token_here" \
+  http://yoursite.local/management/help
+```
+
+See the main [README.md](../README.md) for authentication setup instructions.
+
+## Table of Contents (Legacy Names)
 
 1. [movePublicRoot](#1-movepublicroot)
 2. [moveSecureRoot](#2-movesecureroot)

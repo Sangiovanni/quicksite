@@ -7,7 +7,7 @@
  * 
  * To add a new category:
  * 1. Add the category name to this array
- * 2. Create the corresponding folder: public_template/assets/{category}/
+ * 2. Create the corresponding folder: public/assets/{category}/
  * 3. Add an index.php file in that folder for directory protection
  */
 

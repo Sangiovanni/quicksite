@@ -1,5 +1,9 @@
 <?php
-// filepath: c:\wamp64\www\template_vitrinne\secure_template\management\command\modifyTitle.php
+/**
+ * Edit Title Command (formerly modifyTitle)
+ * 
+ * Updates the title for a specific page in a specific language.
+ */
 
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 

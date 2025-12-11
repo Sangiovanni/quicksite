@@ -2,28 +2,28 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 
 $commands = [
-    'movePublicRoot' => [
-        'description' => 'Moves all public folder content INTO a subdirectory within public_template and updates all references. Use empty destination to restore to root. Note: Management URL changes with the move (e.g., /web/management when moved to "web")',
+    'setPublicSpace' => [
+        'description' => 'Sets the URL space/prefix for the public site. Creates a subdirectory inside the public folder and moves all content there. Use empty destination to restore to root. Note: Site URL changes (e.g., http://domain/web/ when set to "web")',
         'method' => 'POST',
         'parameters' => [
             'destination' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Subdirectory path inside public_template (use empty string "" to move back to root)',
+                'description' => 'URL prefix/space (use empty string "" to remove space and serve from root)',
                 'example' => 'web or app/v1/public',
                 'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/hyphens/underscores/forward-slash only, empty allowed'
             ]
         ],
-        'example_post' => 'POST /management/movePublicRoot with body: {"destination": "web"} or {"destination": ""}',
+        'example_post' => 'POST /management/setPublicSpace with body: {"destination": "web"} or {"destination": ""}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => 'Public root successfully moved',
+            'message' => 'Public space successfully set',
             'data' => [
-                'old_path' => 'C:/path/to/public_template',
-                'new_path' => 'C:/path/to/public_template/web',
+                'old_path' => 'C:/path/to/public',
+                'new_path' => 'C:/path/to/public/web',
                 'destination' => 'web',
-                'init_file_updated' => 'C:/path/to/public_template/web/init.php'
+                'init_file_updated' => 'C:/path/to/public/web/init.php'
             ]
         ],
         'error_responses' => [
@@ -34,11 +34,11 @@ $commands = [
             '423.locked' => 'Operation locked by another process',
             '500.server.file_write_failed' => 'Failed to move files or update .htaccess/init.php'
         ],
-        'notes' => 'Creates subdirectory INSIDE public_template, not a sibling folder. Updates PUBLIC_FOLDER_SPACE constant, both .htaccess files (main and management), and changes site access URL. After moving to "web", site becomes http://domain/web/ and management at http://domain/web/management. The gap between DocumentRoot and content folder is intentional for administrator configuration flexibility.'
+        'notes' => 'Sets the URL space/prefix by creating a subdirectory inside the public folder. Updates PUBLIC_FOLDER_SPACE constant and .htaccess files. After setting to "web", site becomes http://domain/web/ and management at http://domain/web/management. Use renamePublicFolder to actually rename the public folder itself.'
     ],
     
-    'moveSecureRoot' => [
-        'description' => 'Renames the secure folder itself at server root level (not a subdirectory). Updates SECURE_FOLDER_NAME constant. Management URL stays the same.',
+    'renameSecureFolder' => [
+        'description' => 'Renames the secure/backend folder at server root level. Updates SECURE_FOLDER_NAME constant. Management URL stays the same.',
         'method' => 'POST',
         'parameters' => [
             'destination' => [
@@ -49,16 +49,16 @@ $commands = [
                 'validation' => 'Max 255 chars, max 1 level (single folder name), alphanumeric/hyphens/underscores only, cannot be empty'
             ]
         ],
-        'example_post' => 'POST /management/moveSecureRoot with body: {"destination": "app_backend"}',
+        'example_post' => 'POST /management/renameSecureFolder with body: {"destination": "app"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => 'Secure root successfully moved',
+            'message' => 'Secure folder successfully renamed',
             'data' => [
                 'old_path' => '/path/to/secure_template',
-                'new_path' => '/path/to/secure_v2',
+                'new_path' => '/path/to/app',
                 'old_name' => 'secure_template',
-                'new_name' => 'secure_v2',
+                'new_name' => 'app',
                 'init_file_updated' => '/path/to/init.php'
             ]
         ],
@@ -71,7 +71,44 @@ $commands = [
             '423.locked' => 'Operation locked by another process',
             '500.server.file_write_failed' => 'Failed to rename folder or update init.php'
         ],
-        'notes' => 'Renames the secure folder at server root level (e.g., secure_template → app_backend). Restricted to single folder name (no nesting) due to init.php path resolution. Management URL does NOT change. Uses file locking to prevent concurrent operations. Destination must be a single folder name. Cannot move to subdirectories. Checks for naming conflicts with sibling folders.'
+        'notes' => 'Renames the secure/backend folder at server root level (e.g., secure_template → app). Restricted to single folder name (no nesting) due to init.php path resolution. Management URL does NOT change. Uses file locking to prevent concurrent operations.'
+    ],
+
+    'renamePublicFolder' => [
+        'description' => 'Renames the public folder at server root level. Updates all references. Requires Apache/web server config update after rename.',
+        'method' => 'POST',
+        'parameters' => [
+            'destination' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'New folder name (single name, no paths)',
+                'example' => 'www or public or web',
+                'validation' => 'Max 255 chars, single folder name only, alphanumeric/hyphens/underscores only'
+            ]
+        ],
+        'example_post' => 'POST /management/renamePublicFolder with body: {"destination": "www"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Public folder successfully renamed',
+            'data' => [
+                'old_path' => '/path/to/public_template',
+                'new_path' => '/path/to/www',
+                'old_name' => 'public_template',
+                'new_name' => 'www',
+                'init_file_updated' => '/path/to/www/init.php'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing destination parameter',
+            '400.validation.invalid_type' => 'destination must be a string',
+            '400.validation.invalid_format' => 'Must be single folder name (no paths/slashes), cannot be empty',
+            '409.conflict.same_path' => 'Source and destination are the same',
+            '409.conflict.duplicate' => 'A folder with this name already exists',
+            '423.locked' => 'Operation locked by another process',
+            '500.server.file_write_failed' => 'Failed to rename folder or update init.php'
+        ],
+        'notes' => 'Renames the public folder at server root level (e.g., public_template → www). After renaming, you must update your Apache/web server DocumentRoot to point to the new folder name. Uses file locking to prevent concurrent operations.'
     ],
     
     'addRoute' => [
@@ -196,7 +233,7 @@ $commands = [
         'notes' => 'Compiles JSON templates to PHP using JsonToPhpCompiler. Removes management/ and material/ folders. Sanitizes config.php (removes DB credentials). Creates timestamped build folder and ZIP. The "space" parameter controls PUBLIC_FOLDER_SPACE - when set (e.g., "web"), all public files go inside {public}/{space}/ creating access URL like http://site.com/web/. Public and secure folders MUST have different root directories for security. Secure folder restricted to single name (no nesting) for init.php compatibility. Uses file locking to prevent concurrent builds.'
     ],
     
-    'changeFavicon' => [
+    'editFavicon' => [
         'description' => 'Updates the site favicon with a new image from assets/images folder (PNG only)',
         'method' => 'POST',
         'parameters' => [
@@ -208,7 +245,7 @@ $commands = [
                 'validation' => 'Must exist in assets/images/, PNG format only'
             ]
         ],
-        'example_post' => 'POST /management/changeFavicon with body: {"imageName": "logo.png"}',
+        'example_post' => 'POST /management/editFavicon with body: {"imageName": "logo.png"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -230,7 +267,7 @@ $commands = [
         'notes' => 'Validates actual PNG MIME type, not just extension. Creates timestamped backup of old favicon. Uses basename() to prevent path traversal. Favicon must be in /assets/ root as favicon.png.'
     ],
     
-    'modifyTitle' => [
+    'editTitle' => [
         'description' => 'Updates page title for a specific route and language in the translation file (page.titles.{route} structure)',
         'method' => 'POST',
         'parameters' => [
@@ -256,7 +293,7 @@ $commands = [
                 'validation' => 'Max 200 chars, no null bytes'
             ]
         ],
-        'example_post' => 'POST /management/modifyTitle with body: {"route": "home", "lang": "en", "title": "Home - My Site"}',
+        'example_post' => 'POST /management/editTitle with body: {"route": "home", "lang": "en", "title": "Home - My Site"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -553,23 +590,23 @@ $commands = [
         'notes' => 'Updates config.php and creates translation file by copying from default language. Requires system reload to apply changes.'
     ],
     
-    'removeLang' => [
-        'description' => 'Removes a language from the system',
+    'deleteLang' => [
+        'description' => 'Deletes a language from the system',
         'method' => 'POST',
         'parameters' => [
             'code' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Language code to remove',
+                'description' => 'Language code to delete',
                 'example' => 'es',
                 'validation' => 'Must be an existing language (not default, not last)'
             ]
         ],
-        'example_post' => 'POST /management/removeLang with body: {"code": "es"}',
+        'example_post' => 'POST /management/deleteLang with body: {"code": "es"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => 'Language removed successfully',
+            'message' => 'Language deleted successfully',
             'data' => [
                 'code' => 'es',
                 'config_updated' => '/path/to/config.php',
@@ -579,11 +616,11 @@ $commands = [
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing code parameter',
-            '400.validation.invalid_format' => 'Cannot remove default or last language',
+            '400.validation.invalid_format' => 'Cannot delete default or last language',
             '404.route.not_found' => 'Language not found',
             '500.server.file_write_failed' => 'Failed to update config'
         ],
-        'notes' => 'Cannot remove default language or last remaining language. Updates config.php and deletes translation file.'
+        'notes' => 'Cannot delete default language or last remaining language. Updates config.php and deletes translation file.'
     ],
     
     'getTranslationKeys' => [
@@ -879,6 +916,116 @@ $commands = [
                 'total' => 19
             ]
         ]
+    ],
+    
+    'generateToken' => [
+        'description' => 'Creates a new API authentication token with specified permissions. Requires admin permission.',
+        'method' => 'POST',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Descriptive name for the token (1-100 characters)',
+                'example' => 'Flutter App Production'
+            ],
+            'permissions' => [
+                'required' => false,
+                'type' => 'array',
+                'description' => 'Array of permissions for the token',
+                'default' => "['read']",
+                'valid_values' => [
+                    '*' => 'Full access to all commands',
+                    'read' => 'Read-only commands (get*, list*, validate*, help)',
+                    'write' => 'Write commands (edit*, add*, delete*, upload*)',
+                    'admin' => 'Administrative commands (set*, rename*, build, token management)',
+                    'command:name' => 'Access to a specific command (e.g., command:build)'
+                ],
+                'example' => "['read', 'write'] or ['*'] or ['command:build', 'command:getRoutes']"
+            ]
+        ],
+        'example_post' => 'POST /management/generateToken with body: {"name": "Flutter App", "permissions": ["read", "write"]}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Token generated successfully',
+            'data' => [
+                'token' => 'tvt_a1b2c3d4e5f6... (52 characters)',
+                'name' => 'Flutter App',
+                'permissions' => ['read', 'write'],
+                'created' => '2025-12-11 10:30:00',
+                'warning' => 'Save this token securely - it cannot be retrieved later!'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'name parameter is required',
+            '400.validation.invalid_type' => 'name must be string, permissions must be array',
+            '400.validation.invalid_length' => 'name must be between 1 and 100 characters',
+            '400.validation.invalid_format' => 'Invalid permission value',
+            '403.auth.forbidden' => 'Insufficient permissions (requires admin)',
+            '500.server.file_write_failed' => 'Failed to save new token'
+        ],
+        'notes' => 'Token format: tvt_ prefix + 48 hex characters. Store the token immediately as it cannot be retrieved again. Use listTokens to see masked previews of existing tokens.'
+    ],
+    
+    'listTokens' => [
+        'description' => 'Lists all API tokens with masked values. Requires admin permission.',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/listTokens',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Tokens retrieved successfully',
+            'data' => [
+                'total_tokens' => 2,
+                'tokens' => [
+                    [
+                        'token_preview' => 'tvt_dev_...tion',
+                        'name' => 'Default Development Token',
+                        'permissions' => ['*'],
+                        'created' => '2025-12-11'
+                    ]
+                ],
+                'auth_enabled' => true,
+                'development_mode' => true
+            ]
+        ],
+        'error_responses' => [
+            '403.auth.forbidden' => 'Insufficient permissions (requires admin)'
+        ],
+        'notes' => 'Token values are masked (first 8 + last 4 characters visible). Use the token_preview value with revokeToken to delete tokens. Full token values are never exposed after creation.'
+    ],
+    
+    'revokeToken' => [
+        'description' => 'Revokes (permanently deletes) an API token. Requires admin permission.',
+        'method' => 'POST',
+        'parameters' => [
+            'token_preview' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'The token preview from listTokens (e.g., "tvt_dev_...tion") or the full token value',
+                'example' => 'tvt_abc1...xyz9'
+            ]
+        ],
+        'example_post' => 'POST /management/revokeToken with body: {"token_preview": "tvt_abc1...xyz9"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Token revoked successfully',
+            'data' => [
+                'revoked_token' => 'tvt_abc1...xyz9',
+                'name' => 'Old Token Name',
+                'remaining_tokens' => 1
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'token_preview parameter is required',
+            '400.operation.denied' => 'Cannot revoke the last remaining token or currently used token',
+            '403.auth.forbidden' => 'Insufficient permissions (requires admin)',
+            '404.resource.not_found' => 'Token not found',
+            '500.server.file_write_failed' => 'Failed to save config after revoking'
+        ],
+        'notes' => 'Cannot revoke: 1) the last remaining token (create a new one first), 2) the token currently being used for this request. Use a different admin token to revoke another.'
     ]
 ];
 
@@ -913,23 +1060,43 @@ ApiResponse::create(200, 'operation.success')
         'total' => count($commands),
         'base_url' => BASE_URL . '/management',
         'command_categories' => [
-            'folder_management' => ['movePublicRoot', 'moveSecureRoot'],
+            'folder_management' => ['setPublicSpace', 'renameSecureFolder', 'renamePublicFolder'],
             'route_management' => ['addRoute', 'deleteRoute', 'getRoutes'],
             'structure_management' => ['getStructure', 'editStructure'],
             'translation_management' => ['getTranslation', 'getTranslations', 'editTranslation', 'getTranslationKeys', 'validateTranslations'],
-            'language_management' => ['getLangList', 'addLang', 'removeLang'],
+            'language_management' => ['getLangList', 'addLang', 'deleteLang'],
             'asset_management' => ['uploadAsset', 'deleteAsset', 'listAssets'],
             'style_management' => ['getStyles', 'editStyles'],
-            'site_customization' => ['changeFavicon', 'modifyTitle'],
+            'site_customization' => ['editFavicon', 'editTitle'],
             'build_deployment' => ['build'],
+            'authentication' => ['generateToken', 'listTokens', 'revokeToken'],
             'documentation' => ['help']
         ],
-        'usage' => 'GET commands: help, getRoutes, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, deleteAsset, listAssets, getStyles. POST commands: all others (movePublicRoot, moveSecureRoot, addRoute, deleteRoute, editStructure, editTranslation, addLang, removeLang, uploadAsset, editStyles, build, changeFavicon, modifyTitle).',
+        'authentication' => [
+            'required' => true,
+            'header' => 'Authorization: Bearer <your-token>',
+            'token_format' => 'tvt_<48 hex characters>',
+            'default_token' => 'tvt_dev_default_change_me_in_production (CHANGE IN PRODUCTION!)',
+            'permissions' => [
+                '*' => 'Full access to all commands',
+                'read' => 'get*, list*, validate*, help',
+                'write' => 'edit*, add*, delete*, upload*',
+                'admin' => 'set*, rename*, build, token management'
+            ],
+            'config_file' => 'app/config/auth.php'
+        ],
+        'cors' => [
+            'development_mode' => 'Allows localhost:* origins automatically',
+            'config_file' => 'app/config/auth.php',
+            'allowed_methods' => ['GET', 'POST', 'OPTIONS']
+        ],
+        'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, listAssets, getStyles, listTokens. POST commands: all others.',
         'note' => 'For GET commands with URL parameters, use URL segments (e.g., /getStructure/menu, /validateTranslations/en). For POST commands, send parameters as JSON in request body. For file uploads, use multipart/form-data encoding.',
         'workflows' => [
             'translation_workflow' => '1) getTranslationKeys to see required keys, 2) validateTranslations to find missing translations, 3) editTranslation to add them.',
             'asset_workflow' => '1) listAssets to see existing files, 2) uploadAsset to add new files (auto-renames if exists), 3) deleteAsset to remove files.',
-            'style_workflow' => '1) getStyles to retrieve current CSS, 2) editStyles to update (response includes backup for rollback).'
+            'style_workflow' => '1) getStyles to retrieve current CSS, 2) editStyles to update (response includes backup for rollback).',
+            'token_workflow' => '1) listTokens to see existing tokens, 2) generateToken to create new ones, 3) revokeToken to delete old tokens.'
         ]
     ])
     ->send();

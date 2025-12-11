@@ -6,11 +6,11 @@ if (!defined('PUBLIC_FOLDER_ROOT')) {
 }
 
 if(!defined('PUBLIC_FOLDER_NAME')){
-    define('PUBLIC_FOLDER_NAME', 'public_template');
+    define('PUBLIC_FOLDER_NAME', 'public');
 }
 
 if(!defined('SECURE_FOLDER_NAME')){
-    define('SECURE_FOLDER_NAME', 'secure_template');
+    define('SECURE_FOLDER_NAME', 'secure');
 }
 
 if(!defined('PUBLIC_FOLDER_SPACE')){
