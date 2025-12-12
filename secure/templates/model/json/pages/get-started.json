@@ -1,0 +1,341 @@
+[
+    {
+        "tag": "section",
+        "params": {
+            "class": "tutorial-header"
+        },
+        "children": [
+            {
+                "tag": "h1",
+                "children": [
+                    {
+                        "textKey": "tutorial.title"
+                    }
+                ]
+            },
+            {
+                "tag": "p",
+                "params": {
+                    "class": "tutorial-intro"
+                },
+                "children": [
+                    {
+                        "textKey": "tutorial.intro"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "tutorial-step"
+        },
+        "children": [
+            {
+                "tag": "div",
+                "params": {
+                    "class": "step-number"
+                },
+                "children": [
+                    {
+                        "textKey": "__RAW__1"
+                    }
+                ]
+            },
+            {
+                "tag": "h2",
+                "children": [
+                    {
+                        "textKey": "tutorial.step1.title"
+                    }
+                ]
+            },
+            {
+                "tag": "p",
+                "children": [
+                    {
+                        "textKey": "tutorial.step1.desc"
+                    }
+                ]
+            },
+            {
+                "tag": "pre",
+                "params": {
+                    "class": "code-block"
+                },
+                "children": [
+                    {
+                        "tag": "code",
+                        "children": [
+                            {
+                                "textKey": "__RAW__# Clone the repository\ngit clone https://github.com/Sangiovanni/quicksite.git\ncd quicksite"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "tutorial-step"
+        },
+        "children": [
+            {
+                "tag": "div",
+                "params": {
+                    "class": "step-number"
+                },
+                "children": [
+                    {
+                        "textKey": "__RAW__2"
+                    }
+                ]
+            },
+            {
+                "tag": "h2",
+                "children": [
+                    {
+                        "textKey": "tutorial.step2.title"
+                    }
+                ]
+            },
+            {
+                "tag": "p",
+                "children": [
+                    {
+                        "textKey": "tutorial.step2.desc"
+                    }
+                ]
+            },
+            {
+                "tag": "pre",
+                "params": {
+                    "class": "code-block"
+                },
+                "children": [
+                    {
+                        "tag": "code",
+                        "children": [
+                            {
+                                "textKey": "__RAW__# Set your auth token in secure/config/auth.php\n# Or generate a new one via API:\ncurl -X POST /management/generateToken -d '{\"name\": \"My Token\"}'"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "tutorial-step"
+        },
+        "children": [
+            {
+                "tag": "div",
+                "params": {
+                    "class": "step-number"
+                },
+                "children": [
+                    {
+                        "textKey": "__RAW__3"
+                    }
+                ]
+            },
+            {
+                "tag": "h2",
+                "children": [
+                    {
+                        "textKey": "tutorial.step3.title"
+                    }
+                ]
+            },
+            {
+                "tag": "p",
+                "children": [
+                    {
+                        "textKey": "tutorial.step3.desc"
+                    }
+                ]
+            },
+            {
+                "tag": "pre",
+                "params": {
+                    "class": "code-block"
+                },
+                "children": [
+                    {
+                        "tag": "code",
+                        "children": [
+                            {
+                                "textKey": "__RAW__# Create a new route\ncurl -X POST /management/addRoute \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -d '{\"route\": \"about\"}'"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "tutorial-step"
+        },
+        "children": [
+            {
+                "tag": "div",
+                "params": {
+                    "class": "step-number"
+                },
+                "children": [
+                    {
+                        "textKey": "__RAW__4"
+                    }
+                ]
+            },
+            {
+                "tag": "h2",
+                "children": [
+                    {
+                        "textKey": "tutorial.step4.title"
+                    }
+                ]
+            },
+            {
+                "tag": "p",
+                "children": [
+                    {
+                        "textKey": "tutorial.step4.desc"
+                    }
+                ]
+            },
+            {
+                "tag": "pre",
+                "params": {
+                    "class": "code-block"
+                },
+                "children": [
+                    {
+                        "tag": "code",
+                        "children": [
+                            {
+                                "textKey": "__RAW__# Edit page structure with JSON\ncurl -X POST /management/editStructure \\\n  -d '{\"type\": \"page\", \"name\": \"about\", \"structure\": [...]}'"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "tutorial-step"
+        },
+        "children": [
+            {
+                "tag": "div",
+                "params": {
+                    "class": "step-number"
+                },
+                "children": [
+                    {
+                        "textKey": "__RAW__5"
+                    }
+                ]
+            },
+            {
+                "tag": "h2",
+                "children": [
+                    {
+                        "textKey": "tutorial.step5.title"
+                    }
+                ]
+            },
+            {
+                "tag": "p",
+                "children": [
+                    {
+                        "textKey": "tutorial.step5.desc"
+                    }
+                ]
+            },
+            {
+                "tag": "pre",
+                "params": {
+                    "class": "code-block"
+                },
+                "children": [
+                    {
+                        "tag": "code",
+                        "children": [
+                            {
+                                "textKey": "__RAW__# Create production build\ncurl -X POST /management/build \\\n  -d '{\"public\": \"www\", \"secure\": \"app\"}'"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "tutorial-next"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "children": [
+                    {
+                        "textKey": "tutorial.next.title"
+                    }
+                ]
+            },
+            {
+                "tag": "p",
+                "children": [
+                    {
+                        "textKey": "tutorial.next.desc"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "next-links"
+                },
+                "children": [
+                    {
+                        "tag": "a",
+                        "params": {
+                            "href": "/docs",
+                            "class": "btn btn-primary"
+                        },
+                        "children": [
+                            {
+                                "textKey": "tutorial.next.docs"
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "a",
+                        "params": {
+                            "href": "https://github.com/Sangiovanni/quicksite",
+                            "target": "_blank",
+                            "class": "btn btn-secondary"
+                        },
+                        "children": [
+                            {
+                                "textKey": "tutorial.next.github"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+]

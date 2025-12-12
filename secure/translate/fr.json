@@ -1,38 +1,141 @@
 {
+    "cta": {
+        "viewDocs": "Documentation",
+        "github": "GitHub",
+        "getStarted": "Commencer",
+        "learnMore": "En savoir plus"
+    },
+    "site": {
+        "tagline": "CMS base fichiers",
+        "name": "Quicksite"
+    },
+    "home": {
+        "welcomeMessage": "Un CMS PHP moderne base sur JSON avec une API REST puissante. Parfait pour les landing pages, portfolios et microsites.",
+        "title": "Creez des sites rapidement.",
+        "hero": {
+            "title": "QuickSite",
+            "subtitle": "Créez et gérez vos sites web entièrement via une API REST. Aucun framework frontend requis.",
+            "cta_start": "Commencer",
+            "cta_docs": "Voir la doc"
+        },
+        "features": {
+            "title": "Fonctionnalités",
+            "api": {
+                "title": "Contrôle API Total",
+                "desc": "Plus de 45 commandes pour gérer tous les aspects de votre site - routes, pages, styles, traductions, assets, et plus."
+            },
+            "i18n": {
+                "title": "Multi-Langues",
+                "desc": "Internationalisation intégrée avec détection automatique de la langue et gestion facile des traductions."
+            },
+            "css": {
+                "title": "Style Dynamique",
+                "desc": "Modifiez les variables CSS, règles et animations à la volée. Aucune étape de build requise."
+            },
+            "build": {
+                "title": "Déploiement en Un Clic",
+                "desc": "Générez des builds prêts pour la production avec PHP compilé, configs nettoyées et packaging ZIP."
+            }
+        },
+        "stats": {
+            "commands": "Commandes API",
+            "api": "100% API",
+            "dependencies": "Dépendances"
+        }
+    },
     "page": {
         "titles": {
-            "home": "Titre Test pour home",
-            "about": "À Propos - Sangio Stuff",
-            "contact": "Contact - Sangio Stuff",
-            "404": "Page Introuvable - Sangio Stuff"
+            "about": "A propos - Quicksite",
+            "features": "Fonctionnalites - Quicksite",
+            "home": "QuickSite - Créez des sites web par API",
+            "docs": "Documentation - QuickSite",
+            "get-started": "Commencer - QuickSite",
+            "privacy": "Politique de confidentialité - QuickSite",
+            "terms": "Conditions d'utilisation - QuickSite",
+            "404": "Page non trouvée - QuickSite"
         }
     },
     "footer": {
-        "language": "Langue",
-        "privacy": "Politique de confidentialité",
-        "terms": "Conditions d'utilisation"
-    },
-    "menu": {
-        "home": "Accueil",
-        "about": "À propos",
-        "contact": "Contact",
+        "madeWith": "Fait avec amour pour les developpeurs",
+        "language": "Langue :",
         "terms": "Conditions d'utilisation",
-        "external1": "Google"
-    },
-    "home": {
-        "title": "Accueil",
-        "welcomeMessage": "Bienvenu sur notre website!"
+        "privacy": "Politique de confidentialité",
+        "copyright": "© 2025 QuickSite. Fait avec ❤️ et des APIs."
     },
     "404": {
-        "pageNotFound": "Page non trouvée",
-        "message": "Désolé, la page que vous recherchez n'existe pas ou a été déplacée."
+        "message": "Désolé, la page que vous recherchez n'existe pas ou a été déplacée.",
+        "backHome": "Retour à l'Accueil",
+        "pageNotFound": "Page Non Trouvée"
+    },
+    "menu": {
+        "about": "A propos",
+        "features": "Fonctionnalites",
+        "terms": "Conditions",
+        "home": "Accueil",
+        "docs": "Documentation",
+        "getstarted": "Commencer",
+        "github": "GitHub"
     },
     "privacy": {
-        "title": "Politique de confidentialité",
-        "content": "Ceci est la politique de confidentialité de notre site web. Nous respectons votre vie privée et nous nous engageons à protéger vos informations personnelles."
+        "title": "Politique de confidentialite",
+        "content": "Ceci est la politique de confidentialite de notre site web. Nous respectons votre vie privee."
     },
     "termOfUse": {
-        "title": "Conditions d'utilisation",
-        "content": "Ce sont les conditions d'utilisation de notre site web. En utilisant notre site, vous acceptez ces conditions."
+        "title": "Conditions d utilisation",
+        "content": "Ce sont les conditions d utilisation de notre site web. En utilisant notre site, vous acceptez ces conditions."
+    },
+    "docs": {
+        "title": "Documentation API",
+        "intro": "Référence complète de toutes les commandes de gestion QuickSite. Tous les endpoints nécessitent une authentification.",
+        "auth": {
+            "title": "Authentification",
+            "desc": "Incluez votre token API dans l'en-tête Authorization pour toutes les requêtes :"
+        },
+        "cat": {
+            "folder": "Gestion des Dossiers",
+            "route": "Gestion des Routes",
+            "structure": "Gestion de la Structure",
+            "alias": "Alias d'URL",
+            "translation": "Gestion des Traductions",
+            "language": "Gestion des Langues",
+            "asset": "Gestion des Assets",
+            "style": "Gestion des Styles",
+            "css_vars": "Variables & Règles CSS",
+            "animations": "Animations CSS",
+            "customize": "Personnalisation du Site",
+            "build": "Build & Déploiement",
+            "auth": "Gestion des Tokens",
+            "docs": "Documentation"
+        }
+    },
+    "tutorial": {
+        "title": "Premiers Pas avec QuickSite",
+        "intro": "Suivez ce guide étape par étape pour configurer votre premier projet QuickSite en quelques minutes.",
+        "step1": {
+            "title": "1. Installer les Prérequis",
+            "desc": "Assurez-vous d'avoir PHP 7.4+ (testé jusqu'à 8.4) et un serveur web (Apache, Nginx, ou WAMP/XAMPP) installés sur votre système."
+        },
+        "step2": {
+            "title": "2. Cloner le Dépôt",
+            "desc": "Clonez le dépôt du template QuickSite depuis GitHub et configurez votre serveur web pour pointer vers le dossier public."
+        },
+        "step3": {
+            "title": "3. Configurer Votre Site",
+            "desc": "Modifiez les fichiers de configuration dans le dossier secure/config pour définir le nom du site, les langues et le token API."
+        },
+        "step4": {
+            "title": "4. Créer Votre Première Route",
+            "desc": "Utilisez la commande API addRoute pour créer une nouvelle page, puis ajoutez du contenu avec la commande editStructure."
+        },
+        "step5": {
+            "title": "5. Build & Déploiement",
+            "desc": "Générez un build statique de votre site avec la commande build, puis uploadez les fichiers chez votre hébergeur."
+        },
+        "next": {
+            "title": "Étapes Suivantes",
+            "desc": "Maintenant que votre site fonctionne, explorez plus de fonctionnalités :",
+            "docs": "Lisez la documentation API complète",
+            "github": "Mettez-nous une étoile sur GitHub"
+        }
     }
 }

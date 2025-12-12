@@ -114,6 +114,35 @@ if (file_put_contents($routes_file_path, $new_file_content, LOCK_EX) === false) 
         ->send();
 }
 
+// --- CLEAN UP ALIASES POINTING TO THIS ROUTE ---
+$aliasesFile = SECURE_FOLDER_PATH . '/config/aliases.json';
+$deletedAliases = [];
+
+if (file_exists($aliasesFile)) {
+    $aliasContent = file_get_contents($aliasesFile);
+    $aliases = json_decode($aliasContent, true) ?: [];
+    
+    // Find aliases pointing to this route
+    $targetPath = '/' . $route_name;
+    foreach ($aliases as $aliasPath => $aliasInfo) {
+        // Check if target matches the deleted route (exact match or starts with /route_name/)
+        if ($aliasInfo['target'] === $targetPath || 
+            strpos($aliasInfo['target'], $targetPath . '/') === 0) {
+            $deletedAliases[] = [
+                'alias' => $aliasPath,
+                'target' => $aliasInfo['target']
+            ];
+            unset($aliases[$aliasPath]);
+        }
+    }
+    
+    // Save updated aliases if any were removed
+    if (!empty($deletedAliases)) {
+        $aliasJson = json_encode($aliases, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        file_put_contents($aliasesFile, $aliasJson);
+    }
+}
+
 // Invalidate opcode cache for routes file
 if (function_exists('opcache_invalidate')) {
     opcache_invalidate($routes_file_path, true);
@@ -128,6 +157,8 @@ ApiResponse::create(200, 'route.deleted')
             'php' => $target_file,
             'json' => file_exists($json_file) ? null : $json_file // null if already deleted
         ],
-        'routes_updated' => $routes_file_path
+        'routes_updated' => $routes_file_path,
+        'aliases_cleaned' => $deletedAliases,
+        'aliases_removed_count' => count($deletedAliases)
     ])
     ->send();

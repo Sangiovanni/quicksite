@@ -82,12 +82,17 @@ function hasPermission(array $tokenInfo, string $command): bool {
     
     // Category-based permissions
     $readCommands = ['getRoutes', 'getStructure', 'getTranslation', 'getTranslations', 
-                     'getTranslationKeys', 'validateTranslations', 'getLangList', 
-                     'listAssets', 'getStyles', 'help', 'listTokens'];
+                     'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys',
+                     'analyzeTranslations', 'getLangList', 
+                     'listAssets', 'getStyles', 'getRootVariables', 'listStyleRules', 
+                     'getStyleRule', 'getKeyframes', 'help', 'listTokens'];
     
-    $writeCommands = ['editStructure', 'editTranslation', 'addRoute', 'deleteRoute',
-                      'addLang', 'deleteLang', 'uploadAsset', 'deleteAsset', 
-                      'editStyles', 'editTitle', 'editFavicon'];
+    $writeCommands = ['editStructure', 'setTranslationKeys', 'deleteTranslationKeys', 
+                      'addRoute', 'deleteRoute', 'addLang', 'deleteLang', 
+                      'uploadAsset', 'deleteAsset', 'editStyles', 
+                      'setRootVariables', 'setStyleRule', 'deleteStyleRule',
+                      'setKeyframes', 'deleteKeyframes',
+                      'editTitle', 'editFavicon'];
     
     $adminCommands = ['setPublicSpace', 'renameSecureFolder', 'renamePublicFolder', 
                       'build', 'generateToken', 'revokeToken'];

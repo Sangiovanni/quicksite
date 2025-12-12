@@ -146,7 +146,7 @@ $commands = [
     ],
     
     'deleteRoute' => [
-        'description' => 'Deletes an existing route and its associated files (PHP and JSON)',
+        'description' => 'Deletes an existing route and its associated files (PHP and JSON). Also removes any URL aliases pointing to this route.',
         'method' => 'POST',
         'parameters' => [
             'route' => [
@@ -168,7 +168,11 @@ $commands = [
                     'php' => '/path/to/about-us.php',
                     'json' => '/path/to/about-us.json'
                 ],
-                'routes_updated' => '/path/to/routes.php'
+                'routes_updated' => '/path/to/routes.php',
+                'aliases_cleaned' => [
+                    ['alias' => '/old-about', 'target' => '/about-us']
+                ],
+                'aliases_removed_count' => 1
             ]
         ],
         'error_responses' => [
@@ -178,7 +182,7 @@ $commands = [
             '404.file.not_found' => 'Page template file not found',
             '500.server.file_write_failed' => 'Failed to delete files or update routes'
         ],
-        'notes' => 'Deletes both PHP template and JSON page structure. Updates routes.php automatically.'
+        'notes' => 'Deletes both PHP template and JSON page structure. Updates routes.php automatically. Also automatically removes any URL aliases that were pointing to this route to prevent ghost redirects.'
     ],
     
     'build' => [
@@ -489,8 +493,8 @@ $commands = [
         'notes' => 'Returns all translation files. Use getTranslation for single language operations.'
     ],
     
-    'editTranslation' => [
-        'description' => 'Updates translations for a single language',
+    'setTranslationKeys' => [
+        'description' => 'Sets/updates specific translation keys (merge, not replace)',
         'method' => 'POST',
         'parameters' => [
             'language' => [
@@ -503,19 +507,22 @@ $commands = [
             'translations' => [
                 'required' => true,
                 'type' => 'object',
-                'description' => 'Complete translation object (replaces existing)',
-                'example' => '{"menu": {"home": "Home"}, "footer": {...}}',
+                'description' => 'Translation keys to add or update (existing keys preserved)',
+                'example' => '{"menu": {"home": "Home"}, "footer": {"new_key": "value"}}',
                 'validation' => 'Must be valid JSON object'
             ]
         ],
-        'example_post' => 'POST /management/editTranslation with body: {"language": "en", "translations": {...}}',
+        'example_post' => 'POST /management/setTranslationKeys with body: {"language": "en", "translations": {"home": {"title": "New Title"}}}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => 'Translations updated successfully',
+            'message' => 'Translation keys updated successfully',
             'data' => [
                 'language' => 'en',
-                'file' => '/path/to/en.json'
+                'file' => '/path/to/en.json',
+                'keys_added' => 2,
+                'keys_updated' => 1,
+                'keys_unchanged' => 'preserved'
             ]
         ],
         'error_responses' => [
@@ -523,7 +530,48 @@ $commands = [
             '400.validation.invalid_format' => 'Invalid translation format',
             '500.server.file_write_failed' => 'Failed to write translation file'
         ],
-        'notes' => 'Completely replaces translation file for specified language.'
+        'notes' => 'SAFE: Merges with existing translations. New keys are added, existing keys are updated, other keys are preserved. Use deleteTranslationKeys to remove keys.'
+    ],
+    
+    'deleteTranslationKeys' => [
+        'description' => 'Deletes specific translation keys from a language file',
+        'method' => 'POST',
+        'parameters' => [
+            'language' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Language code',
+                'example' => 'en',
+                'validation' => '2-3 lowercase letters'
+            ],
+            'keys' => [
+                'required' => true,
+                'type' => 'array',
+                'description' => 'Array of keys to delete (supports dot notation)',
+                'example' => '["home.old_key", "footer.deprecated", "menu.removed_item"]',
+                'validation' => 'Each key must be a non-empty string'
+            ]
+        ],
+        'example_post' => 'POST /management/deleteTranslationKeys with body: {"language": "en", "keys": ["home.old_key", "deprecated_section"]}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Translation keys deleted successfully',
+            'data' => [
+                'language' => 'en',
+                'file' => '/path/to/en.json',
+                'deleted' => ['home.old_key'],
+                'deleted_count' => 1,
+                'not_found' => ['nonexistent.key'],
+                'not_found_count' => 1
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing language or keys parameter',
+            '404.resource.not_found' => 'Translation file not found or no keys deleted',
+            '500.server.file_write_failed' => 'Failed to write translation file'
+        ],
+        'notes' => 'Supports dot notation for nested keys. Empty parent objects are automatically cleaned up after deletion.'
     ],
     
     'getLangList' => [
@@ -698,6 +746,87 @@ $commands = [
         'notes' => 'Compares keys from getTranslationKeys with actual translation files. Shows missing keys per language and coverage percentage. Use this to identify incomplete translations before deployment.'
     ],
     
+    'getUnusedTranslationKeys' => [
+        'description' => 'Finds translation keys that exist in translation files but are not used in any structure',
+        'method' => 'GET',
+        'url_structure' => '/management/getUnusedTranslationKeys/{lang?}',
+        'parameters' => [
+            '{lang}' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Language code to check (URL segment). If omitted, checks all languages',
+                'example' => 'en',
+                'validation' => '2-3 lowercase letters'
+            ]
+        ],
+        'example_get' => 'GET /management/getUnusedTranslationKeys or GET /management/getUnusedTranslationKeys/en',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Found X unused translation key(s)',
+            'data' => [
+                'results' => [
+                    'en' => [
+                        'file_exists' => true,
+                        'total_translation_keys' => 50,
+                        'unused_keys' => ['old.key', 'deprecated.section'],
+                        'total_unused' => 2,
+                        'usage_percent' => 96
+                    ]
+                ],
+                'total_unused_across_languages' => 2,
+                'recommendation' => 'Consider removing unused keys with deleteTranslationKeys command'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.invalid_format' => 'Invalid language code format'
+        ],
+        'notes' => 'Identifies orphaned translations not referenced by any page, menu, footer, or component. Useful for cleaning up after refactoring. Use deleteTranslationKeys to remove identified unused keys.'
+    ],
+    
+    'analyzeTranslations' => [
+        'description' => 'Complete translation health check - finds both missing AND unused keys',
+        'method' => 'GET',
+        'url_structure' => '/management/analyzeTranslations/{lang?}',
+        'parameters' => [
+            '{lang}' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Language code to analyze (URL segment). If omitted, analyzes all languages',
+                'example' => 'en',
+                'validation' => '2-3 lowercase letters'
+            ]
+        ],
+        'example_get' => 'GET /management/analyzeTranslations or GET /management/analyzeTranslations/fr',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Translation analysis complete',
+            'data' => [
+                'summary' => [
+                    'total_required_keys' => 15,
+                    'total_missing_across_languages' => 2,
+                    'total_unused_across_languages' => 5,
+                    'health_status' => 'needs_attention'
+                ],
+                'analysis' => [
+                    'en' => [
+                        'status' => 'healthy|has_unused|incomplete|needs_attention',
+                        'missing_keys' => [],
+                        'unused_keys' => ['old.key'],
+                        'coverage_percent' => 100,
+                        'efficiency_percent' => 98
+                    ]
+                ],
+                'recommendations' => ['Add missing translations...', 'Clean up unused keys...']
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.invalid_format' => 'Invalid language code format'
+        ],
+        'notes' => 'Combines validateTranslations + getUnusedTranslationKeys in one call. Returns health status: healthy, has_unused, incomplete, needs_attention, or critical. Ideal for CI/CD pipelines and dashboard views.'
+    ],
+    
     'uploadAsset' => [
         'description' => 'Uploads a file to the assets folder with validation and automatic naming',
         'method' => 'POST',
@@ -848,7 +977,7 @@ $commands = [
             'message' => 'Style file retrieved successfully',
             'data' => [
                 'content' => '/* CSS content here */',
-                'file' => '/path/to/style.scss',
+                'file' => '/path/to/style.css',
                 'size' => 12345,
                 'modified' => '2025-12-03 10:30:15'
             ]
@@ -857,7 +986,7 @@ $commands = [
             '404.file.not_found' => 'Style file not found',
             '500.server.file_write_failed' => 'Failed to read style file'
         ],
-        'notes' => 'Returns the complete content of style.scss. Use this to retrieve current styles before editing.'
+        'notes' => 'Returns the complete content of style.css. Use this to retrieve current styles before editing.'
     ],
     
     'editStyles' => [
@@ -878,7 +1007,7 @@ $commands = [
             'code' => 'operation.success',
             'message' => 'Style file updated successfully',
             'data' => [
-                'file' => '/path/to/style.scss',
+                'file' => '/path/to/style.css',
                 'new_size' => 1234,
                 'old_size' => 1200,
                 'backup_content' => '/* old content */',
@@ -891,7 +1020,310 @@ $commands = [
             '404.file.not_found' => 'Style file not found',
             '500.server.file_write_failed' => 'Failed to read or write style file'
         ],
-        'notes' => 'Completely replaces style.scss content. Response includes backup_content for manual rollback if needed. Max size: 2MB. File locking prevents concurrent writes.'
+        'notes' => 'Completely replaces style.css content. Response includes backup_content for manual rollback if needed. Max size: 2MB. File locking prevents concurrent writes.'
+    ],
+    
+    // ==========================================================================
+    // CSS VARIABLES & RULES MANAGEMENT
+    // ==========================================================================
+    
+    'getRootVariables' => [
+        'description' => 'Retrieves all CSS custom properties (variables) defined in the :root selector',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/getRootVariables',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Root variables retrieved successfully',
+            'data' => [
+                'variables' => [
+                    '--color-primary' => '#007bff',
+                    '--color-secondary' => '#6c757d',
+                    '--spacing-md' => '1rem'
+                ],
+                'count' => 3
+            ]
+        ],
+        'error_responses' => [
+            '404.file.not_found' => 'Style file not found',
+            '404.root.not_found' => 'No :root block found in CSS',
+            '500.server.file_read_failed' => 'Failed to read style file'
+        ],
+        'notes' => 'Returns all CSS variables from the :root selector. Variable names include the -- prefix. Use setRootVariables to modify.'
+    ],
+    
+    'setRootVariables' => [
+        'description' => 'Add or update CSS custom properties (variables) in the :root selector',
+        'method' => 'POST',
+        'parameters' => [
+            'variables' => [
+                'required' => true,
+                'type' => 'object',
+                'description' => 'Object of variable names and values to set/update',
+                'example' => '{"--color-primary": "#ff6600", "--new-var": "10px"}',
+                'validation' => 'Variable names must start with -- or will be auto-prefixed'
+            ]
+        ],
+        'example_post' => 'POST /management/setRootVariables with body: {"variables": {"--color-primary": "#ff6600"}}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Root variables updated successfully',
+            'data' => [
+                'added' => ['--new-variable' => 'value'],
+                'updated' => ['--color-primary' => '#ff6600'],
+                'total_changes' => 2,
+                'current_variables' => ['/* all variables */']
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing variables parameter',
+            '400.validation.invalid_format' => 'Variables must be a non-empty object',
+            '400.validation.security' => 'Dangerous CSS pattern detected',
+            '404.file.not_found' => 'Style file not found',
+            '500.server.file_write_failed' => 'Failed to write style file'
+        ],
+        'notes' => 'Adds new variables or updates existing ones. Security validated against CSS injection. File locking prevents concurrent writes. Creates :root block if not exists.'
+    ],
+    
+    'listStyleRules' => [
+        'description' => 'Lists all CSS selectors in the stylesheet, organized by global and media query scopes',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/listStyleRules',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Style rules listed successfully',
+            'data' => [
+                'global' => [':root', 'body', '.btn', '.container'],
+                'mediaQueries' => [
+                    '(max-width: 768px)' => ['.hero', '.nav']
+                ],
+                'totalSelectors' => 100,
+                'totalMediaQueries' => 3
+            ]
+        ],
+        'error_responses' => [
+            '404.file.not_found' => 'Style file not found',
+            '500.server.file_read_failed' => 'Failed to read style file'
+        ],
+        'notes' => 'Returns overview of all CSS selectors organized by scope. Use getStyleRule to get specific rule details.'
+    ],
+    
+    'getStyleRule' => [
+        'description' => 'Get CSS styles for a specific selector, optionally within a media query context',
+        'method' => 'GET',
+        'url_structure' => '/management/getStyleRule/{selector} or /management/getStyleRule/{selector}/{mediaQuery}',
+        'parameters' => [
+            '{selector}' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'CSS selector (URL-encoded if contains special chars)',
+                'example' => '.btn-primary or body'
+            ],
+            '{mediaQuery}' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Media query context (URL-encoded)',
+                'example' => '(max-width: 768px)'
+            ]
+        ],
+        'example_get' => 'GET /management/getStyleRule/.btn-primary or GET /management/getStyleRule/.hero/(max-width%3A%20768px)',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Style rule retrieved successfully',
+            'data' => [
+                'selector' => '.btn-primary',
+                'styles' => 'background-color: var(--color-secondary); color: white;',
+                'mediaQuery' => null
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing selector parameter',
+            '404.file.not_found' => 'Style file not found',
+            '404.selector.not_found' => 'Selector not found (in specified scope)'
+        ],
+        'notes' => 'URL-encode selectors with special characters. Returns styles as raw CSS string. Use listStyleRules to discover available selectors.'
+    ],
+    
+    'setStyleRule' => [
+        'description' => 'Add or update a CSS rule for any selector',
+        'method' => 'POST',
+        'parameters' => [
+            'selector' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'CSS selector to add/update',
+                'example' => '.my-class or #my-id'
+            ],
+            'styles' => [
+                'required' => true,
+                'type' => 'string|object',
+                'description' => 'CSS declarations as string or object',
+                'example' => '"background: #fff; padding: 10px;" or {"background": "#fff", "padding": "10px"}'
+            ],
+            'mediaQuery' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Media query context (creates if not exists)',
+                'example' => '(max-width: 768px)'
+            ]
+        ],
+        'example_post' => 'POST /management/setStyleRule with body: {"selector": ".btn-custom", "styles": {"background": "#007bff", "color": "white"}}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Style rule added/updated successfully',
+            'data' => [
+                'action' => 'added',
+                'selector' => '.btn-custom',
+                'mediaQuery' => null,
+                'styles' => 'background: #007bff; color: white;'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing selector or styles parameter',
+            '400.validation.invalid_format' => 'Invalid selector or styles format',
+            '400.validation.security' => 'Dangerous CSS pattern detected (javascript:, expression(), etc.)',
+            '400.validation.invalid_media_query' => 'Invalid media query format',
+            '404.file.not_found' => 'Style file not found',
+            '500.server.file_write_failed' => 'Failed to write style file'
+        ],
+        'notes' => 'Styles can be string or object format. Object format: {"property": "value"}. Security validated. Creates media query block if specified but not exists.'
+    ],
+    
+    'deleteStyleRule' => [
+        'description' => 'Remove a CSS rule from the stylesheet',
+        'method' => 'POST',
+        'parameters' => [
+            'selector' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'CSS selector to delete',
+                'example' => '.unused-class'
+            ],
+            'mediaQuery' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Media query context to delete from',
+                'example' => '(max-width: 768px)'
+            ]
+        ],
+        'example_post' => 'POST /management/deleteStyleRule with body: {"selector": ".unused-class"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Style rule deleted successfully',
+            'data' => [
+                'selector' => '.unused-class',
+                'mediaQuery' => null
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing selector parameter',
+            '404.file.not_found' => 'Style file not found',
+            '404.selector.not_found' => 'Selector not found (in specified scope)',
+            '500.server.file_write_failed' => 'Failed to write style file'
+        ],
+        'notes' => 'Permanently removes the CSS rule. Use getStyleRule first to confirm selector exists. Cannot be undone.'
+    ],
+    
+    'getKeyframes' => [
+        'description' => 'Retrieves all @keyframes animations defined in the stylesheet',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/getKeyframes',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Keyframes retrieved successfully',
+            'data' => [
+                'keyframes' => [
+                    'fadeIn' => [
+                        'frames' => ['from', 'to'],
+                        'content' => '@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }'
+                    ]
+                ],
+                'count' => 1
+            ]
+        ],
+        'error_responses' => [
+            '404.file.not_found' => 'Style file not found',
+            '500.server.file_read_failed' => 'Failed to read style file'
+        ],
+        'notes' => 'Returns all @keyframes animations with their frame definitions. Use setKeyframes to add/update animations.'
+    ],
+    
+    'setKeyframes' => [
+        'description' => 'Add or update a @keyframes animation',
+        'method' => 'POST',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Animation name (alphanumeric, hyphens, underscores)',
+                'example' => 'fadeIn or slideInFromLeft'
+            ],
+            'frames' => [
+                'required' => true,
+                'type' => 'object',
+                'description' => 'Object with frame keys (0%, 50%, 100%, from, to) and CSS values',
+                'example' => '{"from": "opacity: 0;", "to": "opacity: 1;"} or {"0%, 100%": "transform: scale(1);", "50%": "transform: scale(1.1);"}'
+            ]
+        ],
+        'example_post' => 'POST /management/setKeyframes with body: {"name": "bounce", "frames": {"0%, 100%": "transform: translateY(0);", "50%": "transform: translateY(-20px);"}}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Keyframe animation added/updated successfully',
+            'data' => [
+                'action' => 'added',
+                'name' => 'bounce',
+                'frames' => ['0%, 100%', '50%']
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing name or frames parameter',
+            '400.validation.invalid_format' => 'Invalid name format (must start with letter, alphanumeric only)',
+            '400.validation.invalid_frame' => 'Invalid frame key (must be percentage or from/to)',
+            '400.validation.security' => 'Dangerous CSS pattern detected',
+            '404.file.not_found' => 'Style file not found',
+            '500.server.file_write_failed' => 'Failed to write style file'
+        ],
+        'notes' => 'Frame keys: percentages (0%, 50%, 100%), combined (0%, 100%), or keywords (from, to). Security validated against CSS injection.'
+    ],
+    
+    'deleteKeyframes' => [
+        'description' => 'Remove a @keyframes animation from the stylesheet',
+        'method' => 'POST',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Name of the animation to delete',
+                'example' => 'fadeIn'
+            ]
+        ],
+        'example_post' => 'POST /management/deleteKeyframes with body: {"name": "fadeIn"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Keyframe animation deleted successfully',
+            'data' => [
+                'name' => 'fadeIn'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing name parameter',
+            '400.validation.invalid_format' => 'Animation name cannot be empty',
+            '404.file.not_found' => 'Style file not found',
+            '404.keyframes.not_found' => 'Animation not found',
+            '500.server.file_write_failed' => 'Failed to write style file'
+        ],
+        'notes' => 'Permanently removes the @keyframes animation. Use getKeyframes first to confirm animation exists. Cannot be undone.'
     ],
     
     'help' => [
@@ -1026,6 +1458,175 @@ $commands = [
             '500.server.file_write_failed' => 'Failed to save config after revoking'
         ],
         'notes' => 'Cannot revoke: 1) the last remaining token (create a new one first), 2) the token currently being used for this request. Use a different admin token to revoke another.'
+    ],
+    
+    'listComponents' => [
+        'description' => 'Lists all reusable JSON components with metadata. Shows available slots (placeholders) and component dependencies.',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/listComponents',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Components listed successfully',
+            'data' => [
+                'components' => [
+                    [
+                        'name' => 'footer-link',
+                        'file' => 'footer-link.json',
+                        'valid' => true,
+                        'slots' => ['href', 'label', 'target'],
+                        'uses_components' => [],
+                        'size' => 256,
+                        'modified' => '2025-01-15 10:30:00'
+                    ]
+                ],
+                'count' => 3,
+                'directory' => 'secure/templates/model/json/components/'
+            ]
+        ],
+        'error_responses' => [],
+        'notes' => 'Slots are {{placeholder}} values in components that can be filled when using the component. Components can reference other components. Use editStructure with type="component" to create/update/delete components.'
+    ],
+    
+    'listPages' => [
+        'description' => 'Lists all JSON page structures with metadata. Shows route status, components used, and translation keys.',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/listPages',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Pages listed successfully',
+            'data' => [
+                'pages' => [
+                    [
+                        'name' => 'home',
+                        'file' => 'home.json',
+                        'valid' => true,
+                        'has_route' => true,
+                        'route_url' => '/home',
+                        'components_used' => ['menu-link', 'footer-link'],
+                        'translation_keys' => ['page.home.title'],
+                        'node_count' => 15,
+                        'size' => 1024,
+                        'modified' => '2025-01-15 10:30:00'
+                    ]
+                ],
+                'count' => 4,
+                'with_routes' => 3,
+                'orphaned' => 1,
+                'directory' => 'secure/templates/model/json/pages/'
+            ]
+        ],
+        'error_responses' => [],
+        'notes' => 'Pages without routes (orphaned) are JSON files that exist but have no route defined. Use addRoute to make them accessible. Use editStructure with type="page" to create/update/delete pages.'
+    ],
+    
+    'createAlias' => [
+        'description' => 'Creates a URL redirect alias that points to an existing route. Supports 301 redirects or internal (transparent) routing.',
+        'method' => 'POST',
+        'parameters' => [
+            'alias' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'The alias URL path (with or without leading /)',
+                'example' => '/old-page or legacy/path'
+            ],
+            'target' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'The target route to redirect to',
+                'example' => '/home or /docs/getting-started'
+            ],
+            'type' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Alias type: "redirect" (301 HTTP redirect) or "internal" (transparent). Default: redirect',
+                'example' => 'redirect',
+                'validation' => 'Must be "redirect" or "internal"'
+            ]
+        ],
+        'example_post' => 'POST /management/createAlias with body: {"alias": "/old-home", "target": "/home", "type": "redirect"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => "Alias '/old-home' created successfully",
+            'data' => [
+                'alias' => '/old-home',
+                'target' => '/home',
+                'type' => 'redirect',
+                'redirect_code' => 301
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing alias or target parameter',
+            '400.validation.invalid_parameter' => 'Invalid alias format or target does not exist',
+            '409.conflict' => 'Alias conflicts with existing route or reserved path'
+        ],
+        'notes' => 'Aliases cannot conflict with existing routes or reserved paths (management, assets, build). Delete an alias first to modify its target. Stored in secure/config/aliases.json.'
+    ],
+    
+    'deleteAlias' => [
+        'description' => 'Deletes an existing URL redirect alias.',
+        'method' => 'POST',
+        'parameters' => [
+            'alias' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'The alias URL path to delete',
+                'example' => '/old-page'
+            ]
+        ],
+        'example_post' => 'POST /management/deleteAlias with body: {"alias": "/old-home"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => "Alias '/old-home' deleted successfully",
+            'data' => [
+                'deleted' => [
+                    'alias' => '/old-home',
+                    'target' => '/home',
+                    'type' => 'redirect'
+                ],
+                'remaining_count' => 5
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing alias parameter',
+            '404.not_found' => 'Alias not found'
+        ],
+        'notes' => 'Returns list of available aliases if the requested alias is not found.'
+    ],
+    
+    'listAliases' => [
+        'description' => 'Lists all URL redirect aliases with their targets and types.',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/listAliases',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Aliases listed successfully',
+            'data' => [
+                'aliases' => [
+                    [
+                        'alias' => '/old-home',
+                        'target' => '/home',
+                        'type' => 'redirect',
+                        'redirect_code' => 301,
+                        'created' => '2025-01-15 10:30:00'
+                    ]
+                ],
+                'count' => 2,
+                'by_type' => [
+                    'redirect' => 2,
+                    'internal' => 0
+                ]
+            ]
+        ],
+        'error_responses' => [],
+        'notes' => 'Returns empty array if no aliases defined. Use createAlias to add new aliases.'
     ]
 ];
 
@@ -1062,11 +1663,14 @@ ApiResponse::create(200, 'operation.success')
         'command_categories' => [
             'folder_management' => ['setPublicSpace', 'renameSecureFolder', 'renamePublicFolder'],
             'route_management' => ['addRoute', 'deleteRoute', 'getRoutes'],
-            'structure_management' => ['getStructure', 'editStructure'],
-            'translation_management' => ['getTranslation', 'getTranslations', 'editTranslation', 'getTranslationKeys', 'validateTranslations'],
+            'structure_management' => ['getStructure', 'editStructure', 'listComponents', 'listPages'],
+            'alias_management' => ['createAlias', 'deleteAlias', 'listAliases'],
+            'translation_management' => ['getTranslation', 'getTranslations', 'setTranslationKeys', 'deleteTranslationKeys', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations'],
             'language_management' => ['getLangList', 'addLang', 'deleteLang'],
             'asset_management' => ['uploadAsset', 'deleteAsset', 'listAssets'],
             'style_management' => ['getStyles', 'editStyles'],
+            'css_variables_rules' => ['getRootVariables', 'setRootVariables', 'listStyleRules', 'getStyleRule', 'setStyleRule', 'deleteStyleRule'],
+            'css_animations' => ['getKeyframes', 'setKeyframes', 'deleteKeyframes'],
             'site_customization' => ['editFavicon', 'editTitle'],
             'build_deployment' => ['build'],
             'authentication' => ['generateToken', 'listTokens', 'revokeToken'],
@@ -1080,23 +1684,27 @@ ApiResponse::create(200, 'operation.success')
             'permissions' => [
                 '*' => 'Full access to all commands',
                 'read' => 'get*, list*, validate*, help',
-                'write' => 'edit*, add*, delete*, upload*',
-                'admin' => 'set*, rename*, build, token management'
+                'write' => 'set*, edit*, add*, delete*, upload*',
+                'admin' => 'setPublicSpace, rename*, build, token management'
             ],
-            'config_file' => 'app/config/auth.php'
+            'config_file' => 'secure/config/auth.php'
         ],
         'cors' => [
             'development_mode' => 'Allows localhost:* origins automatically',
-            'config_file' => 'app/config/auth.php',
+            'config_file' => 'secure/config/auth.php',
             'allowed_methods' => ['GET', 'POST', 'OPTIONS']
         ],
-        'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, listAssets, getStyles, listTokens. POST commands: all others.',
-        'note' => 'For GET commands with URL parameters, use URL segments (e.g., /getStructure/menu, /validateTranslations/en). For POST commands, send parameters as JSON in request body. For file uploads, use multipart/form-data encoding.',
+        'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listTokens, listComponents, listPages, listAliases. POST commands: all others.',
+        'note' => 'For GET commands with URL parameters, use URL segments (e.g., /getStructure/menu, /validateTranslations/en, /getStyleRule/.btn-primary). For POST commands, send parameters as JSON in request body. For file uploads, use multipart/form-data encoding.',
         'workflows' => [
-            'translation_workflow' => '1) getTranslationKeys to see required keys, 2) validateTranslations to find missing translations, 3) editTranslation to add them.',
+            'translation_workflow' => '1) analyzeTranslations for full health check, OR 2) validateTranslations to find missing, 3) getUnusedTranslationKeys to find orphans, 4) setTranslationKeys to add/update, 5) deleteTranslationKeys to clean up.',
             'asset_workflow' => '1) listAssets to see existing files, 2) uploadAsset to add new files (auto-renames if exists), 3) deleteAsset to remove files.',
             'style_workflow' => '1) getStyles to retrieve current CSS, 2) editStyles to update (response includes backup for rollback).',
-            'token_workflow' => '1) listTokens to see existing tokens, 2) generateToken to create new ones, 3) revokeToken to delete old tokens.'
+            'css_granular_workflow' => '1) getRootVariables to see all CSS variables, 2) setRootVariables to update colors/spacing/etc, 3) listStyleRules to see all selectors, 4) getStyleRule to inspect specific rules, 5) setStyleRule to add/update rules, 6) deleteStyleRule to remove rules.',
+            'animation_workflow' => '1) getKeyframes to list all animations, 2) setKeyframes to add/update animations, 3) deleteKeyframes to remove animations.',
+            'token_workflow' => '1) listTokens to see existing tokens, 2) generateToken to create new ones, 3) revokeToken to delete old tokens.',
+            'alias_workflow' => '1) listAliases to see existing redirects, 2) createAlias to add URL redirects, 3) deleteAlias to remove redirects.',
+            'component_workflow' => '1) listComponents to see available reusable components, 2) getStructure/component/{name} to view details, 3) editStructure with type="component" to create/update/delete.'
         ]
     ])
     ->send();

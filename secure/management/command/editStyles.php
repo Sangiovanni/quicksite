@@ -50,19 +50,19 @@ if ($contentSize > $maxSize) {
 
 // SECURITY: Check for potentially dangerous CSS patterns
 // Note: This is basic protection. SCSS is compiled server-side, so we focus on obvious attacks
+// Using regex to avoid false positives (e.g., scroll-behavior vs behavior:)
 $dangerousPatterns = [
-    'javascript:' => 'JavaScript protocol',
-    'expression(' => 'CSS expression (IE-specific JS)',
-    'behavior:' => 'CSS behavior (IE-specific)',
-    'vbscript:' => 'VBScript protocol',
-    '-moz-binding:' => 'XBL binding (Firefox-specific)',
-    '@import url("/' => 'Absolute path import (potential file access)',
-    '@import url(\'/' => 'Absolute path import (potential file access)',
-    'data:text/html' => 'Data URI with HTML',
+    '/javascript\s*:/i' => 'JavaScript protocol',
+    '/expression\s*\(/i' => 'CSS expression (IE-specific JS)',
+    '/(?<!scroll-)behavior\s*:/i' => 'CSS behavior (IE-specific)',
+    '/vbscript\s*:/i' => 'VBScript protocol',
+    '/-moz-binding\s*:/i' => 'XBL binding (Firefox-specific)',
+    '/@import\s+url\s*\(\s*["\']?\//i' => 'Absolute path import (potential file access)',
+    '/data\s*:\s*text\/html/i' => 'Data URI with HTML',
 ];
 
 foreach ($dangerousPatterns as $pattern => $description) {
-    if (stripos($newContent, $pattern) !== false) {
+    if (preg_match($pattern, $newContent)) {
         ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Content contains potentially dangerous CSS pattern')
             ->withErrors([
@@ -72,7 +72,7 @@ foreach ($dangerousPatterns as $pattern => $description) {
     }
 }
 
-$styleFile = PUBLIC_FOLDER_ROOT . '/style/style.scss';
+$styleFile = PUBLIC_FOLDER_ROOT . '/style/style.css';
 
 // Check if file exists
 if (!file_exists($styleFile)) {

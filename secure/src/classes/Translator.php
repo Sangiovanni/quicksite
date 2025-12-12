@@ -47,10 +47,13 @@ class Translator {
 
     /**
      * Retrieves a translation string using dot notation (e.g., 'footer.language').
+     * Supports i18next-style interpolation with {{variable}} syntax.
+     * 
      * @param string $key The key to lookup.
+     * @param array $params Optional parameters for interpolation (e.g., ['name' => 'John'])
      * @return string The translated string or the key/default if not found.
      */
-    public static function translate(string $key): string {
+    public static function translate(string $key, array $params = []): string {
         if (self::$translations === null) {
             self::loadTranslations();
         }
@@ -70,8 +73,18 @@ class Translator {
             $current = $current[$segment];
         }
 
-        // Ensure the final value is a string before returning
-        return (string) $current;
+        // Convert to string
+        $result = (string) $current;
+        
+        // Handle i18next-style interpolation: {{variable}}
+        if (!empty($params)) {
+            $result = preg_replace_callback('/\{\{(\w+)\}\}/', function($matches) use ($params) {
+                $paramKey = $matches[1];
+                return $params[$paramKey] ?? $matches[0]; // Keep original if param not found
+            }, $result);
+        }
+
+        return $result;
     }
 
     // A simple method to get the current language without needing to decode

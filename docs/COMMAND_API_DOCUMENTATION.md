@@ -1062,7 +1062,7 @@ See the main [README.md](../README.md) for authentication setup instructions.
 
 ## 19. getStyles
 
-**Description:** Retrieves the content of the main SCSS stylesheet.
+**Description:** Retrieves the content of the main CSS stylesheet.
 
 **HTTP Method:** GET
 
@@ -1076,7 +1076,7 @@ See the main [README.md](../README.md) for authentication setup instructions.
   "message": "Style file retrieved successfully",
   "data": {
     "content": "/* SCSS content here */\nbody { margin: 0; }",
-    "file": "/path/to/style/style.scss",
+    "file": "/path/to/style/style.css",
     "size": 1234,
     "modified": "2023-12-08 14:30:22"
   }
@@ -1097,7 +1097,7 @@ See the main [README.md](../README.md) for authentication setup instructions.
 
 ## 20. editStyles
 
-**Description:** Updates the main SCSS stylesheet content.
+**Description:** Updates the main CSS stylesheet content.
 
 **HTTP Method:** POST
 
@@ -1127,7 +1127,7 @@ See the main [README.md](../README.md) for authentication setup instructions.
   "code": "operation.success",
   "message": "Style file updated successfully",
   "data": {
-    "file": "/path/to/style/style.scss",
+    "file": "/path/to/style/style.css",
     "new_size": 1500,
     "old_size": 1234,
     "backup_content": "/* old content */",

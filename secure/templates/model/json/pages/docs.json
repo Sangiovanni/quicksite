@@ -1,0 +1,2711 @@
+[
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-header"
+        },
+        "children": [
+            {
+                "tag": "h1",
+                "children": [
+                    {
+                        "textKey": "docs.title"
+                    }
+                ]
+            },
+            {
+                "tag": "p",
+                "params": {
+                    "class": "docs-intro"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.intro"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-auth"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "children": [
+                    {
+                        "textKey": "docs.auth.title"
+                    }
+                ]
+            },
+            {
+                "tag": "p",
+                "children": [
+                    {
+                        "textKey": "docs.auth.desc"
+                    }
+                ]
+            },
+            {
+                "tag": "pre",
+                "params": {
+                    "class": "code-block"
+                },
+                "children": [
+                    {
+                        "tag": "code",
+                        "children": [
+                            {
+                                "textKey": "__RAW__Authorization: Bearer tvt_your_token_here"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-category",
+            "id": "folder_management"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "category-title"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.cat.folder"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "commands-list"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-setPublicSpace"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__setPublicSpace"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Sets the URL space/prefix for the public site. Creates a subdirectory inside the public folder and moves all content there. Use empty destination to restore to root. Note: Site URL changes (e.g., http://domain/web/ when set to \"web\")"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-renameSecureFolder"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__renameSecureFolder"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Renames the secure/backend folder at server root level. Updates SECURE_FOLDER_NAME constant. Management URL stays the same."
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-renamePublicFolder"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__renamePublicFolder"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Renames the public folder at server root level. Updates all references. Requires Apache/web server config update after rename."
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-category",
+            "id": "route_management"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "category-title"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.cat.route"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "commands-list"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-addRoute"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__addRoute"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Creates a new route with PHP page template and empty JSON structure"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-deleteRoute"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__deleteRoute"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Deletes an existing route and its associated files (PHP and JSON). Also removes any URL aliases pointing to this route."
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-getRoutes"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__getRoutes"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Returns list of all available routes in the system"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-category",
+            "id": "structure_management"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "category-title"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.cat.structure"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "commands-list"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-getStructure"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__getStructure"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Retrieves the JSON structure for a page, menu, footer, or component"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-editStructure"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__editStructure"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Updates the JSON structure for a page, menu, footer, or component (creates component if new)"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-listComponents"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__listComponents"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Lists all reusable JSON components with metadata. Shows available slots (placeholders) and component dependencies."
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-listPages"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__listPages"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Lists all JSON page structures with metadata. Shows route status, components used, and translation keys."
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-category",
+            "id": "alias_management"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "category-title"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.cat.alias"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "commands-list"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-createAlias"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__createAlias"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Creates a URL redirect alias that points to an existing route. Supports 301 redirects or internal (transparent) routing."
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-deleteAlias"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__deleteAlias"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Deletes an existing URL redirect alias."
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-listAliases"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__listAliases"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Lists all URL redirect aliases with their targets and types."
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-category",
+            "id": "translation_management"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "category-title"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.cat.translation"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "commands-list"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-getTranslation"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__getTranslation"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Retrieves translations for a single language"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-getTranslations"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__getTranslations"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Retrieves translations for all languages"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-setTranslationKeys"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__setTranslationKeys"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Sets/updates specific translation keys (merge, not replace)"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-deleteTranslationKeys"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__deleteTranslationKeys"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Deletes specific translation keys from a language file"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-getTranslationKeys"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__getTranslationKeys"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Scans all JSON structures and extracts required translation keys"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-validateTranslations"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__validateTranslations"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Validates translation completeness by comparing required keys with existing translations"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-getUnusedTranslationKeys"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__getUnusedTranslationKeys"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Finds translation keys that exist in translation files but are not used in any structure"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-analyzeTranslations"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__analyzeTranslations"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Complete translation health check - finds both missing AND unused keys"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-category",
+            "id": "language_management"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "category-title"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.cat.language"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "commands-list"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-getLangList"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__getLangList"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Returns list of configured languages and multilingual settings"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-addLang"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__addLang"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Adds a new language to the system"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-deleteLang"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__deleteLang"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Deletes a language from the system"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-category",
+            "id": "asset_management"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "category-title"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.cat.asset"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "commands-list"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-uploadAsset"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__uploadAsset"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Uploads a file to the assets folder with validation and automatic naming"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-deleteAsset"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__deleteAsset"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Deletes a file from the assets folder"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-listAssets"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__listAssets"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Lists all files in assets folder, optionally filtered by category"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-category",
+            "id": "style_management"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "category-title"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.cat.style"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "commands-list"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-getStyles"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__getStyles"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Retrieves the content of the main SCSS/CSS file"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-editStyles"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__editStyles"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Updates the content of the main SCSS/CSS file"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-category",
+            "id": "css_variables_rules"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "category-title"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.cat.css_vars"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "commands-list"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-getRootVariables"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__getRootVariables"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Retrieves all CSS custom properties (variables) defined in the :root selector"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-setRootVariables"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__setRootVariables"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Add or update CSS custom properties (variables) in the :root selector"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-listStyleRules"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__listStyleRules"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Lists all CSS selectors in the stylesheet, organized by global and media query scopes"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-getStyleRule"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__getStyleRule"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Get CSS styles for a specific selector, optionally within a media query context"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-setStyleRule"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__setStyleRule"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Add or update a CSS rule for any selector"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-deleteStyleRule"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__deleteStyleRule"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Remove a CSS rule from the stylesheet"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-category",
+            "id": "css_animations"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "category-title"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.cat.animations"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "commands-list"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-getKeyframes"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__getKeyframes"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Retrieves all @keyframes animations defined in the stylesheet"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-setKeyframes"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__setKeyframes"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Add or update a @keyframes animation"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-deleteKeyframes"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__deleteKeyframes"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Remove a @keyframes animation from the stylesheet"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-category",
+            "id": "site_customization"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "category-title"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.cat.customize"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "commands-list"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-editFavicon"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__editFavicon"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Updates the site favicon with a new image from assets/images folder (PNG only)"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-editTitle"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__editTitle"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Updates page title for a specific route and language in the translation file (page.titles.{route} structure)"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-category",
+            "id": "build_deployment"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "category-title"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.cat.build"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "commands-list"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-build"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__build"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Creates a production-ready build with compiled PHP files, optional folder renaming, config sanitization, and ZIP archive creation"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-category",
+            "id": "authentication"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "category-title"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.cat.auth"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "commands-list"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-generateToken"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__generateToken"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Creates a new API authentication token with specified permissions. Requires admin permission."
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-listTokens"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__listTokens"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Lists all API tokens with masked values. Requires admin permission."
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-revokeToken"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__revokeToken"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Revokes (permanently deletes) an API token. Requires admin permission."
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-category",
+            "id": "documentation"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "category-title"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.cat.docs"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "commands-list"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-help"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__help"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Returns documentation for all available commands"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+]

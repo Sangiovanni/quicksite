@@ -1,52 +1,91 @@
 [
-  {
-    "tag": "div",
-    "params": {"class": "footer"},
-    "children": [
-      {
-        "tag": "div",
-        "params": {"class": "footer-block"},
-        "children":  [
-          {
-            "component": "footer-link",
-            "data": {
-              "href": "/privacy",
-              "label": "footer.privacy",
-              "target": "_self"
-            }
-          },
-          {
-            "component": "footer-link",
-            "data": {
-              "href": "/terms",
-              "label": "footer.terms",
-              "target": "_self"
-            }
-          }
-        ]
-      },
-      {
-        "tag": "div",
-        "params": {"class": "footer-block"},
+    {
+        "tag": "footer",
+        "params": [],
         "children": [
-          {
-            "component": "footer-link",
-            "data": {
-              "href": "{{__current_page;lang=en}}",
-              "label": "__RAW__English",
-              "target": "_self"
+            {
+                "tag": "div",
+                "params": {
+                    "class": "footer-lang"
+                },
+                "children": [
+                    {
+                        "tag": "span",
+                        "params": {
+                            "class": "lang-label"
+                        },
+                        "children": [
+                            {
+                                "textKey": "footer.language"
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "lang-buttons"
+                        },
+                        "children": [
+                            {
+                                "component": "footer-link",
+                                "data": {
+                                    "href": "{{__current_page;lang=en}}",
+                                    "label": "__RAW__English",
+                                    "target": "_self"
+                                }
+                            },
+                            {
+                                "component": "footer-link",
+                                "data": {
+                                    "href": "{{__current_page;lang=fr}}",
+                                    "label": "__RAW__Français",
+                                    "target": "_self"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "footer-links"
+                },
+                "children": [
+                    {
+                        "component": "footer-link",
+                        "data": {
+                            "href": "/terms",
+                            "label": "footer.terms",
+                            "target": "_self"
+                        }
+                    },
+                    {
+                        "component": "footer-link",
+                        "data": {
+                            "href": "/privacy",
+                            "label": "footer.privacy",
+                            "target": "_self"
+                        }
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "footer-copyright"
+                },
+                "children": [
+                    {
+                        "tag": "p",
+                        "children": [
+                            {
+                                "textKey": "footer.copyright"
+                            }
+                        ]
+                    }
+                ]
             }
-          },
-          {
-            "component": "footer-link",
-            "data": {
-              "href": "{{__current_page;lang=fr}}",
-              "label": "__RAW__Français",
-              "target": "_self"
-            }
-          }        
         ]
-      }
-    ]
-  }
+    }
 ]

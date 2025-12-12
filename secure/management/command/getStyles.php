@@ -1,7 +1,7 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 
-$styleFile = PUBLIC_FOLDER_ROOT . '/style/style.scss';
+$styleFile = PUBLIC_FOLDER_ROOT . '/style/style.css';
 
 // Check if file exists
 if (!file_exists($styleFile)) {

@@ -20,7 +20,7 @@ That question turned a template into a CMS. The file-based architecture wasn't a
 - **JSON-Driven Templates**: Define page structures, menus, and components in JSON, compiled to optimized PHP
 - **Multilingual Support**: Built-in translation system with language switching and validation
 - **Production Builds**: One-command deployment with compilation, optimization, and ZIP packaging
-- **RESTful Management API**: 27 endpoints for complete site management
+- **RESTful Management API**: 45 endpoints for complete site management
 - **File-Based Storage**: No database required - all configuration in JSON/PHP files
 - **Flexible Architecture**: Separate public and secure folders for clean deployment
 - **🔐 API Authentication**: Bearer token authentication with role-based permissions
@@ -46,7 +46,7 @@ That question turned a template into a CMS. The file-based architecture wasn't a
 
 ## 📋 Requirements
 
-- **PHP**: 7.4 or higher
+- **PHP**: 7.4 or higher (tested up to 8.4)
 - **Apache**: mod_rewrite enabled
 - **Extensions**: json, fileinfo, zip
 - **Permissions**: Write access to public/secure folders
@@ -190,9 +190,12 @@ curl -H "Authorization: Bearer your_token_here" \
 #### **Translation Management**
 - `GET /management/getTranslation/{lang}` - Get language translations
 - `GET /management/getTranslations` - Get all translations
-- `POST /management/editTranslation` - Update translations
+- `POST /management/setTranslationKeys` - Add/update translation keys (safe merge)
+- `POST /management/deleteTranslationKeys` - Remove translation keys
 - `GET /management/getTranslationKeys` - Extract all required translation keys
 - `GET /management/validateTranslations/{lang?}` - Validate translation completeness
+- `GET /management/getUnusedTranslationKeys` - Find orphaned keys not used in structures
+- `GET /management/analyzeTranslations` - Full health check (missing + unused + recommendations)
 - `GET /management/getLangList` - List supported languages
 - `POST /management/addLang` - Add new language
 - `POST /management/deleteLang` - Delete language
@@ -205,8 +208,28 @@ curl -H "Authorization: Bearer your_token_here" \
 #### **Customization**
 - `POST /management/editFavicon` - Update favicon from assets
 - `POST /management/editTitle` - Update page title for specific language
-- `GET /management/getStyles` - Get SCSS stylesheet
-- `POST /management/editStyles` - Update SCSS (with backup)
+
+#### **CSS/Style Management**
+- `GET /management/getStyles` - Get CSS stylesheet content
+- `POST /management/editStyles` - Update CSS (with backup)
+- `GET /management/getRootVariables` - Get CSS custom properties from :root
+- `POST /management/setRootVariables` - Add/update CSS variables in :root
+- `GET /management/listStyleRules` - List all CSS selectors
+- `GET /management/getStyleRule/{selector}` - Get styles for specific selector
+- `POST /management/setStyleRule` - Add/update CSS rule
+- `POST /management/deleteStyleRule` - Remove CSS rule
+- `GET /management/getKeyframes` - Get all @keyframes animations
+- `POST /management/setKeyframes` - Add/update @keyframes animation
+- `POST /management/deleteKeyframes` - Remove @keyframes animation
+
+#### **Structure Discovery**
+- `GET /management/listComponents` - List all available components
+- `GET /management/listPages` - List all pages with metadata
+
+#### **URL Aliases**
+- `GET /management/listAliases` - List all URL aliases
+- `POST /management/createAlias` - Create route alias
+- `POST /management/deleteAlias` - Remove route alias
 
 #### **Build & Deploy**
 - `POST /management/build` - Create production build with optional folder renaming
@@ -223,21 +246,22 @@ quicksite/                    # (or your chosen project name)
 ├── public/                   # Public web root
 │   ├── assets/              # Static assets (images, scripts, fonts, videos)
 │   ├── management/          # Management API endpoint
-│   ├── style/               # SCSS stylesheets
+│   ├── style/               # CSS stylesheets
 │   ├── index.php            # Main entry point
 │   ├── init.php             # Configuration & constants
 │   └── .htaccess            # URL rewriting rules
 │
 ├── secure/                  # Backend (renamed from secure_template)
 │   ├── config/              # Configuration files
-│   │   └── auth.php         # Authentication & CORS settings
+│   │   ├── auth.php         # Authentication & CORS settings
+│   │   └── aliases.json     # URL alias definitions
 │   ├── management/          # Management API implementation
-│   │   ├── command/         # API endpoints (28 commands)
+│   │   ├── command/         # API endpoints (45 commands)
 │   │   └── routes.php       # Management routes
 │   ├── material/            # Core classes
 │   │   └── Page.php         # Page rendering engine
 │   ├── src/                 # Utilities & functions
-│   │   ├── classes/         # JsonToPhpCompiler, ApiResponse, etc.
+│   │   ├── classes/         # JsonToPhpCompiler, ApiResponse, CssParser, etc.
 │   │   └── functions/       # PathManagement, AuthManagement, etc.
 │   ├── templates/           # Page templates & structures
 │   │   ├── model/           # Component templates
@@ -303,26 +327,42 @@ The `space` parameter creates a subdirectory inside the public folder, useful fo
 
 ### Translation Workflow
 
-1. **Extract Required Keys**
+1. **Analyze Translation Health** (recommended starting point)
    ```bash
-   curl http://yoursite.local/management/getTranslationKeys
+   curl http://yoursite.local/management/analyzeTranslations
+   # Returns: missing keys, unused keys, health_status, recommendations
    ```
 
-2. **Validate Translations**
+2. **Find Missing Translations Only**
    ```bash
    curl http://yoursite.local/management/validateTranslations/fr
    ```
 
-3. **Add Missing Translations**
+3. **Find Unused/Orphaned Keys**
    ```bash
-   curl -X POST http://yoursite.local/management/editTranslation \
+   curl http://yoursite.local/management/getUnusedTranslationKeys
+   ```
+
+4. **Add Missing Translations** (safe merge - won't delete existing)
+   ```bash
+   curl -X POST http://yoursite.local/management/setTranslationKeys \
      -H "Content-Type: application/json" \
      -d '{
        "language": "fr",
        "translations": {
-         "menu.newpage": "Nouvelle Page",
-         "footer.copyright": "Tous droits réservés"
+         "menu": {"newpage": "Nouvelle Page"},
+         "footer": {"copyright": "Tous droits réservés"}
        }
+     }'
+   ```
+
+5. **Clean Up Unused Keys** (optional)
+   ```bash
+   curl -X POST http://yoursite.local/management/deleteTranslationKeys \
+     -H "Content-Type: application/json" \
+     -d '{
+       "language": "fr",
+       "keys": ["old.unused.key", "legacy.section.title"]
      }'
    ```
 
@@ -382,7 +422,7 @@ Template Vitrine follows a **file-based, zero-database philosophy** - but that d
 
 ### Current Version (v1.x)
 - ✅ Complete file-based CMS with JSON templates
-- ✅ RESTful API with 27 commands
+- ✅ RESTful API with 45 commands
 - ✅ Bearer token authentication with RBAC
 - ✅ CORS support for external UIs
 - ✅ Production build system

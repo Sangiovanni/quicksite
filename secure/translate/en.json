@@ -1,31 +1,80 @@
 {
+    "cta": {
+        "viewDocs": "View Docs",
+        "github": "GitHub",
+        "getStarted": "Get Started",
+        "learnMore": "Learn More"
+    },
+    "site": {
+        "tagline": "File-Based CMS",
+        "name": "Quicksite"
+    },
+    "home": {
+        "welcomeMessage": "A modern, JSON-based PHP CMS with a powerful REST API. Perfect for landing pages, portfolios, and microsites.",
+        "title": "Build websites fast.",
+        "hero": {
+            "title": "QuickSite",
+            "subtitle": "Build and manage websites entirely through a REST API. No frontend framework needed.",
+            "cta_start": "Get Started",
+            "cta_docs": "View Docs"
+        },
+        "features": {
+            "title": "Features",
+            "api": {
+                "title": "Full API Control",
+                "desc": "45+ commands to manage every aspect of your site - routes, pages, styles, translations, assets, and more."
+            },
+            "i18n": {
+                "title": "Multi-Language",
+                "desc": "Built-in internationalization with automatic language detection and easy translation management."
+            },
+            "css": {
+                "title": "Dynamic Styling",
+                "desc": "Modify CSS variables, rules, and animations on the fly. No build step required."
+            },
+            "build": {
+                "title": "One-Click Deploy",
+                "desc": "Generate production-ready builds with compiled PHP, sanitized configs, and ZIP packaging."
+            }
+        },
+        "stats": {
+            "commands": "API Commands",
+            "api": "API-Driven",
+            "dependencies": "Dependencies"
+        }
+    },
     "page": {
         "titles": {
-            "home": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-            "about": "About Us - Sangio Stuff",
-            "contact": "Contact - Sangio Stuff",
-            "404": "Page Not Found - Sangio Stuff"
+            "about": "About - Quicksite",
+            "features": "Features - Quicksite",
+            "home": "QuickSite - Build Websites via API",
+            "docs": "Documentation - QuickSite",
+            "get-started": "Get Started - QuickSite",
+            "privacy": "Privacy Policy - QuickSite",
+            "terms": "Terms of Use - QuickSite",
+            "404": "Page Not Found - QuickSite"
         }
     },
     "footer": {
-        "language": "language",
-        "privacy": "Privacy Policy",
-        "terms": "Terms of Use"
-    },
-    "menu": {
-        "home": "Home",
-        "about": "About",
-        "contact": "Contact",
+        "madeWith": "Made with love for developers",
+        "language": "Language:",
         "terms": "Terms of Use",
-        "external1": "Google"
-    },
-    "home": {
-        "title": "Home",
-        "welcomeMessage": "Welcome to our website!"
+        "privacy": "Privacy Policy",
+        "copyright": "© 2025 QuickSite. Built with ❤️ and APIs."
     },
     "404": {
-        "pageNotFound": "Page Not Found",
-        "message": "Sorry, the page you are looking for does not exist or has been moved."
+        "message": "Sorry, the page you're looking for doesn't exist or has been moved.",
+        "backHome": "Back to Home",
+        "pageNotFound": "Page Not Found"
+    },
+    "menu": {
+        "about": "About",
+        "features": "Features",
+        "terms": "Terms of Use",
+        "home": "Home",
+        "docs": "Documentation",
+        "getstarted": "Get Started",
+        "github": "GitHub"
     },
     "privacy": {
         "title": "Privacy Policy",
@@ -34,5 +83,59 @@
     "termOfUse": {
         "title": "Terms of Use",
         "content": "These are the terms of use for our website. By using our site, you agree to these terms."
+    },
+    "docs": {
+        "title": "API Documentation",
+        "intro": "Complete reference for all QuickSite management commands. All endpoints require authentication.",
+        "auth": {
+            "title": "Authentication",
+            "desc": "Include your API token in the Authorization header for all requests:"
+        },
+        "cat": {
+            "folder": "Folder Management",
+            "route": "Route Management",
+            "structure": "Structure Management",
+            "alias": "URL Aliases",
+            "translation": "Translation Management",
+            "language": "Language Management",
+            "asset": "Asset Management",
+            "style": "Style Management",
+            "css_vars": "CSS Variables & Rules",
+            "animations": "CSS Animations",
+            "customize": "Site Customization",
+            "build": "Build & Deploy",
+            "auth": "Token Management",
+            "docs": "Documentation"
+        }
+    },
+    "tutorial": {
+        "title": "Getting Started with QuickSite",
+        "intro": "Follow this step-by-step guide to set up your first QuickSite project in minutes.",
+        "step1": {
+            "title": "1. Install Prerequisites",
+            "desc": "Make sure you have PHP 7.4+ (tested up to 8.4) and a web server (Apache, Nginx, or WAMP/XAMPP) installed on your system."
+        },
+        "step2": {
+            "title": "2. Clone the Repository",
+            "desc": "Clone the QuickSite template repository from GitHub and configure your web server to point to the public directory."
+        },
+        "step3": {
+            "title": "3. Configure Your Site",
+            "desc": "Edit the configuration files in the secure/config directory to set up your site name, languages, and API token."
+        },
+        "step4": {
+            "title": "4. Create Your First Route",
+            "desc": "Use the addRoute API command to create a new page, then add content with the editStructure command."
+        },
+        "step5": {
+            "title": "5. Build & Deploy",
+            "desc": "Generate a static build of your site using the build command, then upload the files to your hosting provider."
+        },
+        "next": {
+            "title": "Next Steps",
+            "desc": "Now that your site is running, explore more features:",
+            "docs": "Read the full API documentation",
+            "github": "Star us on GitHub"
+        }
     }
 }

@@ -1,48 +1,143 @@
 [
-  
-  {
-    "tag": "div",
-    "params": {"class": "logo"},
-    "children": [
-      {
-        "tag": "a",
-        "params": {"href": "/"},
+    {
+        "tag": "nav",
+        "params": {
+            "class": "menu"
+        },
         "children": [
-          {
-            "tag": "img",
-            "params": {"src": "/assets/images/logo.png"},
-            "children": null
-          }
+            {
+                "tag": "div",
+                "params": {
+                    "class": "menu-logo"
+                },
+                "children": [
+                    {
+                        "tag": "a",
+                        "params": {
+                            "href": "/home"
+                        },
+                        "children": [
+                            {
+                                "tag": "img",
+                                "params": {
+                                    "src": "/assets/images/logo.png",
+                                    "alt": "QuickSite Logo",
+                                    "class": "logo-img"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "menu-label"
+                },
+                "children": [
+                    {
+                        "tag": "a",
+                        "params": {
+                            "href": "/home"
+                        },
+                        "children": [
+                            {
+                                "tag": "img",
+                                "params": {
+                                    "src": "/assets/images/home.png",
+                                    "alt": "",
+                                    "class": "menu-icon"
+                                }
+                            },
+                            {
+                                "textKey": "menu.home"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "menu-label"
+                },
+                "children": [
+                    {
+                        "tag": "a",
+                        "params": {
+                            "href": "/docs"
+                        },
+                        "children": [
+                            {
+                                "tag": "img",
+                                "params": {
+                                    "src": "/assets/images/documentation.png",
+                                    "alt": "",
+                                    "class": "menu-icon"
+                                }
+                            },
+                            {
+                                "textKey": "menu.docs"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "menu-label"
+                },
+                "children": [
+                    {
+                        "tag": "a",
+                        "params": {
+                            "href": "/get-started"
+                        },
+                        "children": [
+                            {
+                                "tag": "img",
+                                "params": {
+                                    "src": "/assets/images/get_started.png",
+                                    "alt": "",
+                                    "class": "menu-icon"
+                                }
+                            },
+                            {
+                                "textKey": "menu.getstarted"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "menu-label github-link"
+                },
+                "children": [
+                    {
+                        "tag": "a",
+                        "params": {
+                            "href": "https://github.com/Sangiovanni/quicksite",
+                            "target": "_blank"
+                        },
+                        "children": [
+                            {
+                                "tag": "img",
+                                "params": {
+                                    "src": "/assets/images/git-hub-logo-white.png",
+                                    "alt": "GitHub",
+                                    "class": "github-icon"
+                                }
+                            },
+                            {
+                                "textKey": "menu.github"
+                            }
+                        ]
+                    }
+                ]
+            }
         ]
-      }
-    ]
-  },
-  {
-    "tag": "div",
-    "params": {"class": "menu"},
-    "children": [
-      {
-        "component": "menu-link",
-        "data": {
-          "href": "/",
-          "label": "menu.home",
-          "target": "_self",
-          "src": "/assets/images/home-icon.png",
-          "imgClass": "menu-logo",
-          "alt": "Home Icon"
-        }
-      },
-      {
-        "component": "menu-link",
-        "data": {
-          "href": "https://www.google.com",
-          "label": "menu.external1",
-          "target": "_blank",
-          "src": "/assets/images/google.png",
-          "imgClass": "menu-logo",
-          "alt": "External Link Icon"
-        }
-      }
-    ]
-  }
+    }
 ]
