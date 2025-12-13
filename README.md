@@ -20,7 +20,7 @@ That question turned a template into a CMS. The file-based architecture wasn't a
 - **JSON-Driven Templates**: Define page structures, menus, and components in JSON, compiled to optimized PHP
 - **Multilingual Support**: Built-in translation system with language switching and validation
 - **Production Builds**: One-command deployment with compilation, optimization, and ZIP packaging
-- **RESTful Management API**: 46 endpoints for complete site management
+- **RESTful Management API**: 47 endpoints for complete site management
 - **File-Based Storage**: No database required - all configuration in JSON/PHP files
 - **Flexible Architecture**: Separate public and secure folders for clean deployment
 - **🔐 API Authentication**: Bearer token authentication with role-based permissions
@@ -261,7 +261,7 @@ quicksite/                    # (or your chosen project name)
 │   │   ├── auth.php         # Authentication & CORS settings
 │   │   └── aliases.json     # URL alias definitions
 │   ├── management/          # Management API implementation
-│   │   ├── command/         # API endpoints (46 commands)
+│   │   ├── command/         # API endpoints (47 commands)
 │   │   └── routes.php       # Management routes
 │   ├── material/            # Core classes
 │   │   └── Page.php         # Page rendering engine
@@ -427,7 +427,7 @@ Template Vitrine follows a **file-based, zero-database philosophy** - but that d
 
 ### Current Version (v1.3.0)
 - ✅ Complete file-based CMS with JSON templates
-- ✅ RESTful API with 46 commands
+- ✅ RESTful API with 47 commands
 - ✅ Bearer token authentication with RBAC
 - ✅ CORS support for external UIs
 - ✅ Production build system

@@ -689,6 +689,17 @@
                                 "textKey": "__RAW__setMultilingual"
                             }
                         ]
+                    },
+                    {
+                        "tag": "span",
+                        "params": {
+                            "class": "command-tag"
+                        },
+                        "children": [
+                            {
+                                "textKey": "__RAW__checkStructureMulti"
+                            }
+                        ]
                     }
                 ]
             },

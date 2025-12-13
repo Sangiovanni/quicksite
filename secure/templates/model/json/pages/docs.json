@@ -2827,6 +2827,41 @@
                         "tag": "div",
                         "params": {
                             "class": "command-card",
+                            "id": "cmd-checkStructureMulti"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {"class": "command-header"},
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {"class": "command-name"},
+                                        "children": [{"textKey": "__RAW__checkStructureMulti"}]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {"class": "method-badge method-get"},
+                                        "children": [{"textKey": "__RAW__GET"}]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "code",
+                                "params": {"class": "command-url"},
+                                "children": [{"textKey": "__RAW__GET /management/checkStructureMulti"}]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {"class": "command-desc"},
+                                "children": [{"textKey": "__RAW__Scans all structures for lang-specific content. Use before switching to mono-language mode."}]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
                             "id": "cmd-addLang"
                         },
                         "children": [

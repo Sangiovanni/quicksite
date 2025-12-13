@@ -657,6 +657,38 @@ $commands = [
         'notes' => 'When switching modes, translations are synced: mono→multi copies default.json keys to default language file, multi→mono copies default language to default.json. Use language="default" with setTranslationKeys in mono-language mode.'
     ],
     
+    'checkStructureMulti' => [
+        'description' => 'Scans all structures (pages, menu, footer, components) for lang-specific content. Use before switching to mono-language mode.',
+        'method' => 'GET',
+        'parameters' => [],
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Found 4 multilingual-specific pattern(s). Review before switching to mono-language mode.',
+            'data' => [
+                'status' => 'has_multilingual_content',
+                'total_findings' => 4,
+                'findings_by_source' => [
+                    'footer' => [
+                        ['path' => 'children.0.children.1...', 'pattern' => 'lang= parameter', 'match' => 'lang=en', 'value' => '{{__current_page;lang=en}}']
+                    ]
+                ],
+                'affected_sources' => ['footer'],
+                'scanned' => [
+                    'pages' => ['home', 'docs', '...'],
+                    'menu' => true,
+                    'footer' => true,
+                    'components' => ['menu-link', '...']
+                ],
+                'recommendation' => 'Remove or update lang-specific content before switching to mono-language mode'
+            ]
+        ],
+        'error_responses' => [
+            '500.server.file_read_failed' => 'Failed to read structure files'
+        ],
+        'notes' => 'Detects patterns like lang=XX, {{__current_page;lang=XX}}, ?lang= query params, and /XX/ path segments. Returns "clean" status if no multilingual content found. Useful to audit before setMultilingual(enabled=false).'
+    ],
+    
     'addLang' => [
         'description' => 'Adds a new language to the system. Requires MULTILINGUAL_SUPPORT = true.',
         'method' => 'POST',
@@ -1739,7 +1771,7 @@ ApiResponse::create(200, 'operation.success')
             'structure_management' => ['getStructure', 'editStructure', 'listComponents', 'listPages'],
             'alias_management' => ['createAlias', 'deleteAlias', 'listAliases'],
             'translation_management' => ['getTranslation', 'getTranslations', 'setTranslationKeys', 'deleteTranslationKeys', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations'],
-            'language_management' => ['getLangList', 'setMultilingual', 'addLang', 'deleteLang'],
+            'language_management' => ['getLangList', 'setMultilingual', 'checkStructureMulti', 'addLang', 'deleteLang'],
             'asset_management' => ['uploadAsset', 'deleteAsset', 'listAssets'],
             'style_management' => ['getStyles', 'editStyles'],
             'css_variables_rules' => ['getRootVariables', 'setRootVariables', 'listStyleRules', 'getStyleRule', 'setStyleRule', 'deleteStyleRule'],
