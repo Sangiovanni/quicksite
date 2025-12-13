@@ -437,7 +437,9 @@ Template Vitrine follows a **file-based, zero-database philosophy** - but that d
 ### Upcoming Releases
 | Version | Feature | Description |
 |---------|---------|-------------|
-| **v1.4** | Admin Panel | Built-in API Explorer with command selector, dynamic forms, and persistent auth |
+| **v1.3.1** | Structure Audit | `checkStructureMulti` command to find lang-specific content (e.g., `lang=fr` links) before switching modes |
+| **v1.4** | Build Management | List, delete, and deploy builds directly via API |
+| **v1.5** | Admin Panel | Built-in API Explorer with command selector, dynamic forms, and persistent auth |
 
 ### Future Vision
 | Feature | Status | Description |
