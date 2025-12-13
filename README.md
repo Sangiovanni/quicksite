@@ -425,7 +425,7 @@ The compiler generates helper variables:
 
 Template Vitrine follows a **file-based, zero-database philosophy** - but that doesn't mean it can't grow!
 
-### Current Version (v1.3.0)
+### Current Version (v1.3.1)
 - ✅ Complete file-based CMS with JSON templates
 - ✅ RESTful API with 47 commands
 - ✅ Bearer token authentication with RBAC
@@ -433,11 +433,11 @@ Template Vitrine follows a **file-based, zero-database philosophy** - but that d
 - ✅ Production build system
 - ✅ Comprehensive Guides page with practical tutorials
 - ✅ **Mono-Language Mode**: Switch between multilingual and single-language sites with `setMultilingual`
+- ✅ **Structure Audit**: `checkStructureMulti` command to find lang-specific content before switching modes
 
 ### Upcoming Releases
 | Version | Feature | Description |
 |---------|---------|-------------|
-| **v1.3.1** | Structure Audit | `checkStructureMulti` command to find lang-specific content (e.g., `lang=fr` links) before switching modes |
 | **v1.4** | Build Management | List, delete, and deploy builds directly via API |
 | **v1.5** | Admin Panel | Built-in API Explorer with command selector, dynamic forms, and persistent auth |
 
