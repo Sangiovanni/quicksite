@@ -35,11 +35,18 @@ $translations = [];
 $languages = [];
 $errors = [];
 
+// Check multilingual status using the constant
+$multilingualEnabled = defined('MULTILINGUAL_SUPPORT') ? MULTILINGUAL_SUPPORT : false;
+
 foreach ($files as $file) {
     $lang = pathinfo($file, PATHINFO_FILENAME);
     
-    // Skip default.json - it's a template, not a language
-    if ($lang === 'default') {
+    // In multilingual mode, skip default.json (it's a template)
+    // In mono-language mode, ONLY include default.json
+    if ($multilingualEnabled && $lang === 'default') {
+        continue;
+    }
+    if (!$multilingualEnabled && $lang !== 'default') {
         continue;
     }
     
@@ -75,13 +82,11 @@ if (empty($translations)) {
         ->send();
 }
 
-// Check multilingual status
-$multilingualEnabled = defined('MULTILINGUAL') ? MULTILINGUAL : (count($languages) > 1);
-
 $responseData = [
     'translations' => $translations,
     'languages' => $languages,
     'multilingual_enabled' => $multilingualEnabled,
+    'mode' => $multilingualEnabled ? 'multilingual' : 'mono-language',
     'count' => count($translations)
 ];
 

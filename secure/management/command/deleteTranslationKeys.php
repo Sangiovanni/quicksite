@@ -60,11 +60,13 @@ if (strlen($language) > 10) {
 }
 
 // SECURITY: Validate language code format
-if (!preg_match('/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/', $language)) {
+// Also supports "default" for mono-language mode
+$isDefault = ($language === 'default');
+if (!$isDefault && !preg_match('/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/', $language)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage('Invalid language code format')
         ->withErrors([
-            ['field' => 'language', 'value' => $language, 'expected' => 'ISO 639 or BCP 47 format (e.g., en, fr, en-US, zh-Hans)']
+            ['field' => 'language', 'value' => $language, 'expected' => 'ISO 639 or BCP 47 format (e.g., en, fr, en-US, zh-Hans) or "default"']
         ])
         ->send();
 }

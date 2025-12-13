@@ -22,7 +22,7 @@
             "title": "Fonctionnalités",
             "api": {
                 "title": "Contrôle API Total",
-                "desc": "Plus de 45 commandes pour gérer tous les aspects de votre site - routes, pages, styles, traductions, assets, et plus."
+                "desc": "46 commandes pour gerer tous les aspects de votre site - routes, pages, styles, traductions, assets, et plus."
             },
             "i18n": {
                 "title": "Multi-Langues",

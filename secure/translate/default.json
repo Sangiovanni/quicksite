@@ -2,22 +2,60 @@
     "footer": {
         "language": "language",
         "privacy": "Privacy Policy",
-        "terms": "Terms of Use"
+        "terms": "Terms of Use",
+        "madeWith": "Made with love for developers",
+        "copyright": "© 2025 QuickSite. Built with ❤️ and APIs."
     },
     "menu": {
         "home": "Home",
         "about": "About",
         "contact": "Contact",
         "terms": "Terms of Use",
-        "external1": "Google"
+        "external1": "Google",
+        "features": "Features",
+        "docs": "Documentation",
+        "getstarted": "Get Started",
+        "github": "GitHub",
+        "guides": "Guides"
     },
     "home": {
         "title": "Home",
-        "welcomeMessage": "Welcome to our website!"
+        "welcomeMessage": "Welcome to our website!",
+        "hero": {
+            "title": "QuickSite",
+            "subtitle": "Build and manage websites entirely through a REST API. No frontend framework needed.",
+            "cta_start": "Get Started",
+            "cta_docs": "View Docs"
+        },
+        "features": {
+            "title": "Features",
+            "api": {
+                "title": "Full API Control",
+                "desc": "45+ commands to manage every aspect of your site - routes, pages, styles, translations, assets, and more."
+            },
+            "i18n": {
+                "title": "Multi-Language",
+                "desc": "Built-in internationalization with automatic language detection and easy translation management."
+            },
+            "css": {
+                "title": "Dynamic Styling",
+                "desc": "Modify CSS variables, rules, and animations on the fly. No build step required."
+            },
+            "build": {
+                "title": "One-Click Deploy",
+                "desc": "Generate production-ready builds with compiled PHP, sanitized configs, and ZIP packaging."
+            }
+        },
+        "stats": {
+            "commands": "API Commands",
+            "api": "API-Driven",
+            "dependencies": "Dependencies"
+        }
     },
     "404": {
         "pageNotFound": "Page Not Found",
-        "message": "Sorry, the page you are looking for does not exist or has been moved."
+        "message": "Sorry, the page you are looking for does not exist or has been moved.",
+        "backHome": "Back to Home"
     },
     "privacy": {
         "title": "Privacy Policy",
@@ -26,5 +64,223 @@
     "termOfUse": {
         "title": "Terms of Use",
         "content": "These are the terms of use for our website. By using our site, you agree to these terms."
+    },
+    "cta": {
+        "viewDocs": "View Docs",
+        "github": "GitHub",
+        "getStarted": "Get Started",
+        "learnMore": "Learn More"
+    },
+    "site": {
+        "tagline": "File-Based CMS",
+        "name": "Quicksite"
+    },
+    "page": {
+        "titles": {
+            "about": "About - Quicksite",
+            "features": "Features - Quicksite",
+            "home": "QuickSite - Build Websites via API",
+            "docs": "Documentation - QuickSite",
+            "get-started": "Get Started - QuickSite",
+            "privacy": "Privacy Policy - QuickSite",
+            "terms": "Terms of Use - QuickSite",
+            "404": "Page Not Found - QuickSite",
+            "guides": "Guides - QuickSite"
+        }
+    },
+    "docs": {
+        "title": "API Documentation",
+        "intro": "Complete reference for all QuickSite management commands. All endpoints require authentication.",
+        "auth": {
+            "title": "Authentication",
+            "desc": "Include your API token in the Authorization header for all requests:"
+        },
+        "cat": {
+            "folder": "Folder Management",
+            "route": "Route Management",
+            "structure": "Structure Management",
+            "alias": "URL Aliases",
+            "translation": "Translation Management",
+            "language": "Language Management",
+            "asset": "Asset Management",
+            "style": "Style Management",
+            "css_vars": "CSS Variables & Rules",
+            "animations": "CSS Animations",
+            "customize": "Site Customization",
+            "build": "Build & Deploy",
+            "auth": "Token Management",
+            "docs": "Documentation"
+        }
+    },
+    "tutorial": {
+        "title": "Getting Started with QuickSite",
+        "intro": "Follow this step-by-step guide to set up your first QuickSite project in minutes.",
+        "step1": {
+            "title": "1. Install Prerequisites",
+            "desc": "Make sure you have PHP 7.4+ (tested up to 8.4) and a web server (Apache, Nginx, or WAMP\/XAMPP) installed on your system."
+        },
+        "step2": {
+            "title": "2. Clone the Repository",
+            "desc": "Clone the QuickSite template repository from GitHub and configure your web server to point to the public directory."
+        },
+        "step3": {
+            "title": "3. Configure Your Site",
+            "desc": "Edit the configuration files in the secure\/config directory to set up your site name, languages, and API token."
+        },
+        "step4": {
+            "title": "4. Create Your First Route",
+            "desc": "Use the addRoute API command to create a new page, then add content with the editStructure command."
+        },
+        "step5": {
+            "title": "5. Build & Deploy",
+            "desc": "Generate a static build of your site using the build command, then upload the files to your hosting provider."
+        },
+        "next": {
+            "title": "Next Steps",
+            "desc": "Now that your site is running, explore more features:",
+            "docs": "Read the full API documentation",
+            "github": "Star us on GitHub"
+        }
+    },
+    "guides": {
+        "i18n": {
+            "title": "Internationalization",
+            "add": {
+                "desc": "Add or update translation keys safely. setTranslationKeys performs a deep merge, so existing keys are preserved."
+            },
+            "intro": "Build multilingual sites with translation keys. QuickSite supports multiple languages with shared page structures.",
+            "health": {
+                "desc": "Check translation completeness across all languages. Find missing keys, unused translations, and get recommendations."
+            },
+            "newlang": {
+                "desc": "Add a new language to your site. This creates the translation file and registers the language in config."
+            }
+        },
+        "structure": {
+            "actions": {
+                "desc": "Use actions to insert, delete, or move nodes relative to others. insertAfter, insertBefore, and delete give you full control."
+            },
+            "showids": {
+                "desc": "Use showIds to see node identifiers for surgical editing. Each node gets a dot-notation ID like 0.2.1 for precise targeting."
+            },
+            "json": {
+                "desc": "QuickSite pages are defined as JSON trees. Each node has a tag (HTML element), optional params (attributes), and children (nested elements or text)."
+            },
+            "nodeid": {
+                "desc": "Target specific nodes for updates using their nodeId. This allows precise edits without replacing the entire structure."
+            },
+            "title": "Structure Editing",
+            "intro": "Master the JSON-based page structure system. Every element is a node with tag, params, and children."
+        },
+        "deploy": {
+            "title": "Deployment",
+            "space": {
+                "desc": "Configure the URL prefix for sites running in a subdirectory. Updates all internal links automatically."
+            },
+            "intro": "Build and deploy your site. Create optimized production builds with customizable folder names.",
+            "build": {
+                "desc": "Create a timestamped production build. Customize public and secure folder names for your hosting environment."
+            }
+        },
+        "urls": {
+            "title": "URL Management",
+            "intro": "Create URL aliases and redirects. Map multiple URLs to the same content or redirect old URLs.",
+            "redirect": {
+                "desc": "Create URL mappings with two types: redirect (301 HTTP redirect) or internal (transparent routing)."
+            }
+        },
+        "title": "Practical Guides",
+        "toc": {
+            "assets": "Assets & Branding",
+            "deploy": "Deployment",
+            "security": "API Security",
+            "urls": "URL Management",
+            "css": "CSS & Theming",
+            "structure": "Structure Editing",
+            "i18n": "Internationalization",
+            "docs": "Documentation",
+            "title": "Table of Contents",
+            "pages": "Building Pages"
+        },
+        "intro": "Learn QuickSite through task-oriented tutorials. Each guide covers related API commands in real-world workflows.",
+        "footer": {
+            "title": "Ready to Build?",
+            "api": "API Reference",
+            "desc": "Explore the full API reference or check out the source code on GitHub.",
+            "github": "View on GitHub"
+        },
+        "assets": {
+            "title": "Assets & Branding",
+            "intro": "Manage media files and branding elements. Upload images, fonts, and other assets via the API.",
+            "favicon": {
+                "desc": "Set the site favicon from an uploaded image. The image should be square (ideally 32x32 or larger)."
+            },
+            "upload": {
+                "desc": "Upload files to categorized folders. Supports images, scripts, fonts, audio, and video files."
+            },
+            "pagetitle": {
+                "desc": "Update page titles per language. Titles appear in the browser tab and search results."
+            }
+        },
+        "security": {
+            "title": "API Security",
+            "create": {
+                "desc": "Generate new API tokens with specific permissions. Use * for full access or read for read-only access."
+            },
+            "intro": "Manage API access with tokens. Create, list, and revoke tokens with customizable permissions.",
+            "manage": {
+                "desc": "View existing tokens (values masked for security) and revoke tokens that are no longer needed."
+            }
+        },
+        "css": {
+            "title": "CSS & Theming",
+            "intro": "Control your site's appearance through the API. Manage CSS variables, rules, and animations programmatically.",
+            "variables": {
+                "desc": "CSS variables (custom properties) are defined in :root and can be changed instantly across your entire site."
+            },
+            "rules": {
+                "desc": "Add or update CSS rules for any selector. Styles are provided as key-value pairs and merged with existing rules."
+            },
+            "animations": {
+                "desc": "Create CSS keyframe animations that can be applied to elements using the animation property."
+            }
+        },
+        "docs": {
+            "title": "API Documentation",
+            "intro": "Access built-in help for all API endpoints. The help command provides detailed documentation.",
+            "help": {
+                "desc": "Get comprehensive documentation for all commands or detailed help for a specific endpoint."
+            }
+        },
+        "pages": {
+            "list": {
+                "desc": "View all pages in your project with their metadata, including routes and file locations."
+            },
+            "title": "Building Pages",
+            "create": {
+                "result": "This creates a new page at \/about-us with an empty JSON structure ready for content.",
+                "desc": "Use addRoute to create a new page. This creates both the PHP file and the JSON structure file."
+            },
+            "intro": "Create, list, and delete pages in your QuickSite project. Each page consists of a PHP handler and a JSON structure file.",
+            "delete": {
+                "desc": "Remove a page completely. This deletes both the PHP handler and JSON structure file."
+            }
+        }
+    },
+    "test": {
+        "key": "value"
+    },
+    "testSection": {
+        "title": "Test Section",
+        "intro": "This is a test introduction with longer text to verify the command works.",
+        "nested": {
+            "key3": "Value 3",
+            "key1": "Value 1",
+            "key2": "Value 2"
+        }
+    },
+    "fileTest": {
+        "title": "File Test",
+        "desc": "Testing file-based approach for large payloads"
     }
 }

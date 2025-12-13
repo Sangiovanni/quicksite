@@ -22,7 +22,7 @@
             "title": "Features",
             "api": {
                 "title": "Full API Control",
-                "desc": "45+ commands to manage every aspect of your site - routes, pages, styles, translations, assets, and more."
+                "desc": "46 commands to manage every aspect of your site - routes, pages, styles, translations, assets, and more."
             },
             "i18n": {
                 "title": "Multi-Language",
@@ -76,7 +76,9 @@
         "docs": "Documentation",
         "getstarted": "Get Started",
         "github": "GitHub",
-        "guides": "Guides"
+        "guides": "Guides",
+        "contact": "Contact",
+        "external1": "Google"
     },
     "privacy": {
         "title": "Privacy Policy",
@@ -115,7 +117,7 @@
         "intro": "Follow this step-by-step guide to set up your first QuickSite project in minutes.",
         "step1": {
             "title": "1. Install Prerequisites",
-            "desc": "Make sure you have PHP 7.4+ (tested up to 8.4) and a web server (Apache, Nginx, or WAMP/XAMPP) installed on your system."
+            "desc": "Make sure you have PHP 7.4+ (tested up to 8.4) and a web server (Apache, Nginx, or WAMP\/XAMPP) installed on your system."
         },
         "step2": {
             "title": "2. Clone the Repository",
@@ -123,7 +125,7 @@
         },
         "step3": {
             "title": "3. Configure Your Site",
-            "desc": "Edit the configuration files in the secure/config directory to set up your site name, languages, and API token."
+            "desc": "Edit the configuration files in the secure\/config directory to set up your site name, languages, and API token."
         },
         "step4": {
             "title": "4. Create Your First Route",
@@ -256,7 +258,7 @@
             },
             "title": "Building Pages",
             "create": {
-                "result": "This creates a new page at /about-us with an empty JSON structure ready for content.",
+                "result": "This creates a new page at \/about-us with an empty JSON structure ready for content.",
                 "desc": "Use addRoute to create a new page. This creates both the PHP file and the JSON structure file."
             },
             "intro": "Create, list, and delete pages in your QuickSite project. Each page consists of a PHP handler and a JSON structure file.",

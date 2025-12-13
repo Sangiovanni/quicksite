@@ -467,9 +467,9 @@ $commands = [
             '{lang}' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Language code (URL segment)',
+                'description' => 'Language code (URL segment), or "default" for mono-language mode',
                 'example' => 'en',
-                'validation' => '2-3 lowercase letters'
+                'validation' => '2-3 lowercase letters, or literal "default"'
             ]
         ],
         'example_get' => 'GET /management/getTranslation/en',
@@ -489,11 +489,11 @@ $commands = [
             '404.file.not_found' => 'Translation file not found',
             '500.server.file_write_failed' => 'Failed to read translation file'
         ],
-        'notes' => 'Returns translations for a single language. Use this when editing one language at a time.'
+        'notes' => 'Returns translations for a single language. Use language="default" in mono-language mode to access default.json.'
     ],
     
     'getTranslations' => [
-        'description' => 'Retrieves translations for all languages',
+        'description' => 'Retrieves translations for all languages (mode-aware)',
         'method' => 'GET',
         'parameters' => [],
         'example_get' => 'GET /management/getTranslations',
@@ -513,7 +513,7 @@ $commands = [
         'error_responses' => [
             '404.file.not_found' => 'No translation files found'
         ],
-        'notes' => 'Returns all translation files. Use getTranslation for single language operations.'
+        'notes' => 'In multilingual mode: returns all language files (en.json, fr.json, etc.). In mono-language mode: returns only default.json. Response includes multilingual_enabled flag.'
     ],
     
     'setTranslationKeys' => [
@@ -523,9 +523,9 @@ $commands = [
             'language' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Language code',
+                'description' => 'Language code, or "default" for mono-language mode',
                 'example' => 'en',
-                'validation' => '2-3 lowercase letters'
+                'validation' => '2-3 lowercase letters, or literal "default"'
             ],
             'translations' => [
                 'required' => true,
@@ -553,7 +553,7 @@ $commands = [
             '400.validation.invalid_format' => 'Invalid translation format',
             '500.server.file_write_failed' => 'Failed to write translation file'
         ],
-        'notes' => 'SAFE: Merges with existing translations. New keys are added, existing keys are updated, other keys are preserved. Use deleteTranslationKeys to remove keys.'
+        'notes' => 'SAFE: Merges with existing translations. Use language="default" in mono-language mode to edit default.json. New keys are added, existing keys are updated, other keys are preserved.'
     ],
     
     'deleteTranslationKeys' => [
@@ -563,9 +563,9 @@ $commands = [
             'language' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Language code',
+                'description' => 'Language code, or "default" for mono-language mode',
                 'example' => 'en',
-                'validation' => '2-3 lowercase letters'
+                'validation' => '2-3 lowercase letters, or literal "default"'
             ],
             'keys' => [
                 'required' => true,
@@ -594,7 +594,7 @@ $commands = [
             '404.resource.not_found' => 'Translation file not found or no keys deleted',
             '500.server.file_write_failed' => 'Failed to write translation file'
         ],
-        'notes' => 'Supports dot notation for nested keys. Empty parent objects are automatically cleaned up after deletion.'
+        'notes' => 'Supports dot notation for nested keys. Use language="default" in mono-language mode. Empty parent objects are automatically cleaned up after deletion.'
     ],
     
     'getLangList' => [
@@ -617,12 +617,50 @@ $commands = [
             ]
         ],
         'error_responses' => [],
-        'notes' => 'Returns configuration from config.php. Useful for UI language selectors.'
+        'notes' => 'Returns configuration from config.php. Useful for UI language selectors and checking current mode.'
+    ],
+    
+    'setMultilingual' => [
+        'description' => 'Enable or disable multilingual support. Syncs translations between default.json and default language file.',
+        'method' => 'POST',
+        'parameters' => [
+            'enabled' => [
+                'required' => true,
+                'type' => 'boolean',
+                'description' => 'true for multilingual mode, false for mono-language mode',
+                'example' => false,
+                'validation' => 'Must be boolean true/false'
+            ]
+        ],
+        'example_post' => 'POST /management/setMultilingual with body: {"enabled": false}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Successfully switched to mono-language mode',
+            'data' => [
+                'multilingual_enabled' => false,
+                'changed' => true,
+                'mode' => 'mono-language',
+                'default_language' => 'en',
+                'sync' => [
+                    'direction' => 'en.json → default.json',
+                    'keys_added' => 42
+                ]
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing enabled parameter',
+            '400.validation.invalid_type' => 'enabled must be boolean',
+            '400.validation.invalid_format' => 'Multilingual mode requires at least 2 languages',
+            '500.server.file_write_failed' => 'Failed to update config.php or translation files'
+        ],
+        'notes' => 'When switching modes, translations are synced: mono→multi copies default.json keys to default language file, multi→mono copies default language to default.json. Use language="default" with setTranslationKeys in mono-language mode.'
     ],
     
     'addLang' => [
-        'description' => 'Adds a new language to the system',
+        'description' => 'Adds a new language to the system. Requires MULTILINGUAL_SUPPORT = true.',
         'method' => 'POST',
+        'requires_mode' => 'multilingual',
         'parameters' => [
             'code' => [
                 'required' => true,
@@ -655,15 +693,17 @@ $commands = [
         'error_responses' => [
             '400.validation.required' => 'Missing code or name parameter',
             '400.validation.invalid_format' => 'Invalid language code format',
+            '403.mode.requires_multilingual' => 'This command requires multilingual mode',
             '409.conflict.duplicate' => 'Language already exists',
             '500.server.file_write_failed' => 'Failed to update config or create translation file'
         ],
-        'notes' => 'Updates config.php and creates translation file by copying from default language. Requires system reload to apply changes.'
+        'notes' => 'Only available when MULTILINGUAL_SUPPORT = true. Use setMultilingual to enable multilingual mode first. Updates config.php and creates translation file by copying from default language.'
     ],
     
     'deleteLang' => [
-        'description' => 'Deletes a language from the system',
+        'description' => 'Deletes a language from the system. Requires MULTILINGUAL_SUPPORT = true.',
         'method' => 'POST',
+        'requires_mode' => 'multilingual',
         'parameters' => [
             'code' => [
                 'required' => true,
@@ -688,10 +728,11 @@ $commands = [
         'error_responses' => [
             '400.validation.required' => 'Missing code parameter',
             '400.validation.invalid_format' => 'Cannot delete default or last language',
+            '403.mode.requires_multilingual' => 'This command requires multilingual mode',
             '404.route.not_found' => 'Language not found',
             '500.server.file_write_failed' => 'Failed to update config'
         ],
-        'notes' => 'Cannot delete default language or last remaining language. Updates config.php and deletes translation file.'
+        'notes' => 'Only available when MULTILINGUAL_SUPPORT = true. Cannot delete default language or last remaining language.'
     ],
     
     'getTranslationKeys' => [
@@ -1698,7 +1739,7 @@ ApiResponse::create(200, 'operation.success')
             'structure_management' => ['getStructure', 'editStructure', 'listComponents', 'listPages'],
             'alias_management' => ['createAlias', 'deleteAlias', 'listAliases'],
             'translation_management' => ['getTranslation', 'getTranslations', 'setTranslationKeys', 'deleteTranslationKeys', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations'],
-            'language_management' => ['getLangList', 'addLang', 'deleteLang'],
+            'language_management' => ['getLangList', 'setMultilingual', 'addLang', 'deleteLang'],
             'asset_management' => ['uploadAsset', 'deleteAsset', 'listAssets'],
             'style_management' => ['getStyles', 'editStyles'],
             'css_variables_rules' => ['getRootVariables', 'setRootVariables', 'listStyleRules', 'getStyleRule', 'setStyleRule', 'deleteStyleRule'],

@@ -2581,6 +2581,252 @@
                         "tag": "div",
                         "params": {
                             "class": "command-card",
+                            "id": "cmd-setMultilingual"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__setMultilingual"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/setMultilingual"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Enable or disable multilingual support. Syncs translations between default.json and default language file."
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__enabled"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Boolean: true for multilingual, false for mono-language"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-setMultilingual"
+                        },
+                        "tag": "div",
+                        "children": [
+                            {
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "tag": "h3",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__setMultilingual"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "tag": "span",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/setMultilingual"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "tag": "p",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Enable or disable multilingual support. Syncs translations between default.json and default language file."
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__enabled"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Boolean: true for multilingual, false for mono-language"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
                             "id": "cmd-addLang"
                         },
                         "children": [

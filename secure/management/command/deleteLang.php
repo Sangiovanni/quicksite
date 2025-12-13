@@ -1,6 +1,14 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 
+// Check if multilingual mode is enabled
+if (!MULTILINGUAL_SUPPORT) {
+    ApiResponse::create(403, 'mode.requires_multilingual')
+        ->withMessage('The deleteLang command requires multilingual mode. Use setMultilingual to enable it first.')
+        ->withData(['current_mode' => 'mono-language'])
+        ->send();
+}
+
 $params = $trimParametersManagement->params();
 
 // Validate required parameter

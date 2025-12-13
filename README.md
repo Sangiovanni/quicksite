@@ -20,7 +20,7 @@ That question turned a template into a CMS. The file-based architecture wasn't a
 - **JSON-Driven Templates**: Define page structures, menus, and components in JSON, compiled to optimized PHP
 - **Multilingual Support**: Built-in translation system with language switching and validation
 - **Production Builds**: One-command deployment with compilation, optimization, and ZIP packaging
-- **RESTful Management API**: 45 endpoints for complete site management
+- **RESTful Management API**: 46 endpoints for complete site management
 - **File-Based Storage**: No database required - all configuration in JSON/PHP files
 - **Flexible Architecture**: Separate public and secure folders for clean deployment
 - **🔐 API Authentication**: Bearer token authentication with role-based permissions
@@ -198,8 +198,9 @@ curl -H "Authorization: Bearer your_token_here" \
 - `GET /management/getUnusedTranslationKeys/{lang?}` - Find orphaned keys not used in structures
 - `GET /management/analyzeTranslations/{lang?}` - Full health check (missing + unused + recommendations)
 - `GET /management/getLangList` - List supported languages
-- `POST /management/addLang` - Add new language
-- `POST /management/deleteLang` - Delete language
+- `POST /management/setMultilingual` - Switch between multilingual and mono-language modes
+- `POST /management/addLang` - Add new language (multilingual mode only)
+- `POST /management/deleteLang` - Delete language (multilingual mode only)
 
 #### **Asset Management**
 - `POST /management/uploadAsset` - Upload file to assets
@@ -260,7 +261,7 @@ quicksite/                    # (or your chosen project name)
 │   │   ├── auth.php         # Authentication & CORS settings
 │   │   └── aliases.json     # URL alias definitions
 │   ├── management/          # Management API implementation
-│   │   ├── command/         # API endpoints (45 commands)
+│   │   ├── command/         # API endpoints (46 commands)
 │   │   └── routes.php       # Management routes
 │   ├── material/            # Core classes
 │   │   └── Page.php         # Page rendering engine
@@ -424,18 +425,18 @@ The compiler generates helper variables:
 
 Template Vitrine follows a **file-based, zero-database philosophy** - but that doesn't mean it can't grow!
 
-### Current Version (v1.2.0)
+### Current Version (v1.3.0)
 - ✅ Complete file-based CMS with JSON templates
-- ✅ RESTful API with 45 commands
+- ✅ RESTful API with 46 commands
 - ✅ Bearer token authentication with RBAC
 - ✅ CORS support for external UIs
 - ✅ Production build system
 - ✅ Comprehensive Guides page with practical tutorials
+- ✅ **Mono-Language Mode**: Switch between multilingual and single-language sites with `setMultilingual`
 
 ### Upcoming Releases
 | Version | Feature | Description |
 |---------|---------|-------------|
-| **v1.3** | Mono-Language Mode | Simplified setup using `default.json` for single-language sites |
 | **v1.4** | Admin Panel | Built-in API Explorer with command selector, dynamic forms, and persistent auth |
 
 ### Future Vision

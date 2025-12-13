@@ -42,7 +42,14 @@ class ApiResponse {
         404 => [
             'route.not_found' => 'Route not found',
             'file.not_found' => 'File not found',
-            'asset.not_found' => 'Asset file not found',                 
+            'asset.not_found' => 'Asset file not found',
+            'node.not_found' => 'Node not found at specified path',
+        ],
+        403 => [
+            'auth.forbidden' => 'Access denied',
+            'mode.requires_multilingual' => 'This command requires MULTILINGUAL_SUPPORT = true',
+            'mode.requires_mono' => 'This command requires MULTILINGUAL_SUPPORT = false',
+            'feature.disabled' => 'This feature is disabled in current configuration',
         ],
         409 => [
             'conflict.duplicate' => 'Resource already exists',

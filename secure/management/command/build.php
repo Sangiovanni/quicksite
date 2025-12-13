@@ -398,12 +398,36 @@ if (!copy(SECURE_FOLDER_PATH . '/src/functions/String.php', $buildFullPath . '/'
         ->send();
 }
 
-// Copy /translate/ directory
-if (!copyDirectory(SECURE_FOLDER_PATH . '/translate', $buildFullPath . '/' . $buildSecureName . '/translate')) {
-    release_build_lock();
-    ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage("Failed to copy /translate/ directory")
-        ->send();
+// Copy /translate/ directory (only default.json in mono-language mode)
+$translateDestPath = $buildFullPath . '/' . $buildSecureName . '/translate';
+if (!is_dir($translateDestPath)) {
+    mkdir($translateDestPath, 0755, true);
+}
+
+if (MULTILINGUAL_SUPPORT) {
+    // Multilingual: copy all translation files
+    if (!copyDirectory(SECURE_FOLDER_PATH . '/translate', $translateDestPath)) {
+        release_build_lock();
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to copy /translate/ directory")
+            ->send();
+    }
+} else {
+    // Mono-language: copy only default.json
+    $defaultJsonPath = SECURE_FOLDER_PATH . '/translate/default.json';
+    if (file_exists($defaultJsonPath)) {
+        if (!copy($defaultJsonPath, $translateDestPath . '/default.json')) {
+            release_build_lock();
+            ApiResponse::create(500, 'server.file_write_failed')
+                ->withMessage("Failed to copy default.json")
+                ->send();
+        }
+    } else {
+        release_build_lock();
+        ApiResponse::create(404, 'file.not_found')
+            ->withMessage("default.json not found - required for mono-language mode")
+            ->send();
+    }
 }
 
 // Step 4: Compile menu.php and footer.php using JsonToPhpCompiler
@@ -552,7 +576,7 @@ NOTES:
 - This is a production build (no management API)
 - Database credentials are intentionally blank for security
 - All pages are pre-compiled for performance
-- Translation files are included for runtime language switching
+- Language mode: %LANG_MODE%
 
 COMPILED PAGES: %PAGES%
 
@@ -561,6 +585,8 @@ README;
 
 $readme = str_replace('%DATE%', date('Y-m-d H:i:s'), $readme);
 $readme = str_replace('%PAGES%', implode(', ', $compiledPages), $readme);
+$langMode = MULTILINGUAL_SUPPORT ? 'Multilingual (all language files included)' : 'Mono-language (default.json only)';
+$readme = str_replace('%LANG_MODE%', $langMode, $readme);
 
 file_put_contents($buildFullPath . '/README.txt', $readme);
 
