@@ -8,8 +8,9 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
 
-// Optional: get specific keyframe by name
-$name = $urlParams[0] ?? null;
+// Optional: get specific keyframe by name from URL segment: /management/getKeyframes/{name?}
+$urlSegments = $trimParametersManagement->additionalParams();
+$name = $urlSegments[0] ?? null;
 
 $styleFile = PUBLIC_FOLDER_ROOT . '/style/style.css';
 

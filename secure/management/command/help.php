@@ -343,9 +343,9 @@ $commands = [
     ],
     
     'getStructure' => [
-        'description' => 'Retrieves the JSON structure for a page, menu, footer, or component',
+        'description' => 'Retrieves the JSON structure for a page, menu, footer, or component. Supports node identifiers for targeted retrieval.',
         'method' => 'GET',
-        'url_structure' => '/management/getStructure/{type}/{name?}',
+        'url_structure' => '/management/getStructure/{type}/{name?}/{option?}',
         'parameters' => [
             '{type}' => [
                 'required' => true,
@@ -360,80 +360,103 @@ $commands = [
                 'description' => 'Name (required for page/component, optional for menu/footer)',
                 'example' => 'home',
                 'validation' => 'Must be an existing route (for pages) or component name'
+            ],
+            '{option}' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Optional: "showIds" to add _nodeId to all nodes, "summary" for tree overview, or a nodeId (e.g., "0.2.1") to get specific node',
+                'example' => 'showIds, summary, 0.2.1',
+                'validation' => 'Either "showIds", "summary", or dot-notation number (0, 0.1, 0.1.2, etc.)'
             ]
         ],
-        'example_get' => 'GET /management/getStructure/menu, GET /management/getStructure/page/home, or GET /management/getStructure/component/img-dynamic',
+        'example_get' => 'GET /management/getStructure/page/home, GET /management/getStructure/page/home/showIds, GET /management/getStructure/page/home/summary, GET /management/getStructure/page/home/0.0.2',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
             'message' => 'Structure retrieved successfully',
             'data' => [
-                'type' => 'component',
-                'name' => 'img-dynamic',
-                'structure' => '(JSON structure object)',
-                'file' => '/path/to/img-dynamic.json'
+                'type' => 'page',
+                'name' => 'home',
+                'structure' => '(JSON structure with optional _nodeId on each node)',
+                'file' => '/path/to/home.json',
+                'nodeIds' => 'included or not included'
             ]
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing type or name in URL',
-            '400.validation.invalid_format' => 'Invalid type (must be page/menu/footer/component)',
+            '400.validation.invalid_format' => 'Invalid type or option format',
             '404.route.not_found' => 'Page does not exist',
             '404.file.not_found' => 'Structure file not found',
-            '500.server.file_write_failed' => 'Failed to read structure file',
-            '500.server.internal_error' => 'Invalid JSON in structure file'
+            '404.node.not_found' => 'Node not found at specified identifier',
+            '500.server.file_write_failed' => 'Failed to read structure file'
         ],
-        'notes' => 'Uses URL segments. For menu/footer: GET /getStructure/{type}. For pages/components: GET /getStructure/{type}/{name}. Components are reusable templates with {{placeholder}} syntax.'
+        'notes' => 'Node identifiers use 0-indexed dot notation: "0.2.1" = root\'s 1st child → 3rd child → 2nd child. Use /summary to see structure overview with nodeIds. Use specific nodeId to retrieve just that node.'
     ],
 
     'editStructure' => [
-        'description' => 'Updates the JSON structure for a page, menu, footer, or component (creates component if new)',
+        'description' => 'Updates JSON structure for page/menu/footer/component. Supports targeted node editing via nodeId parameter.',
         'method' => 'POST',
         'parameters' => [
             'type' => [
                 'required' => true,
                 'type' => 'string',
                 'description' => 'Type of structure to update',
-                'example' => 'component',
+                'example' => 'page',
                 'validation' => 'Must be one of: page, menu, footer, component'
             ],
             'name' => [
                 'required' => false,
                 'type' => 'string',
                 'description' => 'Name (required for page/component)',
-                'example' => 'img-dynamic',
+                'example' => 'home',
                 'validation' => 'Must be existing route (pages) or alphanumeric/hyphens/underscores (components)'
             ],
             'structure' => [
                 'required' => true,
                 'type' => 'array/object',
-                'description' => 'Complete JSON structure (replaces existing). Array for pages/menu/footer, object for components',
-                'example' => '{"tag": "img", "params": {"src": "{{src}}"}, "children": null}',
+                'description' => 'JSON structure. Full replacement if no nodeId, single node if nodeId provided. Not required for action=delete.',
+                'example' => '{"tag": "h2", "children": [{"textKey": "title"}]}',
                 'validation' => 'Must be valid JSON, max 10,000 nodes, max 50 levels deep'
+            ],
+            'nodeId' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Target node identifier for surgical edits (e.g., "0.2.1"). When provided, only that node is affected.',
+                'example' => '0.2.1',
+                'validation' => 'Dot-notation numbers (0, 0.1, 0.1.2, etc.)'
+            ],
+            'action' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Action to perform when nodeId is provided',
+                'default' => 'update',
+                'example' => 'update, delete, insertBefore, insertAfter',
+                'validation' => 'Must be: update (replace node), delete (remove node), insertBefore, insertAfter'
             ]
         ],
-        'example_post' => 'POST /management/editStructure with body: {"type": "component", "name": "button", "structure": {...}}',
+        'example_post' => 'Full: {"type": "page", "name": "home", "structure": [...]}. Targeted: {"type": "page", "name": "home", "nodeId": "0.2", "structure": {...}}. Delete: {"type": "page", "name": "home", "nodeId": "0.2", "action": "delete"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => 'Structure updated successfully',
+            'message' => 'Structure/Node updated successfully',
             'data' => [
-                'type' => 'component',
-                'name' => 'button',
-                'file' => '/path/to/button.json',
-                'structure_size' => 1,
-                'node_count' => 3,
-                'created' => true
+                'type' => 'page',
+                'name' => 'home',
+                'nodeId' => '0.2 (if targeted edit)',
+                'action' => 'updated/deleted/inserted',
+                'file' => '/path/to/home.json'
             ]
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing type, name, or structure parameter',
-            '400.validation.invalid_format' => 'Invalid type, structure format, too large, or too deeply nested',
+            '400.validation.invalid_format' => 'Invalid type, nodeId format, or structure format',
+            '400.operation.failed' => 'Node operation failed (e.g., node not found)',
             '404.route.not_found' => 'Page does not exist',
             '404.file.not_found' => 'Structure file not found',
             '500.server.file_write_failed' => 'Failed to write structure file',
             '500.server.internal_error' => 'Failed to encode structure to JSON'
         ],
-        'notes' => 'Replaces existing structure. For components: creates new if doesn\'t exist. Components use {{placeholder}} for dynamic data. Pages/menu/footer are arrays of nodes, components are single objects. Security: max 10,000 nodes, max 50 levels deep.'
+        'notes' => 'Two modes: (1) Full replacement - sends complete structure. (2) Targeted edit - use nodeId to modify single node. Use getStructure/page/name/showIds to see node identifiers first. Actions: update (replace), delete (remove), insertBefore/insertAfter (add sibling). Security: max 10,000 nodes, max 50 levels deep.'
     ],
     
     'getTranslation' => [
@@ -926,16 +949,17 @@ $commands = [
     'listAssets' => [
         'description' => 'Lists all files in assets folder, optionally filtered by category',
         'method' => 'GET',
+        'url_structure' => '/management/listAssets/{category?}',
         'parameters' => [
-            'category' => [
+            '{category}' => [
                 'required' => false,
-                'type' => 'query_string',
-                'description' => 'Filter by category (optional)',
+                'type' => 'string',
+                'description' => 'Filter by category (URL segment, optional)',
                 'example' => 'images',
                 'validation' => 'If provided, must be one of: images, scripts, font, audio, videos'
             ]
         ],
-        'example_get' => 'GET /management?command=listAssets (all) or GET /management?command=listAssets&category=images (filtered)',
+        'example_get' => 'GET /management/listAssets (all) or GET /management/listAssets/images (filtered)',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1232,10 +1256,18 @@ $commands = [
     ],
     
     'getKeyframes' => [
-        'description' => 'Retrieves all @keyframes animations defined in the stylesheet',
+        'description' => 'Retrieves all @keyframes animations defined in the stylesheet, or a specific one by name',
         'method' => 'GET',
-        'parameters' => [],
-        'example_get' => 'GET /management/getKeyframes',
+        'url_structure' => '/management/getKeyframes/{name?}',
+        'parameters' => [
+            '{name}' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Animation name to retrieve (URL segment, optional)',
+                'example' => 'fadeIn'
+            ]
+        ],
+        'example_get' => 'GET /management/getKeyframes (all) or GET /management/getKeyframes/fadeIn (specific)',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',

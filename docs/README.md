@@ -6,7 +6,7 @@ Technical documentation for the **Quicksite** project (formerly Template Vitrine
 
 ### API Reference
 - **[COMMAND_API_DOCUMENTATION.md](COMMAND_API_DOCUMENTATION.md)** - Complete API reference
-  - All 27 management endpoints
+  - All 45 management commands
   - Parameters, validation rules, examples
   - Error codes and responses
   - Authentication & CORS configuration

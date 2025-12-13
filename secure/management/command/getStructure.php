@@ -1,7 +1,8 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
 
-// Get URL segments: /management/getStructure/{type}/{name?}
+// Get URL segments: /management/getStructure/{type}/{name?}/{nodeId|showIds}
 $urlSegments = $trimParametersManagement->additionalParams();
 
 // Validate type parameter (first segment)
@@ -141,6 +142,77 @@ if (json_last_error() !== JSON_ERROR_NONE) {
         ->send();
 }
 
+// Check for additional parameters: nodeId or showIds
+// For page/component: urlSegments[2] would be the option
+// For menu/footer: urlSegments[1] would be the option
+$optionSegment = ($type === 'page' || $type === 'component') 
+    ? ($urlSegments[2] ?? null) 
+    : ($urlSegments[1] ?? null);
+
+$showIds = false;
+$targetNodeId = null;
+$summaryMode = false;
+
+if ($optionSegment !== null) {
+    if ($optionSegment === 'showIds') {
+        $showIds = true;
+    } elseif ($optionSegment === 'summary') {
+        $summaryMode = true;
+    } elseif (preg_match('/^[0-9]+(\.[0-9]+)*$/', $optionSegment)) {
+        // It's a nodeId - retrieve specific node
+        $targetNodeId = $optionSegment;
+    } else {
+        ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage("Invalid option. Use 'showIds', 'summary', or a node identifier (e.g., '0.2.1')")
+            ->withErrors([['field' => 'option', 'value' => $optionSegment]])
+            ->send();
+    }
+}
+
+// Handle summary mode - returns simplified tree view
+if ($summaryMode) {
+    $summary = NodeNavigator::getSummary($structure);
+    ApiResponse::create(200, 'operation.success')
+        ->withMessage('Structure summary retrieved successfully')
+        ->withData([
+            'type' => $type,
+            'name' => $name,
+            'summary' => $summary,
+            'note' => 'Use _nodeId values with editStructure for targeted edits'
+        ])
+        ->send();
+}
+
+// Handle specific node retrieval
+if ($targetNodeId !== null) {
+    $node = NodeNavigator::getNode($structure, $targetNodeId);
+    
+    if ($node === null) {
+        ApiResponse::create(404, 'node.not_found')
+            ->withMessage("Node not found at identifier: {$targetNodeId}")
+            ->withErrors([['field' => 'nodeId', 'value' => $targetNodeId]])
+            ->send();
+    }
+    
+    // Add nodeId to the returned node
+    $nodeWithId = NodeNavigator::addNodeIds($node, $targetNodeId);
+    
+    ApiResponse::create(200, 'operation.success')
+        ->withMessage('Node retrieved successfully')
+        ->withData([
+            'type' => $type,
+            'name' => $name,
+            'nodeId' => $targetNodeId,
+            'node' => $nodeWithId
+        ])
+        ->send();
+}
+
+// Handle showIds - add _nodeId to all nodes
+if ($showIds) {
+    $structure = NodeNavigator::addNodeIds($structure);
+}
+
 // Success
 ApiResponse::create(200, 'operation.success')
     ->withMessage('Structure retrieved successfully')
@@ -148,6 +220,7 @@ ApiResponse::create(200, 'operation.success')
         'type' => $type,
         'name' => $name,
         'structure' => $structure,
-        'file' => $json_file
+        'file' => $json_file,
+        'nodeIds' => $showIds ? 'included' : 'not included (add /showIds to URL)'
     ])
     ->send();

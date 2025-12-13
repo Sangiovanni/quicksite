@@ -184,8 +184,9 @@ curl -H "Authorization: Bearer your_token_here" \
 - `GET /management/getRoutes` - List all routes
 
 #### **Structure Management**
-- `GET /management/getStructure/{type}/{name?}` - Get page/menu/footer/component JSON
-- `POST /management/editStructure` - Update structure JSON
+- `GET /management/getStructure/{type}/{name?}/{option?}` - Get page/menu/footer/component JSON
+  - Options: `showIds` (add node identifiers), `summary` (tree overview), `{nodeId}` (specific node)
+- `POST /management/editStructure` - Update structure JSON (full replacement or targeted nodeId edit)
 
 #### **Translation Management**
 - `GET /management/getTranslation/{lang}` - Get language translations
@@ -194,8 +195,8 @@ curl -H "Authorization: Bearer your_token_here" \
 - `POST /management/deleteTranslationKeys` - Remove translation keys
 - `GET /management/getTranslationKeys` - Extract all required translation keys
 - `GET /management/validateTranslations/{lang?}` - Validate translation completeness
-- `GET /management/getUnusedTranslationKeys` - Find orphaned keys not used in structures
-- `GET /management/analyzeTranslations` - Full health check (missing + unused + recommendations)
+- `GET /management/getUnusedTranslationKeys/{lang?}` - Find orphaned keys not used in structures
+- `GET /management/analyzeTranslations/{lang?}` - Full health check (missing + unused + recommendations)
 - `GET /management/getLangList` - List supported languages
 - `POST /management/addLang` - Add new language
 - `POST /management/deleteLang` - Delete language
@@ -215,7 +216,7 @@ curl -H "Authorization: Bearer your_token_here" \
 - `GET /management/getRootVariables` - Get CSS custom properties from :root
 - `POST /management/setRootVariables` - Add/update CSS variables in :root
 - `GET /management/listStyleRules` - List all CSS selectors
-- `GET /management/getStyleRule/{selector}` - Get styles for specific selector
+- `GET /management/getStyleRule/{selector}/{mediaQuery?}` - Get styles for specific selector
 - `POST /management/setStyleRule` - Add/update CSS rule
 - `POST /management/deleteStyleRule` - Remove CSS rule
 - `GET /management/getKeyframes` - Get all @keyframes animations
@@ -233,6 +234,9 @@ curl -H "Authorization: Bearer your_token_here" \
 
 #### **Build & Deploy**
 - `POST /management/build` - Create production build with optional folder renaming
+
+#### **Documentation**
+- `GET /management/help/{command?}` - API documentation (all commands or specific)
 
 For complete API documentation with parameters, validation rules, and examples:
 ```bash
@@ -285,11 +289,11 @@ quicksite/                    # (or your chosen project name)
 
 ### Custom Folder Structure
 
-Use `movePublicRoot` to create subdirectories for multi-site hosting:
+Use `setPublicSpace` to create subdirectories for multi-site hosting:
 
 ```bash
 # Move all public files into "web" subdirectory
-curl -X POST http://yoursite.local/management/movePublicRoot \
+curl -X POST http://yoursite.local/management/setPublicSpace \
   -H "Content-Type: application/json" \
   -d '{"destination": "web"}'
 
@@ -297,7 +301,7 @@ curl -X POST http://yoursite.local/management/movePublicRoot \
 # Management at: http://yoursite.local/web/management/
 
 # Restore to root with empty destination
-curl -X POST http://yoursite.local/web/management/movePublicRoot \
+curl -X POST http://yoursite.local/web/management/setPublicSpace \
   -H "Content-Type: application/json" \
   -d '{"destination": ""}'
 ```
@@ -420,17 +424,24 @@ The compiler generates helper variables:
 
 Template Vitrine follows a **file-based, zero-database philosophy** - but that doesn't mean it can't grow!
 
-### Current Version (v1.x)
+### Current Version (v1.2.0)
 - ✅ Complete file-based CMS with JSON templates
 - ✅ RESTful API with 45 commands
 - ✅ Bearer token authentication with RBAC
 - ✅ CORS support for external UIs
 - ✅ Production build system
+- ✅ Comprehensive Guides page with practical tutorials
 
-### Planned Features
+### Upcoming Releases
+| Version | Feature | Description |
+|---------|---------|-------------|
+| **v1.3** | Mono-Language Mode | Simplified setup using `default.json` for single-language sites |
+| **v1.4** | Admin Panel | Built-in API Explorer with command selector, dynamic forms, and persistent auth |
+
+### Future Vision
 | Feature | Status | Description |
 |---------|--------|-------------|
-| **Flutter UI** | 🔜 Planned | Cross-platform admin interface |
+| **Flutter UI** | 🔜 Planned | Cross-platform admin interface with drag-and-drop editing |
 | **Database Module** | 💡 Considering | Optional SQLite/MySQL module for dynamic content |
 | **User System** | 💡 Future | Multi-user authentication (building on current token system) |
 | **Plugin System** | 💡 Future | Extensible architecture for custom commands |

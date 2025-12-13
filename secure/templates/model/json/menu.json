@@ -113,6 +113,33 @@
             {
                 "tag": "div",
                 "params": {
+                    "class": "menu-label"
+                },
+                "children": [
+                    {
+                        "tag": "a",
+                        "params": {
+                            "href": "/guides"
+                        },
+                        "children": [
+                            {
+                                "tag": "img",
+                                "params": {
+                                    "src": "/assets/images/documentation.png",
+                                    "alt": "",
+                                    "class": "menu-icon"
+                                }
+                            },
+                            {
+                                "textKey": "menu.guides"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
                     "class": "menu-label github-link"
                 },
                 "children": [

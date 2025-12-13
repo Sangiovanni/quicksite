@@ -1,9 +1,9 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 
-// Get parameters (works with GET, POST, or JSON)
-$params = $trimParametersManagement->params();
-$category = $params['category'] ?? null;
+// Get category from URL segment: /management/listAssets/{category?}
+$urlSegments = $trimParametersManagement->additionalParams();
+$category = $urlSegments[0] ?? null;
 
 // Validate category if provided
 $validCategories = require SECURE_FOLDER_PATH . '/management/config/assetCategories.php';

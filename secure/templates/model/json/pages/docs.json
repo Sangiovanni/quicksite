@@ -69,6 +69,30 @@
     {
         "tag": "section",
         "params": {
+            "class": "docs-url-patterns"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "children": [
+                    {
+                        "textKey": "__RAW__URL Patterns"
+                    }
+                ]
+            },
+            {
+                "tag": "p",
+                "children": [
+                    {
+                        "textKey": "__RAW__All API endpoints follow the pattern /management/{command}. Some commands accept URL path parameters for GET requests - these are shown with the command URL below. Use GET /management/help/{command} for detailed API documentation."
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
             "class": "docs-category",
             "id": "folder_management"
         },
@@ -128,6 +152,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/setPublicSpace"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -135,6 +170,68 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Sets the URL space/prefix for the public site. Creates a subdirectory inside the public folder and moves all content there. Use empty destination to restore to root. Note: Site URL changes (e.g., http://domain/web/ when set to \"web\")"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__destination"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__URL prefix/space for public site (empty string to remove)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -178,6 +275,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/renameSecureFolder"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -185,6 +293,68 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Renames the secure/backend folder at server root level. Updates SECURE_FOLDER_NAME constant. Management URL stays the same."
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__destination"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__New folder name (single name, no paths)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -228,6 +398,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/renamePublicFolder"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -235,6 +416,68 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Renames the public folder at server root level. Updates all references. Requires Apache/web server config update after rename."
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__destination"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__New folder name (single name, no paths)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -306,6 +549,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/addRoute"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -313,6 +567,68 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Creates a new route with PHP page template and empty JSON structure"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__route"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Route name for URL (lowercase, numbers, hyphens)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -356,6 +672,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/deleteRoute"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -363,6 +690,68 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Deletes an existing route and its associated files (PHP and JSON). Also removes any URL aliases pointing to this route."
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__route"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Route name to delete"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -402,6 +791,17 @@
                                                 "textKey": "__RAW__GET"
                                             }
                                         ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/getRoutes"
                                     }
                                 ]
                             },
@@ -484,13 +884,24 @@
                                 ]
                             },
                             {
+                                "tag": "code",
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__/management/getStructure/{type}/{name?}/{option?}"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Retrieves the JSON structure for a page, menu, footer, or component"
+                                        "textKey": "__RAW__Retrieves the JSON structure for a page, menu, footer, or component. Options: showIds (adds node identifiers), summary (tree overview), or nodeId (get specific node by 0-indexed path like 0.2.1)"
                                     }
                                 ]
                             }
@@ -534,13 +945,238 @@
                                 ]
                             },
                             {
+                                "tag": "code",
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__/management/editStructure"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Updates the JSON structure for a page, menu, footer, or component (creates component if new)"
+                                        "textKey": "__RAW__Updates the JSON structure. Two modes: full replacement (send complete structure) or targeted edit (use nodeId + action: update, delete, insertBefore, insertAfter)"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__type"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Structure type: page, menu, footer, component"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__name"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(optional)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Name (required for page/component)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__structure"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__JSON structure to save"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__nodeId"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(optional)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Target node for surgical edit (e.g., 0.2.1)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__action"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(optional)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__update, delete, insertBefore, insertAfter"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -580,6 +1216,17 @@
                                                 "textKey": "__RAW__GET"
                                             }
                                         ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/listComponents"
                                     }
                                 ]
                             },
@@ -630,6 +1277,17 @@
                                                 "textKey": "__RAW__GET"
                                             }
                                         ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/listPages"
                                     }
                                 ]
                             },
@@ -712,6 +1370,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/createAlias"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -719,6 +1388,144 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Creates a URL redirect alias that points to an existing route. Supports 301 redirects or internal (transparent) routing."
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__alias"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__URL path for the alias"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__target"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Target route to redirect to"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__type"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(optional)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__redirect (301) or internal (transparent)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -762,6 +1569,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/deleteAlias"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -769,6 +1587,68 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Deletes an existing URL redirect alias."
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__alias"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Alias URL path to delete"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -808,6 +1688,17 @@
                                                 "textKey": "__RAW__GET"
                                             }
                                         ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/listAliases"
                                     }
                                 ]
                             },
@@ -890,6 +1781,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/getTranslation/{lang}"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -936,6 +1838,17 @@
                                                 "textKey": "__RAW__GET"
                                             }
                                         ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/getTranslations"
                                     }
                                 ]
                             },
@@ -990,6 +1903,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/setTranslationKeys"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -997,6 +1921,106 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Sets/updates specific translation keys (merge, not replace)"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__language"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Language code (e.g., en, fr)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__translations"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Object of keys to add/update (safe merge)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -1040,6 +2064,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/deleteTranslationKeys"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -1047,6 +2082,144 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Deletes specific translation keys from a language file"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "strong",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Params: "
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "textKey": "__RAW__language, keys (required)"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__language"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Language code (e.g., en, fr)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__keys"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Array of dot-notation keys to delete"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "p",
+                                "children": [
+                                    {
+                                        "tag": "strong",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Params: "
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "textKey": "__RAW__language, keys (required)"
                                     }
                                 ]
                             }
@@ -1086,6 +2259,17 @@
                                                 "textKey": "__RAW__GET"
                                             }
                                         ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/getTranslationKeys"
                                     }
                                 ]
                             },
@@ -1140,6 +2324,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/validateTranslations/{lang?}"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -1190,6 +2385,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/getUnusedTranslationKeys/{lang?}"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -1236,6 +2442,17 @@
                                                 "textKey": "__RAW__GET"
                                             }
                                         ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/analyzeTranslations/{lang?}"
                                     }
                                 ]
                             },
@@ -1318,6 +2535,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/getLangList"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -1325,6 +2553,25 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Returns list of configured languages and multilingual settings"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "p",
+                                "children": [
+                                    {
+                                        "tag": "strong",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Params: "
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "textKey": "__RAW__alias, target (required), type (optional)"
                                     }
                                 ]
                             }
@@ -1368,6 +2615,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/addLang"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -1375,6 +2633,106 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Adds a new language to the system"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__code"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__ISO language code (e.g., es, de)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__name"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Display name (e.g., Espanol)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -1418,6 +2776,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/deleteLang"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -1425,6 +2794,68 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Deletes a language from the system"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__code"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Language code to delete (not default/last)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -1496,6 +2927,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/uploadAsset?category={cat}"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -1503,6 +2945,106 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Uploads a file to the assets folder with validation and automatic naming"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__category"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__images, scripts, font, audio, or videos"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__file"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__File upload (multipart/form-data)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -1542,6 +3084,17 @@
                                                 "textKey": "__RAW__GET"
                                             }
                                         ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/deleteAsset?category={cat}&filename={name}"
                                     }
                                 ]
                             },
@@ -1592,6 +3145,17 @@
                                                 "textKey": "__RAW__GET"
                                             }
                                         ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/listAssets/{category?}"
                                     }
                                 ]
                             },
@@ -1674,6 +3238,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/getStyles"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -1724,6 +3299,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/editStyles"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -1731,6 +3317,68 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Updates the content of the main SCSS/CSS file"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__content"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Complete CSS content (replaces file)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -1802,6 +3450,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/getRootVariables"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -1852,6 +3511,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/setRootVariables"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -1859,6 +3529,68 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Add or update CSS custom properties (variables) in the :root selector"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__variables"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Object of CSS variables to set/update"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -1898,6 +3630,17 @@
                                                 "textKey": "__RAW__GET"
                                             }
                                         ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/listStyleRules"
                                     }
                                 ]
                             },
@@ -1952,6 +3695,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/getStyleRule/{selector}/{media?}"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -2002,6 +3756,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/setStyleRule"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -2009,6 +3774,144 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Add or update a CSS rule for any selector"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__selector"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__CSS selector (e.g., .btn-primary)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__styles"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__CSS declarations (string or object)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__mediaQuery"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(optional)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Media query context (optional)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -2052,6 +3955,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/deleteStyleRule"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -2059,6 +3973,106 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Remove a CSS rule from the stylesheet"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__selector"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__CSS selector to delete"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__mediaQuery"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(optional)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Media query context (optional)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -2130,6 +4144,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/getKeyframes/{name?}"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -2180,6 +4205,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/setKeyframes"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -2187,6 +4223,106 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Add or update a @keyframes animation"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__name"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Animation name (alphanumeric)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__frames"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Object with frame keys (0%, 50%, from, to)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -2230,6 +4366,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/deleteKeyframes"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -2237,6 +4384,68 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Remove a @keyframes animation from the stylesheet"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__name"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Animation name to delete"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -2308,6 +4517,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/editFavicon"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -2315,6 +4535,68 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Updates the site favicon with a new image from assets/images folder (PNG only)"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__imageName"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__PNG filename from assets/images/"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -2358,6 +4640,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/editTitle"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -2365,6 +4658,144 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Updates page title for a specific route and language in the translation file (page.titles.{route} structure)"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__route"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Route name to update title for"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__lang"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Language code"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__title"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__New page title text"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -2436,6 +4867,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/build"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -2443,6 +4885,144 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Creates a production-ready build with compiled PHP files, optional folder renaming, config sanitization, and ZIP archive creation"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__public"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(optional)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Custom public folder name/path"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__secure"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(optional)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Custom secure folder name (single level)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__space"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(optional)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__PUBLIC_FOLDER_SPACE subdirectory"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -2514,6 +5094,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/generateToken"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -2521,6 +5112,106 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Creates a new API authentication token with specified permissions. Requires admin permission."
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__name"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Descriptive name for the token"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__permissions"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(optional)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Array: *, read, write, admin, command:name"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -2560,6 +5251,17 @@
                                                 "textKey": "__RAW__GET"
                                             }
                                         ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/listTokens"
                                     }
                                 ]
                             },
@@ -2614,6 +5316,17 @@
                                 ]
                             },
                             {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/revokeToken"
+                                    }
+                                ]
+                            },
+                            {
                                 "tag": "p",
                                 "params": {
                                     "class": "command-desc"
@@ -2621,6 +5334,68 @@
                                 "children": [
                                     {
                                         "textKey": "__RAW__Revokes (permanently deletes) an API token. Requires admin permission."
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__token_preview"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Token preview from listTokens or full token"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -2688,6 +5463,17 @@
                                                 "textKey": "__RAW__GET"
                                             }
                                         ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/help/{command?}"
                                     }
                                 ]
                             },

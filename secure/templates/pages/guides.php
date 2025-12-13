@@ -7,14 +7,14 @@ $translator = new Translator($trimParameters->lang());
 $lang = $trimParameters->lang();
 
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
-$renderer = new JsonToHtmlRenderer($translator);
+$renderer = new JsonToHtmlRenderer($translator, ['lang' => $lang, 'page' => 'guides']);
 
-$content = $renderer->renderPage('home');
+$content = $renderer->renderPage('guides');
 
-
-
-// Now use this constant to include files from your src folder
 require_once SECURE_FOLDER_PATH . '/src/classes/PageManagement.php';
 
-$page = new PageManagement("Sangio Stuff", $content, $lang);
+// Get page title from translation
+$pageTitle = $translator->translate('page.titles.guides');
+
+$page = new PageManagement($pageTitle, $content, $lang);
 $page->render();

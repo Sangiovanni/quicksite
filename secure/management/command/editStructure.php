@@ -1,22 +1,32 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
 
 $params = $trimParametersManagement->params();
 
+// Check for nodeId-based edit mode
+$nodeId = $params['nodeId'] ?? null;
+$action = $params['action'] ?? 'update'; // 'update', 'delete', 'insertBefore', 'insertAfter'
+
 // Validate required parameters
-if (!isset($params['type']) || !isset($params['structure'])) {
-    $missing = [];
-    if (!isset($params['type'])) $missing[] = 'type';
-    if (!isset($params['structure'])) $missing[] = 'structure';
-    
+// For nodeId mode: type, name (for page/component), structure (except delete)
+// For full mode: type, structure
+if (!isset($params['type'])) {
     ApiResponse::create(400, 'validation.required')
-        ->withErrors(array_map(fn($f) => ['field' => $f, 'reason' => 'missing'], $missing))
+        ->withErrors([['field' => 'type', 'reason' => 'missing']])
+        ->send();
+}
+
+// Structure is required unless action is 'delete'
+if (!isset($params['structure']) && $action !== 'delete') {
+    ApiResponse::create(400, 'validation.required')
+        ->withErrors([['field' => 'structure', 'reason' => 'missing (required unless action is delete)']])
         ->send();
 }
 
 $type = $params['type'];
-$structure = $params['structure'];
+$structure = $params['structure'] ?? null;
 
 // Type validation - type must be string
 if (!is_string($type)) {
@@ -50,17 +60,17 @@ if (!in_array($type, $allowed_types, true)) {
         ->send();
 }
 
-// Validate structure is an array (or object for components)
-if (!is_array($structure)) {
+// Validate structure is an array (skip for delete action with nodeId)
+if ($structure !== null && !is_array($structure)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage("Structure must be an array or object")
         ->withErrors([['field' => 'structure', 'reason' => 'must be array/object']])
         ->send();
 }
 
-// SECURITY: Check structure size (prevent memory exhaustion)
+// SECURITY: Check structure size (prevent memory exhaustion) - skip for delete
 $nodeCount = 0;
-if (is_array($structure)) {
+if ($structure !== null && is_array($structure)) {
     // For pages/menu/footer (arrays of nodes)
     if (isset($structure[0]) || empty($structure)) {
         foreach ($structure as $node) {
@@ -72,15 +82,15 @@ if (is_array($structure)) {
     }
 }
 
-if ($nodeCount > 10000) {
+if ($structure !== null && $nodeCount > 10000) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage("Structure too large (max 10,000 nodes)")
         ->withData(['node_count' => $nodeCount, 'max_allowed' => 10000])
         ->send();
 }
 
-// SECURITY: Check structure depth (prevent stack overflow)
-if (is_array($structure)) {
+// SECURITY: Check structure depth (prevent stack overflow) - skip for delete
+if ($structure !== null && is_array($structure)) {
     // For pages/menu/footer
     if (isset($structure[0]) || empty($structure)) {
         foreach ($structure as $node) {
@@ -219,6 +229,110 @@ if ($type === 'component') {
         }
     }
 }
+
+// ===== NodeId-based targeted edit mode =====
+if ($nodeId !== null) {
+    // Validate nodeId format
+    if (!preg_match('/^[0-9]+(\.[0-9]+)*$/', $nodeId)) {
+        ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage("Invalid nodeId format. Use dot notation like '0.2.1'")
+            ->withErrors([['field' => 'nodeId', 'value' => $nodeId]])
+            ->send();
+    }
+    
+    // Validate action
+    $allowedActions = ['update', 'delete', 'insertBefore', 'insertAfter'];
+    if (!in_array($action, $allowedActions, true)) {
+        ApiResponse::create(400, 'validation.invalid_value')
+            ->withMessage("Invalid action. Must be one of: " . implode(', ', $allowedActions))
+            ->withErrors([['field' => 'action', 'value' => $action, 'allowed' => $allowedActions]])
+            ->send();
+    }
+    
+    // Read existing structure
+    if (!file_exists($json_file)) {
+        ApiResponse::create(404, 'file.not_found')
+            ->withMessage("Structure file not found")
+            ->withData(['file' => $json_file])
+            ->send();
+    }
+    
+    $existingContent = @file_get_contents($json_file);
+    if ($existingContent === false) {
+        ApiResponse::create(500, 'server.file_read_failed')
+            ->withMessage("Failed to read structure file")
+            ->send();
+    }
+    
+    $existingStructure = json_decode($existingContent, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        ApiResponse::create(500, 'server.internal_error')
+            ->withMessage("Invalid JSON in structure file: " . json_last_error_msg())
+            ->send();
+    }
+    
+    // Perform the targeted operation
+    $result = null;
+    
+    switch ($action) {
+        case 'delete':
+            $result = NodeNavigator::updateNode($existingStructure, $nodeId, null);
+            break;
+            
+        case 'update':
+            $result = NodeNavigator::updateNode($existingStructure, $nodeId, $structure);
+            break;
+            
+        case 'insertBefore':
+            $result = NodeNavigator::insertNode($existingStructure, $nodeId, $structure, 'before');
+            $result['action'] = 'inserted';
+            break;
+            
+        case 'insertAfter':
+            $result = NodeNavigator::insertNode($existingStructure, $nodeId, $structure, 'after');
+            $result['action'] = 'inserted';
+            break;
+    }
+    
+    if (!$result['success']) {
+        ApiResponse::create(400, 'operation.failed')
+            ->withMessage($result['error'] ?? 'Failed to perform node operation')
+            ->withErrors([['field' => 'nodeId', 'value' => $nodeId, 'action' => $action]])
+            ->send();
+    }
+    
+    // Use the modified structure
+    $structure = $result['structure'];
+    
+    // Encode and write
+    $json_content = json_encode($structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($json_content === false) {
+        ApiResponse::create(500, 'server.internal_error')
+            ->withMessage("Failed to encode structure to JSON")
+            ->send();
+    }
+    
+    if (file_put_contents($json_file, $json_content, LOCK_EX) === false) {
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to write structure file")
+            ->send();
+    }
+    
+    // Success for nodeId operation
+    ApiResponse::create(200, 'operation.success')
+        ->withMessage("Node {$result['action']} successfully")
+        ->withData([
+            'type' => $type,
+            'name' => $name,
+            'nodeId' => $nodeId,
+            'action' => $result['action'],
+            'insertedAt' => $result['insertedAt'] ?? null,
+            'file' => $json_file
+        ])
+        ->send();
+}
+
+// ===== Full structure replacement mode =====
 
 // Encode structure to JSON
 $json_content = json_encode($structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

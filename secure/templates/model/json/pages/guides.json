@@ -1,0 +1,362 @@
+[
+    {
+        "tag": "section",
+        "params": {"class": "guides-header"},
+        "children": [
+            {"tag": "h1", "children": [{"textKey": "guides.title"}]},
+            {"tag": "p", "params": {"class": "guides-intro"}, "children": [{"textKey": "guides.intro"}]}
+        ]
+    },
+    {
+        "tag": "nav",
+        "params": {"class": "guides-toc"},
+        "children": [
+            {"tag": "h2", "children": [{"textKey": "guides.toc.title"}]},
+            {
+                "tag": "ul",
+                "children": [
+                    {"tag": "li", "children": [{"tag": "a", "params": {"href": "#building-pages"}, "children": [{"textKey": "guides.toc.pages"}]}]},
+                    {"tag": "li", "children": [{"tag": "a", "params": {"href": "#structure-editing"}, "children": [{"textKey": "guides.toc.structure"}]}]},
+                    {"tag": "li", "children": [{"tag": "a", "params": {"href": "#internationalization"}, "children": [{"textKey": "guides.toc.i18n"}]}]},
+                    {"tag": "li", "children": [{"tag": "a", "params": {"href": "#css-theming"}, "children": [{"textKey": "guides.toc.css"}]}]},
+                    {"tag": "li", "children": [{"tag": "a", "params": {"href": "#assets-branding"}, "children": [{"textKey": "guides.toc.assets"}]}]},
+                    {"tag": "li", "children": [{"tag": "a", "params": {"href": "#url-management"}, "children": [{"textKey": "guides.toc.urls"}]}]},
+                    {"tag": "li", "children": [{"tag": "a", "params": {"href": "#deployment"}, "children": [{"textKey": "guides.toc.deploy"}]}]},
+                    {"tag": "li", "children": [{"tag": "a", "params": {"href": "#api-security"}, "children": [{"textKey": "guides.toc.security"}]}]},
+                    {"tag": "li", "children": [{"tag": "a", "params": {"href": "#api-documentation"}, "children": [{"textKey": "guides.toc.docs"}]}]}
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {"class": "guide-section", "id": "building-pages"},
+        "children": [
+            {"tag": "h2", "params": {"class": "section-title"}, "children": [{"textKey": "guides.pages.title"}]},
+            {"tag": "p", "params": {"class": "section-intro"}, "children": [{"textKey": "guides.pages.intro"}]},
+            {
+                "tag": "div",
+                "params": {"class": "guide-commands"},
+                "children": [
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__addRoute"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__deleteRoute"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__getRoutes"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__listPages"}]}
+                ]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Creating a New Page"}]},
+            {"tag": "p", "children": [{"textKey": "guides.pages.create.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Create a new route\ncurl -X POST http://yoursite.local/management/addRoute \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"route\": \"about-us\"}'"}]}]
+            },
+            {"tag": "p", "children": [{"textKey": "guides.pages.create.result"}]},
+            {"tag": "h3", "children": [{"textKey": "__RAW__Listing All Pages"}]},
+            {"tag": "p", "children": [{"textKey": "guides.pages.list.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# List all pages with metadata\ncurl http://yoursite.local/management/listPages \\\n  -H \"Authorization: Bearer YOUR_TOKEN\""}]}]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Deleting a Page"}]},
+            {"tag": "p", "children": [{"textKey": "guides.pages.delete.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Delete a route (removes PHP + JSON files)\ncurl -X POST http://yoursite.local/management/deleteRoute \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"route\": \"old-page\"}'"}]}]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {"class": "guide-section", "id": "structure-editing"},
+        "children": [
+            {"tag": "h2", "params": {"class": "section-title"}, "children": [{"textKey": "guides.structure.title"}]},
+            {"tag": "p", "params": {"class": "section-intro"}, "children": [{"textKey": "guides.structure.intro"}]},
+            {
+                "tag": "div",
+                "params": {"class": "guide-commands"},
+                "children": [
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__getStructure"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__editStructure"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__listComponents"}]}
+                ]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Understanding JSON Structure"}]},
+            {"tag": "p", "children": [{"textKey": "guides.structure.json.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__// Basic JSON node structure\n{\n  \"tag\": \"div\",\n  \"params\": {\"class\": \"container\", \"id\": \"main\"},\n  \"children\": [\n    {\"tag\": \"h1\", \"children\": [{\"textKey\": \"page.title\"}]},\n    {\"tag\": \"p\", \"children\": [{\"textKey\": \"page.description\"}]}\n  ]\n}"}]}]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Get Structure with Node IDs"}]},
+            {"tag": "p", "children": [{"textKey": "guides.structure.showids.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Get page structure with node identifiers\ncurl http://yoursite.local/management/getStructure/page/home/showIds \\\n  -H \"Authorization: Bearer YOUR_TOKEN\"\n\n# Get summary view (tree overview)\ncurl http://yoursite.local/management/getStructure/page/home/summary"}]}]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Surgical Editing with nodeId"}]},
+            {"tag": "p", "children": [{"textKey": "guides.structure.nodeid.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Update a specific node (e.g., change text at node 0.2.1)\ncurl -X POST http://yoursite.local/management/editStructure \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"type\": \"page\",\n    \"name\": \"home\",\n    \"nodeId\": \"0.2.1\",\n    \"structure\": {\"textKey\": \"__RAW__New text content\"}\n  }'"}]}]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Insert, Delete, and Move Nodes"}]},
+            {"tag": "p", "children": [{"textKey": "guides.structure.actions.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Insert after a node\n{\"type\": \"page\", \"name\": \"home\", \"nodeId\": \"0.2\", \"action\": \"insertAfter\",\n \"structure\": {\"tag\": \"p\", \"children\": [{\"textKey\": \"new.paragraph\"}]}}\n\n# Delete a node\n{\"type\": \"page\", \"name\": \"home\", \"nodeId\": \"0.3\", \"action\": \"delete\"}\n\n# Insert before a node\n{\"type\": \"page\", \"name\": \"home\", \"nodeId\": \"0.1\", \"action\": \"insertBefore\",\n \"structure\": {\"tag\": \"div\", \"params\": {\"class\": \"banner\"}}}"}]}]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {"class": "guide-section", "id": "internationalization"},
+        "children": [
+            {"tag": "h2", "params": {"class": "section-title"}, "children": [{"textKey": "guides.i18n.title"}]},
+            {"tag": "p", "params": {"class": "section-intro"}, "children": [{"textKey": "guides.i18n.intro"}]},
+            {
+                "tag": "div",
+                "params": {"class": "guide-commands"},
+                "children": [
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__setTranslationKeys"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__getTranslation"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__validateTranslations"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__analyzeTranslations"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__addLang"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__deleteLang"}]}
+                ]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Adding Translation Keys"}]},
+            {"tag": "p", "children": [{"textKey": "guides.i18n.add.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Add/update translation keys (safe merge - won't delete existing)\ncurl -X POST http://yoursite.local/management/setTranslationKeys \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"language\": \"en\",\n    \"translations\": {\n      \"about\": {\n        \"title\": \"About Us\",\n        \"description\": \"Learn more about our company\"\n      }\n    }\n  }'"}]}]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Checking Translation Health"}]},
+            {"tag": "p", "children": [{"textKey": "guides.i18n.health.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Full translation analysis (missing + unused + recommendations)\ncurl http://yoursite.local/management/analyzeTranslations \\\n  -H \"Authorization: Bearer YOUR_TOKEN\"\n\n# Validate specific language\ncurl http://yoursite.local/management/validateTranslations/fr \\\n  -H \"Authorization: Bearer YOUR_TOKEN\""}]}]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Adding a New Language"}]},
+            {"tag": "p", "children": [{"textKey": "guides.i18n.newlang.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Add Spanish language\ncurl -X POST http://yoursite.local/management/addLang \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"code\": \"es\", \"name\": \"Español\"}'"}]}]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {"class": "guide-section", "id": "css-theming"},
+        "children": [
+            {"tag": "h2", "params": {"class": "section-title"}, "children": [{"textKey": "guides.css.title"}]},
+            {"tag": "p", "params": {"class": "section-intro"}, "children": [{"textKey": "guides.css.intro"}]},
+            {
+                "tag": "div",
+                "params": {"class": "guide-commands"},
+                "children": [
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__setRootVariables"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__setStyleRule"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__setKeyframes"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__listStyleRules"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__editStyles"}]}
+                ]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Quick Theming with CSS Variables"}]},
+            {"tag": "p", "children": [{"textKey": "guides.css.variables.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Change site colors instantly\ncurl -X POST http://yoursite.local/management/setRootVariables \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"variables\": {\n      \"--color-primary\": \"#6366f1\",\n      \"--color-secondary\": \"#ec4899\",\n      \"--spacing-lg\": \"2rem\"\n    }\n  }'"}]}]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Adding CSS Rules"}]},
+            {"tag": "p", "children": [{"textKey": "guides.css.rules.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Add a new CSS rule\ncurl -X POST http://yoursite.local/management/setStyleRule \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"selector\": \".hero-banner\",\n    \"styles\": {\n      \"background\": \"linear-gradient(135deg, var(--color-primary), var(--color-secondary))\",\n      \"padding\": \"4rem 2rem\",\n      \"text-align\": \"center\"\n    }\n  }'"}]}]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Creating Animations"}]},
+            {"tag": "p", "children": [{"textKey": "guides.css.animations.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Create a fade-in animation\ncurl -X POST http://yoursite.local/management/setKeyframes \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"name\": \"fadeInUp\",\n    \"frames\": {\n      \"from\": \"opacity: 0; transform: translateY(20px);\",\n      \"to\": \"opacity: 1; transform: translateY(0);\"\n    }\n  }'"}]}]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {"class": "guide-section", "id": "assets-branding"},
+        "children": [
+            {"tag": "h2", "params": {"class": "section-title"}, "children": [{"textKey": "guides.assets.title"}]},
+            {"tag": "p", "params": {"class": "section-intro"}, "children": [{"textKey": "guides.assets.intro"}]},
+            {
+                "tag": "div",
+                "params": {"class": "guide-commands"},
+                "children": [
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__uploadAsset"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__listAssets"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__deleteAsset"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__editFavicon"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__editTitle"}]}
+                ]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Uploading Files"}]},
+            {"tag": "p", "children": [{"textKey": "guides.assets.upload.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Upload an image (multipart/form-data)\ncurl -X POST \"http://yoursite.local/management/uploadAsset?category=images\" \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -F \"file=@/path/to/logo.png\"\n\n# Categories: images, scripts, font, audio, videos"}]}]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Changing the Favicon"}]},
+            {"tag": "p", "children": [{"textKey": "guides.assets.favicon.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Set favicon from uploaded image\ncurl -X POST http://yoursite.local/management/editFavicon \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"imageName\": \"my-logo.png\"}'"}]}]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Managing Page Titles"}]},
+            {"tag": "p", "children": [{"textKey": "guides.assets.pagetitle.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Update page title for a specific language\ncurl -X POST http://yoursite.local/management/editTitle \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"route\": \"about\",\n    \"lang\": \"en\",\n    \"title\": \"About Us - My Company\"\n  }'"}]}]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {"class": "guide-section", "id": "url-management"},
+        "children": [
+            {"tag": "h2", "params": {"class": "section-title"}, "children": [{"textKey": "guides.urls.title"}]},
+            {"tag": "p", "params": {"class": "section-intro"}, "children": [{"textKey": "guides.urls.intro"}]},
+            {
+                "tag": "div",
+                "params": {"class": "guide-commands"},
+                "children": [
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__createAlias"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__deleteAlias"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__listAliases"}]}
+                ]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Creating URL Redirects"}]},
+            {"tag": "p", "children": [{"textKey": "guides.urls.redirect.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Create a 301 redirect\ncurl -X POST http://yoursite.local/management/createAlias \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"alias\": \"/old-about-page\",\n    \"target\": \"/about\",\n    \"type\": \"redirect\"\n  }'\n\n# Create internal (transparent) routing\ncurl -X POST http://yoursite.local/management/createAlias \\\n  -d '{\"alias\": \"/info\", \"target\": \"/about\", \"type\": \"internal\"}'"}]}]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {"class": "guide-section", "id": "deployment"},
+        "children": [
+            {"tag": "h2", "params": {"class": "section-title"}, "children": [{"textKey": "guides.deploy.title"}]},
+            {"tag": "p", "params": {"class": "section-intro"}, "children": [{"textKey": "guides.deploy.intro"}]},
+            {
+                "tag": "div",
+                "params": {"class": "guide-commands"},
+                "children": [
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__build"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__setPublicSpace"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__renameSecureFolder"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__renamePublicFolder"}]}
+                ]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Creating a Production Build"}]},
+            {"tag": "p", "children": [{"textKey": "guides.deploy.build.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Create optimized production build\ncurl -X POST http://yoursite.local/management/build \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"public\": \"www\",\n    \"secure\": \"app\",\n    \"space\": \"\"\n  }'\n\n# Result: Creates build_YYYYMMDD_HHMMSS/ folder + ZIP archive"}]}]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Setting URL Prefix (Public Space)"}]},
+            {"tag": "p", "children": [{"textKey": "guides.deploy.space.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Move site to subdirectory (e.g., /web/)\ncurl -X POST http://yoursite.local/management/setPublicSpace \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"destination\": \"web\"}'\n\n# Site now at: http://domain.com/web/\n# Restore to root with empty destination: {\"destination\": \"\"}"}]}]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {"class": "guide-section", "id": "api-security"},
+        "children": [
+            {"tag": "h2", "params": {"class": "section-title"}, "children": [{"textKey": "guides.security.title"}]},
+            {"tag": "p", "params": {"class": "section-intro"}, "children": [{"textKey": "guides.security.intro"}]},
+            {
+                "tag": "div",
+                "params": {"class": "guide-commands"},
+                "children": [
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__generateToken"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__listTokens"}]},
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__revokeToken"}]}
+                ]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Creating API Tokens"}]},
+            {"tag": "p", "children": [{"textKey": "guides.security.create.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Generate a new token with full access\ncurl -X POST http://yoursite.local/management/generateToken \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"name\": \"Flutter App\", \"permissions\": [\"*\"]}'\n\n# Generate read-only token\ncurl -X POST http://yoursite.local/management/generateToken \\\n  -d '{\"name\": \"Public API\", \"permissions\": [\"read\"]}'"}]}]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Managing Existing Tokens"}]},
+            {"tag": "p", "children": [{"textKey": "guides.security.manage.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# List all tokens (values are masked)\ncurl http://yoursite.local/management/listTokens \\\n  -H \"Authorization: Bearer YOUR_TOKEN\"\n\n# Revoke a token\ncurl -X POST http://yoursite.local/management/revokeToken \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -d '{\"token_preview\": \"tvt_abc1...xyz9\"}'"}]}]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {"class": "guide-section", "id": "api-documentation"},
+        "children": [
+            {"tag": "h2", "params": {"class": "section-title"}, "children": [{"textKey": "guides.docs.title"}]},
+            {"tag": "p", "params": {"class": "section-intro"}, "children": [{"textKey": "guides.docs.intro"}]},
+            {
+                "tag": "div",
+                "params": {"class": "guide-commands"},
+                "children": [
+                    {"tag": "span", "params": {"class": "command-tag"}, "children": [{"textKey": "__RAW__help"}]}
+                ]
+            },
+            {"tag": "h3", "children": [{"textKey": "__RAW__Getting Help"}]},
+            {"tag": "p", "children": [{"textKey": "guides.docs.help.desc"}]},
+            {
+                "tag": "pre",
+                "params": {"class": "code-block"},
+                "children": [{"tag": "code", "children": [{"textKey": "__RAW__# Get all command documentation\ncurl http://yoursite.local/management/help \\\n  -H \"Authorization: Bearer YOUR_TOKEN\"\n\n# Get help for specific command\ncurl http://yoursite.local/management/help/editStructure \\\n  -H \"Authorization: Bearer YOUR_TOKEN\""}]}]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {"class": "guides-footer"},
+        "children": [
+            {"tag": "h2", "children": [{"textKey": "guides.footer.title"}]},
+            {"tag": "p", "params": {"class": "center-block"}, "children": [{"textKey": "guides.footer.desc"}]},
+            {
+                "tag": "div",
+                "params": {"class": "next-links"},
+                "children": [
+                    {"tag": "a", "params": {"href": "/docs", "class": "btn btn-primary"}, "children": [{"textKey": "guides.footer.api"}]},
+                    {"tag": "a", "params": {"href": "https://github.com/user/quicksite", "target": "_blank", "class": "btn btn-secondary"}, "children": [{"textKey": "guides.footer.github"}]}
+                ]
+            }
+        ]
+    }
+]

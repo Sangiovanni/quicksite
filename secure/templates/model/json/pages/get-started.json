@@ -297,6 +297,9 @@
             },
             {
                 "tag": "p",
+                "params" : {
+                    "class": "center-block"
+                },
                 "children": [
                     {
                         "textKey": "tutorial.next.desc"
