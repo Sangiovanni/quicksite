@@ -590,6 +590,28 @@ $readme = str_replace('%LANG_MODE%', $langMode, $readme);
 
 file_put_contents($buildFullPath . '/README.txt', $readme);
 
+// Step 6b: Create build manifest for listBuilds/getBuild commands
+$manifest = [
+    'name' => $buildFolderName,
+    'created' => date('c'), // ISO 8601 format
+    'created_timestamp' => time(),
+    'public' => $buildPublicName,
+    'secure' => $buildSecureName,
+    'space' => $buildPublicSpace,
+    'multilingual' => CONFIG['MULTILINGUAL_SUPPORT'],
+    'languages' => CONFIG['MULTILINGUAL_SUPPORT'] ? CONFIG['LANGUAGES_SUPPORTED'] : ['default'],
+    'default_language' => CONFIG['LANGUAGE_DEFAULT'],
+    'compiled_pages' => $compiledPages,
+    'pages_count' => count($compiledPages),
+    'source' => [
+        'public_folder' => PUBLIC_FOLDER_NAME,
+        'secure_folder' => SECURE_FOLDER_NAME,
+        'public_space' => PUBLIC_FOLDER_SPACE
+    ],
+    'quicksite_version' => '1.4.0'
+];
+file_put_contents($buildFullPath . '/build_manifest.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
 // Check build size before creating ZIP (prevent resource exhaustion)
 $buildSizeBytes = getDirectorySize($buildFullPath);
 $buildSizeMB = round($buildSizeBytes / 1024 / 1024, 2);

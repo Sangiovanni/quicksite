@@ -1461,6 +1461,70 @@
                         ]
                     }
                 ]
+            },
+            {
+                "tag": "h3",
+                "children": [
+                    {
+                        "textKey": "__RAW__Managing Builds"
+                    }
+                ]
+            },
+            {
+                "tag": "p",
+                "children": [
+                    {
+                        "textKey": "__RAW__QuickSite v1.4 includes comprehensive build management commands to list, inspect, clean up, deploy, and download builds."
+                    }
+                ]
+            },
+            {
+                "tag": "pre",
+                "params": {
+                    "class": "code-block"
+                },
+                "children": [
+                    {
+                        "tag": "code",
+                        "children": [
+                            {
+                                "textKey": "__RAW__# List all builds with metadata\ncurl http://yoursite.local/management/listBuilds \\\n  -H \"Authorization: Bearer YOUR_TOKEN\"\n\n# Get detailed info for a specific build\ncurl http://yoursite.local/management/getBuild/build_20250101_120000 \\\n  -H \"Authorization: Bearer YOUR_TOKEN\"\n\n# Delete a specific build\ncurl -X POST http://yoursite.local/management/deleteBuild \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"name\": \"build_20250101_120000\"}'\n\n# Clean up old builds (preview with dry_run)\ncurl -X POST http://yoursite.local/management/cleanBuilds \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"before\": \"2025-01-01\", \"dry_run\": true}'"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "tag": "h3",
+                "children": [
+                    {
+                        "textKey": "__RAW__Deploying Builds"
+                    }
+                ]
+            },
+            {
+                "tag": "p",
+                "children": [
+                    {
+                        "textKey": "__RAW__The deployBuild command copies a build to your production paths. Use absolute paths and be cautious with the overwrite option."
+                    }
+                ]
+            },
+            {
+                "tag": "pre",
+                "params": {
+                    "class": "code-block"
+                },
+                "children": [
+                    {
+                        "tag": "code",
+                        "children": [
+                            {
+                                "textKey": "__RAW__# Deploy a build to production\ncurl -X POST http://yoursite.local/management/deployBuild \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"name\": \"build_20250101_120000\",\n    \"publicPath\": \"/var/www/production/public\",\n    \"securePath\": \"/var/www/production/app\",\n    \"overwrite\": false\n  }'\n\n# Get download URL for a build ZIP\ncurl http://yoursite.local/management/downloadBuild/build_20250101_120000 \\\n  -H \"Authorization: Bearer YOUR_TOKEN\""
+                            }
+                        ]
+                    }
+                ]
             }
         ]
     },

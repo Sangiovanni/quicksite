@@ -237,6 +237,233 @@ $commands = [
         'notes' => 'Compiles JSON templates to PHP using JsonToPhpCompiler. Removes management/ and material/ folders. Sanitizes config.php (removes DB credentials). Creates timestamped build folder and ZIP. The "space" parameter controls PUBLIC_FOLDER_SPACE - when set (e.g., "web"), all public files go inside {public}/{space}/ creating access URL like http://site.com/web/. Public and secure folders MUST have different root directories for security. Secure folder restricted to single name (no nesting) for init.php compatibility. Uses file locking to prevent concurrent builds.'
     ],
     
+    'listBuilds' => [
+        'description' => 'Lists all production builds with metadata including folder names, sizes, and language settings',
+        'method' => 'GET',
+        'parameters' => [],
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Build list retrieved successfully',
+            'data' => [
+                'builds' => [
+                    ['name' => 'build_20251214_084504', 'created' => '2025-12-14T08:45:04+00:00', 'public' => 'www', 'secure' => 'backend', 'space' => '', 'multilingual' => true, 'languages' => ['en', 'fr'], 'pages_count' => 7, 'has_zip' => true, 'has_manifest' => true, 'folder_size_mb' => 3.46, 'zip_size_mb' => 2.3]
+                ],
+                'total' => 1,
+                'total_folder_size_mb' => 3.46,
+                'total_zip_size_mb' => 2.3,
+                'build_directory' => '/path/to/public/build'
+            ]
+        ],
+        'error_responses' => [],
+        'notes' => 'Reads build_manifest.json from each build folder for accurate metadata. Legacy builds without manifest show partial info parsed from folder structure. Sorted by creation date (newest first).'
+    ],
+    
+    'getBuild' => [
+        'description' => 'Returns detailed information for a specific build including manifest data, file counts, and download URL',
+        'method' => 'GET',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string (URL path)',
+                'description' => 'Build folder name',
+                'example' => 'build_20251214_084504',
+                'validation' => 'Must match format build_YYYYMMDD_HHMMSS'
+            ]
+        ],
+        'example_get' => 'GET /management/getBuild/build_20251214_084504',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Build details retrieved successfully',
+            'data' => [
+                'name' => 'build_20251214_084504',
+                'created' => '2025-12-14T08:45:04+00:00',
+                'public' => 'www',
+                'secure' => 'backend',
+                'folder_size_mb' => 3.46,
+                'file_count' => 49,
+                'download_url' => 'http://site.com/build/build_20251214_084504.zip',
+                'contents' => ['LICENSE', 'README.txt', 'backend/', 'www/']
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Build name missing from URL',
+            '400.validation.invalid_format' => 'Invalid build name format',
+            '404.build.not_found' => 'Build folder does not exist'
+        ],
+        'notes' => 'Returns full manifest data if available, plus calculated folder size, file count, and ZIP info. Contents shows top-level items in build folder.'
+    ],
+    
+    'deleteBuild' => [
+        'description' => 'Deletes a build folder and its associated ZIP archive',
+        'method' => 'POST',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Build folder name to delete',
+                'example' => 'build_20251214_084504',
+                'validation' => 'Must match format build_YYYYMMDD_HHMMSS'
+            ]
+        ],
+        'example_post' => 'POST /management/deleteBuild with body: {"name": "build_20251214_084504"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Build deleted successfully',
+            'data' => [
+                'deleted_build' => 'build_20251214_084504',
+                'deleted_items' => [
+                    ['type' => 'folder', 'name' => 'build_20251214_084504', 'size_mb' => 3.46],
+                    ['type' => 'zip', 'name' => 'build_20251214_084504.zip', 'size_mb' => 2.3]
+                ],
+                'space_freed_mb' => 5.76
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing name parameter',
+            '400.validation.invalid_format' => 'Invalid build name format',
+            '404.build.not_found' => 'Build not found (neither folder nor ZIP exists)',
+            '207.operation.partial_success' => 'Some items could not be deleted',
+            '500.server.file_delete_failed' => 'Failed to delete build'
+        ],
+        'notes' => 'Deletes both folder and ZIP if they exist. Reports freed disk space. Build name format prevents path traversal attacks.'
+    ],
+    
+    'cleanBuilds' => [
+        'description' => 'Deletes all builds older than a specified timestamp',
+        'method' => 'POST',
+        'parameters' => [
+            'before' => [
+                'required' => true,
+                'type' => 'integer|string',
+                'description' => 'Unix timestamp or ISO 8601 date - delete builds created before this time',
+                'example' => '1702483200 or "2024-12-13T00:00:00"',
+                'validation' => 'Must be valid timestamp or parseable date string'
+            ],
+            'dry_run' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'If true, only list what would be deleted without actually deleting',
+                'example' => true,
+                'validation' => 'Boolean true/false'
+            ]
+        ],
+        'example_post' => 'POST /management/cleanBuilds with body: {"before": "2024-12-01", "dry_run": true}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Old builds cleaned successfully',
+            'data' => [
+                'before_timestamp' => 1701388800,
+                'before_date' => '2024-12-01T00:00:00+00:00',
+                'builds_processed' => 3,
+                'space_freed_mb' => 15.5
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing before parameter',
+            '400.validation.invalid_format' => 'Invalid timestamp format',
+            '207.operation.partial_success' => 'Some builds could not be deleted'
+        ],
+        'notes' => 'Use dry_run=true first to preview what will be deleted. Useful for automated cleanup scripts. Compares build creation time from manifest or folder name.'
+    ],
+    
+    'deployBuild' => [
+        'description' => 'Copies a build to production paths (public and secure folders)',
+        'method' => 'POST',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Build folder name to deploy',
+                'example' => 'build_20251214_084504',
+                'validation' => 'Must match format build_YYYYMMDD_HHMMSS'
+            ],
+            'publicPath' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Absolute path where public folder contents should be copied',
+                'example' => 'C:/wamp64/www/mysite (Windows) or /var/www/mysite (Linux)',
+                'validation' => 'Must be absolute path, no path traversal (..)'
+            ],
+            'securePath' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Absolute path where secure folder contents should be copied',
+                'example' => 'C:/wamp64/www/mysite_app',
+                'validation' => 'Must be absolute path, different from publicPath, not nested'
+            ],
+            'overwrite' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'If true, overwrite existing files in destination',
+                'example' => false,
+                'validation' => 'Boolean true/false (default: false)'
+            ]
+        ],
+        'example_post' => 'POST /management/deployBuild with body: {"name": "build_20251214_084504", "publicPath": "C:/wamp64/www/prod", "securePath": "C:/wamp64/www/prod_app"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Build deployed successfully',
+            'data' => [
+                'build' => 'build_20251214_084504',
+                'deployed_to' => ['public' => 'C:/wamp64/www/prod', 'secure' => 'C:/wamp64/www/prod_app'],
+                'public_deployment' => ['files_copied' => 28, 'directories_created' => 7],
+                'secure_deployment' => ['files_copied' => 18, 'directories_created' => 6],
+                'extra_files_copied' => ['LICENSE', 'README.txt', 'build_manifest.json']
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing required parameter',
+            '400.validation.invalid_format' => 'Path must be absolute',
+            '400.validation.security_violation' => 'Path traversal (..) not allowed',
+            '404.build.not_found' => 'Build not found',
+            '409.conflict.directory_not_empty' => 'Destination not empty (use overwrite=true)',
+            '409.conflict.operation_in_progress' => 'Another deployment in progress',
+            '500.server.directory_create_failed' => 'Failed to create destination directory',
+            '500.server.permission_denied' => 'Destination not writable'
+        ],
+        'notes' => 'SECURITY: Allows copying to any absolute path - protect your API token! The secure folder should be placed outside the web root. LICENSE and README are copied to secure folder. Uses file locking to prevent concurrent deployments.'
+    ],
+    
+    'downloadBuild' => [
+        'description' => 'Returns the download URL and file info for a build ZIP archive',
+        'method' => 'GET',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string (URL path)',
+                'description' => 'Build folder name',
+                'example' => 'build_20251214_084504',
+                'validation' => 'Must match format build_YYYYMMDD_HHMMSS'
+            ]
+        ],
+        'example_get' => 'GET /management/downloadBuild/build_20251214_084504',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Download URL retrieved successfully',
+            'data' => [
+                'build' => 'build_20251214_084504',
+                'download_url' => 'http://site.com/build/build_20251214_084504.zip',
+                'filename' => 'build_20251214_084504.zip',
+                'file_size_mb' => 2.3,
+                'content_type' => 'application/zip',
+                'manifest' => ['public' => 'www', 'secure' => 'backend', 'multilingual' => true]
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Build name missing from URL',
+            '400.validation.invalid_format' => 'Invalid build name format',
+            '404.build.not_found' => 'Build not found',
+            '404.build.zip_not_found' => 'Build exists but ZIP file not found'
+        ],
+        'notes' => 'Returns direct download URL for the ZIP file. Includes manifest summary if available. Use this URL to download the build via browser or wget/curl.'
+    ],
+    
     'editFavicon' => [
         'description' => 'Updates the site favicon with a new image from assets/images folder (PNG only)',
         'method' => 'POST',
@@ -1777,7 +2004,7 @@ ApiResponse::create(200, 'operation.success')
             'css_variables_rules' => ['getRootVariables', 'setRootVariables', 'listStyleRules', 'getStyleRule', 'setStyleRule', 'deleteStyleRule'],
             'css_animations' => ['getKeyframes', 'setKeyframes', 'deleteKeyframes'],
             'site_customization' => ['editFavicon', 'editTitle'],
-            'build_deployment' => ['build'],
+            'build_deployment' => ['build', 'listBuilds', 'getBuild', 'deleteBuild', 'cleanBuilds', 'deployBuild', 'downloadBuild'],
             'authentication' => ['generateToken', 'listTokens', 'revokeToken'],
             'documentation' => ['help']
         ],
