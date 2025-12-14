@@ -90,7 +90,7 @@ function createLogEntry(
     string $method,
     array $body,
     array $tokenInfo,
-    string $status,
+    int $httpStatus,
     string $responseCode,
     float $startTime
 ): array {
@@ -113,7 +113,7 @@ function createLogEntry(
             'token_name' => $tokenInfo['name'] ?? 'Unknown'
         ],
         'result' => [
-            'status' => $status,
+            'http_status' => $httpStatus,
             'code' => $responseCode
         ],
         'duration_ms' => $duration
@@ -157,7 +157,7 @@ function logCommand(
     string $method,
     array $body,
     array $tokenInfo,
-    string $status,
+    int $httpStatus,
     string $responseCode,
     float $startTime
 ): bool {
@@ -169,15 +169,18 @@ function logCommand(
         return true;
     }
     
+    // Determine if this is a success response (2xx status codes)
+    $isSuccess = $httpStatus >= 200 && $httpStatus < 300;
+    
     // Only log successful commands and auth failures
-    $shouldLog = ($status === 'success') || 
+    $shouldLog = $isSuccess || 
                  (in_array($responseCode, ['auth.invalid_token', 'auth.missing_token', 'auth.permission_denied']));
     
     if (!$shouldLog) {
         return true; // Not an error, just nothing to log
     }
     
-    $entry = createLogEntry($command, $method, $body, $tokenInfo, $status, $responseCode, $startTime);
+    $entry = createLogEntry($command, $method, $body, $tokenInfo, $httpStatus, $responseCode, $startTime);
     return writeLogEntry($entry);
 }
 

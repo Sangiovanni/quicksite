@@ -85,7 +85,8 @@
             "privacy": "Privacy Policy - QuickSite",
             "terms": "Terms of Use - QuickSite",
             "404": "Page Not Found - QuickSite",
-            "guides": "Guides - QuickSite"
+            "guides": "Guides - QuickSite",
+            "test": "test title"
         }
     },
     "docs": {
@@ -268,7 +269,8 @@
         }
     },
     "test": {
-        "key": "value"
+        "key": "value",
+        "title": "title test"
     },
     "testSection": {
         "title": "Test Section",

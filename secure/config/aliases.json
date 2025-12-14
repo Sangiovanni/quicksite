@@ -1,1 +1,7 @@
-[]
+{
+    "/test--": {
+        "target": "/test",
+        "type": "internal",
+        "created": "2025-12-14 18:05:18"
+    }
+}

@@ -123,7 +123,22 @@ if (!write_htaccess_fallback($management_htaccess_path, $management_fallback)) {
         ->send();
 }
 
-// 3. Modify $target_destination_path/init.php (PUBLIC_FOLDER_SPACE constant) - still inside lock
+// 3. Write admin .htaccess (still inside lock)
+$admin_htaccess_path = $new_base_path . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . '.htaccess';
+$admin_fallback = $relative_path_input !== '' ? '/' . $relative_path_input . '/admin/index.php' : '/admin/index.php';
+
+if (is_dir(dirname($admin_htaccess_path))) {
+    if (!write_htaccess_fallback($admin_htaccess_path, $admin_fallback)) {
+        releaseLock($lock);
+        
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to write admin/.htaccess file")
+            ->withData(['file' => $admin_htaccess_path])
+            ->send();
+    }
+}
+
+// 4. Modify $target_destination_path/init.php (PUBLIC_FOLDER_SPACE constant) - still inside lock
 $init_path = $new_base_path . DIRECTORY_SEPARATOR . 'init.php';
 
 // The search pattern MUST match exactly what is in your file, including quotes and spaces.
@@ -155,15 +170,24 @@ releaseLock($lock);
 header('Content-Type: application/json; charset=utf-8');
 http_response_code(200);
 
+// Normalize paths to forward slashes for clean JSON output (works on both Windows and Linux)
+$normalizePath = fn($path) => str_replace('\\', '/', $path);
+
 $response_data = [
     'status' => 200,
     'code' => 'operation.success',
     'message' => 'Public root successfully moved',
     'data' => [
-        'old_path' => $template_source_path,
-        'new_path' => $target_destination_path,
+        'old_path' => $normalizePath($template_source_path),
+        'new_path' => $normalizePath($target_destination_path),
         'destination' => $relative_path_input,
-        'init_file_updated' => $init_path
+        'init_file_updated' => $normalizePath($init_path),
+        'htaccess_updated' => [
+            'main' => $normalizePath($htaccess_path),
+            'management' => $normalizePath($management_htaccess_path),
+            'admin' => $normalizePath($admin_htaccess_path)
+        ],
+        'warning' => 'Admin panel URL has changed. You may need to navigate to the new location.'
     ]
 ];
 

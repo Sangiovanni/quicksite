@@ -1,17 +1,5 @@
 {
-    "cta": {
-        "viewDocs": "View Docs",
-        "github": "GitHub",
-        "getStarted": "Get Started",
-        "learnMore": "Learn More"
-    },
-    "site": {
-        "tagline": "File-Based CMS",
-        "name": "Quicksite"
-    },
     "home": {
-        "welcomeMessage": "A modern, JSON-based PHP CMS with a powerful REST API. Perfect for landing pages, portfolios, and microsites.",
-        "title": "Build websites fast.",
         "hero": {
             "title": "QuickSite",
             "subtitle": "Build and manage websites entirely through a REST API. No frontend framework needed.",
@@ -45,23 +33,20 @@
     },
     "page": {
         "titles": {
-            "about": "About - Quicksite",
-            "features": "Features - Quicksite",
             "home": "QuickSite - Build Websites via API",
             "docs": "Documentation - QuickSite",
             "get-started": "Get Started - QuickSite",
             "privacy": "Privacy Policy - QuickSite",
             "terms": "Terms of Use - QuickSite",
-            "404": "Page Not Found - QuickSite",
-            "guides": "Guides - QuickSite"
+            "guides": "Guides - QuickSite",
+            "test": "test title"
         }
     },
     "footer": {
-        "madeWith": "Made with love for developers",
         "language": "Language:",
-        "terms": "Terms of Use",
-        "privacy": "Privacy Policy",
-        "copyright": "© 2025 QuickSite. Built with ❤️ and APIs."
+        "copyright": "© 2025 QuickSite. Built with ❤️ and APIs.",
+        "terms": "Terms of Service",
+        "privacy": "Privacy Policy"
     },
     "404": {
         "message": "Sorry, the page you're looking for doesn't exist or has been moved.",
@@ -69,16 +54,11 @@
         "pageNotFound": "Page Not Found"
     },
     "menu": {
-        "about": "About",
-        "features": "Features",
-        "terms": "Terms of Use",
         "home": "Home",
         "docs": "Documentation",
         "getstarted": "Get Started",
         "github": "GitHub",
-        "guides": "Guides",
-        "contact": "Contact",
-        "external1": "Google"
+        "guides": "Guides"
     },
     "privacy": {
         "title": "Privacy Policy",
@@ -117,7 +97,7 @@
         "intro": "Follow this step-by-step guide to set up your first QuickSite project in minutes.",
         "step1": {
             "title": "1. Install Prerequisites",
-            "desc": "Make sure you have PHP 7.4+ (tested up to 8.4) and a web server (Apache, Nginx, or WAMP\/XAMPP) installed on your system."
+            "desc": "Make sure you have PHP 7.4+ (tested up to 8.4) and a web server (Apache, Nginx, or WAMP/XAMPP) installed on your system."
         },
         "step2": {
             "title": "2. Clone the Repository",
@@ -125,7 +105,7 @@
         },
         "step3": {
             "title": "3. Configure Your Site",
-            "desc": "Edit the configuration files in the secure\/config directory to set up your site name, languages, and API token."
+            "desc": "Edit the configuration files in the secure/config directory to set up your site name, languages, and API token."
         },
         "step4": {
             "title": "4. Create Your First Route",
@@ -258,7 +238,7 @@
             },
             "title": "Building Pages",
             "create": {
-                "result": "This creates a new page at \/about-us with an empty JSON structure ready for content.",
+                "result": "This creates a new page at /about-us with an empty JSON structure ready for content.",
                 "desc": "Use addRoute to create a new page. This creates both the PHP file and the JSON structure file."
             },
             "intro": "Create, list, and delete pages in your QuickSite project. Each page consists of a PHP handler and a JSON structure file.",
@@ -266,21 +246,5 @@
                 "desc": "Remove a page completely. This deletes both the PHP handler and JSON structure file."
             }
         }
-    },
-    "test": {
-        "key": "value"
-    },
-    "testSection": {
-        "title": "Test Section",
-        "intro": "This is a test introduction with longer text to verify the command works.",
-        "nested": {
-            "key3": "Value 3",
-            "key1": "Value 1",
-            "key2": "Value 2"
-        }
-    },
-    "fileTest": {
-        "title": "File Test",
-        "desc": "Testing file-based approach for large payloads"
     }
 }

@@ -121,10 +121,9 @@ function countNodes($structure): int {
  * @param array $keys Accumulator for found keys (passed by reference)
  * @param int $currentDepth Current recursion depth
  * @param int $maxDepth Maximum allowed recursion depth (default 20)
- * @param array $seen Array of seen node references to prevent circular loops
  * @return array The accumulated keys
  */
-function extractTextKeys($node, &$keys = [], $currentDepth = 0, $maxDepth = 20, &$seen = []): array {
+function extractTextKeys($node, &$keys = [], $currentDepth = 0, $maxDepth = 20): array {
     // Depth limit protection - prevent stack overflow
     if ($currentDepth > $maxDepth) {
         return $keys;
@@ -134,13 +133,6 @@ function extractTextKeys($node, &$keys = [], $currentDepth = 0, $maxDepth = 20, 
     if (!is_array($node)) {
         return $keys;
     }
-    
-    // Circular reference protection
-    $nodeId = spl_object_hash((object)$node);
-    if (isset($seen[$nodeId])) {
-        return $keys;
-    }
-    $seen[$nodeId] = true;
     
     // Extract textKey if present (skip __RAW__ prefixed keys)
     if (isset($node['textKey']) && is_string($node['textKey'])) {
@@ -152,23 +144,44 @@ function extractTextKeys($node, &$keys = [], $currentDepth = 0, $maxDepth = 20, 
     // Recursively process children
     if (isset($node['children']) && is_array($node['children'])) {
         foreach ($node['children'] as $child) {
-            extractTextKeys($child, $keys, $currentDepth + 1, $maxDepth, $seen);
+            extractTextKeys($child, $keys, $currentDepth + 1, $maxDepth);
         }
     }
     
-    // Process component data labels
-    if (isset($node['data']['label']) && is_array($node['data']['label'])) {
-        foreach ($node['data']['label'] as $label) {
-            if (isset($label['textKey']) && is_string($label['textKey'])) {
-                if (strpos($label['textKey'], '__RAW__') !== 0) {
-                    $keys[] = $label['textKey'];
+    // Process component data - check all string values that look like translation keys
+    if (isset($node['component']) && isset($node['data']) && is_array($node['data'])) {
+        foreach ($node['data'] as $key => $value) {
+            // String value that looks like a translation key (contains dot, no spaces, not a path/url)
+            if (is_string($value) && 
+                strpos($value, '.') !== false && 
+                strpos($value, ' ') === false &&
+                strpos($value, '/') !== 0 &&
+                strpos($value, 'http') !== 0 &&
+                strpos($value, '__RAW__') !== 0 &&
+                strpos($value, '{{') !== 0) {
+                $keys[] = $value;
+            }
+            // Array of labels (for carousel, etc.)
+            if (is_array($value)) {
+                foreach ($value as $item) {
+                    if (isset($item['textKey']) && is_string($item['textKey'])) {
+                        if (strpos($item['textKey'], '__RAW__') !== 0) {
+                            $keys[] = $item['textKey'];
+                        }
+                    }
+                    // Also check if item itself is a translation key string
+                    if (is_string($item) && 
+                        strpos($item, '.') !== false && 
+                        strpos($item, ' ') === false &&
+                        strpos($item, '/') !== 0 &&
+                        strpos($item, 'http') !== 0 &&
+                        strpos($item, '__RAW__') !== 0) {
+                        $keys[] = $item;
+                    }
                 }
             }
         }
     }
-    
-    // Clean up seen tracker for this branch
-    unset($seen[$nodeId]);
     
     return $keys;
 }

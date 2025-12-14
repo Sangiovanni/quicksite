@@ -149,8 +149,7 @@ class ApiResponse {
     public function send(): void {
         // Call logging callback if set
         if (self::$beforeSendCallback !== null) {
-            $status = $this->status >= 200 && $this->status < 300 ? 'success' : 'error';
-            call_user_func(self::$beforeSendCallback, $status, $this->code);
+            call_user_func(self::$beforeSendCallback, $this->status, $this->code);
         }
         
         http_response_code($this->status);

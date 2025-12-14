@@ -76,6 +76,30 @@ function extractAllKeys() {
         }
     }
     
+    // Scan components
+    $componentsDir = SECURE_FOLDER_PATH . '/templates/model/json/components';
+    if (is_dir($componentsDir)) {
+        foreach (glob($componentsDir . '/*.json') as $file) {
+            $structure = loadJsonStructure($file);
+            if (is_array($structure)) {
+                foreach ($structure as $node) {
+                    extractTextKeys($node, $allKeys, 0, 20);
+                }
+            }
+        }
+    }
+    
+    // Also include page.titles.{route} keys which are used dynamically
+    $routesFile = SECURE_FOLDER_PATH . '/routes.php';
+    if (file_exists($routesFile)) {
+        $routes = include $routesFile;
+        if (is_array($routes)) {
+            foreach ($routes as $route) {
+                $allKeys[] = 'page.titles.' . $route;
+            }
+        }
+    }
+    
     return array_unique($allKeys);
 }
 

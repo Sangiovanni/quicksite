@@ -1,0 +1,201 @@
+{
+    "common": {
+        "appName": "QuickSite Admin",
+        "loading": "Loading...",
+        "error": "Error",
+        "success": "Success",
+        "warning": "Warning",
+        "confirm": "Confirm",
+        "cancel": "Cancel",
+        "save": "Save",
+        "delete": "Delete",
+        "edit": "Edit",
+        "view": "View",
+        "back": "Back",
+        "next": "Next",
+        "previous": "Previous",
+        "close": "Close",
+        "yes": "Yes",
+        "no": "No",
+        "search": "Search...",
+        "noResults": "No results found",
+        "required": "Required",
+        "optional": "Optional",
+        "execute": "Execute",
+        "reset": "Reset",
+        "copy": "Copy",
+        "copied": "Copied!",
+        "backToSite": "Back to Site"
+    },
+    "login": {
+        "title": "Admin Login",
+        "subtitle": "Enter your API token to access the admin panel",
+        "tokenLabel": "API Token",
+        "tokenPlaceholder": "tvt_xxxxxxxxxxxxxxxx...",
+        "rememberToken": "Remember token on this device",
+        "rememberHint": "Your token will be stored securely in your browser",
+        "submit": "Login",
+        "invalidToken": "Invalid or expired token",
+        "connectionError": "Could not connect to API",
+        "privacyNote": "By checking 'Remember token', you consent to storing authentication data locally.",
+        "help": {
+            "title": "Need a token?",
+            "text": "Use the generateToken command via API, or check your auth.php config file for the default token."
+        }
+    },
+    "logout": {
+        "title": "Logout",
+        "message": "You have been logged out successfully",
+        "redirect": "Redirecting to login..."
+    },
+    "dashboard": {
+        "title": "Dashboard",
+        "welcome": "Welcome to QuickSite Admin",
+        "subtitle": "Manage your site through a friendly interface",
+        "quickActions": "Quick Actions",
+        "recentCommands": "Recent Commands",
+        "noHistory": "No command history yet",
+        "viewAllHistory": "View All History",
+        "stats": {
+            "title": "Site Statistics",
+            "routes": "Routes",
+            "pages": "Pages",
+            "components": "Components",
+            "languages": "Languages"
+        },
+        "categories": {
+            "title": "Commands by Category"
+        }
+    },
+    "commands": {
+        "title": "Commands",
+        "subtitle": "Browse and execute API commands",
+        "searchPlaceholder": "Search commands...",
+        "allCategories": "All Categories",
+        "method": "Method",
+        "parameters": "Parameters",
+        "noParameters": "No parameters required",
+        "requiredParams": "Required Parameters",
+        "optionalParams": "Optional Parameters",
+        "response": "Response",
+        "execute": "Execute Command",
+        "tryIt": "Try it",
+        "viewDocs": "View Documentation",
+        "example": "Example",
+        "notes": "Notes",
+        "successResponse": "Success Response",
+        "errorResponses": "Error Responses",
+        "paramTypes": {
+            "string": "String",
+            "number": "Number",
+            "boolean": "Boolean",
+            "array": "Array",
+            "object": "Object",
+            "file": "File"
+        }
+    },
+    "history": {
+        "title": "Command History",
+        "subtitle": "View executed commands and their results",
+        "noHistory": "No commands have been executed yet",
+        "filters": {
+            "date": "Date",
+            "command": "Command",
+            "status": "Status",
+            "all": "All"
+        },
+        "columns": {
+            "id": "ID",
+            "timestamp": "Timestamp",
+            "command": "Command",
+            "method": "Method",
+            "status": "Status",
+            "duration": "Duration",
+            "details": "Details"
+        },
+        "clearHistory": "Clear History",
+        "clearConfirm": "Are you sure you want to clear command history?",
+        "export": "Export"
+    },
+    "errors": {
+        "404": {
+            "title": "Page Not Found",
+            "message": "The page you're looking for doesn't exist.",
+            "backToDashboard": "Back to Dashboard"
+        },
+        "500": {
+            "title": "Server Error",
+            "message": "Something went wrong. Please try again.",
+            "retry": "Retry"
+        },
+        "apiError": "API Error",
+        "networkError": "Network error. Please check your connection."
+    },
+    "form": {
+        "validation": {
+            "required": "This field is required",
+            "invalidFormat": "Invalid format",
+            "minLength": "Minimum :min characters required",
+            "maxLength": "Maximum :max characters allowed",
+            "invalidJson": "Invalid JSON format"
+        },
+        "placeholders": {
+            "selectOption": "Select an option...",
+            "enterValue": "Enter value...",
+            "jsonInput": "Enter JSON data..."
+        }
+    },
+    "nav": {
+        "login": "Login",
+        "dashboard": "Dashboard",
+        "commands": "Commands",
+        "command": "Command",
+        "history": "History",
+        "settings": "Settings",
+        "favorites": "Favorites",
+        "structure": "Structure",
+        "batch": "Batch",
+        "docs": "Docs",
+        "logout": "Logout"
+    },
+    "settings": {
+        "title": "Settings",
+        "subtitle": "View configuration and manage preferences",
+        "systemInfo": "System Information",
+        "configuration": "Configuration",
+        "routes": "Active Routes",
+        "languages": "Languages",
+        "preferences": "Admin Preferences",
+        "keyboardShortcuts": "Keyboard Shortcuts",
+        "confirmDestructive": "Destructive Action Confirmation",
+        "toastDuration": "Toast Notification Duration"
+    },
+    "favorites": {
+        "title": "Favorites",
+        "subtitle": "Quick access to your bookmarked commands",
+        "quickActions": "Quick Actions",
+        "yourFavorites": "Your Favorite Commands",
+        "addFavorites": "Add to Favorites"
+    },
+    "structure": {
+        "title": "Structure Viewer",
+        "subtitle": "Visual tree view of page and component structures"
+    },
+    "batch": {
+        "title": "Batch Execution",
+        "subtitle": "Execute multiple commands in sequence",
+        "queue": "Command Queue",
+        "addCommands": "Add Commands",
+        "results": "Execution Results"
+    },
+    "docs": {
+        "title": "API Documentation",
+        "subtitle": "Complete reference for all available API commands",
+        "quickReference": "Quick Reference",
+        "commandReference": "Command Reference"
+    },
+    "footer": {
+        "version": "QuickSite v:version",
+        "powered": "Admin Panel"
+    }
+}

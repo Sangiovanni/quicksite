@@ -71,8 +71,7 @@ function extractAllUsedKeys(): array {
     $menuStructure = loadJsonStructure($menuFile);
     if (is_array($menuStructure)) {
         foreach ($menuStructure as $node) {
-            extractTextKeys($node, $menuKeys ?? [], 0, 20);
-            $allKeys = array_merge($allKeys, $menuKeys ?? []);
+            extractTextKeys($node, $allKeys, 0, 20);
         }
     }
     
@@ -81,8 +80,7 @@ function extractAllUsedKeys(): array {
     $footerStructure = loadJsonStructure($footerFile);
     if (is_array($footerStructure)) {
         foreach ($footerStructure as $node) {
-            extractTextKeys($node, $footerKeys ?? [], 0, 20);
-            $allKeys = array_merge($allKeys, $footerKeys ?? []);
+            extractTextKeys($node, $allKeys, 0, 20);
         }
     }
     

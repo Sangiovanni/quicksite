@@ -33,6 +33,7 @@ return array (
       1 => 'http://localhost:8080',
       2 => 'http://127.0.0.1:3000',
       3 => 'http://127.0.0.1:8080',
+      4 => 'http://template.vitrine',
     ),
     'allowed_methods' => 
     array (

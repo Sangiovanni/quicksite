@@ -1,0 +1,497 @@
+<?php
+/**
+ * Admin Settings Page
+ * 
+ * Displays current configuration and allows viewing system info.
+ * 
+ * @version 1.6.0
+ */
+?>
+
+<div class="admin-page-header">
+    <h1 class="admin-page-header__title"><?= __admin('settings.title') ?></h1>
+    <p class="admin-page-header__subtitle"><?= __admin('settings.subtitle') ?></p>
+</div>
+
+<div class="admin-grid admin-grid--cols-2">
+    <!-- System Information -->
+    <div class="admin-card">
+        <div class="admin-card__header">
+            <h2 class="admin-card__title">
+                <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                <?= __admin('settings.systemInfo') ?>
+            </h2>
+        </div>
+        <div class="admin-card__body">
+            <div id="system-info" class="admin-loading">
+                <span class="admin-spinner"></span>
+                Loading...
+            </div>
+        </div>
+    </div>
+
+    <!-- Current Configuration -->
+    <div class="admin-card">
+        <div class="admin-card__header">
+            <h2 class="admin-card__title">
+                <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                    <polyline points="10 9 9 9 8 9"/>
+                </svg>
+                <?= __admin('settings.configuration') ?>
+            </h2>
+        </div>
+        <div class="admin-card__body">
+            <div id="config-info" class="admin-loading">
+                <span class="admin-spinner"></span>
+                Loading...
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Routes Overview -->
+<div class="admin-card" style="margin-top: var(--space-lg);">
+    <div class="admin-card__header">
+        <h2 class="admin-card__title">
+            <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            </svg>
+            <?= __admin('settings.routes') ?>
+        </h2>
+        <a href="<?= $router->url('command', 'addRoute') ?>" class="admin-btn admin-btn--small admin-btn--primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Add Route
+        </a>
+    </div>
+    <div class="admin-card__body">
+        <div id="routes-list" class="admin-loading">
+            <span class="admin-spinner"></span>
+            Loading routes...
+        </div>
+    </div>
+</div>
+
+<!-- Languages Overview -->
+<div class="admin-card" style="margin-top: var(--space-lg);">
+    <div class="admin-card__header">
+        <h2 class="admin-card__title">
+            <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 8l6 6"/>
+                <path d="M4 14l6-6 2-3"/>
+                <path d="M2 5h12"/>
+                <path d="M7 2h1"/>
+                <path d="M22 22l-5-10-5 10"/>
+                <path d="M14 18h6"/>
+            </svg>
+            <?= __admin('settings.languages') ?>
+        </h2>
+        <a href="<?= $router->url('command', 'addLang') ?>" class="admin-btn admin-btn--small admin-btn--primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Add Language
+        </a>
+    </div>
+    <div class="admin-card__body">
+        <div id="languages-list" class="admin-loading">
+            <span class="admin-spinner"></span>
+            Loading languages...
+        </div>
+    </div>
+</div>
+
+<!-- Admin Preferences -->
+<div class="admin-card" style="margin-top: var(--space-lg);">
+    <div class="admin-card__header">
+        <h2 class="admin-card__title">
+            <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+            </svg>
+            <?= __admin('settings.preferences') ?>
+        </h2>
+    </div>
+    <div class="admin-card__body">
+        <div class="admin-form-group">
+            <label class="admin-label"><?= __admin('settings.keyboardShortcuts') ?></label>
+            <div class="admin-toggle-group">
+                <label class="admin-toggle">
+                    <input type="checkbox" id="pref-shortcuts" checked>
+                    <span class="admin-toggle__slider"></span>
+                    <span class="admin-toggle__label">Enable keyboard shortcuts</span>
+                </label>
+            </div>
+            <p class="admin-hint">Press <kbd>?</kbd> to view all shortcuts</p>
+        </div>
+        
+        <div class="admin-form-group">
+            <label class="admin-label"><?= __admin('settings.confirmDestructive') ?></label>
+            <div class="admin-toggle-group">
+                <label class="admin-toggle">
+                    <input type="checkbox" id="pref-confirm" checked>
+                    <span class="admin-toggle__slider"></span>
+                    <span class="admin-toggle__label">Show confirmation for destructive actions</span>
+                </label>
+            </div>
+        </div>
+        
+        <div class="admin-form-group">
+            <label class="admin-label"><?= __admin('settings.toastDuration') ?></label>
+            <select id="pref-toast-duration" class="admin-select" style="max-width: 200px;">
+                <option value="2000">2 seconds</option>
+                <option value="4000" selected>4 seconds</option>
+                <option value="6000">6 seconds</option>
+                <option value="0">Don't auto-hide</option>
+            </select>
+        </div>
+        
+        <button type="button" class="admin-btn admin-btn--primary" onclick="savePreferences()">
+            Save Preferences
+        </button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadSystemInfo();
+    loadConfigInfo();
+    loadRoutes();
+    loadLanguages();
+    loadPreferences();
+});
+
+async function loadSystemInfo() {
+    const container = document.getElementById('system-info');
+    
+    try {
+        // Get basic system info from help command
+        const result = await QuickSiteAdmin.apiRequest('help');
+        
+        if (result.ok && result.data.data) {
+            const info = result.data.data;
+            
+            container.innerHTML = `
+                <dl class="admin-definition-list">
+                    <dt>API Version</dt>
+                    <dd><code>${info.version || 'Unknown'}</code></dd>
+                    
+                    <dt>Total Commands</dt>
+                    <dd>${info.commands?.length || 0}</dd>
+                    
+                    <dt>Base URL</dt>
+                    <dd><code>${info.base_url || '<?= BASE_URL ?>'}</code></dd>
+                    
+                    <dt>Server Time</dt>
+                    <dd>${new Date().toLocaleString()}</dd>
+                </dl>
+            `;
+        } else {
+            container.innerHTML = '<p class="admin-text-muted">Could not load system info</p>';
+        }
+    } catch (error) {
+        container.innerHTML = `<p class="admin-text-error">Error: ${error.message}</p>`;
+    }
+}
+
+async function loadConfigInfo() {
+    const container = document.getElementById('config-info');
+    
+    try {
+        // Use getStyles to check if styles are working
+        const stylesResult = await QuickSiteAdmin.apiRequest('getStyles');
+        const langResult = await QuickSiteAdmin.apiRequest('getLangList');
+        const routesResult = await QuickSiteAdmin.apiRequest('getRoutes');
+        
+        const langCount = langResult.ok ? (langResult.data.data?.languages?.length || 0) : 0;
+        const routeCount = routesResult.ok ? (routesResult.data.data?.routes?.length || 0) : 0;
+        const isMultilingual = langCount > 1;
+        
+        container.innerHTML = `
+            <dl class="admin-definition-list">
+                <dt>Multilingual Mode</dt>
+                <dd>
+                    <span class="admin-badge admin-badge--${isMultilingual ? 'success' : 'info'}">
+                        ${isMultilingual ? 'Enabled' : 'Single Language'}
+                    </span>
+                </dd>
+                
+                <dt>Languages</dt>
+                <dd>${langCount} configured</dd>
+                
+                <dt>Routes</dt>
+                <dd>${routeCount} active</dd>
+                
+                <dt>Styles Status</dt>
+                <dd>
+                    <span class="admin-badge admin-badge--${stylesResult.ok ? 'success' : 'error'}">
+                        ${stylesResult.ok ? 'Loaded' : 'Error'}
+                    </span>
+                </dd>
+            </dl>
+        `;
+    } catch (error) {
+        container.innerHTML = `<p class="admin-text-error">Error: ${error.message}</p>`;
+    }
+}
+
+async function loadRoutes() {
+    const container = document.getElementById('routes-list');
+    
+    try {
+        const result = await QuickSiteAdmin.apiRequest('getRoutes');
+        
+        if (result.ok && result.data.data?.routes) {
+            const routes = result.data.data.routes;
+            
+            if (routes.length === 0) {
+                container.innerHTML = '<p class="admin-text-muted">No routes configured</p>';
+                return;
+            }
+            
+            let html = '<div class="admin-tag-list">';
+            routes.forEach(route => {
+                html += `
+                    <span class="admin-tag admin-tag--route">
+                        <code>/${route}</code>
+                        <a href="<?= $router->getBaseUrl() ?>/command/deleteRoute?route=${encodeURIComponent(route)}" 
+                           class="admin-tag__action" title="Delete route">×</a>
+                    </span>
+                `;
+            });
+            html += '</div>';
+            
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '<p class="admin-text-muted">Could not load routes</p>';
+        }
+    } catch (error) {
+        container.innerHTML = `<p class="admin-text-error">Error: ${error.message}</p>`;
+    }
+}
+
+async function loadLanguages() {
+    const container = document.getElementById('languages-list');
+    
+    try {
+        const result = await QuickSiteAdmin.apiRequest('getLangList');
+        
+        if (result.ok && result.data.data?.languages) {
+            const langs = result.data.data.languages;
+            
+            if (langs.length === 0) {
+                container.innerHTML = '<p class="admin-text-muted">No languages configured</p>';
+                return;
+            }
+            
+            let html = '<div class="admin-tag-list">';
+            langs.forEach((lang, index) => {
+                const isDefault = index === 0;
+                html += `
+                    <span class="admin-tag admin-tag--lang ${isDefault ? 'admin-tag--primary' : ''}">
+                        <code>${lang.toUpperCase()}</code>
+                        ${isDefault ? '<span class="admin-tag__badge">Default</span>' : ''}
+                    </span>
+                `;
+            });
+            html += '</div>';
+            
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '<p class="admin-text-muted">Could not load languages</p>';
+        }
+    } catch (error) {
+        container.innerHTML = `<p class="admin-text-error">Error: ${error.message}</p>`;
+    }
+}
+
+function loadPreferences() {
+    const prefs = JSON.parse(localStorage.getItem('quicksite_admin_prefs') || '{}');
+    
+    document.getElementById('pref-shortcuts').checked = prefs.shortcuts !== false;
+    document.getElementById('pref-confirm').checked = prefs.confirmDestructive !== false;
+    document.getElementById('pref-toast-duration').value = prefs.toastDuration || '4000';
+}
+
+function savePreferences() {
+    const prefs = {
+        shortcuts: document.getElementById('pref-shortcuts').checked,
+        confirmDestructive: document.getElementById('pref-confirm').checked,
+        toastDuration: document.getElementById('pref-toast-duration').value
+    };
+    
+    localStorage.setItem('quicksite_admin_prefs', JSON.stringify(prefs));
+    QuickSiteAdmin.showToast('Preferences saved', 'success');
+}
+</script>
+
+<style>
+.admin-definition-list {
+    margin: 0;
+}
+
+.admin-definition-list dt {
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+    margin-bottom: var(--space-xs);
+}
+
+.admin-definition-list dd {
+    margin: 0 0 var(--space-md) 0;
+    font-size: var(--font-size-base);
+}
+
+.admin-definition-list dd code {
+    background: var(--admin-bg);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+}
+
+.admin-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    border-radius: var(--radius-full);
+}
+
+.admin-badge--success {
+    background: var(--admin-success-bg);
+    color: var(--admin-success);
+}
+
+.admin-badge--info {
+    background: var(--admin-info-bg);
+    color: var(--admin-info);
+}
+
+.admin-badge--error {
+    background: var(--admin-error-bg);
+    color: var(--admin-error);
+}
+
+.admin-tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.admin-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--admin-bg-tertiary);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+}
+
+.admin-tag code {
+    color: var(--admin-accent);
+}
+
+.admin-tag--primary {
+    border-color: var(--admin-accent);
+    background: var(--admin-accent-muted);
+}
+
+.admin-tag__action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    margin-left: var(--space-xs);
+    color: var(--admin-text-muted);
+    text-decoration: none;
+    border-radius: 50%;
+    transition: all var(--transition-fast);
+}
+
+.admin-tag__action:hover {
+    background: var(--admin-error-bg);
+    color: var(--admin-error);
+}
+
+.admin-tag__badge {
+    font-size: var(--font-size-xs);
+    padding: 2px 6px;
+    background: var(--admin-accent);
+    color: white;
+    border-radius: var(--radius-sm);
+    margin-left: var(--space-xs);
+}
+
+.admin-toggle-group {
+    margin-bottom: var(--space-sm);
+}
+
+.admin-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    cursor: pointer;
+}
+
+.admin-toggle input {
+    display: none;
+}
+
+.admin-toggle__slider {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: var(--admin-bg-tertiary);
+    border-radius: var(--radius-full);
+    transition: background var(--transition-fast);
+}
+
+.admin-toggle__slider::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    transition: transform var(--transition-fast);
+}
+
+.admin-toggle input:checked + .admin-toggle__slider {
+    background: var(--admin-accent);
+}
+
+.admin-toggle input:checked + .admin-toggle__slider::after {
+    transform: translateX(20px);
+}
+
+.admin-toggle__label {
+    font-size: var(--font-size-sm);
+    color: var(--admin-text);
+}
+
+kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-xs);
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+}
+</style>

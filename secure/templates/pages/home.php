@@ -16,5 +16,8 @@ $content = $renderer->renderPage('home');
 // Now use this constant to include files from your src folder
 require_once SECURE_FOLDER_PATH . '/src/classes/PageManagement.php';
 
-$page = new PageManagement("Sangio Stuff", $content, $lang);
+// Get page title from translation
+$pageTitle = $translator->translate('page.titles.home');
+
+$page = new PageManagement($pageTitle, $content, $lang);
 $page->render();

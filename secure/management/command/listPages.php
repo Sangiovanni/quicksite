@@ -50,7 +50,6 @@ foreach ($files as $file) {
             'error' => 'Invalid JSON: ' . json_last_error_msg(),
             'has_route' => in_array($name, $routes),
             'components_used' => [],
-            'translation_keys' => [],
             'node_count' => 0,
             'size' => filesize($file),
             'modified' => date('Y-m-d H:i:s', filemtime($file))
@@ -61,10 +60,9 @@ foreach ($files as $file) {
     // Count nodes
     $nodeCount = countPageNodes($structure);
     
-    // Find components used
+    // Find components used (skip translation keys - too verbose)
     $componentsUsed = [];
-    $translationKeys = [];
-    analyzePageStructure($structure, $componentsUsed, $translationKeys);
+    findComponentsInStructure($structure, $componentsUsed);
     
     $pages[] = [
         'name' => $name,
@@ -73,7 +71,6 @@ foreach ($files as $file) {
         'has_route' => in_array($name, $routes),
         'route_url' => in_array($name, $routes) ? '/' . $name : null,
         'components_used' => array_unique($componentsUsed),
-        'translation_keys' => array_unique($translationKeys),
         'node_count' => $nodeCount,
         'size' => filesize($file),
         'modified' => date('Y-m-d H:i:s', filemtime($file))
@@ -129,9 +126,9 @@ function countPageNodes($structure) {
 }
 
 /**
- * Analyze page structure for components and translation keys
+ * Find component references in structure (simpler version without translation keys)
  */
-function analyzePageStructure($node, &$components, &$translations) {
+function findComponentsInStructure($node, &$components) {
     if (!is_array($node)) {
         return;
     }
@@ -139,7 +136,7 @@ function analyzePageStructure($node, &$components, &$translations) {
     // If it's an array of nodes
     if (isset($node[0]) || (is_array($node) && !isset($node['tag']) && !isset($node['textKey']) && !isset($node['component']))) {
         foreach ($node as $child) {
-            analyzePageStructure($child, $components, $translations);
+            findComponentsInStructure($child, $components);
         }
         return;
     }
@@ -147,34 +144,12 @@ function analyzePageStructure($node, &$components, &$translations) {
     // Check for component reference
     if (isset($node['component'])) {
         $components[] = $node['component'];
-        
-        // Check data for translation keys
-        if (isset($node['data']) && is_array($node['data'])) {
-            foreach ($node['data'] as $key => $value) {
-                // Keys ending with 'label', 'title', 'text' or starting with translation-like patterns
-                if (is_string($value) && !str_starts_with($value, '/') && !str_starts_with($value, 'http') && !str_starts_with($value, '#')) {
-                    // Check if it looks like a translation key (contains dots)
-                    if (strpos($value, '.') !== false && !str_contains($value, ' ')) {
-                        $translations[] = $value;
-                    }
-                }
-            }
-        }
-    }
-    
-    // Check for textKey
-    if (isset($node['textKey'])) {
-        $key = $node['textKey'];
-        // Skip raw text markers and placeholders
-        if (!str_starts_with($key, '__RAW__') && !str_starts_with($key, '{{')) {
-            $translations[] = $key;
-        }
     }
     
     // Recurse into children
     if (isset($node['children']) && is_array($node['children'])) {
         foreach ($node['children'] as $child) {
-            analyzePageStructure($child, $components, $translations);
+            findComponentsInStructure($child, $components);
         }
     }
 }

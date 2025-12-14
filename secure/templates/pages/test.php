@@ -5,17 +5,16 @@ $trimParameters = new TrimParameters();
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 $translator = new Translator($trimParameters->lang());
 $lang = $trimParameters->lang();
+
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
-$renderer = new JsonToHtmlRenderer($translator);
+$renderer = new JsonToHtmlRenderer($translator, ['lang' => $lang, 'page' => 'test']);
 
-$content = $renderer->renderPage('privacy');
+$content = $renderer->renderPage('test');
 
-
-// Now use this constant to include files from your src folder
 require_once SECURE_FOLDER_PATH . '/src/classes/PageManagement.php';
 
 // Get page title from translation
-$pageTitle = $translator->translate('page.titles.privacy');
+$pageTitle = $translator->translate('page.titles.test');
 
 $page = new PageManagement($pageTitle, $content, $lang);
 $page->render();
