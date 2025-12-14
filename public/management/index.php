@@ -2,6 +2,10 @@
 require_once '../init.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/LoggingManagement.php';
+
+// Track execution start time for logging
+$commandStartTime = microtime(true);
 
 // ============================================================================
 // CORS Handling - Must be before any output
@@ -56,6 +60,11 @@ $currentTokenInfo = $authResult['token_info'];
 // ============================================================================
 // Route Management Setup
 // ============================================================================
+
+// Capture request body FIRST (before TrimParametersManagement consumes php://input)
+$rawRequestBody = file_get_contents('php://input');
+define('REQUEST_BODY_RAW', $rawRequestBody);
+
 if(!defined('ROUTES_MANAGEMENT_PATH')){
     define('ROUTES_MANAGEMENT_PATH', SERVER_ROOT . '/' . SECURE_FOLDER_NAME . '/management/routes.php');
 }
@@ -96,4 +105,21 @@ if (!hasPermission($currentTokenInfo, $command)) {
 // ============================================================================
 // Execute Command
 // ============================================================================
+
+// Parse request body for logging
+$requestBody = json_decode(REQUEST_BODY_RAW, true) ?? [];
+
+// Set up logging callback
+ApiResponse::setBeforeSendCallback(function($status, $responseCode) use ($command, $currentTokenInfo, $commandStartTime, $requestBody) {
+    logCommand(
+        $command,
+        $_SERVER['REQUEST_METHOD'],
+        $requestBody,
+        $currentTokenInfo,
+        $status,
+        $responseCode,
+        $commandStartTime
+    );
+});
+
 require_once SECURE_FOLDER_PATH . '/management/command/'. $command .'.php';

@@ -14,7 +14,8 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 
 // Get request body
-$body = json_decode(file_get_contents('php://input'), true);
+$rawBody = defined('REQUEST_BODY_RAW') ? REQUEST_BODY_RAW : file_get_contents('php://input');
+$body = json_decode($rawBody, true);
 
 if (!$body) {
     ApiResponse::create(400, 'api.error.invalid_request')

@@ -464,6 +464,143 @@ $commands = [
         'notes' => 'Returns direct download URL for the ZIP file. Includes manifest summary if available. Use this URL to download the build via browser or wget/curl.'
     ],
     
+    'getCommandHistory' => [
+        'description' => 'Retrieves command execution history with optional filtering and pagination. Useful for audit trails, debugging, and AI context.',
+        'method' => 'GET',
+        'parameters' => [],
+        'query_parameters' => [
+            'start_date' => [
+                'type' => 'string',
+                'required' => false,
+                'description' => 'Filter from date (inclusive)',
+                'default' => '7 days ago',
+                'format' => 'YYYY-MM-DD',
+                'example' => '2025-12-01'
+            ],
+            'end_date' => [
+                'type' => 'string',
+                'required' => false,
+                'description' => 'Filter to date (inclusive)',
+                'default' => 'today',
+                'format' => 'YYYY-MM-DD',
+                'example' => '2025-12-14'
+            ],
+            'command' => [
+                'type' => 'string',
+                'required' => false,
+                'description' => 'Filter by specific command name',
+                'example' => 'editStructure'
+            ],
+            'status' => [
+                'type' => 'string',
+                'required' => false,
+                'description' => 'Filter by result status',
+                'allowed_values' => ['success', 'error'],
+                'example' => 'success'
+            ],
+            'token_name' => [
+                'type' => 'string',
+                'required' => false,
+                'description' => 'Filter by token name (partial match)',
+                'example' => 'Development'
+            ],
+            'page' => [
+                'type' => 'integer',
+                'required' => false,
+                'description' => 'Page number',
+                'default' => 1
+            ],
+            'limit' => [
+                'type' => 'integer',
+                'required' => false,
+                'description' => 'Entries per page',
+                'default' => 100,
+                'max' => 500
+            ],
+            'dates_only' => [
+                'type' => 'boolean',
+                'required' => false,
+                'description' => 'If true, only return list of available log dates with summary',
+                'example' => 'true'
+            ]
+        ],
+        'example_get' => 'GET /management/getCommandHistory?command=editStructure&status=success&limit=50',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'data' => [
+                'entries' => [
+                    [
+                        'id' => 'log_20251214_120000_abc123',
+                        'timestamp' => '2025-12-14T12:00:00+00:00',
+                        'command' => 'editStructure',
+                        'method' => 'POST',
+                        'body' => ['type' => 'page', 'name' => 'home'],
+                        'publisher' => ['token_preview' => 'tvt_dev...tion', 'token_name' => 'Dev Token'],
+                        'result' => ['status' => 'success', 'code' => 'operation.success'],
+                        'duration_ms' => 45.2
+                    ]
+                ],
+                'pagination' => ['page' => 1, 'limit' => 100, 'total' => 150, 'pages' => 2]
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.invalid_date' => 'Invalid date format (expected YYYY-MM-DD)'
+        ],
+        'notes' => 'Logs are stored in daily files. By default returns last 7 days. The getCommandHistory command itself is not logged to prevent recursion. Request bodies are sanitized (uploadAsset files, generateToken tokens are redacted).'
+    ],
+    
+    'clearCommandHistory' => [
+        'description' => 'Deletes command log files older than a specified date. Requires confirmation to execute.',
+        'method' => 'POST',
+        'parameters' => [
+            'before' => [
+                'type' => 'string',
+                'required' => true,
+                'description' => 'Delete logs before this date (exclusive)',
+                'format' => 'YYYY-MM-DD',
+                'example' => '2025-12-01'
+            ],
+            'confirm' => [
+                'type' => 'boolean',
+                'required' => true,
+                'description' => 'Must be true to execute deletion. Without it, shows preview of what would be deleted.',
+                'example' => true
+            ]
+        ],
+        'example_body' => [
+            'before' => '2025-12-01',
+            'confirm' => true
+        ],
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Command history cleared successfully',
+            'data' => [
+                'deleted' => [
+                    'deleted_files' => 5,
+                    'deleted_entries' => 324,
+                    'space_freed_kb' => 156.4
+                ],
+                'before_date' => '2025-12-01'
+            ]
+        ],
+        'preview_response' => [
+            'status' => 200,
+            'code' => 'operation.preview',
+            'message' => 'Preview: Add "confirm": true to execute deletion',
+            'data' => [
+                'would_delete' => ['files' => 5, 'entries' => 324, 'size_kb' => 156.4],
+                'dates_affected' => ['2025-11-25', '2025-11-26', '2025-11-27']
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.missing_parameter' => 'Missing required parameter: before',
+            '400.validation.invalid_date' => 'Invalid date format or future date'
+        ],
+        'notes' => 'Without confirm=true, returns a preview showing what would be deleted. Requires admin permission.'
+    ],
+    
     'editFavicon' => [
         'description' => 'Updates the site favicon with a new image from assets/images folder (PNG only)',
         'method' => 'POST',
@@ -2005,6 +2142,7 @@ ApiResponse::create(200, 'operation.success')
             'css_animations' => ['getKeyframes', 'setKeyframes', 'deleteKeyframes'],
             'site_customization' => ['editFavicon', 'editTitle'],
             'build_deployment' => ['build', 'listBuilds', 'getBuild', 'deleteBuild', 'cleanBuilds', 'deployBuild', 'downloadBuild'],
+            'command_history' => ['getCommandHistory', 'clearCommandHistory'],
             'authentication' => ['generateToken', 'listTokens', 'revokeToken'],
             'documentation' => ['help']
         ],

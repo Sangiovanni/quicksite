@@ -6,6 +6,9 @@ class ApiResponse {
     private $message;
     private $data;
     private $errors;
+    
+    // Logging callback - called before send
+    private static $beforeSendCallback = null;
 
     // Registry of standard responses
     private static $registry = [
@@ -123,9 +126,33 @@ class ApiResponse {
     }
 
     /**
+     * Set a callback to be executed before send (for logging)
+     */
+    public static function setBeforeSendCallback(callable $callback): void {
+        self::$beforeSendCallback = $callback;
+    }
+
+    /**
+     * Get response info without sending (for logging)
+     */
+    public function getResponseInfo(): array {
+        return [
+            'status' => $this->status,
+            'code' => $this->code,
+            'message' => $this->message
+        ];
+    }
+
+    /**
      * Send the JSON response and exit
      */
     public function send(): void {
+        // Call logging callback if set
+        if (self::$beforeSendCallback !== null) {
+            $status = $this->status >= 200 && $this->status < 300 ? 'success' : 'error';
+            call_user_func(self::$beforeSendCallback, $status, $this->code);
+        }
+        
         http_response_code($this->status);
         header('Content-Type: application/json');
         

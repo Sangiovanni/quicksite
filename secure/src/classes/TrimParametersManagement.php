@@ -23,8 +23,8 @@ class TrimParametersManagement{
         $this->params = $_POST;
     }
     else{
-      // Check for JSON data (requests sent with json=...)
-      $json_data = file_get_contents('php://input');
+      // Check for JSON data - use pre-captured body if available (for logging)
+      $json_data = defined('REQUEST_BODY_RAW') ? REQUEST_BODY_RAW : file_get_contents('php://input');
       $data = json_decode($json_data, true);
       if ($data !== null) {
           $this->params = $data;
