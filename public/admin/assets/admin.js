@@ -123,7 +123,7 @@ const QuickSiteAdmin = {
     /**
      * Make an API request
      */
-    async apiRequest(command, method = 'GET', data = null, urlParams = []) {
+    async apiRequest(command, method = 'GET', data = null, urlParams = [], queryParams = {}) {
         const token = this.getToken();
         if (!token) {
             throw new Error('No authentication token');
@@ -132,6 +132,20 @@ const QuickSiteAdmin = {
         let url = `${this.config.apiBase}/${command}`;
         if (urlParams.length > 0) {
             url += '/' + urlParams.join('/');
+        }
+        
+        // Add query parameters for GET requests
+        if (Object.keys(queryParams).length > 0) {
+            const searchParams = new URLSearchParams();
+            for (const [key, value] of Object.entries(queryParams)) {
+                if (value !== null && value !== undefined && value !== '') {
+                    searchParams.append(key, value);
+                }
+            }
+            const queryString = searchParams.toString();
+            if (queryString) {
+                url += '?' + queryString;
+            }
         }
 
         const options = {

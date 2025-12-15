@@ -211,11 +211,26 @@ function getCommandHistory(array $filters = []): array {
     
     // Apply filters
     if (!empty($filters['command'])) {
-        $logs = array_filter($logs, fn($l) => $l['command'] === $filters['command']);
+        $commandFilter = strtolower($filters['command']);
+        $logs = array_filter($logs, fn($l) => 
+            stripos($l['command'], $commandFilter) !== false
+        );
     }
     
     if (!empty($filters['status'])) {
-        $logs = array_filter($logs, fn($l) => $l['result']['status'] === $filters['status']);
+        $statusFilter = strtolower($filters['status']);
+        $logs = array_filter($logs, function($l) use ($statusFilter) {
+            // Handle both old format (status: "success") and new format (http_status: 200)
+            $httpStatus = $l['result']['http_status'] ?? $l['result']['status'] ?? null;
+            
+            if (is_numeric($httpStatus)) {
+                $isSuccess = $httpStatus >= 200 && $httpStatus < 300;
+            } else {
+                $isSuccess = $httpStatus === 'success';
+            }
+            
+            return $statusFilter === 'success' ? $isSuccess : !$isSuccess;
+        });
     }
     
     if (!empty($filters['token_name'])) {

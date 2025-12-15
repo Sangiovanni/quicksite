@@ -29,12 +29,20 @@
         <div class="admin-filter-row">
             <div class="admin-filter-group">
                 <label class="admin-label"><?= __admin('history.filters.date') ?></label>
-                <input type="date" id="filter-date" class="admin-input">
+                <div style="display: flex; gap: var(--space-xs); align-items: center;">
+                    <input type="date" id="filter-date" class="admin-input" style="flex: 1;">
+                    <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" onclick="clearDateFilter()" title="Show all dates (last 7 days)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
             
             <div class="admin-filter-group">
                 <label class="admin-label"><?= __admin('history.filters.command') ?></label>
-                <input type="text" id="filter-command" class="admin-input" placeholder="e.g., getStructure">
+                <input type="text" id="filter-command" class="admin-input" placeholder="e.g., getStructure, edit, delete...">
             </div>
             
             <div class="admin-filter-group">
@@ -108,13 +116,19 @@
 
 <script>
 let currentPage = 1;
-const pageSize = 20;
+const pageSize = 50;
 let totalEntries = 0;
+let totalPages = 0;
 
 document.addEventListener('DOMContentLoaded', function() {
     // Set default date to today
     document.getElementById('filter-date').valueAsDate = new Date();
     loadHistory();
+    
+    // Allow pressing Enter to search
+    document.getElementById('filter-command').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') loadHistory();
+    });
 });
 
 async function loadHistory() {
@@ -128,36 +142,42 @@ async function loadHistory() {
         </div>
     `;
     
-    // Build URL params
-    const params = [];
-    
+    // Build query parameters for server-side filtering
     const date = document.getElementById('filter-date').value;
+    const commandFilter = document.getElementById('filter-command').value.trim();
+    const statusFilter = document.getElementById('filter-status').value;
+    
+    const queryParams = {
+        page: currentPage,
+        limit: pageSize
+    };
+    
+    // Use date as both start and end date to filter single day
     if (date) {
-        params.push(date);
+        queryParams.start_date = date;
+        queryParams.end_date = date;
+    }
+    
+    // Server-side command filter
+    if (commandFilter) {
+        queryParams.command = commandFilter;
+    }
+    
+    // Server-side status filter
+    if (statusFilter) {
+        queryParams.status = statusFilter;
     }
     
     try {
-        const result = await QuickSiteAdmin.apiRequest('getCommandHistory', 'GET', null, params);
+        const result = await QuickSiteAdmin.apiRequest('getCommandHistory', 'GET', null, [], queryParams);
         
         if (result.ok && result.data.data) {
-            let entries = result.data.data.entries || [];
+            const entries = result.data.data.entries || [];
+            const paginationData = result.data.data.pagination || {};
             
-            // Client-side filtering
-            const commandFilter = document.getElementById('filter-command').value.toLowerCase();
-            const statusFilter = document.getElementById('filter-status').value;
-            
-            if (commandFilter) {
-                entries = entries.filter(e => e.command.toLowerCase().includes(commandFilter));
-            }
-            
-            if (statusFilter) {
-                entries = entries.filter(e => {
-                    const isSuccess = e.result?.status < 300;
-                    return statusFilter === 'success' ? isSuccess : !isSuccess;
-                });
-            }
-            
-            totalEntries = entries.length;
+            totalEntries = paginationData.total || entries.length;
+            totalPages = paginationData.pages || Math.ceil(totalEntries / pageSize);
+            currentPage = paginationData.page || currentPage;
             
             if (entries.length === 0) {
                 container.innerHTML = `
@@ -167,17 +187,14 @@ async function loadHistory() {
                             <polyline points="12 6 12 12 16 14"/>
                         </svg>
                         <h3 class="admin-empty__title"><?= __admin('history.noHistory') ?></h3>
+                        <p class="admin-empty__desc">No command history found for the selected filters.</p>
                     </div>
                 `;
                 pagination.style.display = 'none';
                 return;
             }
             
-            // Paginate
-            const start = (currentPage - 1) * pageSize;
-            const pageEntries = entries.slice(start, start + pageSize);
-            
-            renderHistoryTable(pageEntries);
+            renderHistoryTable(entries);
             updatePagination();
         } else {
             container.innerHTML = `
@@ -257,8 +274,6 @@ function updatePagination() {
     const prevBtn = document.getElementById('prev-page');
     const nextBtn = document.getElementById('next-page');
     
-    const totalPages = Math.ceil(totalEntries / pageSize);
-    
     if (totalPages <= 1) {
         pagination.style.display = 'none';
         return;
@@ -273,6 +288,12 @@ function updatePagination() {
 
 function changePage(delta) {
     currentPage += delta;
+    loadHistory();
+}
+
+function clearDateFilter() {
+    document.getElementById('filter-date').value = '';
+    currentPage = 1;
     loadHistory();
 }
 
