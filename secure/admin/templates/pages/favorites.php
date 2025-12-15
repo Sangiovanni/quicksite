@@ -34,7 +34,7 @@ foreach ($categories as $cat) {
     </div>
     <div class="admin-card__body">
         <div class="admin-quick-actions">
-            <a href="<?= $baseUrl ?>/command/build" class="admin-quick-action">
+            <a href="<?= $router->url('command') ?>/build" class="admin-quick-action">
                 <div class="admin-quick-action__icon admin-quick-action__icon--primary">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
@@ -44,7 +44,7 @@ foreach ($categories as $cat) {
                 <span class="admin-quick-action__label">Build Site</span>
             </a>
             
-            <a href="<?= $baseUrl ?>/command/getRoutes" class="admin-quick-action">
+            <a href="<?= $router->url('command') ?>/getRoutes" class="admin-quick-action">
                 <div class="admin-quick-action__icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"/>
@@ -55,7 +55,7 @@ foreach ($categories as $cat) {
                 <span class="admin-quick-action__label">View Routes</span>
             </a>
             
-            <a href="<?= $baseUrl ?>/command/listAssets" class="admin-quick-action">
+            <a href="<?= $router->url('command') ?>/listAssets" class="admin-quick-action">
                 <div class="admin-quick-action__icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
@@ -66,7 +66,7 @@ foreach ($categories as $cat) {
                 <span class="admin-quick-action__label">List Assets</span>
             </a>
             
-            <a href="<?= $baseUrl ?>/command/getTranslations" class="admin-quick-action">
+            <a href="<?= $router->url('command') ?>/getTranslations" class="admin-quick-action">
                 <div class="admin-quick-action__icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M5 8l6 6"/>
@@ -80,7 +80,7 @@ foreach ($categories as $cat) {
                 <span class="admin-quick-action__label">Translations</span>
             </a>
             
-            <a href="<?= $baseUrl ?>/command/getStyles" class="admin-quick-action">
+            <a href="<?= $router->url('command') ?>/getStyles" class="admin-quick-action">
                 <div class="admin-quick-action__icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="13.5" cy="6.5" r=".5"/>
@@ -93,7 +93,7 @@ foreach ($categories as $cat) {
                 <span class="admin-quick-action__label">View Styles</span>
             </a>
             
-            <a href="<?= $baseUrl ?>/structure" class="admin-quick-action">
+            <a href="<?= $router->url('structure') ?>" class="admin-quick-action">
                 <div class="admin-quick-action__icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
@@ -150,7 +150,7 @@ foreach ($categories as $cat) {
 
 <script>
 const ALL_COMMANDS = <?= json_encode($allCommands) ?>;
-const BASE_URL = '<?= $baseUrl ?>';
+const COMMAND_BASE_URL = '<?= $router->url('command') ?>';
 
 document.addEventListener('DOMContentLoaded', function() {
     loadFavorites();
@@ -187,7 +187,7 @@ function loadFavorites() {
         const category = ALL_COMMANDS[cmd] || 'Unknown';
         html += `
             <div class="admin-favorite-card">
-                <a href="${BASE_URL}/command/${cmd}" class="admin-favorite-card__link">
+                <a href="${COMMAND_BASE_URL}/${cmd}" class="admin-favorite-card__link">
                     <code>${cmd}</code>
                     <span class="admin-favorite-card__category">${category}</span>
                 </a>
