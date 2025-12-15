@@ -16,5 +16,17 @@
                 "textKey": "docs.auth.title"
             }
         ]
-    }
+    },
+    [
+        {
+            "_nodeId": "1.0.0",
+            "textKey": "docs.auth.title"
+        }
+    ],
+    [
+        {
+            "_nodeId": "1.0.0",
+            "textKey": "docs.auth.title"
+        }
+    ]
 ]

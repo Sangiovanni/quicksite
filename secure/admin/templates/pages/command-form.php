@@ -359,7 +359,7 @@ async function loadCommandDocumentation() {
             
             // If in batch mode, pre-fill form with saved params
             if (IS_BATCH_MODE && BATCH_ID) {
-                prefillFromBatchQueue();
+                await prefillFromBatchQueue();
             }
         } else {
             document.getElementById('command-params').innerHTML = `
@@ -379,8 +379,10 @@ async function loadCommandDocumentation() {
 
 /**
  * Pre-fill form fields from batch queue item
+ * This is called after initEnhancedFeatures() so selects are already converted
+ * For cascading selects, we need to set values and wait for async population
  */
-function prefillFromBatchQueue() {
+async function prefillFromBatchQueue() {
     const queueKey = 'admin_batch_queue';
     let queue = [];
     
@@ -391,42 +393,165 @@ function prefillFromBatchQueue() {
     }
     
     const item = queue.find(i => i.id === parseInt(BATCH_ID));
-    if (!item) return;
+    if (!item) {
+        console.log('Batch item not found:', BATCH_ID);
+        return;
+    }
+    
+    console.log('Pre-filling from batch item:', item);
     
     const form = document.getElementById('command-form');
     const params = item.params || {};
     const urlParamsData = item.urlParams || [];
     
+    // For commands with cascading selects, we need special handling
+    // The order matters: type → name → nodeId, etc.
+    const cascadingCommands = ['editStructure', 'getStructure', 'deleteAsset', 'downloadAsset'];
+    
+    if (cascadingCommands.includes(COMMAND_NAME)) {
+        await prefillCascadingForm(form, params, urlParamsData);
+    } else {
+        // Simple form - just fill all fields
+        await prefillSimpleForm(form, params, urlParamsData);
+    }
+    
+    QuickSiteAdmin.showToast('Form pre-filled with saved parameters', 'info');
+}
+
+/**
+ * Pre-fill a simple form (no cascading selects)
+ */
+async function prefillSimpleForm(form, params, urlParamsData) {
     // Pre-fill URL params (in order they appear in form)
     const urlParamInputs = form.querySelectorAll('[data-url-param]');
     urlParamInputs.forEach((input, index) => {
         if (urlParamsData[index]) {
             input.value = urlParamsData[index];
-            // Trigger change event for cascading selects
-            input.dispatchEvent(new Event('change', { bubbles: true }));
         }
     });
     
     // Pre-fill regular params
     Object.entries(params).forEach(([key, value]) => {
-        const input = form.querySelector(`[name="${key}"]`);
-        if (!input) return;
+        setFormFieldValue(form, key, value);
+    });
+}
+
+/**
+ * Pre-fill a form with cascading selects
+ * Must set parent selects first and wait for child options to load
+ */
+async function prefillCascadingForm(form, params, urlParamsData) {
+    // Determine which fields to fill based on command
+    if (COMMAND_NAME === 'editStructure' || COMMAND_NAME === 'getStructure') {
+        // Order: type → name → nodeId/option, then other params
+        const typeSelect = form.querySelector('[name="type"]');
+        const nameSelect = form.querySelector('[name="name"]');
+        const nodeIdSelect = form.querySelector('[name="nodeId"]') || form.querySelector('[name="option"]');
+        const actionSelect = form.querySelector('[name="action"]');
         
-        if (input.tagName === 'TEXTAREA') {
-            input.value = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-        } else if (input.tagName === 'SELECT') {
-            input.value = value;
-        } else if (input.type === 'checkbox') {
-            input.checked = !!value;
-        } else {
-            input.value = value;
+        // Set type first
+        if (params.type && typeSelect) {
+            typeSelect.value = params.type;
+            // Trigger change and wait for name options to load
+            typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            await waitForSelectOptions(nameSelect, 500);
         }
         
-        // Trigger change event
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+        // Set name (if applicable for page/component)
+        if (params.name && nameSelect && !nameSelect.disabled) {
+            nameSelect.value = params.name;
+            // Trigger change and wait for nodeId options to load
+            nameSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            if (nodeIdSelect) {
+                await waitForSelectOptions(nodeIdSelect, 500);
+            }
+        }
+        
+        // Set nodeId
+        if (params.nodeId && nodeIdSelect) {
+            nodeIdSelect.value = params.nodeId;
+            nodeIdSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        
+        // Set action
+        if (params.action && actionSelect) {
+            actionSelect.value = params.action;
+            actionSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        
+        // Set structure (textarea)
+        if (params.structure) {
+            setFormFieldValue(form, 'structure', params.structure);
+        }
+        
+    } else if (COMMAND_NAME === 'deleteAsset' || COMMAND_NAME === 'downloadAsset') {
+        // Order: type → path
+        const typeSelect = form.querySelector('[name="type"]');
+        const pathSelect = form.querySelector('[name="path"]');
+        
+        if (params.type && typeSelect) {
+            typeSelect.value = params.type;
+            typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            await waitForSelectOptions(pathSelect, 500);
+        }
+        
+        if (params.path && pathSelect) {
+            pathSelect.value = params.path;
+        }
+    }
     
-    QuickSiteAdmin.showToast('Form pre-filled with saved parameters', 'info');
+    // Fill any remaining params not handled above
+    const handledKeys = ['type', 'name', 'nodeId', 'option', 'action', 'structure', 'path'];
+    Object.entries(params).forEach(([key, value]) => {
+        if (!handledKeys.includes(key)) {
+            setFormFieldValue(form, key, value);
+        }
+    });
+}
+
+/**
+ * Wait for a select element to have options loaded
+ */
+function waitForSelectOptions(select, timeout = 500) {
+    return new Promise(resolve => {
+        if (!select || select.disabled) {
+            resolve();
+            return;
+        }
+        
+        // Check if already has options (more than just placeholder)
+        if (select.options.length > 1) {
+            resolve();
+            return;
+        }
+        
+        // Wait for options to load
+        const startTime = Date.now();
+        const checkInterval = setInterval(() => {
+            if (select.options.length > 1 || Date.now() - startTime > timeout) {
+                clearInterval(checkInterval);
+                resolve();
+            }
+        }, 50);
+    });
+}
+
+/**
+ * Set a single form field value
+ */
+function setFormFieldValue(form, key, value) {
+    const input = form.querySelector(`[name="${key}"]`);
+    if (!input) return;
+    
+    if (input.tagName === 'TEXTAREA') {
+        input.value = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+    } else if (input.tagName === 'SELECT') {
+        input.value = value;
+    } else if (input.type === 'checkbox') {
+        input.checked = !!value;
+    } else {
+        input.value = value;
+    }
 }
 
 /**
