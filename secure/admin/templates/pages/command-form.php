@@ -307,9 +307,17 @@ async function initEnhancedFeatures() {
 
 /**
  * Initialize editStructure form with cascading selects
+ * Also handles URL parameters for pre-filling from Structure page
  */
 async function initEditStructureForm() {
     const form = document.getElementById('command-form');
+    
+    // Read URL parameters (from Structure page navigation)
+    const urlParams = new URLSearchParams(window.location.search);
+    const prefillType = urlParams.get('type');
+    const prefillName = urlParams.get('name');
+    const prefillNodeId = urlParams.get('nodeId');
+    const prefillAction = urlParams.get('action');
     
     // Convert type input to select
     const typeInput = form.querySelector('[name="type"]');
@@ -365,9 +373,11 @@ async function initEditStructureForm() {
     const typeSelect = form.querySelector('[name="type"]');
     const nameSelect = form.querySelector('[name="name"]');
     const nodeIdSelect = form.querySelector('[name="nodeId"]');
+    const actionSelect = form.querySelector('[name="action"]');
+    const structureTextarea = form.querySelector('[name="structure"]');
     
-    // Function to load node options
-    async function loadNodeOptions() {
+    // Function to load node options and return them for selection
+    async function loadNodeOptions(selectValue = null) {
         if (!nodeIdSelect) return;
         
         const type = typeSelect?.value;
@@ -394,8 +404,51 @@ async function initEditStructureForm() {
             const nodes = await QuickSiteAdmin.fetchHelperData('structure-nodes', params);
             nodeIdSelect.innerHTML = '<option value="">(Optional) Select node for targeted edit...</option>';
             QuickSiteAdmin.appendOptionsToSelect(nodeIdSelect, nodes);
+            
+            // Select the prefilled value if provided
+            if (selectValue) {
+                nodeIdSelect.value = selectValue;
+                // Trigger the node content loading
+                await loadNodeContent();
+            }
         } catch (error) {
             nodeIdSelect.innerHTML = '<option value="">Error loading nodes</option>';
+        }
+    }
+    
+    // Function to load node content when action is 'update' and nodeId is selected
+    async function loadNodeContent() {
+        if (!structureTextarea || !nodeIdSelect) return;
+        
+        const action = actionSelect?.value;
+        const nodeId = nodeIdSelect?.value;
+        const type = typeSelect?.value;
+        const name = nameSelect?.value;
+        
+        // Only load for update action with a selected nodeId
+        if (action !== 'update' || !nodeId) return;
+        
+        // Build API params
+        const apiParams = [type];
+        if (type === 'page' || type === 'component') {
+            apiParams.push(name);
+        }
+        apiParams.push(nodeId); // This fetches the specific node
+        
+        try {
+            structureTextarea.placeholder = 'Loading node content...';
+            const result = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, apiParams);
+            
+            if (result.ok && result.data.data?.node) {
+                // Format the node JSON nicely
+                const nodeJson = JSON.stringify(result.data.data.node, null, 2);
+                structureTextarea.value = nodeJson;
+                structureTextarea.placeholder = 'Node content loaded - modify and submit to update';
+                QuickSiteAdmin.showToast('Node content loaded into structure field', 'info');
+            }
+        } catch (error) {
+            console.error('Failed to load node content:', error);
+            structureTextarea.placeholder = 'Enter new structure JSON...';
         }
     }
     
@@ -420,10 +473,63 @@ async function initEditStructureForm() {
                 nodeIdSelect.innerHTML = '<option value="">Select name first...</option>';
                 nodeIdSelect.disabled = true;
             }
+            
+            // Clear structure textarea when type changes
+            if (structureTextarea) {
+                structureTextarea.value = '';
+            }
         });
         
         // When name changes, populate nodeId options
-        nameSelect.addEventListener('change', loadNodeOptions);
+        nameSelect.addEventListener('change', async () => {
+            await loadNodeOptions();
+            // Clear structure textarea when name changes
+            if (structureTextarea) {
+                structureTextarea.value = '';
+            }
+        });
+    }
+    
+    // When nodeId changes and action is 'update', load the node content
+    if (nodeIdSelect) {
+        nodeIdSelect.addEventListener('change', loadNodeContent);
+    }
+    
+    // When action changes to 'update' with a nodeId, load the node content
+    if (actionSelect) {
+        actionSelect.addEventListener('change', loadNodeContent);
+    }
+    
+    // Pre-fill form from URL parameters
+    if (prefillType) {
+        typeSelect.value = prefillType;
+        
+        // Trigger cascading for name select
+        if (prefillType === 'page' || prefillType === 'component') {
+            const endpoint = prefillType === 'page' ? 'pages' : 'components';
+            await QuickSiteAdmin.populateSelect(nameSelect, endpoint, [], `Select ${prefillType}...`);
+            nameSelect.disabled = false;
+            
+            if (prefillName) {
+                nameSelect.value = prefillName;
+                // Load node options and select the prefilled nodeId
+                await loadNodeOptions(prefillNodeId);
+            }
+        } else {
+            // menu/footer
+            nameSelect.innerHTML = '<option value="">Not required for this type</option>';
+            nameSelect.disabled = true;
+            await loadNodeOptions(prefillNodeId);
+        }
+    }
+    
+    // Pre-fill action
+    if (prefillAction && actionSelect) {
+        actionSelect.value = prefillAction;
+        // If action is update and nodeId is set, load the node content
+        if (prefillAction === 'update' && prefillNodeId) {
+            await loadNodeContent();
+        }
     }
 }
 

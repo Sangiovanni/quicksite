@@ -368,14 +368,26 @@ function showNodeDetails(node, nodeId) {
         `;
     }
     
+    // Build edit URL with query parameters
+    const editParams = new URLSearchParams();
+    editParams.set('type', currentType);
+    if (currentName) editParams.set('name', currentName);
+    if (nodeId) editParams.set('nodeId', nodeId);
+    editParams.set('action', 'update'); // Default to update when clicking from node details
+    const editUrl = `${COMMAND_BASE_URL}/editStructure?${editParams.toString()}`;
+    
     html += `
             <dt>Children</dt>
             <dd>${node.children ? node.children.length : 0} child node(s)</dd>
         </dl>
         
         <div class="admin-node-details__actions">
-            <a href="${COMMAND_BASE_URL}/editStructure" class="admin-btn admin-btn--small admin-btn--primary">
-                Edit Structure
+            <a href="${editUrl}" class="admin-btn admin-btn--small admin-btn--primary">
+                Edit This Node
+            </a>
+            <a href="${COMMAND_BASE_URL}/editStructure?type=${currentType}${currentName ? '&name=' + currentName : ''}" 
+               class="admin-btn admin-btn--small admin-btn--secondary">
+                Edit Full Structure
             </a>
         </div>
     `;
