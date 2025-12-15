@@ -11,9 +11,11 @@
 // $selectedCommand is already set from command.php
 
 // Commands that change URL structure - need special warning
-// Note: renameSecureFolder doesn't change public URLs, so it's not included
-$pathChangingCommands = ['setPublicSpace', 'renamePublicFolder'];
-$isPathChanging = in_array($selectedCommand, $pathChangingCommands);
+$urlChangingCommands = ['setPublicSpace']; // Changes admin URL, auto-redirect
+$serverConfigCommands = ['renamePublicFolder']; // Requires server config change
+
+$isUrlChanging = in_array($selectedCommand, $urlChangingCommands);
+$isServerConfig = in_array($selectedCommand, $serverConfigCommands);
 
 // Load command documentation
 $commandDoc = null;
@@ -42,7 +44,7 @@ function getCommandDocumentation(string $command): ?array {
 }
 ?>
 
-<?php if ($isPathChanging): ?>
+<?php if ($isUrlChanging): ?>
 <div class="admin-alert admin-alert--warning" style="margin-bottom: var(--space-lg);">
     <svg class="admin-alert__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
@@ -59,6 +61,27 @@ function getCommandDocumentation(string $command): ?array {
 </div>
 <?php endif; ?>
 
+<?php if ($isServerConfig): ?>
+<div class="admin-alert admin-alert--error" style="margin-bottom: var(--space-lg);">
+    <svg class="admin-alert__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    <div>
+        <strong>🚨 Server Configuration Required</strong>
+        <p style="margin: var(--space-xs) 0 0;">
+            <strong>Advanced users only!</strong> This command renames the physical public folder. 
+            After execution, your site will be <strong>inaccessible</strong> until you update your 
+            server configuration (Apache VirtualHost, nginx config, etc.) to point to the new folder name.
+        </p>
+        <p style="margin: var(--space-xs) 0 0; font-size: var(--font-size-sm); opacity: 0.9;">
+            Use case: switching between test/production environments sharing the same server root with different DNS configurations.
+        </p>
+    </div>
+</div>
+<?php endif; ?>
+
 <div class="admin-page-header">
     <div class="admin-breadcrumb">
         <a href="<?= $router->url('command') ?>" class="admin-breadcrumb__link">
@@ -70,9 +93,14 @@ function getCommandDocumentation(string $command): ?array {
     </div>
     <h1 class="admin-page-header__title">
         <code><?= adminEscape($selectedCommand) ?></code>
-        <?php if ($isPathChanging): ?>
+        <?php if ($isUrlChanging): ?>
         <span class="badge badge--warning" style="margin-left: var(--space-sm); font-size: var(--font-size-xs);">
             Changes URLs
+        </span>
+        <?php endif; ?>
+        <?php if ($isServerConfig): ?>
+        <span class="badge badge--error" style="margin-left: var(--space-sm); font-size: var(--font-size-xs);">
+            ⚠️ Server Config Required
         </span>
         <?php endif; ?>
         <button type="button" id="favorite-btn" class="admin-favorite-btn" onclick="toggleFavorite()" title="Add to favorites">
@@ -208,6 +236,9 @@ async function initEnhancedFeatures() {
         case 'downloadAsset':
             await initAssetSelectForm();
             break;
+        case 'listAssets':
+            await initListAssetsForm();
+            break;
         case 'getStructure':
             await initGetStructureForm();
             break;
@@ -237,7 +268,39 @@ async function initEnhancedFeatures() {
             await initUploadAssetForm();
             break;
         case 'editFavicon':
-            initFileUploadForm();
+            await initEditFaviconForm();
+            break;
+        case 'editTitle':
+            await initEditTitleForm();
+            break;
+        case 'editStyles':
+            await initEditStylesForm();
+            break;
+        case 'setRootVariables':
+            await initSetRootVariablesForm();
+            break;
+        case 'getStyleRule':
+        case 'setStyleRule':
+        case 'deleteStyleRule':
+            await initStyleRuleForm();
+            break;
+        case 'getKeyframes':
+        case 'deleteKeyframes':
+            await initKeyframeSelectForm();
+            break;
+        case 'setKeyframes':
+            await initSetKeyframesForm();
+            break;
+        case 'getBuild':
+        case 'deleteBuild':
+        case 'downloadBuild':
+            await initBuildSelectForm();
+            break;
+        case 'clearCommandHistory':
+            await initClearHistoryForm();
+            break;
+        case 'generateToken':
+            initGenerateTokenForm();
             break;
     }
 }
@@ -480,6 +543,44 @@ async function initAssetSelectForm() {
 }
 
 /**
+ * Initialize listAssets form with optional category select
+ */
+async function initListAssetsForm() {
+    const form = document.getElementById('command-form');
+    
+    // Convert category to select (it's a URL segment parameter)
+    const categoryInput = form.querySelector('[name="category"]');
+    if (categoryInput && categoryInput.tagName !== 'SELECT') {
+        const categorySelect = document.createElement('select');
+        categorySelect.name = 'category';
+        categorySelect.className = 'admin-select';
+        // Not required - it's optional for listAssets
+        categorySelect.required = false;
+        
+        // Preserve URL param attribute if present
+        if (categoryInput.dataset.urlParam !== undefined) {
+            categorySelect.dataset.urlParam = '';
+        }
+        
+        categoryInput.replaceWith(categorySelect);
+        
+        // Add "All categories" option first, then populate with categories
+        categorySelect.innerHTML = '<option value="">All categories</option>';
+        try {
+            const categories = await QuickSiteAdmin.fetchHelperData('asset-categories', []);
+            categories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.value;
+                option.textContent = cat.label;
+                categorySelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Failed to load categories:', error);
+        }
+    }
+}
+
+/**
  * Initialize uploadAsset form with category select and file upload
  */
 async function initUploadAssetForm() {
@@ -498,6 +599,876 @@ async function initUploadAssetForm() {
     
     // Also init file upload styling
     initFileUploadForm();
+}
+
+/**
+ * Initialize editFavicon form with image selector from assets/images
+ */
+async function initEditFaviconForm() {
+    const form = document.getElementById('command-form');
+    const imageNameInput = form.querySelector('[name="imageName"]');
+    
+    if (imageNameInput && imageNameInput.tagName !== 'SELECT') {
+        const imageSelect = document.createElement('select');
+        imageSelect.name = 'imageName';
+        imageSelect.className = 'admin-select';
+        imageSelect.required = imageNameInput.required;
+        
+        imageNameInput.replaceWith(imageSelect);
+        
+        // Load images from assets/images
+        imageSelect.innerHTML = '<option value="">Loading images...</option>';
+        
+        try {
+            const images = await QuickSiteAdmin.fetchHelperData('assets', ['images']);
+            imageSelect.innerHTML = '<option value="">Select image for favicon...</option>';
+            
+            // Filter for PNG images (favicon requires PNG)
+            images.forEach(img => {
+                const option = document.createElement('option');
+                option.value = img.value;
+                option.textContent = img.label;
+                // Highlight PNG files
+                if (img.value.toLowerCase().endsWith('.png')) {
+                    option.textContent = '✓ ' + img.label;
+                }
+                imageSelect.appendChild(option);
+            });
+            
+            if (images.length === 0) {
+                imageSelect.innerHTML = '<option value="">No images found in assets/images</option>';
+            }
+        } catch (error) {
+            imageSelect.innerHTML = '<option value="">Error loading images</option>';
+        }
+    }
+    
+    // Add hint about PNG requirement
+    const hint = document.createElement('p');
+    hint.className = 'admin-hint';
+    hint.innerHTML = '💡 Only PNG images are supported for favicon. Images marked with ✓ are PNG files.';
+    const formGroup = form.querySelector('[name="imageName"]')?.parentNode;
+    if (formGroup) {
+        formGroup.appendChild(hint);
+    }
+}
+
+/**
+ * Initialize editTitle form with route and language selectors
+ */
+async function initEditTitleForm() {
+    const form = document.getElementById('command-form');
+    const routeInput = form.querySelector('[name="route"]');
+    const langInput = form.querySelector('[name="lang"]');
+    const titleInput = form.querySelector('[name="title"]');
+    
+    // Convert route input to select
+    if (routeInput && routeInput.tagName !== 'SELECT') {
+        const routeSelect = document.createElement('select');
+        routeSelect.name = 'route';
+        routeSelect.className = 'admin-select';
+        routeSelect.required = routeInput.required;
+        routeInput.replaceWith(routeSelect);
+        await QuickSiteAdmin.populateSelect(routeSelect, 'routes', [], 'Select route...');
+    }
+    
+    // Convert lang input to select
+    if (langInput && langInput.tagName !== 'SELECT') {
+        const langSelect = document.createElement('select');
+        langSelect.name = 'lang';
+        langSelect.className = 'admin-select';
+        langSelect.required = langInput.required;
+        langInput.replaceWith(langSelect);
+        await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], 'Select language...');
+    }
+    
+    // Function to load current title
+    const loadCurrentTitle = async () => {
+        const routeSelect = form.querySelector('[name="route"]');
+        const langSelect = form.querySelector('[name="lang"]');
+        
+        if (!routeSelect || !langSelect || !titleInput) return;
+        
+        const route = routeSelect.value;
+        const lang = langSelect.value;
+        
+        if (!route || !lang) return;
+        
+        try {
+            const result = await QuickSiteAdmin.fetchHelperData('page-title', [route, lang]);
+            if (result && result.title !== undefined) {
+                titleInput.value = result.title;
+                titleInput.placeholder = result.title ? 'Current: ' + result.title : 'No title set for this route/language';
+            }
+        } catch (error) {
+            console.error('Error loading current title:', error);
+            titleInput.placeholder = 'Enter new title...';
+        }
+    };
+    
+    // Add change listeners to load title when route or lang changes
+    const routeSelect = form.querySelector('[name="route"]');
+    const langSelect = form.querySelector('[name="lang"]');
+    
+    if (routeSelect) {
+        routeSelect.addEventListener('change', loadCurrentTitle);
+    }
+    if (langSelect) {
+        langSelect.addEventListener('change', loadCurrentTitle);
+    }
+}
+
+/**
+ * Initialize build select form (getBuild, deleteBuild, downloadBuild)
+ */
+async function initBuildSelectForm() {
+    const form = document.getElementById('command-form');
+    const nameInput = form.querySelector('[name="name"]');
+    
+    if (nameInput && nameInput.tagName !== 'SELECT') {
+        const nameSelect = document.createElement('select');
+        nameSelect.name = 'name';
+        nameSelect.className = 'admin-select';
+        nameSelect.required = nameInput.required;
+        // Preserve data-url-param attribute if present (for GET commands like getBuild, downloadBuild)
+        if (nameInput.dataset.urlParam !== undefined) {
+            nameSelect.dataset.urlParam = '';
+        }
+        nameInput.replaceWith(nameSelect);
+        await QuickSiteAdmin.populateSelect(nameSelect, 'builds', [], 'Select build...');
+    }
+}
+
+/**
+ * Initialize clearCommandHistory form with date picker
+ */
+async function initClearHistoryForm() {
+    const form = document.getElementById('command-form');
+    const beforeInput = form.querySelector('[name="before"]');
+    
+    if (beforeInput && beforeInput.type !== 'date') {
+        // Convert text input to date input
+        const dateInput = document.createElement('input');
+        dateInput.type = 'date';
+        dateInput.name = 'before';
+        dateInput.className = 'admin-input';
+        dateInput.required = beforeInput.required;
+        
+        // Set max date to today
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.max = today;
+        
+        // Set a sensible default (30 days ago)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        dateInput.value = thirtyDaysAgo.toISOString().split('T')[0];
+        
+        beforeInput.replaceWith(dateInput);
+    }
+    
+    // Add hint
+    const hint = document.createElement('p');
+    hint.className = 'admin-hint';
+    hint.innerHTML = '💡 All log entries <strong>before</strong> this date will be deleted. Set <code>confirm</code> to false first to preview what will be deleted.';
+    const formGroup = form.querySelector('[name="before"]')?.parentNode;
+    if (formGroup && !formGroup.querySelector('.admin-hint')) {
+        formGroup.appendChild(hint);
+    }
+}
+
+/**
+ * Initialize generateToken form with quick-add buttons for common token names
+ */
+function initGenerateTokenForm() {
+    const form = document.getElementById('command-form');
+    const nameInput = form.querySelector('[name="name"]');
+    
+    if (!nameInput) return;
+    
+    // Quick add buttons for common token names
+    const quickNames = [
+        { label: 'Developer', value: 'Developer Token' },
+        { label: 'Collaborator', value: 'Collaborator Token' },
+        { label: 'Read-Only', value: 'Read-Only API Access' },
+        { label: 'CI/CD', value: 'CI/CD Pipeline' },
+        { label: 'External API', value: 'External API Integration' }
+    ];
+    
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'quick-add-buttons';
+    buttonContainer.style.cssText = 'display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;';
+    
+    quickNames.forEach(item => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'admin-btn admin-btn--small admin-btn--secondary';
+        btn.textContent = '+ ' + item.label;
+        btn.onclick = () => {
+            nameInput.value = item.value;
+            nameInput.focus();
+        };
+        buttonContainer.appendChild(btn);
+    });
+    
+    nameInput.parentNode.appendChild(buttonContainer);
+    
+    // Add permission selector
+    const permInput = form.querySelector('[name="permissions"]');
+    if (permInput) {
+        // Create permission builder UI
+        const permBuilder = document.createElement('div');
+        permBuilder.className = 'permission-builder';
+        permBuilder.style.cssText = 'margin-top: 0.5rem;';
+        
+        // Permission select
+        const permSelect = document.createElement('select');
+        permSelect.className = 'admin-select';
+        permSelect.style.cssText = 'display: inline-block; width: auto; min-width: 200px; margin-right: 0.5rem;';
+        permSelect.innerHTML = `
+            <option value="">-- Select permission --</option>
+            <optgroup label="Full Access">
+                <option value="*">* (Full access to all commands)</option>
+            </optgroup>
+            <optgroup label="Permission Categories">
+                <option value="read">read (get*, list*, validate*, help)</option>
+                <option value="write">write (edit*, add*, delete*, upload*)</option>
+                <option value="admin">admin (set*, rename*, build, tokens)</option>
+            </optgroup>
+            <optgroup label="Common Combinations">
+                <option value="read,write">read + write</option>
+                <option value="read,write,admin">read + write + admin</option>
+            </optgroup>
+        `;
+        
+        // Add button
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'admin-btn admin-btn--small admin-btn--primary';
+        addBtn.textContent = '+ Add';
+        addBtn.onclick = () => {
+            if (!permSelect.value) return;
+            
+            let currentPerms = [];
+            try {
+                currentPerms = JSON.parse(permInput.value || '[]');
+                if (!Array.isArray(currentPerms)) currentPerms = [];
+            } catch {
+                currentPerms = [];
+            }
+            
+            // Handle comma-separated values (for combinations)
+            const newPerms = permSelect.value.split(',');
+            newPerms.forEach(p => {
+                if (!currentPerms.includes(p)) {
+                    currentPerms.push(p);
+                }
+            });
+            
+            permInput.value = JSON.stringify(currentPerms);
+            permSelect.value = '';
+        };
+        
+        // Clear button
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'admin-btn admin-btn--small admin-btn--secondary';
+        clearBtn.textContent = 'Clear';
+        clearBtn.style.marginLeft = '0.5rem';
+        clearBtn.onclick = () => {
+            permInput.value = '[]';
+        };
+        
+        permBuilder.appendChild(permSelect);
+        permBuilder.appendChild(addBtn);
+        permBuilder.appendChild(clearBtn);
+        permInput.parentNode.appendChild(permBuilder);
+        
+        // Set default empty array
+        if (!permInput.value) {
+            permInput.value = '["read"]';
+        }
+        
+        // Add hint
+        const hint = document.createElement('p');
+        hint.className = 'admin-hint';
+        hint.innerHTML = '💡 Permissions control API access. <code>read</code> = view only, <code>write</code> = modify content, <code>admin</code> = system settings. Use <code>*</code> for full access.';
+        permInput.parentNode.appendChild(hint);
+    }
+}
+
+/**
+ * Initialize editStyles form - loads current CSS content into textarea
+ */
+async function initEditStylesForm() {
+    const form = document.getElementById('command-form');
+    const contentTextarea = form.querySelector('[name="content"]');
+    
+    if (contentTextarea) {
+        // Add loading indicator
+        contentTextarea.placeholder = 'Loading current styles...';
+        contentTextarea.disabled = true;
+        
+        // Add helper buttons above textarea
+        const helperDiv = document.createElement('div');
+        helperDiv.className = 'admin-style-helper';
+        helperDiv.innerHTML = `
+            <div style="display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm); flex-wrap: wrap;">
+                <button type="button" id="load-styles-btn" class="admin-btn admin-btn--secondary admin-btn--small">
+                    🔄 Reload Current Styles
+                </button>
+                <button type="button" id="format-css-btn" class="admin-btn admin-btn--outline admin-btn--small">
+                    ✨ Format CSS
+                </button>
+            </div>
+            <p class="admin-hint">⚠️ This will replace the entire style.css file. Make sure to include all styles you want to keep.</p>
+        `;
+        contentTextarea.parentNode.insertBefore(helperDiv, contentTextarea);
+        
+        const loadBtn = document.getElementById('load-styles-btn');
+        const formatBtn = document.getElementById('format-css-btn');
+        
+        // Function to load current styles
+        async function loadCurrentStyles() {
+            contentTextarea.disabled = true;
+            contentTextarea.placeholder = 'Loading...';
+            
+            try {
+                const data = await QuickSiteAdmin.fetchHelperData('current-styles', []);
+                // Normalize line endings for textarea display
+                contentTextarea.value = data.content ? data.content.replace(/\r\n/g, '\n') : '';
+                contentTextarea.placeholder = 'CSS content...';
+            } catch (error) {
+                contentTextarea.placeholder = 'Failed to load styles. Enter CSS manually.';
+                QuickSiteAdmin.showToast('Failed to load current styles', 'error');
+            }
+            
+            contentTextarea.disabled = false;
+        }
+        
+        // Load styles on init
+        await loadCurrentStyles();
+        
+        // Reload button
+        loadBtn.addEventListener('click', async () => {
+            await loadCurrentStyles();
+            QuickSiteAdmin.showToast('Styles reloaded', 'success');
+        });
+        
+        // Basic CSS formatting (just normalizes whitespace)
+        formatBtn.addEventListener('click', () => {
+            let css = contentTextarea.value;
+            // Basic formatting: ensure newlines after { and ;, before }
+            css = css
+                .replace(/\s*{\s*/g, ' {\n  ')
+                .replace(/;\s*/g, ';\n  ')
+                .replace(/\s*}\s*/g, '\n}\n')
+                .replace(/\n\s+\n/g, '\n')
+                .replace(/  }/g, '}')
+                .trim();
+            contentTextarea.value = css;
+            QuickSiteAdmin.showToast('CSS formatted', 'success');
+        });
+        
+        // Make textarea taller for CSS editing
+        contentTextarea.style.minHeight = '400px';
+        contentTextarea.style.fontFamily = 'monospace';
+    }
+}
+
+/**
+ * Initialize setRootVariables form with variable selector
+ */
+async function initSetRootVariablesForm() {
+    const form = document.getElementById('command-form');
+    const variablesTextarea = form.querySelector('[name="variables"]');
+    
+    if (variablesTextarea) {
+        // Add helper above textarea
+        const helperDiv = document.createElement('div');
+        helperDiv.className = 'admin-variable-selector';
+        helperDiv.innerHTML = `
+            <label class="admin-label">Variable Selector</label>
+            <div style="display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);">
+                <select id="var-selector" class="admin-select" style="flex: 1;" size="6">
+                    <option value="" disabled>Loading variables...</option>
+                </select>
+                <div style="display: flex; flex-direction: column; gap: var(--space-xs);">
+                    <input type="text" id="var-value-input" class="admin-input" placeholder="New value..." style="width: 180px;">
+                    <p class="admin-hint" style="margin: 0;">Current: <span id="var-current-value" style="font-style: italic;">-</span></p>
+                    <button type="button" id="add-var-btn" class="admin-btn admin-btn--secondary">
+                        Add/Update →
+                    </button>
+                    <button type="button" id="clear-vars-btn" class="admin-btn admin-btn--outline">
+                        Clear All
+                    </button>
+                </div>
+            </div>
+            <p class="admin-hint">Select a variable to edit, or type a new value. This merges with existing variables.</p>
+        `;
+        variablesTextarea.parentNode.insertBefore(helperDiv, variablesTextarea);
+        
+        const varSelector = document.getElementById('var-selector');
+        const varValueInput = document.getElementById('var-value-input');
+        const currentValueSpan = document.getElementById('var-current-value');
+        const addBtn = document.getElementById('add-var-btn');
+        const clearBtn = document.getElementById('clear-vars-btn');
+        
+        // Store variables data
+        let variablesData = [];
+        
+        // Load variables
+        async function loadVariables() {
+            varSelector.innerHTML = '<option value="" disabled>Loading...</option>';
+            try {
+                variablesData = await QuickSiteAdmin.fetchHelperData('root-variables', []);
+                varSelector.innerHTML = '';
+                
+                if (variablesData.length === 0) {
+                    varSelector.innerHTML = '<option value="" disabled>No variables found</option>';
+                    return;
+                }
+                
+                variablesData.forEach(v => {
+                    const option = document.createElement('option');
+                    option.value = v.value;
+                    option.textContent = v.label;
+                    option.dataset.currentValue = v.currentValue;
+                    varSelector.appendChild(option);
+                });
+            } catch (error) {
+                varSelector.innerHTML = '<option value="" disabled>Error loading variables</option>';
+            }
+        }
+        
+        await loadVariables();
+        
+        // Show current value on select
+        varSelector.addEventListener('change', () => {
+            const selected = varSelector.selectedOptions[0];
+            if (selected && selected.dataset.currentValue) {
+                currentValueSpan.textContent = selected.dataset.currentValue;
+                // Pre-fill input with current value for easy editing
+                varValueInput.value = selected.dataset.currentValue;
+            } else {
+                currentValueSpan.textContent = '-';
+            }
+        });
+        
+        // Add variable button
+        addBtn.addEventListener('click', () => {
+            const varName = varSelector.value;
+            const varValue = varValueInput.value.trim();
+            
+            if (!varName) {
+                QuickSiteAdmin.showToast('Please select a variable', 'warning');
+                return;
+            }
+            if (!varValue) {
+                QuickSiteAdmin.showToast('Please enter a value', 'warning');
+                return;
+            }
+            
+            // Parse current variables object
+            let variables = {};
+            try {
+                variables = JSON.parse(variablesTextarea.value || '{}');
+            } catch {
+                variables = {};
+            }
+            
+            // Add/update variable
+            variables[varName] = varValue;
+            
+            // Update textarea
+            variablesTextarea.value = JSON.stringify(variables, null, 2);
+            
+            // Clear input
+            varValueInput.value = '';
+            currentValueSpan.textContent = '-';
+            
+            QuickSiteAdmin.showToast(`Added: ${varName}`, 'success');
+        });
+        
+        // Clear button
+        clearBtn.addEventListener('click', () => {
+            variablesTextarea.value = '{}';
+        });
+        
+        // Refresh after successful command
+        form.addEventListener('command-success', async (e) => {
+            if (e.detail.command === 'setRootVariables') {
+                await loadVariables();
+                variablesTextarea.value = '{}';
+                currentValueSpan.textContent = '-';
+            }
+        });
+    }
+}
+
+/**
+ * Initialize getStyleRule/setStyleRule/deleteStyleRule form with selector picker
+ */
+async function initStyleRuleForm() {
+    const form = document.getElementById('command-form');
+    const selectorInput = form.querySelector('[name="selector"]');
+    const mediaQueryInput = form.querySelector('[name="mediaQuery"]');
+    
+    if (selectorInput) {
+        // Create a helper section above the selector input
+        const helperDiv = document.createElement('div');
+        helperDiv.className = 'admin-style-rule-helper';
+        helperDiv.innerHTML = `
+            <label class="admin-label">CSS Selector Picker</label>
+            <div style="display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);">
+                <select id="rule-selector" class="admin-select" style="flex: 1;" size="8">
+                    <option value="" disabled>Loading selectors...</option>
+                </select>
+            </div>
+            <p class="admin-hint">Select a CSS rule from the list above. The selector and media query fields will be filled automatically.</p>
+        `;
+        selectorInput.parentNode.parentNode.insertBefore(helperDiv, selectorInput.parentNode);
+        
+        const ruleSelector = document.getElementById('rule-selector');
+        
+        // Store selectors with their media queries
+        let selectorsData = [];
+        
+        // Load selectors
+        async function loadSelectors() {
+            ruleSelector.innerHTML = '<option value="" disabled>Loading...</option>';
+            try {
+                const data = await QuickSiteAdmin.fetchHelperData('style-rules', []);
+                ruleSelector.innerHTML = '';
+                selectorsData = [];
+                
+                // Build optgroups
+                data.forEach(group => {
+                    if (group.type === 'optgroup') {
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = group.label;
+                        
+                        group.options.forEach(opt => {
+                            const option = document.createElement('option');
+                            option.value = opt.value;
+                            option.textContent = opt.label;
+                            option.dataset.mediaQuery = opt.mediaQuery || '';
+                            optgroup.appendChild(option);
+                            
+                            selectorsData.push({
+                                selector: opt.value,
+                                mediaQuery: opt.mediaQuery
+                            });
+                        });
+                        
+                        ruleSelector.appendChild(optgroup);
+                    }
+                });
+                
+                if (ruleSelector.options.length === 0) {
+                    ruleSelector.innerHTML = '<option value="" disabled>No CSS rules found</option>';
+                }
+            } catch (error) {
+                ruleSelector.innerHTML = '<option value="" disabled>Error loading selectors</option>';
+            }
+        }
+        
+        await loadSelectors();
+        
+        // When a selector is chosen, fill in the form fields
+        ruleSelector.addEventListener('change', () => {
+            const selected = ruleSelector.selectedOptions[0];
+            if (selected) {
+                // Fill selector input
+                if (selectorInput.tagName === 'INPUT') {
+                    selectorInput.value = selected.value;
+                }
+                
+                // Fill media query input if present
+                if (mediaQueryInput) {
+                    const mediaQuery = selected.dataset.mediaQuery || '';
+                    if (mediaQueryInput.tagName === 'INPUT') {
+                        mediaQueryInput.value = mediaQuery;
+                    }
+                }
+            }
+        });
+        
+        // Refresh after successful delete
+        form.addEventListener('command-success', async (e) => {
+            if (e.detail.command === 'deleteStyleRule') {
+                await loadSelectors();
+            }
+        });
+    }
+}
+
+/**
+ * Initialize getKeyframes/deleteKeyframes form with keyframe name selector
+ */
+async function initKeyframeSelectForm() {
+    const form = document.getElementById('command-form');
+    const nameInput = form.querySelector('[name="name"]');
+    
+    if (nameInput && nameInput.tagName !== 'SELECT') {
+        const nameSelect = document.createElement('select');
+        nameSelect.name = 'name';
+        nameSelect.className = 'admin-select';
+        nameSelect.required = nameInput.required;
+        
+        // Preserve URL param attribute if present
+        if (nameInput.dataset.urlParam !== undefined) {
+            nameSelect.dataset.urlParam = '';
+        }
+        
+        nameInput.replaceWith(nameSelect);
+        
+        // Add empty option for "all keyframes" on getKeyframes
+        const isGetCommand = COMMAND_NAME === 'getKeyframes';
+        const placeholder = isGetCommand ? 'All keyframes (leave empty)' : 'Select keyframe...';
+        
+        nameSelect.innerHTML = `<option value="">${placeholder}</option>`;
+        
+        try {
+            const keyframes = await QuickSiteAdmin.fetchHelperData('keyframes', []);
+            keyframes.forEach(kf => {
+                const option = document.createElement('option');
+                option.value = kf.value;
+                option.textContent = kf.label;
+                nameSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Failed to load keyframes:', error);
+        }
+        
+        // Refresh after successful delete
+        form.addEventListener('command-success', async (e) => {
+            if (e.detail.command === 'deleteKeyframes') {
+                // Reload the select
+                nameSelect.innerHTML = `<option value="">${placeholder}</option>`;
+                try {
+                    const keyframes = await QuickSiteAdmin.fetchHelperData('keyframes', []);
+                    keyframes.forEach(kf => {
+                        const option = document.createElement('option');
+                        option.value = kf.value;
+                        option.textContent = kf.label;
+                        nameSelect.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Failed to reload keyframes:', error);
+                }
+            }
+        });
+    }
+}
+
+/**
+ * Initialize setKeyframes form with name selector/input and frame builder
+ */
+async function initSetKeyframesForm() {
+    const form = document.getElementById('command-form');
+    const nameInput = form.querySelector('[name="name"]');
+    const framesTextarea = form.querySelector('[name="frames"]');
+    
+    if (nameInput && framesTextarea) {
+        // Store existing keyframes for reference
+        let existingKeyframes = {};
+        
+        // Add helper section above the name input
+        const helperDiv = document.createElement('div');
+        helperDiv.className = 'admin-keyframe-builder';
+        helperDiv.innerHTML = `
+            <label class="admin-label">Keyframe Builder</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); margin-bottom: var(--space-sm);">
+                <div>
+                    <label class="admin-label admin-label--small">Animation Name</label>
+                    <select id="kf-name-selector" class="admin-select" style="margin-bottom: var(--space-xs);">
+                        <option value="">Select existing or type new...</option>
+                    </select>
+                    <input type="text" id="kf-name-input" class="admin-input" placeholder="Or type new name (e.g., fadeIn)">
+                </div>
+                <div>
+                    <label class="admin-label admin-label--small">Current Frames</label>
+                    <div id="kf-current-frames" class="admin-hint" style="background: var(--color-bg-secondary); padding: var(--space-sm); border-radius: var(--radius-sm); min-height: 60px; font-family: monospace; font-size: 12px; overflow: auto; max-height: 100px;">
+                        Select an animation to see its frames
+                    </div>
+                </div>
+            </div>
+            <div style="border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-sm); margin-bottom: var(--space-sm);">
+                <label class="admin-label admin-label--small">Add Frame</label>
+                <div style="display: flex; gap: var(--space-sm); align-items: flex-start;">
+                    <div style="width: 120px;">
+                        <select id="kf-frame-key" class="admin-select">
+                            <option value="from">from</option>
+                            <option value="to">to</option>
+                            <option value="0%">0%</option>
+                            <option value="25%">25%</option>
+                            <option value="50%">50%</option>
+                            <option value="75%">75%</option>
+                            <option value="100%">100%</option>
+                            <option value="custom">Custom...</option>
+                        </select>
+                        <input type="text" id="kf-frame-key-custom" class="admin-input" placeholder="e.g., 0%, 100%" style="margin-top: var(--space-xs); display: none;">
+                    </div>
+                    <div style="flex: 1;">
+                        <input type="text" id="kf-frame-value" class="admin-input" placeholder="CSS properties (e.g., opacity: 0; transform: scale(0.5);)">
+                    </div>
+                    <button type="button" id="kf-add-frame-btn" class="admin-btn admin-btn--secondary">
+                        Add Frame
+                    </button>
+                </div>
+            </div>
+            <div style="display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);">
+                <button type="button" id="kf-apply-name-btn" class="admin-btn admin-btn--outline admin-btn--small">
+                    Apply Name to Form
+                </button>
+                <button type="button" id="kf-clear-btn" class="admin-btn admin-btn--outline admin-btn--small">
+                    Clear Frames
+                </button>
+                <button type="button" id="kf-load-existing-btn" class="admin-btn admin-btn--outline admin-btn--small">
+                    Load Existing Frames
+                </button>
+            </div>
+            <p class="admin-hint">Build your keyframe animation using the form above. The frames will be added to the JSON below.</p>
+        `;
+        nameInput.parentNode.parentNode.insertBefore(helperDiv, nameInput.parentNode);
+        
+        const kfNameSelector = document.getElementById('kf-name-selector');
+        const kfNameInput = document.getElementById('kf-name-input');
+        const kfCurrentFrames = document.getElementById('kf-current-frames');
+        const kfFrameKey = document.getElementById('kf-frame-key');
+        const kfFrameKeyCustom = document.getElementById('kf-frame-key-custom');
+        const kfFrameValue = document.getElementById('kf-frame-value');
+        const kfAddFrameBtn = document.getElementById('kf-add-frame-btn');
+        const kfApplyNameBtn = document.getElementById('kf-apply-name-btn');
+        const kfClearBtn = document.getElementById('kf-clear-btn');
+        const kfLoadExistingBtn = document.getElementById('kf-load-existing-btn');
+        
+        // Load existing keyframes
+        async function loadKeyframes() {
+            try {
+                const keyframes = await QuickSiteAdmin.fetchHelperData('keyframes', []);
+                kfNameSelector.innerHTML = '<option value="">Select existing or type new...</option>';
+                existingKeyframes = {};
+                
+                keyframes.forEach(kf => {
+                    const option = document.createElement('option');
+                    option.value = kf.value;
+                    option.textContent = kf.label;
+                    kfNameSelector.appendChild(option);
+                    existingKeyframes[kf.value] = kf.frames;
+                });
+            } catch (error) {
+                console.error('Failed to load keyframes:', error);
+            }
+        }
+        
+        await loadKeyframes();
+        
+        // Show/hide custom key input
+        kfFrameKey.addEventListener('change', () => {
+            kfFrameKeyCustom.style.display = kfFrameKey.value === 'custom' ? 'block' : 'none';
+        });
+        
+        // When selecting existing keyframe, show its frames
+        kfNameSelector.addEventListener('change', () => {
+            const name = kfNameSelector.value;
+            if (name && existingKeyframes[name]) {
+                kfNameInput.value = '';
+                const frames = existingKeyframes[name];
+                let html = '';
+                for (const [key, value] of Object.entries(frames)) {
+                    html += `<strong>${key}:</strong> ${value}<br>`;
+                }
+                kfCurrentFrames.innerHTML = html || 'No frames';
+            } else {
+                kfCurrentFrames.innerHTML = 'Select an animation to see its frames';
+            }
+        });
+        
+        // Clear selector when typing new name
+        kfNameInput.addEventListener('input', () => {
+            if (kfNameInput.value) {
+                kfNameSelector.selectedIndex = 0;
+                kfCurrentFrames.innerHTML = '(New animation)';
+            }
+        });
+        
+        // Add frame button
+        kfAddFrameBtn.addEventListener('click', () => {
+            let frameKey = kfFrameKey.value;
+            if (frameKey === 'custom') {
+                frameKey = kfFrameKeyCustom.value.trim();
+            }
+            const frameValue = kfFrameValue.value.trim();
+            
+            if (!frameKey) {
+                QuickSiteAdmin.showToast('Please select or enter a frame key', 'warning');
+                return;
+            }
+            if (!frameValue) {
+                QuickSiteAdmin.showToast('Please enter CSS properties', 'warning');
+                return;
+            }
+            
+            // Parse current frames
+            let frames = {};
+            try {
+                frames = JSON.parse(framesTextarea.value || '{}');
+            } catch {
+                frames = {};
+            }
+            
+            // Add frame
+            frames[frameKey] = frameValue;
+            
+            // Update textarea
+            framesTextarea.value = JSON.stringify(frames, null, 2);
+            
+            // Clear value input
+            kfFrameValue.value = '';
+            
+            QuickSiteAdmin.showToast(`Added frame: ${frameKey}`, 'success');
+        });
+        
+        // Apply name button
+        kfApplyNameBtn.addEventListener('click', () => {
+            const name = kfNameInput.value || kfNameSelector.value;
+            if (name) {
+                nameInput.value = name;
+                QuickSiteAdmin.showToast(`Name set: ${name}`, 'success');
+            } else {
+                QuickSiteAdmin.showToast('Please select or enter an animation name', 'warning');
+            }
+        });
+        
+        // Clear frames button
+        kfClearBtn.addEventListener('click', () => {
+            framesTextarea.value = '{}';
+            QuickSiteAdmin.showToast('Frames cleared', 'success');
+        });
+        
+        // Load existing frames into textarea
+        kfLoadExistingBtn.addEventListener('click', () => {
+            const name = kfNameSelector.value;
+            if (name && existingKeyframes[name]) {
+                framesTextarea.value = JSON.stringify(existingKeyframes[name], null, 2);
+                nameInput.value = name;
+                QuickSiteAdmin.showToast(`Loaded frames for: ${name}`, 'success');
+            } else {
+                QuickSiteAdmin.showToast('Please select an existing animation first', 'warning');
+            }
+        });
+        
+        // Refresh after successful command
+        form.addEventListener('command-success', async (e) => {
+            if (e.detail.command === 'setKeyframes') {
+                await loadKeyframes();
+                framesTextarea.value = '{}';
+                nameInput.value = '';
+                kfCurrentFrames.innerHTML = 'Select an animation to see its frames';
+            }
+        });
+    }
 }
 
 /**
@@ -630,12 +1601,14 @@ async function initDeleteAliasForm() {
 }
 
 /**
- * Initialize setTranslationKeys form with language select
+ * Initialize setTranslationKeys form with language select and key selector helper
  */
 async function initSetTranslationKeysForm() {
     const form = document.getElementById('command-form');
     const langInput = form.querySelector('[name="language"]');
+    const translationsTextarea = form.querySelector('[name="translations"]');
     
+    // Convert language to select if needed
     if (langInput && langInput.tagName !== 'SELECT') {
         const langSelect = document.createElement('select');
         langSelect.name = 'language';
@@ -649,7 +1622,253 @@ async function initSetTranslationKeysForm() {
         langInput.replaceWith(langSelect);
         
         await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], 'Select language...');
+        
+        // Add key selector helper above the translations textarea
+        if (translationsTextarea) {
+            const helperDiv = document.createElement('div');
+            helperDiv.className = 'admin-key-selector';
+            helperDiv.innerHTML = `
+                <label class="admin-label">Translation Key Selector</label>
+                <div style="display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);">
+                    <select id="key-selector" class="admin-select" style="flex: 1;" size="8">
+                        <option value="" disabled>Select language first...</option>
+                    </select>
+                    <div style="display: flex; flex-direction: column; gap: var(--space-xs);">
+                        <input type="text" id="value-input" class="admin-input" placeholder="Translation value..." style="width: 200px;">
+                        <p class="admin-hint" style="margin: 0;">Current: <span id="current-value" style="font-style: italic;">-</span></p>
+                        <button type="button" id="add-translation-btn" class="admin-btn admin-btn--secondary">
+                            Add Translation →
+                        </button>
+                        <button type="button" id="clear-translations-btn" class="admin-btn admin-btn--outline" title="Clear all translations">
+                            Clear All
+                        </button>
+                    </div>
+                </div>
+                <p class="admin-hint">🟢 Used keys are active in structure. 🟡 Unused keys exist but aren't used. 🔴 Unset keys need translation.</p>
+            `;
+            translationsTextarea.parentNode.insertBefore(helperDiv, translationsTextarea);
+            
+            const keySelector = document.getElementById('key-selector');
+            const valueInput = document.getElementById('value-input');
+            const currentValueSpan = document.getElementById('current-value');
+            const addBtn = document.getElementById('add-translation-btn');
+            const clearBtn = document.getElementById('clear-translations-btn');
+            
+            // Store current translations data for showing current values
+            let currentTranslations = {};
+            
+            // Load keys when language changes
+            langSelect.addEventListener('change', async () => {
+                const lang = langSelect.value;
+                if (lang) {
+                    try {
+                        // Fetch grouped keys (used/unused/unset)
+                        const data = await QuickSiteAdmin.fetchHelperData('translation-keys-grouped', [lang]);
+                        keySelector.innerHTML = '';
+                        
+                        // Add unset keys first (most important - needs translation)
+                        if (data.unset && data.unset.length > 0) {
+                            const unsetGroup = document.createElement('optgroup');
+                            unsetGroup.label = `🔴 Unset Keys (${data.unset.length}) - Need Translation`;
+                            data.unset.forEach(opt => {
+                                const option = document.createElement('option');
+                                option.value = opt.value;
+                                option.textContent = opt.label;
+                                option.dataset.isUnset = 'true';
+                                unsetGroup.appendChild(option);
+                            });
+                            keySelector.appendChild(unsetGroup);
+                        }
+                        
+                        // Add used keys
+                        if (data.used && data.used.length > 0) {
+                            const usedGroup = document.createElement('optgroup');
+                            usedGroup.label = `🟢 Used Keys (${data.used.length})`;
+                            data.used.forEach(opt => {
+                                const option = document.createElement('option');
+                                option.value = opt.value;
+                                option.textContent = opt.label;
+                                usedGroup.appendChild(option);
+                            });
+                            keySelector.appendChild(usedGroup);
+                        }
+                        
+                        // Add unused keys
+                        if (data.unused && data.unused.length > 0) {
+                            const unusedGroup = document.createElement('optgroup');
+                            unusedGroup.label = `🟡 Unused Keys (${data.unused.length})`;
+                            data.unused.forEach(opt => {
+                                const option = document.createElement('option');
+                                option.value = opt.value;
+                                option.textContent = opt.label;
+                                unusedGroup.appendChild(option);
+                            });
+                            keySelector.appendChild(unusedGroup);
+                        }
+                        
+                        // Also fetch full translations for current value display
+                        const fullData = await QuickSiteAdmin.fetchHelperData('translation-full', [lang]);
+                        currentTranslations = fullData || {};
+                    } catch (error) {
+                        keySelector.innerHTML = '<option value="" disabled>Error loading keys</option>';
+                    }
+                } else {
+                    keySelector.innerHTML = '<option value="" disabled>Select language first...</option>';
+                    currentTranslations = {};
+                }
+                currentValueSpan.textContent = '-';
+            });
+            
+            // Show current value when key is selected
+            keySelector.addEventListener('change', () => {
+                const key = keySelector.value;
+                if (key) {
+                    const isUnset = keySelector.selectedOptions[0]?.dataset.isUnset === 'true';
+                    if (isUnset) {
+                        currentValueSpan.textContent = '(not set)';
+                    } else {
+                        const value = getNestedValue(currentTranslations, key);
+                        currentValueSpan.textContent = value !== undefined ? `"${value}"` : '(not set)';
+                    }
+                } else {
+                    currentValueSpan.textContent = '-';
+                }
+            });
+            
+            // Add translation button
+            addBtn.addEventListener('click', () => {
+                const key = keySelector.value;
+                const value = valueInput.value;
+                
+                if (!key) {
+                    QuickSiteAdmin.showToast('Please select a key', 'warning');
+                    return;
+                }
+                if (!value) {
+                    QuickSiteAdmin.showToast('Please enter a value', 'warning');
+                    return;
+                }
+                
+                // Parse current translations object
+                let translations = {};
+                try {
+                    translations = JSON.parse(translationsTextarea.value || '{}');
+                } catch {
+                    translations = {};
+                }
+                
+                // Convert dot notation to nested object and merge
+                setNestedValue(translations, key, value);
+                
+                // Update textarea
+                translationsTextarea.value = JSON.stringify(translations, null, 2);
+                
+                // Clear inputs
+                valueInput.value = '';
+                currentValueSpan.textContent = '-';
+                
+                QuickSiteAdmin.showToast(`Added: ${key}`, 'success');
+            });
+            
+            // Clear button
+            clearBtn.addEventListener('click', () => {
+                translationsTextarea.value = '{}';
+            });
+            
+            // Helper function to refresh key selector
+            async function refreshKeySelector() {
+                const lang = langSelect.value;
+                if (!lang) return;
+                
+                try {
+                    const data = await QuickSiteAdmin.fetchHelperData('translation-keys-grouped', [lang]);
+                    keySelector.innerHTML = '';
+                    
+                    // Add unset keys first
+                    if (data.unset && data.unset.length > 0) {
+                        const unsetGroup = document.createElement('optgroup');
+                        unsetGroup.label = `🔴 Unset Keys (${data.unset.length}) - Need Translation`;
+                        data.unset.forEach(opt => {
+                            const option = document.createElement('option');
+                            option.value = opt.value;
+                            option.textContent = opt.label;
+                            option.dataset.isUnset = 'true';
+                            unsetGroup.appendChild(option);
+                        });
+                        keySelector.appendChild(unsetGroup);
+                    }
+                    
+                    // Add used keys
+                    if (data.used && data.used.length > 0) {
+                        const usedGroup = document.createElement('optgroup');
+                        usedGroup.label = `🟢 Used Keys (${data.used.length})`;
+                        data.used.forEach(opt => {
+                            const option = document.createElement('option');
+                            option.value = opt.value;
+                            option.textContent = opt.label;
+                            usedGroup.appendChild(option);
+                        });
+                        keySelector.appendChild(usedGroup);
+                    }
+                    
+                    // Add unused keys
+                    if (data.unused && data.unused.length > 0) {
+                        const unusedGroup = document.createElement('optgroup');
+                        unusedGroup.label = `🟡 Unused Keys (${data.unused.length})`;
+                        data.unused.forEach(opt => {
+                            const option = document.createElement('option');
+                            option.value = opt.value;
+                            option.textContent = opt.label;
+                            unusedGroup.appendChild(option);
+                        });
+                        keySelector.appendChild(unusedGroup);
+                    }
+                    
+                    // Refresh full translations too
+                    const fullData = await QuickSiteAdmin.fetchHelperData('translation-full', [lang]);
+                    currentTranslations = fullData || {};
+                } catch (error) {
+                    console.error('Error refreshing keys:', error);
+                }
+            }
+            
+            // Refresh selector after successful command
+            form.addEventListener('command-success', async (e) => {
+                if (e.detail.command === 'setTranslationKeys') {
+                    await refreshKeySelector();
+                    // Clear the textarea for next input
+                    translationsTextarea.value = '{}';
+                    currentValueSpan.textContent = '-';
+                }
+            });
+        }
     }
+}
+
+/**
+ * Get nested value from object using dot notation
+ */
+function getNestedValue(obj, path) {
+    return path.split('.').reduce((current, key) => 
+        current && current[key] !== undefined ? current[key] : undefined, obj);
+}
+
+/**
+ * Set nested value in object using dot notation
+ */
+function setNestedValue(obj, path, value) {
+    const keys = path.split('.');
+    let current = obj;
+    
+    for (let i = 0; i < keys.length - 1; i++) {
+        const key = keys[i];
+        if (!(key in current) || typeof current[key] !== 'object') {
+            current[key] = {};
+        }
+        current = current[key];
+    }
+    
+    current[keys[keys.length - 1]] = value;
 }
 
 /**
@@ -812,6 +2031,62 @@ async function initDeleteTranslationKeysForm() {
             // Clear keys button handler
             clearKeysBtn.addEventListener('click', () => {
                 keysTextarea.value = '[]';
+            });
+            
+            // Helper function to refresh key selector
+            async function refreshKeySelector() {
+                const lang = langSelect.value;
+                if (!lang) return;
+                
+                keySelector.innerHTML = '<option value="" disabled>Refreshing...</option>';
+                try {
+                    const data = await QuickSiteAdmin.fetchHelperData('translation-keys-grouped', [lang]);
+                    keySelector.innerHTML = '';
+                    
+                    // Store unused keys for bulk add
+                    unusedKeys = (data.unused || []).map(k => k.value);
+                    
+                    // Add Used keys optgroup
+                    if (data.used && data.used.length > 0) {
+                        const usedGroup = document.createElement('optgroup');
+                        usedGroup.label = `✓ Used Keys (${data.used.length})`;
+                        data.used.forEach(opt => {
+                            const option = document.createElement('option');
+                            option.value = opt.value;
+                            option.textContent = opt.label;
+                            usedGroup.appendChild(option);
+                        });
+                        keySelector.appendChild(usedGroup);
+                    }
+                    
+                    // Add Unused keys optgroup
+                    if (data.unused && data.unused.length > 0) {
+                        const unusedGroup = document.createElement('optgroup');
+                        unusedGroup.label = `⚠ Unused Keys (${data.unused.length})`;
+                        data.unused.forEach(opt => {
+                            const option = document.createElement('option');
+                            option.value = opt.value;
+                            option.textContent = opt.label;
+                            unusedGroup.appendChild(option);
+                        });
+                        keySelector.appendChild(unusedGroup);
+                    }
+                    
+                    if (!data.used?.length && !data.unused?.length) {
+                        keySelector.innerHTML = '<option value="" disabled>No keys found</option>';
+                    }
+                } catch (error) {
+                    keySelector.innerHTML = '<option value="" disabled>Error refreshing keys</option>';
+                }
+            }
+            
+            // Refresh selector after successful deletion
+            form.addEventListener('command-success', async (e) => {
+                if (e.detail.command === 'deleteTranslationKeys') {
+                    await refreshKeySelector();
+                    // Clear the textarea
+                    keysTextarea.value = '[]';
+                }
             });
         }
     }

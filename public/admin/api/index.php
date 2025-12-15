@@ -124,10 +124,15 @@ switch ($action) {
         $result = makeInternalApiCall($url, $token);
         if ($result['success']) {
             $files = [];
-            // Handle both single category (files array) and all categories (by_category object)
-            $fileData = $result['data']['files'] ?? [];
-            if (empty($fileData) && isset($result['data']['by_category'][$category])) {
-                $fileData = $result['data']['by_category'][$category];
+            // listAssets returns data in ['assets'][$category] format
+            $fileData = [];
+            if ($category && isset($result['data']['assets'][$category])) {
+                $fileData = $result['data']['assets'][$category];
+            } elseif (isset($result['data']['assets'])) {
+                // If no category specified, flatten all categories
+                foreach ($result['data']['assets'] as $catFiles) {
+                    $fileData = array_merge($fileData, $catFiles);
+                }
             }
             foreach ($fileData as $file) {
                 // Use filename for value (what deleteAsset expects), full path for label
@@ -160,12 +165,19 @@ switch ($action) {
         // Return list of builds
         $result = makeInternalApiCall('listBuilds', $token);
         if ($result['success']) {
+            $buildsData = $result['data']['builds'] ?? [];
             $builds = array_map(function($build) {
-                return ['value' => $build['name'], 'label' => $build['name'] . ' (' . $build['size'] . ')'];
-            }, $result['data']['builds'] ?? []);
+                // Handle both array and object formats
+                $name = is_array($build) ? $build['name'] : (isset($build->name) ? $build->name : $build);
+                // Size is in folder_size_mb or zip_size_mb fields
+                $folderSize = is_array($build) ? ($build['folder_size_mb'] ?? null) : (isset($build->folder_size_mb) ? $build->folder_size_mb : null);
+                $zipSize = is_array($build) ? ($build['zip_size_mb'] ?? null) : (isset($build->zip_size_mb) ? $build->zip_size_mb : null);
+                $sizeStr = $folderSize !== null ? $folderSize . ' MB' : ($zipSize !== null ? $zipSize . ' MB (zip)' : 'Unknown');
+                return ['value' => $name, 'label' => $name . ' (' . $sizeStr . ')'];
+            }, $buildsData);
             echo json_encode(['success' => true, 'data' => $builds]);
         } else {
-            echo json_encode(['success' => false, 'error' => $result['error']]);
+            echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Unknown error']);
         }
         break;
         
@@ -213,8 +225,42 @@ switch ($action) {
         }
         break;
     
+    case 'translation-full':
+        // Return full translation data for a language (for showing current values)
+        $lang = $params[0] ?? 'en';
+        
+        $result = makeInternalApiCall('getTranslation/' . $lang, $token);
+        if ($result['success']) {
+            echo json_encode(['success' => true, 'data' => $result['data']['translations'] ?? []]);
+        } else {
+            echo json_encode(['success' => false, 'error' => $result['error']]);
+        }
+        break;
+    
+    case 'page-title':
+        // Get current title for a specific route and language
+        $route = $params[0] ?? null;
+        $lang = $params[1] ?? null;
+        
+        if (!$route || !$lang) {
+            echo json_encode(['success' => false, 'error' => 'Route and language parameters required']);
+            break;
+        }
+        
+        // Get translation for the language
+        $result = makeInternalApiCall('getTranslation/' . $lang, $token);
+        if ($result['success']) {
+            $translations = $result['data']['translations'] ?? [];
+            // Look for page.titles.{route}
+            $title = $translations['page']['titles'][$route] ?? '';
+            echo json_encode(['success' => true, 'data' => ['title' => $title]]);
+        } else {
+            echo json_encode(['success' => false, 'error' => $result['error']]);
+        }
+        break;
+    
     case 'translation-keys-grouped':
-        // Return translation keys grouped by used/unused status
+        // Return translation keys grouped by used/unused/unset status
         $lang = $params[0] ?? 'en';
         
         // Get all translation keys
@@ -224,17 +270,24 @@ switch ($action) {
             break;
         }
         
-        // Get unused keys
+        // Get unused keys (keys in translation but not used in structure)
         $unusedResult = makeInternalApiCall('getUnusedTranslationKeys/' . $lang, $token);
         $unusedKeys = [];
         if ($unusedResult['success'] && isset($unusedResult['data']['results'][$lang]['unused_keys'])) {
             $unusedKeys = $unusedResult['data']['results'][$lang]['unused_keys'];
         }
         
-        // Flatten all keys
+        // Get missing/unset keys (keys in structure but not in translation)
+        $validateResult = makeInternalApiCall('validateTranslations/' . $lang, $token);
+        $missingKeys = [];
+        if ($validateResult['success'] && isset($validateResult['data']['validation_results'][$lang]['missing_keys'])) {
+            $missingKeys = $validateResult['data']['validation_results'][$lang]['missing_keys'];
+        }
+        
+        // Flatten all existing keys
         $allKeys = flattenTranslationKeysForSelect($translationResult['data']['translations'] ?? []);
         
-        // Group keys
+        // Group existing keys into used/unused
         $usedKeys = [];
         $unused = [];
         
@@ -246,11 +299,17 @@ switch ($action) {
             }
         }
         
+        // Format missing keys for select (these don't exist in translation yet)
+        $unset = array_map(function($key) {
+            return ['value' => $key, 'label' => $key];
+        }, $missingKeys);
+        
         echo json_encode([
             'success' => true,
             'data' => [
                 'used' => $usedKeys,
-                'unused' => $unused
+                'unused' => $unused,
+                'unset' => $unset
             ]
         ]);
         break;
@@ -294,6 +353,117 @@ switch ($action) {
             $structure = $result['data']['structure'] ?? [];
             $nodes = buildHierarchicalNodeOptions($structure);
             echo json_encode(['success' => true, 'data' => $nodes]);
+        } else {
+            echo json_encode(['success' => false, 'error' => $result['error']]);
+        }
+        break;
+    
+    case 'current-styles':
+        // Return current CSS content for editStyles
+        $result = makeInternalApiCall('getStyles', $token);
+        if ($result['success']) {
+            echo json_encode([
+                'success' => true, 
+                'data' => [
+                    'content' => $result['data']['content'] ?? '',
+                    'size' => $result['data']['size'] ?? 0,
+                    'modified' => $result['data']['modified'] ?? null
+                ]
+            ]);
+        } else {
+            echo json_encode(['success' => false, 'error' => $result['error']]);
+        }
+        break;
+    
+    case 'root-variables':
+        // Return CSS :root variables for setRootVariables selector
+        $result = makeInternalApiCall('getRootVariables', $token);
+        if ($result['success']) {
+            $variables = $result['data']['variables'] ?? [];
+            // Return as array with name and value for selector
+            $varList = [];
+            foreach ($variables as $name => $value) {
+                $varList[] = [
+                    'value' => $name,
+                    'label' => $name . ': ' . (strlen($value) > 30 ? substr($value, 0, 30) . '...' : $value),
+                    'currentValue' => $value
+                ];
+            }
+            echo json_encode(['success' => true, 'data' => $varList]);
+        } else {
+            echo json_encode(['success' => false, 'error' => $result['error']]);
+        }
+        break;
+    
+    case 'keyframes':
+        // Return list of keyframe animation names
+        $result = makeInternalApiCall('getKeyframes', $token);
+        if ($result['success']) {
+            $keyframes = $result['data']['keyframes'] ?? [];
+            $list = [];
+            foreach ($keyframes as $name => $frames) {
+                // Show frame count in label
+                $frameCount = count($frames);
+                $list[] = [
+                    'value' => $name,
+                    'label' => $name . ' (' . $frameCount . ' frames)',
+                    'frames' => $frames
+                ];
+            }
+            echo json_encode(['success' => true, 'data' => $list]);
+        } else {
+            echo json_encode(['success' => false, 'error' => $result['error']]);
+        }
+        break;
+    
+    case 'style-rules':
+        // Return CSS selectors grouped by global/media for getStyleRule/setStyleRule/deleteStyleRule
+        $result = makeInternalApiCall('listStyleRules', $token);
+        if ($result['success']) {
+            $grouped = $result['data']['grouped'] ?? [];
+            $selectors = $result['data']['selectors'] ?? [];
+            
+            // Build options with optgroups
+            $options = [];
+            
+            // Global selectors
+            if (!empty($grouped['global'])) {
+                $globalOptions = [];
+                foreach ($grouped['global'] as $selector) {
+                    $globalOptions[] = [
+                        'value' => $selector,
+                        'label' => $selector,
+                        'mediaQuery' => null
+                    ];
+                }
+                $options[] = [
+                    'type' => 'optgroup',
+                    'label' => 'Global Selectors (' . count($grouped['global']) . ')',
+                    'options' => $globalOptions
+                ];
+            }
+            
+            // Media query selectors
+            if (!empty($grouped['media'])) {
+                foreach ($grouped['media'] as $mediaQuery => $mediaSelectors) {
+                    $mediaOptions = [];
+                    foreach ($mediaSelectors as $selector) {
+                        $mediaOptions[] = [
+                            'value' => $selector,
+                            'label' => $selector,
+                            'mediaQuery' => $mediaQuery
+                        ];
+                    }
+                    $options[] = [
+                        'type' => 'optgroup',
+                        'label' => '@media ' . $mediaQuery . ' (' . count($mediaSelectors) . ')',
+                        'options' => $mediaOptions,
+                        'mediaQuery' => $mediaQuery
+                    ];
+                }
+            }
+            
+            echo json_encode(['success' => true, 'data' => $options]);
         } else {
             echo json_encode(['success' => false, 'error' => $result['error']]);
         }

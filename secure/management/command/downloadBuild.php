@@ -86,7 +86,7 @@ if (file_exists($manifestPath)) {
 }
 
 // Build download URL
-$downloadUrl = BASE_URL . '/build/' . $buildName . '.zip';
+$downloadUrl = rtrim(BASE_URL, '/') . '/build/' . $buildName . '.zip';
 
 ApiResponse::create(200, 'operation.success')
     ->withMessage('Download URL retrieved successfully')

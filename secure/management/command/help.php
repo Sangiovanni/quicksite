@@ -4,7 +4,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 $commands = [
     'setPublicSpace' => [
         'description' => 'Sets the URL space/prefix for the public site. Creates a subdirectory inside the public folder and moves all content there. Use empty destination to restore to root. Note: Site URL changes (e.g., http://domain/web/ when set to "web")',
-        'method' => 'POST',
+        'method' => 'PATCH',
         'parameters' => [
             'destination' => [
                 'required' => true,
@@ -14,7 +14,7 @@ $commands = [
                 'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/hyphens/underscores/forward-slash only, empty allowed'
             ]
         ],
-        'example_post' => 'POST /management/setPublicSpace with body: {"destination": "web"} or {"destination": ""}',
+        'example_patch' => 'PATCH /management/setPublicSpace with body: {"destination": "web"} or {"destination": ""}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -39,7 +39,7 @@ $commands = [
     
     'renameSecureFolder' => [
         'description' => 'Renames the secure/backend folder at server root level. Updates SECURE_FOLDER_NAME constant. Management URL stays the same.',
-        'method' => 'POST',
+        'method' => 'PATCH',
         'parameters' => [
             'destination' => [
                 'required' => true,
@@ -49,7 +49,7 @@ $commands = [
                 'validation' => 'Max 255 chars, max 1 level (single folder name), alphanumeric/hyphens/underscores only, cannot be empty'
             ]
         ],
-        'example_post' => 'POST /management/renameSecureFolder with body: {"destination": "app"}',
+        'example_patch' => 'PATCH /management/renameSecureFolder with body: {"destination": "app"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -76,7 +76,7 @@ $commands = [
 
     'renamePublicFolder' => [
         'description' => 'Renames the public folder at server root level. Updates all references. Requires Apache/web server config update after rename.',
-        'method' => 'POST',
+        'method' => 'PATCH',
         'parameters' => [
             'destination' => [
                 'required' => true,
@@ -86,7 +86,7 @@ $commands = [
                 'validation' => 'Max 255 chars, single folder name only, alphanumeric/hyphens/underscores only'
             ]
         ],
-        'example_post' => 'POST /management/renamePublicFolder with body: {"destination": "www"}',
+        'example_patch' => 'PATCH /management/renamePublicFolder with body: {"destination": "www"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -147,7 +147,7 @@ $commands = [
     
     'deleteRoute' => [
         'description' => 'Deletes an existing route and its associated files (PHP and JSON). Also removes any URL aliases pointing to this route.',
-        'method' => 'POST',
+        'method' => 'DELETE',
         'parameters' => [
             'route' => [
                 'required' => true,
@@ -157,7 +157,7 @@ $commands = [
                 'validation' => 'Must be an existing route'
             ]
         ],
-        'example_post' => 'POST /management/deleteRoute with body: {"route": "about-us"}',
+        'example_delete' => 'DELETE /management/deleteRoute with body: {"route": "about-us"}',
         'success_response' => [
             'status' => 200,
             'code' => 'route.deleted',
@@ -263,10 +263,10 @@ $commands = [
         'description' => 'Returns detailed information for a specific build including manifest data, file counts, and download URL',
         'method' => 'GET',
         'parameters' => [
-            'name' => [
+            '{name}' => [
                 'required' => true,
-                'type' => 'string (URL path)',
-                'description' => 'Build folder name',
+                'type' => 'string',
+                'description' => 'Build folder name (URL path segment)',
                 'example' => 'build_20251214_084504',
                 'validation' => 'Must match format build_YYYYMMDD_HHMMSS'
             ]
@@ -297,7 +297,7 @@ $commands = [
     
     'deleteBuild' => [
         'description' => 'Deletes a build folder and its associated ZIP archive',
-        'method' => 'POST',
+        'method' => 'DELETE',
         'parameters' => [
             'name' => [
                 'required' => true,
@@ -307,7 +307,7 @@ $commands = [
                 'validation' => 'Must match format build_YYYYMMDD_HHMMSS'
             ]
         ],
-        'example_post' => 'POST /management/deleteBuild with body: {"name": "build_20251214_084504"}',
+        'example_delete' => 'DELETE /management/deleteBuild with body: {"name": "build_20251214_084504"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -333,7 +333,7 @@ $commands = [
     
     'cleanBuilds' => [
         'description' => 'Deletes all builds older than a specified timestamp',
-        'method' => 'POST',
+        'method' => 'DELETE',
         'parameters' => [
             'before' => [
                 'required' => true,
@@ -350,7 +350,7 @@ $commands = [
                 'validation' => 'Boolean true/false'
             ]
         ],
-        'example_post' => 'POST /management/cleanBuilds with body: {"before": "2024-12-01", "dry_run": true}',
+        'example_delete' => 'DELETE /management/cleanBuilds with body: {"before": "2024-12-01", "dry_run": true}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -433,10 +433,10 @@ $commands = [
         'description' => 'Returns the download URL and file info for a build ZIP archive',
         'method' => 'GET',
         'parameters' => [
-            'name' => [
+            '{name}' => [
                 'required' => true,
-                'type' => 'string (URL path)',
-                'description' => 'Build folder name',
+                'type' => 'string',
+                'description' => 'Build folder name (URL path segment)',
                 'example' => 'build_20251214_084504',
                 'validation' => 'Must match format build_YYYYMMDD_HHMMSS'
             ]
@@ -552,7 +552,7 @@ $commands = [
     
     'clearCommandHistory' => [
         'description' => 'Deletes command log files older than a specified date. Requires confirmation to execute.',
-        'method' => 'POST',
+        'method' => 'DELETE',
         'parameters' => [
             'before' => [
                 'type' => 'string',
@@ -568,6 +568,7 @@ $commands = [
                 'example' => true
             ]
         ],
+        'example_delete' => 'DELETE /management/clearCommandHistory with body: {"before": "2025-12-01", "confirm": true}',
         'example_body' => [
             'before' => '2025-12-01',
             'confirm' => true
@@ -603,7 +604,7 @@ $commands = [
     
     'editFavicon' => [
         'description' => 'Updates the site favicon with a new image from assets/images folder (PNG only)',
-        'method' => 'POST',
+        'method' => 'PATCH',
         'parameters' => [
             'imageName' => [
                 'required' => true,
@@ -613,7 +614,7 @@ $commands = [
                 'validation' => 'Must exist in assets/images/, PNG format only'
             ]
         ],
-        'example_post' => 'POST /management/editFavicon with body: {"imageName": "logo.png"}',
+        'example_patch' => 'PATCH /management/editFavicon with body: {"imageName": "logo.png"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -637,7 +638,7 @@ $commands = [
     
     'editTitle' => [
         'description' => 'Updates page title for a specific route and language in the translation file (page.titles.{route} structure)',
-        'method' => 'POST',
+        'method' => 'PATCH',
         'parameters' => [
             'route' => [
                 'required' => true,
@@ -661,7 +662,7 @@ $commands = [
                 'validation' => 'Max 200 chars, no null bytes'
             ]
         ],
-        'example_post' => 'POST /management/editTitle with body: {"route": "home", "lang": "en", "title": "Home - My Site"}',
+        'example_patch' => 'PATCH /management/editTitle with body: {"route": "home", "lang": "en", "title": "Home - My Site"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -759,7 +760,7 @@ $commands = [
 
     'editStructure' => [
         'description' => 'Updates JSON structure for page/menu/footer/component. Supports targeted node editing via nodeId parameter.',
-        'method' => 'POST',
+        'method' => 'PATCH',
         'parameters' => [
             'type' => [
                 'required' => true,
@@ -798,7 +799,7 @@ $commands = [
                 'validation' => 'Must be: update (replace node), delete (remove node), insertBefore, insertAfter'
             ]
         ],
-        'example_post' => 'Full: {"type": "page", "name": "home", "structure": [...]}. Targeted: {"type": "page", "name": "home", "nodeId": "0.2", "structure": {...}}. Delete: {"type": "page", "name": "home", "nodeId": "0.2", "action": "delete"}',
+        'example_patch' => 'Full: {"type": "page", "name": "home", "structure": [...]}. Targeted: {"type": "page", "name": "home", "nodeId": "0.2", "structure": {...}}. Delete: {"type": "page", "name": "home", "nodeId": "0.2", "action": "delete"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -882,7 +883,7 @@ $commands = [
     
     'setTranslationKeys' => [
         'description' => 'Sets/updates specific translation keys (merge, not replace)',
-        'method' => 'POST',
+        'method' => 'PATCH',
         'parameters' => [
             'language' => [
                 'required' => true,
@@ -899,7 +900,7 @@ $commands = [
                 'validation' => 'Must be valid JSON object'
             ]
         ],
-        'example_post' => 'POST /management/setTranslationKeys with body: {"language": "en", "translations": {"home": {"title": "New Title"}}}',
+        'example_patch' => 'PATCH /management/setTranslationKeys with body: {"language": "en", "translations": {"home": {"title": "New Title"}}}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -922,7 +923,7 @@ $commands = [
     
     'deleteTranslationKeys' => [
         'description' => 'Deletes specific translation keys from a language file',
-        'method' => 'POST',
+        'method' => 'DELETE',
         'parameters' => [
             'language' => [
                 'required' => true,
@@ -939,7 +940,7 @@ $commands = [
                 'validation' => 'Each key must be a non-empty string'
             ]
         ],
-        'example_post' => 'POST /management/deleteTranslationKeys with body: {"language": "en", "keys": ["home.old_key", "deprecated_section"]}',
+        'example_delete' => 'DELETE /management/deleteTranslationKeys with body: {"language": "en", "keys": ["home.old_key", "deprecated_section"]}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -986,7 +987,7 @@ $commands = [
     
     'setMultilingual' => [
         'description' => 'Enable or disable multilingual support. Syncs translations between default.json and default language file.',
-        'method' => 'POST',
+        'method' => 'PATCH',
         'parameters' => [
             'enabled' => [
                 'required' => true,
@@ -996,7 +997,7 @@ $commands = [
                 'validation' => 'Must be boolean true/false'
             ]
         ],
-        'example_post' => 'POST /management/setMultilingual with body: {"enabled": false}',
+        'example_patch' => 'PATCH /management/setMultilingual with body: {"enabled": false}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1098,7 +1099,7 @@ $commands = [
     
     'deleteLang' => [
         'description' => 'Deletes a language from the system. Requires MULTILINGUAL_SUPPORT = true.',
-        'method' => 'POST',
+        'method' => 'DELETE',
         'requires_mode' => 'multilingual',
         'parameters' => [
             'code' => [
@@ -1109,7 +1110,7 @@ $commands = [
                 'validation' => 'Must be an existing language (not default, not last)'
             ]
         ],
-        'example_post' => 'POST /management/deleteLang with body: {"code": "es"}',
+        'example_delete' => 'DELETE /management/deleteLang with body: {"code": "es"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1346,24 +1347,24 @@ $commands = [
     
     'deleteAsset' => [
         'description' => 'Deletes a file from the assets folder',
-        'method' => 'GET',
+        'method' => 'DELETE',
         'parameters' => [
             'category' => [
                 'required' => true,
-                'type' => 'query_string',
+                'type' => 'string',
                 'description' => 'Asset category',
                 'example' => 'images',
                 'validation' => 'Must be one of: images, scripts, font, audio, videos'
             ],
             'filename' => [
                 'required' => true,
-                'type' => 'query_string',
+                'type' => 'string',
                 'description' => 'Filename to delete',
                 'example' => 'logo.png',
                 'validation' => 'Must exist in specified category'
             ]
         ],
-        'example_get' => 'GET /management?command=deleteAsset&category=images&filename=logo.png',
+        'example_delete' => 'DELETE /management/deleteAsset {"category": "images", "filename": "logo.png"}',
         'success_response' => [
             'status' => 204,
             'code' => 'operation.success',
@@ -1452,7 +1453,7 @@ $commands = [
     
     'editStyles' => [
         'description' => 'Updates the content of the main SCSS/CSS file',
-        'method' => 'POST',
+        'method' => 'PUT',
         'parameters' => [
             'content' => [
                 'required' => true,
@@ -1462,7 +1463,7 @@ $commands = [
                 'validation' => 'Must be string, max 2MB'
             ]
         ],
-        'example_post' => 'POST /management/editStyles with body: {"content": "body { margin: 0; }"}',
+        'example_put' => 'PUT /management/editStyles with body: {"content": "body { margin: 0; }"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1516,7 +1517,7 @@ $commands = [
     
     'setRootVariables' => [
         'description' => 'Add or update CSS custom properties (variables) in the :root selector',
-        'method' => 'POST',
+        'method' => 'PATCH',
         'parameters' => [
             'variables' => [
                 'required' => true,
@@ -1526,7 +1527,7 @@ $commands = [
                 'validation' => 'Variable names must start with -- or will be auto-prefixed'
             ]
         ],
-        'example_post' => 'POST /management/setRootVariables with body: {"variables": {"--color-primary": "#ff6600"}}',
+        'example_patch' => 'PATCH /management/setRootVariables with body: {"variables": {"--color-primary": "#ff6600"}}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1612,7 +1613,7 @@ $commands = [
     
     'setStyleRule' => [
         'description' => 'Add or update a CSS rule for any selector',
-        'method' => 'POST',
+        'method' => 'PATCH',
         'parameters' => [
             'selector' => [
                 'required' => true,
@@ -1658,7 +1659,7 @@ $commands = [
     
     'deleteStyleRule' => [
         'description' => 'Remove a CSS rule from the stylesheet',
-        'method' => 'POST',
+        'method' => 'DELETE',
         'parameters' => [
             'selector' => [
                 'required' => true,
@@ -1673,7 +1674,7 @@ $commands = [
                 'example' => '(max-width: 768px)'
             ]
         ],
-        'example_post' => 'POST /management/deleteStyleRule with body: {"selector": ".unused-class"}',
+        'example_delete' => 'DELETE /management/deleteStyleRule with body: {"selector": ".unused-class"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1728,7 +1729,7 @@ $commands = [
     
     'setKeyframes' => [
         'description' => 'Add or update a @keyframes animation',
-        'method' => 'POST',
+        'method' => 'PATCH',
         'parameters' => [
             'name' => [
                 'required' => true,
@@ -1743,7 +1744,7 @@ $commands = [
                 'example' => '{"from": "opacity: 0;", "to": "opacity: 1;"} or {"0%, 100%": "transform: scale(1);", "50%": "transform: scale(1.1);"}'
             ]
         ],
-        'example_post' => 'POST /management/setKeyframes with body: {"name": "bounce", "frames": {"0%, 100%": "transform: translateY(0);", "50%": "transform: translateY(-20px);"}}',
+        'example_patch' => 'PATCH /management/setKeyframes with body: {"name": "bounce", "frames": {"0%, 100%": "transform: translateY(0);", "50%": "transform: translateY(-20px);"}}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1767,7 +1768,7 @@ $commands = [
     
     'deleteKeyframes' => [
         'description' => 'Remove a @keyframes animation from the stylesheet',
-        'method' => 'POST',
+        'method' => 'DELETE',
         'parameters' => [
             'name' => [
                 'required' => true,
@@ -1776,7 +1777,7 @@ $commands = [
                 'example' => 'fadeIn'
             ]
         ],
-        'example_post' => 'POST /management/deleteKeyframes with body: {"name": "fadeIn"}',
+        'example_delete' => 'DELETE /management/deleteKeyframes with body: {"name": "fadeIn"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1827,7 +1828,7 @@ $commands = [
                 'required' => true,
                 'type' => 'string',
                 'description' => 'Descriptive name for the token (1-100 characters)',
-                'example' => 'Flutter App Production'
+                'example' => 'Collaborator Token'
             ],
             'permissions' => [
                 'required' => false,
@@ -1844,14 +1845,14 @@ $commands = [
                 'example' => "['read', 'write'] or ['*'] or ['command:build', 'command:getRoutes']"
             ]
         ],
-        'example_post' => 'POST /management/generateToken with body: {"name": "Flutter App", "permissions": ["read", "write"]}',
+        'example_post' => 'POST /management/generateToken with body: {"name": "Collaborator Token", "permissions": ["read", "write"]}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
             'message' => 'Token generated successfully',
             'data' => [
                 'token' => 'tvt_a1b2c3d4e5f6... (52 characters)',
-                'name' => 'Flutter App',
+                'name' => 'Collaborator Token',
                 'permissions' => ['read', 'write'],
                 'created' => '2025-12-11 10:30:00',
                 'warning' => 'Save this token securely - it cannot be retrieved later!'
@@ -1899,7 +1900,7 @@ $commands = [
     
     'revokeToken' => [
         'description' => 'Revokes (permanently deletes) an API token. Requires admin permission.',
-        'method' => 'POST',
+        'method' => 'DELETE',
         'parameters' => [
             'token_preview' => [
                 'required' => true,
@@ -1908,7 +1909,7 @@ $commands = [
                 'example' => 'tvt_abc1...xyz9'
             ]
         ],
-        'example_post' => 'POST /management/revokeToken with body: {"token_preview": "tvt_abc1...xyz9"}',
+        'example_delete' => 'DELETE /management/revokeToken with body: {"token_preview": "tvt_abc1...xyz9"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -2038,7 +2039,7 @@ $commands = [
     
     'deleteAlias' => [
         'description' => 'Deletes an existing URL redirect alias.',
-        'method' => 'POST',
+        'method' => 'DELETE',
         'parameters' => [
             'alias' => [
                 'required' => true,
@@ -2047,7 +2048,7 @@ $commands = [
                 'example' => '/old-page'
             ]
         ],
-        'example_post' => 'POST /management/deleteAlias with body: {"alias": "/old-home"}',
+        'example_delete' => 'DELETE /management/deleteAlias with body: {"alias": "/old-home"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',

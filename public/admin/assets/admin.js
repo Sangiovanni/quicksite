@@ -147,7 +147,24 @@ const QuickSiteAdmin = {
         }
 
         const response = await fetch(url, options);
-        const result = await response.json();
+        
+        // Handle 204 No Content responses (empty body)
+        let result = null;
+        if (response.status !== 204) {
+            const text = await response.text();
+            if (text) {
+                try {
+                    result = JSON.parse(text);
+                } catch {
+                    result = { message: text };
+                }
+            }
+        }
+        
+        // For 204, create a success response
+        if (response.status === 204) {
+            result = { status: 204, code: 'operation.success', message: 'Operation completed successfully' };
+        }
 
         return {
             ok: response.ok,
@@ -614,7 +631,8 @@ const QuickSiteAdmin = {
             }
         } catch (error) {
             console.error('Failed to populate select:', error);
-            selectElement.innerHTML = `<option value="">Error loading options</option>`;
+            const errorMsg = error.message || 'Error loading options';
+            selectElement.innerHTML = `<option value="">Error: ${errorMsg}</option>`;
         }
         
         selectElement.disabled = false;

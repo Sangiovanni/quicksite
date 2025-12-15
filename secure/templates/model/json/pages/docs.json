@@ -141,11 +141,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-patch"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__PATCH"
                                             }
                                         ]
                                     }
@@ -158,7 +158,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/setPublicSpace"
+                                        "textKey": "__RAW__PATCH /management/setPublicSpace"
                                     }
                                 ]
                             },
@@ -264,11 +264,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-patch"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__PATCH"
                                             }
                                         ]
                                     }
@@ -281,7 +281,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/renameSecureFolder"
+                                        "textKey": "__RAW__PATCH /management/renameSecureFolder"
                                     }
                                 ]
                             },
@@ -387,11 +387,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-patch"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__PATCH"
                                             }
                                         ]
                                     }
@@ -404,7 +404,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/renamePublicFolder"
+                                        "textKey": "__RAW__PATCH /management/renamePublicFolder"
                                     }
                                 ]
                             },
@@ -661,11 +661,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-delete"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__DELETE"
                                             }
                                         ]
                                     }
@@ -678,7 +678,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/deleteRoute"
+                                        "textKey": "__RAW__DELETE /management/deleteRoute"
                                     }
                                 ]
                             },
@@ -934,11 +934,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-patch"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__PATCH"
                                             }
                                         ]
                                     }
@@ -1558,11 +1558,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-delete"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__DELETE"
                                             }
                                         ]
                                     }
@@ -1575,7 +1575,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/deleteAlias"
+                                        "textKey": "__RAW__DELETE /management/deleteAlias"
                                     }
                                 ]
                             },
@@ -1892,11 +1892,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-patch"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__PATCH"
                                             }
                                         ]
                                     }
@@ -1909,7 +1909,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/setTranslationKeys"
+                                        "textKey": "__RAW__PATCH /management/setTranslationKeys"
                                     }
                                 ]
                             },
@@ -2053,11 +2053,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-delete"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__DELETE"
                                             }
                                         ]
                                     }
@@ -2070,7 +2070,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/deleteTranslationKeys"
+                                        "textKey": "__RAW__DELETE /management/deleteTranslationKeys"
                                     }
                                 ]
                             },
@@ -2604,11 +2604,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-patch"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__PATCH"
                                             }
                                         ]
                                     }
@@ -2621,7 +2621,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/setMultilingual"
+                                        "textKey": "__RAW__PATCH /management/setMultilingual"
                                     }
                                 ]
                             },
@@ -2726,12 +2726,12 @@
                                     },
                                     {
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-patch"
                                         },
                                         "tag": "span",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__PATCH"
                                             }
                                         ]
                                     }
@@ -2744,7 +2744,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/setMultilingual"
+                                        "textKey": "__RAW__PATCH /management/setMultilingual"
                                     }
                                 ]
                             },
@@ -3046,11 +3046,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-delete"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__DELETE"
                                             }
                                         ]
                                     }
@@ -3063,7 +3063,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/deleteLang"
+                                        "textKey": "__RAW__DELETE /management/deleteLang"
                                     }
                                 ]
                             },
@@ -3358,11 +3358,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-get"
+                                            "class": "method-badge method-delete"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__GET"
+                                                "textKey": "__RAW__DELETE"
                                             }
                                         ]
                                     }
@@ -3375,7 +3375,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/deleteAsset?category={cat}&filename={name}"
+                                        "textKey": "__RAW__DELETE /management/deleteAsset?category={cat}&filename={name}"
                                     }
                                 ]
                             },
@@ -3569,11 +3569,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-put"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__PUT"
                                             }
                                         ]
                                     }
@@ -3586,7 +3586,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/editStyles"
+                                        "textKey": "__RAW__PUT /management/editStyles"
                                     }
                                 ]
                             },
@@ -3781,11 +3781,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-patch"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__PATCH"
                                             }
                                         ]
                                     }
@@ -3798,7 +3798,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/setRootVariables"
+                                        "textKey": "__RAW__PATCH /management/setRootVariables"
                                     }
                                 ]
                             },
@@ -4026,11 +4026,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-patch"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__PATCH"
                                             }
                                         ]
                                     }
@@ -4043,7 +4043,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/setStyleRule"
+                                        "textKey": "__RAW__PATCH /management/setStyleRule"
                                     }
                                 ]
                             },
@@ -4225,11 +4225,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-delete"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__DELETE"
                                             }
                                         ]
                                     }
@@ -4242,7 +4242,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/deleteStyleRule"
+                                        "textKey": "__RAW__DELETE /management/deleteStyleRule"
                                     }
                                 ]
                             },
@@ -4475,11 +4475,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-patch"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__PATCH"
                                             }
                                         ]
                                     }
@@ -4492,7 +4492,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/setKeyframes"
+                                        "textKey": "__RAW__PATCH /management/setKeyframes"
                                     }
                                 ]
                             },
@@ -4636,11 +4636,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-delete"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__DELETE"
                                             }
                                         ]
                                     }
@@ -4653,7 +4653,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/deleteKeyframes"
+                                        "textKey": "__RAW__DELETE /management/deleteKeyframes"
                                     }
                                 ]
                             },
@@ -4787,11 +4787,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-patch"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__PATCH"
                                             }
                                         ]
                                     }
@@ -4804,7 +4804,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/editFavicon"
+                                        "textKey": "__RAW__PATCH /management/editFavicon"
                                     }
                                 ]
                             },
@@ -4910,11 +4910,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-patch"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__PATCH"
                                             }
                                         ]
                                     }
@@ -4927,7 +4927,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/editTitle"
+                                        "textKey": "__RAW__PATCH /management/editTitle"
                                     }
                                 ]
                             },
@@ -5520,11 +5520,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-delete"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__DELETE"
                                             }
                                         ]
                                     }
@@ -5537,7 +5537,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/deleteBuild"
+                                        "textKey": "__RAW__DELETE /management/deleteBuild"
                                     }
                                 ]
                             },
@@ -5643,11 +5643,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-delete"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__DELETE"
                                             }
                                         ]
                                     }
@@ -5660,7 +5660,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/cleanBuilds"
+                                        "textKey": "__RAW__DELETE /management/cleanBuilds"
                                     }
                                 ]
                             },
@@ -6253,11 +6253,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-delete"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__DELETE"
                                             }
                                         ]
                                     }
@@ -6270,7 +6270,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/clearCommandHistory"
+                                        "textKey": "__RAW__DELETE /management/clearCommandHistory"
                                     }
                                 ]
                             },
@@ -6664,11 +6664,11 @@
                                     {
                                         "tag": "span",
                                         "params": {
-                                            "class": "method-badge method-post"
+                                            "class": "method-badge method-delete"
                                         },
                                         "children": [
                                             {
-                                                "textKey": "__RAW__POST"
+                                                "textKey": "__RAW__DELETE"
                                             }
                                         ]
                                     }
@@ -6681,7 +6681,7 @@
                                 "tag": "code",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__POST /management/revokeToken"
+                                        "textKey": "__RAW__DELETE /management/revokeToken"
                                     }
                                 ]
                             },

@@ -1032,6 +1032,21 @@ pre code {
     color: white;
 }
 
+.method-patch {
+    background: #0ea5e9;
+    color: white;
+}
+
+.method-put {
+    background: #f59e0b;
+    color: white;
+}
+
+.method-delete {
+    background: #ef4444;
+    color: white;
+}
+
 .command-url {
     font-family: monospace;
     font-size: 0.85rem;

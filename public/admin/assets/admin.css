@@ -455,6 +455,21 @@ code{
     color: var(--admin-success);
 }
 
+.badge--delete {
+    background: var(--admin-error-bg);
+    color: var(--admin-error);
+}
+
+.badge--put {
+    background: var(--admin-warning-bg);
+    color: var(--admin-warning);
+}
+
+.badge--patch {
+    background: #e6f3ff;
+    color: #0066cc;
+}
+
 .badge--success {
     background: var(--admin-success-bg);
     color: var(--admin-success);
