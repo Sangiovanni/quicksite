@@ -421,16 +421,21 @@ function moveDown(id) {
 function clearQueue() {
     if (batchQueue.length === 0) return;
     
-    QuickSiteAdmin.showConfirm(
-        'Clear Queue',
+    QuickSiteAdmin.confirm(
         'Are you sure you want to clear all commands from the queue?',
-        () => {
+        {
+            title: 'Clear Queue',
+            confirmText: 'Clear All',
+            confirmClass: 'danger'
+        }
+    ).then(confirmed => {
+        if (confirmed) {
             batchQueue = [];
             saveQueue();
             renderQueue();
             QuickSiteAdmin.showToast('Queue cleared', 'info');
         }
-    );
+    });
 }
 
 function renderQueue() {

@@ -218,6 +218,10 @@ function initBatchMode() {
     // Show batch mode banner
     document.getElementById('batch-mode-banner').style.display = 'flex';
     
+    // Mark form as batch mode (prevents QuickSiteAdmin.handleCommandSubmit from executing)
+    const form = document.getElementById('command-form');
+    form.dataset.batchMode = 'true';
+    
     // Change submit button text
     const submitBtn = document.getElementById('submit-btn');
     submitBtn.innerHTML = `
@@ -245,9 +249,7 @@ function initBatchMode() {
         `;
     }
     
-    // Override form submission
-    const form = document.getElementById('command-form');
-    form.removeEventListener('submit', QuickSiteAdmin.handleCommandSubmit);
+    // Add batch submit handler
     form.addEventListener('submit', handleBatchSubmit);
 }
 
@@ -387,35 +389,127 @@ async function prefillFromBatchQueue() {
     let queue = [];
     
     try {
-        queue = JSON.parse(localStorage.getItem(queueKey) || '[]');
+        const stored = localStorage.getItem(queueKey);
+        queue = JSON.parse(stored || '[]');
     } catch (e) {
+        console.error('Failed to parse batch queue:', e);
         return;
     }
     
-    const item = queue.find(i => i.id === parseInt(BATCH_ID));
+    const batchIdNum = parseInt(BATCH_ID);
+    const item = queue.find(i => i.id === batchIdNum);
+    
     if (!item) {
-        console.log('Batch item not found:', BATCH_ID);
+        console.error('Batch item not found:', BATCH_ID);
         return;
     }
-    
-    console.log('Pre-filling from batch item:', item);
     
     const form = document.getElementById('command-form');
+    if (!form) {
+        console.error('Form not found!');
+        return;
+    }
+    
     const params = item.params || {};
     const urlParamsData = item.urlParams || [];
     
-    // For commands with cascading selects, we need special handling
-    // The order matters: type → name → nodeId, etc.
+    // Commands with cascading selects need special handling with loading state
     const cascadingCommands = ['editStructure', 'getStructure', 'deleteAsset', 'downloadAsset'];
     
     if (cascadingCommands.includes(COMMAND_NAME)) {
-        await prefillCascadingForm(form, params, urlParamsData);
+        // Show loading overlay while cascading selects load
+        showFormLoadingOverlay('Loading saved parameters...');
+        
+        try {
+            await prefillCascadingForm(form, params, urlParamsData);
+            QuickSiteAdmin.showToast('Form restored from queue', 'success');
+        } catch (e) {
+            console.error('Pre-fill error:', e);
+            // Show saved params as fallback reminder
+            showSavedParamsReminder(params);
+        } finally {
+            hideFormLoadingOverlay();
+        }
     } else {
         // Simple form - just fill all fields
         await prefillSimpleForm(form, params, urlParamsData);
+        QuickSiteAdmin.showToast('Form pre-filled with saved parameters', 'info');
     }
+}
+
+/**
+ * Show a loading overlay on the form
+ */
+function showFormLoadingOverlay(message = 'Loading...') {
+    const form = document.getElementById('command-form');
+    if (!form) return;
     
-    QuickSiteAdmin.showToast('Form pre-filled with saved parameters', 'info');
+    // Make form container position relative
+    const formContainer = form.parentElement;
+    formContainer.style.position = 'relative';
+    
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'form-loading-overlay';
+    overlay.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(var(--admin-bg-rgb, 255,255,255), 0.9);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        border-radius: var(--radius-lg);
+    `;
+    overlay.innerHTML = `
+        <div class="admin-spinner" style="width: 40px; height: 40px; margin-bottom: var(--space-md);"></div>
+        <p style="color: var(--admin-text); font-weight: 500;">${QuickSiteAdmin.escapeHtml(message)}</p>
+    `;
+    
+    formContainer.appendChild(overlay);
+}
+
+/**
+ * Hide the form loading overlay
+ */
+function hideFormLoadingOverlay() {
+    const overlay = document.getElementById('form-loading-overlay');
+    if (overlay) {
+        overlay.remove();
+    }
+}
+
+/**
+ * Show a reminder of saved params for complex forms (fallback when loading fails)
+ */
+function showSavedParamsReminder(params) {
+    // Build a summary of saved params
+    const summary = Object.entries(params)
+        .filter(([key, value]) => value && key !== 'structure') // Exclude structure (it's long)
+        .map(([key, value]) => `<strong>${key}:</strong> ${QuickSiteAdmin.escapeHtml(String(value).substring(0, 50))}`)
+        .join('<br>');
+    
+    // Add notice before the form
+    const form = document.getElementById('command-form');
+    const existingNotice = document.getElementById('batch-params-notice');
+    if (existingNotice) existingNotice.remove();
+    
+    if (summary) {
+        const notice = document.createElement('div');
+        notice.id = 'batch-params-notice';
+        notice.className = 'admin-alert admin-alert--info';
+        notice.style.marginBottom = 'var(--space-md)';
+        notice.innerHTML = `
+            <strong>Saved parameters for this queued command:</strong><br>
+            ${summary}
+            <br><small style="opacity: 0.7">Please re-select the options below, then update the queue.</small>
+        `;
+        form.parentNode.insertBefore(notice, form);
+    }
 }
 
 /**
@@ -439,49 +533,93 @@ async function prefillSimpleForm(form, params, urlParamsData) {
 /**
  * Pre-fill a form with cascading selects
  * Must set parent selects first and wait for child options to load
+ * For editStructure, the structure textarea is the key - always fill that
  */
 async function prefillCascadingForm(form, params, urlParamsData) {
+    console.log('prefillCascadingForm called with:', params);
+    
     // Determine which fields to fill based on command
     if (COMMAND_NAME === 'editStructure' || COMMAND_NAME === 'getStructure') {
-        // Order: type → name → nodeId/option, then other params
+        // Order: type → name → nodeId → action → structure (LAST!)
         const typeSelect = form.querySelector('[name="type"]');
         const nameSelect = form.querySelector('[name="name"]');
         const nodeIdSelect = form.querySelector('[name="nodeId"]') || form.querySelector('[name="option"]');
         const actionSelect = form.querySelector('[name="action"]');
+        const structureField = form.querySelector('[name="structure"]');
         
-        // Set type first
+        console.log('Found fields:', {
+            type: !!typeSelect,
+            name: !!nameSelect,
+            nodeId: !!nodeIdSelect,
+            action: !!actionSelect,
+            structure: !!structureField
+        });
+        
+        // Save structure value to fill at the end
+        const structureValue = params.structure !== undefined
+            ? (typeof params.structure === 'string' ? params.structure : JSON.stringify(params.structure, null, 2))
+            : null;
+        
+        // 1) Set type first
         if (params.type && typeSelect) {
+            console.log('Step 1: Setting type to:', params.type);
             typeSelect.value = params.type;
-            // Trigger change and wait for name options to load
             typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-            await waitForSelectOptions(nameSelect, 500);
-        }
-        
-        // Set name (if applicable for page/component)
-        if (params.name && nameSelect && !nameSelect.disabled) {
-            nameSelect.value = params.name;
-            // Trigger change and wait for nodeId options to load
-            nameSelect.dispatchEvent(new Event('change', { bubbles: true }));
-            if (nodeIdSelect) {
-                await waitForSelectOptions(nodeIdSelect, 500);
+            
+            // 2) For page/component, wait for name select options to load
+            if (params.type === 'page' || params.type === 'component') {
+                console.log('Step 2: Waiting for name select options...');
+                const nameLoaded = await waitForSelectOptions(nameSelect, 3000);
+                console.log('Name options loaded:', nameLoaded);
+                
+                // 3) Set name value
+                if (nameLoaded && params.name) {
+                    console.log('Step 3: Setting name to:', params.name);
+                    nameSelect.value = params.name;
+                    nameSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                    
+                    // 4) Wait for nodeId options to load
+                    if (nodeIdSelect) {
+                        console.log('Step 4: Waiting for nodeId select options...');
+                        const nodeIdLoaded = await waitForSelectOptions(nodeIdSelect, 3000);
+                        console.log('NodeId options loaded:', nodeIdLoaded);
+                        
+                        // 5) Set nodeId
+                        if (nodeIdLoaded && params.nodeId) {
+                            console.log('Step 5: Setting nodeId to:', params.nodeId);
+                            nodeIdSelect.value = params.nodeId;
+                        }
+                    }
+                }
+            } else {
+                // For menu/footer, wait for nodeId options directly
+                if (nodeIdSelect) {
+                    console.log('Step 2 (menu/footer): Waiting for nodeId options...');
+                    const nodeIdLoaded = await waitForSelectOptions(nodeIdSelect, 3000);
+                    console.log('NodeId options loaded:', nodeIdLoaded);
+                    
+                    if (nodeIdLoaded && params.nodeId) {
+                        console.log('Step 3: Setting nodeId to:', params.nodeId);
+                        nodeIdSelect.value = params.nodeId;
+                    }
+                }
             }
         }
         
-        // Set nodeId
-        if (params.nodeId && nodeIdSelect) {
-            nodeIdSelect.value = params.nodeId;
-            nodeIdSelect.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-        
-        // Set action
+        // 6) Set action
         if (params.action && actionSelect) {
+            console.log('Step 6: Setting action to:', params.action);
             actionSelect.value = params.action;
-            actionSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            // Don't dispatch change event here - it might try to load node content
         }
         
-        // Set structure (textarea)
-        if (params.structure) {
-            setFormFieldValue(form, 'structure', params.structure);
+        // 7) Fill structure LAST so it doesn't get overwritten by any auto-load
+        if (structureValue && structureField) {
+            console.log('Step 7: Filling structure field, length:', structureValue.length);
+            // Small delay to ensure any auto-load from action change has started
+            await new Promise(r => setTimeout(r, 100));
+            structureField.value = structureValue;
+            console.log('Structure field filled successfully');
         }
         
     } else if (COMMAND_NAME === 'deleteAsset' || COMMAND_NAME === 'downloadAsset') {
@@ -510,28 +648,44 @@ async function prefillCascadingForm(form, params, urlParamsData) {
 }
 
 /**
- * Wait for a select element to have options loaded
+ * Wait for a select element to become enabled AND have options loaded
+ * Returns true if options were loaded, false if timeout
  */
-function waitForSelectOptions(select, timeout = 500) {
+function waitForSelectOptions(select, timeout = 3000) {
     return new Promise(resolve => {
-        if (!select || select.disabled) {
-            resolve();
+        if (!select) {
+            console.log('waitForSelectOptions: select is null');
+            resolve(false);
             return;
         }
         
-        // Check if already has options (more than just placeholder)
-        if (select.options.length > 1) {
-            resolve();
-            return;
-        }
-        
-        // Wait for options to load
         const startTime = Date.now();
+        
         const checkInterval = setInterval(() => {
-            if (select.options.length > 1 || Date.now() - startTime > timeout) {
-                clearInterval(checkInterval);
-                resolve();
+            const elapsed = Date.now() - startTime;
+            
+            // First check if enabled (might start disabled)
+            if (select.disabled) {
+                // Still disabled, keep waiting unless timeout
+                if (elapsed > timeout) {
+                    console.log('waitForSelectOptions: timeout waiting for enable after', elapsed, 'ms');
+                    clearInterval(checkInterval);
+                    resolve(false);
+                }
+                return; // Keep waiting
             }
+            
+            // Select is enabled, now check for options
+            if (select.options.length > 1) {
+                console.log('waitForSelectOptions: options loaded after', elapsed, 'ms:', select.options.length);
+                clearInterval(checkInterval);
+                resolve(true);
+            } else if (elapsed > timeout) {
+                console.log('waitForSelectOptions: timeout after', elapsed, 'ms, options:', select.options.length);
+                clearInterval(checkInterval);
+                resolve(false);
+            }
+            // Keep waiting for options
         }, 50);
     });
 }
@@ -541,17 +695,24 @@ function waitForSelectOptions(select, timeout = 500) {
  */
 function setFormFieldValue(form, key, value) {
     const input = form.querySelector(`[name="${key}"]`);
-    if (!input) return;
+    if (!input) {
+        console.warn('setFormFieldValue: field not found:', key);
+        return false;
+    }
     
     if (input.tagName === 'TEXTAREA') {
         input.value = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+        console.log('setFormFieldValue: set textarea', key, 'length:', input.value.length);
     } else if (input.tagName === 'SELECT') {
         input.value = value;
+        console.log('setFormFieldValue: set select', key, 'to:', value);
     } else if (input.type === 'checkbox') {
         input.checked = !!value;
     } else {
         input.value = value;
+        console.log('setFormFieldValue: set input', key, 'to:', value);
     }
+    return true;
 }
 
 /**
@@ -834,12 +995,25 @@ async function initEditStructureForm() {
     }
     
     // When action changes to 'update' with a nodeId, load the node content
+    // Also toggle structure required based on action
     if (actionSelect) {
-        actionSelect.addEventListener('change', loadNodeContent);
+        actionSelect.addEventListener('change', () => {
+            loadNodeContent();
+            // Structure is not required for 'delete' action
+            if (structureTextarea) {
+                if (actionSelect.value === 'delete') {
+                    structureTextarea.removeAttribute('required');
+                    structureTextarea.placeholder = 'Not required for delete action';
+                } else {
+                    structureTextarea.setAttribute('required', '');
+                    structureTextarea.placeholder = 'Enter JSON structure...';
+                }
+            }
+        });
     }
     
-    // Pre-fill form from URL parameters
-    if (prefillType) {
+    // Pre-fill form from URL parameters (but NOT in batch mode - that's handled separately)
+    if (!IS_BATCH_MODE && prefillType) {
         typeSelect.value = prefillType;
         
         // Trigger cascading for name select
@@ -861,8 +1035,8 @@ async function initEditStructureForm() {
         }
     }
     
-    // Pre-fill action
-    if (prefillAction && actionSelect) {
+    // Pre-fill action (but NOT in batch mode)
+    if (!IS_BATCH_MODE && prefillAction && actionSelect) {
         actionSelect.value = prefillAction;
         // If action is update and nodeId is set, load the node content
         if (prefillAction === 'update' && prefillNodeId) {

@@ -314,6 +314,12 @@ const QuickSiteAdmin = {
         e.preventDefault();
         
         const form = e.target;
+        
+        // Check if form is in batch mode - if so, don't execute (batch handler will take over)
+        if (form.dataset.batchMode === 'true') {
+            return;
+        }
+        
         const command = form.dataset.command;
         const method = form.dataset.method || 'POST';
         const submitBtn = form.querySelector('[type="submit"]');
