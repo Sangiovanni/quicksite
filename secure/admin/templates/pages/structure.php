@@ -96,7 +96,9 @@
 
 <script>
 let currentStructure = null;
-const BASE_URL = '<?= $baseUrl ?>';
+let currentType = '';
+let currentName = '';
+const COMMAND_BASE_URL = '<?= $router->url('command') ?>';
 
 document.addEventListener('DOMContentLoaded', function() {
     initStructureSelectors();
@@ -163,6 +165,10 @@ async function loadStructure() {
     
     if (!type) return;
     
+    // Store current context for later use
+    currentType = type;
+    currentName = name;
+    
     structureCard.style.display = 'block';
     treeContainer.innerHTML = '<div class="admin-loading"><span class="admin-spinner"></span> Loading structure...</div>';
     
@@ -171,6 +177,8 @@ async function loadStructure() {
         if (name && (type === 'page' || type === 'component')) {
             urlParams.push(name);
         }
+        // Add showIds to get node identifiers
+        urlParams.push('showIds');
         
         const result = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, urlParams);
         
@@ -206,50 +214,61 @@ function renderStructureTree(structure) {
     container.innerHTML = renderNodes(tree, 0);
 }
 
-function renderNodes(nodes, depth) {
+function renderNodes(nodes, depth, parentPath = '') {
     let html = '<ul class="admin-tree">';
     
     nodes.forEach((node, index) => {
-        const nodeId = node.id ?? index;
-        const element = node.element || node.type || 'node';
+        // Build node path for ID (0, 0.1, 0.1.2, etc.)
+        const nodePath = parentPath ? `${parentPath}.${index}` : `${index}`;
+        // Use _nodeId if present (from showIds), otherwise use computed path
+        const nodeId = node._nodeId ?? nodePath;
+        
+        // Handle different node types:
+        // - tag: HTML element (section, div, h1, etc.)
+        // - component: reusable component reference
+        // - textKey: translation key (leaf node with text)
+        // - text: raw text content
+        const element = node.tag || node.component || (node.textKey ? 'text' : (node.text ? 'raw' : 'node'));
         const hasChildren = node.children && node.children.length > 0;
-        const attributes = node.attributes || {};
+        const attributes = node.params || {};
         
         // Build label
-        let label = `<span class="admin-tree__element">&lt;${element}</span>`;
-        
-        if (attributes.id) {
-            label += `<span class="admin-tree__attr-id">#${attributes.id}</span>`;
-        }
-        if (attributes.class) {
-            const classes = Array.isArray(attributes.class) ? attributes.class.join(' ') : attributes.class;
-            label += `<span class="admin-tree__attr-class">.${classes.replace(/\s+/g, '.')}</span>`;
-        }
-        
-        label += `<span class="admin-tree__element">&gt;</span>`;
-        label += `<span class="admin-tree__node-id">[id: ${nodeId}]</span>`;
-        
-        // Text content preview
-        if (node.text) {
+        let label = '';
+        if (node.component) {
+            label = `<span class="admin-tree__component">&lt;${node.component}/&gt;</span>`;
+        } else if (node.tag) {
+            label = `<span class="admin-tree__element">&lt;${element}</span>`;
+            
+            if (attributes.id) {
+                label += `<span class="admin-tree__attr-id">#${attributes.id}</span>`;
+            }
+            if (attributes.class) {
+                const classes = Array.isArray(attributes.class) ? attributes.class.join(' ') : attributes.class;
+                label += `<span class="admin-tree__attr-class">.${classes.replace(/\s+/g, '.')}</span>`;
+            }
+            
+            label += `<span class="admin-tree__element">&gt;</span>`;
+        } else if (node.textKey) {
+            label = `<span class="admin-tree__trans">{{${node.textKey}}}</span>`;
+        } else if (node.text) {
             const preview = node.text.length > 30 ? node.text.substring(0, 30) + '...' : node.text;
-            label += `<span class="admin-tree__text">"${escapeHtml(preview)}"</span>`;
+            label = `<span class="admin-tree__text">"${escapeHtml(preview)}"</span>`;
+        } else {
+            label = `<span class="admin-tree__element">&lt;unknown&gt;</span>`;
         }
         
-        // Translation key
-        if (node.trans) {
-            label += `<span class="admin-tree__trans">{{${node.trans}}}</span>`;
-        }
+        label += `<span class="admin-tree__node-id">[${nodeId}]</span>`;
         
         html += `
             <li class="admin-tree__item ${hasChildren ? 'admin-tree__item--has-children' : ''}" data-node-id="${nodeId}">
-                <div class="admin-tree__row" onclick="selectNode(this, ${JSON.stringify(node).replace(/"/g, '&quot;')})">
+                <div class="admin-tree__row" onclick="selectNode(this, ${JSON.stringify(node).replace(/"/g, '&quot;')}, '${nodeId}')">
                     ${hasChildren ? '<span class="admin-tree__toggle" onclick="event.stopPropagation(); toggleNode(this)">▶</span>' : '<span class="admin-tree__spacer"></span>'}
                     ${label}
                 </div>
         `;
         
         if (hasChildren) {
-            html += renderNodes(node.children, depth + 1);
+            html += renderNodes(node.children, depth + 1, nodePath);
         }
         
         html += '</li>';
@@ -281,32 +300,41 @@ function collapseAll() {
     });
 }
 
-function selectNode(rowEl, node) {
+function selectNode(rowEl, node, nodeId) {
     // Remove previous selection
     document.querySelectorAll('.admin-tree__row--selected').forEach(el => {
         el.classList.remove('admin-tree__row--selected');
     });
     
     rowEl.classList.add('admin-tree__row--selected');
-    showNodeDetails(node);
+    showNodeDetails(node, nodeId);
 }
 
-function showNodeDetails(node) {
+function showNodeDetails(node, nodeId) {
     const panel = document.getElementById('node-details');
     const content = document.getElementById('node-details-content');
     
-    const attributes = node.attributes || {};
+    // Use params instead of attributes (actual JSON format)
+    const attributes = node.params || {};
     const attrKeys = Object.keys(attributes);
+    
+    // Determine element type
+    let elementType = 'unknown';
+    if (node.tag) elementType = node.tag;
+    else if (node.component) elementType = `component: ${node.component}`;
+    else if (node.textKey) elementType = 'text (translation)';
+    else if (node.text) elementType = 'text (raw)';
     
     let html = `
         <dl class="admin-definition-list">
             <dt>Node ID</dt>
-            <dd><code>${node.id ?? 'N/A'}</code></dd>
+            <dd><code>${nodeId || node._nodeId || 'N/A'}</code></dd>
             
             <dt>Element</dt>
-            <dd><code>${node.element || node.type || 'unknown'}</code></dd>
+            <dd><code>${elementType}</code></dd>
     `;
     
+    // Show raw text
     if (node.text) {
         html += `
             <dt>Text Content</dt>
@@ -314,13 +342,15 @@ function showNodeDetails(node) {
         `;
     }
     
-    if (node.trans) {
+    // Show translation key (textKey in JSON)
+    if (node.textKey) {
         html += `
             <dt>Translation Key</dt>
-            <dd><code>{{${node.trans}}}</code></dd>
+            <dd><code>{{${node.textKey}}}</code></dd>
         `;
     }
     
+    // Show component reference
     if (node.component) {
         html += `
             <dt>Component</dt>
@@ -328,6 +358,7 @@ function showNodeDetails(node) {
         `;
     }
     
+    // Show attributes/params
     if (attrKeys.length > 0) {
         html += `
             <dt>Attributes</dt>
@@ -343,7 +374,7 @@ function showNodeDetails(node) {
         </dl>
         
         <div class="admin-node-details__actions">
-            <a href="${BASE_URL}/command/editStructure" class="admin-btn admin-btn--small admin-btn--primary">
+            <a href="${COMMAND_BASE_URL}/editStructure" class="admin-btn admin-btn--small admin-btn--primary">
                 Edit Structure
             </a>
         </div>
@@ -465,6 +496,11 @@ function escapeHtml(text) {
     color: var(--admin-accent);
 }
 
+.admin-tree__component {
+    color: var(--admin-warning);
+    font-weight: 500;
+}
+
 /* Node Details Panel */
 .admin-node-details {
     position: fixed;
@@ -493,6 +529,7 @@ function escapeHtml(text) {
 .admin-node-details__header h3 {
     margin: 0;
     font-size: var(--font-size-base);
+    color: var(--admin-text);
 }
 
 .admin-node-details__close {

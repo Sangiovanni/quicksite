@@ -67,6 +67,23 @@ switch ($action) {
                 $name = is_array($page) ? ($page['name'] ?? $page) : $page;
                 return ['value' => $name, 'label' => $name];
             }, $result['data']['pages'] ?? []);
+            
+            // Check if 404 page exists and add it (it's not a route but has a structure file)
+            $page404File = SECURE_FOLDER_PATH . '/templates/model/json/pages/404.json';
+            if (file_exists($page404File)) {
+                // Only add if not already in the list
+                $has404 = false;
+                foreach ($pages as $p) {
+                    if ($p['value'] === '404') {
+                        $has404 = true;
+                        break;
+                    }
+                }
+                if (!$has404) {
+                    $pages[] = ['value' => '404', 'label' => '404 (Error Page)'];
+                }
+            }
+            
             echo json_encode(['success' => true, 'data' => $pages]);
         } else {
             echo json_encode(['success' => false, 'error' => $result['error']]);

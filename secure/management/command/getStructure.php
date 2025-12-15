@@ -100,7 +100,8 @@ if ($type === 'page' || $type === 'component') {
     }
     
     // Validate page exists (only for pages, not components)
-    if ($type === 'page' && !in_array($name, ROUTES, true)) {
+    // Special case: 404 page is not a route but has a structure file
+    if ($type === 'page' && $name !== '404' && !in_array($name, ROUTES, true)) {
         ApiResponse::create(404, 'route.not_found')
             ->withMessage("Page '{$name}' does not exist")
             ->withData(['available_routes' => ROUTES])
