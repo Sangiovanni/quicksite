@@ -82,9 +82,28 @@ function getCommandDocumentation(string $command): ?array {
 </div>
 <?php endif; ?>
 
+<!-- Batch Mode Banner (shown via JavaScript when ?batch=1) -->
+<div class="admin-alert admin-alert--info" id="batch-mode-banner" style="display: none; margin-bottom: var(--space-lg);">
+    <svg class="admin-alert__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="8" y1="6" x2="21" y2="6"/>
+        <line x1="8" y1="12" x2="21" y2="12"/>
+        <line x1="8" y1="18" x2="21" y2="18"/>
+        <line x1="3" y1="6" x2="3.01" y2="6"/>
+        <line x1="3" y1="12" x2="3.01" y2="12"/>
+        <line x1="3" y1="18" x2="3.01" y2="18"/>
+    </svg>
+    <div>
+        <strong>📋 Batch Mode</strong>
+        <p style="margin: var(--space-xs) 0 0;">
+            Configure the command parameters and click "Save to Queue" to add this command to your batch queue.
+            The command will not be executed until you run the entire batch.
+        </p>
+    </div>
+</div>
+
 <div class="admin-page-header">
     <div class="admin-breadcrumb">
-        <a href="<?= $router->url('command') ?>" class="admin-breadcrumb__link">
+        <a href="<?= $router->url('command') ?>" class="admin-breadcrumb__link" id="breadcrumb-link">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <polyline points="15 18 9 12 15 6"/>
             </svg>
@@ -133,12 +152,15 @@ function getCommandDocumentation(string $command): ?array {
                 </div>
                 
                 <div class="admin-form-actions">
-                    <button type="submit" class="admin-btn admin-btn--primary admin-btn--lg">
+                    <button type="submit" class="admin-btn admin-btn--primary admin-btn--lg" id="submit-btn">
                         <?= __admin('commands.execute') ?>
                     </button>
                     <button type="reset" class="admin-btn admin-btn--outline">
                         <?= __admin('common.reset') ?>
                     </button>
+                    <a href="<?= $router->url('batch') ?>" class="admin-btn admin-btn--secondary" id="cancel-batch-btn" style="display: none;">
+                        Cancel
+                    </a>
                 </div>
             </form>
         </div>
@@ -172,11 +194,145 @@ function getCommandDocumentation(string $command): ?array {
 
 <script>
 const COMMAND_NAME = '<?= addslashes($selectedCommand) ?>';
+const BATCH_URL = '<?= $router->url('batch') ?>';
+
+// Batch mode detection
+const urlParams = new URLSearchParams(window.location.search);
+const IS_BATCH_MODE = urlParams.get('batch') === '1';
+const BATCH_ID = urlParams.get('batchId');
 
 document.addEventListener('DOMContentLoaded', async function() {
     await loadCommandDocumentation();
     updateFavoriteButton();
+    
+    // Initialize batch mode if detected
+    if (IS_BATCH_MODE) {
+        initBatchMode();
+    }
 });
+
+/**
+ * Initialize batch mode UI and behavior
+ */
+function initBatchMode() {
+    // Show batch mode banner
+    document.getElementById('batch-mode-banner').style.display = 'flex';
+    
+    // Change submit button text
+    const submitBtn = document.getElementById('submit-btn');
+    submitBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Save to Queue
+    `;
+    submitBtn.classList.remove('admin-btn--primary');
+    submitBtn.classList.add('admin-btn--success');
+    
+    // Show cancel button
+    document.getElementById('cancel-batch-btn').style.display = 'inline-flex';
+    
+    // Update breadcrumb to go back to batch page
+    const breadcrumbLink = document.getElementById('breadcrumb-link');
+    if (breadcrumbLink) {
+        breadcrumbLink.href = BATCH_URL;
+        breadcrumbLink.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            Back to Batch
+        `;
+    }
+    
+    // Override form submission
+    const form = document.getElementById('command-form');
+    form.removeEventListener('submit', QuickSiteAdmin.handleCommandSubmit);
+    form.addEventListener('submit', handleBatchSubmit);
+}
+
+/**
+ * Handle form submission in batch mode - save to queue instead of executing
+ */
+function handleBatchSubmit(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const form = e.target;
+    const formData = new FormData(form);
+    const params = {};
+    const urlParams = [];
+    
+    // Collect form data
+    for (const [key, value] of formData.entries()) {
+        // Skip empty values
+        if (!value) continue;
+        
+        // Skip file inputs (can't serialize files to localStorage)
+        const input = form.querySelector(`[name="${key}"]`);
+        if (input?.type === 'file') {
+            QuickSiteAdmin.showToast('File uploads cannot be added to batch queue', 'warning');
+            continue;
+        }
+        
+        // Handle URL parameters
+        if (input?.dataset.urlParam !== undefined) {
+            if (value) urlParams.push(value);
+        } else {
+            // Try to parse JSON values
+            try {
+                params[key] = JSON.parse(value);
+            } catch {
+                params[key] = value;
+            }
+        }
+    }
+    
+    // Update the batch queue in localStorage
+    const queueKey = 'admin_batch_queue';
+    let queue = [];
+    
+    try {
+        queue = JSON.parse(localStorage.getItem(queueKey) || '[]');
+    } catch (e) {
+        queue = [];
+    }
+    
+    if (BATCH_ID) {
+        // Update existing item
+        const itemIndex = queue.findIndex(item => item.id === parseInt(BATCH_ID));
+        if (itemIndex !== -1) {
+            queue[itemIndex].params = params;
+            queue[itemIndex].urlParams = urlParams;
+            QuickSiteAdmin.showToast(`Updated "${COMMAND_NAME}" in queue`, 'success');
+        } else {
+            // Item not found, add as new
+            queue.push({
+                id: Date.now(),
+                command: COMMAND_NAME,
+                params: params,
+                urlParams: urlParams
+            });
+            QuickSiteAdmin.showToast(`Added "${COMMAND_NAME}" to queue`, 'success');
+        }
+    } else {
+        // Add new item
+        queue.push({
+            id: Date.now(),
+            command: COMMAND_NAME,
+            params: params,
+            urlParams: urlParams
+        });
+        QuickSiteAdmin.showToast(`Added "${COMMAND_NAME}" to queue`, 'success');
+    }
+    
+    // Save and redirect back to batch page
+    localStorage.setItem(queueKey, JSON.stringify(queue));
+    
+    setTimeout(() => {
+        window.location.href = BATCH_URL;
+    }, 500);
+}
 
 function updateFavoriteButton() {
     const btn = document.getElementById('favorite-btn');
@@ -199,7 +355,12 @@ async function loadCommandDocumentation() {
             renderCommandForm(doc);
             renderCommandDocs(doc);
             // Initialize enhanced features after form renders
-            initEnhancedFeatures();
+            await initEnhancedFeatures();
+            
+            // If in batch mode, pre-fill form with saved params
+            if (IS_BATCH_MODE && BATCH_ID) {
+                prefillFromBatchQueue();
+            }
         } else {
             document.getElementById('command-params').innerHTML = `
                 <div class="admin-alert admin-alert--error">
@@ -214,6 +375,58 @@ async function loadCommandDocumentation() {
             </div>
         `;
     }
+}
+
+/**
+ * Pre-fill form fields from batch queue item
+ */
+function prefillFromBatchQueue() {
+    const queueKey = 'admin_batch_queue';
+    let queue = [];
+    
+    try {
+        queue = JSON.parse(localStorage.getItem(queueKey) || '[]');
+    } catch (e) {
+        return;
+    }
+    
+    const item = queue.find(i => i.id === parseInt(BATCH_ID));
+    if (!item) return;
+    
+    const form = document.getElementById('command-form');
+    const params = item.params || {};
+    const urlParamsData = item.urlParams || [];
+    
+    // Pre-fill URL params (in order they appear in form)
+    const urlParamInputs = form.querySelectorAll('[data-url-param]');
+    urlParamInputs.forEach((input, index) => {
+        if (urlParamsData[index]) {
+            input.value = urlParamsData[index];
+            // Trigger change event for cascading selects
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+    
+    // Pre-fill regular params
+    Object.entries(params).forEach(([key, value]) => {
+        const input = form.querySelector(`[name="${key}"]`);
+        if (!input) return;
+        
+        if (input.tagName === 'TEXTAREA') {
+            input.value = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+        } else if (input.tagName === 'SELECT') {
+            input.value = value;
+        } else if (input.type === 'checkbox') {
+            input.checked = !!value;
+        } else {
+            input.value = value;
+        }
+        
+        // Trigger change event
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    
+    QuickSiteAdmin.showToast('Form pre-filled with saved parameters', 'info');
 }
 
 /**

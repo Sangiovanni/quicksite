@@ -460,15 +460,28 @@ function renderQueue() {
     
     let html = '';
     batchQueue.forEach((item, index) => {
-        const paramsStr = Object.keys(item.params).length > 0 
-            ? JSON.stringify(item.params).substring(0, 50) + '...'
-            : 'No params';
+        // Build params display string
+        let paramsDisplay = 'No params';
+        const hasParams = Object.keys(item.params || {}).length > 0;
+        const hasUrlParams = (item.urlParams || []).length > 0;
+        
+        if (hasParams || hasUrlParams) {
+            const parts = [];
+            if (hasUrlParams) {
+                parts.push(`URL: /${item.urlParams.join('/')}`);
+            }
+            if (hasParams) {
+                const paramStr = JSON.stringify(item.params);
+                parts.push(paramStr.length > 40 ? paramStr.substring(0, 40) + '...' : paramStr);
+            }
+            paramsDisplay = parts.join(' | ');
+        }
         
         html += `
             <div class="admin-batch-item" data-id="${item.id}">
                 <span class="admin-batch-item__order">${index + 1}</span>
                 <span class="admin-batch-item__name">${QuickSiteAdmin.escapeHtml(item.command)}</span>
-                <span class="admin-batch-item__params">${QuickSiteAdmin.escapeHtml(paramsStr)}</span>
+                <span class="admin-batch-item__params" title="${QuickSiteAdmin.escapeHtml(JSON.stringify(item.params || {}))}">${QuickSiteAdmin.escapeHtml(paramsDisplay)}</span>
                 <div class="admin-batch-item__actions">
                     <button type="button" class="admin-batch-item__btn" onclick="editQueueItem(${item.id})" title="Edit parameters">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
@@ -518,6 +531,15 @@ function filterBatchCommands(query) {
     });
 }
 
+// Commands that use GET method
+const GET_COMMANDS = [
+    'help', 'getRoutes', 'getStructure', 'getTranslation', 'getTranslations',
+    'getLangList', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys',
+    'analyzeTranslations', 'listAssets', 'getStyles', 'getRootVariables', 'listStyleRules',
+    'getStyleRule', 'getKeyframes', 'listTokens', 'listComponents', 'listPages',
+    'listAliases', 'listBuilds', 'getBuild', 'getCommandHistory'
+];
+
 async function executeBatch() {
     if (isExecuting || batchQueue.length === 0) return;
     
@@ -542,7 +564,12 @@ async function executeBatch() {
         const startTime = Date.now();
         
         try {
-            const result = await QuickSiteAdmin.apiRequest(item.command, item.params);
+            // Determine HTTP method based on command
+            const method = GET_COMMANDS.includes(item.command) ? 'GET' : 'POST';
+            const urlParams = item.urlParams || [];
+            const data = Object.keys(item.params || {}).length > 0 ? item.params : null;
+            
+            const result = await QuickSiteAdmin.apiRequest(item.command, method, method === 'GET' ? null : data, urlParams);
             const duration = Date.now() - startTime;
             
             if (itemEl) {
