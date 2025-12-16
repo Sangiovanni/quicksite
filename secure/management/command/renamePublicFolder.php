@@ -126,14 +126,24 @@ if (!rename($source_path, $target_path)) {
         ->send();
 }
 
-// Update init.php - change PUBLIC_FOLDER_ROOT reference if needed
-// The init.php uses __DIR__ so it should auto-resolve, but we need to update
-// any hardcoded references
-
-// Build the new init.php path
+// Update init.php - change PUBLIC_FOLDER_NAME constant
 $init_path = PUBLIC_FOLDER_SPACE !== '' 
     ? $target_path . DIRECTORY_SEPARATOR . PUBLIC_FOLDER_SPACE . DIRECTORY_SEPARATOR . 'init.php'
     : $target_path . DIRECTORY_SEPARATOR . 'init.php';
+
+// Update PUBLIC_FOLDER_NAME in init.php
+if (file_exists($init_path)) {
+    $init_content = file_get_contents($init_path);
+    if ($init_content !== false) {
+        // Replace the PUBLIC_FOLDER_NAME definition
+        $init_content = preg_replace(
+            "/define\\('PUBLIC_FOLDER_NAME',\\s*'[^']*'\\)/",
+            "define('PUBLIC_FOLDER_NAME', '" . $new_folder_name . "')",
+            $init_content
+        );
+        file_put_contents($init_path, $init_content);
+    }
+}
 
 // Release lock - operation complete
 releaseLock($lock);

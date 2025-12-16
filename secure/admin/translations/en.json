@@ -156,6 +156,7 @@
         "structure": "Structure",
         "batch": "Batch",
         "docs": "Docs",
+        "ai": "AI Integration",
         "logout": "Logout"
     },
     "settings": {
@@ -193,6 +194,13 @@
         "subtitle": "Complete reference for all available API commands",
         "quickReference": "Quick Reference",
         "commandReference": "Command Reference"
+    },
+    "ai": {
+        "title": "AI Integration",
+        "subtitle": "Generate commands with AI assistants",
+        "howItWorks": "How It Works",
+        "specification": "AI Specification",
+        "quickPrompts": "Example Prompts"
     },
     "footer": {
         "version": "QuickSite v:version",

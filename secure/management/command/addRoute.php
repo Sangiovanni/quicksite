@@ -11,8 +11,13 @@ if (!array_key_exists('route', $trimParametersManagement->params())) {
         ->send();
 }
 
-// Type validation
-if (!is_string($trimParametersManagement->params()['route'])) {
+// Type validation (allow numeric for routes like "404")
+$routeParam = $trimParametersManagement->params()['route'];
+if (is_int($routeParam) || is_float($routeParam)) {
+    $routeParam = (string) $routeParam;
+}
+
+if (!is_string($routeParam)) {
     ApiResponse::create(400, 'validation.invalid_type')
         ->withMessage('The route parameter must be a string.')
         ->withErrors([
@@ -21,7 +26,7 @@ if (!is_string($trimParametersManagement->params()['route'])) {
         ->send();
 }
 
-$route_name = $trimParametersManagement->params()['route'];
+$route_name = $routeParam;
 
 // Length validation
 if (strlen($route_name) < 1 || strlen($route_name) > 100) {

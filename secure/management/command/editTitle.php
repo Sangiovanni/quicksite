@@ -31,7 +31,11 @@ if (empty($route)) {
         ->send();
 }
 
-// Validate route is string
+// Validate route is string (allow numeric for routes like "404")
+if (is_int($route) || is_float($route)) {
+    $route = (string) $route;
+}
+
 if (!is_string($route)) {
     ApiResponse::create(400, 'validation.invalid_type')
         ->withMessage('route must be a string')
@@ -78,13 +82,17 @@ if (!preg_match('/^[a-zA-Z0-9_-]+$/', $route)) {
         ->send();
 }
 
-// Validate route exists in ROUTES
-if (!in_array($route, ROUTES)) {
+// Special pages that exist but are not in ROUTES (error pages, etc.)
+$specialPages = ['404', '500', '403', '401'];
+
+// Validate route exists in ROUTES or is a special page
+if (!in_array($route, ROUTES) && !in_array($route, $specialPages, true)) {
     ApiResponse::create(404, 'validation.invalid_route')
         ->withMessage('Route does not exist')
         ->withData([
             'provided_route' => $route,
-            'available_routes' => ROUTES
+            'available_routes' => ROUTES,
+            'special_pages' => $specialPages
         ])
         ->send();
 }

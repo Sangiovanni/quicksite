@@ -18,7 +18,11 @@ if(!defined('PUBLIC_FOLDER_SPACE')){
 }
 
 if(!defined('SERVER_ROOT')){
-    define('SERVER_ROOT', str_replace(PUBLIC_FOLDER_NAME, '', PUBLIC_FOLDER_ROOT));
+    // Remove only the rightmost occurrence of PUBLIC_FOLDER_NAME from path
+    // This prevents issues when folder name appears multiple times in path
+    // e.g., C:/wamp64/www/mysite/www -> C:/wamp64/www/mysite/ (not C:/wamp64//mysite/)
+    $folderPattern = '/' . preg_quote(PUBLIC_FOLDER_NAME, '/') . '[\\\\\\/]?$/';
+    define('SERVER_ROOT', preg_replace($folderPattern, '', PUBLIC_FOLDER_ROOT));
 }
 
 if(!defined('CONFIG_PATH')){

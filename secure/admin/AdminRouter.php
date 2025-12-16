@@ -22,6 +22,7 @@ class AdminRouter {
         'structure',  // Structure tree viewer
         'batch',      // Batch command execution
         'docs',       // API documentation
+        'ai',         // AI Integration / Communication spec
         'logout'      // Logout action
     ];
 

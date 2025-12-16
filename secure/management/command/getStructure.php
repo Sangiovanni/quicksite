@@ -58,7 +58,11 @@ if ($type === 'page' || $type === 'component') {
     
     $name = $urlSegments[1];
     
-    // Type validation - name must be string
+    // Type validation - name must be string (allow numeric for routes like "404")
+    if (is_int($name) || is_float($name)) {
+        $name = (string) $name;
+    }
+    
     if (!is_string($name)) {
         ApiResponse::create(400, 'validation.invalid_type')
             ->withMessage('The name parameter must be a string.')
@@ -99,12 +103,15 @@ if ($type === 'page' || $type === 'component') {
             ->send();
     }
     
+    // Special pages that exist but are not in ROUTES (error pages, etc.)
+    $specialPages = ['404', '500', '403', '401'];
+    
     // Validate page exists (only for pages, not components)
-    // Special case: 404 page is not a route but has a structure file
-    if ($type === 'page' && $name !== '404' && !in_array($name, ROUTES, true)) {
+    // Allow special pages (404, 500, etc.) even if not in ROUTES
+    if ($type === 'page' && !in_array($name, ROUTES, true) && !in_array($name, $specialPages, true)) {
         ApiResponse::create(404, 'route.not_found')
             ->withMessage("Page '{$name}' does not exist")
-            ->withData(['available_routes' => ROUTES])
+            ->withData(['available_routes' => ROUTES, 'special_pages' => $specialPages])
             ->send();
     }
     
