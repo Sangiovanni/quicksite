@@ -200,7 +200,8 @@ curl -H "Authorization: Bearer your_token_here" \
 - `GET /management/getLangList` - List supported languages
 - `POST /management/setMultilingual` - Switch between multilingual and mono-language modes
 - `POST /management/addLang` - Add new language (multilingual mode only)
-- `POST /management/deleteLang` - Delete language (multilingual mode only)
+- `DELETE /management/deleteLang` - Delete language (multilingual mode only)
+- `PATCH /management/setDefaultLang` - Set default language (multilingual mode only)
 
 #### **Asset Management**
 - `POST /management/uploadAsset` - Upload file to assets
@@ -544,4 +545,4 @@ Your support helps fund:
 
 ---
 
-**Made with ❤️ by [Ludovic](https://github.com/Sangiovanni) for the open source community**
+**Made with ❤️ by [Sangio](https://github.com/Sangiovanni) for the open source community**

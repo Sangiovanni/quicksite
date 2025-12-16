@@ -103,7 +103,7 @@ function getCommandCategories(): array {
         'language_management' => [
             'label' => 'Languages',
             'icon' => 'language',
-            'commands' => ['getLangList', 'setMultilingual', 'checkStructureMulti', 'addLang', 'deleteLang']
+            'commands' => ['getLangList', 'setMultilingual', 'checkStructureMulti', 'addLang', 'deleteLang', 'setDefaultLang']
         ],
         'asset_management' => [
             'label' => 'Assets',

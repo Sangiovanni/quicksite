@@ -772,7 +772,12 @@ const QuickSiteAdmin = {
     /**
      * Show a toast notification
      */
-    showToast(message, type = 'info', duration = 4000) {
+    showToast(message, type = 'info', duration = null) {
+        // Use preference duration if not explicitly provided
+        if (duration === null) {
+            duration = parseInt(this.getPref('toastDuration', 4000));
+        }
+        
         // Create toast container if it doesn't exist
         let container = document.querySelector('.admin-toast-container');
         if (!container) {
@@ -966,9 +971,10 @@ const QuickSiteAdmin = {
      * Initialize keyboard shortcuts
      */
     initKeyboardShortcuts() {
-        if (!this.getPref('shortcuts', true)) return;
-
         document.addEventListener('keydown', (e) => {
+            // Check preference dynamically so changes take effect immediately
+            if (!this.getPref('shortcuts', true)) return;
+            
             // Don't trigger when typing in inputs
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
                 // Allow Escape to blur inputs

@@ -1132,6 +1132,41 @@ $commands = [
         'notes' => 'Only available when MULTILINGUAL_SUPPORT = true. Cannot delete default language or last remaining language.'
     ],
     
+    'setDefaultLang' => [
+        'description' => 'Sets the default language for the site. The language must already exist in LANGUAGES_SUPPORTED.',
+        'method' => 'PATCH',
+        'requires_mode' => 'multilingual',
+        'parameters' => [
+            'lang' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Language code to set as default',
+                'example' => 'fr',
+                'validation' => '2-3 lowercase letters, must exist in LANGUAGES_SUPPORTED'
+            ]
+        ],
+        'example_patch' => 'PATCH /management/setDefaultLang with body: {"lang": "fr"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Default language updated successfully',
+            'data' => [
+                'new_default' => ['code' => 'fr', 'name' => 'Français'],
+                'previous_default' => ['code' => 'en', 'name' => 'English'],
+                'config_updated' => true
+            ]
+        ],
+        'error_responses' => [
+            '200.operation.no_change' => 'Language is already the default',
+            '400.validation.required' => 'Missing lang parameter',
+            '400.validation.invalid_format' => 'Invalid language code format',
+            '403.mode.requires_multilingual' => 'This command requires multilingual mode',
+            '404.not_found.language' => 'Language not found in LANGUAGES_SUPPORTED',
+            '500.server.file_write_failed' => 'Failed to update config file'
+        ],
+        'notes' => 'Only available when MULTILINGUAL_SUPPORT = true. The language must first be added using addLang. This affects the LANGUAGE_DEFAULT config value.'
+    ],
+    
     'getTranslationKeys' => [
         'description' => 'Scans all JSON structures and extracts required translation keys',
         'method' => 'GET',
@@ -2129,14 +2164,14 @@ ApiResponse::create(200, 'operation.success')
     ->withData([
         'commands' => $commands,
         'total' => count($commands),
-        'base_url' => BASE_URL . '/management',
+        'base_url' => rtrim(BASE_URL, '/') . '/management',
         'command_categories' => [
             'folder_management' => ['setPublicSpace', 'renameSecureFolder', 'renamePublicFolder'],
             'route_management' => ['addRoute', 'deleteRoute', 'getRoutes'],
             'structure_management' => ['getStructure', 'editStructure', 'listComponents', 'listPages'],
             'alias_management' => ['createAlias', 'deleteAlias', 'listAliases'],
             'translation_management' => ['getTranslation', 'getTranslations', 'setTranslationKeys', 'deleteTranslationKeys', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations'],
-            'language_management' => ['getLangList', 'setMultilingual', 'checkStructureMulti', 'addLang', 'deleteLang'],
+            'language_management' => ['getLangList', 'setMultilingual', 'checkStructureMulti', 'addLang', 'deleteLang', 'setDefaultLang'],
             'asset_management' => ['uploadAsset', 'deleteAsset', 'listAssets'],
             'style_management' => ['getStyles', 'editStyles'],
             'css_variables_rules' => ['getRootVariables', 'setRootVariables', 'listStyleRules', 'getStyleRule', 'setStyleRule', 'deleteStyleRule'],

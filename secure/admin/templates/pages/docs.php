@@ -27,7 +27,7 @@
         <div class="admin-docs-quick">
             <div class="admin-docs-item">
                 <h3 class="admin-docs-item__title">API Base URL</h3>
-                <code class="admin-docs-item__code"><?= BASE_URL ?>/management</code>
+                <code class="admin-docs-item__code"><?= rtrim(BASE_URL, '/') ?>/management</code>
             </div>
             
             <div class="admin-docs-item">
@@ -294,11 +294,21 @@ async function loadDocumentation() {
     const container = document.getElementById('docs-container');
     
     try {
-        const result = await QuickSiteAdmin.apiRequest('help', { showid: 'true' });
+        const result = await QuickSiteAdmin.apiRequest('help', 'GET');
         
         if (result.ok && result.data.data) {
             const data = result.data.data;
-            allDocs = data.commands || [];
+            // Convert commands object to array with name property
+            const commandsObj = data.commands || {};
+            allDocs = Object.entries(commandsObj).map(([name, cmd]) => ({
+                name,
+                ...cmd,
+                // Convert parameters object to array if needed
+                parameters: cmd.parameters ? Object.entries(cmd.parameters).map(([pName, pData]) => ({
+                    name: pName,
+                    ...pData
+                })) : []
+            }));
             
             loading.style.display = 'none';
             container.style.display = 'flex';
@@ -404,7 +414,7 @@ function filterDocs(query) {
 }
 
 function copyEndpoint(command) {
-    const url = `<?= BASE_URL ?>/management/${command}`;
+    const url = `<?= rtrim(BASE_URL, '/') ?>/management/${command}`;
     navigator.clipboard.writeText(url).then(() => {
         QuickSiteAdmin.showToast('URL copied to clipboard', 'success');
     }).catch(() => {

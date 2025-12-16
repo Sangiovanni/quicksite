@@ -3141,6 +3141,129 @@
                                 ]
                             }
                         ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-setDefaultLang"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__setDefaultLang"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-patch"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__PATCH"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__PATCH /management/setDefaultLang"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__Sets the default language for the site"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__Parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__lang"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__(required)"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__Language code to set as default (must exist)"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 ]
             }

@@ -749,6 +749,7 @@ async function initEnhancedFeatures() {
         case 'validateTranslations':
         case 'getUnusedTranslationKeys':
         case 'analyzeTranslations':
+        case 'setDefaultLang':
             await initLanguageSelectForm();
             break;
         case 'createAlias':

@@ -186,13 +186,13 @@ async function loadSystemInfo() {
             container.innerHTML = `
                 <dl class="admin-definition-list">
                     <dt>API Version</dt>
-                    <dd><code>${info.version || 'Unknown'}</code></dd>
+                    <dd><code>${info.version || '<?= defined('QUICKSITE_VERSION') ? QUICKSITE_VERSION : '1.6.0' ?>'}</code></dd>
                     
                     <dt>Total Commands</dt>
-                    <dd>${info.commands?.length || 0}</dd>
+                    <dd>${info.total || Object.keys(info.commands || {}).length || 0}</dd>
                     
                     <dt>Base URL</dt>
-                    <dd><code>${info.base_url || '<?= BASE_URL ?>'}</code></dd>
+                    <dd><code>${info.base_url ? info.base_url.replace(/\/+/g, '/').replace(':/', '://') : '<?= rtrim(BASE_URL, '/') ?>/management'}</code></dd>
                     
                     <dt>Server Time</dt>
                     <dd>${new Date().toLocaleString()}</dd>
@@ -289,21 +289,35 @@ async function loadLanguages() {
         const result = await QuickSiteAdmin.apiRequest('getLangList');
         
         if (result.ok && result.data.data?.languages) {
-            const langs = result.data.data.languages;
+            const data = result.data.data;
+            const langs = data.languages;
+            const defaultLang = data.default_language;
+            const langNames = data.language_names || {};
             
             if (langs.length === 0) {
                 container.innerHTML = '<p class="admin-text-muted">No languages configured</p>';
                 return;
             }
             
-            let html = '<div class="admin-tag-list">';
-            langs.forEach((lang, index) => {
-                const isDefault = index === 0;
+            let html = '<div class="admin-lang-list">';
+            langs.forEach(lang => {
+                const isDefault = lang === defaultLang;
+                const name = langNames[lang] || lang;
                 html += `
-                    <span class="admin-tag admin-tag--lang ${isDefault ? 'admin-tag--primary' : ''}">
-                        <code>${lang.toUpperCase()}</code>
-                        ${isDefault ? '<span class="admin-tag__badge">Default</span>' : ''}
-                    </span>
+                    <div class="admin-lang-item ${isDefault ? 'admin-lang-item--default' : ''}">
+                        <div class="admin-lang-info">
+                            <code class="admin-lang-code">${lang.toUpperCase()}</code>
+                            <span class="admin-lang-name">${QuickSiteAdmin.escapeHtml(name)}</span>
+                            ${isDefault ? '<span class="admin-badge admin-badge--success">Default</span>' : ''}
+                        </div>
+                        ${!isDefault ? `
+                            <button class="admin-btn admin-btn--small admin-btn--ghost" 
+                                    onclick="setDefaultLang('${lang}')" 
+                                    title="Set as default language">
+                                Set Default
+                            </button>
+                        ` : ''}
+                    </div>
                 `;
             });
             html += '</div>';
@@ -314,6 +328,28 @@ async function loadLanguages() {
         }
     } catch (error) {
         container.innerHTML = `<p class="admin-text-error">Error: ${error.message}</p>`;
+    }
+}
+
+async function setDefaultLang(langCode) {
+    if (!confirm(`Set "${langCode.toUpperCase()}" as the default language?`)) {
+        return;
+    }
+    
+    try {
+        const result = await QuickSiteAdmin.apiRequest('setDefaultLang', 'PATCH', { lang: langCode });
+        
+        if (result.ok) {
+            QuickSiteAdmin.showToast(result.data.message || 'Default language updated', 'success');
+            // Reload languages list to reflect the change
+            loadLanguages();
+            // Also reload system info to update the display
+            loadSystemInfo();
+        } else {
+            QuickSiteAdmin.showToast(result.data.message || 'Failed to update default language', 'error');
+        }
+    } catch (error) {
+        QuickSiteAdmin.showToast(`Error: ${error.message}`, 'error');
     }
 }
 
@@ -333,6 +369,10 @@ function savePreferences() {
     };
     
     localStorage.setItem('quicksite_admin_prefs', JSON.stringify(prefs));
+    
+    // Update QuickSiteAdmin.prefs immediately so changes take effect without reload
+    QuickSiteAdmin.prefs = prefs;
+    
     QuickSiteAdmin.showToast('Preferences saved', 'success');
 }
 </script>
@@ -493,5 +533,47 @@ kbd {
     background: var(--admin-bg);
     border: 1px solid var(--admin-border);
     border-radius: var(--radius-sm);
+}
+
+/* Language list styles */
+.admin-lang-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.admin-lang-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--admin-bg-secondary);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    transition: border-color var(--transition-fast);
+}
+
+.admin-lang-item--default {
+    border-color: var(--admin-accent);
+    background: var(--admin-accent-muted);
+}
+
+.admin-lang-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.admin-lang-code {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    color: var(--admin-accent);
+    min-width: 2.5rem;
+}
+
+.admin-lang-name {
+    font-size: var(--font-size-sm);
+    color: var(--admin-text);
 }
 </style>

@@ -147,7 +147,7 @@ async function loadDashboardStats() {
         // Get languages count
         const langResult = await QuickSiteAdmin.apiRequest('getLangList');
         if (langResult.ok) {
-            document.getElementById('stat-languages').textContent = langResult.data.data?.count || 1;
+            document.getElementById('stat-languages').textContent = langResult.data.data?.languages?.length || 1;
         }
     } catch (error) {
         console.error('Failed to load stats:', error);
