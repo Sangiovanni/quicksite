@@ -182,16 +182,17 @@ $categories = getCommandCategories();
         </p>
         
         <div class="admin-templates-grid">
-            <!-- Reset Project Template -->
-            <div class="admin-template" data-template="reset">
+            <!-- Fresh Start Template (Dynamic) -->
+            <div class="admin-template admin-template--dynamic" data-template="fresh-start">
                 <div class="admin-template__header">
-                    <span class="admin-template__icon">🧹</span>
-                    <span class="admin-template__title">Reset Project</span>
+                    <span class="admin-template__icon">✨</span>
+                    <span class="admin-template__title">Fresh Start</span>
+                    <span class="admin-template__badge">Dynamic</span>
                 </div>
-                <p class="admin-template__desc">Clear all custom content: routes (except home), translations, and custom styles. Start fresh.</p>
+                <p class="admin-template__desc">Wipe all content to blank slate: delete routes, clear assets, empty translations, reset CSS. Keeps languages & 404 page.</p>
                 <div class="admin-template__actions">
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="previewTemplate('reset')">Preview</button>
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="loadTemplate('reset')">Load</button>
+                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="generateFreshStartPreview()">Analyze & Preview</button>
+                    <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="generateFreshStart()">Generate & Load</button>
                 </div>
             </div>
             
@@ -631,6 +632,27 @@ $categories = getCommandCategories();
 
 .admin-template__title {
     font-weight: var(--font-weight-medium);
+}
+
+.admin-template__badge {
+    font-size: 0.65rem;
+    font-weight: var(--font-weight-medium);
+    text-transform: uppercase;
+    padding: 0.15rem 0.4rem;
+    background: var(--admin-accent);
+    color: white;
+    border-radius: var(--radius-sm);
+    margin-left: auto;
+}
+
+.admin-template--dynamic {
+    border-color: var(--admin-accent);
+    background: linear-gradient(135deg, var(--admin-card-bg) 0%, rgba(79, 70, 229, 0.05) 100%);
+}
+
+.admin-template--dynamic:hover {
+    border-color: var(--admin-accent);
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.15);
 }
 
 .admin-template__desc {
@@ -1138,19 +1160,256 @@ function importJsonCommands() {
 // Command Templates
 // ============================================
 
+/**
+ * Execute an API call and return parsed response
+ * Helper for dynamic template generators
+ * Returns the inner data object from API response
+ */
+async function executeApiCall(command, params = {}) {
+    const method = GET_COMMANDS.includes(command) ? 'GET' : 'POST';
+    const result = await QuickSiteAdmin.apiRequest(command, method, method === 'GET' ? null : params, []);
+    
+    // result.data is the full API response: { status, code, data: {...actual data...}, message }
+    // We want to return the inner data object
+    return {
+        ok: result.ok,
+        status: result.status,
+        data: result.data?.data || null,  // Extract the inner data
+        message: result.data?.message || null,
+        error: result.ok ? null : (result.data?.message || 'Unknown error')
+    };
+}
+
+// ============================================
+// Dynamic Template: Fresh Start
+// ============================================
+
+/**
+ * Fetches current project state and generates commands to wipe it clean
+ * - Deletes all routes except 404 and system routes (home stays but gets emptied)
+ * - Deletes all assets
+ * - Clears all translation keys (keeps languages)
+ * - Resets CSS to minimal
+ * - Clears menu, footer, components structures
+ * - Minimizes 404 page structure
+ */
+async function generateFreshStartCommands() {
+    const commands = [];
+    const summary = { routes: 0, assets: 0, translations: 0, structures: 0, components: 0 };
+    
+    try {
+        // 1. Fetch current routes (returns array of strings: ['home', 'about', ...])
+        const routesResponse = await executeApiCall('getRoutes', {});
+        if (routesResponse.ok && routesResponse.data?.routes) {
+            const routes = routesResponse.data.routes;
+            // Delete all routes except 404 and home (home is protected)
+            const protectedRoutes = ['404', 'home'];
+            
+            for (const routeName of routes) {
+                if (!protectedRoutes.includes(routeName)) {
+                    commands.push({ command: 'deleteRoute', params: { route: routeName } });
+                    summary.routes++;
+                }
+            }
+        }
+        
+        // 2. Fetch and delete all assets (format: { assets: { category: [{filename, ...}] } })
+        // deleteAsset expects: { category: 'images', filename: 'file.png' }
+        const assetsResponse = await executeApiCall('listAssets', {});
+        if (assetsResponse.ok && assetsResponse.data?.assets) {
+            const assets = assetsResponse.data.assets;
+            for (const [category, files] of Object.entries(assets)) {
+                for (const file of files) {
+                    commands.push({ 
+                        command: 'deleteAsset', 
+                        params: { category: category, filename: file.filename } 
+                    });
+                    summary.assets++;
+                }
+            }
+        }
+        
+        // 3. Fetch and delete all components via editStructure
+        // editStructure for delete: { type: 'component', name: '...', nodeId: '', action: 'delete' }
+        const componentsResponse = await executeApiCall('listComponents', {});
+        if (componentsResponse.ok && componentsResponse.data?.components) {
+            const components = componentsResponse.data.components;
+            for (const component of components) {
+                commands.push({ 
+                    command: 'editStructure', 
+                    params: { 
+                        type: 'component', 
+                        name: component.name, 
+                        nodeId: '', 
+                        action: 'delete' 
+                    } 
+                });
+                summary.components++;
+            }
+        }
+        
+        // 4. Fetch all languages and clear translation keys (except 404.*)
+        // Use getTranslations (plural) to get all languages
+        const translationsResponse = await executeApiCall('getTranslations', {});
+        if (translationsResponse.ok && translationsResponse.data?.translations) {
+            const allTranslations = translationsResponse.data.translations;
+            
+            for (const [lang, keys] of Object.entries(allTranslations)) {
+                // Get all top-level keys except '404' (preserve 404 page translations)
+                const topLevelKeys = Object.keys(keys).filter(key => key !== '404');
+                if (topLevelKeys.length > 0) {
+                    commands.push({ 
+                        command: 'deleteTranslationKeys', 
+                        params: { language: lang, keys: topLevelKeys } 
+                    });
+                    summary.translations += topLevelKeys.length;
+                }
+            }
+        }
+        
+        // 5. Clear structures: menu, footer
+        commands.push({ command: 'editStructure', params: { type: 'menu', structure: [] } });
+        commands.push({ command: 'editStructure', params: { type: 'footer', structure: [] } });
+        summary.structures += 2;
+        
+        // 6. Empty home page structure
+        commands.push({ command: 'editStructure', params: { type: 'page', name: 'home', structure: [] } });
+        summary.structures++;
+        
+        // 7. Minimize 404 page structure (use existing textKeys for translations)
+        commands.push({ 
+            command: 'editStructure', 
+            params: { 
+                type: 'page',
+                name: '404', 
+                structure: [
+                    { tag: 'section', params: { class: 'error-page' }, children: [
+                        { tag: 'h1', children: [{ textKey: '404.pageNotFound' }] },
+                        { tag: 'p', children: [{ textKey: '404.message' }] }
+                    ]}
+                ]
+            } 
+        });
+        summary.structures++;
+        
+        // 8. Clear CSS file (single space - the set* commands can recreate sections from scratch)
+        commands.push({ command: 'editStyles', params: { content: '/* Fresh Start - CSS cleared */\n' } });
+        
+        return { commands, summary, error: null };
+        
+    } catch (error) {
+        return { commands: [], summary, error: error.message };
+    }
+}
+
+async function generateFreshStartPreview() {
+    const previewBtn = event.target;
+    previewBtn.disabled = true;
+    previewBtn.textContent = 'Analyzing...';
+    
+    try {
+        const { commands, summary, error } = await generateFreshStartCommands();
+        
+        if (error) {
+            QuickSiteAdmin.showToast('Error analyzing project: ' + error, 'error');
+            return;
+        }
+        
+        currentPreviewTemplate = 'fresh-start-generated';
+        commandTemplates['fresh-start-generated'] = {
+            name: 'Fresh Start',
+            commands: commands
+        };
+        
+        const preview = document.getElementById('template-preview');
+        const title = document.getElementById('template-preview-title');
+        const content = document.getElementById('template-preview-content');
+        const count = document.getElementById('template-preview-count');
+        
+        title.textContent = 'Fresh Start Preview (Generated)';
+        content.value = JSON.stringify(commands, null, 2);
+        count.innerHTML = `⚠️ <strong>${commands.length} commands</strong> will be generated:\n` +
+            `• ${summary.routes} route(s) to delete\n` +
+            `• ${summary.assets} asset(s) to delete\n` +
+            `• ${summary.components} component(s) to delete\n` +
+            `• ${summary.translations} translation key group(s) to clear\n` +
+            `• ${summary.structures} structure(s) to reset\n` +
+            `• CSS file will be cleared`;
+        count.style.whiteSpace = 'pre-line';
+        
+        preview.style.display = 'block';
+        preview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+    } finally {
+        previewBtn.disabled = false;
+        previewBtn.textContent = 'Analyze & Preview';
+    }
+}
+
+async function generateFreshStart() {
+    if (!confirm('⚠️ Fresh Start will generate commands to:\n\n' +
+        '• Delete ALL routes (except 404 & home)\n' +
+        '• Delete ALL assets\n' +
+        '• Delete ALL components\n' +
+        '• Clear ALL translation keys (except 404.*)\n' +
+        '• Empty menu, footer, home structures\n' +
+        '• Minimize 404 page structure\n' +
+        '• Clear CSS file (style.css)\n\n' +
+        'This will analyze your project and add delete commands to the queue.\n' +
+        'Commands won\'t execute until you run them.\n\n' +
+        'Continue?')) {
+        return;
+    }
+    
+    const loadBtn = event.target;
+    loadBtn.disabled = true;
+    loadBtn.textContent = 'Generating...';
+    
+    try {
+        const { commands, summary, error } = await generateFreshStartCommands();
+        
+        if (error) {
+            QuickSiteAdmin.showToast('Error generating commands: ' + error, 'error');
+            return;
+        }
+        
+        if (commands.length === 0) {
+            QuickSiteAdmin.showToast('Project already clean - no commands needed!', 'info');
+            return;
+        }
+        
+        // Add all commands to queue
+        let added = 0;
+        commands.forEach(cmd => {
+            batchQueue.push({
+                id: Date.now() + added,
+                command: cmd.command,
+                params: cmd.params
+            });
+            added++;
+        });
+        
+        saveQueue();
+        renderQueue();
+        
+        QuickSiteAdmin.showToast(
+            `Fresh Start: ${commands.length} commands queued (${summary.routes} routes, ${summary.assets} assets, ${summary.components} components)`, 
+            'success'
+        );
+        
+        document.getElementById('batch-queue').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+    } finally {
+        loadBtn.disabled = false;
+        loadBtn.textContent = 'Generate & Load';
+    }
+}
+
+// ============================================
+// Static Command Templates
+// ============================================
+
 const commandTemplates = {
-    'reset': {
-        name: 'Reset Project',
-        description: 'Clear all custom content and start fresh',
-        commands: [
-            { command: 'getRoutes', params: {} },
-            // Note: This template shows the concept - actual reset would need 
-            // to iterate routes from getRoutes response
-            { command: 'deleteTranslationKeys', params: { language: 'en', keys: ['nav', 'home', 'about', 'services', 'contact', 'common', 'footer'] } },
-            { command: 'setRootVariables', params: { variables: {}, replace: true } }
-        ],
-        warning: '⚠️ This will delete translations and reset CSS variables. Routes need to be deleted manually after checking getRoutes.'
-    },
     
     'starter-business': {
         name: 'Starter Business',

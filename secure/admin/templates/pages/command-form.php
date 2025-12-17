@@ -2844,6 +2844,7 @@ function renderCommandForm(doc) {
 
 function renderFormField(rawName, param, required) {
     const type = param.type || 'string';
+    const uiType = param.ui_type || null; // Custom UI type for special inputs
     const description = param.description || '';
     const example = param.example || '';
     const validation = param.validation || '';
@@ -2863,6 +2864,60 @@ function renderFormField(rawName, param, required) {
     let inputHtml = '';
     const inputId = 'param-' + name;
     const urlParamAttr = isUrlParam ? 'data-url-param' : '';
+    
+    // Handle special UI types first
+    if (uiType === 'datetime' || uiType === 'date') {
+        const includeTime = (uiType === 'datetime');
+        const today = new Date().toISOString().split('T')[0];
+        const defaultExample = example || today;
+        
+        inputHtml = `
+            <div class="admin-datetime-picker" data-target="${inputId}">
+                <div class="admin-datetime-picker__selectors">
+                    <div class="admin-form-group admin-form-group--inline">
+                        <label class="admin-label admin-label--small">Date</label>
+                        <input type="date" id="${inputId}-date" class="admin-input admin-input--date" 
+                            data-datetime-date="${inputId}" value="${today}">
+                    </div>
+                    ${includeTime ? `
+                    <div class="admin-form-group admin-form-group--inline">
+                        <label class="admin-label admin-label--small">Hour</label>
+                        <select id="${inputId}-hour" class="admin-select admin-select--small" data-datetime-hour="${inputId}">
+                            ${Array.from({length: 24}, (_, i) => `<option value="${String(i).padStart(2, '0')}" ${i === 0 ? 'selected' : ''}>${String(i).padStart(2, '0')}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="admin-form-group admin-form-group--inline">
+                        <label class="admin-label admin-label--small">Min</label>
+                        <select id="${inputId}-min" class="admin-select admin-select--small" data-datetime-min="${inputId}">
+                            ${Array.from({length: 60}, (_, i) => `<option value="${String(i).padStart(2, '0')}" ${i === 0 ? 'selected' : ''}>${String(i).padStart(2, '0')}</option>`).join('')}
+                        </select>
+                    </div>
+                    ` : ''}
+                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="applyDateTimeToField('${inputId}', ${includeTime})">
+                        Apply
+                    </button>
+                </div>
+                <div class="admin-form-group" style="margin-top: var(--space-sm);">
+                    <label class="admin-label admin-label--small">Or enter manually:</label>
+                    <input type="text" name="${name}" id="${inputId}" class="admin-input" 
+                        placeholder="${QuickSiteAdmin.escapeHtml(defaultExample)}" 
+                        ${required ? 'required' : ''} ${urlParamAttr}>
+                </div>
+            </div>
+        `;
+        
+        return `
+            <div class="admin-form-group">
+                <label class="admin-label ${required ? 'admin-label--required' : ''}" for="${inputId}">
+                    ${displayName}
+                    <span class="admin-label__type">(${type})</span>
+                </label>
+                ${inputHtml}
+                <p class="admin-hint">${QuickSiteAdmin.escapeHtml(description)}</p>
+                ${validation ? `<p class="admin-hint"><strong>Validation:</strong> ${QuickSiteAdmin.escapeHtml(validation)}</p>` : ''}
+            </div>
+        `;
+    }
     
     switch (type) {
         case 'boolean':
@@ -2999,6 +3054,65 @@ function renderCommandDocs(doc) {
     
     container.innerHTML = html || '<p>No additional documentation available.</p>';
 }
+
+/**
+ * Apply date/time picker values to the target input field
+ * @param {string} fieldId - The ID of the target input field
+ * @param {boolean} includeTime - Whether to include time in the value
+ */
+function applyDateTimeToField(fieldId, includeTime = true) {
+    const dateInput = document.getElementById(fieldId + '-date');
+    const targetInput = document.getElementById(fieldId);
+    
+    if (!dateInput || !targetInput) return;
+    
+    let value = dateInput.value;
+    
+    if (!value) {
+        // Default to today
+        value = new Date().toISOString().split('T')[0];
+    }
+    
+    if (includeTime) {
+        const hourSelect = document.getElementById(fieldId + '-hour');
+        const minSelect = document.getElementById(fieldId + '-min');
+        
+        const hour = hourSelect ? hourSelect.value : '00';
+        const min = minSelect ? minSelect.value : '00';
+        
+        value = `${value}T${hour}:${min}:00`;
+    }
+    
+    targetInput.value = value;
+    targetInput.focus();
+    
+    // Trigger change event for any listeners
+    targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/**
+ * Initialize datetime pickers - set up auto-apply on change (optional)
+ */
+function initDateTimePickers() {
+    document.querySelectorAll('.admin-datetime-picker').forEach(picker => {
+        const targetId = picker.dataset.target;
+        const dateInput = picker.querySelector('[data-datetime-date]');
+        
+        // Optional: auto-apply when date changes
+        if (dateInput) {
+            dateInput.addEventListener('change', () => {
+                // Only auto-apply if user has interacted with date picker
+                const targetInput = document.getElementById(targetId);
+                if (targetInput && !targetInput.value) {
+                    // Don't auto-apply if user hasn't clicked Apply yet
+                }
+            });
+        }
+    });
+}
+
+// Initialize on page load and when form is re-rendered
+document.addEventListener('DOMContentLoaded', initDateTimePickers);
 </script>
 
 <style>
@@ -3104,6 +3218,50 @@ function renderCommandDocs(doc) {
 
 .admin-favorite-btn--active svg {
     fill: currentColor;
+}
+
+/* DateTime Picker Styles */
+.admin-datetime-picker {
+    background: var(--admin-bg-light);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+}
+
+.admin-datetime-picker__selectors {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+}
+
+.admin-form-group--inline {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin-bottom: 0;
+}
+
+.admin-form-group--inline .admin-label--small {
+    font-size: var(--font-size-xs);
+    margin-bottom: 0;
+}
+
+.admin-input--date {
+    min-width: 150px;
+}
+
+.admin-select--small {
+    min-width: 70px;
+    padding: var(--space-xs) var(--space-sm);
+}
+
+.admin-btn--small {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--font-size-sm);
+    height: auto;
+    align-self: flex-end;
 }
 
 @media (max-width: 1024px) {

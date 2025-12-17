@@ -306,14 +306,19 @@ class RegexPatterns
      * 
      * @param string $patternName The pattern identifier
      * @param string $value The value to test
-     * @param array &$matches Matches will be stored here
+     * @param array &$matches Matches will be stored here (auto-initialized if null)
      * @return bool True if matches
      * @throws InvalidArgumentException If pattern doesn't exist
      */
-    public static function matchWithCapture(string $patternName, string $value, array &$matches): bool
+    public static function matchWithCapture(string $patternName, string $value, ?array &$matches = null): bool
     {
         if (!isset(self::$patterns[$patternName])) {
             throw new InvalidArgumentException("Unknown regex pattern: {$patternName}");
+        }
+        
+        // Initialize matches array if not provided (allows passing uninitialized variables)
+        if ($matches === null) {
+            $matches = [];
         }
         
         return (bool) preg_match(self::$patterns[$patternName]['pattern'], $value, $matches);
