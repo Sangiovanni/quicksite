@@ -13,6 +13,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 $params = $trimParametersManagement->params();
 
@@ -64,7 +65,7 @@ foreach ($permissions as $perm) {
     }
     
     // Check if it's a valid base permission or command:xxx format
-    if (!in_array($perm, $validPermissions) && !preg_match('/^command:[a-zA-Z]+$/', $perm)) {
+    if (!in_array($perm, $validPermissions) && !RegexPatterns::match('permission_command', $perm)) {
         ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Invalid permission: {$perm}")
             ->withData([

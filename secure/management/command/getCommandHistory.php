@@ -21,6 +21,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/functions/LoggingManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 // Parse query parameters
 $params = $_GET;
@@ -61,17 +62,17 @@ $filters = [
 $filters = array_filter($filters, fn($v) => $v !== null);
 
 // Validate date formats
-if (isset($filters['start_date']) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $filters['start_date'])) {
+if (isset($filters['start_date']) && !RegexPatterns::match('date_iso', $filters['start_date'])) {
     ApiResponse::create(400, 'validation.invalid_date')
         ->withMessage('Invalid start_date format')
-        ->withData(['expected_format' => 'YYYY-MM-DD'])
+        ->withErrors([RegexPatterns::validationError('date_iso', 'start_date', $filters['start_date'])])
         ->send();
 }
 
-if (isset($filters['end_date']) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $filters['end_date'])) {
+if (isset($filters['end_date']) && !RegexPatterns::match('date_iso', $filters['end_date'])) {
     ApiResponse::create(400, 'validation.invalid_date')
         ->withMessage('Invalid end_date format')
-        ->withData(['expected_format' => 'YYYY-MM-DD'])
+        ->withErrors([RegexPatterns::validationError('date_iso', 'end_date', $filters['end_date'])])
         ->send();
 }
 

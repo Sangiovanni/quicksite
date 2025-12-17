@@ -1,5 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 // Get URL segment: /management/getTranslation/{lang}
 $urlSegments = $trimParametersManagement->additionalParams();
@@ -52,12 +53,10 @@ if (strlen($language) > 10) {
 // Also supports "default" for mono-language mode
 // Pattern: 2-3 lowercase letters, optionally followed by dash and 2-4 alphanumeric chars
 $isDefault = ($language === 'default');
-if (!$isDefault && !preg_match('/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/', $language)) {
+if (!$isDefault && !RegexPatterns::match('language_code_extended', $language)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage('Invalid language code format')
-        ->withErrors([
-            ['field' => 'language', 'value' => $language, 'expected' => 'ISO 639 or BCP 47 format (e.g., en, fr, en-US, zh-Hans) or "default"']
-        ])
+        ->withErrors([RegexPatterns::validationError('language_code_extended', 'language', $language)])
         ->send();
 }
 

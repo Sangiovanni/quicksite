@@ -12,6 +12,7 @@
  * - ZIP availability and sizes
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 $buildPath = PUBLIC_FOLDER_ROOT . '/build';
 
@@ -35,7 +36,7 @@ foreach ($items as $item) {
     // Skip non-directories and non-build folders
     if ($item === '.' || $item === '..') continue;
     if (!is_dir($buildPath . '/' . $item)) continue;
-    if (!preg_match('/^build_\d{8}_\d{6}$/', $item)) continue;
+    if (!RegexPatterns::match('build_name', $item)) continue;
     
     $buildFolder = $buildPath . '/' . $item;
     $manifestPath = $buildFolder . '/build_manifest.json';
@@ -73,7 +74,7 @@ foreach ($items as $item) {
         }
     } else {
         // Fallback: parse timestamp from folder name
-        if (preg_match('/^build_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})$/', $item, $matches)) {
+        if (RegexPatterns::matchWithCapture('build_name_parse', $item, $matches)) {
             $dateStr = "{$matches[1]}-{$matches[2]}-{$matches[3]}T{$matches[4]}:{$matches[5]}:{$matches[6]}";
             $buildInfo['created'] = $dateStr;
             $buildInfo['created_timestamp'] = strtotime($dateStr);

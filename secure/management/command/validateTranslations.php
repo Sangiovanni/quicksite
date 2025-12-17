@@ -1,6 +1,7 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 // Get URL segment for language (optional)
 $urlSegments = $trimParametersManagement->additionalParams();
@@ -29,12 +30,10 @@ if ($targetLang !== null) {
     }
     
     // Format validation - supports ISO 639 and BCP 47 locale codes
-    if (!preg_match('/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/', $targetLang)) {
+    if (!RegexPatterns::match('language_code_extended', $targetLang)) {
         ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid language code format')
-            ->withErrors([
-                ['field' => 'language', 'value' => $targetLang, 'expected' => 'ISO 639 or BCP 47 format (e.g., en, fr, en-US, zh-Hans)']
-            ])
+            ->withErrors([RegexPatterns::validationError('language_code_extended', 'language', $targetLang)])
             ->send();
     }
 }

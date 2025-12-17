@@ -15,6 +15,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 // Get request body
 $rawBody = defined('REQUEST_BODY_RAW') ? REQUEST_BODY_RAW : file_get_contents('php://input');
@@ -60,9 +61,10 @@ $target = rtrim($target, '/');
 if ($target === '') $target = '/';
 
 // Validate alias format
-if (!preg_match('/^\/[a-zA-Z0-9\/_-]*$/', $alias)) {
+if (!RegexPatterns::match('url_alias', $alias)) {
     ApiResponse::create(400, 'api.error.invalid_parameter')
         ->withMessage('Invalid alias format. Use alphanumeric characters, dashes, underscores, and slashes only')
+        ->withErrors([RegexPatterns::validationError('url_alias', 'alias', $alias)])
         ->send();
 }
 

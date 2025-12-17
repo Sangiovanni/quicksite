@@ -22,6 +22,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 // Get parameters
 $params = $trimParametersManagement->params();
@@ -42,7 +43,7 @@ $name = trim($params['name']);
 $frames = $params['frames'];
 
 // Validate name (alphanumeric and hyphens only)
-if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/', $name)) {
+if (!RegexPatterns::match('keyframe_name', $name)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage('Animation name must start with a letter and contain only letters, numbers, hyphens, and underscores')
         ->send();
@@ -58,7 +59,7 @@ if (!is_array($frames) || empty($frames)) {
 // Validate each frame
 foreach ($frames as $key => $styles) {
     // Validate frame key (0%-100%, from, to)
-    if (!preg_match('/^(\d+%(\s*,\s*\d+%)*|from|to)$/i', $key)) {
+    if (!RegexPatterns::match('keyframe_selector', $key)) {
         ApiResponse::create(400, 'validation.invalid_frame')
             ->withMessage("Invalid frame key: '$key'. Must be percentage(s) or 'from'/'to'")
             ->send();

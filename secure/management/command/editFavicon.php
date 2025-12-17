@@ -1,5 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 /**
  * Change Favicon Command
@@ -55,12 +56,10 @@ if (strlen($imageName) > 100) {
 
 // Validate filename format (only safe characters)
 // Pattern: lowercase letters, numbers, hyphens, underscores, and .png extension
-if (!preg_match('/^[a-z0-9_-]+\.png$/i', $imageName)) {
+if (!RegexPatterns::match('favicon_file', $imageName)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage('Image filename must contain only letters, numbers, hyphens, underscores, and end with .png')
-        ->withErrors([
-            ['field' => 'imageName', 'value' => $imageName, 'pattern' => 'a-z, 0-9, _, -, .png']
-        ])
+        ->withErrors([RegexPatterns::validationError('favicon_file', 'imageName', $imageName)])
         ->send();
 }
 

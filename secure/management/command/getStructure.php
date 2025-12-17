@@ -1,6 +1,7 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 // Get URL segments: /management/getStructure/{type}/{name?}/{nodeId|showIds}
 $urlSegments = $trimParametersManagement->additionalParams();
@@ -96,10 +97,10 @@ if ($type === 'page' || $type === 'component') {
     }
     
     // Validate name format (alphanumeric, hyphens, underscores) for both pages and components
-    if (!preg_match('/^[a-zA-Z0-9_-]+$/', $name)) {
+    if (!RegexPatterns::match('identifier_alphanum', $name)) {
         ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Invalid name format. Use only alphanumeric, hyphens, and underscores")
-            ->withErrors([['field' => 'name', 'value' => $name, 'type' => $type]])
+            ->withErrors([RegexPatterns::validationError('identifier_alphanum', 'name', $name)])
             ->send();
     }
     
@@ -166,7 +167,7 @@ if ($optionSegment !== null) {
         $showIds = true;
     } elseif ($optionSegment === 'summary') {
         $summaryMode = true;
-    } elseif (preg_match('/^[0-9]+(\.[0-9]+)*$/', $optionSegment)) {
+    } elseif (RegexPatterns::match('node_id', $optionSegment)) {
         // It's a nodeId - retrieve specific node
         $targetNodeId = $optionSegment;
     } else {

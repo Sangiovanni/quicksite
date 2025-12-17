@@ -6,6 +6,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 /**
  * Modify Page Title Command
@@ -71,13 +72,13 @@ if (strlen($route) > 100) {
 }
 
 // Validate route format (alphanumeric, hyphens, underscores)
-if (!preg_match('/^[a-zA-Z0-9_-]+$/', $route)) {
+if (!RegexPatterns::match('identifier_alphanum', $route)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage('route contains invalid characters')
-        ->withData([
+        ->withErrors([
             'field' => 'route',
-            'allowed' => 'Letters, numbers, hyphens, underscores',
-            'pattern' => '/^[a-zA-Z0-9_-]+$/'
+            'allowed' => RegexPatterns::getDescription('identifier_alphanum'),
+            'examples' => RegexPatterns::getExamples('identifier_alphanum')
         ])
         ->send();
 }
@@ -143,14 +144,10 @@ if (strlen($lang) > 10) {
 }
 
 // Validate language code format (2-3 lowercase letters, optional locale)
-if (!preg_match('/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/', $lang)) {
+if (!RegexPatterns::match('language_code_extended', $lang)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage('lang has invalid format')
-        ->withData([
-            'field' => 'lang',
-            'allowed' => '2-3 lowercase letters, optional locale (e.g., en, fr, en-US)',
-            'pattern' => '/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/'
-        ])
+        ->withErrors([RegexPatterns::validationError('language_code_extended', 'lang', $lang)])
         ->send();
 }
 

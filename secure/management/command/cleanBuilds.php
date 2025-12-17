@@ -14,6 +14,7 @@
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 $params = $trimParametersManagement->params();
 $before = $params['before'] ?? null;
@@ -93,7 +94,7 @@ foreach ($items as $item) {
     // Skip non-directories and non-build folders
     if ($item === '.' || $item === '..') continue;
     if (!is_dir($buildPath . '/' . $item)) continue;
-    if (!preg_match('/^build_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})$/', $item, $matches)) continue;
+    if (!RegexPatterns::matchWithCapture('build_name_parse', $item, $matches)) continue;
     
     // Parse timestamp from folder name
     $buildTimestamp = mktime(

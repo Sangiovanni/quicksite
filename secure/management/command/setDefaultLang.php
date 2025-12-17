@@ -10,6 +10,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 // Check if multilingual mode is enabled
 if (!MULTILINGUAL_SUPPORT) {
@@ -39,10 +40,10 @@ if (!is_string($params['lang'])) {
 $langCode = trim(strtolower($params['lang']));
 
 // Validate language code format (2-3 lowercase letters)
-if (!preg_match('/^[a-z]{2,3}$/', $langCode)) {
+if (!RegexPatterns::match('language_code', $langCode)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage("Invalid language code format")
-        ->withErrors([['field' => 'lang', 'value' => $langCode, 'expected' => '2-3 lowercase letters (e.g., en, fr, es)']])
+        ->withErrors([RegexPatterns::validationError('language_code', 'lang', $langCode)])
         ->send();
 }
 

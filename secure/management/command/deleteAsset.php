@@ -1,5 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 /**
  * Delete Asset Command
@@ -114,12 +115,10 @@ if (strlen($filename) > 100) {
 }
 
 // Format validation - only alphanumeric, hyphens, underscores, and dots for extension
-if (!preg_match('/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/', $filename)) {
+if (!RegexPatterns::match('file_name_with_ext', $filename)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage('Filename must contain only letters, numbers, hyphens, and underscores, with a valid extension')
-        ->withErrors([
-            ['field' => 'filename', 'value' => $filename, 'pattern' => 'alphanumeric_with_extension']
-        ])
+        ->withErrors([RegexPatterns::validationError('file_name_with_ext', 'filename', $filename)])
         ->send();
 }
 

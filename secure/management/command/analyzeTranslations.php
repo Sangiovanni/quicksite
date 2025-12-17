@@ -12,6 +12,7 @@
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 // Get URL segment for language (optional)
 $urlSegments = $trimParametersManagement->additionalParams();
@@ -32,9 +33,10 @@ if ($targetLang !== null) {
             ->send();
     }
     
-    if (!preg_match('/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/', $targetLang)) {
+    if (!RegexPatterns::match('language_code_extended', $targetLang)) {
         ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid language code format')
+            ->withErrors([RegexPatterns::validationError('language_code_extended', 'language', $targetLang)])
             ->send();
     }
 }

@@ -2,6 +2,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 $params = $trimParametersManagement->params();
 
@@ -172,10 +173,10 @@ if ($type === 'page' || $type === 'component') {
     }
     
     // Validate component name format (alphanumeric, hyphens, underscores)
-    if ($type === 'component' && !preg_match('/^[a-zA-Z0-9_-]+$/', $name)) {
+    if ($type === 'component' && !RegexPatterns::match('identifier_alphanum', $name)) {
         ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Invalid component name. Use only alphanumeric, hyphens, and underscores")
-            ->withErrors([['field' => 'name', 'value' => $name]])
+            ->withErrors([RegexPatterns::validationError('identifier_alphanum', 'name', $name)])
             ->send();
     }
     
@@ -241,10 +242,10 @@ if ($type === 'component') {
 // ===== NodeId-based targeted edit mode =====
 if ($nodeId !== null) {
     // Validate nodeId format
-    if (!preg_match('/^[0-9]+(\.[0-9]+)*$/', $nodeId)) {
+    if (!RegexPatterns::match('node_id', $nodeId)) {
         ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Invalid nodeId format. Use dot notation like '0.2.1'")
-            ->withErrors([['field' => 'nodeId', 'value' => $nodeId]])
+            ->withErrors([RegexPatterns::validationError('node_id', 'nodeId', $nodeId)])
             ->send();
     }
     

@@ -1,5 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 // Check if multilingual mode is enabled
 if (!MULTILINGUAL_SUPPORT) {
@@ -41,10 +42,10 @@ $langCode = trim($params['code']);
 $langName = trim($params['name']);
 
 // Validate language code format (2-3 lowercase letters)
-if (!preg_match('/^[a-z]{2,3}$/', $langCode)) {
+if (!RegexPatterns::match('language_code', $langCode)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage("Invalid language code format")
-        ->withErrors([['field' => 'code', 'value' => $langCode, 'expected' => '2-3 lowercase letters (e.g., en, fr, es)']])
+        ->withErrors([RegexPatterns::validationError('language_code', 'code', $langCode)])
         ->send();
 }
 
@@ -56,12 +57,12 @@ if (strlen($langName) === 0 || strlen($langName) > 100) {
         ->send();
 }
 
-// Validate language name contains only safe characters (letters, spaces, hyphens, apostrophes)
-// This prevents PHP code injection and filename issues
-if (!preg_match('/^[a-zA-Z\s\-\']+$/', $langName)) {
+// Validate language name contains only safe characters
+// Uses Unicode \p{L} to support all scripts (Latin, Cyrillic, Arabic, CJK, etc.)
+if (!RegexPatterns::match('language_name', $langName)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage("Invalid language name format")
-        ->withErrors([['field' => 'name', 'value' => $langName, 'expected' => 'Only letters, spaces, hyphens, and apostrophes allowed (e.g., English, Français, Español)']])
+        ->withErrors([RegexPatterns::validationError('language_name', 'name', $langName)])
         ->send();
 }
 

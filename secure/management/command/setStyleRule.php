@@ -11,6 +11,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 // Get parameters
 $params = $trimParametersManagement->params();
@@ -75,9 +76,9 @@ foreach ($dangerousPatterns as $pattern) {
 }
 
 // Validate media query format if provided
-if ($mediaQuery !== null && !preg_match('/^\([^)]+\)$|^screen\s|^print\s|^all\s/i', $mediaQuery)) {
+if ($mediaQuery !== null && !RegexPatterns::match('media_query_basic', $mediaQuery)) {
     // Allow common media query formats
-    if (!preg_match('/^[\w\s\-\(\)\:\,\.]+$/', $mediaQuery)) {
+    if (!RegexPatterns::match('media_query_chars', $mediaQuery)) {
         ApiResponse::create(400, 'validation.invalid_media_query')
             ->withMessage('Invalid media query format')
             ->send();

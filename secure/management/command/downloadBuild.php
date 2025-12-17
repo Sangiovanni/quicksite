@@ -11,6 +11,7 @@
  * Returns the direct download URL for the build ZIP file
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 // Get build name from URL path: /management/downloadBuild/{name}
 $urlSegments = $trimParametersManagement->additionalParams();
@@ -27,12 +28,10 @@ if (empty($buildName)) {
 }
 
 // Validate build name format
-if (!preg_match('/^build_\d{8}_\d{6}$/', $buildName)) {
+if (!RegexPatterns::match('build_name', $buildName)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage('Invalid build name format')
-        ->withErrors([
-            ['field' => 'name', 'value' => $buildName, 'expected_format' => 'build_YYYYMMDD_HHMMSS']
-        ])
+        ->withErrors([RegexPatterns::validationError('build_name', 'name', $buildName)])
         ->send();
 }
 
