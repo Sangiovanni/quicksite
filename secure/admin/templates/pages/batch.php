@@ -1230,7 +1230,7 @@ async function generateFreshStartCommands() {
         }
         
         // 3. Fetch and delete all components via editStructure
-        // editStructure for delete: { type: 'component', name: '...', nodeId: '', action: 'delete' }
+        // Component deletion uses empty structure array: { type: 'component', name: '...', structure: [] }
         const componentsResponse = await executeApiCall('listComponents', {});
         if (componentsResponse.ok && componentsResponse.data?.components) {
             const components = componentsResponse.data.components;
@@ -1240,8 +1240,7 @@ async function generateFreshStartCommands() {
                     params: { 
                         type: 'component', 
                         name: component.name, 
-                        nodeId: '', 
-                        action: 'delete' 
+                        structure: []  // Empty structure = delete component
                     } 
                 });
                 summary.components++;
@@ -1415,11 +1414,12 @@ const commandTemplates = {
         name: 'Starter Business',
         description: 'Basic business website structure',
         commands: [
-            { command: 'addRoute', params: { name: 'about' } },
-            { command: 'addRoute', params: { name: 'services' } },
-            { command: 'addRoute', params: { name: 'contact' } },
+            { command: 'addRoute', params: { route: 'about' } },
+            { command: 'addRoute', params: { route: 'services' } },
+            { command: 'addRoute', params: { route: 'contact' } },
             { command: 'editStructure', params: { 
-                route: 'home', 
+                type: 'page',
+                name: 'home', 
                 structure: [
                     { tag: 'section', params: { class: 'hero' }, children: [
                         { tag: 'h1', children: [{ textKey: 'home.hero.title' }] },
@@ -1429,7 +1429,8 @@ const commandTemplates = {
                 ]
             }},
             { command: 'editStructure', params: { 
-                route: 'about', 
+                type: 'page',
+                name: 'about', 
                 structure: [
                     { tag: 'section', params: { class: 'page-header' }, children: [
                         { tag: 'h1', children: [{ textKey: 'about.title' }] },
@@ -1438,7 +1439,8 @@ const commandTemplates = {
                 ]
             }},
             { command: 'editStructure', params: { 
-                route: 'services', 
+                type: 'page',
+                name: 'services', 
                 structure: [
                     { tag: 'section', params: { class: 'page-header' }, children: [
                         { tag: 'h1', children: [{ textKey: 'services.title' }] }
@@ -1452,7 +1454,8 @@ const commandTemplates = {
                 ]
             }},
             { command: 'editStructure', params: { 
-                route: 'contact', 
+                type: 'page',
+                name: 'contact', 
                 structure: [
                     { tag: 'section', params: { class: 'page-header' }, children: [
                         { tag: 'h1', children: [{ textKey: 'contact.title' }] },
@@ -1551,7 +1554,8 @@ const commandTemplates = {
         description: 'Single-page landing structure',
         commands: [
             { command: 'editStructure', params: { 
-                route: 'home', 
+                type: 'page',
+                name: 'home', 
                 structure: [
                     { tag: 'section', params: { class: 'hero', id: 'hero' }, children: [
                         { tag: 'div', params: { class: 'hero-content' }, children: [
