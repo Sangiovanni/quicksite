@@ -96,7 +96,6 @@ foreach ($keysToDelete as $index => $key) {
         ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Invalid key format at index {$index}")
             ->withErrors([RegexPatterns::validationError('translation_key_simple', "keys[{$index}]", $key)])
-            ])
             ->send();
     }
 }

@@ -27,7 +27,7 @@ $baseUrl = rtrim(BASE_URL, '/');
     <title><?= __admin('common.appName') ?> - <?= adminEscape($pageTitle) ?></title>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="<?= $baseUrl ?>/assets/images/favicon.png">
+    <link rel="icon" type="image/png" href="<?= $baseUrl ?>/admin/assets/images/favicon.png">
     
     <!-- Base site styles (for CSS variables) -->
     <link rel="stylesheet" href="<?= $baseUrl ?>/style/style.css">

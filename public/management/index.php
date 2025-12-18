@@ -8,6 +8,50 @@ require_once SECURE_FOLDER_PATH . '/src/functions/LoggingManagement.php';
 $commandStartTime = microtime(true);
 
 // ============================================================================
+// Fatal Error Handler - Catches parse errors and other fatal errors
+// ============================================================================
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        // Clear any output that was sent
+        if (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
+        // Set proper error status
+        http_response_code(500);
+        header('Content-Type: application/json');
+        
+        // Build error response
+        $errorResponse = [
+            'status' => 500,
+            'code' => 'server.internal_error',
+            'message' => 'A fatal error occurred while processing the request',
+            'data' => null
+        ];
+        
+        // In development, include error details
+        if (defined('ENVIRONMENT') && ENVIRONMENT === 'development') {
+            $errorResponse['debug'] = [
+                'type' => match($error['type']) {
+                    E_ERROR => 'E_ERROR',
+                    E_PARSE => 'E_PARSE',
+                    E_CORE_ERROR => 'E_CORE_ERROR',
+                    E_COMPILE_ERROR => 'E_COMPILE_ERROR',
+                    default => 'UNKNOWN'
+                },
+                'message' => $error['message'],
+                'file' => $error['file'],
+                'line' => $error['line']
+            ];
+        }
+        
+        echo json_encode($errorResponse, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+});
+
+// ============================================================================
 // CORS Handling - Must be before any output
 // ============================================================================
 $origin = $_SERVER['HTTP_ORIGIN'] ?? null;

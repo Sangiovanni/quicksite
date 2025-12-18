@@ -54,11 +54,17 @@ $categories = getCommandCategories();
             </div>
             
             <div class="admin-batch-controls" style="margin-top: var(--space-lg); display: none;" id="batch-controls">
-                <button type="button" class="admin-btn admin-btn--primary admin-btn--full" onclick="executeBatch()">
+                <button type="button" class="admin-btn admin-btn--primary admin-btn--full" onclick="executeBatch(true)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
                         <polygon points="5 3 19 12 5 21 5 3"/>
                     </svg>
-                    Execute Queue
+                    Execute &amp; Clear Queue
+                </button>
+                <button type="button" class="admin-btn admin-btn--secondary admin-btn--full" onclick="executeBatch(false)" style="margin-top: var(--space-sm);">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    Execute &amp; Keep Queue
                 </button>
             </div>
         </div>
@@ -185,7 +191,7 @@ $categories = getCommandCategories();
             <!-- Fresh Start Template (Dynamic) -->
             <div class="admin-template admin-template--dynamic" data-template="fresh-start">
                 <div class="admin-template__header">
-                    <span class="admin-template__icon">✨</span>
+                    <span class="admin-template__icon"><img src="<?= $baseUrl ?>/admin/assets/images/fresh-start.png" alt="Fresh Start"></span>
                     <span class="admin-template__title">Fresh Start</span>
                     <span class="admin-template__badge">Dynamic</span>
                 </div>
@@ -199,65 +205,58 @@ $categories = getCommandCategories();
             <!-- Starter Business Template -->
             <div class="admin-template" data-template="starter-business">
                 <div class="admin-template__header">
-                    <span class="admin-template__icon">🏢</span>
+                    <span class="admin-template__icon"><img src="<?= $baseUrl ?>/admin/assets/images/starter-business.png" alt="Starter Business"></span>
                     <span class="admin-template__title">Starter Business</span>
                 </div>
-                <p class="admin-template__desc">Create basic pages (home, about, services, contact) with empty structures ready for content.</p>
+                <p class="admin-template__desc">Business website with menu, footer, 4 pages (home, about, services, contact) and teal theme. Single language.</p>
                 <div class="admin-template__actions">
                     <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="previewTemplate('starter-business')">Preview</button>
                     <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="loadTemplate('starter-business')">Load</button>
                 </div>
             </div>
             
-            <!-- Common Translations Template -->
-            <div class="admin-template" data-template="common-translations">
+            <!-- Starter Business Multilingual Template -->
+            <div class="admin-template" data-template="starter-business-multilingual">
                 <div class="admin-template__header">
-                    <span class="admin-template__icon">🌐</span>
-                    <span class="admin-template__title">Common Translations</span>
+                    <span class="admin-template__icon admin-template__icon--combo">
+                        <img src="<?= $baseUrl ?>/admin/assets/images/starter-business.png" alt="Starter Business" class="admin-template__icon-main">
+                        <img src="<?= $baseUrl ?>/admin/assets/images/multi-lingual.png" alt="Multilingual" class="admin-template__icon-badge">
+                    </span>
+                    <span class="admin-template__title">Starter Business (Multilingual)</span>
                 </div>
-                <p class="admin-template__desc">Add frequently used translation keys: navigation, buttons, footer, and common labels.</p>
+                <p class="admin-template__desc">Same as Starter Business with EN + FR translations and language switcher in footer.</p>
                 <div class="admin-template__actions">
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="previewTemplate('common-translations')">Preview</button>
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="loadTemplate('common-translations')">Load</button>
-                </div>
-            </div>
-            
-            <!-- Modern Theme Template -->
-            <div class="admin-template" data-template="modern-theme">
-                <div class="admin-template__header">
-                    <span class="admin-template__icon">🎨</span>
-                    <span class="admin-template__title">Modern Theme</span>
-                </div>
-                <p class="admin-template__desc">Set up CSS variables for a clean, modern design with primary colors and typography.</p>
-                <div class="admin-template__actions">
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="previewTemplate('modern-theme')">Preview</button>
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="loadTemplate('modern-theme')">Load</button>
-                </div>
-            </div>
-            
-            <!-- Enable Multilingual Template -->
-            <div class="admin-template" data-template="multilingual-setup">
-                <div class="admin-template__header">
-                    <span class="admin-template__icon">🗣️</span>
-                    <span class="admin-template__title">Enable Multilingual</span>
-                </div>
-                <p class="admin-template__desc">Enable multilingual support and add French & Spanish languages.</p>
-                <div class="admin-template__actions">
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="previewTemplate('multilingual-setup')">Preview</button>
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="loadTemplate('multilingual-setup')">Load</button>
+                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="previewTemplate('starter-business-multilingual')">Preview</button>
+                    <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="loadTemplate('starter-business-multilingual')">Load</button>
                 </div>
             </div>
             
             <!-- Landing Page Template -->
             <div class="admin-template" data-template="landing-page">
                 <div class="admin-template__header">
-                    <span class="admin-template__icon">📄</span>
+                    <span class="admin-template__icon"><img src="<?= $baseUrl ?>/admin/assets/images/landing-page.png" alt="Landing Page"></span>
                     <span class="admin-template__title">Landing Page</span>
                 </div>
                 <p class="admin-template__desc">Create a single-page landing structure with hero, features, and CTA sections.</p>
                 <div class="admin-template__actions">
                     <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="previewTemplate('landing-page')">Preview</button>
                     <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="loadTemplate('landing-page')">Load</button>
+                </div>
+            </div>
+            
+            <!-- Landing Page Multilingual Template -->
+            <div class="admin-template" data-template="landing-page-multilingual">
+                <div class="admin-template__header">
+                    <span class="admin-template__icon admin-template__icon--combo">
+                        <img src="<?= $baseUrl ?>/admin/assets/images/landing-page.png" alt="Landing Page" class="admin-template__icon-main">
+                        <img src="<?= $baseUrl ?>/admin/assets/images/multi-lingual.png" alt="Multilingual" class="admin-template__icon-badge">
+                    </span>
+                    <span class="admin-template__title">Landing Page (Multilingual)</span>
+                </div>
+                <p class="admin-template__desc">Same as Landing Page with EN + FR translations and language switcher.</p>
+                <div class="admin-template__actions">
+                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="previewTemplate('landing-page-multilingual')">Preview</button>
+                    <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="loadTemplate('landing-page-multilingual')">Load</button>
                 </div>
             </div>
         </div>
@@ -627,7 +626,38 @@ $categories = getCommandCategories();
 }
 
 .admin-template__icon {
-    font-size: 1.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.admin-template__icon img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+.admin-template__icon--combo {
+    width: 3rem;
+}
+
+.admin-template__icon-main {
+    max-width: 2.5rem;
+    max-height: 2.5rem;
+}
+
+.admin-template__icon-badge {
+    position: absolute;
+    bottom: -2px;
+    right: -4px;
+    max-width: 1.5rem !important;
+    max-height: 1.5rem !important;
 }
 
 .admin-template__title {
@@ -883,7 +913,7 @@ const GET_COMMANDS = [
     'listAliases', 'listBuilds', 'getBuild', 'getCommandHistory'
 ];
 
-async function executeBatch() {
+async function executeBatch(clearQueue = true) {
     if (isExecuting || batchQueue.length === 0) return;
     
     isExecuting = true;
@@ -896,12 +926,20 @@ async function executeBatch() {
     let successCount = 0;
     let errorCount = 0;
     
-    for (let i = 0; i < batchQueue.length; i++) {
-        const item = batchQueue[i];
+    // Small delay between commands (ms) as a best practice for sequential operations
+    const COMMAND_DELAY = 50;
+    
+    // Make a copy of the queue to iterate over
+    const queueToExecute = [...batchQueue];
+    
+    for (let i = 0; i < queueToExecute.length; i++) {
+        const item = queueToExecute[i];
         const itemEl = document.querySelector(`.admin-batch-item[data-id="${item.id}"]`);
         
         if (itemEl) {
             itemEl.classList.add('admin-batch-item--running');
+            // Auto-scroll to keep running item visible
+            itemEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
         
         const startTime = Date.now();
@@ -939,13 +977,26 @@ async function executeBatch() {
             
             resultsContainer.innerHTML += renderResult(item.command, { ok: false, error: error.message }, duration);
         }
+        
+        // Add delay between commands to allow file system operations to complete
+        if (i < queueToExecute.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, COMMAND_DELAY));
+        }
     }
     
     isExecuting = false;
     
+    // Clear the queue if requested
+    if (clearQueue) {
+        batchQueue = [];
+        saveQueue();
+        renderQueue();
+    }
+    
     // Show summary
+    const clearMsg = clearQueue ? ' Queue cleared.' : ' Queue kept.';
     QuickSiteAdmin.showToast(
-        `Batch complete: ${successCount} succeeded, ${errorCount} failed`,
+        `Batch complete: ${successCount} succeeded, ${errorCount} failed.${clearMsg}`,
         errorCount > 0 ? 'warning' : 'success'
     );
 }
@@ -987,8 +1038,8 @@ function clearResults() {
 // Available commands (loaded from help API)
 let availableCommands = [];
 
-// Load available commands on init
-(async function loadAvailableCommands() {
+// Load available commands on init (wait for DOMContentLoaded to ensure QuickSiteAdmin is loaded)
+document.addEventListener('DOMContentLoaded', async function loadAvailableCommands() {
     try {
         const result = await QuickSiteAdmin.apiRequest('help', 'GET');
         if (result.ok && result.data.data?.commands) {
@@ -997,7 +1048,7 @@ let availableCommands = [];
     } catch (e) {
         console.warn('Could not load available commands:', e);
     }
-})();
+});
 
 function toggleJsonImport() {
     const body = document.getElementById('json-import-body');
@@ -1412,11 +1463,43 @@ const commandTemplates = {
     
     'starter-business': {
         name: 'Starter Business',
-        description: 'Basic business website structure',
+        description: 'Business website with menu, footer, 4 pages and teal theme',
         commands: [
             { command: 'addRoute', params: { route: 'about' } },
             { command: 'addRoute', params: { route: 'services' } },
             { command: 'addRoute', params: { route: 'contact' } },
+            { command: 'editStructure', params: { 
+                type: 'menu',
+                structure: [
+                    { tag: 'nav', params: { class: 'main-nav' }, children: [
+                        { tag: 'a', params: { href: '/', class: 'nav-logo' }, children: [{ textKey: 'site.name' }] },
+                        { tag: 'ul', params: { class: 'nav-links' }, children: [
+                            { tag: 'li', children: [{ tag: 'a', params: { href: '/' }, children: [{ textKey: 'nav.home' }] }] },
+                            { tag: 'li', children: [{ tag: 'a', params: { href: '/services' }, children: [{ textKey: 'nav.services' }] }] }
+                        ]}
+                    ]}
+                ]
+            }},
+            { command: 'editStructure', params: { 
+                type: 'footer',
+                structure: [
+                    { tag: 'footer', params: { class: 'main-footer' }, children: [
+                        { tag: 'div', params: { class: 'footer-content' }, children: [
+                            { tag: 'div', params: { class: 'footer-brand' }, children: [
+                                { tag: 'span', params: { class: 'footer-logo' }, children: [{ textKey: 'site.name' }] },
+                                { tag: 'p', children: [{ textKey: 'site.tagline' }] }
+                            ]},
+                            { tag: 'nav', params: { class: 'footer-nav' }, children: [
+                                { tag: 'a', params: { href: '/about' }, children: [{ textKey: 'nav.about' }] },
+                                { tag: 'a', params: { href: '/contact' }, children: [{ textKey: 'nav.contact' }] }
+                            ]}
+                        ]},
+                        { tag: 'div', params: { class: 'footer-bottom' }, children: [
+                            { tag: 'p', children: [{ textKey: 'footer.copyright' }] }
+                        ]}
+                    ]}
+                ]
+            }},
             { command: 'editStructure', params: { 
                 type: 'page',
                 name: 'home', 
@@ -1425,6 +1508,23 @@ const commandTemplates = {
                         { tag: 'h1', children: [{ textKey: 'home.hero.title' }] },
                         { tag: 'p', children: [{ textKey: 'home.hero.subtitle' }] },
                         { tag: 'a', params: { href: '/contact', class: 'btn btn-primary' }, children: [{ textKey: 'common.cta' }] }
+                    ]},
+                    { tag: 'section', params: { class: 'features' }, children: [
+                        { tag: 'h2', children: [{ textKey: 'home.features.title' }] },
+                        { tag: 'div', params: { class: 'features-grid' }, children: [
+                            { tag: 'div', params: { class: 'feature-card' }, children: [
+                                { tag: 'h3', children: [{ textKey: 'home.features.f1.title' }] },
+                                { tag: 'p', children: [{ textKey: 'home.features.f1.desc' }] }
+                            ]},
+                            { tag: 'div', params: { class: 'feature-card' }, children: [
+                                { tag: 'h3', children: [{ textKey: 'home.features.f2.title' }] },
+                                { tag: 'p', children: [{ textKey: 'home.features.f2.desc' }] }
+                            ]},
+                            { tag: 'div', params: { class: 'feature-card' }, children: [
+                                { tag: 'h3', children: [{ textKey: 'home.features.f3.title' }] },
+                                { tag: 'p', children: [{ textKey: 'home.features.f3.desc' }] }
+                            ]}
+                        ]}
                     ]}
                 ]
             }},
@@ -1435,6 +1535,12 @@ const commandTemplates = {
                     { tag: 'section', params: { class: 'page-header' }, children: [
                         { tag: 'h1', children: [{ textKey: 'about.title' }] },
                         { tag: 'p', children: [{ textKey: 'about.intro' }] }
+                    ]},
+                    { tag: 'section', params: { class: 'about-content' }, children: [
+                        { tag: 'div', params: { class: 'about-text' }, children: [
+                            { tag: 'h2', children: [{ textKey: 'about.story.title' }] },
+                            { tag: 'p', children: [{ textKey: 'about.story.text' }] }
+                        ]}
                     ]}
                 ]
             }},
@@ -1443,12 +1549,21 @@ const commandTemplates = {
                 name: 'services', 
                 structure: [
                     { tag: 'section', params: { class: 'page-header' }, children: [
-                        { tag: 'h1', children: [{ textKey: 'services.title' }] }
+                        { tag: 'h1', children: [{ textKey: 'services.title' }] },
+                        { tag: 'p', children: [{ textKey: 'services.intro' }] }
                     ]},
                     { tag: 'section', params: { class: 'services-grid' }, children: [
                         { tag: 'div', params: { class: 'service-card' }, children: [
-                            { tag: 'h3', children: [{ textKey: 'services.card1.title' }] },
-                            { tag: 'p', children: [{ textKey: 'services.card1.desc' }] }
+                            { tag: 'h3', children: [{ textKey: 'services.s1.title' }] },
+                            { tag: 'p', children: [{ textKey: 'services.s1.desc' }] }
+                        ]},
+                        { tag: 'div', params: { class: 'service-card' }, children: [
+                            { tag: 'h3', children: [{ textKey: 'services.s2.title' }] },
+                            { tag: 'p', children: [{ textKey: 'services.s2.desc' }] }
+                        ]},
+                        { tag: 'div', params: { class: 'service-card' }, children: [
+                            { tag: 'h3', children: [{ textKey: 'services.s3.title' }] },
+                            { tag: 'p', children: [{ textKey: 'services.s3.desc' }] }
                         ]}
                     ]}
                 ]
@@ -1460,99 +1575,445 @@ const commandTemplates = {
                     { tag: 'section', params: { class: 'page-header' }, children: [
                         { tag: 'h1', children: [{ textKey: 'contact.title' }] },
                         { tag: 'p', children: [{ textKey: 'contact.intro' }] }
+                    ]},
+                    { tag: 'section', params: { class: 'contact-info' }, children: [
+                        { tag: 'div', params: { class: 'contact-item' }, children: [
+                            { tag: 'h3', children: [{ textKey: 'contact.email.label' }] },
+                            { tag: 'p', children: [{ textKey: 'contact.email.value' }] }
+                        ]},
+                        { tag: 'div', params: { class: 'contact-item' }, children: [
+                            { tag: 'h3', children: [{ textKey: 'contact.phone.label' }] },
+                            { tag: 'p', children: [{ textKey: 'contact.phone.value' }] }
+                        ]}
                     ]}
                 ]
-            }}
-        ]
-    },
-    
-    'common-translations': {
-        name: 'Common Translations',
-        description: 'Frequently used translation keys',
-        commands: [
+            }},
             { command: 'setTranslationKeys', params: { 
                 language: 'en', 
                 translations: {
-                    nav: {
-                        home: 'Home',
-                        about: 'About',
-                        services: 'Services',
-                        contact: 'Contact',
-                        blog: 'Blog'
+                    site: { name: 'Business Name', tagline: 'Your trusted partner' },
+                    page: { titles: { home: 'Home', about: 'About Us', services: 'Our Services', contact: 'Contact Us' } },
+                    nav: { home: 'Home', about: 'About', services: 'Services', contact: 'Contact' },
+                    common: { cta: 'Get Started', learnMore: 'Learn More' },
+                    footer: { copyright: '2025 Business Name. All rights reserved.' },
+                    home: { 
+                        hero: { title: 'Welcome to Our Business', subtitle: 'We deliver excellence in everything we do.' },
+                        features: { 
+                            title: 'Why Choose Us',
+                            f1: { title: 'Quality Service', desc: 'We maintain the highest standards in all our work.' },
+                            f2: { title: 'Expert Team', desc: 'Our professionals bring years of experience.' },
+                            f3: { title: 'Fast Delivery', desc: 'Quick turnaround without compromising quality.' }
+                        }
                     },
-                    common: {
-                        cta: 'Get Started',
-                        learnMore: 'Learn More',
-                        readMore: 'Read More',
-                        submit: 'Submit',
-                        send: 'Send',
-                        back: 'Back',
-                        next: 'Next',
-                        close: 'Close'
+                    about: { 
+                        title: 'About Us', 
+                        intro: 'Learn more about our company and mission.',
+                        story: { title: 'Our Story', text: 'Founded with a vision to provide exceptional service.' }
                     },
-                    footer: {
-                        copyright: '© 2025 Company Name. All rights reserved.',
-                        privacy: 'Privacy Policy',
-                        terms: 'Terms of Service'
+                    services: { 
+                        title: 'Our Services', 
+                        intro: 'Comprehensive solutions tailored to your needs.',
+                        s1: { title: 'Consulting', desc: 'Expert advice to help you succeed.' },
+                        s2: { title: 'Development', desc: 'Custom solutions built for your business.' },
+                        s3: { title: 'Support', desc: 'Ongoing assistance when you need it.' }
+                    },
+                    contact: { 
+                        title: 'Contact Us', 
+                        intro: 'Get in touch with our team.',
+                        email: { label: 'Email', value: 'hello@example.com' },
+                        phone: { label: 'Phone', value: '+1 (555) 123-4567' }
                     }
                 }
-            }}
-        ]
-    },
-    
-    'modern-theme': {
-        name: 'Modern Theme',
-        description: 'Clean, modern CSS variables',
-        commands: [
+            }},
+            { command: 'editStyles', params: { 
+                content: `/* GLOBAL RESET & STYLES */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--color-text); line-height: 1.7; background: var(--color-bg); }
+a { transition: all 0.3s ease; }
+
+/* NAVIGATION */
+.main-nav { display: flex; justify-content: space-between; align-items: center; padding: 1rem 3rem; background: linear-gradient(180deg, var(--color-bg) 0%, var(--color-bg-card) 100%); position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--color-border); }
+.nav-logo { font-size: 1.6rem; font-weight: 800; color: var(--color-primary); text-decoration: none; letter-spacing: -0.5px; }
+.nav-logo:hover { color: var(--color-primary-light); }
+.nav-links { display: flex; gap: 2.5rem; list-style: none; }
+.nav-links a { text-decoration: none; color: var(--color-text); font-weight: 500; position: relative; padding: 0.5rem 0; }
+.nav-links a::after { content: ''; position: absolute; bottom: 0; left: 0; width: 0; height: 2px; background: var(--color-primary); transition: width 0.3s ease; }
+.nav-links a:hover { color: var(--color-primary); }
+.nav-links a:hover::after { width: 100%; }
+
+/* HERO SECTION */
+.hero { text-align: center; padding: 8rem 2rem 6rem; background: linear-gradient(160deg, var(--color-bg) 0%, var(--color-bg-card) 50%, var(--color-bg) 100%); position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(ellipse at top right, rgba(245, 158, 11, 0.15) 0%, transparent 50%), radial-gradient(ellipse at bottom left, rgba(16, 185, 129, 0.1) 0%, transparent 50%); pointer-events: none; }
+.hero h1 { font-size: 3.5rem; margin-bottom: 1.5rem; color: var(--color-text); font-weight: 800; letter-spacing: -1px; line-height: 1.2; position: relative; }
+.hero p { font-size: 1.3rem; color: var(--color-text-muted); margin-bottom: 2.5rem; max-width: 600px; margin-left: auto; margin-right: auto; position: relative; }
+.btn { display: inline-block; padding: 1rem 2.5rem; border-radius: 8px; text-decoration: none; font-weight: 700; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px; }
+.btn-primary { background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%); color: var(--color-text-dark); box-shadow: 0 4px 20px var(--shadow-primary); }
+.btn-primary:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(245, 158, 11, 0.5); color: var(--color-text-dark); }
+
+/* PAGE HEADERS */
+.page-header { text-align: center; padding: 5rem 2rem; background: linear-gradient(180deg, var(--color-bg-card) 0%, var(--color-bg) 100%); border-bottom: 1px solid var(--color-border); }
+.page-header h1 { font-size: 2.8rem; margin-bottom: 1rem; font-weight: 700; color: var(--color-text); }
+.page-header p { color: var(--color-text-muted); font-size: 1.2rem; max-width: 600px; margin: 0 auto; }
+
+/* FEATURES SECTION */
+.features { padding: 6rem 2rem; max-width: 1200px; margin: 0 auto; background: var(--color-bg); }
+.features h2 { text-align: center; font-size: 2.2rem; margin-bottom: 1rem; color: var(--color-text); font-weight: 700; }
+.features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 3rem; }
+.feature-card { padding: 2.5rem; background: linear-gradient(145deg, var(--color-bg-card) 0%, var(--color-bg-card-grad) 100%); border: 1px solid rgba(248, 250, 252, 0.08); border-radius: 1rem; text-align: center; transition: all 0.4s ease; position: relative; overflow: hidden; }
+.feature-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, var(--color-primary), var(--color-secondary)); transform: scaleX(0); transition: transform 0.4s ease; }
+.feature-card:hover { transform: translateY(-8px); box-shadow: 0 20px 40px var(--shadow-color); border-color: rgba(245, 158, 11, 0.3); }
+.feature-card:hover::before { transform: scaleX(1); }
+.feature-card h3 { color: var(--color-primary); margin-bottom: 1rem; font-size: 1.3rem; font-weight: 600; }
+.feature-card p { color: var(--color-text-muted); line-height: 1.7; }
+
+/* SERVICES SECTION */
+.services-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem; padding: 4rem 2rem; max-width: 1200px; margin: 0 auto; }
+.service-card { padding: 2.5rem; background: linear-gradient(145deg, var(--color-bg-card) 0%, var(--color-bg-card-grad) 100%); border-radius: 1rem; border-left: 4px solid var(--color-primary); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); transition: all 0.3s ease; }
+.service-card:hover { transform: translateX(8px); box-shadow: 0 8px 30px var(--shadow-color); border-left-color: var(--color-primary-light); }
+.service-card h3 { color: var(--color-primary); margin-bottom: 0.75rem; font-size: 1.25rem; font-weight: 600; }
+.service-card p { color: var(--color-text-muted); line-height: 1.7; }
+
+/* CONTACT SECTION */
+.contact-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2.5rem; padding: 4rem 2rem; max-width: 900px; margin: 0 auto; }
+.contact-item { padding: 2rem; background: linear-gradient(145deg, var(--color-bg-card) 0%, var(--color-bg-card-grad) 100%); border-radius: 1rem; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); text-align: center; transition: all 0.3s ease; border: 1px solid rgba(248, 250, 252, 0.08); }
+.contact-item:hover { transform: scale(1.02); box-shadow: 0 8px 30px var(--shadow-color); border-color: var(--color-primary); }
+.contact-item h3 { color: var(--color-primary); margin-bottom: 0.75rem; font-size: 1.1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+.contact-item p { color: var(--color-text); font-size: 1.1rem; }
+
+/* ABOUT SECTION */
+.about-content { padding: 4rem 2rem; max-width: 800px; margin: 0 auto; }
+.about-content h2 { color: var(--color-text); margin-bottom: 1.5rem; font-size: 1.8rem; position: relative; display: inline-block; }
+.about-content h2::after { content: ''; position: absolute; bottom: -8px; left: 0; width: 60px; height: 3px; background: linear-gradient(90deg, var(--color-primary), var(--color-secondary)); border-radius: 2px; }
+.about-content p { color: var(--color-text-muted); line-height: 1.9; font-size: 1.1rem; margin-top: 2rem; }
+
+/* FOOTER */
+.main-footer { background: linear-gradient(180deg, var(--color-bg-footer) 0%, #000000 100%); color: var(--color-text); padding: 4rem 2rem 1.5rem; position: relative; }
+.main-footer::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, var(--color-primary), var(--color-secondary), var(--color-primary)); }
+.footer-content { display: flex; justify-content: space-between; align-items: flex-start; max-width: 1200px; margin: 0 auto; flex-wrap: wrap; gap: 3rem; }
+.footer-logo { font-size: 1.4rem; font-weight: 700; color: var(--color-primary); }
+.footer-brand p { color: var(--color-text-muted); margin-top: 0.75rem; font-size: 0.95rem; line-height: 1.6; }
+.footer-nav { display: flex; gap: 2rem; }
+.footer-nav a { color: var(--color-text-muted); text-decoration: none; font-weight: 500; }
+.footer-nav a:hover { color: var(--color-primary); }
+.footer-bottom { text-align: center; padding-top: 2.5rem; margin-top: 3rem; border-top: 1px solid rgba(255, 255, 255, 0.08); color: var(--color-text-muted); font-size: 0.9rem; }`
+            }},
             { command: 'setRootVariables', params: { 
                 variables: {
-                    '--color-primary': '#3B82F6',
-                    '--color-primary-dark': '#1E40AF',
-                    '--color-secondary': '#64748B',
-                    '--color-accent': '#F59E0B',
-                    '--color-success': '#10B981',
-                    '--color-danger': '#EF4444',
-                    '--color-bg': '#ffffff',
-                    '--color-bg-alt': '#F8FAFC',
-                    '--color-text': '#1E293B',
-                    '--color-text-muted': '#64748B',
-                    '--font-family': "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-                    '--font-size-sm': '0.875rem',
-                    '--font-size-base': '1rem',
-                    '--font-size-lg': '1.125rem',
-                    '--font-size-xl': '1.25rem',
-                    '--font-size-2xl': '1.5rem',
-                    '--font-size-3xl': '2rem',
-                    '--spacing-xs': '0.25rem',
-                    '--spacing-sm': '0.5rem',
-                    '--spacing-md': '1rem',
-                    '--spacing-lg': '1.5rem',
-                    '--spacing-xl': '2rem',
-                    '--radius-sm': '0.25rem',
-                    '--radius-md': '0.5rem',
-                    '--radius-lg': '1rem',
-                    '--shadow-sm': '0 1px 2px rgba(0,0,0,0.05)',
-                    '--shadow-md': '0 4px 6px rgba(0,0,0,0.1)',
-                    '--shadow-lg': '0 10px 15px rgba(0,0,0,0.1)'
+                    '--color-primary': '#f59e0b',
+                    '--color-primary-light': '#fbbf24',
+                    '--color-primary-dark': '#d97706',
+                    '--color-secondary': '#10b981',
+                    '--color-bg': '#0f172a',
+                    '--color-bg-card': '#1e293b',
+                    '--color-bg-card-grad': '#334155',
+                    '--color-bg-footer': '#020617',
+                    '--color-text': '#f8fafc',
+                    '--color-text-muted': '#94a3b8',
+                    '--color-text-dark': '#0f172a',
+                    '--color-border': 'rgba(248, 250, 252, 0.1)',
+                    '--shadow-color': 'rgba(0, 0, 0, 0.3)',
+                    '--shadow-primary': 'rgba(245, 158, 11, 0.4)'
                 }
-            }}
+            }},
+            { command: 'setMultilingual', params: { enabled: false } }
         ]
     },
     
-    'multilingual-setup': {
-        name: 'Enable Multilingual',
-        description: 'Enable multilingual with French & Spanish',
+    'starter-business-multilingual': {
+        name: 'Starter Business (Multilingual)',
+        description: 'Business website with EN + FR and language switcher',
         commands: [
             { command: 'setMultilingual', params: { enabled: true } },
-            { command: 'addLang', params: { code: 'fr', name: 'Français' } },
-            { command: 'addLang', params: { code: 'es', name: 'Español' } }
+            { command: 'addRoute', params: { route: 'about' } },
+            { command: 'addRoute', params: { route: 'services' } },
+            { command: 'addRoute', params: { route: 'contact' } },
+            { command: 'addLang', params: { code: 'fr', name: 'Francais' } },
+            { command: 'editStructure', params: { 
+                type: 'menu',
+                structure: [
+                    { tag: 'nav', params: { class: 'main-nav' }, children: [
+                        { tag: 'a', params: { href: '/', class: 'nav-logo' }, children: [{ textKey: 'site.name' }] },
+                        { tag: 'ul', params: { class: 'nav-links' }, children: [
+                            { tag: 'li', children: [{ tag: 'a', params: { href: '/' }, children: [{ textKey: 'nav.home' }] }] },
+                            { tag: 'li', children: [{ tag: 'a', params: { href: '/services' }, children: [{ textKey: 'nav.services' }] }] }
+                        ]}
+                    ]}
+                ]
+            }},
+            { command: 'editStructure', params: { 
+                type: 'footer',
+                structure: [
+                    { tag: 'footer', params: { class: 'main-footer' }, children: [
+                        { tag: 'div', params: { class: 'footer-content' }, children: [
+                            { tag: 'div', params: { class: 'footer-brand' }, children: [
+                                { tag: 'span', params: { class: 'footer-logo' }, children: [{ textKey: 'site.name' }] },
+                                { tag: 'p', children: [{ textKey: 'site.tagline' }] }
+                            ]},
+                            { tag: 'nav', params: { class: 'footer-nav' }, children: [
+                                { tag: 'a', params: { href: '/about' }, children: [{ textKey: 'nav.about' }] },
+                                { tag: 'a', params: { href: '/contact' }, children: [{ textKey: 'nav.contact' }] }
+                            ]},
+                            { tag: 'div', params: { class: 'footer-lang' }, children: [
+                                { tag: 'span', params: { class: 'lang-label' }, children: [{ textKey: 'footer.language' }] },
+                                { tag: 'div', params: { class: 'lang-buttons' }, children: [
+                                    { tag: 'a', params: { href: '{{__current_page;lang=en}}', class: 'lang-link' }, children: [{ textKey: '__RAW__English' }] },
+                                    { tag: 'a', params: { href: '{{__current_page;lang=fr}}', class: 'lang-link' }, children: [{ textKey: '__RAW__Français' }] }
+                                ]}
+                            ]}
+                        ]},
+                        { tag: 'div', params: { class: 'footer-bottom' }, children: [
+                            { tag: 'p', children: [{ textKey: 'footer.copyright' }] }
+                        ]}
+                    ]}
+                ]
+            }},
+            { command: 'editStructure', params: { 
+                type: 'page',
+                name: 'home', 
+                structure: [
+                    { tag: 'section', params: { class: 'hero' }, children: [
+                        { tag: 'h1', children: [{ textKey: 'home.hero.title' }] },
+                        { tag: 'p', children: [{ textKey: 'home.hero.subtitle' }] },
+                        { tag: 'a', params: { href: '/contact', class: 'btn btn-primary' }, children: [{ textKey: 'common.cta' }] }
+                    ]},
+                    { tag: 'section', params: { class: 'features' }, children: [
+                        { tag: 'h2', children: [{ textKey: 'home.features.title' }] },
+                        { tag: 'div', params: { class: 'features-grid' }, children: [
+                            { tag: 'div', params: { class: 'feature-card' }, children: [
+                                { tag: 'h3', children: [{ textKey: 'home.features.f1.title' }] },
+                                { tag: 'p', children: [{ textKey: 'home.features.f1.desc' }] }
+                            ]},
+                            { tag: 'div', params: { class: 'feature-card' }, children: [
+                                { tag: 'h3', children: [{ textKey: 'home.features.f2.title' }] },
+                                { tag: 'p', children: [{ textKey: 'home.features.f2.desc' }] }
+                            ]},
+                            { tag: 'div', params: { class: 'feature-card' }, children: [
+                                { tag: 'h3', children: [{ textKey: 'home.features.f3.title' }] },
+                                { tag: 'p', children: [{ textKey: 'home.features.f3.desc' }] }
+                            ]}
+                        ]}
+                    ]}
+                ]
+            }},
+            { command: 'editStructure', params: { type: 'page', name: 'about', structure: [
+                { tag: 'section', params: { class: 'page-header' }, children: [
+                    { tag: 'h1', children: [{ textKey: 'about.title' }] },
+                    { tag: 'p', children: [{ textKey: 'about.intro' }] }
+                ]},
+                { tag: 'section', params: { class: 'about-content' }, children: [
+                    { tag: 'div', params: { class: 'about-text' }, children: [
+                        { tag: 'h2', children: [{ textKey: 'about.story.title' }] },
+                        { tag: 'p', children: [{ textKey: 'about.story.text' }] }
+                    ]}
+                ]}
+            ]}},
+            { command: 'editStructure', params: { type: 'page', name: 'services', structure: [
+                { tag: 'section', params: { class: 'page-header' }, children: [
+                    { tag: 'h1', children: [{ textKey: 'services.title' }] },
+                    { tag: 'p', children: [{ textKey: 'services.intro' }] }
+                ]},
+                { tag: 'section', params: { class: 'services-grid' }, children: [
+                    { tag: 'div', params: { class: 'service-card' }, children: [
+                        { tag: 'h3', children: [{ textKey: 'services.s1.title' }] },
+                        { tag: 'p', children: [{ textKey: 'services.s1.desc' }] }
+                    ]},
+                    { tag: 'div', params: { class: 'service-card' }, children: [
+                        { tag: 'h3', children: [{ textKey: 'services.s2.title' }] },
+                        { tag: 'p', children: [{ textKey: 'services.s2.desc' }] }
+                    ]},
+                    { tag: 'div', params: { class: 'service-card' }, children: [
+                        { tag: 'h3', children: [{ textKey: 'services.s3.title' }] },
+                        { tag: 'p', children: [{ textKey: 'services.s3.desc' }] }
+                    ]}
+                ]}
+            ]}},
+            { command: 'editStructure', params: { type: 'page', name: 'contact', structure: [
+                { tag: 'section', params: { class: 'page-header' }, children: [
+                    { tag: 'h1', children: [{ textKey: 'contact.title' }] },
+                    { tag: 'p', children: [{ textKey: 'contact.intro' }] }
+                ]},
+                { tag: 'section', params: { class: 'contact-info' }, children: [
+                    { tag: 'div', params: { class: 'contact-item' }, children: [
+                        { tag: 'h3', children: [{ textKey: 'contact.email.label' }] },
+                        { tag: 'p', children: [{ textKey: 'contact.email.value' }] }
+                    ]},
+                    { tag: 'div', params: { class: 'contact-item' }, children: [
+                        { tag: 'h3', children: [{ textKey: 'contact.phone.label' }] },
+                        { tag: 'p', children: [{ textKey: 'contact.phone.value' }] }
+                    ]}
+                ]}
+            ]}},
+            { command: 'setTranslationKeys', params: { 
+                language: 'en', 
+                translations: {
+                    site: { name: 'Business Name', tagline: 'Your trusted partner' },
+                    page: { titles: { home: 'Home', about: 'About Us', services: 'Our Services', contact: 'Contact Us' } },
+                    nav: { home: 'Home', about: 'About', services: 'Services', contact: 'Contact' },
+                    common: { cta: 'Get Started', learnMore: 'Learn More' },
+                    footer: { copyright: '2025 Business Name. All rights reserved.', language: 'Language:' },
+                    home: { 
+                        hero: { title: 'Welcome to Our Business', subtitle: 'We deliver excellence in everything we do.' },
+                        features: { 
+                            title: 'Why Choose Us',
+                            f1: { title: 'Quality Service', desc: 'We maintain the highest standards in all our work.' },
+                            f2: { title: 'Expert Team', desc: 'Our professionals bring years of experience.' },
+                            f3: { title: 'Fast Delivery', desc: 'Quick turnaround without compromising quality.' }
+                        }
+                    },
+                    about: { title: 'About Us', intro: 'Learn more about our company and mission.', story: { title: 'Our Story', text: 'Founded with a vision to provide exceptional service.' } },
+                    services: { title: 'Our Services', intro: 'Comprehensive solutions tailored to your needs.', s1: { title: 'Consulting', desc: 'Expert advice to help you succeed.' }, s2: { title: 'Development', desc: 'Custom solutions built for your business.' }, s3: { title: 'Support', desc: 'Ongoing assistance when you need it.' } },
+                    contact: { title: 'Contact Us', intro: 'Get in touch with our team.', email: { label: 'Email', value: 'hello@example.com' }, phone: { label: 'Phone', value: '+1 (555) 123-4567' } }
+                }
+            }},
+            { command: 'setTranslationKeys', params: { 
+                language: 'fr', 
+                translations: {
+                    site: { name: 'Nom Entreprise', tagline: 'Votre partenaire de confiance' },
+                    page: { titles: { home: 'Accueil', about: 'A Propos', services: 'Nos Services', contact: 'Contact' } },
+                    nav: { home: 'Accueil', about: 'A Propos', services: 'Services', contact: 'Contact' },
+                    common: { cta: 'Commencer', learnMore: 'En savoir plus' },
+                    footer: { copyright: '2025 Nom Entreprise. Tous droits reserves.', language: 'Langue :' },
+                    home: { 
+                        hero: { title: 'Bienvenue dans notre entreprise', subtitle: 'Nous offrons l\'excellence dans tout ce que nous faisons.' },
+                        features: { 
+                            title: 'Pourquoi nous choisir',
+                            f1: { title: 'Service de qualite', desc: 'Nous maintenons les plus hauts standards.' },
+                            f2: { title: 'Equipe experte', desc: 'Nos professionnels ont des annees d\'experience.' },
+                            f3: { title: 'Livraison rapide', desc: 'Rapidite sans compromettre la qualite.' }
+                        }
+                    },
+                    about: { title: 'A Propos', intro: 'Decouvrez notre entreprise et notre mission.', story: { title: 'Notre Histoire', text: 'Fondee avec la vision d\'offrir un service exceptionnel.' } },
+                    services: { title: 'Nos Services', intro: 'Solutions completes adaptees a vos besoins.', s1: { title: 'Conseil', desc: 'Conseils d\'experts pour votre succes.' }, s2: { title: 'Developpement', desc: 'Solutions sur mesure pour votre entreprise.' }, s3: { title: 'Support', desc: 'Assistance continue quand vous en avez besoin.' } },
+                    contact: { title: 'Contactez-nous', intro: 'Entrez en contact avec notre equipe.', email: { label: 'Courriel', value: 'bonjour@exemple.com' }, phone: { label: 'Telephone', value: '+33 1 23 45 67 89' } }
+                }
+            }},
+            { command: 'editStyles', params: { 
+                content: `/* GLOBAL RESET & STYLES */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--color-text); line-height: 1.7; background: var(--color-bg); }
+a { transition: all 0.3s ease; }
+
+/* NAVIGATION */
+.main-nav { display: flex; justify-content: space-between; align-items: center; padding: 1rem 3rem; background: linear-gradient(180deg, var(--color-bg) 0%, var(--color-bg-card) 100%); position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--color-border); }
+.nav-logo { font-size: 1.6rem; font-weight: 800; color: var(--color-primary); text-decoration: none; letter-spacing: -0.5px; }
+.nav-logo:hover { color: var(--color-primary-light); }
+.nav-links { display: flex; gap: 2.5rem; list-style: none; }
+.nav-links a { text-decoration: none; color: var(--color-text); font-weight: 500; position: relative; padding: 0.5rem 0; }
+.nav-links a::after { content: ''; position: absolute; bottom: 0; left: 0; width: 0; height: 2px; background: var(--color-primary); transition: width 0.3s ease; }
+.nav-links a:hover { color: var(--color-primary); }
+.nav-links a:hover::after { width: 100%; }
+
+/* HERO SECTION */
+.hero { text-align: center; padding: 8rem 2rem 6rem; background: linear-gradient(160deg, var(--color-bg) 0%, var(--color-bg-card) 50%, var(--color-bg) 100%); position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(ellipse at top right, rgba(245, 158, 11, 0.15) 0%, transparent 50%), radial-gradient(ellipse at bottom left, rgba(16, 185, 129, 0.1) 0%, transparent 50%); pointer-events: none; }
+.hero h1 { font-size: 3.5rem; margin-bottom: 1.5rem; color: var(--color-text); font-weight: 800; letter-spacing: -1px; line-height: 1.2; position: relative; }
+.hero p { font-size: 1.3rem; color: var(--color-text-muted); margin-bottom: 2.5rem; max-width: 600px; margin-left: auto; margin-right: auto; position: relative; }
+.btn { display: inline-block; padding: 1rem 2.5rem; border-radius: 8px; text-decoration: none; font-weight: 700; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px; }
+.btn-primary { background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%); color: var(--color-text-dark); box-shadow: 0 4px 20px var(--shadow-primary); }
+.btn-primary:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(245, 158, 11, 0.5); color: var(--color-text-dark); }
+
+/* PAGE HEADERS */
+.page-header { text-align: center; padding: 5rem 2rem; background: linear-gradient(180deg, var(--color-bg-card) 0%, var(--color-bg) 100%); border-bottom: 1px solid var(--color-border); }
+.page-header h1 { font-size: 2.8rem; margin-bottom: 1rem; font-weight: 700; color: var(--color-text); }
+.page-header p { color: var(--color-text-muted); font-size: 1.2rem; max-width: 600px; margin: 0 auto; }
+
+/* FEATURES SECTION */
+.features { padding: 6rem 2rem; max-width: 1200px; margin: 0 auto; background: var(--color-bg); }
+.features h2 { text-align: center; font-size: 2.2rem; margin-bottom: 1rem; color: var(--color-text); font-weight: 700; }
+.features > p { text-align: center; color: var(--color-text-muted); margin-bottom: 4rem; }
+.features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; }
+.feature-card { padding: 2.5rem; background: linear-gradient(145deg, var(--color-bg-card) 0%, var(--color-bg-card-grad) 100%); border: 1px solid rgba(248, 250, 252, 0.08); border-radius: 1rem; text-align: center; transition: all 0.4s ease; position: relative; overflow: hidden; }
+.feature-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, var(--color-primary), var(--color-secondary)); transform: scaleX(0); transition: transform 0.4s ease; }
+.feature-card:hover { transform: translateY(-8px); box-shadow: 0 20px 40px var(--shadow-color); border-color: rgba(245, 158, 11, 0.3); }
+.feature-card:hover::before { transform: scaleX(1); }
+.feature-card h3 { color: var(--color-primary); margin-bottom: 1rem; font-size: 1.3rem; font-weight: 600; }
+.feature-card p { color: var(--color-text-muted); line-height: 1.7; }
+
+/* SERVICES SECTION */
+.services-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem; padding: 4rem 2rem; max-width: 1200px; margin: 0 auto; }
+.service-card { padding: 2.5rem; background: linear-gradient(145deg, var(--color-bg-card) 0%, var(--color-bg-card-grad) 100%); border-radius: 1rem; border-left: 4px solid var(--color-primary); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); transition: all 0.3s ease; }
+.service-card:hover { transform: translateX(8px); box-shadow: 0 8px 30px var(--shadow-color); border-left-color: var(--color-primary-light); }
+.service-card h3 { color: var(--color-primary); margin-bottom: 0.75rem; font-size: 1.25rem; font-weight: 600; }
+.service-card p { color: var(--color-text-muted); line-height: 1.7; }
+
+/* CONTACT SECTION */
+.contact-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2.5rem; padding: 4rem 2rem; max-width: 900px; margin: 0 auto; }
+.contact-item { padding: 2rem; background: linear-gradient(145deg, var(--color-bg-card) 0%, var(--color-bg-card-grad) 100%); border-radius: 1rem; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); text-align: center; transition: all 0.3s ease; border: 1px solid rgba(248, 250, 252, 0.08); }
+.contact-item:hover { transform: scale(1.02); box-shadow: 0 8px 30px var(--shadow-color); border-color: var(--color-primary); }
+.contact-item h3 { color: var(--color-primary); margin-bottom: 0.75rem; font-size: 1.1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+.contact-item p { color: var(--color-text); font-size: 1.1rem; }
+
+/* ABOUT SECTION */
+.about-content { padding: 4rem 2rem; max-width: 800px; margin: 0 auto; }
+.about-content h2 { color: var(--color-text); margin-bottom: 1.5rem; font-size: 1.8rem; position: relative; display: inline-block; }
+.about-content h2::after { content: ''; position: absolute; bottom: -8px; left: 0; width: 60px; height: 3px; background: linear-gradient(90deg, var(--color-primary), var(--color-secondary)); border-radius: 2px; }
+.about-content p { color: var(--color-text-muted); line-height: 1.9; font-size: 1.1rem; margin-top: 2rem; }
+
+/* FOOTER */
+.main-footer { background: linear-gradient(180deg, var(--color-bg-footer) 0%, #000000 100%); color: var(--color-text); padding: 4rem 2rem 1.5rem; position: relative; }
+.main-footer::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, var(--color-primary), var(--color-secondary), var(--color-primary)); }
+.footer-content { display: flex; justify-content: space-between; align-items: flex-start; max-width: 1200px; margin: 0 auto; flex-wrap: wrap; gap: 3rem; }
+.footer-logo { font-size: 1.4rem; font-weight: 700; color: var(--color-primary); }
+.footer-brand p { color: var(--color-text-muted); margin-top: 0.75rem; font-size: 0.95rem; line-height: 1.6; }
+.footer-nav { display: flex; gap: 2rem; }
+.footer-nav a { color: var(--color-text-muted); text-decoration: none; font-weight: 500; position: relative; }
+.footer-nav a:hover { color: var(--color-primary); }
+.footer-lang { display: flex; align-items: center; gap: 1rem; }
+.lang-label { color: var(--color-text-muted); font-size: 0.9rem; font-weight: 500; }
+.lang-buttons { display: flex; gap: 0.5rem; }
+.lang-link { color: var(--color-text-muted); text-decoration: none; padding: 0.4rem 1rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600; border: 1px solid rgba(245, 158, 11, 0.3); background: rgba(245, 158, 11, 0.1); transition: all 0.3s ease; }
+.lang-link:hover { color: var(--color-text-dark); background: var(--color-primary); border-color: var(--color-primary); box-shadow: 0 0 20px var(--shadow-primary); }
+.footer-bottom { text-align: center; padding-top: 2.5rem; margin-top: 3rem; border-top: 1px solid rgba(255, 255, 255, 0.08); color: var(--color-text-muted); font-size: 0.9rem; }`
+            }},
+            { command: 'setRootVariables', params: { 
+                variables: {
+                    '--color-primary': '#f59e0b',
+                    '--color-primary-light': '#fbbf24',
+                    '--color-primary-dark': '#d97706',
+                    '--color-secondary': '#10b981',
+                    '--color-bg': '#0f172a',
+                    '--color-bg-card': '#1e293b',
+                    '--color-bg-card-grad': '#334155',
+                    '--color-bg-footer': '#020617',
+                    '--color-text': '#f8fafc',
+                    '--color-text-muted': '#94a3b8',
+                    '--color-text-dark': '#0f172a',
+                    '--color-border': 'rgba(248, 250, 252, 0.1)',
+                    '--shadow-color': 'rgba(0, 0, 0, 0.3)',
+                    '--shadow-primary': 'rgba(245, 158, 11, 0.4)'
+                }
+            }}
         ]
     },
     
     'landing-page': {
         name: 'Landing Page',
-        description: 'Single-page landing structure',
+        description: 'Single-page landing with hero, features and CTA',
         commands: [
+            { command: 'editStructure', params: { 
+                type: 'menu',
+                structure: [
+                    { tag: 'nav', params: { class: 'landing-nav' }, children: [
+                        { tag: 'a', params: { href: '#hero', class: 'nav-logo' }, children: [{ textKey: 'site.name' }] },
+                        { tag: 'ul', params: { class: 'nav-links' }, children: [
+                            { tag: 'li', children: [{ tag: 'a', params: { href: '#features' }, children: [{ textKey: 'nav.features' }] }] },
+                            { tag: 'li', children: [{ tag: 'a', params: { href: '#contact' }, children: [{ textKey: 'nav.contact' }] }] }
+                        ]}
+                    ]}
+                ]
+            }},
+            { command: 'editStructure', params: { 
+                type: 'footer',
+                structure: [
+                    { tag: 'footer', params: { class: 'landing-footer' }, children: [
+                        { tag: 'div', params: { class: 'footer-content' }, children: [
+                            { tag: 'p', children: [{ textKey: 'footer.copyright' }] }
+                        ]}
+                    ]}
+                ]
+            }},
             { command: 'editStructure', params: { 
                 type: 'page',
                 name: 'home', 
@@ -1594,27 +2055,282 @@ const commandTemplates = {
             { command: 'setTranslationKeys', params: { 
                 language: 'en', 
                 translations: {
+                    site: { name: 'YourBrand' },
+                    page: { titles: { home: 'Home' } },
+                    nav: { features: 'Features', contact: 'Contact' },
+                    common: { learnMore: 'Learn More' },
+                    footer: { copyright: '2025 YourBrand. All rights reserved.' },
                     landing: {
-                        hero: {
-                            title: 'Build Something Amazing',
-                            subtitle: 'The modern way to create beautiful websites without the complexity.',
-                            cta: 'Get Started Free'
-                        },
-                        features: {
-                            title: 'Why Choose Us',
-                            f1: { title: 'Fast & Simple', desc: 'Get up and running in minutes, not hours.' },
-                            f2: { title: 'Fully Customizable', desc: 'Make it yours with powerful customization options.' },
-                            f3: { title: 'Always Reliable', desc: '99.9% uptime guaranteed for your peace of mind.' }
-                        },
-                        cta: {
-                            title: 'Ready to Get Started?',
-                            subtitle: 'Join thousands of satisfied customers today.',
-                            button: 'Start Your Free Trial'
-                        }
-                    },
-                    common: {
-                        learnMore: 'Learn More'
+                        hero: { title: 'Build Something Amazing', subtitle: 'The modern way to create beautiful websites without the complexity.', cta: 'Get Started Free' },
+                        features: { title: 'Why Choose Us', f1: { title: 'Fast & Simple', desc: 'Get up and running in minutes, not hours.' }, f2: { title: 'Fully Customizable', desc: 'Make it yours with powerful customization options.' }, f3: { title: 'Always Reliable', desc: '99.9% uptime guaranteed for your peace of mind.' } },
+                        cta: { title: 'Ready to Get Started?', subtitle: 'Join thousands of satisfied customers today.', button: 'Start Your Free Trial' }
                     }
+                }
+            }},
+            { command: 'editStyles', params: { 
+                content: `/* GLOBAL STYLES */
+html { scroll-behavior: smooth; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--color-text); line-height: 1.7; background: var(--color-bg); }
+a { transition: all 0.3s ease; }
+
+/* NAVIGATION */
+.landing-nav { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 3rem; position: fixed; top: 0; left: 0; right: 0; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); z-index: 100; box-shadow: 0 2px 30px rgba(var(--primary-rgb), 0.1); }
+.nav-logo { font-size: 1.7rem; font-weight: 800; color: var(--color-primary); text-decoration: none; letter-spacing: -0.5px; }
+.nav-links { display: flex; gap: 2.5rem; list-style: none; }
+.nav-links a { text-decoration: none; color: var(--color-text-muted); font-weight: 500; position: relative; padding: 0.5rem 0; }
+.nav-links a::after { content: ''; position: absolute; bottom: 0; left: 50%; width: 0; height: 2px; background: linear-gradient(90deg, var(--color-primary), var(--color-secondary)); transition: all 0.3s ease; transform: translateX(-50%); }
+.nav-links a:hover { color: var(--color-primary); }
+.nav-links a:hover::after { width: 100%; }
+
+/* HERO SECTION */
+.hero { min-height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center; padding: 8rem 2rem 6rem; background: linear-gradient(160deg, var(--color-bg) 0%, var(--color-bg-alt) 40%, var(--color-bg-accent) 100%); position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: 10%; right: 5%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(var(--primary-rgb), 0.15) 0%, transparent 70%); pointer-events: none; border-radius: 50%; animation: float 8s ease-in-out infinite; }
+.hero::after { content: ''; position: absolute; bottom: 20%; left: 10%; width: 300px; height: 300px; background: radial-gradient(circle, rgba(var(--secondary-rgb), 0.1) 0%, transparent 70%); pointer-events: none; border-radius: 50%; animation: float 6s ease-in-out infinite reverse; }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+.hero-content { position: relative; z-index: 1; max-width: 800px; }
+.hero-title { font-size: 4rem; margin-bottom: 1.5rem; font-weight: 800; letter-spacing: -2px; line-height: 1.1; background: linear-gradient(135deg, var(--color-text) 0%, var(--color-primary) 50%, var(--color-secondary) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.hero-subtitle { font-size: 1.35rem; color: var(--color-text-muted); margin-bottom: 3rem; max-width: 550px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+.hero-cta { display: flex; gap: 1.25rem; justify-content: center; flex-wrap: wrap; }
+.btn { display: inline-block; padding: 1.1rem 2.5rem; border-radius: 50px; text-decoration: none; font-weight: 600; transition: all 0.3s ease; }
+.btn-primary { background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%); color: var(--color-text-white); box-shadow: 0 8px 30px rgba(var(--primary-rgb), 0.4); }
+.btn-primary:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(var(--primary-rgb), 0.5); color: var(--color-text-white); }
+.btn-secondary { background: white; color: var(--color-text); border: 2px solid var(--color-border-light); box-shadow: 0 4px 15px rgba(var(--primary-rgb), 0.08); }
+.btn-secondary:hover { border-color: var(--color-primary); color: var(--color-primary); transform: translateY(-2px); background: var(--color-bg-alt); }
+
+/* FEATURES SECTION */
+.features { padding: 7rem 2rem; max-width: 1200px; margin: 0 auto; background: white; }
+.section-title { text-align: center; font-size: 2.8rem; margin-bottom: 1rem; color: var(--color-text); font-weight: 700; letter-spacing: -1px; }
+.features > p { text-align: center; color: var(--color-text-muted); margin-bottom: 4rem; font-size: 1.1rem; }
+.features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2.5rem; }
+.feature-card { padding: 3rem 2.5rem; background: linear-gradient(145deg, var(--color-bg) 0%, var(--color-bg-alt) 100%); border: 1px solid rgba(var(--primary-rgb), 0.08); border-radius: 1.5rem; text-align: center; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; }
+.feature-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, var(--color-primary), var(--color-secondary)); transform: scaleX(0); transition: transform 0.4s ease; transform-origin: left; }
+.feature-card:hover { transform: translateY(-12px); box-shadow: 0 25px 50px rgba(var(--primary-rgb), 0.15); }
+.feature-card:hover::before { transform: scaleX(1); }
+.feature-card h3 { color: var(--color-primary); margin-bottom: 1rem; font-size: 1.4rem; font-weight: 600; }
+.feature-card p { color: var(--color-text-muted); line-height: 1.8; font-size: 1.05rem; }
+
+/* CTA SECTION */
+.cta-section { text-align: center; padding: 7rem 2rem; background: linear-gradient(180deg, white 0%, var(--color-bg-alt) 50%, var(--color-bg-accent) 100%); position: relative; }
+.cta-section::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(var(--primary-rgb), 0.3), transparent); }
+.cta-section h2 { font-size: 2.8rem; margin-bottom: 1rem; color: var(--color-text); font-weight: 700; letter-spacing: -1px; }
+.cta-section p { color: var(--color-text-muted); margin-bottom: 2.5rem; font-size: 1.2rem; }
+.btn-lg { padding: 1.35rem 3.5rem; font-size: 1.15rem; }
+
+/* FOOTER */
+.landing-footer { background: linear-gradient(180deg, var(--color-bg-footer) 0%, var(--color-bg-footer-dark) 100%); color: var(--color-text-white); padding: 2.5rem 2rem; position: relative; }
+.landing-footer::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--color-primary), var(--color-secondary), var(--color-primary-light)); }
+.landing-footer .footer-content { display: flex; justify-content: center; align-items: center; max-width: 1200px; margin: 0 auto; }
+.landing-footer p { color: var(--color-text-light); font-size: 0.95rem; }`
+            }},
+            { command: 'setRootVariables', params: { 
+                variables: {
+                    '--color-primary': '#7c3aed',
+                    '--color-primary-dark': '#6d28d9',
+                    '--color-primary-light': '#8b5cf6',
+                    '--color-secondary': '#ec4899',
+                    '--primary-rgb': '124, 58, 237',
+                    '--secondary-rgb': '236, 72, 153',
+                    '--color-bg': '#fdfcff',
+                    '--color-bg-alt': '#faf5ff',
+                    '--color-bg-accent': '#f3e8ff',
+                    '--color-bg-footer': '#1e1b4b',
+                    '--color-bg-footer-dark': '#0f0d24',
+                    '--color-text': '#1f2937',
+                    '--color-text-muted': '#64748b',
+                    '--color-text-light': '#9ca3af',
+                    '--color-text-white': '#ffffff',
+                    '--color-border-light': '#e9d5ff',
+                    '--color-border-footer': 'rgba(139, 92, 246, 0.3)'
+                }
+            }},
+            { command: 'setMultilingual', params: { enabled: false } }
+        ]
+    },
+    
+    'landing-page-multilingual': {
+        name: 'Landing Page (Multilingual)',
+        description: 'Single-page landing with EN + FR',
+        commands: [
+            { command: 'setMultilingual', params: { enabled: true } },
+            { command: 'addLang', params: { code: 'fr', name: 'Francais' } },
+            { command: 'editStructure', params: { 
+                type: 'menu',
+                structure: [
+                    { tag: 'nav', params: { class: 'landing-nav' }, children: [
+                        { tag: 'a', params: { href: '#hero', class: 'nav-logo' }, children: [{ textKey: 'site.name' }] },
+                        { tag: 'ul', params: { class: 'nav-links' }, children: [
+                            { tag: 'li', children: [{ tag: 'a', params: { href: '#features' }, children: [{ textKey: 'nav.features' }] }] },
+                            { tag: 'li', children: [{ tag: 'a', params: { href: '#contact' }, children: [{ textKey: 'nav.contact' }] }] }
+                        ]}
+                    ]}
+                ]
+            }},
+            { command: 'editStructure', params: { 
+                type: 'footer',
+                structure: [
+                    { tag: 'footer', params: { class: 'landing-footer' }, children: [
+                        { tag: 'div', params: { class: 'footer-content' }, children: [
+                            { tag: 'p', children: [{ textKey: 'footer.copyright' }] },
+                            { tag: 'div', params: { class: 'footer-lang' }, children: [
+                                { tag: 'span', params: { class: 'lang-label' }, children: [{ textKey: 'footer.language' }] },
+                                { tag: 'div', params: { class: 'lang-buttons' }, children: [
+                                    { tag: 'a', params: { href: '{{__current_page;lang=en}}', class: 'lang-link' }, children: [{ textKey: '__RAW__English' }] },
+                                    { tag: 'a', params: { href: '{{__current_page;lang=fr}}', class: 'lang-link' }, children: [{ textKey: '__RAW__Français' }] }
+                                ]}
+                            ]}
+                        ]}
+                    ]}
+                ]
+            }},
+            { command: 'editStructure', params: { 
+                type: 'page',
+                name: 'home', 
+                structure: [
+                    { tag: 'section', params: { class: 'hero', id: 'hero' }, children: [
+                        { tag: 'div', params: { class: 'hero-content' }, children: [
+                            { tag: 'h1', params: { class: 'hero-title' }, children: [{ textKey: 'landing.hero.title' }] },
+                            { tag: 'p', params: { class: 'hero-subtitle' }, children: [{ textKey: 'landing.hero.subtitle' }] },
+                            { tag: 'div', params: { class: 'hero-cta' }, children: [
+                                { tag: 'a', params: { href: '#contact', class: 'btn btn-primary' }, children: [{ textKey: 'landing.hero.cta' }] },
+                                { tag: 'a', params: { href: '#features', class: 'btn btn-secondary' }, children: [{ textKey: 'common.learnMore' }] }
+                            ]}
+                        ]}
+                    ]},
+                    { tag: 'section', params: { class: 'features', id: 'features' }, children: [
+                        { tag: 'h2', params: { class: 'section-title' }, children: [{ textKey: 'landing.features.title' }] },
+                        { tag: 'div', params: { class: 'features-grid' }, children: [
+                            { tag: 'div', params: { class: 'feature-card' }, children: [
+                                { tag: 'h3', children: [{ textKey: 'landing.features.f1.title' }] },
+                                { tag: 'p', children: [{ textKey: 'landing.features.f1.desc' }] }
+                            ]},
+                            { tag: 'div', params: { class: 'feature-card' }, children: [
+                                { tag: 'h3', children: [{ textKey: 'landing.features.f2.title' }] },
+                                { tag: 'p', children: [{ textKey: 'landing.features.f2.desc' }] }
+                            ]},
+                            { tag: 'div', params: { class: 'feature-card' }, children: [
+                                { tag: 'h3', children: [{ textKey: 'landing.features.f3.title' }] },
+                                { tag: 'p', children: [{ textKey: 'landing.features.f3.desc' }] }
+                            ]}
+                        ]}
+                    ]},
+                    { tag: 'section', params: { class: 'cta-section', id: 'contact' }, children: [
+                        { tag: 'h2', children: [{ textKey: 'landing.cta.title' }] },
+                        { tag: 'p', children: [{ textKey: 'landing.cta.subtitle' }] },
+                        { tag: 'a', params: { href: '#', class: 'btn btn-primary btn-lg' }, children: [{ textKey: 'landing.cta.button' }] }
+                    ]}
+                ]
+            }},
+            { command: 'setTranslationKeys', params: { 
+                language: 'en', 
+                translations: {
+                    site: { name: 'YourBrand' },
+                    page: { titles: { home: 'Home' } },
+                    nav: { features: 'Features', contact: 'Contact' },
+                    common: { learnMore: 'Learn More' },
+                    footer: { copyright: '2025 YourBrand. All rights reserved.', language: 'Language:' },
+                    landing: {
+                        hero: { title: 'Build Something Amazing', subtitle: 'The modern way to create beautiful websites without the complexity.', cta: 'Get Started Free' },
+                        features: { title: 'Why Choose Us', f1: { title: 'Fast & Simple', desc: 'Get up and running in minutes, not hours.' }, f2: { title: 'Fully Customizable', desc: 'Make it yours with powerful customization options.' }, f3: { title: 'Always Reliable', desc: '99.9% uptime guaranteed for your peace of mind.' } },
+                        cta: { title: 'Ready to Get Started?', subtitle: 'Join thousands of satisfied customers today.', button: 'Start Your Free Trial' }
+                    }
+                }
+            }},
+            { command: 'setTranslationKeys', params: { 
+                language: 'fr', 
+                translations: {
+                    site: { name: 'VotreMarque' },
+                    page: { titles: { home: 'Accueil' } },
+                    nav: { features: 'Fonctionnalites', contact: 'Contact' },
+                    common: { learnMore: 'En savoir plus' },
+                    footer: { copyright: '2025 VotreMarque. Tous droits reserves.', language: 'Langue :' },
+                    landing: {
+                        hero: { title: 'Creez quelque chose d\'incroyable', subtitle: 'La maniere moderne de creer de beaux sites web sans complexite.', cta: 'Commencer gratuitement' },
+                        features: { title: 'Pourquoi nous choisir', f1: { title: 'Rapide et simple', desc: 'Soyez operationnel en minutes, pas en heures.' }, f2: { title: 'Entierement personnalisable', desc: 'Faites-le votre avec des options de personnalisation puissantes.' }, f3: { title: 'Toujours fiable', desc: '99.9% de disponibilite garantie pour votre tranquillite d\'esprit.' } },
+                        cta: { title: 'Pret a commencer ?', subtitle: 'Rejoignez des milliers de clients satisfaits aujourd\'hui.', button: 'Commencez votre essai gratuit' }
+                    }
+                }
+            }},
+            { command: 'editStyles', params: { 
+                content: `/* GLOBAL STYLES */
+html { scroll-behavior: smooth; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--color-text); line-height: 1.7; background: var(--color-bg); }
+a { transition: all 0.3s ease; }
+
+/* NAVIGATION */
+.landing-nav { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 3rem; position: fixed; top: 0; left: 0; right: 0; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); z-index: 100; box-shadow: 0 2px 30px rgba(var(--primary-rgb), 0.1); }
+.nav-logo { font-size: 1.7rem; font-weight: 800; color: var(--color-primary); text-decoration: none; letter-spacing: -0.5px; }
+.nav-links { display: flex; gap: 2.5rem; list-style: none; }
+.nav-links a { text-decoration: none; color: var(--color-text-muted); font-weight: 500; position: relative; padding: 0.5rem 0; }
+.nav-links a::after { content: ''; position: absolute; bottom: 0; left: 50%; width: 0; height: 2px; background: linear-gradient(90deg, var(--color-primary), var(--color-secondary)); transition: all 0.3s ease; transform: translateX(-50%); }
+.nav-links a:hover { color: var(--color-primary); }
+.nav-links a:hover::after { width: 100%; }
+
+/* HERO SECTION */
+.hero { min-height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center; padding: 8rem 2rem 6rem; background: linear-gradient(160deg, var(--color-bg) 0%, var(--color-bg-alt) 40%, var(--color-bg-accent) 100%); position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: 10%; right: 5%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(var(--primary-rgb), 0.15) 0%, transparent 70%); pointer-events: none; border-radius: 50%; animation: float 8s ease-in-out infinite; }
+.hero::after { content: ''; position: absolute; bottom: 20%; left: 10%; width: 300px; height: 300px; background: radial-gradient(circle, rgba(var(--secondary-rgb), 0.1) 0%, transparent 70%); pointer-events: none; border-radius: 50%; animation: float 6s ease-in-out infinite reverse; }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+.hero-content { position: relative; z-index: 1; max-width: 800px; }
+.hero-title { font-size: 4rem; margin-bottom: 1.5rem; font-weight: 800; letter-spacing: -2px; line-height: 1.1; background: linear-gradient(135deg, var(--color-text) 0%, var(--color-primary) 50%, var(--color-secondary) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.hero-subtitle { font-size: 1.35rem; color: var(--color-text-muted); margin-bottom: 3rem; max-width: 550px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+.hero-cta { display: flex; gap: 1.25rem; justify-content: center; flex-wrap: wrap; }
+.btn { display: inline-block; padding: 1.1rem 2.5rem; border-radius: 50px; text-decoration: none; font-weight: 600; transition: all 0.3s ease; }
+.btn-primary { background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%); color: var(--color-text-white); box-shadow: 0 8px 30px rgba(var(--primary-rgb), 0.4); }
+.btn-primary:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(var(--primary-rgb), 0.5); color: var(--color-text-white); }
+.btn-secondary { background: white; color: var(--color-text); border: 2px solid var(--color-border-light); box-shadow: 0 4px 15px rgba(var(--primary-rgb), 0.08); }
+.btn-secondary:hover { border-color: var(--color-primary); color: var(--color-primary); transform: translateY(-2px); background: var(--color-bg-alt); }
+
+/* FEATURES SECTION */
+.features { padding: 7rem 2rem; max-width: 1200px; margin: 0 auto; background: white; }
+.section-title { text-align: center; font-size: 2.8rem; margin-bottom: 1rem; color: var(--color-text); font-weight: 700; letter-spacing: -1px; }
+.features > p { text-align: center; color: var(--color-text-muted); margin-bottom: 4rem; font-size: 1.1rem; }
+.features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2.5rem; }
+.feature-card { padding: 3rem 2.5rem; background: linear-gradient(145deg, var(--color-bg) 0%, var(--color-bg-alt) 100%); border: 1px solid rgba(var(--primary-rgb), 0.08); border-radius: 1.5rem; text-align: center; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; }
+.feature-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, var(--color-primary), var(--color-secondary)); transform: scaleX(0); transition: transform 0.4s ease; transform-origin: left; }
+.feature-card:hover { transform: translateY(-12px); box-shadow: 0 25px 50px rgba(var(--primary-rgb), 0.15); }
+.feature-card:hover::before { transform: scaleX(1); }
+.feature-card h3 { color: var(--color-primary); margin-bottom: 1rem; font-size: 1.4rem; font-weight: 600; }
+.feature-card p { color: var(--color-text-muted); line-height: 1.8; font-size: 1.05rem; }
+
+/* CTA SECTION */
+.cta-section { text-align: center; padding: 7rem 2rem; background: linear-gradient(180deg, white 0%, var(--color-bg-alt) 50%, var(--color-bg-accent) 100%); position: relative; }
+.cta-section::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(var(--primary-rgb), 0.3), transparent); }
+.cta-section h2 { font-size: 2.8rem; margin-bottom: 1rem; color: var(--color-text); font-weight: 700; letter-spacing: -1px; }
+.cta-section p { color: var(--color-text-muted); margin-bottom: 2.5rem; font-size: 1.2rem; }
+.btn-lg { padding: 1.35rem 3.5rem; font-size: 1.15rem; }
+
+/* FOOTER */
+.landing-footer { background: linear-gradient(180deg, var(--color-bg-footer) 0%, var(--color-bg-footer-dark) 100%); color: var(--color-text-white); padding: 2.5rem 2rem; position: relative; }
+.landing-footer::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--color-primary), var(--color-secondary), var(--color-primary-light)); }
+.landing-footer .footer-content { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto; flex-wrap: wrap; gap: 1.5rem; }
+.landing-footer p { color: var(--color-text-light); font-size: 0.95rem; }
+.footer-lang { display: flex; align-items: center; gap: 1rem; }
+.lang-label { color: var(--color-text-light); font-size: 0.9rem; font-weight: 500; }
+.lang-buttons { display: flex; gap: 0.5rem; }
+.lang-link { color: #C4B5FD; text-decoration: none; padding: 0.4rem 1rem; border-radius: 20px; font-size: 0.85rem; font-weight: 500; border: 1px solid var(--color-border-footer); background: rgba(var(--primary-rgb), 0.1); transition: all 0.3s ease; }
+.lang-link:hover { color: var(--color-text-white); background: rgba(var(--primary-rgb), 0.3); border-color: var(--color-primary); box-shadow: 0 0 15px rgba(var(--primary-rgb), 0.4); }`
+            }},
+            { command: 'setRootVariables', params: { 
+                variables: {
+                    '--color-primary': '#7c3aed',
+                    '--color-primary-dark': '#6d28d9',
+                    '--color-primary-light': '#8b5cf6',
+                    '--color-secondary': '#ec4899',
+                    '--primary-rgb': '124, 58, 237',
+                    '--secondary-rgb': '236, 72, 153',
+                    '--color-bg': '#fdfcff',
+                    '--color-bg-alt': '#faf5ff',
+                    '--color-bg-accent': '#f3e8ff',
+                    '--color-bg-footer': '#1e1b4b',
+                    '--color-bg-footer-dark': '#0f0d24',
+                    '--color-text': '#1f2937',
+                    '--color-text-muted': '#64748b',
+                    '--color-text-light': '#9ca3af',
+                    '--color-text-white': '#ffffff',
+                    '--color-border-light': '#e9d5ff',
+                    '--color-border-footer': 'rgba(139, 92, 246, 0.3)'
                 }
             }}
         ]

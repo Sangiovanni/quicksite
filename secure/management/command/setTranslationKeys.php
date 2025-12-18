@@ -229,6 +229,38 @@ if (file_put_contents($translations_file, $json_content, LOCK_EX) === false) {
         ->send();
 }
 
+// Also update default.json to ensure it always has at least the same keys
+// This ensures mono-lingual mode works correctly and default always has minimal requirements
+$defaultUpdated = false;
+if (!$isDefault) {
+    $default_file = SECURE_FOLDER_PATH . '/translate/default.json';
+    
+    // Load existing default translations
+    $existingDefault = [];
+    if (file_exists($default_file)) {
+        $defaultJson = @file_get_contents($default_file);
+        if ($defaultJson !== false) {
+            $decoded = json_decode($defaultJson, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $existingDefault = $decoded;
+            }
+        }
+    }
+    
+    // Merge new translations into default (default gets all keys from any language update)
+    $mergedDefault = mergeTranslations($existingDefault, $newTranslations);
+    
+    // Only write if there are actual changes
+    if ($mergedDefault !== $existingDefault) {
+        $defaultJsonContent = json_encode($mergedDefault, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($defaultJsonContent !== false) {
+            if (file_put_contents($default_file, $defaultJsonContent, LOCK_EX) !== false) {
+                $defaultUpdated = true;
+            }
+        }
+    }
+}
+
 ApiResponse::create(200, 'operation.success')
     ->withMessage('Translation keys updated successfully')
     ->withData([
@@ -236,6 +268,7 @@ ApiResponse::create(200, 'operation.success')
         'file' => $translations_file,
         'keys_added' => $keysAdded,
         'keys_updated' => $keysUpdated,
-        'keys_unchanged' => 'preserved'
+        'keys_unchanged' => 'preserved',
+        'default_synced' => $defaultUpdated
     ])
     ->send();

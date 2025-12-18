@@ -264,7 +264,15 @@ class JsonToHtmlRenderer {
         // Special handling for URL attributes
         $urlAttributes = ['href', 'src', 'data', 'poster', 'action', 'formaction', 'cite', 'srcset'];
         if (in_array($name, $urlAttributes, true) && is_string($value) && !empty($value)) {
-            $value = $this->processUrl($value);
+            // Process placeholders first (e.g., {{__current_page;lang=en}})
+            if (strpos($value, '{{__') !== false) {
+                $value = $this->processDataPlaceholders($value);
+            }
+            // Then process URL (add base URL, language prefix, etc.)
+            // Only if the value doesn't already look like a complete URL after placeholder processing
+            if (!preg_match('/^(https?:)?\/\//i', $value)) {
+                $value = $this->processUrl($value);
+            }
         }
 
         // Convert value to string and escape
