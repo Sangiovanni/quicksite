@@ -8,6 +8,14 @@ $category = $urlSegments[0] ?? null;
 // Validate category if provided
 $validCategories = require SECURE_FOLDER_PATH . '/management/config/assetCategories.php';
 
+// Load asset metadata
+$metadataPath = SECURE_FOLDER_PATH . '/config/assets_metadata.json';
+$allMetadata = [];
+if (file_exists($metadataPath)) {
+    $metadataContent = file_get_contents($metadataPath);
+    $allMetadata = json_decode($metadataContent, true) ?: [];
+}
+
 // If category is provided, validate it
 if ($category !== null) {
     // Type validation - category must be string
@@ -66,12 +74,43 @@ foreach ($categoriesToScan as $cat) {
             continue;
         }
         
-        $fileList[] = [
+        // Build file info
+        $fileInfo = [
             'filename' => $file,
             'size' => filesize($filePath),
             'modified' => date('Y-m-d H:i:s', filemtime($filePath)),
             'path' => '/assets/' . $cat . '/' . $file
         ];
+        
+        // Merge metadata if available
+        $assetKey = $cat . '/' . $file;
+        if (isset($allMetadata[$assetKey])) {
+            $meta = $allMetadata[$assetKey];
+            
+            // Add description if available
+            if (!empty($meta['description'])) {
+                $fileInfo['description'] = $meta['description'];
+            }
+            
+            // Add dimensions for images
+            if (isset($meta['dimensions'])) {
+                $fileInfo['dimensions'] = $meta['dimensions'];
+                $fileInfo['width'] = $meta['width'];
+                $fileInfo['height'] = $meta['height'];
+            }
+            
+            // Add mime type if stored
+            if (isset($meta['mime_type'])) {
+                $fileInfo['mime_type'] = $meta['mime_type'];
+            }
+            
+            // Add upload date if available
+            if (isset($meta['uploaded'])) {
+                $fileInfo['uploaded'] = $meta['uploaded'];
+            }
+        }
+        
+        $fileList[] = $fileInfo;
     }
     
     // Sort by filename

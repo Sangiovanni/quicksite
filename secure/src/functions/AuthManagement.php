@@ -89,7 +89,7 @@ function hasPermission(array $tokenInfo, string $command): bool {
     
     $writeCommands = ['editStructure', 'setTranslationKeys', 'deleteTranslationKeys', 
                       'addRoute', 'deleteRoute', 'addLang', 'deleteLang', 
-                      'uploadAsset', 'deleteAsset', 'editStyles', 
+                      'uploadAsset', 'deleteAsset', 'updateAssetMeta', 'editStyles', 
                       'setRootVariables', 'setStyleRule', 'deleteStyleRule',
                       'setKeyframes', 'deleteKeyframes',
                       'editTitle', 'editFavicon'];

@@ -414,7 +414,7 @@ async function prefillFromBatchQueue() {
     const urlParamsData = item.urlParams || [];
     
     // Commands with cascading selects need special handling with loading state
-    const cascadingCommands = ['editStructure', 'getStructure', 'deleteAsset', 'downloadAsset'];
+    const cascadingCommands = ['editStructure', 'getStructure', 'deleteAsset', 'downloadAsset', 'updateAssetMeta'];
     
     if (cascadingCommands.includes(COMMAND_NAME)) {
         // Show loading overlay while cascading selects load
@@ -733,6 +733,7 @@ async function initEnhancedFeatures() {
             break;
         case 'deleteAsset':
         case 'downloadAsset':
+        case 'updateAssetMeta':
             await initAssetSelectForm();
             break;
         case 'listAssets':

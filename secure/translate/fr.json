@@ -108,7 +108,315 @@
             "build": "Build & Déploiement",
             "auth": "Gestion des Tokens",
             "docs": "Documentation"
-        }
+        },
+        "cmd": {
+            "setPublicSpace": {
+                "desc": "Définit l'espace/préfixe URL pour le site public. Crée un sous-répertoire dans le dossier public et y déplace tout le contenu. Utilisez une destination vide pour revenir à la racine. Note: L'URL du site change (ex: http://domaine/web/ quand défini sur \"web\")",
+                "params": {
+                    "destination": "Préfixe/espace URL pour le site public (chaîne vide pour supprimer)"
+                }
+            },
+            "renameSecureFolder": {
+                "desc": "Renomme le dossier secure/backend au niveau racine du serveur. Met à jour la constante SECURE_FOLDER_NAME. L'URL de gestion reste la même.",
+                "params": {
+                    "destination": "Nouveau nom de dossier (nom simple, sans chemins)"
+                }
+            },
+            "renamePublicFolder": {
+                "desc": "Renomme le dossier public au niveau racine du serveur. Met à jour toutes les références. Nécessite une mise à jour de la config Apache/serveur web après le renommage.",
+                "params": {
+                    "destination": "Nouveau nom de dossier (nom simple, sans chemins)"
+                }
+            },
+            "addRoute": {
+                "desc": "Crée une nouvelle route avec un template de page PHP et une structure JSON vide",
+                "params": {
+                    "route": "Nom de la route pour l'URL (minuscules, chiffres, tirets)"
+                }
+            },
+            "deleteRoute": {
+                "desc": "Supprime une route existante et ses fichiers associés (PHP et JSON). Supprime également tous les alias d'URL pointant vers cette route.",
+                "params": {
+                    "route": "Nom de la route à supprimer"
+                }
+            },
+            "getRoutes": {
+                "desc": "Retourne la liste de toutes les routes disponibles dans le système"
+            },
+            "getStructure": {
+                "desc": "Récupère la structure JSON d'une page, menu, footer ou composant. Options: showIds (ajoute les identifiants de nœuds), summary (aperçu de l'arbre), ou nodeId (obtient un nœud spécifique par chemin indexé à 0 comme 0.2.1)"
+            },
+            "editStructure": {
+                "desc": "Met à jour la structure JSON. Deux modes: remplacement complet (envoie la structure complète) ou édition ciblée (utilise nodeId + action: update, delete, insertBefore, insertAfter)",
+                "params": {
+                    "type": "Type de structure: page, menu, footer, component",
+                    "name": "Nom (requis pour page/composant)",
+                    "structure": "Structure JSON à sauvegarder",
+                    "nodeId": "Nœud cible pour l'édition chirurgicale (ex: 0.2.1)",
+                    "action": "update, delete, insertBefore, insertAfter"
+                }
+            },
+            "listComponents": {
+                "desc": "Liste tous les composants JSON réutilisables avec leurs métadonnées. Affiche les emplacements disponibles (placeholders) et les dépendances des composants."
+            },
+            "listPages": {
+                "desc": "Liste toutes les structures de pages JSON avec leurs métadonnées. Affiche le statut des routes, les composants utilisés et les clés de traduction."
+            },
+            "createAlias": {
+                "desc": "Crée un alias de redirection URL pointant vers une route existante. Supporte les redirections 301 ou le routage interne (transparent).",
+                "params": {
+                    "alias": "Chemin URL pour l'alias",
+                    "target": "Route cible vers laquelle rediriger",
+                    "type": "redirect (301) ou internal (transparent)"
+                }
+            },
+            "deleteAlias": {
+                "desc": "Supprime un alias de redirection URL existant.",
+                "params": {
+                    "alias": "Chemin URL de l'alias à supprimer"
+                }
+            },
+            "listAliases": {
+                "desc": "Liste tous les alias de redirection URL avec leurs cibles et types."
+            },
+            "getTranslation": {
+                "desc": "Récupère les traductions pour une seule langue"
+            },
+            "getTranslations": {
+                "desc": "Récupère les traductions pour toutes les langues"
+            },
+            "setTranslationKeys": {
+                "desc": "Définit/met à jour des clés de traduction spécifiques (fusion, pas de remplacement)",
+                "params": {
+                    "language": "Code de langue (ex: en, fr)",
+                    "translations": "Objet de clés à ajouter/mettre à jour (fusion sécurisée)"
+                }
+            },
+            "deleteTranslationKeys": {
+                "desc": "Supprime des clés de traduction spécifiques d'un fichier de langue",
+                "params": {
+                    "language": "Code de langue (ex: en, fr)",
+                    "keys": "Tableau de clés en notation pointée à supprimer"
+                }
+            },
+            "getTranslationKeys": {
+                "desc": "Analyse toutes les structures JSON et extrait les clés de traduction requises"
+            },
+            "validateTranslations": {
+                "desc": "Valide la complétude des traductions en comparant les clés requises avec les traductions existantes"
+            },
+            "getUnusedTranslationKeys": {
+                "desc": "Trouve les clés de traduction qui existent dans les fichiers de traduction mais ne sont utilisées dans aucune structure"
+            },
+            "analyzeTranslations": {
+                "desc": "Vérification complète de la santé des traductions - trouve les clés manquantes ET inutilisées"
+            },
+            "getLangList": {
+                "desc": "Retourne la liste des langues configurées et les paramètres multilingues"
+            },
+            "setMultilingual": {
+                "desc": "Active ou désactive le support multilingue. Synchronise les traductions entre default.json et le fichier de la langue par défaut.",
+                "params": {
+                    "enabled": "Booléen: true pour multilingue, false pour mono-langue"
+                }
+            },
+            "checkStructureMulti": {
+                "desc": "Analyse toutes les structures pour le contenu spécifique à une langue. À utiliser avant de passer en mode mono-langue."
+            },
+            "addLang": {
+                "desc": "Ajoute une nouvelle langue au système",
+                "params": {
+                    "code": "Code de langue ISO (ex: es, de)",
+                    "name": "Nom d'affichage (ex: Español)"
+                }
+            },
+            "deleteLang": {
+                "desc": "Supprime une langue du système",
+                "params": {
+                    "code": "Code de langue à supprimer (pas la défaut/dernière)"
+                }
+            },
+            "setDefaultLang": {
+                "desc": "Définit la langue par défaut du site",
+                "params": {
+                    "lang": "Code de langue à définir par défaut (doit exister)"
+                }
+            },
+            "uploadAsset": {
+                "desc": "Upload un fichier vers le dossier assets avec validation et nommage automatique",
+                "params": {
+                    "category": "images, scripts, font, audio, ou videos",
+                    "file": "Upload de fichier (multipart/form-data)"
+                }
+            },
+            "deleteAsset": {
+                "desc": "Supprime un fichier du dossier assets"
+            },
+            "listAssets": {
+                "desc": "Liste tous les fichiers dans le dossier assets avec métadonnées, optionnellement filtrés par catégorie"
+            },
+            "updateAssetMeta": {
+                "desc": "Met à jour les métadonnées (description, texte alternatif) d'un asset existant. Utile pour le contexte IA et l'accessibilité.",
+                "params": {
+                    "category": "Catégorie d'asset (images, scripts, font, audio, videos)",
+                    "filename": "Nom du fichier à mettre à jour",
+                    "description": "Description pour contexte IA (max 500 caractères)",
+                    "alt": "Texte alternatif pour images/accessibilité (max 200 caractères)"
+                }
+            },
+            "getStyles": {
+                "desc": "Récupère le contenu du fichier SCSS/CSS principal"
+            },
+            "editStyles": {
+                "desc": "Met à jour le contenu du fichier SCSS/CSS principal",
+                "params": {
+                    "content": "Contenu CSS complet (remplace le fichier)"
+                }
+            },
+            "getRootVariables": {
+                "desc": "Récupère toutes les propriétés CSS personnalisées (variables) définies dans le sélecteur :root"
+            },
+            "setRootVariables": {
+                "desc": "Ajoute ou met à jour des propriétés CSS personnalisées (variables) dans le sélecteur :root",
+                "params": {
+                    "variables": "Objet de variables CSS à définir/mettre à jour"
+                }
+            },
+            "listStyleRules": {
+                "desc": "Liste tous les sélecteurs CSS dans la feuille de style, organisés par scope global et media query"
+            },
+            "getStyleRule": {
+                "desc": "Obtient les styles CSS pour un sélecteur spécifique, optionnellement dans un contexte de media query"
+            },
+            "setStyleRule": {
+                "desc": "Ajoute ou met à jour une règle CSS pour n'importe quel sélecteur",
+                "params": {
+                    "selector": "Sélecteur CSS (ex: .btn-primary)",
+                    "styles": "Déclarations CSS (chaîne ou objet)",
+                    "mediaQuery": "Contexte media query (optionnel)"
+                }
+            },
+            "deleteStyleRule": {
+                "desc": "Supprime une règle CSS de la feuille de style",
+                "params": {
+                    "selector": "Sélecteur CSS à supprimer",
+                    "mediaQuery": "Contexte media query (optionnel)"
+                }
+            },
+            "getKeyframes": {
+                "desc": "Récupère toutes les animations @keyframes définies dans la feuille de style"
+            },
+            "setKeyframes": {
+                "desc": "Ajoute ou met à jour une animation @keyframes",
+                "params": {
+                    "name": "Nom de l'animation (alphanumérique)",
+                    "frames": "Objet avec les clés de frames (0%, 50%, from, to)"
+                }
+            },
+            "deleteKeyframes": {
+                "desc": "Supprime une animation @keyframes de la feuille de style",
+                "params": {
+                    "name": "Nom de l'animation à supprimer"
+                }
+            },
+            "editFavicon": {
+                "desc": "Met à jour le favicon du site avec une nouvelle image du dossier assets/images (PNG uniquement)",
+                "params": {
+                    "imageName": "Nom de fichier PNG depuis assets/images/"
+                }
+            },
+            "editTitle": {
+                "desc": "Met à jour le titre de page pour une route et une langue spécifiques dans le fichier de traduction (structure page.titles.{route})",
+                "params": {
+                    "route": "Nom de la route à mettre à jour",
+                    "lang": "Code de langue",
+                    "title": "Nouveau texte du titre de page"
+                }
+            },
+            "build": {
+                "desc": "Crée un build prêt pour la production avec des fichiers PHP compilés, renommage optionnel des dossiers, nettoyage de la config et création d'archive ZIP",
+                "params": {
+                    "public": "Nom/chemin personnalisé du dossier public",
+                    "secure": "Nom personnalisé du dossier secure (un seul niveau)",
+                    "space": "Sous-répertoire PUBLIC_FOLDER_SPACE"
+                }
+            },
+            "listBuilds": {
+                "desc": "Liste tous les builds disponibles avec leurs métadonnées incluant date de création, tailles, langues et nombre de pages"
+            },
+            "getBuild": {
+                "desc": "Obtient les infos détaillées d'un build spécifique incluant les données du manifest, le nombre de fichiers et le contenu du répertoire",
+                "params": {
+                    "name": "Nom du build (ex: build_20250101_120000)"
+                }
+            },
+            "deleteBuild": {
+                "desc": "Supprime un build spécifique incluant le dossier et l'archive ZIP",
+                "params": {
+                    "name": "Nom du build à supprimer"
+                }
+            },
+            "cleanBuilds": {
+                "desc": "Suppression en masse des builds plus anciens qu'un timestamp spécifié avec mode dry-run optionnel",
+                "params": {
+                    "before": "Timestamp Unix ou chaîne de date",
+                    "dry_run": "Aperçu sans suppression (défaut: false)"
+                }
+            },
+            "deployBuild": {
+                "desc": "Déploie un build vers les chemins de production avec verrouillage de fichiers et vérifications d'intégrité",
+                "params": {
+                    "name": "Nom du build à déployer",
+                    "publicPath": "Chemin absolu pour le dossier public",
+                    "securePath": "Chemin absolu pour le dossier secure",
+                    "overwrite": "Écraser les fichiers existants (défaut: false)"
+                }
+            },
+            "downloadBuild": {
+                "desc": "Obtient l'URL de téléchargement du fichier ZIP d'un build avec taille et infos du manifest",
+                "params": {
+                    "name": "Nom du build à télécharger"
+                }
+            },
+            "getCommandHistory": {
+                "desc": "Récupère l'historique d'exécution des commandes avec filtrage et pagination. Supporte le filtrage par date, commande, statut et token."
+            },
+            "clearCommandHistory": {
+                "desc": "Supprime les fichiers de log de commandes plus anciens qu'une date spécifiée. Affiche un aperçu sans confirm=true.",
+                "params": {
+                    "before": "Date au format AAAA-MM-JJ",
+                    "confirm": "Définir à true pour exécuter la suppression"
+                }
+            },
+            "generateToken": {
+                "desc": "Crée un nouveau token d'authentification API avec les permissions spécifiées. Nécessite la permission admin.",
+                "params": {
+                    "name": "Nom descriptif pour le token",
+                    "permissions": "Tableau: *, read, write, admin, command:name"
+                }
+            },
+            "listTokens": {
+                "desc": "Liste tous les tokens API avec valeurs masquées. Nécessite la permission admin."
+            },
+            "revokeToken": {
+                "desc": "Révoque (supprime définitivement) un token API. Nécessite la permission admin.",
+                "params": {
+                    "token_preview": "Aperçu du token depuis listTokens ou token complet"
+                }
+            },
+            "help": {
+                "desc": "Retourne la documentation pour toutes les commandes disponibles"
+            }
+        },
+        "labels": {
+            "urlPatterns": "Formats d'URL",
+            "parameters": "Paramètres",
+            "required": "(requis)",
+            "optional": "(optionnel)",
+            "parameters_93": "Paramètre URL",
+            "parameters_106": "Paramètre URL"
+        },
+        "urlPatternsDesc": "Tous les endpoints API suivent le format /management/{commande}. Certaines commandes acceptent des paramètres de chemin URL pour les requêtes GET - ceux-ci sont affichés avec l'URL de la commande ci-dessous. Utilisez GET /management/help/{commande} pour la documentation API détaillée."
     },
     "tutorial": {
         "title": "Premiers Pas avec QuickSite",

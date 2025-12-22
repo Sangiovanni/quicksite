@@ -90,7 +90,315 @@
             "build": "Build & Deploy",
             "auth": "Token Management",
             "docs": "Documentation"
-        }
+        },
+        "cmd": {
+            "setPublicSpace": {
+                "desc": "Sets the URL space/prefix for the public site. Creates a subdirectory inside the public folder and moves all content there. Use empty destination to restore to root. Note: Site URL changes (e.g., http://domain/web/ when set to \"web\")",
+                "params": {
+                    "destination": "URL prefix/space for public site (empty string to remove)"
+                }
+            },
+            "renameSecureFolder": {
+                "desc": "Renames the secure/backend folder at server root level. Updates SECURE_FOLDER_NAME constant. Management URL stays the same.",
+                "params": {
+                    "destination": "New folder name (single name, no paths)"
+                }
+            },
+            "renamePublicFolder": {
+                "desc": "Renames the public folder at server root level. Updates all references. Requires Apache/web server config update after rename.",
+                "params": {
+                    "destination": "New folder name (single name, no paths)"
+                }
+            },
+            "addRoute": {
+                "desc": "Creates a new route with PHP page template and empty JSON structure",
+                "params": {
+                    "route": "Route name for URL (lowercase, numbers, hyphens)"
+                }
+            },
+            "deleteRoute": {
+                "desc": "Deletes an existing route and its associated files (PHP and JSON). Also removes any URL aliases pointing to this route.",
+                "params": {
+                    "route": "Route name to delete"
+                }
+            },
+            "getRoutes": {
+                "desc": "Returns list of all available routes in the system"
+            },
+            "getStructure": {
+                "desc": "Retrieves the JSON structure for a page, menu, footer, or component. Options: showIds (adds node identifiers), summary (tree overview), or nodeId (get specific node by 0-indexed path like 0.2.1)"
+            },
+            "editStructure": {
+                "desc": "Updates the JSON structure. Two modes: full replacement (send complete structure) or targeted edit (use nodeId + action: update, delete, insertBefore, insertAfter)",
+                "params": {
+                    "type": "Structure type: page, menu, footer, component",
+                    "name": "Name (required for page/component)",
+                    "structure": "JSON structure to save",
+                    "nodeId": "Target node for surgical edit (e.g., 0.2.1)",
+                    "action": "update, delete, insertBefore, insertAfter"
+                }
+            },
+            "listComponents": {
+                "desc": "Lists all reusable JSON components with metadata. Shows available slots (placeholders) and component dependencies."
+            },
+            "listPages": {
+                "desc": "Lists all JSON page structures with metadata. Shows route status, components used, and translation keys."
+            },
+            "createAlias": {
+                "desc": "Creates a URL redirect alias that points to an existing route. Supports 301 redirects or internal (transparent) routing.",
+                "params": {
+                    "alias": "URL path for the alias",
+                    "target": "Target route to redirect to",
+                    "type": "redirect (301) or internal (transparent)"
+                }
+            },
+            "deleteAlias": {
+                "desc": "Deletes an existing URL redirect alias.",
+                "params": {
+                    "alias": "Alias URL path to delete"
+                }
+            },
+            "listAliases": {
+                "desc": "Lists all URL redirect aliases with their targets and types."
+            },
+            "getTranslation": {
+                "desc": "Retrieves translations for a single language"
+            },
+            "getTranslations": {
+                "desc": "Retrieves translations for all languages"
+            },
+            "setTranslationKeys": {
+                "desc": "Sets/updates specific translation keys (merge, not replace)",
+                "params": {
+                    "language": "Language code (e.g., en, fr)",
+                    "translations": "Object of keys to add/update (safe merge)"
+                }
+            },
+            "deleteTranslationKeys": {
+                "desc": "Deletes specific translation keys from a language file",
+                "params": {
+                    "language": "Language code (e.g., en, fr)",
+                    "keys": "Array of dot-notation keys to delete"
+                }
+            },
+            "getTranslationKeys": {
+                "desc": "Scans all JSON structures and extracts required translation keys"
+            },
+            "validateTranslations": {
+                "desc": "Validates translation completeness by comparing required keys with existing translations"
+            },
+            "getUnusedTranslationKeys": {
+                "desc": "Finds translation keys that exist in translation files but are not used in any structure"
+            },
+            "analyzeTranslations": {
+                "desc": "Complete translation health check - finds both missing AND unused keys"
+            },
+            "getLangList": {
+                "desc": "Returns list of configured languages and multilingual settings"
+            },
+            "setMultilingual": {
+                "desc": "Enable or disable multilingual support. Syncs translations between default.json and default language file.",
+                "params": {
+                    "enabled": "Boolean: true for multilingual, false for mono-language"
+                }
+            },
+            "checkStructureMulti": {
+                "desc": "Scans all structures for lang-specific content. Use before switching to mono-language mode."
+            },
+            "addLang": {
+                "desc": "Adds a new language to the system",
+                "params": {
+                    "code": "ISO language code (e.g., es, de)",
+                    "name": "Display name (e.g., Espanol)"
+                }
+            },
+            "deleteLang": {
+                "desc": "Deletes a language from the system",
+                "params": {
+                    "code": "Language code to delete (not default/last)"
+                }
+            },
+            "setDefaultLang": {
+                "desc": "Sets the default language for the site",
+                "params": {
+                    "lang": "Language code to set as default (must exist)"
+                }
+            },
+            "uploadAsset": {
+                "desc": "Uploads a file to the assets folder with validation and automatic naming",
+                "params": {
+                    "category": "images, scripts, font, audio, or videos",
+                    "file": "File upload (multipart/form-data)"
+                }
+            },
+            "deleteAsset": {
+                "desc": "Deletes a file from the assets folder"
+            },
+            "listAssets": {
+                "desc": "Lists all files in assets folder with metadata, optionally filtered by category"
+            },
+            "updateAssetMeta": {
+                "desc": "Updates metadata (description, alt text) for an existing asset. Useful for AI context and accessibility.",
+                "params": {
+                    "category": "Asset category (images, scripts, font, audio, videos)",
+                    "filename": "Name of the file to update metadata for",
+                    "description": "Description for AI context (max 500 chars)",
+                    "alt": "Alt text for images/accessibility (max 200 chars)"
+                }
+            },
+            "getStyles": {
+                "desc": "Retrieves the content of the main SCSS/CSS file"
+            },
+            "editStyles": {
+                "desc": "Updates the content of the main SCSS/CSS file",
+                "params": {
+                    "content": "Complete CSS content (replaces file)"
+                }
+            },
+            "getRootVariables": {
+                "desc": "Retrieves all CSS custom properties (variables) defined in the :root selector"
+            },
+            "setRootVariables": {
+                "desc": "Add or update CSS custom properties (variables) in the :root selector",
+                "params": {
+                    "variables": "Object of CSS variables to set/update"
+                }
+            },
+            "listStyleRules": {
+                "desc": "Lists all CSS selectors in the stylesheet, organized by global and media query scopes"
+            },
+            "getStyleRule": {
+                "desc": "Get CSS styles for a specific selector, optionally within a media query context"
+            },
+            "setStyleRule": {
+                "desc": "Add or update a CSS rule for any selector",
+                "params": {
+                    "selector": "CSS selector (e.g., .btn-primary)",
+                    "styles": "CSS declarations (string or object)",
+                    "mediaQuery": "Media query context (optional)"
+                }
+            },
+            "deleteStyleRule": {
+                "desc": "Remove a CSS rule from the stylesheet",
+                "params": {
+                    "selector": "CSS selector to delete",
+                    "mediaQuery": "Media query context (optional)"
+                }
+            },
+            "getKeyframes": {
+                "desc": "Retrieves all @keyframes animations defined in the stylesheet"
+            },
+            "setKeyframes": {
+                "desc": "Add or update a @keyframes animation",
+                "params": {
+                    "name": "Animation name (alphanumeric)",
+                    "frames": "Object with frame keys (0%, 50%, from, to)"
+                }
+            },
+            "deleteKeyframes": {
+                "desc": "Remove a @keyframes animation from the stylesheet",
+                "params": {
+                    "name": "Animation name to delete"
+                }
+            },
+            "editFavicon": {
+                "desc": "Updates the site favicon with a new image from assets/images folder (PNG only)",
+                "params": {
+                    "imageName": "PNG filename from assets/images/"
+                }
+            },
+            "editTitle": {
+                "desc": "Updates page title for a specific route and language in the translation file (page.titles.{route} structure)",
+                "params": {
+                    "route": "Route name to update title for",
+                    "lang": "Language code",
+                    "title": "New page title text"
+                }
+            },
+            "build": {
+                "desc": "Creates a production-ready build with compiled PHP files, optional folder renaming, config sanitization, and ZIP archive creation",
+                "params": {
+                    "public": "Custom public folder name/path",
+                    "secure": "Custom secure folder name (single level)",
+                    "space": "PUBLIC_FOLDER_SPACE subdirectory"
+                }
+            },
+            "listBuilds": {
+                "desc": "Lists all available builds with metadata including creation date, sizes, languages, and page counts"
+            },
+            "getBuild": {
+                "desc": "Get detailed info for a specific build including manifest data, file count, and directory contents",
+                "params": {
+                    "name": "Build name (e.g., build_20250101_120000)"
+                }
+            },
+            "deleteBuild": {
+                "desc": "Delete a specific build including both folder and ZIP archive",
+                "params": {
+                    "name": "Build name to delete"
+                }
+            },
+            "cleanBuilds": {
+                "desc": "Bulk delete builds older than a specified timestamp with optional dry-run mode",
+                "params": {
+                    "before": "Unix timestamp or date string",
+                    "dry_run": "Preview without deleting (default: false)"
+                }
+            },
+            "deployBuild": {
+                "desc": "Deploy a build to production paths with file locking and integrity checks",
+                "params": {
+                    "name": "Build name to deploy",
+                    "publicPath": "Absolute path for public folder",
+                    "securePath": "Absolute path for secure folder",
+                    "overwrite": "Overwrite existing files (default: false)"
+                }
+            },
+            "downloadBuild": {
+                "desc": "Get download URL for a build ZIP file with size and manifest info",
+                "params": {
+                    "name": "Build name to download"
+                }
+            },
+            "getCommandHistory": {
+                "desc": "Retrieves command execution history with filtering and pagination. Supports filtering by date, command, status, and token."
+            },
+            "clearCommandHistory": {
+                "desc": "Deletes command log files older than a specified date. Shows preview without confirm=true.",
+                "params": {
+                    "before": "Date in YYYY-MM-DD format",
+                    "confirm": "Set to true to execute deletion"
+                }
+            },
+            "generateToken": {
+                "desc": "Creates a new API authentication token with specified permissions. Requires admin permission.",
+                "params": {
+                    "name": "Descriptive name for the token",
+                    "permissions": "Array: *, read, write, admin, command:name"
+                }
+            },
+            "listTokens": {
+                "desc": "Lists all API tokens with masked values. Requires admin permission."
+            },
+            "revokeToken": {
+                "desc": "Revokes (permanently deletes) an API token. Requires admin permission.",
+                "params": {
+                    "token_preview": "Token preview from listTokens or full token"
+                }
+            },
+            "help": {
+                "desc": "Returns documentation for all available commands"
+            }
+        },
+        "labels": {
+            "urlPatterns": "URL Patterns",
+            "parameters": "Parameters",
+            "required": "(required)",
+            "optional": "(optional)",
+            "parameters_93": "URL Parameter",
+            "parameters_106": "URL Parameter"
+        },
+        "urlPatternsDesc": "All API endpoints follow the pattern /management/{command}. Some commands accept URL path parameters for GET requests - these are shown with the command URL below. Use GET /management/help/{command} for detailed API documentation."
     },
     "tutorial": {
         "title": "Getting Started with QuickSite",

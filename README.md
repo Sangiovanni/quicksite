@@ -204,9 +204,10 @@ curl -H "Authorization: Bearer your_token_here" \
 - `PATCH /management/setDefaultLang` - Set default language (multilingual mode only)
 
 #### **Asset Management**
-- `POST /management/uploadAsset` - Upload file to assets
+- `POST /management/uploadAsset` - Upload file to assets (with optional description)
 - `POST /management/deleteAsset` - Delete asset file
-- `GET /management/listAssets/{category?}` - List assets by category
+- `GET /management/listAssets/{category?}` - List assets by category (includes metadata)
+- `POST /management/updateAssetMeta` - Update asset metadata (description, alt text)
 
 #### **Customization**
 - `POST /management/editFavicon` - Update favicon from assets

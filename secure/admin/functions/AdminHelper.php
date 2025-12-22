@@ -108,7 +108,7 @@ function getCommandCategories(): array {
         'asset_management' => [
             'label' => 'Assets',
             'icon' => 'image',
-            'commands' => ['uploadAsset', 'deleteAsset', 'listAssets']
+            'commands' => ['uploadAsset', 'deleteAsset', 'listAssets', 'updateAssetMeta']
         ],
         'style_management' => [
             'label' => 'Styles',

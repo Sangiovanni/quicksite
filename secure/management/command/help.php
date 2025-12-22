@@ -1465,8 +1465,68 @@ $commands = [
         'error_responses' => [
             '400.asset.invalid_category' => 'Invalid category'
         ],
-        'notes' => 'Returns files sorted alphabetically. Excludes index.php files. Shows size in bytes and last modified timestamp.'
+        'notes' => 'Returns files sorted alphabetically. Excludes index.php files. Shows size in bytes and last modified timestamp. Includes metadata (description, alt, dimensions) when available.'
     ],
+    
+    'updateAssetMeta' => [
+        'description' => 'Updates metadata (description, alt text) for an existing asset. Useful for AI context and accessibility.',
+        'method' => 'POST',
+        'parameters' => [
+            'category' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Asset category',
+                'example' => 'images',
+                'validation' => 'Must be one of: images, scripts, font, audio, videos'
+            ],
+            'filename' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Name of the file to update metadata for',
+                'example' => 'logo.png',
+                'validation' => 'Must exist in specified category'
+            ],
+            'description' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Description of the asset for AI context and documentation',
+                'example' => 'Company logo displayed in header',
+                'validation' => 'Max 500 characters'
+            ],
+            'alt' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Alt text for images (accessibility)',
+                'example' => 'Acme Corp logo - blue mountains on white background',
+                'validation' => 'Max 200 characters'
+            ]
+        ],
+        'example_request' => 'POST /management/updateAssetMeta {"category": "images", "filename": "logo.png", "description": "Main company logo", "alt": "Company logo"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Asset metadata updated successfully',
+            'data' => [
+                'category' => 'images',
+                'filename' => 'logo.png',
+                'metadata' => [
+                    'description' => 'Main company logo',
+                    'alt' => 'Company logo',
+                    'dimensions' => ['width' => 200, 'height' => 50]
+                ]
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.missing_field' => 'Missing required parameter (category or filename)',
+            '400.validation.invalid_type' => 'Parameter must be a string',
+            '400.validation.invalid_value' => 'Invalid category',
+            '400.validation.invalid_length' => 'Description or alt text too long',
+            '400.validation.no_updates' => 'At least one metadata field required',
+            '404.asset.not_found' => 'Asset file not found'
+        ],
+        'notes' => 'Metadata is stored in secure/config/assets_metadata.json. At least one of description or alt must be provided. Image dimensions are auto-detected if not already stored.'
+    ],
+    
     'getStyles' => [
         'description' => 'Retrieves the content of the main SCSS/CSS file',
         'method' => 'GET',
@@ -2176,7 +2236,7 @@ ApiResponse::create(200, 'operation.success')
             'alias_management' => ['createAlias', 'deleteAlias', 'listAliases'],
             'translation_management' => ['getTranslation', 'getTranslations', 'setTranslationKeys', 'deleteTranslationKeys', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations'],
             'language_management' => ['getLangList', 'setMultilingual', 'checkStructureMulti', 'addLang', 'deleteLang', 'setDefaultLang'],
-            'asset_management' => ['uploadAsset', 'deleteAsset', 'listAssets'],
+            'asset_management' => ['uploadAsset', 'deleteAsset', 'listAssets', 'updateAssetMeta'],
             'style_management' => ['getStyles', 'editStyles'],
             'css_variables_rules' => ['getRootVariables', 'setRootVariables', 'listStyleRules', 'getStyleRule', 'setStyleRule', 'deleteStyleRule'],
             'css_animations' => ['getKeyframes', 'setKeyframes', 'deleteKeyframes'],
@@ -2208,7 +2268,7 @@ ApiResponse::create(200, 'operation.success')
         'note' => 'For GET commands with URL parameters, use URL segments (e.g., /getStructure/menu, /validateTranslations/en, /getStyleRule/.btn-primary). For POST commands, send parameters as JSON in request body. For file uploads, use multipart/form-data encoding.',
         'workflows' => [
             'translation_workflow' => '1) analyzeTranslations for full health check, OR 2) validateTranslations to find missing, 3) getUnusedTranslationKeys to find orphans, 4) setTranslationKeys to add/update, 5) deleteTranslationKeys to clean up.',
-            'asset_workflow' => '1) listAssets to see existing files, 2) uploadAsset to add new files (auto-renames if exists), 3) deleteAsset to remove files.',
+            'asset_workflow' => '1) listAssets to see existing files with metadata, 2) uploadAsset to add new files (with optional description), 3) updateAssetMeta to add/update descriptions and alt text, 4) deleteAsset to remove files.',
             'style_workflow' => '1) getStyles to retrieve current CSS, 2) editStyles to update (response includes backup for rollback).',
             'css_granular_workflow' => '1) getRootVariables to see all CSS variables, 2) setRootVariables to update colors/spacing/etc, 3) listStyleRules to see all selectors, 4) getStyleRule to inspect specific rules, 5) setStyleRule to add/update rules, 6) deleteStyleRule to remove rules.',
             'animation_workflow' => '1) getKeyframes to list all animations, 2) setKeyframes to add/update animations, 3) deleteKeyframes to remove animations.',

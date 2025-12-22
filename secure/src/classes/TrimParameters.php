@@ -7,7 +7,7 @@ class TrimParameters{
   private $page = ROUTES[0] ?? 'home';
   private $id = null;
   private $params = [];
-  private static $supportedLangs = MULTILINGUAL_SUPPORT ?  ['fr', 'en'] : [];
+  private static $supportedLangs = MULTILINGUAL_SUPPORT ?  CONFIG['LANGUAGES_SUPPORTED'] : [];
   private static $supportedRoute = ROUTES;
 
   public function __construct() {

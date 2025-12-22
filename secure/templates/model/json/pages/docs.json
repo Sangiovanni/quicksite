@@ -76,7 +76,7 @@
                 "tag": "h2",
                 "children": [
                     {
-                        "textKey": "__RAW__URL Patterns"
+                        "textKey": "docs.labels.urlPatterns"
                     }
                 ]
             },
@@ -84,7 +84,7 @@
                 "tag": "p",
                 "children": [
                     {
-                        "textKey": "__RAW__All API endpoints follow the pattern /management/{command}. Some commands accept URL path parameters for GET requests - these are shown with the command URL below. Use GET /management/help/{command} for detailed API documentation."
+                        "textKey": "docs.urlPatternsDesc"
                     }
                 ]
             }
@@ -169,7 +169,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Sets the URL space/prefix for the public site. Creates a subdirectory inside the public folder and moves all content there. Use empty destination to restore to root. Note: Site URL changes (e.g., http://domain/web/ when set to \"web\")"
+                                        "textKey": "docs.cmd.setPublicSpace.desc"
                                     }
                                 ]
                             },
@@ -186,7 +186,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -214,7 +214,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -225,7 +225,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__URL prefix/space for public site (empty string to remove)"
+                                                                "textKey": "docs.cmd.setPublicSpace.params.destination"
                                                             }
                                                         ]
                                                     }
@@ -292,7 +292,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Renames the secure/backend folder at server root level. Updates SECURE_FOLDER_NAME constant. Management URL stays the same."
+                                        "textKey": "docs.cmd.renameSecureFolder.desc"
                                     }
                                 ]
                             },
@@ -309,7 +309,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -337,7 +337,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -348,7 +348,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__New folder name (single name, no paths)"
+                                                                "textKey": "docs.cmd.renameSecureFolder.params.destination"
                                                             }
                                                         ]
                                                     }
@@ -415,7 +415,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Renames the public folder at server root level. Updates all references. Requires Apache/web server config update after rename."
+                                        "textKey": "docs.cmd.renamePublicFolder.desc"
                                     }
                                 ]
                             },
@@ -432,7 +432,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -460,7 +460,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -471,7 +471,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__New folder name (single name, no paths)"
+                                                                "textKey": "docs.cmd.renamePublicFolder.params.destination"
                                                             }
                                                         ]
                                                     }
@@ -566,7 +566,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Creates a new route with PHP page template and empty JSON structure"
+                                        "textKey": "docs.cmd.addRoute.desc"
                                     }
                                 ]
                             },
@@ -583,7 +583,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -611,7 +611,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -622,7 +622,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Route name for URL (lowercase, numbers, hyphens)"
+                                                                "textKey": "docs.cmd.addRoute.params.route"
                                                             }
                                                         ]
                                                     }
@@ -689,7 +689,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Deletes an existing route and its associated files (PHP and JSON). Also removes any URL aliases pointing to this route."
+                                        "textKey": "docs.cmd.deleteRoute.desc"
                                     }
                                 ]
                             },
@@ -706,7 +706,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -734,7 +734,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -745,7 +745,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Route name to delete"
+                                                                "textKey": "docs.cmd.deleteRoute.params.route"
                                                             }
                                                         ]
                                                     }
@@ -812,7 +812,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Returns list of all available routes in the system"
+                                        "textKey": "docs.cmd.getRoutes.desc"
                                     }
                                 ]
                             }
@@ -901,7 +901,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Retrieves the JSON structure for a page, menu, footer, or component. Options: showIds (adds node identifiers), summary (tree overview), or nodeId (get specific node by 0-indexed path like 0.2.1)"
+                                        "textKey": "docs.cmd.getStructure.desc"
                                     }
                                 ]
                             }
@@ -962,7 +962,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Updates the JSON structure. Two modes: full replacement (send complete structure) or targeted edit (use nodeId + action: update, delete, insertBefore, insertAfter)"
+                                        "textKey": "docs.cmd.editStructure.desc"
                                     }
                                 ]
                             },
@@ -979,7 +979,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -1007,7 +1007,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -1018,7 +1018,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Structure type: page, menu, footer, component"
+                                                                "textKey": "docs.cmd.editStructure.params.type"
                                                             }
                                                         ]
                                                     }
@@ -1045,7 +1045,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(optional)"
+                                                                "textKey": "docs.labels.optional"
                                                             }
                                                         ]
                                                     },
@@ -1056,7 +1056,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Name (required for page/component)"
+                                                                "textKey": "docs.cmd.editStructure.params.name"
                                                             }
                                                         ]
                                                     }
@@ -1083,7 +1083,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -1094,7 +1094,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__JSON structure to save"
+                                                                "textKey": "docs.cmd.editStructure.params.structure"
                                                             }
                                                         ]
                                                     }
@@ -1121,7 +1121,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(optional)"
+                                                                "textKey": "docs.labels.optional"
                                                             }
                                                         ]
                                                     },
@@ -1132,7 +1132,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Target node for surgical edit (e.g., 0.2.1)"
+                                                                "textKey": "docs.cmd.editStructure.params.nodeId"
                                                             }
                                                         ]
                                                     }
@@ -1159,7 +1159,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(optional)"
+                                                                "textKey": "docs.labels.optional"
                                                             }
                                                         ]
                                                     },
@@ -1170,7 +1170,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__update, delete, insertBefore, insertAfter"
+                                                                "textKey": "docs.cmd.editStructure.params.action"
                                                             }
                                                         ]
                                                     }
@@ -1237,7 +1237,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Lists all reusable JSON components with metadata. Shows available slots (placeholders) and component dependencies."
+                                        "textKey": "docs.cmd.listComponents.desc"
                                     }
                                 ]
                             }
@@ -1298,7 +1298,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Lists all JSON page structures with metadata. Shows route status, components used, and translation keys."
+                                        "textKey": "docs.cmd.listPages.desc"
                                     }
                                 ]
                             }
@@ -1387,7 +1387,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Creates a URL redirect alias that points to an existing route. Supports 301 redirects or internal (transparent) routing."
+                                        "textKey": "docs.cmd.createAlias.desc"
                                     }
                                 ]
                             },
@@ -1404,7 +1404,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -1432,7 +1432,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -1443,7 +1443,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__URL path for the alias"
+                                                                "textKey": "docs.cmd.createAlias.params.alias"
                                                             }
                                                         ]
                                                     }
@@ -1470,7 +1470,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -1481,7 +1481,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Target route to redirect to"
+                                                                "textKey": "docs.cmd.createAlias.params.target"
                                                             }
                                                         ]
                                                     }
@@ -1508,7 +1508,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(optional)"
+                                                                "textKey": "docs.labels.optional"
                                                             }
                                                         ]
                                                     },
@@ -1519,7 +1519,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__redirect (301) or internal (transparent)"
+                                                                "textKey": "docs.cmd.createAlias.params.type"
                                                             }
                                                         ]
                                                     }
@@ -1586,7 +1586,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Deletes an existing URL redirect alias."
+                                        "textKey": "docs.cmd.deleteAlias.desc"
                                     }
                                 ]
                             },
@@ -1603,7 +1603,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -1631,7 +1631,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -1642,7 +1642,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Alias URL path to delete"
+                                                                "textKey": "docs.cmd.deleteAlias.params.alias"
                                                             }
                                                         ]
                                                     }
@@ -1709,7 +1709,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Lists all URL redirect aliases with their targets and types."
+                                        "textKey": "docs.cmd.listAliases.desc"
                                     }
                                 ]
                             }
@@ -1798,7 +1798,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Retrieves translations for a single language"
+                                        "textKey": "docs.cmd.getTranslation.desc"
                                     }
                                 ]
                             }
@@ -1859,7 +1859,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Retrieves translations for all languages"
+                                        "textKey": "docs.cmd.getTranslations.desc"
                                     }
                                 ]
                             }
@@ -1920,7 +1920,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Sets/updates specific translation keys (merge, not replace)"
+                                        "textKey": "docs.cmd.setTranslationKeys.desc"
                                     }
                                 ]
                             },
@@ -1937,7 +1937,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -1965,7 +1965,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -1976,7 +1976,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Language code (e.g., en, fr)"
+                                                                "textKey": "docs.cmd.setTranslationKeys.params.language"
                                                             }
                                                         ]
                                                     }
@@ -2003,7 +2003,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -2014,7 +2014,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Object of keys to add/update (safe merge)"
+                                                                "textKey": "docs.cmd.setTranslationKeys.params.translations"
                                                             }
                                                         ]
                                                     }
@@ -2081,7 +2081,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Deletes specific translation keys from a language file"
+                                        "textKey": "docs.cmd.deleteTranslationKeys.desc"
                                     }
                                 ]
                             },
@@ -2117,7 +2117,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -2145,7 +2145,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -2156,7 +2156,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Language code (e.g., en, fr)"
+                                                                "textKey": "docs.cmd.deleteTranslationKeys.params.language"
                                                             }
                                                         ]
                                                     }
@@ -2183,7 +2183,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -2194,7 +2194,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Array of dot-notation keys to delete"
+                                                                "textKey": "docs.cmd.deleteTranslationKeys.params.keys"
                                                             }
                                                         ]
                                                     }
@@ -2280,7 +2280,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Scans all JSON structures and extracts required translation keys"
+                                        "textKey": "docs.cmd.getTranslationKeys.desc"
                                     }
                                 ]
                             }
@@ -2341,7 +2341,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Validates translation completeness by comparing required keys with existing translations"
+                                        "textKey": "docs.cmd.validateTranslations.desc"
                                     }
                                 ]
                             }
@@ -2402,7 +2402,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Finds translation keys that exist in translation files but are not used in any structure"
+                                        "textKey": "docs.cmd.getUnusedTranslationKeys.desc"
                                     }
                                 ]
                             }
@@ -2463,7 +2463,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Complete translation health check - finds both missing AND unused keys"
+                                        "textKey": "docs.cmd.analyzeTranslations.desc"
                                     }
                                 ]
                             }
@@ -2552,7 +2552,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Returns list of configured languages and multilingual settings"
+                                        "textKey": "docs.cmd.getLangList.desc"
                                     }
                                 ]
                             },
@@ -2632,7 +2632,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Enable or disable multilingual support. Syncs translations between default.json and default language file."
+                                        "textKey": "docs.cmd.setMultilingual.desc"
                                     }
                                 ]
                             },
@@ -2649,7 +2649,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -2677,7 +2677,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -2688,7 +2688,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Boolean: true for multilingual, false for mono-language"
+                                                                "textKey": "docs.cmd.setMultilingual.params.enabled"
                                                             }
                                                         ]
                                                     }
@@ -2755,7 +2755,7 @@
                                 "tag": "p",
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Enable or disable multilingual support. Syncs translations between default.json and default language file."
+                                        "textKey": "docs.cmd.setMultilingual.desc"
                                     }
                                 ]
                             },
@@ -2772,7 +2772,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -2800,7 +2800,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -2811,7 +2811,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Boolean: true for multilingual, false for mono-language"
+                                                                "textKey": "docs.cmd.setMultilingual.params.enabled"
                                                             }
                                                         ]
                                                     }
@@ -2832,29 +2832,55 @@
                         "children": [
                             {
                                 "tag": "div",
-                                "params": {"class": "command-header"},
+                                "params": {
+                                    "class": "command-header"
+                                },
                                 "children": [
                                     {
                                         "tag": "h3",
-                                        "params": {"class": "command-name"},
-                                        "children": [{"textKey": "__RAW__checkStructureMulti"}]
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__checkStructureMulti"
+                                            }
+                                        ]
                                     },
                                     {
                                         "tag": "span",
-                                        "params": {"class": "method-badge method-get"},
-                                        "children": [{"textKey": "__RAW__GET"}]
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
                                     }
                                 ]
                             },
                             {
                                 "tag": "code",
-                                "params": {"class": "command-url"},
-                                "children": [{"textKey": "__RAW__GET /management/checkStructureMulti"}]
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/checkStructureMulti"
+                                    }
+                                ]
                             },
                             {
                                 "tag": "p",
-                                "params": {"class": "command-desc"},
-                                "children": [{"textKey": "__RAW__Scans all structures for lang-specific content. Use before switching to mono-language mode."}]
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.checkStructureMulti.desc"
+                                    }
+                                ]
                             }
                         ]
                     },
@@ -2913,7 +2939,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Adds a new language to the system"
+                                        "textKey": "docs.cmd.addLang.desc"
                                     }
                                 ]
                             },
@@ -2930,7 +2956,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -2958,7 +2984,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -2969,7 +2995,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__ISO language code (e.g., es, de)"
+                                                                "textKey": "docs.cmd.addLang.params.code"
                                                             }
                                                         ]
                                                     }
@@ -2996,7 +3022,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -3007,7 +3033,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Display name (e.g., Espanol)"
+                                                                "textKey": "docs.cmd.addLang.params.name"
                                                             }
                                                         ]
                                                     }
@@ -3074,7 +3100,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Deletes a language from the system"
+                                        "textKey": "docs.cmd.deleteLang.desc"
                                     }
                                 ]
                             },
@@ -3091,7 +3117,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -3119,7 +3145,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -3130,7 +3156,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Language code to delete (not default/last)"
+                                                                "textKey": "docs.cmd.deleteLang.params.code"
                                                             }
                                                         ]
                                                     }
@@ -3197,7 +3223,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Sets the default language for the site"
+                                        "textKey": "docs.cmd.setDefaultLang.desc"
                                     }
                                 ]
                             },
@@ -3214,7 +3240,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -3242,7 +3268,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -3253,7 +3279,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Language code to set as default (must exist)"
+                                                                "textKey": "docs.cmd.setDefaultLang.params.lang"
                                                             }
                                                         ]
                                                     }
@@ -3348,7 +3374,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Uploads a file to the assets folder with validation and automatic naming"
+                                        "textKey": "docs.cmd.uploadAsset.desc"
                                     }
                                 ]
                             },
@@ -3365,7 +3391,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -3393,7 +3419,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -3404,7 +3430,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__images, scripts, font, audio, or videos"
+                                                                "textKey": "docs.cmd.uploadAsset.params.category"
                                                             }
                                                         ]
                                                     }
@@ -3431,7 +3457,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -3442,7 +3468,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__File upload (multipart/form-data)"
+                                                                "textKey": "docs.cmd.uploadAsset.params.file"
                                                             }
                                                         ]
                                                     }
@@ -3509,7 +3535,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Deletes a file from the assets folder"
+                                        "textKey": "docs.cmd.deleteAsset.desc"
                                     }
                                 ]
                             }
@@ -3570,7 +3596,244 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Lists all files in assets folder, optionally filtered by category"
+                                        "textKey": "docs.cmd.listAssets.desc"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-updateAssetMeta"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__updateAssetMeta"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/updateAssetMeta"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.updateAssetMeta.desc"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "docs.labels.parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__category"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.required"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.updateAssetMeta.params.category"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__filename"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.required"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.updateAssetMeta.params.filename"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__description"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.optional"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.updateAssetMeta.params.description"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__alt"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.optional"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.updateAssetMeta.params.alt"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -3659,7 +3922,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Retrieves the content of the main SCSS/CSS file"
+                                        "textKey": "docs.cmd.getStyles.desc"
                                     }
                                 ]
                             }
@@ -3720,7 +3983,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Updates the content of the main SCSS/CSS file"
+                                        "textKey": "docs.cmd.editStyles.desc"
                                     }
                                 ]
                             },
@@ -3737,7 +4000,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -3765,7 +4028,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -3776,7 +4039,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Complete CSS content (replaces file)"
+                                                                "textKey": "docs.cmd.editStyles.params.content"
                                                             }
                                                         ]
                                                     }
@@ -3871,7 +4134,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Retrieves all CSS custom properties (variables) defined in the :root selector"
+                                        "textKey": "docs.cmd.getRootVariables.desc"
                                     }
                                 ]
                             }
@@ -3932,7 +4195,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Add or update CSS custom properties (variables) in the :root selector"
+                                        "textKey": "docs.cmd.setRootVariables.desc"
                                     }
                                 ]
                             },
@@ -3949,7 +4212,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -3977,7 +4240,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -3988,7 +4251,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Object of CSS variables to set/update"
+                                                                "textKey": "docs.cmd.setRootVariables.params.variables"
                                                             }
                                                         ]
                                                     }
@@ -4055,7 +4318,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Lists all CSS selectors in the stylesheet, organized by global and media query scopes"
+                                        "textKey": "docs.cmd.listStyleRules.desc"
                                     }
                                 ]
                             }
@@ -4116,7 +4379,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Get CSS styles for a specific selector, optionally within a media query context"
+                                        "textKey": "docs.cmd.getStyleRule.desc"
                                     }
                                 ]
                             }
@@ -4177,7 +4440,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Add or update a CSS rule for any selector"
+                                        "textKey": "docs.cmd.setStyleRule.desc"
                                     }
                                 ]
                             },
@@ -4194,7 +4457,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -4222,7 +4485,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -4233,7 +4496,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__CSS selector (e.g., .btn-primary)"
+                                                                "textKey": "docs.cmd.setStyleRule.params.selector"
                                                             }
                                                         ]
                                                     }
@@ -4260,7 +4523,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -4271,7 +4534,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__CSS declarations (string or object)"
+                                                                "textKey": "docs.cmd.setStyleRule.params.styles"
                                                             }
                                                         ]
                                                     }
@@ -4298,7 +4561,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(optional)"
+                                                                "textKey": "docs.labels.optional"
                                                             }
                                                         ]
                                                     },
@@ -4309,7 +4572,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Media query context (optional)"
+                                                                "textKey": "docs.cmd.setStyleRule.params.mediaQuery"
                                                             }
                                                         ]
                                                     }
@@ -4376,7 +4639,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Remove a CSS rule from the stylesheet"
+                                        "textKey": "docs.cmd.deleteStyleRule.desc"
                                     }
                                 ]
                             },
@@ -4393,7 +4656,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -4421,7 +4684,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -4432,7 +4695,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__CSS selector to delete"
+                                                                "textKey": "docs.cmd.deleteStyleRule.params.selector"
                                                             }
                                                         ]
                                                     }
@@ -4459,7 +4722,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(optional)"
+                                                                "textKey": "docs.labels.optional"
                                                             }
                                                         ]
                                                     },
@@ -4470,7 +4733,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Media query context (optional)"
+                                                                "textKey": "docs.cmd.deleteStyleRule.params.mediaQuery"
                                                             }
                                                         ]
                                                     }
@@ -4565,7 +4828,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Retrieves all @keyframes animations defined in the stylesheet"
+                                        "textKey": "docs.cmd.getKeyframes.desc"
                                     }
                                 ]
                             }
@@ -4626,7 +4889,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Add or update a @keyframes animation"
+                                        "textKey": "docs.cmd.setKeyframes.desc"
                                     }
                                 ]
                             },
@@ -4643,7 +4906,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -4671,7 +4934,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -4682,7 +4945,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Animation name (alphanumeric)"
+                                                                "textKey": "docs.cmd.setKeyframes.params.name"
                                                             }
                                                         ]
                                                     }
@@ -4709,7 +4972,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -4720,7 +4983,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Object with frame keys (0%, 50%, from, to)"
+                                                                "textKey": "docs.cmd.setKeyframes.params.frames"
                                                             }
                                                         ]
                                                     }
@@ -4787,7 +5050,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Remove a @keyframes animation from the stylesheet"
+                                        "textKey": "docs.cmd.deleteKeyframes.desc"
                                     }
                                 ]
                             },
@@ -4804,7 +5067,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -4832,7 +5095,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -4843,7 +5106,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Animation name to delete"
+                                                                "textKey": "docs.cmd.deleteKeyframes.params.name"
                                                             }
                                                         ]
                                                     }
@@ -4938,7 +5201,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Updates the site favicon with a new image from assets/images folder (PNG only)"
+                                        "textKey": "docs.cmd.editFavicon.desc"
                                     }
                                 ]
                             },
@@ -4955,7 +5218,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -4983,7 +5246,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -4994,7 +5257,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__PNG filename from assets/images/"
+                                                                "textKey": "docs.cmd.editFavicon.params.imageName"
                                                             }
                                                         ]
                                                     }
@@ -5061,7 +5324,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Updates page title for a specific route and language in the translation file (page.titles.{route} structure)"
+                                        "textKey": "docs.cmd.editTitle.desc"
                                     }
                                 ]
                             },
@@ -5078,7 +5341,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -5106,7 +5369,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -5117,7 +5380,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Route name to update title for"
+                                                                "textKey": "docs.cmd.editTitle.params.route"
                                                             }
                                                         ]
                                                     }
@@ -5144,7 +5407,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -5155,7 +5418,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Language code"
+                                                                "textKey": "docs.cmd.editTitle.params.lang"
                                                             }
                                                         ]
                                                     }
@@ -5182,7 +5445,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -5193,7 +5456,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__New page title text"
+                                                                "textKey": "docs.cmd.editTitle.params.title"
                                                             }
                                                         ]
                                                     }
@@ -5288,7 +5551,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Creates a production-ready build with compiled PHP files, optional folder renaming, config sanitization, and ZIP archive creation"
+                                        "textKey": "docs.cmd.build.desc"
                                     }
                                 ]
                             },
@@ -5305,7 +5568,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -5333,7 +5596,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(optional)"
+                                                                "textKey": "docs.labels.optional"
                                                             }
                                                         ]
                                                     },
@@ -5344,7 +5607,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Custom public folder name/path"
+                                                                "textKey": "docs.cmd.build.params.public"
                                                             }
                                                         ]
                                                     }
@@ -5371,7 +5634,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(optional)"
+                                                                "textKey": "docs.labels.optional"
                                                             }
                                                         ]
                                                     },
@@ -5382,7 +5645,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Custom secure folder name (single level)"
+                                                                "textKey": "docs.cmd.build.params.secure"
                                                             }
                                                         ]
                                                     }
@@ -5409,7 +5672,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(optional)"
+                                                                "textKey": "docs.labels.optional"
                                                             }
                                                         ]
                                                     },
@@ -5420,7 +5683,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__PUBLIC_FOLDER_SPACE subdirectory"
+                                                                "textKey": "docs.cmd.build.params.space"
                                                             }
                                                         ]
                                                     }
@@ -5487,7 +5750,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Lists all available builds with metadata including creation date, sizes, languages, and page counts"
+                                        "textKey": "docs.cmd.listBuilds.desc"
                                     }
                                 ]
                             }
@@ -5548,7 +5811,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Get detailed info for a specific build including manifest data, file count, and directory contents"
+                                        "textKey": "docs.cmd.getBuild.desc"
                                     }
                                 ]
                             },
@@ -5565,7 +5828,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__URL Parameter"
+                                                "textKey": "docs.labels.parameters_93"
                                             }
                                         ]
                                     },
@@ -5593,7 +5856,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -5604,7 +5867,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Build name (e.g., build_20250101_120000)"
+                                                                "textKey": "docs.cmd.getBuild.params.name"
                                                             }
                                                         ]
                                                     }
@@ -5671,7 +5934,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Delete a specific build including both folder and ZIP archive"
+                                        "textKey": "docs.cmd.deleteBuild.desc"
                                     }
                                 ]
                             },
@@ -5688,7 +5951,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -5716,7 +5979,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -5727,7 +5990,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Build name to delete"
+                                                                "textKey": "docs.cmd.deleteBuild.params.name"
                                                             }
                                                         ]
                                                     }
@@ -5794,7 +6057,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Bulk delete builds older than a specified timestamp with optional dry-run mode"
+                                        "textKey": "docs.cmd.cleanBuilds.desc"
                                     }
                                 ]
                             },
@@ -5811,7 +6074,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -5839,7 +6102,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -5850,7 +6113,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Unix timestamp or date string"
+                                                                "textKey": "docs.cmd.cleanBuilds.params.before"
                                                             }
                                                         ]
                                                     }
@@ -5877,7 +6140,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(optional)"
+                                                                "textKey": "docs.labels.optional"
                                                             }
                                                         ]
                                                     },
@@ -5888,7 +6151,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Preview without deleting (default: false)"
+                                                                "textKey": "docs.cmd.cleanBuilds.params.dry_run"
                                                             }
                                                         ]
                                                     }
@@ -5955,7 +6218,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Deploy a build to production paths with file locking and integrity checks"
+                                        "textKey": "docs.cmd.deployBuild.desc"
                                     }
                                 ]
                             },
@@ -5972,7 +6235,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -6000,7 +6263,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -6011,7 +6274,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Build name to deploy"
+                                                                "textKey": "docs.cmd.deployBuild.params.name"
                                                             }
                                                         ]
                                                     }
@@ -6038,7 +6301,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -6049,7 +6312,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Absolute path for public folder"
+                                                                "textKey": "docs.cmd.deployBuild.params.publicPath"
                                                             }
                                                         ]
                                                     }
@@ -6076,7 +6339,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -6087,7 +6350,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Absolute path for secure folder"
+                                                                "textKey": "docs.cmd.deployBuild.params.securePath"
                                                             }
                                                         ]
                                                     }
@@ -6114,7 +6377,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(optional)"
+                                                                "textKey": "docs.labels.optional"
                                                             }
                                                         ]
                                                     },
@@ -6125,7 +6388,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Overwrite existing files (default: false)"
+                                                                "textKey": "docs.cmd.deployBuild.params.overwrite"
                                                             }
                                                         ]
                                                     }
@@ -6192,7 +6455,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Get download URL for a build ZIP file with size and manifest info"
+                                        "textKey": "docs.cmd.downloadBuild.desc"
                                     }
                                 ]
                             },
@@ -6209,7 +6472,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__URL Parameter"
+                                                "textKey": "docs.labels.parameters_106"
                                             }
                                         ]
                                     },
@@ -6237,7 +6500,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -6248,7 +6511,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Build name to download"
+                                                                "textKey": "docs.cmd.downloadBuild.params.name"
                                                             }
                                                         ]
                                                     }
@@ -6343,7 +6606,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Retrieves command execution history with filtering and pagination. Supports filtering by date, command, status, and token."
+                                        "textKey": "docs.cmd.getCommandHistory.desc"
                                     }
                                 ]
                             }
@@ -6404,7 +6667,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Deletes command log files older than a specified date. Shows preview without confirm=true."
+                                        "textKey": "docs.cmd.clearCommandHistory.desc"
                                     }
                                 ]
                             },
@@ -6421,7 +6684,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -6449,7 +6712,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -6460,7 +6723,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Date in YYYY-MM-DD format"
+                                                                "textKey": "docs.cmd.clearCommandHistory.params.before"
                                                             }
                                                         ]
                                                     }
@@ -6487,7 +6750,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -6498,7 +6761,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Set to true to execute deletion"
+                                                                "textKey": "docs.cmd.clearCommandHistory.params.confirm"
                                                             }
                                                         ]
                                                     }
@@ -6593,7 +6856,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Creates a new API authentication token with specified permissions. Requires admin permission."
+                                        "textKey": "docs.cmd.generateToken.desc"
                                     }
                                 ]
                             },
@@ -6610,7 +6873,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -6638,7 +6901,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -6649,7 +6912,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Descriptive name for the token"
+                                                                "textKey": "docs.cmd.generateToken.params.name"
                                                             }
                                                         ]
                                                     }
@@ -6676,7 +6939,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(optional)"
+                                                                "textKey": "docs.labels.optional"
                                                             }
                                                         ]
                                                     },
@@ -6687,7 +6950,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Array: *, read, write, admin, command:name"
+                                                                "textKey": "docs.cmd.generateToken.params.permissions"
                                                             }
                                                         ]
                                                     }
@@ -6754,7 +7017,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Lists all API tokens with masked values. Requires admin permission."
+                                        "textKey": "docs.cmd.listTokens.desc"
                                     }
                                 ]
                             }
@@ -6815,7 +7078,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Revokes (permanently deletes) an API token. Requires admin permission."
+                                        "textKey": "docs.cmd.revokeToken.desc"
                                     }
                                 ]
                             },
@@ -6832,7 +7095,7 @@
                                         "tag": "div",
                                         "children": [
                                             {
-                                                "textKey": "__RAW__Parameters"
+                                                "textKey": "docs.labels.parameters"
                                             }
                                         ]
                                     },
@@ -6860,7 +7123,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__(required)"
+                                                                "textKey": "docs.labels.required"
                                                             }
                                                         ]
                                                     },
@@ -6871,7 +7134,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__Token preview from listTokens or full token"
+                                                                "textKey": "docs.cmd.revokeToken.params.token_preview"
                                                             }
                                                         ]
                                                     }
@@ -6966,7 +7229,7 @@
                                 },
                                 "children": [
                                     {
-                                        "textKey": "__RAW__Returns documentation for all available commands"
+                                        "textKey": "docs.cmd.help.desc"
                                     }
                                 ]
                             }

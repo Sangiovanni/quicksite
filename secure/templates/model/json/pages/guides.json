@@ -1109,6 +1109,17 @@
                         },
                         "children": [
                             {
+                                "textKey": "__RAW__updateAssetMeta"
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "span",
+                        "params": {
+                            "class": "command-tag"
+                        },
+                        "children": [
+                            {
                                 "textKey": "__RAW__editFavicon"
                             }
                         ]
