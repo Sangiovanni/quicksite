@@ -1,8 +1,6 @@
 <?php
 /**
  * Authentication & CORS Configuration
- * 
- * Auto-updated: 2025-12-15 13:06:19
  */
 
 return array (

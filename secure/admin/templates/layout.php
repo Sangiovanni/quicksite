@@ -67,6 +67,12 @@ $langNames = [
     
     <!-- Admin-specific styles -->
     <link rel="stylesheet" href="<?= $baseUrl ?>/admin/assets/admin.css">
+    
+    <!-- Tutorial styles -->
+    <link rel="stylesheet" href="<?= $baseUrl ?>/admin/assets/css/tutorial.css">
+    
+    <!-- Bootstrap Icons for tutorial -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 </head>
 <body class="admin-body<?= $isLoginPage ? ' admin-body--login' : '' ?>">
     
@@ -310,6 +316,32 @@ $langNames = [
                 },
                 ai: {
                     executionComplete: '<?= __adminJs('ai.executionComplete') ?>'
+                },
+                tutorial: {
+                    welcomeTitle: '<?= __adminJs('tutorial.welcomeTitle') ?>',
+                    welcomeSubtitle: '<?= __adminJs('tutorial.welcomeSubtitle') ?>',
+                    whatYouLearn: '<?= __adminJs('tutorial.whatYouLearn') ?>',
+                    step1Preview: '<?= __adminJs('tutorial.step1Preview') ?>',
+                    step2Preview: '<?= __adminJs('tutorial.step2Preview') ?>',
+                    step3Preview: '<?= __adminJs('tutorial.step3Preview') ?>',
+                    step4Preview: '<?= __adminJs('tutorial.step4Preview') ?>',
+                    step5Preview: '<?= __adminJs('tutorial.step5Preview') ?>',
+                    step6Preview: '<?= __adminJs('tutorial.step6Preview') ?>',
+                    freshStartWarning: '<?= __adminJs('tutorial.freshStartWarning') ?>',
+                    startTutorial: '<?= __adminJs('tutorial.startTutorial') ?>',
+                    skipForNow: '<?= __adminJs('tutorial.skipForNow') ?>',
+                    welcomeBack: '<?= __adminJs('tutorial.welcomeBack') ?>',
+                    resumeSubtitle: '<?= __adminJs('tutorial.resumeSubtitle') ?>',
+                    yourProgress: '<?= __adminJs('tutorial.yourProgress') ?>',
+                    continueTutorial: '<?= __adminJs('tutorial.continueTutorial') ?>',
+                    startOver: '<?= __adminJs('tutorial.startOver') ?>',
+                    congratulations: '<?= __adminJs('tutorial.congratulations') ?>',
+                    tutorialComplete: '<?= __adminJs('tutorial.tutorialComplete') ?>',
+                    whatsNext: '<?= __adminJs('tutorial.whatsNext') ?>',
+                    nextExplore: '<?= __adminJs('tutorial.nextExplore') ?>',
+                    nextDocs: '<?= __adminJs('tutorial.nextDocs') ?>',
+                    nextPublish: '<?= __adminJs('tutorial.nextPublish') ?>',
+                    startCreating: '<?= __adminJs('tutorial.startCreating') ?>'
                 }
             },
             adminLang: '<?= $currentLang ?>'
@@ -339,5 +371,25 @@ $langNames = [
     
     <!-- Admin JavaScript -->
     <script src="<?= $baseUrl ?>/admin/assets/admin.js"></script>
+    
+    <?php if (!$isLoginPage): ?>
+    <!-- Tutorial JavaScript -->
+    <script src="<?= $baseUrl ?>/admin/assets/js/tutorial.js"></script>
+    <script>
+        // Get tutorial data from server
+        <?php 
+        $tutorial = AdminTutorial::getInstance();
+        $tutorialData = $tutorial->exportForJs();
+        ?>
+        window.TUTORIAL_TRANSLATIONS = QUICKSITE_CONFIG.translations.tutorial;
+        window.QUICKSITE_CONFIG.token = '<?= adminEscape($router->getToken()) ?>';
+        window.QUICKSITE_CONFIG.apiUrl = '<?= $router->getApiUrl() ?>';
+        
+        // Initialize tutorial on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            tutorial.init(<?= json_encode($tutorialData) ?>);
+        });
+    </script>
+    <?php endif; ?>
 </body>
 </html>

@@ -1,2 +1,8 @@
 RewriteEngine On
+
+# Allow direct access to actual PHP files (like tutorial-api.php)
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# Route everything else through index.php
 FallbackResource /admin/index.php

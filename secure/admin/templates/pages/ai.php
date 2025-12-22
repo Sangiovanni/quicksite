@@ -230,12 +230,19 @@ Include details like:
                     </svg>
                     Copy Spec Only
                 </button>
-                <button type="button" class="admin-btn admin-btn--ghost" onclick="toggleSpecPreview()">
+                <button type="button" class="admin-btn admin-btn--ghost" onclick="previewFullPrompt()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                         <circle cx="12" cy="12" r="3"/>
                     </svg>
-                    Preview Spec
+                    Preview Full
+                </button>
+                <button type="button" class="admin-btn admin-btn--ghost" onclick="toggleSpecPreview()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    Preview Spec Only
                 </button>
             </div>
         
@@ -409,9 +416,10 @@ Include details like:
     padding: var(--space-xs) var(--space-sm);
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-medium);
-    background: var(--admin-bg);
+    background: var(--admin-bg-secondary);
     border: 1px solid var(--admin-border);
     border-radius: var(--radius-full);
+    color: var(--admin-text-secondary);
     cursor: pointer;
     transition: all 0.15s;
 }
@@ -1281,39 +1289,83 @@ function toggleSpecPreview() {
     
     if (isHidden) {
         preview.style.display = 'block';
-        // Generate and show spec + user goal if present
+        // Generate and show spec only (no user goal)
         generateSpec(currentSpec);
-        
-        // If user has typed a goal, show it in the preview too
-        const userGoal = document.getElementById('user-goal').value.trim();
-        if (userGoal && specsCache[currentSpec.id]) {
-            const fullContent = specsCache[currentSpec.id] + '\n\n---\n\n## My Request\n\n' + userGoal;
-            document.getElementById('ai-spec-content').value = fullContent;
-            // Update stats for full prompt
-            const charCount = fullContent.length;
-            const wordCount = fullContent.split(/\s+/).length;
-            document.getElementById('ai-spec-stats').innerHTML = `
-                <div class="admin-ai-spec-stat">
-                    <span class="admin-ai-spec-stat__label">Characters:</span>
-                    <span class="admin-ai-spec-stat__value">${charCount.toLocaleString()}</span>
-                </div>
-                <div class="admin-ai-spec-stat">
-                    <span class="admin-ai-spec-stat__label">Words:</span>
-                    <span class="admin-ai-spec-stat__value">${wordCount.toLocaleString()}</span>
-                </div>
-                <div class="admin-ai-spec-stat">
-                    <span class="admin-ai-spec-stat__label">Est. tokens:</span>
-                    <span class="admin-ai-spec-stat__value">~${Math.ceil(wordCount * 1.3).toLocaleString()}</span>
-                </div>
-                <div class="admin-ai-spec-stat" style="color: var(--admin-success);">
-                    <span class="admin-ai-spec-stat__label">✓</span>
-                    <span class="admin-ai-spec-stat__value">Includes your request</span>
-                </div>
-            `;
-        }
     } else {
         preview.style.display = 'none';
     }
+}
+
+function previewFullPrompt() {
+    if (!currentSpec) {
+        QuickSiteAdmin.showToast('Select a spec first', 'warning');
+        return;
+    }
+    
+    if (!commandsData) {
+        QuickSiteAdmin.showToast('Commands data still loading, please wait...', 'warning');
+        return;
+    }
+    
+    const preview = document.getElementById('spec-preview');
+    preview.style.display = 'block';
+    
+    // Generate spec if not cached
+    if (!specsCache[currentSpec.id]) {
+        generateSpec(currentSpec);
+    }
+    
+    const spec = specsCache[currentSpec.id];
+    const userGoal = document.getElementById('user-goal')?.value?.trim() || '';
+    
+    if (!spec) {
+        QuickSiteAdmin.showToast('Specification not ready', 'warning');
+        return;
+    }
+    
+    let fullContent = spec;
+    
+    if (userGoal) {
+        fullContent += '\n\n---\n\n## My Request\n\n' + userGoal;
+    }
+    
+    document.getElementById('ai-spec-content').value = fullContent;
+    
+    // Update stats
+    const charCount = fullContent.length;
+    const wordCount = fullContent.split(/\s+/).length;
+    let statsHtml = `
+        <div class="admin-ai-spec-stat">
+            <span class="admin-ai-spec-stat__label">Characters:</span>
+            <span class="admin-ai-spec-stat__value">${charCount.toLocaleString()}</span>
+        </div>
+        <div class="admin-ai-spec-stat">
+            <span class="admin-ai-spec-stat__label">Words:</span>
+            <span class="admin-ai-spec-stat__value">${wordCount.toLocaleString()}</span>
+        </div>
+        <div class="admin-ai-spec-stat">
+            <span class="admin-ai-spec-stat__label">Est. tokens:</span>
+            <span class="admin-ai-spec-stat__value">~${Math.ceil(wordCount * 1.3).toLocaleString()}</span>
+        </div>
+    `;
+    
+    if (userGoal) {
+        statsHtml += `
+            <div class="admin-ai-spec-stat" style="color: var(--admin-success);">
+                <span class="admin-ai-spec-stat__label">✓</span>
+                <span class="admin-ai-spec-stat__value">Includes your request</span>
+            </div>
+        `;
+    } else {
+        statsHtml += `
+            <div class="admin-ai-spec-stat" style="color: var(--admin-warning);">
+                <span class="admin-ai-spec-stat__label">⚠</span>
+                <span class="admin-ai-spec-stat__value">No user request added</span>
+            </div>
+        `;
+    }
+    
+    document.getElementById('ai-spec-stats').innerHTML = statsHtml;
 }
 
 function generateSpec(spec) {
@@ -2041,6 +2093,8 @@ function formatCommandBrief(name, cmd) {
 }
 
 async function copyFullPrompt() {
+    console.log('copyFullPrompt called, currentSpec:', currentSpec, 'commandsData:', !!commandsData);
+    
     if (!currentSpec) {
         QuickSiteAdmin.showToast('Select a spec first', 'warning');
         return;
@@ -2053,11 +2107,14 @@ async function copyFullPrompt() {
     
     // Generate spec if not cached
     if (!specsCache[currentSpec.id]) {
+        console.log('Generating spec for:', currentSpec.id);
         generateSpec(currentSpec);
     }
     
     const spec = specsCache[currentSpec.id];
-    const userGoal = document.getElementById('user-goal').value.trim();
+    const userGoal = document.getElementById('user-goal')?.value?.trim() || '';
+    
+    console.log('spec exists:', !!spec, 'userGoal:', userGoal);
     
     if (!spec) {
         QuickSiteAdmin.showToast('Specification not ready. Try clicking Preview Spec first.', 'warning');
@@ -2070,20 +2127,27 @@ async function copyFullPrompt() {
         fullPrompt += '\n\n---\n\n## My Request\n\n' + userGoal;
     } else {
         QuickSiteAdmin.showToast('Add a description of what you want to create!', 'warning');
-        document.getElementById('user-goal').focus();
+        document.getElementById('user-goal')?.focus();
         return;
     }
+    
+    console.log('Attempting to copy, length:', fullPrompt.length);
     
     try {
         await navigator.clipboard.writeText(fullPrompt);
         QuickSiteAdmin.showToast('Full prompt copied! Paste in your AI chat.', 'success');
     } catch (e) {
+        console.error('Clipboard API failed:', e);
         // Fallback
         const textarea = document.getElementById('ai-spec-content');
-        textarea.value = fullPrompt;
-        textarea.select();
-        document.execCommand('copy');
-        QuickSiteAdmin.showToast('Full prompt copied!', 'success');
+        if (textarea) {
+            textarea.value = fullPrompt;
+            textarea.select();
+            document.execCommand('copy');
+            QuickSiteAdmin.showToast('Full prompt copied!', 'success');
+        } else {
+            QuickSiteAdmin.showToast('Could not copy to clipboard', 'error');
+        }
     }
 }
 

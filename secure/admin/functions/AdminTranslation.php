@@ -39,18 +39,23 @@ class AdminTranslation {
             session_start();
         }
         
+        // URL parameter has HIGHEST priority (user clicking language switcher)
+        if (!empty($_GET['lang'])) {
+            $requestedLang = $_GET['lang'];
+            if ($this->isValidLanguage($requestedLang)) {
+                $this->currentLang = $requestedLang;
+                $_SESSION['admin_lang'] = $requestedLang;
+                return;
+            }
+        }
+        
+        // Then check session
         if (!empty($_SESSION['admin_lang'])) {
             $this->currentLang = $_SESSION['admin_lang'];
             return;
         }
         
-        // Check query parameter
-        if (!empty($_GET['lang'])) {
-            $this->setLanguage($_GET['lang']);
-            return;
-        }
-        
-        // Check browser preference
+        // Finally check browser preference
         if (!empty($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
             $browserLang = substr($_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2);
             if ($this->isValidLanguage($browserLang)) {

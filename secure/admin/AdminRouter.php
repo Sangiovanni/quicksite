@@ -85,7 +85,7 @@ class AdminRouter {
     }
 
     /**
-     * Check if user is authenticated (has token in session/cookie)
+     * Check if user is authenticated (has valid token in session/cookie)
      */
     public function isAuthenticated(): bool {
         // Start session if not started
@@ -93,7 +93,29 @@ class AdminRouter {
             session_start();
         }
         
-        return !empty($_SESSION['admin_token']);
+        // Check if token exists in session
+        if (empty($_SESSION['admin_token'])) {
+            return false;
+        }
+        
+        // Validate token against auth.php
+        $token = $_SESSION['admin_token'];
+        $authConfigPath = SECURE_FOLDER_PATH . '/config/auth.php';
+        
+        if (!file_exists($authConfigPath)) {
+            return false;
+        }
+        
+        $authConfig = include $authConfigPath;
+        
+        // Check if token exists in config
+        if (!isset($authConfig['authentication']['tokens'][$token])) {
+            // Invalid token - clear session
+            unset($_SESSION['admin_token']);
+            return false;
+        }
+        
+        return true;
     }
 
     /**
@@ -233,9 +255,17 @@ class AdminRouter {
         // Load admin functions
         require_once SECURE_FOLDER_PATH . '/admin/functions/AdminHelper.php';
         require_once SECURE_FOLDER_PATH . '/admin/functions/AdminTranslation.php';
+        require_once SECURE_FOLDER_PATH . '/admin/functions/AdminTutorial.php';
         
         // Initialize translation helper
         $lang = AdminTranslation::getInstance();
+        
+        // Initialize tutorial system with current token
+        $tutorial = AdminTutorial::getInstance();
+        $token = $this->getToken();
+        if ($token) {
+            $tutorial->setCurrentToken($token);
+        }
         
         // Pass router to templates
         $router = $this;
