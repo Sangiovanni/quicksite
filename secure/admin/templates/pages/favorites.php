@@ -41,7 +41,7 @@ foreach ($categories as $cat) {
                         <polyline points="22 4 12 14.01 9 11.01"/>
                     </svg>
                 </div>
-                <span class="admin-quick-action__label">Build Site</span>
+                <span class="admin-quick-action__label"><?= __admin('favorites.quickAction.buildSite') ?></span>
             </a>
             
             <a href="<?= $router->url('command') ?>/getRoutes" class="admin-quick-action">
@@ -52,7 +52,7 @@ foreach ($categories as $cat) {
                         <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                     </svg>
                 </div>
-                <span class="admin-quick-action__label">View Routes</span>
+                <span class="admin-quick-action__label"><?= __admin('favorites.quickAction.viewRoutes') ?></span>
             </a>
             
             <a href="<?= $router->url('command') ?>/listAssets" class="admin-quick-action">
@@ -63,7 +63,7 @@ foreach ($categories as $cat) {
                         <polyline points="21 15 16 10 5 21"/>
                     </svg>
                 </div>
-                <span class="admin-quick-action__label">List Assets</span>
+                <span class="admin-quick-action__label"><?= __admin('favorites.quickAction.listAssets') ?></span>
             </a>
             
             <a href="<?= $router->url('command') ?>/getTranslations" class="admin-quick-action">
@@ -77,7 +77,7 @@ foreach ($categories as $cat) {
                         <path d="M14 18h6"/>
                     </svg>
                 </div>
-                <span class="admin-quick-action__label">Translations</span>
+                <span class="admin-quick-action__label"><?= __admin('favorites.quickAction.translations') ?></span>
             </a>
             
             <a href="<?= $router->url('command') ?>/getStyles" class="admin-quick-action">
@@ -90,7 +90,7 @@ foreach ($categories as $cat) {
                         <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.555C21.965 6.012 17.461 2 12 2z"/>
                     </svg>
                 </div>
-                <span class="admin-quick-action__label">View Styles</span>
+                <span class="admin-quick-action__label"><?= __admin('favorites.quickAction.viewStyles') ?></span>
             </a>
             
             <a href="<?= $router->url('structure') ?>" class="admin-quick-action">
@@ -101,7 +101,7 @@ foreach ($categories as $cat) {
                         <line x1="12" y1="22.08" x2="12" y2="12"/>
                     </svg>
                 </div>
-                <span class="admin-quick-action__label">Structure</span>
+                <span class="admin-quick-action__label"><?= __admin('favorites.quickAction.structure') ?></span>
             </a>
         </div>
     </div>
@@ -117,13 +117,13 @@ foreach ($categories as $cat) {
             <?= __admin('favorites.yourFavorites') ?>
         </h2>
         <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="clearAllFavorites()">
-            Clear All
+            <?= __admin('common.clearAll') ?>
         </button>
     </div>
     <div class="admin-card__body">
         <div id="favorites-list" class="admin-loading">
             <span class="admin-spinner"></span>
-            Loading favorites...
+            <?= __admin('favorites.loading') ?>
         </div>
     </div>
 </div>
@@ -142,7 +142,7 @@ foreach ($categories as $cat) {
     <div class="admin-card__body">
         <div class="admin-form-group">
             <input type="text" id="command-search" class="admin-input" 
-                   placeholder="Search commands to add to favorites...">
+                   placeholder="<?= __admin('favorites.searchPlaceholder') ?>">
         </div>
         <div id="command-suggestions" class="admin-command-suggestions"></div>
     </div>
@@ -151,6 +151,13 @@ foreach ($categories as $cat) {
 <script>
 const ALL_COMMANDS = <?= json_encode($allCommands) ?>;
 const COMMAND_BASE_URL = '<?= $router->url('command') ?>';
+const TRANSLATIONS = {
+    empty: {
+        title: '<?= __admin('favorites.empty.title') ?>',
+        message: '<?= __admin('favorites.empty.message') ?>'
+    },
+    noMatches: '<?= __admin('favorites.noMatches') ?>'
+};
 
 document.addEventListener('DOMContentLoaded', function() {
     loadFavorites();
@@ -175,8 +182,8 @@ function loadFavorites() {
                 <svg class="admin-empty__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                 </svg>
-                <h3 class="admin-empty__title">No favorites yet</h3>
-                <p class="admin-empty__text">Search for commands below to add them to your favorites.</p>
+                <h3 class="admin-empty__title">${TRANSLATIONS.empty.title}</h3>
+                <p class="admin-empty__text">${TRANSLATIONS.empty.message}</p>
             </div>
         `;
         return;
@@ -258,7 +265,7 @@ function initCommandSearch() {
         ).slice(0, 10);
         
         if (matches.length === 0) {
-            suggestions.innerHTML = '<p class="admin-text-muted">No matching commands found</p>';
+            suggestions.innerHTML = `<p class="admin-text-muted">${TRANSLATIONS.noMatches}</p>`;
             return;
         }
         

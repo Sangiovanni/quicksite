@@ -26,22 +26,22 @@
     <div class="admin-card__body">
         <div class="admin-docs-quick">
             <div class="admin-docs-item">
-                <h3 class="admin-docs-item__title">API Base URL</h3>
+                <h3 class="admin-docs-item__title"><?= __admin('docs.quickRef.apiBaseUrl') ?></h3>
                 <code class="admin-docs-item__code"><?= rtrim(BASE_URL, '/') ?>/management</code>
             </div>
             
             <div class="admin-docs-item">
-                <h3 class="admin-docs-item__title">Authentication</h3>
-                <p>Include token via:</p>
+                <h3 class="admin-docs-item__title"><?= __admin('docs.quickRef.authentication') ?></h3>
+                <p><?= __admin('docs.quickRef.includeTokenVia') ?></p>
                 <ul class="admin-docs-list">
-                    <li>Header: <code>X-Auth-Token: your_token</code></li>
-                    <li>Query: <code>?token=your_token</code></li>
-                    <li>POST body: <code>{"token": "your_token"}</code></li>
+                    <li><?= __admin('docs.quickRef.header') ?> <code>X-Auth-Token: your_token</code></li>
+                    <li><?= __admin('docs.quickRef.query') ?> <code>?token=your_token</code></li>
+                    <li><?= __admin('docs.quickRef.postBody') ?> <code>{"token": "your_token"}</code></li>
                 </ul>
             </div>
             
             <div class="admin-docs-item">
-                <h3 class="admin-docs-item__title">Response Format</h3>
+                <h3 class="admin-docs-item__title"><?= __admin('docs.quickRef.responseFormat') ?></h3>
                 <pre class="admin-docs-pre">{
   "success": true|false,
   "data": {...} | null,
@@ -66,12 +66,12 @@
     <div class="admin-card__body">
         <div class="admin-form-group">
             <input type="text" id="docs-search" class="admin-input" 
-                   placeholder="Search commands..." oninput="filterDocs(this.value)">
+                   placeholder="<?= __admin('docs.searchPlaceholder') ?>" oninput="filterDocs(this.value)">
         </div>
         
         <div id="docs-loading" class="admin-loading">
             <span class="admin-spinner"></span>
-            Loading documentation...
+            <?= __admin('docs.loading') ?>
         </div>
         
         <div id="docs-container" class="admin-docs-commands" style="display: none;"></div>

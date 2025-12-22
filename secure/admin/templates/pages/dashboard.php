@@ -156,6 +156,9 @@ async function loadDashboardStats() {
 
 async function loadRecentCommands() {
     const container = document.getElementById('recent-commands');
+    const t = window.QUICKSITE_CONFIG?.translations || {};
+    const cols = t.dashboard?.columns || {};
+    const common = t.common || {};
     
     try {
         const result = await QuickSiteAdmin.apiRequest('getCommandHistory', 'GET', null, []);
@@ -164,7 +167,7 @@ async function loadRecentCommands() {
             const entries = result.data.data.entries.slice(0, 5); // Last 5 commands
             
             let html = '<table class="admin-table"><thead><tr>';
-            html += '<th>Command</th><th>Status</th><th>Duration</th><th>Time</th>';
+            html += `<th>${cols.command || 'Command'}</th><th>${cols.status || 'Status'}</th><th>${cols.duration || 'Duration'}</th><th>${cols.time || 'Time'}</th>`;
             html += '</tr></thead><tbody>';
             
             entries.forEach(entry => {
@@ -174,7 +177,7 @@ async function loadRecentCommands() {
                     ? httpStatus >= 200 && httpStatus < 300
                     : httpStatus === 'success';
                 const statusClass = isSuccess ? 'badge--success' : 'badge--error';
-                const statusText = isSuccess ? 'Success' : 'Error';
+                const statusText = isSuccess ? (common.success || 'Success') : (common.error || 'Error');
                 
                 html += `<tr>
                     <td><code>${QuickSiteAdmin.escapeHtml(entry.command)}</code></td>

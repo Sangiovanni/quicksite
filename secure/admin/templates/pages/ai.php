@@ -28,35 +28,35 @@
     </div>
     <div class="admin-card__body">
         <div class="admin-ai-intro">
-            <p>Use AI assistants (ChatGPT, Claude, Gemini...) to create complete websites via QuickSite commands.</p>
+            <p><?= __admin('ai.intro.description') ?></p>
             
             <div class="admin-ai-steps">
                 <div class="admin-ai-step">
                     <span class="admin-ai-step__number">1</span>
                     <div class="admin-ai-step__content">
-                        <strong>Choose a Spec</strong>
-                        <p>Select "Landing Page" for single-page sites or "Website" for multi-page.</p>
+                        <strong><?= __admin('ai.steps.chooseSpec.title') ?></strong>
+                        <p><?= __admin('ai.steps.chooseSpec.hint') ?></p>
                     </div>
                 </div>
                 <div class="admin-ai-step">
                     <span class="admin-ai-step__number">2</span>
                     <div class="admin-ai-step__content">
-                        <strong>Describe Your Goal</strong>
-                        <p>Use an example or write your own description with details.</p>
+                        <strong><?= __admin('ai.steps.describeGoal.title') ?></strong>
+                        <p><?= __admin('ai.steps.describeGoal.hint') ?></p>
                     </div>
                 </div>
                 <div class="admin-ai-step">
                     <span class="admin-ai-step__number">3</span>
                     <div class="admin-ai-step__content">
-                        <strong>Copy Full Prompt</strong>
-                        <p>The spec + your goal are combined and ready to paste.</p>
+                        <strong><?= __admin('ai.steps.copyPrompt.title') ?></strong>
+                        <p><?= __admin('ai.steps.copyPrompt.hint') ?></p>
                     </div>
                 </div>
                 <div class="admin-ai-step">
                     <span class="admin-ai-step__number">4</span>
                     <div class="admin-ai-step__content">
-                        <strong>Import & Execute</strong>
-                        <p>Paste AI's JSON response and click Execute Now.</p>
+                        <strong><?= __admin('ai.steps.importExecute.title') ?></strong>
+                        <p><?= __admin('ai.steps.importExecute.hint') ?></p>
                     </div>
                 </div>
             </div>
@@ -80,7 +80,7 @@
         <!-- Step 1: Choose a Spec -->
         <div class="admin-ai-workflow-step">
             <div class="admin-ai-step-badge">1</div>
-            <div class="admin-ai-step-label">Choose a Spec</div>
+            <div class="admin-ai-step-label"><?= __admin('ai.steps.chooseSpec.title') ?></div>
         </div>
         
         <!-- Search & Filter Bar -->
@@ -90,15 +90,15 @@
                     <circle cx="11" cy="11" r="8"/>
                     <path d="M21 21l-4.35-4.35"/>
                 </svg>
-                <input type="text" id="spec-search" class="admin-ai-search__input" placeholder="Search specs..." oninput="filterSpecs()">
+                <input type="text" id="spec-search" class="admin-ai-search__input" placeholder="<?= __admin('ai.searchPlaceholder') ?>" oninput="filterSpecs()">
             </div>
             <div class="admin-ai-tags" id="filter-tags">
-                <button type="button" class="admin-ai-tag admin-ai-tag--active" data-tag="all" onclick="filterByTag('all')">All</button>
-                <button type="button" class="admin-ai-tag" data-tag="landing" onclick="filterByTag('landing')">Landing Page</button>
-                <button type="button" class="admin-ai-tag" data-tag="website" onclick="filterByTag('website')">Website</button>
-                <button type="button" class="admin-ai-tag" data-tag="business" onclick="filterByTag('business')">Business</button>
-                <button type="button" class="admin-ai-tag" data-tag="creative" onclick="filterByTag('creative')">Creative</button>
-                <button type="button" class="admin-ai-tag" data-tag="multilang" onclick="filterByTag('multilang')">Multilingual</button>
+                <button type="button" class="admin-ai-tag admin-ai-tag--active" data-tag="all" onclick="filterByTag('all')"><?= __admin('ai.filter.all') ?></button>
+                <button type="button" class="admin-ai-tag" data-tag="landing" onclick="filterByTag('landing')"><?= __admin('ai.filter.landingPage') ?></button>
+                <button type="button" class="admin-ai-tag" data-tag="website" onclick="filterByTag('website')"><?= __admin('ai.filter.website') ?></button>
+                <button type="button" class="admin-ai-tag" data-tag="business" onclick="filterByTag('business')"><?= __admin('ai.filter.business') ?></button>
+                <button type="button" class="admin-ai-tag" data-tag="creative" onclick="filterByTag('creative')"><?= __admin('ai.filter.creative') ?></button>
+                <button type="button" class="admin-ai-tag" data-tag="multilang" onclick="filterByTag('multilang')"><?= __admin('ai.filter.multilingual') ?></button>
             </div>
         </div>
 
@@ -109,8 +109,8 @@
             <div class="admin-ai-section" data-section="fresh">
                 <h3 class="admin-ai-section__title">
                     <span class="admin-ai-section__icon">🌱</span>
-                    Fresh Start
-                    <span class="admin-ai-section__hint">Starting from scratch</span>
+                    <?= __admin('ai.section.freshStart.title') ?>
+                    <span class="admin-ai-section__hint"><?= __admin('ai.section.freshStart.hint') ?></span>
                 </h3>
                 <div class="admin-ai-specs-grid" id="specs-fresh">
                     <!-- Populated by JS -->
@@ -121,8 +121,8 @@
             <div class="admin-ai-section" data-section="early">
                 <h3 class="admin-ai-section__title">
                     <span class="admin-ai-section__icon">🌿</span>
-                    Early Stage
-                    <span class="admin-ai-section__hint">Basic structure exists</span>
+                    <?= __admin('ai.section.earlyStage.title') ?>
+                    <span class="admin-ai-section__hint"><?= __admin('ai.section.earlyStage.hint') ?></span>
                 </h3>
                 <div class="admin-ai-specs-grid" id="specs-early">
                     <!-- Populated by JS -->
@@ -133,8 +133,8 @@
             <div class="admin-ai-section" data-section="wip">
                 <h3 class="admin-ai-section__title">
                     <span class="admin-ai-section__icon">🔧</span>
-                    Work In Progress
-                    <span class="admin-ai-section__hint">Enhance existing project</span>
+                    <?= __admin('ai.section.workInProgress.title') ?>
+                    <span class="admin-ai-section__hint"><?= __admin('ai.section.workInProgress.hint') ?></span>
                 </h3>
                 <div class="admin-ai-specs-grid" id="specs-wip">
                     <!-- Populated by JS -->

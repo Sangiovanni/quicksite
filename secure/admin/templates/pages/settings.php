@@ -28,7 +28,7 @@
         <div class="admin-card__body">
             <div id="system-info" class="admin-loading">
                 <span class="admin-spinner"></span>
-                Loading...
+                <?= __admin('common.loading') ?>
             </div>
         </div>
     </div>
@@ -50,7 +50,7 @@
         <div class="admin-card__body">
             <div id="config-info" class="admin-loading">
                 <span class="admin-spinner"></span>
-                Loading...
+                <?= __admin('common.loading') ?>
             </div>
         </div>
     </div>
@@ -72,13 +72,13 @@
                 <line x1="12" y1="5" x2="12" y2="19"/>
                 <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            Add Route
+            <?= __admin('settings.addRoute') ?>
         </a>
     </div>
     <div class="admin-card__body">
         <div id="routes-list" class="admin-loading">
             <span class="admin-spinner"></span>
-            Loading routes...
+            <?= __admin('settings.loadingRoutes') ?>
         </div>
     </div>
 </div>
@@ -102,13 +102,13 @@
                 <line x1="12" y1="5" x2="12" y2="19"/>
                 <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            Add Language
+            <?= __admin('settings.addLanguage') ?>
         </a>
     </div>
     <div class="admin-card__body">
         <div id="languages-list" class="admin-loading">
             <span class="admin-spinner"></span>
-            Loading languages...
+            <?= __admin('settings.loadingLanguages') ?>
         </div>
     </div>
 </div>

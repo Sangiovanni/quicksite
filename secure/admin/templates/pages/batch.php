@@ -33,7 +33,7 @@ $categories = getCommandCategories();
             </h2>
             <div class="admin-card__actions">
                 <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="clearQueue()">
-                    Clear All
+                    <?= __admin('common.clearAll') ?>
                 </button>
             </div>
         </div>
@@ -48,8 +48,8 @@ $categories = getCommandCategories();
                         <line x1="3" y1="12" x2="3.01" y2="12"/>
                         <line x1="3" y1="18" x2="3.01" y2="18"/>
                     </svg>
-                    <p class="admin-empty__text">No commands in queue</p>
-                    <p class="admin-hint">Add commands from the list on the right</p>
+                    <p class="admin-empty__text"><?= __admin('batch.emptyQueue') ?></p>
+                    <p class="admin-hint"><?= __admin('batch.emptyQueueHint') ?></p>
                 </div>
             </div>
             
@@ -58,13 +58,13 @@ $categories = getCommandCategories();
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
                         <polygon points="5 3 19 12 5 21 5 3"/>
                     </svg>
-                    Execute &amp; Clear Queue
+                    <?= __admin('batch.executeAndClear') ?>
                 </button>
                 <button type="button" class="admin-btn admin-btn--secondary admin-btn--full" onclick="executeBatch(false)" style="margin-top: var(--space-sm);">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
                         <polygon points="5 3 19 12 5 21 5 3"/>
                     </svg>
-                    Execute &amp; Keep Queue
+                    <?= __admin('batch.executeAndKeep') ?>
                 </button>
             </div>
         </div>
@@ -84,7 +84,7 @@ $categories = getCommandCategories();
         <div class="admin-card__body">
             <div class="admin-form-group">
                 <input type="text" id="batch-search" class="admin-input" 
-                       placeholder="Search commands..." oninput="filterBatchCommands(this.value)">
+                       placeholder="<?= __admin('batch.searchPlaceholder') ?>" oninput="filterBatchCommands(this.value)">
             </div>
             
             <div class="admin-batch-commands" id="batch-commands">
@@ -124,7 +124,7 @@ $categories = getCommandCategories();
                 <line x1="12" y1="18" x2="12" y2="12"/>
                 <line x1="9" y1="15" x2="15" y2="15"/>
             </svg>
-            Import JSON Commands
+            <?= __admin('batch.importJson.title') ?>
         </h2>
         <svg class="admin-card__toggle" id="json-import-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
             <polyline points="6 9 12 15 18 9"/>
@@ -132,10 +132,10 @@ $categories = getCommandCategories();
     </div>
     <div class="admin-card__body" id="json-import-body" style="display: none;">
         <p class="admin-hint" style="margin-bottom: var(--space-md);">
-            Paste a JSON array of commands to add them to the queue. Perfect for AI-generated command sequences.
+            <?= __admin('batch.importJson.hint') ?>
         </p>
         <div class="admin-form-group">
-            <label class="admin-label">JSON Commands Array</label>
+            <label class="admin-label"><?= __admin('batch.importJson.label') ?></label>
             <textarea id="json-import-input" class="admin-textarea admin-textarea--code" rows="10" 
                 placeholder='[
   {
@@ -153,14 +153,14 @@ $categories = getCommandCategories();
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                     <polyline points="20 6 9 17 4 12"/>
                 </svg>
-                Validate
+                <?= __admin('common.validate') ?>
             </button>
             <button type="button" class="admin-btn admin-btn--primary" onclick="importJsonCommands()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                     <line x1="12" y1="5" x2="12" y2="19"/>
                     <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
-                Add to Queue
+                <?= __admin('batch.importJson.addToQueue') ?>
             </button>
         </div>
         <div id="json-import-preview" class="admin-json-preview" style="display: none; margin-top: var(--space-md);"></div>
@@ -176,7 +176,7 @@ $categories = getCommandCategories();
                 <line x1="3" y1="9" x2="21" y2="9"/>
                 <line x1="9" y1="21" x2="9" y2="9"/>
             </svg>
-            Command Templates
+            <?= __admin('batch.templates.title') ?>
         </h2>
         <svg class="admin-card__toggle" id="templates-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
             <polyline points="6 9 12 15 18 9"/>
@@ -184,7 +184,7 @@ $categories = getCommandCategories();
     </div>
     <div class="admin-card__body" id="templates-body" style="display: none;">
         <p class="admin-hint" style="margin-bottom: var(--space-md);">
-            Pre-built command sequences for common tasks. Click to preview, then load into queue.
+            <?= __admin('batch.templates.hint') ?>
         </p>
         
         <div class="admin-templates-grid">
@@ -192,13 +192,13 @@ $categories = getCommandCategories();
             <div class="admin-template admin-template--dynamic" data-template="fresh-start">
                 <div class="admin-template__header">
                     <span class="admin-template__icon"><img src="<?= $baseUrl ?>/admin/assets/images/fresh-start.png" alt="Fresh Start"></span>
-                    <span class="admin-template__title">Fresh Start</span>
-                    <span class="admin-template__badge">Dynamic</span>
+                    <span class="admin-template__title"><?= __admin('batch.templates.freshStart.title') ?></span>
+                    <span class="admin-template__badge"><?= __admin('batch.templates.dynamic') ?></span>
                 </div>
-                <p class="admin-template__desc">Wipe all content to blank slate: delete routes, clear assets, empty translations, reset CSS. Keeps languages & 404 page.</p>
+                <p class="admin-template__desc"><?= __admin('batch.templates.freshStart.desc') ?></p>
                 <div class="admin-template__actions">
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="generateFreshStartPreview()">Analyze & Preview</button>
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="generateFreshStart()">Generate & Load</button>
+                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="generateFreshStartPreview()"><?= __admin('batch.templates.analyzePreview') ?></button>
+                    <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="generateFreshStart()"><?= __admin('batch.templates.generateLoad') ?></button>
                 </div>
             </div>
             
@@ -206,12 +206,12 @@ $categories = getCommandCategories();
             <div class="admin-template" data-template="starter-business">
                 <div class="admin-template__header">
                     <span class="admin-template__icon"><img src="<?= $baseUrl ?>/admin/assets/images/starter-business.png" alt="Starter Business"></span>
-                    <span class="admin-template__title">Starter Business</span>
+                    <span class="admin-template__title"><?= __admin('batch.templates.starterBusiness.title') ?></span>
                 </div>
-                <p class="admin-template__desc">Business website with menu, footer, 4 pages (home, about, services, contact) and teal theme. Single language.</p>
+                <p class="admin-template__desc"><?= __admin('batch.templates.starterBusiness.desc') ?></p>
                 <div class="admin-template__actions">
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="previewTemplate('starter-business')">Preview</button>
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="loadTemplate('starter-business')">Load</button>
+                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="previewTemplate('starter-business')"><?= __admin('common.preview') ?></button>
+                    <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="loadTemplate('starter-business')"><?= __admin('common.load') ?></button>
                 </div>
             </div>
             
@@ -222,12 +222,12 @@ $categories = getCommandCategories();
                         <img src="<?= $baseUrl ?>/admin/assets/images/starter-business.png" alt="Starter Business" class="admin-template__icon-main">
                         <img src="<?= $baseUrl ?>/admin/assets/images/multi-lingual.png" alt="Multilingual" class="admin-template__icon-badge">
                     </span>
-                    <span class="admin-template__title">Starter Business (Multilingual)</span>
+                    <span class="admin-template__title"><?= __admin('batch.templates.starterBusinessMultilingual.title') ?></span>
                 </div>
-                <p class="admin-template__desc">Same as Starter Business with EN + FR translations and language switcher in footer.</p>
+                <p class="admin-template__desc"><?= __admin('batch.templates.starterBusinessMultilingual.desc') ?></p>
                 <div class="admin-template__actions">
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="previewTemplate('starter-business-multilingual')">Preview</button>
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="loadTemplate('starter-business-multilingual')">Load</button>
+                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="previewTemplate('starter-business-multilingual')"><?= __admin('common.preview') ?></button>
+                    <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="loadTemplate('starter-business-multilingual')"><?= __admin('common.load') ?></button>
                 </div>
             </div>
             
@@ -235,12 +235,12 @@ $categories = getCommandCategories();
             <div class="admin-template" data-template="landing-page">
                 <div class="admin-template__header">
                     <span class="admin-template__icon"><img src="<?= $baseUrl ?>/admin/assets/images/landing-page.png" alt="Landing Page"></span>
-                    <span class="admin-template__title">Landing Page</span>
+                    <span class="admin-template__title"><?= __admin('batch.templates.landingPage.title') ?></span>
                 </div>
-                <p class="admin-template__desc">Create a single-page landing structure with hero, features, and CTA sections.</p>
+                <p class="admin-template__desc"><?= __admin('batch.templates.landingPage.desc') ?></p>
                 <div class="admin-template__actions">
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="previewTemplate('landing-page')">Preview</button>
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="loadTemplate('landing-page')">Load</button>
+                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="previewTemplate('landing-page')"><?= __admin('common.preview') ?></button>
+                    <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="loadTemplate('landing-page')"><?= __admin('common.load') ?></button>
                 </div>
             </div>
             
@@ -251,12 +251,12 @@ $categories = getCommandCategories();
                         <img src="<?= $baseUrl ?>/admin/assets/images/landing-page.png" alt="Landing Page" class="admin-template__icon-main">
                         <img src="<?= $baseUrl ?>/admin/assets/images/multi-lingual.png" alt="Multilingual" class="admin-template__icon-badge">
                     </span>
-                    <span class="admin-template__title">Landing Page (Multilingual)</span>
+                    <span class="admin-template__title"><?= __admin('batch.templates.landingPageMultilingual.title') ?></span>
                 </div>
-                <p class="admin-template__desc">Same as Landing Page with EN + FR translations and language switcher.</p>
+                <p class="admin-template__desc"><?= __admin('batch.templates.landingPageMultilingual.desc') ?></p>
                 <div class="admin-template__actions">
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="previewTemplate('landing-page-multilingual')">Preview</button>
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="loadTemplate('landing-page-multilingual')">Load</button>
+                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="previewTemplate('landing-page-multilingual')"><?= __admin('common.preview') ?></button>
+                    <button type="button" class="admin-btn admin-btn--small admin-btn--primary" onclick="loadTemplate('landing-page-multilingual')"><?= __admin('common.load') ?></button>
                 </div>
             </div>
         </div>
@@ -264,13 +264,13 @@ $categories = getCommandCategories();
         <!-- Template Preview Modal -->
         <div id="template-preview" class="admin-template-preview" style="display: none;">
             <div class="admin-template-preview__header">
-                <strong id="template-preview-title">Template Preview</strong>
+                <strong id="template-preview-title"><?= __admin('batch.templates.previewTitle') ?></strong>
                 <button type="button" class="admin-btn admin-btn--small admin-btn--ghost" onclick="closeTemplatePreview()">×</button>
             </div>
             <textarea id="template-preview-content" class="admin-textarea admin-textarea--code" rows="12" readonly></textarea>
             <div class="admin-template-preview__actions">
                 <span id="template-preview-count" class="admin-hint"></span>
-                <button type="button" class="admin-btn admin-btn--primary" onclick="loadPreviewedTemplate()">Load into Queue</button>
+                <button type="button" class="admin-btn admin-btn--primary" onclick="loadPreviewedTemplate()"><?= __admin('batch.templates.loadIntoQueue') ?></button>
             </div>
         </div>
     </div>
@@ -287,7 +287,7 @@ $categories = getCommandCategories();
         </h2>
         <div class="admin-card__actions">
             <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="clearResults()">
-                Clear Results
+                <?= __admin('batch.clearResults') ?>
             </button>
         </div>
     </div>

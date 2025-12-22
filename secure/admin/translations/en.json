@@ -25,7 +25,20 @@
         "reset": "Reset",
         "copy": "Copy",
         "copied": "Copied!",
-        "backToSite": "Back to Site"
+        "backToSite": "Back to Site",
+        "clearAll": "Clear All",
+        "notApplicable": "N/A",
+        "validate": "Validate",
+        "preview": "Preview",
+        "load": "Load",
+        "add": "+ Add",
+        "remove": "Remove",
+        "enabled": "Enabled",
+        "default": "Default",
+        "status": {
+            "success": "Success",
+            "error": "Error"
+        }
     },
     "login": {
         "title": "Admin Login",
@@ -65,6 +78,14 @@
         },
         "categories": {
             "title": "Commands by Category"
+        },
+        "history": {
+            "columns": {
+                "command": "Command",
+                "status": "Status",
+                "duration": "Duration",
+                "time": "Time"
+            }
         }
     },
     "commands": {
@@ -94,15 +115,50 @@
             "file": "File"
         }
     },
+    "commandForm": {
+        "warning": {
+            "urlChange": {
+                "title": "URL Structure Change",
+                "message": "This command will change your site's URL structure. The admin panel URL will change, and you will be automatically redirected to the new location after execution."
+            },
+            "serverConfig": {
+                "title": "Server Configuration Required",
+                "advanced": "Advanced users only!",
+                "message": "This command renames the physical public folder. After execution, your site will be inaccessible until you update your server configuration (Apache VirtualHost, nginx config, etc.) to point to the new folder name.",
+                "useCase": "Use case: switching between test/production environments sharing the same server root with different DNS configurations."
+            }
+        },
+        "batchMode": {
+            "title": "Batch Mode",
+            "message": "Configure the command parameters and click \"Save to Queue\" to add this command to your batch queue. The command will not be executed until you run the entire batch."
+        },
+        "badge": {
+            "changesUrls": "Changes URLs",
+            "serverConfigRequired": "Server Config Required"
+        },
+        "addToFavorites": "Add to favorites",
+        "removeFromFavorites": "Remove from favorites",
+        "saveToQueue": "Save to Queue",
+        "backToBatch": "Back to Batch",
+        "errors": {
+            "docNotFound": "Command documentation not found",
+            "docLoadFailed": "Failed to load command documentation:",
+            "fileUploadBatch": "File uploads cannot be added to batch queue"
+        }
+    },
     "history": {
         "title": "Command History",
         "subtitle": "View executed commands and their results",
         "noHistory": "No commands have been executed yet",
+        "noHistoryFiltered": "No command history found for the selected filters.",
         "filters": {
             "date": "Date",
             "command": "Command",
             "status": "Status",
-            "all": "All"
+            "all": "All",
+            "success": "Success",
+            "error": "Error",
+            "showAllDates": "Show all dates (last 7 days)"
         },
         "columns": {
             "id": "ID",
@@ -113,9 +169,25 @@
             "duration": "Duration",
             "details": "Details"
         },
+        "detail": {
+            "id": "ID",
+            "timestamp": "Timestamp",
+            "command": "Command",
+            "method": "Method",
+            "duration": "Duration",
+            "publisher": "Publisher",
+            "requestBody": "Request Body",
+            "response": "Response"
+        },
+        "pagination": {
+            "info": "Page :page of :total (:count entries)"
+        },
         "clearHistory": "Clear History",
         "clearConfirm": "Are you sure you want to clear command history?",
-        "export": "Export"
+        "export": "Export",
+        "errors": {
+            "loadFailed": "Failed to load history:"
+        }
     },
     "errors": {
         "404": {
@@ -169,41 +241,304 @@
         "preferences": "Admin Preferences",
         "keyboardShortcuts": "Keyboard Shortcuts",
         "confirmDestructive": "Destructive Action Confirmation",
-        "toastDuration": "Toast Notification Duration"
+        "toastDuration": "Toast Notification Duration",
+        "addRoute": "Add Route",
+        "loadingRoutes": "Loading routes...",
+        "addLanguage": "Add Language",
+        "loadingLanguages": "Loading languages...",
+        "savePreferences": "Save Preferences",
+        "pref": {
+            "enableShortcuts": "Enable keyboard shortcuts",
+            "shortcutsHint": "Press ? to view all shortcuts",
+            "confirmDestructive": "Show confirmation for destructive actions",
+            "duration": {
+                "2s": "2 seconds",
+                "4s": "4 seconds",
+                "6s": "6 seconds",
+                "noHide": "Don't auto-hide"
+            }
+        },
+        "sysInfo": {
+            "apiVersion": "API Version",
+            "totalCommands": "Total Commands",
+            "baseUrl": "Base URL",
+            "serverTime": "Server Time"
+        },
+        "config": {
+            "multilingualMode": "Multilingual Mode",
+            "enabled": "Enabled",
+            "singleLanguage": "Single Language",
+            "languages": "Languages",
+            "configured": "configured",
+            "routes": "Routes",
+            "active": "active",
+            "stylesStatus": "Styles Status",
+            "loaded": "Loaded",
+            "error": "Error"
+        },
+        "routesList": {
+            "none": "No routes configured",
+            "delete": "Delete route"
+        },
+        "languagesList": {
+            "none": "No languages configured",
+            "setDefault": "Set Default",
+            "setDefaultTitle": "Set as default language"
+        },
+        "toast": {
+            "preferencesSaved": "Preferences saved",
+            "defaultLangUpdated": "Default language updated"
+        },
+        "errors": {
+            "sysInfoFailed": "Could not load system info",
+            "routesFailed": "Could not load routes",
+            "languagesFailed": "Could not load languages",
+            "defaultLangFailed": "Failed to update default language"
+        }
     },
     "favorites": {
         "title": "Favorites",
         "subtitle": "Quick access to your bookmarked commands",
         "quickActions": "Quick Actions",
         "yourFavorites": "Your Favorite Commands",
-        "addFavorites": "Add to Favorites"
+        "addFavorites": "Add to Favorites",
+        "loading": "Loading favorites...",
+        "searchPlaceholder": "Search commands to add to favorites...",
+        "noMatches": "No matching commands found",
+        "quickAction": {
+            "buildSite": "Build Site",
+            "viewRoutes": "View Routes",
+            "listAssets": "List Assets",
+            "translations": "Translations",
+            "viewStyles": "View Styles",
+            "structure": "Structure"
+        },
+        "empty": {
+            "title": "No favorites yet",
+            "message": "Search for commands below to add them to your favorites."
+        },
+        "modal": {
+            "clearTitle": "Clear Favorites",
+            "clearMessage": "Are you sure you want to clear all favorites?",
+            "clearConfirm": "Clear All"
+        },
+        "toast": {
+            "added": "Added \":command\" to favorites",
+            "removed": "Removed \":command\" from favorites",
+            "cleared": "All favorites cleared"
+        }
     },
     "structure": {
         "title": "Structure Viewer",
-        "subtitle": "Visual tree view of page and component structures"
+        "subtitle": "Visual tree view of page and component structures",
+        "selectStructure": "Select Structure",
+        "loadStructure": "Load Structure",
+        "label": {
+            "type": "Type",
+            "name": "Name"
+        },
+        "select": {
+            "type": "Select type...",
+            "typeFirst": "Select type first...",
+            "notRequired": "Not required for :type",
+            "selectType": "Select :type..."
+        },
+        "type": {
+            "page": "Page",
+            "menu": "Menu",
+            "footer": "Footer",
+            "component": "Component"
+        },
+        "tree": {
+            "title": "Structure Tree",
+            "expandAll": "Expand All",
+            "collapseAll": "Collapse All",
+            "copyJson": "Copy JSON",
+            "empty": "Select a structure type and name above to view",
+            "loading": "Loading structure...",
+            "isEmpty": "Structure is empty",
+            "structurePrefix": "Structure:"
+        },
+        "nodeDetails": {
+            "title": "Node Details",
+            "nodeId": "Node ID",
+            "element": "Element",
+            "textContent": "Text Content",
+            "translationKey": "Translation Key",
+            "component": "Component",
+            "attributes": "Attributes",
+            "children": "Children",
+            "childNodes": "child node(s)",
+            "editNode": "Edit This Node",
+            "editFull": "Edit Full Structure"
+        },
+        "toast": {
+            "jsonCopied": "Structure JSON copied to clipboard"
+        },
+        "errors": {
+            "loadOptions": "Error loading options",
+            "loadFailed": "Failed to load structure"
+        }
     },
     "batch": {
         "title": "Batch Execution",
         "subtitle": "Execute multiple commands in sequence",
         "queue": "Command Queue",
         "addCommands": "Add Commands",
-        "results": "Execution Results"
+        "results": "Execution Results",
+        "emptyQueue": "No commands in queue",
+        "emptyQueueHint": "Add commands from the list on the right",
+        "executeAndClear": "Execute & Clear Queue",
+        "executeAndKeep": "Execute & Keep Queue",
+        "searchPlaceholder": "Search commands...",
+        "clearResults": "Clear Results",
+        "importJson": {
+            "title": "Import JSON Commands",
+            "hint": "Paste a JSON array of commands to add them to the queue. Perfect for AI-generated command sequences.",
+            "label": "JSON Commands Array",
+            "addToQueue": "Add to Queue"
+        },
+        "templates": {
+            "title": "Command Templates",
+            "hint": "Pre-built command sequences for common tasks. Click to preview, then load into queue.",
+            "dynamic": "Dynamic",
+            "analyzePreview": "Analyze & Preview",
+            "generateLoad": "Generate & Load",
+            "loadIntoQueue": "Load into Queue",
+            "previewTitle": "Template Preview",
+            "freshStart": {
+                "title": "Fresh Start",
+                "desc": "Wipe all content to blank slate: delete routes, clear assets, empty translations, reset CSS. Keeps languages & 404 page."
+            },
+            "starterBusiness": {
+                "title": "Starter Business",
+                "desc": "Business website with menu, footer, 4 pages (home, about, services, contact) and teal theme. Single language."
+            },
+            "starterBusinessMultilingual": {
+                "title": "Starter Business (Multilingual)",
+                "desc": "Same as Starter Business with EN + FR translations and language switcher in footer."
+            },
+            "landingPage": {
+                "title": "Landing Page",
+                "desc": "Create a single-page landing structure with hero, features, and CTA sections."
+            },
+            "landingPageMultilingual": {
+                "title": "Landing Page (Multilingual)",
+                "desc": "Same as Landing Page with EN + FR translations and language switcher."
+            }
+        }
     },
     "docs": {
         "title": "API Documentation",
         "subtitle": "Complete reference for all available API commands",
         "quickReference": "Quick Reference",
-        "commandReference": "Command Reference"
+        "commandReference": "Command Reference",
+        "searchPlaceholder": "Search commands...",
+        "loading": "Loading documentation...",
+        "quickRef": {
+            "apiBaseUrl": "API Base URL",
+            "authentication": "Authentication",
+            "includeTokenVia": "Include token via:",
+            "header": "Header:",
+            "query": "Query:",
+            "postBody": "POST body:",
+            "responseFormat": "Response Format"
+        },
+        "section": {
+            "description": "Description",
+            "parameters": "Parameters"
+        },
+        "noParameters": "No parameters required",
+        "noDescription": "No description",
+        "copyUrl": "Copy URL",
+        "urlCopied": "URL copied to clipboard",
+        "errors": {
+            "couldNotLoad": "Could not load documentation",
+            "copyFailed": "Could not copy URL"
+        }
     },
     "ai": {
         "title": "AI Integration",
         "subtitle": "Generate commands with AI assistants",
         "howItWorks": "How It Works",
         "specification": "AI Specification",
-        "quickPrompts": "Example Prompts"
+        "quickPrompts": "Example Prompts",
+        "intro": {
+            "description": "Use AI assistants (ChatGPT, Claude, Gemini...) to create complete websites via QuickSite commands."
+        },
+        "steps": {
+            "chooseSpec": {
+                "title": "Choose a Spec",
+                "hint": "Select \"Landing Page\" for single-page sites or \"Website\" for multi-page."
+            },
+            "describeGoal": {
+                "title": "Describe Your Goal",
+                "hint": "Use an example or write your own description with details."
+            },
+            "copyPrompt": {
+                "title": "Copy Full Prompt",
+                "hint": "The spec + your goal are combined and ready to paste."
+            },
+            "importExecute": {
+                "title": "Import & Execute",
+                "hint": "Paste AI's JSON response and click Execute Now."
+            },
+            "copyAndSend": "Copy & Send to AI"
+        },
+        "searchPlaceholder": "Search specs...",
+        "filter": {
+            "all": "All",
+            "landingPage": "Landing Page",
+            "website": "Website",
+            "business": "Business",
+            "creative": "Creative",
+            "multilingual": "Multilingual"
+        },
+        "section": {
+            "freshStart": {
+                "title": "Fresh Start",
+                "hint": "Starting from scratch"
+            },
+            "earlyStage": {
+                "title": "Early Stage",
+                "hint": "Basic structure exists"
+            },
+            "workInProgress": {
+                "title": "Work In Progress",
+                "hint": "Enhance existing project"
+            }
+        },
+        "backToSpecs": "Back to specs",
+        "promptBuilder": {
+            "title": "What do you want to build?",
+            "startFromExample": "Start from an example:",
+            "writeYourOwn": "Write your own...",
+            "placeholder": "Describe what you want to create...",
+            "includeDetails": "Include details like:",
+            "hints": {
+                "languages": "Languages (English, French, Spanish...)",
+                "pages": "Pages and their purpose",
+                "style": "Style preferences (colors, mood)",
+                "content": "Specific content or sections"
+            },
+            "beSpecific": "Be specific! The more details you provide, the better the AI output."
+        },
+        "copyFullPrompt": "Copy Full Prompt",
+        "copySpecOnly": "Copy Spec Only",
+        "previewSpec": "Preview Spec",
+        "importResponse": {
+            "title": "Import AI Response",
+            "hint": "After sending the prompt to AI, paste its JSON response below",
+            "pasteJson": "Paste JSON to begin"
+        },
+        "executeNow": "Execute Now",
+        "openInBatch": "Open in Batch",
+        "executionComplete": "Execution Complete",
+        "clear": "Clear"
     },
     "footer": {
         "version": "QuickSite v:version",
-        "powered": "Admin Panel"
+        "powered": "Admin Panel",
+        "language": "Language"
     }
 }

@@ -17,6 +17,25 @@ $pageTitle = $lang->has('nav.' . $currentPage)
     : ucfirst($currentPage);
 
 $baseUrl = rtrim(BASE_URL, '/');
+
+// Get available admin languages and current language
+$adminLang = AdminTranslation::getInstance();
+$availableLangs = $adminLang->getAvailableLanguages();
+$currentLang = $adminLang->getCurrentLanguage();
+
+// Language display names
+$langNames = [
+    'en' => 'English',
+    'fr' => 'Français',
+    'es' => 'Español',
+    'de' => 'Deutsch',
+    'it' => 'Italiano',
+    'pt' => 'Português',
+    'nl' => 'Nederlands',
+    'ja' => '日本語',
+    'zh' => '中文',
+    'ko' => '한국어'
+];
 ?>
 <!DOCTYPE html>
 <html lang="<?= adminEscape($lang->getCurrentLanguage()) ?>">
@@ -28,6 +47,20 @@ $baseUrl = rtrim(BASE_URL, '/');
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="<?= $baseUrl ?>/admin/assets/images/favicon.png">
+    
+    <!-- Early language redirect from localStorage -->
+    <script>
+    (function() {
+        var stored = localStorage.getItem('quicksite_admin_lang');
+        var current = '<?= $currentLang ?>';
+        var url = new URL(window.location.href);
+        // Only redirect if stored lang differs and we're not already setting it via URL
+        if (stored && stored !== current && !url.searchParams.has('lang')) {
+            url.searchParams.set('lang', stored);
+            window.location.replace(url.toString());
+        }
+    })();
+    </script>
     
     <!-- Base site styles (for CSS variables) -->
     <link rel="stylesheet" href="<?= $baseUrl ?>/style/style.css">
@@ -178,7 +211,20 @@ $baseUrl = rtrim(BASE_URL, '/');
     <?php if (!$isLoginPage): ?>
     <!-- Admin Footer -->
     <footer class="admin-footer">
-        <p><?= __admin('footer.version', ['version' => '1.6.0']) ?> &bull; <?= __admin('footer.powered') ?></p>
+        <div class="admin-footer__content">
+            <p><?= __admin('footer.version', ['version' => '1.6.0']) ?> &bull; <?= __admin('footer.powered') ?></p>
+            
+            <div class="admin-footer__lang">
+                <span class="admin-footer__lang-label"><?= __admin('footer.language') ?>:</span>
+                <?php foreach ($availableLangs as $langCode): ?>
+                    <?php if ($langCode === $currentLang): ?>
+                        <span class="admin-footer__lang-btn admin-footer__lang-btn--active"><?= $langNames[$langCode] ?? strtoupper($langCode) ?></span>
+                    <?php else: ?>
+                        <button type="button" class="admin-footer__lang-btn" data-lang="<?= $langCode ?>"><?= $langNames[$langCode] ?? strtoupper($langCode) ?></button>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+            </div>
+        </div>
     </footer>
     <?php endif; ?>
     
@@ -190,8 +236,105 @@ $baseUrl = rtrim(BASE_URL, '/');
             baseUrl: '<?= rtrim(BASE_URL, '/') ?>',
             publicSpace: '<?= defined('PUBLIC_FOLDER_SPACE') ? PUBLIC_FOLDER_SPACE : '' ?>',
             defaultLang: '<?= CONFIG['LANGUAGE_DEFAULT'] ?? 'en' ?>',
-            multilingual: <?= (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) ? 'true' : 'false' ?>
+            multilingual: <?= (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) ? 'true' : 'false' ?>,
+            translations: {
+                common: {
+                    success: '<?= __admin('common.status.success') ?>',
+                    error: '<?= __admin('common.status.error') ?>',
+                    loading: '<?= __admin('common.loading') ?>',
+                    noResults: '<?= __admin('common.noResults') ?>'
+                },
+                dashboard: {
+                    columns: {
+                        command: '<?= __admin('dashboard.history.columns.command') ?>',
+                        status: '<?= __admin('dashboard.history.columns.status') ?>',
+                        duration: '<?= __admin('dashboard.history.columns.duration') ?>',
+                        time: '<?= __admin('dashboard.history.columns.time') ?>'
+                    }
+                },
+                history: {
+                    noHistoryFiltered: '<?= __admin('history.noHistoryFiltered') ?>',
+                    pagination: {
+                        info: '<?= __admin('history.pagination.info') ?>'
+                    },
+                    errors: {
+                        loadFailed: '<?= __admin('history.errors.loadFailed') ?>'
+                    }
+                },
+                structure: {
+                    tree: {
+                        loading: '<?= __admin('structure.tree.loading') ?>',
+                        isEmpty: '<?= __admin('structure.tree.isEmpty') ?>'
+                    },
+                    errors: {
+                        loadFailed: '<?= __admin('structure.errors.loadFailed') ?>'
+                    },
+                    toast: {
+                        jsonCopied: '<?= __admin('structure.toast.jsonCopied') ?>'
+                    }
+                },
+                favorites: {
+                    toast: {
+                        added: '<?= __admin('favorites.toast.added') ?>',
+                        removed: '<?= __admin('favorites.toast.removed') ?>',
+                        cleared: '<?= __admin('favorites.toast.cleared') ?>'
+                    }
+                },
+                commandForm: {
+                    addToFavorites: '<?= __admin('commandForm.addToFavorites') ?>',
+                    removeFromFavorites: '<?= __admin('commandForm.removeFromFavorites') ?>',
+                    errors: {
+                        docNotFound: '<?= __admin('commandForm.errors.docNotFound') ?>',
+                        docLoadFailed: '<?= __admin('commandForm.errors.docLoadFailed') ?>',
+                        fileUploadBatch: '<?= __admin('commandForm.errors.fileUploadBatch') ?>'
+                    }
+                },
+                docs: {
+                    urlCopied: '<?= __admin('docs.urlCopied') ?>',
+                    errors: {
+                        couldNotLoad: '<?= __admin('docs.errors.couldNotLoad') ?>',
+                        copyFailed: '<?= __admin('docs.errors.copyFailed') ?>'
+                    }
+                },
+                settings: {
+                    toast: {
+                        preferencesSaved: '<?= __admin('settings.toast.preferencesSaved') ?>',
+                        defaultLangUpdated: '<?= __admin('settings.toast.defaultLangUpdated') ?>'
+                    },
+                    errors: {
+                        sysInfoFailed: '<?= __admin('settings.errors.sysInfoFailed') ?>',
+                        routesFailed: '<?= __admin('settings.errors.routesFailed') ?>',
+                        languagesFailed: '<?= __admin('settings.errors.languagesFailed') ?>',
+                        defaultLangFailed: '<?= __admin('settings.errors.defaultLangFailed') ?>'
+                    }
+                },
+                ai: {
+                    executionComplete: '<?= __admin('ai.executionComplete') ?>'
+                }
+            },
+            adminLang: '<?= $currentLang ?>'
         };
+        
+        // Language Switcher
+        (function() {
+            const STORAGE_KEY = 'quicksite_admin_lang';
+            
+            // Store current language in localStorage for persistence
+            localStorage.setItem(STORAGE_KEY, QUICKSITE_CONFIG.adminLang);
+            
+            // Handle language switch buttons
+            document.addEventListener('click', function(e) {
+                const langBtn = e.target.closest('[data-lang]');
+                if (langBtn) {
+                    const newLang = langBtn.dataset.lang;
+                    localStorage.setItem(STORAGE_KEY, newLang);
+                    // Reload with lang parameter
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('lang', newLang);
+                    window.location.href = url.toString();
+                }
+            });
+        })();
     </script>
     
     <!-- Admin JavaScript -->

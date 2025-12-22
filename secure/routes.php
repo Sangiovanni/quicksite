@@ -5,5 +5,4 @@
   3 => 'docs',
   4 => 'get-started',
   5 => 'guides',
-  6 => 'test',
 ); ?>

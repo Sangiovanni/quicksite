@@ -21,33 +21,33 @@
                 <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
                 <line x1="12" y1="22.08" x2="12" y2="12"/>
             </svg>
-            Select Structure
+            <?= __admin('structure.selectStructure') ?>
         </h2>
     </div>
     <div class="admin-card__body">
         <div class="admin-grid admin-grid--cols-3">
             <div class="admin-form-group">
-                <label class="admin-label">Type</label>
+                <label class="admin-label"><?= __admin('structure.label.type') ?></label>
                 <select id="structure-type" class="admin-select">
-                    <option value="">Select type...</option>
-                    <option value="page">Page</option>
-                    <option value="menu">Menu</option>
-                    <option value="footer">Footer</option>
-                    <option value="component">Component</option>
+                    <option value=""><?= __admin('structure.select.type') ?></option>
+                    <option value="page"><?= __admin('structure.type.page') ?></option>
+                    <option value="menu"><?= __admin('structure.type.menu') ?></option>
+                    <option value="footer"><?= __admin('structure.type.footer') ?></option>
+                    <option value="component"><?= __admin('structure.type.component') ?></option>
                 </select>
             </div>
             
             <div class="admin-form-group">
-                <label class="admin-label">Name</label>
+                <label class="admin-label"><?= __admin('structure.label.name') ?></label>
                 <select id="structure-name" class="admin-select" disabled>
-                    <option value="">Select type first...</option>
+                    <option value=""><?= __admin('structure.select.typeFirst') ?></option>
                 </select>
             </div>
             
             <div class="admin-form-group">
                 <label class="admin-label">&nbsp;</label>
                 <button type="button" id="load-structure" class="admin-btn admin-btn--primary" disabled>
-                    Load Structure
+                    <?= __admin('structure.loadStructure') ?>
                 </button>
             </div>
         </div>
@@ -61,24 +61,24 @@
             <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
-            <span>Structure Tree</span>
+            <span><?= __admin('structure.tree.title') ?></span>
         </h2>
         <div class="admin-card__actions">
             <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="expandAll()">
-                Expand All
+                <?= __admin('structure.tree.expandAll') ?>
             </button>
             <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="collapseAll()">
-                Collapse All
+                <?= __admin('structure.tree.collapseAll') ?>
             </button>
             <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="copyStructure()">
-                Copy JSON
+                <?= __admin('structure.tree.copyJson') ?>
             </button>
         </div>
     </div>
     <div class="admin-card__body">
         <div id="structure-tree" class="admin-structure-tree">
             <div class="admin-empty">
-                <p>Select a structure type and name above to view</p>
+                <p><?= __admin('structure.tree.empty') ?></p>
             </div>
         </div>
     </div>
@@ -87,7 +87,7 @@
 <!-- Node Details Panel -->
 <div id="node-details" class="admin-node-details" style="display: none;">
     <div class="admin-node-details__header">
-        <h3>Node Details</h3>
+        <h3><?= __admin('structure.nodeDetails.title') ?></h3>
         <button type="button" class="admin-node-details__close" onclick="closeNodeDetails()">×</button>
     </div>
     <div class="admin-node-details__body" id="node-details-content">

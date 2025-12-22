@@ -267,6 +267,53 @@ code{
     font-size: var(--font-size-sm);
 }
 
+.admin-footer__content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.admin-footer__content p {
+    margin: 0;
+}
+
+.admin-footer__lang {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.admin-footer__lang-label {
+    opacity: 0.7;
+    margin-right: var(--space-xs);
+}
+
+.admin-footer__lang-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: var(--font-size-xs);
+    background: transparent;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    color: var(--admin-text-light);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.admin-footer__lang-btn:hover {
+    background: var(--admin-bg-primary);
+    border-color: var(--admin-primary);
+    color: var(--admin-primary);
+}
+
+.admin-footer__lang-btn--active {
+    background: var(--admin-primary);
+    border-color: var(--admin-primary);
+    color: var(--admin-bg-primary);
+    cursor: default;
+}
+
 /* =============================================================================
    CARDS & PANELS
    ============================================================================= */

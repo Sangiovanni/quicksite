@@ -1,0 +1,544 @@
+{
+    "common": {
+        "appName": "QuickSite Admin",
+        "loading": "Chargement...",
+        "error": "Erreur",
+        "success": "Succès",
+        "warning": "Attention",
+        "confirm": "Confirmer",
+        "cancel": "Annuler",
+        "save": "Enregistrer",
+        "delete": "Supprimer",
+        "edit": "Modifier",
+        "view": "Voir",
+        "back": "Retour",
+        "next": "Suivant",
+        "previous": "Précédent",
+        "close": "Fermer",
+        "yes": "Oui",
+        "no": "Non",
+        "search": "Rechercher...",
+        "noResults": "Aucun résultat trouvé",
+        "required": "Requis",
+        "optional": "Optionnel",
+        "execute": "Exécuter",
+        "reset": "Réinitialiser",
+        "copy": "Copier",
+        "copied": "Copié !",
+        "backToSite": "Retour au site",
+        "clearAll": "Tout effacer",
+        "notApplicable": "N/A",
+        "validate": "Valider",
+        "preview": "Aperçu",
+        "load": "Charger",
+        "add": "+ Ajouter",
+        "remove": "Retirer",
+        "enabled": "Activé",
+        "default": "Par défaut",
+        "status": {
+            "success": "Succès",
+            "error": "Erreur"
+        }
+    },
+    "login": {
+        "title": "Connexion Admin",
+        "subtitle": "Entrez votre jeton API pour accéder au panneau d'administration",
+        "tokenLabel": "Jeton API",
+        "tokenPlaceholder": "tvt_xxxxxxxxxxxxxxxx...",
+        "rememberToken": "Se souvenir du jeton sur cet appareil",
+        "rememberHint": "Votre jeton sera stocké en toute sécurité dans votre navigateur",
+        "submit": "Connexion",
+        "invalidToken": "Jeton invalide ou expiré",
+        "connectionError": "Impossible de se connecter à l'API",
+        "privacyNote": "En cochant 'Se souvenir du jeton', vous consentez au stockage local des données d'authentification.",
+        "help": {
+            "title": "Besoin d'un jeton ?",
+            "text": "Utilisez la commande generateToken via l'API, ou consultez votre fichier auth.php pour le jeton par défaut."
+        }
+    },
+    "logout": {
+        "title": "Déconnexion",
+        "message": "Vous avez été déconnecté avec succès",
+        "redirect": "Redirection vers la page de connexion..."
+    },
+    "dashboard": {
+        "title": "Tableau de bord",
+        "welcome": "Bienvenue sur QuickSite Admin",
+        "subtitle": "Gérez votre site via une interface conviviale",
+        "quickActions": "Actions rapides",
+        "recentCommands": "Commandes récentes",
+        "noHistory": "Aucun historique de commandes",
+        "viewAllHistory": "Voir tout l'historique",
+        "stats": {
+            "title": "Statistiques du site",
+            "routes": "Routes",
+            "pages": "Pages",
+            "components": "Composants",
+            "languages": "Langues"
+        },
+        "categories": {
+            "title": "Commandes par catégorie"
+        },
+        "history": {
+            "columns": {
+                "command": "Commande",
+                "status": "Statut",
+                "duration": "Durée",
+                "time": "Heure"
+            }
+        }
+    },
+    "commands": {
+        "title": "Commandes",
+        "subtitle": "Parcourir et exécuter les commandes API",
+        "searchPlaceholder": "Rechercher des commandes...",
+        "allCategories": "Toutes les catégories",
+        "method": "Méthode",
+        "parameters": "Paramètres",
+        "noParameters": "Aucun paramètre requis",
+        "requiredParams": "Paramètres requis",
+        "optionalParams": "Paramètres optionnels",
+        "response": "Réponse",
+        "execute": "Exécuter la commande",
+        "tryIt": "Essayer",
+        "viewDocs": "Voir la documentation",
+        "example": "Exemple",
+        "notes": "Notes",
+        "successResponse": "Réponse de succès",
+        "errorResponses": "Réponses d'erreur",
+        "paramTypes": {
+            "string": "Chaîne",
+            "number": "Nombre",
+            "boolean": "Booléen",
+            "array": "Tableau",
+            "object": "Objet",
+            "file": "Fichier"
+        }
+    },
+    "commandForm": {
+        "warning": {
+            "urlChange": {
+                "title": "Changement de structure d'URL",
+                "message": "Cette commande modifiera la structure des URL de votre site. L'URL du panneau d'administration changera, et vous serez automatiquement redirigé vers le nouvel emplacement après l'exécution."
+            },
+            "serverConfig": {
+                "title": "Configuration serveur requise",
+                "advanced": "Utilisateurs avancés uniquement !",
+                "message": "Cette commande renomme le dossier public physique. Après l'exécution, votre site sera inaccessible jusqu'à ce que vous mettiez à jour la configuration de votre serveur (VirtualHost Apache, config nginx, etc.) pour pointer vers le nouveau nom de dossier.",
+                "useCase": "Cas d'utilisation : basculement entre environnements de test/production partageant la même racine serveur avec différentes configurations DNS."
+            }
+        },
+        "batchMode": {
+            "title": "Mode batch",
+            "message": "Configurez les paramètres de la commande et cliquez sur \"Ajouter à la file\" pour ajouter cette commande à votre file d'attente. La commande ne sera pas exécutée tant que vous n'aurez pas lancé l'ensemble du batch."
+        },
+        "badge": {
+            "changesUrls": "Modifie les URLs",
+            "serverConfigRequired": "Config serveur requise"
+        },
+        "addToFavorites": "Ajouter aux favoris",
+        "removeFromFavorites": "Retirer des favoris",
+        "saveToQueue": "Ajouter à la file",
+        "backToBatch": "Retour au batch",
+        "errors": {
+            "docNotFound": "Documentation de la commande introuvable",
+            "docLoadFailed": "Échec du chargement de la documentation :",
+            "fileUploadBatch": "Les téléchargements de fichiers ne peuvent pas être ajoutés à la file d'attente"
+        }
+    },
+    "history": {
+        "title": "Historique des commandes",
+        "subtitle": "Voir les commandes exécutées et leurs résultats",
+        "noHistory": "Aucune commande n'a encore été exécutée",
+        "noHistoryFiltered": "Aucun historique de commandes trouvé pour les filtres sélectionnés.",
+        "filters": {
+            "date": "Date",
+            "command": "Commande",
+            "status": "Statut",
+            "all": "Tous",
+            "success": "Succès",
+            "error": "Erreur",
+            "showAllDates": "Afficher toutes les dates (7 derniers jours)"
+        },
+        "columns": {
+            "id": "ID",
+            "timestamp": "Horodatage",
+            "command": "Commande",
+            "method": "Méthode",
+            "status": "Statut",
+            "duration": "Durée",
+            "details": "Détails"
+        },
+        "detail": {
+            "id": "ID",
+            "timestamp": "Horodatage",
+            "command": "Commande",
+            "method": "Méthode",
+            "duration": "Durée",
+            "publisher": "Éditeur",
+            "requestBody": "Corps de la requête",
+            "response": "Réponse"
+        },
+        "pagination": {
+            "info": "Page :page sur :total (:count entrées)"
+        },
+        "clearHistory": "Effacer l'historique",
+        "clearConfirm": "Êtes-vous sûr de vouloir effacer l'historique des commandes ?",
+        "export": "Exporter",
+        "errors": {
+            "loadFailed": "Échec du chargement de l'historique :"
+        }
+    },
+    "errors": {
+        "404": {
+            "title": "Page non trouvée",
+            "message": "La page que vous recherchez n'existe pas.",
+            "backToDashboard": "Retour au tableau de bord"
+        },
+        "500": {
+            "title": "Erreur serveur",
+            "message": "Une erreur s'est produite. Veuillez réessayer.",
+            "retry": "Réessayer"
+        },
+        "apiError": "Erreur API",
+        "networkError": "Erreur réseau. Veuillez vérifier votre connexion."
+    },
+    "form": {
+        "validation": {
+            "required": "Ce champ est requis",
+            "invalidFormat": "Format invalide",
+            "minLength": "Minimum :min caractères requis",
+            "maxLength": "Maximum :max caractères autorisés",
+            "invalidJson": "Format JSON invalide"
+        },
+        "placeholders": {
+            "selectOption": "Sélectionnez une option...",
+            "enterValue": "Entrez une valeur...",
+            "jsonInput": "Entrez des données JSON..."
+        }
+    },
+    "nav": {
+        "login": "Connexion",
+        "dashboard": "Tableau de bord",
+        "commands": "Commandes",
+        "command": "Commande",
+        "history": "Historique",
+        "settings": "Paramètres",
+        "favorites": "Favoris",
+        "structure": "Structure",
+        "batch": "Batch",
+        "docs": "Documentation",
+        "ai": "Intégration IA",
+        "logout": "Déconnexion"
+    },
+    "settings": {
+        "title": "Paramètres",
+        "subtitle": "Voir la configuration et gérer les préférences",
+        "systemInfo": "Informations système",
+        "configuration": "Configuration",
+        "routes": "Routes actives",
+        "languages": "Langues",
+        "preferences": "Préférences admin",
+        "keyboardShortcuts": "Raccourcis clavier",
+        "confirmDestructive": "Confirmation des actions destructives",
+        "toastDuration": "Durée des notifications",
+        "addRoute": "Ajouter une route",
+        "loadingRoutes": "Chargement des routes...",
+        "addLanguage": "Ajouter une langue",
+        "loadingLanguages": "Chargement des langues...",
+        "savePreferences": "Enregistrer les préférences",
+        "pref": {
+            "enableShortcuts": "Activer les raccourcis clavier",
+            "shortcutsHint": "Appuyez sur ? pour voir tous les raccourcis",
+            "confirmDestructive": "Afficher la confirmation pour les actions destructives",
+            "duration": {
+                "2s": "2 secondes",
+                "4s": "4 secondes",
+                "6s": "6 secondes",
+                "noHide": "Ne pas masquer automatiquement"
+            }
+        },
+        "sysInfo": {
+            "apiVersion": "Version API",
+            "totalCommands": "Total des commandes",
+            "baseUrl": "URL de base",
+            "serverTime": "Heure serveur"
+        },
+        "config": {
+            "multilingualMode": "Mode multilingue",
+            "enabled": "Activé",
+            "singleLanguage": "Langue unique",
+            "languages": "Langues",
+            "configured": "configurées",
+            "routes": "Routes",
+            "active": "actives",
+            "stylesStatus": "État des styles",
+            "loaded": "Chargé",
+            "error": "Erreur"
+        },
+        "routesList": {
+            "none": "Aucune route configurée",
+            "delete": "Supprimer la route"
+        },
+        "languagesList": {
+            "none": "Aucune langue configurée",
+            "setDefault": "Définir par défaut",
+            "setDefaultTitle": "Définir comme langue par défaut"
+        },
+        "toast": {
+            "preferencesSaved": "Préférences enregistrées",
+            "defaultLangUpdated": "Langue par défaut mise à jour"
+        },
+        "errors": {
+            "sysInfoFailed": "Impossible de charger les infos système",
+            "routesFailed": "Impossible de charger les routes",
+            "languagesFailed": "Impossible de charger les langues",
+            "defaultLangFailed": "Échec de la mise à jour de la langue par défaut"
+        }
+    },
+    "favorites": {
+        "title": "Favoris",
+        "subtitle": "Accès rapide à vos commandes favorites",
+        "quickActions": "Actions rapides",
+        "yourFavorites": "Vos commandes favorites",
+        "addFavorites": "Ajouter aux favoris",
+        "loading": "Chargement des favoris...",
+        "searchPlaceholder": "Rechercher des commandes à ajouter aux favoris...",
+        "noMatches": "Aucune commande correspondante trouvée",
+        "quickAction": {
+            "buildSite": "Construire le site",
+            "viewRoutes": "Voir les routes",
+            "listAssets": "Liste des assets",
+            "translations": "Traductions",
+            "viewStyles": "Voir les styles",
+            "structure": "Structure"
+        },
+        "empty": {
+            "title": "Aucun favori",
+            "message": "Recherchez des commandes ci-dessous pour les ajouter à vos favoris."
+        },
+        "modal": {
+            "clearTitle": "Effacer les favoris",
+            "clearMessage": "Êtes-vous sûr de vouloir effacer tous les favoris ?",
+            "clearConfirm": "Tout effacer"
+        },
+        "toast": {
+            "added": "\":command\" ajouté aux favoris",
+            "removed": "\":command\" retiré des favoris",
+            "cleared": "Tous les favoris effacés"
+        }
+    },
+    "structure": {
+        "title": "Visualiseur de structure",
+        "subtitle": "Vue arborescente des structures de pages et composants",
+        "selectStructure": "Sélectionner une structure",
+        "loadStructure": "Charger la structure",
+        "label": {
+            "type": "Type",
+            "name": "Nom"
+        },
+        "select": {
+            "type": "Sélectionner le type...",
+            "typeFirst": "Sélectionnez d'abord le type...",
+            "notRequired": "Non requis pour :type",
+            "selectType": "Sélectionner :type..."
+        },
+        "type": {
+            "page": "Page",
+            "menu": "Menu",
+            "footer": "Pied de page",
+            "component": "Composant"
+        },
+        "tree": {
+            "title": "Arborescence",
+            "expandAll": "Tout déplier",
+            "collapseAll": "Tout replier",
+            "copyJson": "Copier JSON",
+            "empty": "Sélectionnez un type et un nom de structure ci-dessus pour visualiser",
+            "loading": "Chargement de la structure...",
+            "isEmpty": "La structure est vide",
+            "structurePrefix": "Structure :"
+        },
+        "nodeDetails": {
+            "title": "Détails du nœud",
+            "nodeId": "ID du nœud",
+            "element": "Élément",
+            "textContent": "Contenu texte",
+            "translationKey": "Clé de traduction",
+            "component": "Composant",
+            "attributes": "Attributs",
+            "children": "Enfants",
+            "childNodes": "nœud(s) enfant(s)",
+            "editNode": "Modifier ce nœud",
+            "editFull": "Modifier la structure complète"
+        },
+        "toast": {
+            "jsonCopied": "JSON de la structure copié dans le presse-papiers"
+        },
+        "errors": {
+            "loadOptions": "Erreur lors du chargement des options",
+            "loadFailed": "Échec du chargement de la structure"
+        }
+    },
+    "batch": {
+        "title": "Exécution batch",
+        "subtitle": "Exécuter plusieurs commandes en séquence",
+        "queue": "File de commandes",
+        "addCommands": "Ajouter des commandes",
+        "results": "Résultats d'exécution",
+        "emptyQueue": "Aucune commande dans la file",
+        "emptyQueueHint": "Ajoutez des commandes depuis la liste à droite",
+        "executeAndClear": "Exécuter et vider la file",
+        "executeAndKeep": "Exécuter et garder la file",
+        "searchPlaceholder": "Rechercher des commandes...",
+        "clearResults": "Effacer les résultats",
+        "importJson": {
+            "title": "Importer des commandes JSON",
+            "hint": "Collez un tableau JSON de commandes pour les ajouter à la file. Parfait pour les séquences générées par IA.",
+            "label": "Tableau JSON de commandes",
+            "addToQueue": "Ajouter à la file"
+        },
+        "templates": {
+            "title": "Modèles de commandes",
+            "hint": "Séquences de commandes prédéfinies pour les tâches courantes. Cliquez pour prévisualiser, puis chargez dans la file.",
+            "dynamic": "Dynamique",
+            "analyzePreview": "Analyser et prévisualiser",
+            "generateLoad": "Générer et charger",
+            "loadIntoQueue": "Charger dans la file",
+            "previewTitle": "Aperçu du modèle",
+            "freshStart": {
+                "title": "Nouveau départ",
+                "desc": "Remettre à zéro tout le contenu : supprimer les routes, vider les assets, effacer les traductions, réinitialiser le CSS. Conserve les langues et la page 404."
+            },
+            "starterBusiness": {
+                "title": "Site entreprise",
+                "desc": "Site web d'entreprise avec menu, pied de page, 4 pages (accueil, à propos, services, contact) et thème turquoise. Langue unique."
+            },
+            "starterBusinessMultilingual": {
+                "title": "Site entreprise (Multilingue)",
+                "desc": "Identique au site entreprise avec traductions EN + FR et sélecteur de langue dans le pied de page."
+            },
+            "landingPage": {
+                "title": "Page d'atterrissage",
+                "desc": "Créer une structure de page unique avec sections héros, fonctionnalités et appel à l'action."
+            },
+            "landingPageMultilingual": {
+                "title": "Page d'atterrissage (Multilingue)",
+                "desc": "Identique à la page d'atterrissage avec traductions EN + FR et sélecteur de langue."
+            }
+        }
+    },
+    "docs": {
+        "title": "Documentation API",
+        "subtitle": "Référence complète de toutes les commandes API disponibles",
+        "quickReference": "Référence rapide",
+        "commandReference": "Référence des commandes",
+        "searchPlaceholder": "Rechercher des commandes...",
+        "loading": "Chargement de la documentation...",
+        "quickRef": {
+            "apiBaseUrl": "URL de base API",
+            "authentication": "Authentification",
+            "includeTokenVia": "Inclure le jeton via :",
+            "header": "En-tête :",
+            "query": "Requête :",
+            "postBody": "Corps POST :",
+            "responseFormat": "Format de réponse"
+        },
+        "section": {
+            "description": "Description",
+            "parameters": "Paramètres"
+        },
+        "noParameters": "Aucun paramètre requis",
+        "noDescription": "Pas de description",
+        "copyUrl": "Copier l'URL",
+        "urlCopied": "URL copiée dans le presse-papiers",
+        "errors": {
+            "couldNotLoad": "Impossible de charger la documentation",
+            "copyFailed": "Impossible de copier l'URL"
+        }
+    },
+    "ai": {
+        "title": "Intégration IA",
+        "subtitle": "Générer des commandes avec des assistants IA",
+        "howItWorks": "Comment ça marche",
+        "specification": "Spécification IA",
+        "quickPrompts": "Exemples de prompts",
+        "intro": {
+            "description": "Utilisez des assistants IA (ChatGPT, Claude, Gemini...) pour créer des sites web complets via les commandes QuickSite."
+        },
+        "steps": {
+            "chooseSpec": {
+                "title": "Choisir une spec",
+                "hint": "Sélectionnez \"Landing Page\" pour les sites mono-page ou \"Website\" pour multi-pages."
+            },
+            "describeGoal": {
+                "title": "Décrivez votre objectif",
+                "hint": "Utilisez un exemple ou rédigez votre propre description avec des détails."
+            },
+            "copyPrompt": {
+                "title": "Copier le prompt complet",
+                "hint": "La spec + votre objectif sont combinés et prêts à coller."
+            },
+            "importExecute": {
+                "title": "Importer et exécuter",
+                "hint": "Collez la réponse JSON de l'IA et cliquez sur Exécuter maintenant."
+            },
+            "copyAndSend": "Copier et envoyer à l'IA"
+        },
+        "searchPlaceholder": "Rechercher des specs...",
+        "filter": {
+            "all": "Tous",
+            "landingPage": "Landing Page",
+            "website": "Site web",
+            "business": "Entreprise",
+            "creative": "Créatif",
+            "multilingual": "Multilingue"
+        },
+        "section": {
+            "freshStart": {
+                "title": "Nouveau départ",
+                "hint": "Partir de zéro"
+            },
+            "earlyStage": {
+                "title": "Début de projet",
+                "hint": "Structure de base existante"
+            },
+            "workInProgress": {
+                "title": "En cours",
+                "hint": "Améliorer un projet existant"
+            }
+        },
+        "backToSpecs": "Retour aux specs",
+        "promptBuilder": {
+            "title": "Que voulez-vous construire ?",
+            "startFromExample": "Commencer par un exemple :",
+            "writeYourOwn": "Écrire le vôtre...",
+            "placeholder": "Décrivez ce que vous voulez créer...",
+            "includeDetails": "Incluez des détails comme :",
+            "hints": {
+                "languages": "Langues (anglais, français, espagnol...)",
+                "pages": "Pages et leur objectif",
+                "style": "Préférences de style (couleurs, ambiance)",
+                "content": "Contenu ou sections spécifiques"
+            },
+            "beSpecific": "Soyez précis ! Plus vous donnez de détails, meilleur sera le résultat de l'IA."
+        },
+        "copyFullPrompt": "Copier le prompt complet",
+        "copySpecOnly": "Copier la spec uniquement",
+        "previewSpec": "Aperçu de la spec",
+        "importResponse": {
+            "title": "Importer la réponse IA",
+            "hint": "Après avoir envoyé le prompt à l'IA, collez sa réponse JSON ci-dessous",
+            "pasteJson": "Collez le JSON pour commencer"
+        },
+        "executeNow": "Exécuter maintenant",
+        "openInBatch": "Ouvrir dans Batch",
+        "executionComplete": "Exécution terminée",
+        "clear": "Effacer"
+    },
+    "footer": {
+        "version": "QuickSite v:version",
+        "powered": "Panneau d'administration",
+        "language": "Langue"
+    }
+}

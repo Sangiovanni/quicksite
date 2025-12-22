@@ -52,10 +52,9 @@ function getCommandDocumentation(string $command): ?array {
         <line x1="12" y1="17" x2="12.01" y2="17"/>
     </svg>
     <div>
-        <strong>⚠️ URL Structure Change</strong>
+        <strong>⚠️ <?= __admin('commandForm.warning.urlChange.title') ?></strong>
         <p style="margin: var(--space-xs) 0 0;">
-            This command will change your site's URL structure. The admin panel URL will change, 
-            and you will be automatically redirected to the new location after execution.
+            <?= __admin('commandForm.warning.urlChange.message') ?>
         </p>
     </div>
 </div>
@@ -69,14 +68,12 @@ function getCommandDocumentation(string $command): ?array {
         <line x1="12" y1="16" x2="12.01" y2="16"/>
     </svg>
     <div>
-        <strong>🚨 Server Configuration Required</strong>
+        <strong>🚨 <?= __admin('commandForm.warning.serverConfig.title') ?></strong>
         <p style="margin: var(--space-xs) 0 0;">
-            <strong>Advanced users only!</strong> This command renames the physical public folder. 
-            After execution, your site will be <strong>inaccessible</strong> until you update your 
-            server configuration (Apache VirtualHost, nginx config, etc.) to point to the new folder name.
+            <strong><?= __admin('commandForm.warning.serverConfig.advanced') ?></strong> <?= __admin('commandForm.warning.serverConfig.message') ?>
         </p>
         <p style="margin: var(--space-xs) 0 0; font-size: var(--font-size-sm); opacity: 0.9;">
-            Use case: switching between test/production environments sharing the same server root with different DNS configurations.
+            <?= __admin('commandForm.warning.serverConfig.useCase') ?>
         </p>
     </div>
 </div>
@@ -93,10 +90,9 @@ function getCommandDocumentation(string $command): ?array {
         <line x1="3" y1="18" x2="3.01" y2="18"/>
     </svg>
     <div>
-        <strong>📋 Batch Mode</strong>
+        <strong>📋 <?= __admin('commandForm.batchMode.title') ?></strong>
         <p style="margin: var(--space-xs) 0 0;">
-            Configure the command parameters and click "Save to Queue" to add this command to your batch queue.
-            The command will not be executed until you run the entire batch.
+            <?= __admin('commandForm.batchMode.message') ?>
         </p>
     </div>
 </div>
@@ -114,15 +110,15 @@ function getCommandDocumentation(string $command): ?array {
         <code><?= adminEscape($selectedCommand) ?></code>
         <?php if ($isUrlChanging): ?>
         <span class="badge badge--warning" style="margin-left: var(--space-sm); font-size: var(--font-size-xs);">
-            Changes URLs
+            <?= __admin('commandForm.badge.changesUrls') ?>
         </span>
         <?php endif; ?>
         <?php if ($isServerConfig): ?>
         <span class="badge badge--error" style="margin-left: var(--space-sm); font-size: var(--font-size-xs);">
-            ⚠️ Server Config Required
+            ⚠️ <?= __admin('commandForm.badge.serverConfigRequired') ?>
         </span>
         <?php endif; ?>
-        <button type="button" id="favorite-btn" class="admin-favorite-btn" onclick="toggleFavorite()" title="Add to favorites">
+        <button type="button" id="favorite-btn" class="admin-favorite-btn" onclick="toggleFavorite()" title="<?= __admin('commandForm.addToFavorites') ?>">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
             </svg>
@@ -339,8 +335,9 @@ function handleBatchSubmit(e) {
 function updateFavoriteButton() {
     const btn = document.getElementById('favorite-btn');
     const isFav = QuickSiteAdmin.isFavorite(COMMAND_NAME);
+    const t = window.QUICKSITE_CONFIG?.translations?.commandForm || {};
     btn.classList.toggle('admin-favorite-btn--active', isFav);
-    btn.title = isFav ? 'Remove from favorites' : 'Add to favorites';
+    btn.title = isFav ? (t.removeFromFavorites || 'Remove from favorites') : (t.addToFavorites || 'Add to favorites');
 }
 
 function toggleFavorite() {
