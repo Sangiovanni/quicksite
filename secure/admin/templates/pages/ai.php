@@ -1281,21 +1281,50 @@ function toggleSpecPreview() {
     
     if (isHidden) {
         preview.style.display = 'block';
+        // Generate and show spec + user goal if present
         generateSpec(currentSpec);
+        
+        // If user has typed a goal, show it in the preview too
+        const userGoal = document.getElementById('user-goal').value.trim();
+        if (userGoal && specsCache[currentSpec.id]) {
+            const fullContent = specsCache[currentSpec.id] + '\n\n---\n\n## My Request\n\n' + userGoal;
+            document.getElementById('ai-spec-content').value = fullContent;
+            // Update stats for full prompt
+            const charCount = fullContent.length;
+            const wordCount = fullContent.split(/\s+/).length;
+            document.getElementById('ai-spec-stats').innerHTML = `
+                <div class="admin-ai-spec-stat">
+                    <span class="admin-ai-spec-stat__label">Characters:</span>
+                    <span class="admin-ai-spec-stat__value">${charCount.toLocaleString()}</span>
+                </div>
+                <div class="admin-ai-spec-stat">
+                    <span class="admin-ai-spec-stat__label">Words:</span>
+                    <span class="admin-ai-spec-stat__value">${wordCount.toLocaleString()}</span>
+                </div>
+                <div class="admin-ai-spec-stat">
+                    <span class="admin-ai-spec-stat__label">Est. tokens:</span>
+                    <span class="admin-ai-spec-stat__value">~${Math.ceil(wordCount * 1.3).toLocaleString()}</span>
+                </div>
+                <div class="admin-ai-spec-stat" style="color: var(--admin-success);">
+                    <span class="admin-ai-spec-stat__label">✓</span>
+                    <span class="admin-ai-spec-stat__value">Includes your request</span>
+                </div>
+            `;
+        }
     } else {
         preview.style.display = 'none';
     }
 }
 
 function generateSpec(spec) {
-    if (!commandsData || !spec) return;
+    if (!commandsData || !spec) return null;
     
     const specId = spec.id;
     
     // Check cache
     if (specsCache[specId]) {
         displaySpec(specsCache[specId]);
-        return;
+        return specsCache[specId];
     }
     
     let specContent = '';
@@ -1315,6 +1344,7 @@ function generateSpec(spec) {
     
     specsCache[specId] = specContent;
     displaySpec(specContent);
+    return specContent;
 }
 
 function displaySpec(specContent) {
@@ -2016,6 +2046,11 @@ async function copyFullPrompt() {
         return;
     }
     
+    if (!commandsData) {
+        QuickSiteAdmin.showToast('Commands data still loading, please wait...', 'warning');
+        return;
+    }
+    
     // Generate spec if not cached
     if (!specsCache[currentSpec.id]) {
         generateSpec(currentSpec);
@@ -2025,7 +2060,7 @@ async function copyFullPrompt() {
     const userGoal = document.getElementById('user-goal').value.trim();
     
     if (!spec) {
-        QuickSiteAdmin.showToast('Specification not ready', 'warning');
+        QuickSiteAdmin.showToast('Specification not ready. Try clicking Preview Spec first.', 'warning');
         return;
     }
     

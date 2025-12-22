@@ -239,77 +239,77 @@ $langNames = [
             multilingual: <?= (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) ? 'true' : 'false' ?>,
             translations: {
                 common: {
-                    success: '<?= __admin('common.status.success') ?>',
-                    error: '<?= __admin('common.status.error') ?>',
-                    loading: '<?= __admin('common.loading') ?>',
-                    noResults: '<?= __admin('common.noResults') ?>'
+                    success: '<?= __adminJs('common.status.success') ?>',
+                    error: '<?= __adminJs('common.status.error') ?>',
+                    loading: '<?= __adminJs('common.loading') ?>',
+                    noResults: '<?= __adminJs('common.noResults') ?>'
                 },
                 dashboard: {
                     columns: {
-                        command: '<?= __admin('dashboard.history.columns.command') ?>',
-                        status: '<?= __admin('dashboard.history.columns.status') ?>',
-                        duration: '<?= __admin('dashboard.history.columns.duration') ?>',
-                        time: '<?= __admin('dashboard.history.columns.time') ?>'
+                        command: '<?= __adminJs('dashboard.history.columns.command') ?>',
+                        status: '<?= __adminJs('dashboard.history.columns.status') ?>',
+                        duration: '<?= __adminJs('dashboard.history.columns.duration') ?>',
+                        time: '<?= __adminJs('dashboard.history.columns.time') ?>'
                     }
                 },
                 history: {
-                    noHistoryFiltered: '<?= __admin('history.noHistoryFiltered') ?>',
+                    noHistoryFiltered: '<?= __adminJs('history.noHistoryFiltered') ?>',
                     pagination: {
-                        info: '<?= __admin('history.pagination.info') ?>'
+                        info: '<?= __adminJs('history.pagination.info') ?>'
                     },
                     errors: {
-                        loadFailed: '<?= __admin('history.errors.loadFailed') ?>'
+                        loadFailed: '<?= __adminJs('history.errors.loadFailed') ?>'
                     }
                 },
                 structure: {
                     tree: {
-                        loading: '<?= __admin('structure.tree.loading') ?>',
-                        isEmpty: '<?= __admin('structure.tree.isEmpty') ?>'
+                        loading: '<?= __adminJs('structure.tree.loading') ?>',
+                        isEmpty: '<?= __adminJs('structure.tree.isEmpty') ?>'
                     },
                     errors: {
-                        loadFailed: '<?= __admin('structure.errors.loadFailed') ?>'
+                        loadFailed: '<?= __adminJs('structure.errors.loadFailed') ?>'
                     },
                     toast: {
-                        jsonCopied: '<?= __admin('structure.toast.jsonCopied') ?>'
+                        jsonCopied: '<?= __adminJs('structure.toast.jsonCopied') ?>'
                     }
                 },
                 favorites: {
                     toast: {
-                        added: '<?= __admin('favorites.toast.added') ?>',
-                        removed: '<?= __admin('favorites.toast.removed') ?>',
-                        cleared: '<?= __admin('favorites.toast.cleared') ?>'
+                        added: '<?= __adminJs('favorites.toast.added') ?>',
+                        removed: '<?= __adminJs('favorites.toast.removed') ?>',
+                        cleared: '<?= __adminJs('favorites.toast.cleared') ?>'
                     }
                 },
                 commandForm: {
-                    addToFavorites: '<?= __admin('commandForm.addToFavorites') ?>',
-                    removeFromFavorites: '<?= __admin('commandForm.removeFromFavorites') ?>',
+                    addToFavorites: '<?= __adminJs('commandForm.addToFavorites') ?>',
+                    removeFromFavorites: '<?= __adminJs('commandForm.removeFromFavorites') ?>',
                     errors: {
-                        docNotFound: '<?= __admin('commandForm.errors.docNotFound') ?>',
-                        docLoadFailed: '<?= __admin('commandForm.errors.docLoadFailed') ?>',
-                        fileUploadBatch: '<?= __admin('commandForm.errors.fileUploadBatch') ?>'
+                        docNotFound: '<?= __adminJs('commandForm.errors.docNotFound') ?>',
+                        docLoadFailed: '<?= __adminJs('commandForm.errors.docLoadFailed') ?>',
+                        fileUploadBatch: '<?= __adminJs('commandForm.errors.fileUploadBatch') ?>'
                     }
                 },
                 docs: {
-                    urlCopied: '<?= __admin('docs.urlCopied') ?>',
+                    urlCopied: '<?= __adminJs('docs.urlCopied') ?>',
                     errors: {
-                        couldNotLoad: '<?= __admin('docs.errors.couldNotLoad') ?>',
-                        copyFailed: '<?= __admin('docs.errors.copyFailed') ?>'
+                        couldNotLoad: '<?= __adminJs('docs.errors.couldNotLoad') ?>',
+                        copyFailed: '<?= __adminJs('docs.errors.copyFailed') ?>'
                     }
                 },
                 settings: {
                     toast: {
-                        preferencesSaved: '<?= __admin('settings.toast.preferencesSaved') ?>',
-                        defaultLangUpdated: '<?= __admin('settings.toast.defaultLangUpdated') ?>'
+                        preferencesSaved: '<?= __adminJs('settings.toast.preferencesSaved') ?>',
+                        defaultLangUpdated: '<?= __adminJs('settings.toast.defaultLangUpdated') ?>'
                     },
                     errors: {
-                        sysInfoFailed: '<?= __admin('settings.errors.sysInfoFailed') ?>',
-                        routesFailed: '<?= __admin('settings.errors.routesFailed') ?>',
-                        languagesFailed: '<?= __admin('settings.errors.languagesFailed') ?>',
-                        defaultLangFailed: '<?= __admin('settings.errors.defaultLangFailed') ?>'
+                        sysInfoFailed: '<?= __adminJs('settings.errors.sysInfoFailed') ?>',
+                        routesFailed: '<?= __adminJs('settings.errors.routesFailed') ?>',
+                        languagesFailed: '<?= __adminJs('settings.errors.languagesFailed') ?>',
+                        defaultLangFailed: '<?= __adminJs('settings.errors.defaultLangFailed') ?>'
                     }
                 },
                 ai: {
-                    executionComplete: '<?= __admin('ai.executionComplete') ?>'
+                    executionComplete: '<?= __adminJs('ai.executionComplete') ?>'
                 }
             },
             adminLang: '<?= $currentLang ?>'

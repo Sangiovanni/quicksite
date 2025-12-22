@@ -175,3 +175,17 @@ class AdminTranslation {
 function __admin(string $key, array $params = []): string {
     return AdminTranslation::getInstance()->t($key, $params);
 }
+
+/**
+ * Helper function for translation escaped for JavaScript single-quoted strings
+ * Escapes apostrophes, backslashes, and newlines
+ */
+function __adminJs(string $key, array $params = []): string {
+    $value = AdminTranslation::getInstance()->t($key, $params);
+    // Escape backslashes first, then single quotes, then newlines
+    return str_replace(
+        ['\\', "'", "\r\n", "\n", "\r"],
+        ['\\\\', "\\'", '\\n', '\\n', '\\n'],
+        $value
+    );
+}

@@ -153,10 +153,10 @@ const ALL_COMMANDS = <?= json_encode($allCommands) ?>;
 const COMMAND_BASE_URL = '<?= $router->url('command') ?>';
 const TRANSLATIONS = {
     empty: {
-        title: '<?= __admin('favorites.empty.title') ?>',
-        message: '<?= __admin('favorites.empty.message') ?>'
+        title: '<?= __adminJs('favorites.empty.title') ?>',
+        message: '<?= __adminJs('favorites.empty.message') ?>'
     },
-    noMatches: '<?= __admin('favorites.noMatches') ?>'
+    noMatches: '<?= __adminJs('favorites.noMatches') ?>'
 };
 
 document.addEventListener('DOMContentLoaded', function() {
