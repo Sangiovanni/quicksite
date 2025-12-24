@@ -188,7 +188,7 @@ $langNames = [
                 $siteUrl .= (CONFIG['LANGUAGE_DEFAULT'] ?? 'en') . '/';
             }
             ?>
-            <a href="<?= $siteUrl ?>" class="admin-btn admin-btn--ghost" target="_blank">
+            <a href="<?= $siteUrl ?>" id="back-to-site-btn" class="admin-btn admin-btn--ghost" target="_blank">
                 <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                     <polyline points="15 3 21 3 21 9"/>
@@ -379,6 +379,7 @@ $langNames = [
         // Get tutorial data from server
         <?php 
         $tutorial = AdminTutorial::getInstance();
+        $tutorial->setCurrentToken($router->getToken());
         $tutorialData = $tutorial->exportForJs();
         ?>
         window.TUTORIAL_TRANSLATIONS = QUICKSITE_CONFIG.translations.tutorial;

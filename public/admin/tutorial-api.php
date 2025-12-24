@@ -68,21 +68,21 @@ switch ($action) {
         $status = $input['status'] ?? null;
         
         // Validate step
-        if ($step !== null && (!is_numeric($step) || $step < 1 || $step > 6)) {
+        if ($step !== null && (!is_numeric($step) || $step < 1 || $step > 10)) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'Step must be between 1 and 6']);
+            echo json_encode(['success' => false, 'error' => 'Step must be between 1 and 10']);
             exit;
         }
         
         // Validate substep
-        if ($substep !== null && (!is_numeric($substep) || $substep < 1 || $substep > 10)) {
+        if ($substep !== null && (!is_numeric($substep) || $substep < 1 || $substep > 15)) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'Substep must be between 1 and 10']);
+            echo json_encode(['success' => false, 'error' => 'Substep must be between 1 and 15']);
             exit;
         }
         
         // Validate status
-        $validStatuses = ['pending', 'skipped', 'completed'];
+        $validStatuses = ['pending', 'active', 'paused', 'skipped', 'completed'];
         if ($status !== null && !in_array($status, $validStatuses)) {
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Invalid status']);

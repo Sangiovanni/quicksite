@@ -429,7 +429,15 @@ async function loadTutorialStatus() {
             };
             
             const status = statusLabels[data.status] || statusLabels['pending'];
-            const stepText = data.step ? `Step ${data.step}/6` : 'Not started';
+            const totalSteps = 4;
+            let stepText;
+            if (data.status === 'completed') {
+                stepText = 'Completed';
+            } else if (data.step) {
+                stepText = `Step ${data.step}/${totalSteps}`;
+            } else {
+                stepText = 'Not started';
+            }
             
             container.innerHTML = `
                 <dl class="admin-definition-list">
@@ -479,8 +487,9 @@ async function restartTutorial() {
         const result = await response.json();
         
         if (result.success) {
-            // Also clear localStorage flag
+            // Clear all tutorial localStorage data
             localStorage.removeItem('quicksite_tutorial_started');
+            localStorage.removeItem('quicksite_tutorial_progress');
             QuickSiteAdmin.showToast('Tutorial reset! Redirecting...', 'success');
             setTimeout(() => {
                 window.location.href = '<?= $router->url('dashboard') ?>';

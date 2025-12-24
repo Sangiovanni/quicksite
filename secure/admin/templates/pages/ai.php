@@ -2188,6 +2188,15 @@ async function copySpecOnly() {
 
 let parsedCommands = null;
 
+// Commands that use GET method (same as batch.php)
+const GET_COMMANDS = [
+    'help', 'getRoutes', 'getStructure', 'getTranslation', 'getTranslations',
+    'getLangList', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys',
+    'analyzeTranslations', 'listAssets', 'getStyles', 'getRootVariables', 'listStyleRules',
+    'getStyleRule', 'getKeyframes', 'listTokens', 'listComponents', 'listPages',
+    'listAliases', 'listBuilds', 'getBuild', 'getCommandHistory'
+];
+
 function validateImportJson() {
     const textarea = document.getElementById('import-json');
     const statusEl = document.getElementById('import-status');
@@ -2258,6 +2267,11 @@ function validateImportJson() {
         
         statusEl.innerHTML = statusHtml;
         
+        // Dispatch event for tutorial system
+        document.dispatchEvent(new CustomEvent('quicksite:import-json-valid', {
+            detail: { commandCount: validCommands.length }
+        }));
+        
     } catch (e) {
         // Parse error
         statusEl.className = 'admin-ai-import-status admin-ai-import-status--invalid';
@@ -2293,13 +2307,21 @@ async function executeImportedJson() {
     let successCount = 0;
     let errorCount = 0;
     
+    // Small delay between commands (ms) to allow file system operations to complete
+    const COMMAND_DELAY = 50;
+    
     for (let i = 0; i < parsedCommands.length; i++) {
         const cmd = parsedCommands[i];
         
         try {
-            const response = await QuickSiteAdmin.apiRequest(cmd.command, cmd.params || {});
+            // Determine HTTP method based on command (same logic as batch.php)
+            const method = GET_COMMANDS.includes(cmd.command) ? 'GET' : 'POST';
+            const urlParams = cmd.urlParams || [];
+            const data = Object.keys(cmd.params || {}).length > 0 ? cmd.params : null;
             
-            if (response.success) {
+            const response = await QuickSiteAdmin.apiRequest(cmd.command, method, method === 'GET' ? null : data, urlParams);
+            
+            if (response.ok || response.success) {
                 successCount++;
                 results.push({
                     command: cmd.command,
@@ -2324,6 +2346,11 @@ async function executeImportedJson() {
                 success: false,
                 message: e.message || 'Request failed'
             });
+        }
+        
+        // Add delay between commands to allow file system operations to complete
+        if (i < parsedCommands.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, COMMAND_DELAY));
         }
     }
     

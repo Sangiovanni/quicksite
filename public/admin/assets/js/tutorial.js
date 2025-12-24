@@ -6,6 +6,7 @@
 class QuickSiteTutorial {
     constructor() {
         this.isActive = false;
+        this.isInitialized = false;
         this.currentStep = 1;
         this.currentSubstep = 1;
         this.status = 'pending';
@@ -17,6 +18,12 @@ class QuickSiteTutorial {
         this.minimizedElement = null;
         this.isMinimized = false;
         this.targetElement = null;
+        this.externalLinkClicked = false;  // Flag to track if user clicked external link
+        
+        // Drag state
+        this.isDragging = false;
+        this.dragOffset = { x: 0, y: 0 };
+        this.userDragPosition = null; // User's custom position from dragging
         
         // Translations (will be set from PHP)
         this.translations = window.TUTORIAL_TRANSLATIONS || {};
@@ -28,8 +35,12 @@ class QuickSiteTutorial {
     init(data) {
         if (!data) return;
         
-        // Check for pending localStorage sync (from beacon saves during navigation)
-        this.syncFromLocalStorage();
+        // Prevent double initialization
+        if (this.isInitialized) {
+            console.log('Tutorial: Already initialized, skipping');
+            return;
+        }
+        this.isInitialized = true;
         
         this.status = data.status || 'pending';
         this.currentStep = data.currentStep || 1;
@@ -38,19 +49,17 @@ class QuickSiteTutorial {
         this.stepInfo = data.stepInfo;
         this.suggestedRoute = data.suggestedRoute || 'test-quicksite';
         
-        // Check if localStorage has more recent progress
+        // Check if localStorage has more recent progress (for navigation scenarios)
         const localProgress = this.getLocalProgress();
         if (localProgress && localProgress.step && localProgress.substep) {
-            // Compare: localStorage might be ahead if beacon save was pending
             const localTotal = (localProgress.step - 1) * 10 + localProgress.substep;
             const serverTotal = (this.currentStep - 1) * 10 + this.currentSubstep;
             
-            if (localTotal > serverTotal) {
+            if (localTotal > serverTotal && localProgress.status === 'active') {
                 console.log('Tutorial: Using localStorage progress (ahead of server)', localProgress);
                 this.currentStep = localProgress.step;
                 this.currentSubstep = localProgress.substep;
-                this.status = localProgress.status || this.status;
-                // Sync to server
+                this.status = localProgress.status;
                 this.saveProgress();
             }
         }
@@ -63,26 +72,39 @@ class QuickSiteTutorial {
         // IMPORTANT: Hide everything initially
         this.hideAll();
         
-        // Check if we should start
-        if (this.status === 'pending') {
-            // Check if step/substep is null (never started) vs just step 1 substep 1
-            const neverStarted = (data.currentStep === null || data.currentStep === 1) && 
-                                 (data.currentSubstep === null || data.currentSubstep === 1);
+        // Determine what to show based on status
+        // Status meanings:
+        // - 'pending': Never started or legacy state → check if first time
+        // - 'active': Currently doing tutorial → show current step immediately
+        // - 'paused': User clicked "Continue Later" → show minimized widget (not modal)
+        // - 'skipped': User skipped tutorial → show minimized widget
+        // - 'completed': Tutorial finished → show minimized widget
+        
+        if (this.status === 'active') {
+            // Active tutorial - show current step immediately
+            this.isActive = true;
+            this.showCurrentStep();
+        } else if (this.status === 'pending') {
+            // Check if this is truly first time (step/substep null or 1/1 AND never started before)
+            const isFirstTime = (data.currentStep === null || (data.currentStep === 1 && data.currentSubstep === 1)) 
+                                && !this.hasStartedBefore();
             
-            if (neverStarted && !this.hasStartedBefore()) {
-                // First time - show welcome only (no bubble/overlay yet)
+            if (isFirstTime) {
+                // First time - show welcome
                 this.showWelcome();
-            } else if (this.hasStartedBefore()) {
-                // Already started - auto-resume without modal (they're in the middle of the tutorial)
-                this.isActive = true;
-                this.showCurrentStep();
             } else {
-                // Not started but has progress somehow - show resume
+                // Has some progress or started before - show resume modal
                 this.showResume();
             }
-        } else if (this.status === 'skipped' || this.status === 'completed') {
+        } else if (this.status === 'paused') {
+            // Paused - show minimized widget (user can click to open resume modal)
+            this.showMinimized();
+        } else if (this.status === 'skipped') {
             // Show minimized widget for restart option
             this.showMinimized();
+        } else if (this.status === 'completed') {
+            // Tutorial completed - don't show anything, user is done!
+            // They can restart from Settings page if needed
         }
     }
     
@@ -191,12 +213,14 @@ class QuickSiteTutorial {
     createBubble() {
         if (this.bubbleElement) return;
         
+        const totalSteps = Object.keys(this.steps).length;
+        
         this.bubbleElement = document.createElement('div');
         this.bubbleElement.className = 'tutorial-bubble arrow-top';
         this.bubbleElement.innerHTML = `
-            <div class="tutorial-bubble-header">
+            <div class="tutorial-bubble-header" style="cursor: grab;">
                 <h4>
-                    <span class="step-badge">Step <span class="step-num">1</span>/6</span>
+                    <span class="step-badge">Step <span class="step-num">1</span>/${totalSteps}</span>
                     <span class="step-title">Create Your Website</span>
                 </h4>
                 <button class="tutorial-close-btn" onclick="tutorial.minimize()" title="Minimize">
@@ -223,6 +247,74 @@ class QuickSiteTutorial {
         `;
         
         document.body.appendChild(this.bubbleElement);
+        
+        // Add drag functionality
+        this.initDraggable();
+    }
+    
+    /**
+     * Initialize drag functionality for the bubble
+     */
+    initDraggable() {
+        const header = this.bubbleElement.querySelector('.tutorial-bubble-header');
+        if (!header) return;
+        
+        // Double-click to reset position
+        header.addEventListener('dblclick', (e) => {
+            if (e.target.closest('button')) return;
+            this.userDragPosition = null;
+            this.positionBubble();
+        });
+        
+        header.addEventListener('mousedown', (e) => {
+            // Don't drag if clicking on buttons
+            if (e.target.closest('button')) return;
+            
+            this.isDragging = true;
+            header.style.cursor = 'grabbing';
+            
+            const rect = this.bubbleElement.getBoundingClientRect();
+            this.dragOffset = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+            
+            e.preventDefault();
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!this.isDragging) return;
+            
+            const x = e.clientX - this.dragOffset.x;
+            const y = e.clientY - this.dragOffset.y;
+            
+            // Keep within viewport
+            const maxX = window.innerWidth - this.bubbleElement.offsetWidth - 10;
+            const maxY = window.innerHeight - this.bubbleElement.offsetHeight - 10;
+            
+            const finalX = Math.max(10, Math.min(x, maxX));
+            const finalY = Math.max(10, Math.min(y, maxY));
+            
+            // Apply position
+            this.bubbleElement.style.left = finalX + 'px';
+            this.bubbleElement.style.top = finalY + 'px';
+            this.bubbleElement.style.right = 'auto';
+            this.bubbleElement.style.bottom = 'auto';
+            this.bubbleElement.style.transform = 'none';
+            
+            // Remove arrow classes when dragging
+            this.bubbleElement.className = this.bubbleElement.className.replace(/arrow-\w+/g, '').trim();
+            
+            // Store user position
+            this.userDragPosition = { x: finalX, y: finalY };
+        });
+        
+        document.addEventListener('mouseup', () => {
+            if (this.isDragging) {
+                this.isDragging = false;
+                header.style.cursor = 'grab';
+            }
+        });
     }
     
     /**
@@ -268,11 +360,9 @@ class QuickSiteTutorial {
                     <h3>${t.whatYouLearn || 'In this tutorial, you\'ll learn:'}</h3>
                     <ul class="tutorial-steps-preview">
                         <li><span class="step-num">1</span><span class="step-text">${t.step1Preview || 'Create a website with AI'}</span></li>
-                        <li><span class="step-num">2</span><span class="step-text">${t.step2Preview || 'Build and preview your site'}</span></li>
-                        <li><span class="step-num">3</span><span class="step-text">${t.step3Preview || 'Explore the structure'}</span></li>
-                        <li><span class="step-num">4</span><span class="step-text">${t.step4Preview || 'Make quick edits'}</span></li>
-                        <li><span class="step-num">5</span><span class="step-text">${t.step5Preview || 'Add a new page'}</span></li>
-                        <li><span class="step-num">6</span><span class="step-text">${t.step6Preview || 'Learn about publishing'}</span></li>
+                        <li><span class="step-num">2</span><span class="step-text">${t.step2Preview || 'Batch Basics'}</span></li>
+                        <li><span class="step-num">3</span><span class="step-text">${t.step3Preview || 'Understanding Commands'}</span></li>
+                        <li><span class="step-num">4</span><span class="step-text">${t.step4Preview || 'Understanding Structure'}</span></li>
                     </ul>
                     <div class="tutorial-warning">
                         <span class="icon">⚠️</span>
@@ -300,6 +390,7 @@ class QuickSiteTutorial {
         const t = this.translations;
         const step = this.steps[this.currentStep];
         const stepTitle = step ? step.title : '';
+        const completedSteps = this.currentStep - 1;
         
         const modal = document.createElement('div');
         modal.className = 'tutorial-welcome-modal';
@@ -313,23 +404,15 @@ class QuickSiteTutorial {
                 </div>
                 <div class="tutorial-welcome-body">
                     <h3>${t.yourProgress || 'Your Progress'}</h3>
-                    <div class="tutorial-progress-summary" style="margin-bottom: 20px;">
-                        <p style="font-size: 1.1rem;">
-                            <strong>Step ${this.currentStep}</strong>: ${stepTitle}
-                        </p>
-                        <div class="tutorial-progress" style="justify-content: flex-start; gap: 8px; padding: 12px 0;">
-                            ${this.renderProgressDots()}
-                        </div>
-                    </div>
+                    <ul class="tutorial-steps-preview">
+                        ${this.renderStepsList(completedSteps)}
+                    </ul>
                     <div class="tutorial-welcome-actions">
                         <button class="tutorial-btn tutorial-btn-primary" onclick="tutorial.resumeTutorial()">
                             ${t.continueTutorial || 'Continue Tutorial'} <i class="bi bi-arrow-right"></i>
                         </button>
-                        <button class="tutorial-btn tutorial-btn-secondary" onclick="tutorial.restartTutorial()">
-                            ${t.startOver || 'Start Over'}
-                        </button>
-                        <button class="tutorial-btn tutorial-btn-skip" onclick="tutorial.skipFromWelcome()">
-                            ${t.skipForNow || 'Skip for now'}
+                        <button class="tutorial-btn tutorial-btn-secondary" onclick="tutorial.pauseTutorial()">
+                            ${t.continueLater || 'Continue Later'}
                         </button>
                     </div>
                 </div>
@@ -354,6 +437,111 @@ class QuickSiteTutorial {
     }
     
     /**
+     * Render step list with completion status
+     */
+    renderStepsList(completedUpTo = 0) {
+        const t = this.translations;
+        const stepTitles = [
+            t.step1Preview || 'Create a website with AI',
+            t.step2Preview || 'Batch Basics',
+            t.step3Preview || 'Understanding Commands',
+            t.step4Preview || 'Understanding Structure'
+        ];
+        
+        let html = '';
+        for (let i = 1; i <= 4; i++) {
+            const isCompleted = i <= completedUpTo;
+            const isCurrent = i === completedUpTo + 1;
+            let cls = isCompleted ? 'completed' : '';
+            if (isCurrent) cls += ' current';
+            
+            html += `<li class="${cls}">`;
+            if (isCompleted) {
+                html += `<span class="step-num completed"><i class="bi bi-check"></i></span>`;
+            } else {
+                html += `<span class="step-num">${i}</span>`;
+            }
+            html += `<span class="step-text">${stepTitles[i-1]}</span></li>`;
+        }
+        return html;
+    }
+    
+    /**
+     * Show step complete modal
+     */
+    showStepComplete(completedStepNum) {
+        const t = this.translations;
+        const completedStep = this.steps[completedStepNum];
+        const nextStep = this.steps[completedStepNum + 1];
+        
+        const modal = document.createElement('div');
+        modal.className = 'tutorial-welcome-modal';
+        modal.id = 'tutorial-step-complete';
+        modal.innerHTML = `
+            <div class="tutorial-welcome-card">
+                <div class="tutorial-welcome-header">
+                    <div class="icon">🎉</div>
+                    <h2>${t.stepComplete || 'Step Complete!'}</h2>
+                    <p>${completedStep?.title || 'Step ' + completedStepNum} ${t.completed || 'completed successfully'}</p>
+                </div>
+                <div class="tutorial-welcome-body">
+                    <h3>${t.yourProgress || 'Your Progress'}</h3>
+                    <ul class="tutorial-steps-preview">
+                        ${this.renderStepsList(completedStepNum)}
+                    </ul>
+                    ${nextStep ? `
+                    <div class="tutorial-next-step-preview">
+                        <strong>${t.nextUp || 'Next up'}:</strong> ${nextStep.title}
+                    </div>
+                    ` : ''}
+                    <div class="tutorial-welcome-actions">
+                        <button class="tutorial-btn tutorial-btn-primary" onclick="tutorial.continueAfterStepComplete()">
+                            ${t.continueTutorial || 'Continue Tutorial'} <i class="bi bi-arrow-right"></i>
+                        </button>
+                        <button class="tutorial-btn tutorial-btn-secondary" onclick="tutorial.pauseTutorial()">
+                            ${t.continueLater || 'Continue Later'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+    }
+    
+    /**
+     * Continue after step complete modal
+     */
+    continueAfterStepComplete() {
+        const modal = document.getElementById('tutorial-step-complete');
+        if (modal) modal.remove();
+        
+        this.isActive = true;
+        this.status = 'active';
+        this.saveProgress();
+        this.showCurrentStep();
+    }
+    
+    /**
+     * Pause tutorial (Continue Later)
+     */
+    async pauseTutorial() {
+        const modal = document.getElementById('tutorial-step-complete');
+        const welcome = document.getElementById('tutorial-welcome');
+        const resume = document.getElementById('tutorial-resume');
+        if (modal) modal.remove();
+        if (welcome) welcome.remove();
+        if (resume) resume.remove();
+        
+        this.status = 'paused';
+        this.isActive = false;
+        await this.saveProgress();
+        
+        // Show minimized widget
+        this.showMinimized();
+    }
+
+    /**
      * Start the tutorial
      */
     async startTutorial() {
@@ -361,33 +549,43 @@ class QuickSiteTutorial {
         const welcome = document.getElementById('tutorial-welcome');
         if (welcome) welcome.remove();
         
-        // Mark as started in localStorage
+        // Clear any stale localStorage progress to ensure fresh start
+        localStorage.removeItem('quicksite_tutorial_progress');
+        
+        // Mark as started in localStorage FIRST
         this.markAsStarted();
         
         // Initialize first step
         this.currentStep = 1;
         this.currentSubstep = 1;
-        this.status = 'pending';
+        this.status = 'active';
         this.isActive = true;
         
-        // Save progress FIRST (so refresh won't show welcome again)
+        // Save progress FIRST (so any page refresh won't show welcome again)
         await this.saveProgress();
         
-        // Apply fresh start (reset structure)
+        // Save to localStorage too as backup
+        this.saveLocalProgress();
+        
+        // Apply fresh start (reset structure) - this makes API calls but doesn't refresh
         await this.applyFreshStart();
         
-        // Now show the tutorial UI
-        this.showCurrentStep();
+        // Now show the tutorial UI (only if we haven't been navigated away)
+        if (this.isActive) {
+            this.showCurrentStep();
+        }
     }
     
     /**
      * Resume tutorial
      */
-    resumeTutorial() {
+    async resumeTutorial() {
         const modal = document.getElementById('tutorial-resume');
         if (modal) modal.remove();
         
         this.isActive = true;
+        this.status = 'active';
+        await this.saveProgress();
         this.showCurrentStep();
     }
     
@@ -397,6 +595,10 @@ class QuickSiteTutorial {
     async restartTutorial() {
         const modal = document.getElementById('tutorial-resume');
         if (modal) modal.remove();
+        
+        // Clear all tutorial localStorage data
+        localStorage.removeItem('quicksite_tutorial_started');
+        localStorage.removeItem('quicksite_tutorial_progress');
         
         await this.applyFreshStart();
         
@@ -610,6 +812,9 @@ class QuickSiteTutorial {
         // Check if we need to navigate to a different page
         this.ensureCorrectPage();
         
+        // Prepare page for current step (expand collapsed sections, etc.)
+        this.preparePageForStep(substep);
+        
         // Update bubble content
         this.updateBubble(step, substep);
         
@@ -628,6 +833,31 @@ class QuickSiteTutorial {
         this.bubbleElement.style.display = 'block';
         this.minimizedElement.style.display = 'none';
         this.isMinimized = false;
+    }
+    
+    /**
+     * Prepare page for current step - expand collapsed sections, etc.
+     */
+    preparePageForStep(substep) {
+        // For batch page template substeps, ensure templates section is expanded
+        const batchTemplateSubsteps = [
+            'select_fresh_start', 'generate_fresh_start',
+            'select_starter_multilingual', 'load_starter',
+            'select_starter_again', 'preview_template', 'load_to_queue'
+        ];
+        
+        if (batchTemplateSubsteps.includes(substep.id)) {
+            const templatesBody = document.getElementById('templates-body');
+            const templatesToggle = document.getElementById('templates-toggle');
+            
+            if (templatesBody && templatesBody.style.display === 'none') {
+                templatesBody.style.display = 'block';
+                // Rotate the toggle arrow
+                if (templatesToggle) {
+                    templatesToggle.style.transform = 'rotate(180deg)';
+                }
+            }
+        }
     }
     
     /**
@@ -650,18 +880,87 @@ class QuickSiteTutorial {
             <p class="substep-description">${this.getSubstepDescription(substep)}</p>
         `;
         
-        // Update progress dots
+        // Update progress dots - make them clickable to jump to substep
         const totalSubsteps = Object.keys(step.substeps).length;
         const progressHtml = this.renderSubstepProgress(totalSubsteps);
         this.bubbleElement.querySelector('.tutorial-progress').innerHTML = progressHtml;
         
-        // Update buttons
+        // Update Previous button visibility
         const prevBtn = this.bubbleElement.querySelector('.tutorial-btn-secondary');
         prevBtn.style.display = (this.currentStep === 1 && this.currentSubstep === 1) ? 'none' : 'inline-flex';
+        
+        // Check if this is the last substep of the current step
+        const isLastSubstep = this.currentSubstep === totalSubsteps;
+        
+        // Update Next/Finish button
+        const nextBtn = this.bubbleElement.querySelector('.tutorial-btn-primary');
+        const requiresClick = this.substepRequiresClick(substep);
+        
+        // Check if this is an external link substep (opens in new tab)
+        const isExternalLinkSubstep = ['view_site', 'view_blank_site', 'view_starter_site'].includes(substep.id);
+        
+        if (isLastSubstep && isExternalLinkSubstep) {
+            // Last substep with external link - hide button until they click the link
+            const finishText = t.finishStep || 'Finish Step';
+            nextBtn.innerHTML = `${finishText} ${this.currentStep} <i class="bi bi-check-lg"></i>`;
+            nextBtn.style.display = 'none'; // Hidden until they click Back to Site
+        } else if (isLastSubstep) {
+            // Last substep (not external link) - show "Finish Step X" button
+            const finishText = t.finishStep || 'Finish Step';
+            nextBtn.innerHTML = `${finishText} ${this.currentStep} <i class="bi bi-check-lg"></i>`;
+            nextBtn.style.display = 'inline-flex';
+        } else if (requiresClick) {
+            // Mid-step that requires click - hide Next button
+            nextBtn.innerHTML = `${t.next || 'Next'} <i class="bi bi-arrow-right"></i>`;
+            nextBtn.style.display = 'none';
+        } else {
+            // Regular substep - show Next button
+            nextBtn.innerHTML = `${t.next || 'Next'} <i class="bi bi-arrow-right"></i>`;
+            nextBtn.style.display = 'inline-flex';
+        }
     }
     
     /**
-     * Render substep progress dots
+     * Check if substep requires user to click on target (vs just filling input)
+     */
+    substepRequiresClick(substep) {
+        // These substep IDs require user to click on something specific
+        // Note: "select_*" steps are observation only (show Next button)
+        const clickRequired = [
+            // Step 1: AI Integration
+            'click_create',    // Click AI Integration link
+            'select_spec',     // Click Create Website card
+            'preview_prompt',  // Click Preview Full button
+            'copy_prompt',     // Click Copy Full Prompt button
+            'apply_structure', // Click Apply Structure button
+            'view_site',       // Click Back to Site button
+            // Step 2: Batch Basics
+            'go_batch',              // Click Batch link
+            'generate_fresh_start',  // Click Generate & Load
+            'execute_fresh_start',   // Click Execute & Clear
+            'view_blank_site',       // Click Back to Site
+            'load_starter',          // Click Load button
+            'execute_starter',       // Click Execute & Clear
+            'view_starter_site',     // Click Back to Site
+            // Step 3: Understanding Commands
+            'preview_template',      // Click Preview button
+            'load_to_queue',         // Click Load button
+            'clear_queue',           // Click Clear All button
+            // Step 4: Understanding Structure
+            'go_structure',          // Click Structure link
+            'select_menu_type',      // Select menu in dropdown
+            'load_menu_structure',   // Click Load Structure
+            'expand_menu',           // Click Expand All
+            'select_page_type',      // Select page in dropdown
+            'select_home_page',      // Select home page
+            'load_page_structure',   // Click Load Structure
+            'expand_page'            // Click Expand All
+        ];
+        return clickRequired.includes(substep.id);
+    }
+    
+    /**
+     * Render substep progress dots (clickable to jump to substep)
      */
     renderSubstepProgress(total) {
         let html = '';
@@ -669,9 +968,24 @@ class QuickSiteTutorial {
             let cls = 'tutorial-progress-dot';
             if (i < this.currentSubstep) cls += ' completed';
             if (i === this.currentSubstep) cls += ' current';
-            html += `<span class="${cls}"></span>`;
+            html += `<span class="${cls}" onclick="tutorial.jumpToSubstep(${i})" title="Go to substep ${i}"></span>`;
         }
         return html;
+    }
+    
+    /**
+     * Jump to a specific substep within current step
+     */
+    async jumpToSubstep(substepNum) {
+        const step = this.steps[this.currentStep];
+        if (!step) return;
+        
+        const totalSubsteps = Object.keys(step.substeps).length;
+        if (substepNum < 1 || substepNum > totalSubsteps) return;
+        
+        this.currentSubstep = substepNum;
+        await this.saveProgress();
+        this.showCurrentStep();
     }
     
     /**
@@ -687,31 +1001,50 @@ class QuickSiteTutorial {
      */
     getSubstepDescription(substep) {
         const descriptions = {
+            // Step 1: AI Integration
             'click_create': 'Click on "AI Integration" in the sidebar to get started.',
             'select_spec': 'Choose "Create Website" to generate a complete multi-page website.',
             'enter_goal': 'Describe what kind of website you want to create. Be specific about your needs.',
             'view_examples': 'Browse the example websites to get inspired. You can use any of them as a starting point!',
             'preview_prompt': 'Click "Preview Full" to see the complete prompt that will be sent to your AI.',
-            'copy_prompt': 'Copy the full prompt and paste it into your favorite AI chatbot (ChatGPT, Claude, etc.)',
-            'paste_response': 'Paste the JSON response from the AI into the response field.',
-            'apply_structure': 'Click to save your new website configuration.',
-            'go_build': 'Navigate to the Build command to generate your website files.',
-            'click_build': 'Click Execute to compile your website.',
-            'preview_site': 'Open your website in a new tab to see the result!',
-            'go_structure': 'Go to the Structure page to see your website organization.',
-            'expand_route': 'Click on a route to expand and see its content sections.',
-            'view_content': 'Explore the different content blocks that make up your page.',
-            'find_title': 'Find the Edit Title command to modify page titles.',
-            'edit_title': 'Enter a new title for your page.',
-            'rebuild': 'Go back to Build to regenerate your site with changes.',
-            'go_routes': 'Find the Add Route command to create a new page.',
-            'enter_name': `Enter a route name like "${this.suggestedRoute || 'test-quicksite'}".`,
-            'enter_title': 'Give your new page a title.',
-            'confirm_add': 'Execute the command to create your route.',
-            'preview_page': 'Check the Structure page to see your new route!',
-            'learn_hosting': 'Visit the Documentation page to learn more.',
-            'explore_settings': 'Explore the Settings page for configuration options.',
-            'complete': 'Congratulations! You\'ve completed the tutorial! 🎉'
+            'copy_prompt': 'Click to copy the full prompt to your clipboard.',
+            'use_ai_chatbot': 'Now paste this prompt into your favorite AI chatbot (ChatGPT, Claude, Gemini, etc.) and wait for the JSON response. Click Next when ready.',
+            'paste_response': 'Paste the JSON response from the AI into this field.',
+            'apply_structure': 'Click Execute Now to build your new website!',
+            'view_site': 'Congratulations! Your website structure is ready. Click "Back to Site" to preview it in a new tab, then click "Finish Step 1" to complete this step.',
+            
+            // Step 2: Batch Basics
+            'go_batch': 'Click on "Batch" in the sidebar. This powerful page lets you run multiple commands at once using templates.',
+            'select_fresh_start': 'This is the "Fresh Start" template. It will reset your website to a completely blank state. Click Next to continue.',
+            'generate_fresh_start': 'Click "Generate & Load". ⚠️ A confirmation dialog will appear - click "OK" to proceed (this clears your site data).',
+            'execute_fresh_start': 'Click "Execute & Clear Queue" to run all commands and clear your website.',
+            'view_blank_site': 'Check your website - it should now be blank! Click "Back to Site" to verify, then click Next.',
+            'select_starter_multilingual': 'This is the "Starter Business (Multilingual)" template. It creates a professional multi-language business website. Click Next.',
+            'load_starter': 'Click "Load" to add this template\'s commands to the queue.',
+            'execute_starter': 'Click "Execute & Clear Queue" to build your new business website!',
+            'view_starter_site': 'Amazing! Your professional website is ready. Click "Back to Site" to see your new business site, then Finish Step 2.',
+            
+            // Step 3: Understanding Commands
+            'select_starter_again': 'Let\'s explore how templates work. This is the same "Starter Business (Multilingual)" template. Click Next.',
+            'preview_template': 'Click "Preview" to see what commands this template contains.',
+            'understand_structure': 'Look at the JSON structure. Each command has a "command" name and "params". This is how QuickSite builds websites! Commands like "addRoute", "editContent", and "addLang" work together. Click Next when ready.',
+            'load_to_queue': 'Click "Load" to add these commands to the queue (we won\'t execute them).',
+            'view_queue': 'See how the queue fills up? Each item is a command that will be executed in order. You can manually add, remove, or reorder commands here. Click Next.',
+            'clear_queue': 'Click "Clear All". A confirmation will ask if you\'re sure - click "OK" to empty the queue (your site won\'t be affected).',
+            'commands_done': '✅ Great! You now understand how commands work. Click "Finish Step 3" to learn about page structures next.',
+            
+            // Step 4: Understanding Structure
+            'go_structure': 'Click on "Structure" in the sidebar. This page lets you visualize how your pages are built.',
+            'select_menu_type': 'Select "Menu" from the type dropdown to view your navigation structure.',
+            'load_menu_structure': 'Click "Load Structure" to display the menu\'s HTML tree.',
+            'expand_menu': 'Click "Expand All" to see all nested elements.',
+            'observe_menu': 'This is your menu structure! Notice how HTML tags are nested. Click Next when ready.',
+            'select_page_type': 'Now select "Page" to view a page structure.',
+            'select_home_page': 'Select "home" (or any page) from the dropdown.',
+            'load_page_structure': 'Click "Load Structure" to display the page tree.',
+            'expand_page': 'Click "Expand All" to see the full page structure.',
+            'understand_colors': '🎨 <strong>Color guide:</strong> <span style="color:#7a9eb8">Blue = HTML tags</span>, <span style="color:#6b8e5c">Green = CSS classes</span>, <span style="color:#c2703e">Orange = translation keys</span>. Tags can contain other tags, text, or images. Classes let you style elements with CSS or target them with JavaScript. Click Next.',
+            'structure_done': '🎉 <strong>Tutorial Complete!</strong> You now understand QuickSite! Use <strong>AI Integration</strong> for custom sites, <strong>Batch</strong> for templates, and <strong>Structure</strong> to visualize your pages. Happy building!'
         };
         
         return descriptions[substep.id] || substep.title;
@@ -719,15 +1052,19 @@ class QuickSiteTutorial {
     
     /**
      * Ensure we're on the correct page for current step
+     * Only redirects if tutorial is actively running
      */
     ensureCorrectPage() {
+        // Don't redirect if tutorial is not active
+        if (!this.isActive || this.status !== 'active') {
+            return;
+        }
+        
         const pageMap = {
-            1: 'ai',
-            2: 'build',
-            3: 'structure',
-            4: 'structure',
-            5: 'structure',
-            6: 'settings'
+            1: 'ai',        // Step 1: AI Integration page
+            2: 'batch',     // Step 2: Batch Basics
+            3: 'batch',     // Step 3: Understanding Commands
+            4: 'structure'  // Step 4: Understanding Structure
         };
         
         const targetPage = pageMap[this.currentStep];
@@ -751,6 +1088,7 @@ class QuickSiteTutorial {
     getCurrentPage() {
         const path = window.location.pathname;
         if (path.includes('/ai')) return 'ai';
+        if (path.includes('/batch')) return 'batch';
         if (path.includes('/build')) return 'build';
         if (path.includes('/structure')) return 'structure';
         if (path.includes('/settings')) return 'settings';
@@ -810,8 +1148,34 @@ class QuickSiteTutorial {
         // Use capture phase to catch the click before navigation
         target.addEventListener('click', (e) => this.onTargetClick(e, target), { once: true, capture: true });
         
-        // Scroll target into view if needed
+        // Special listener for import JSON textarea - auto-advance when valid JSON detected
+        if (selector.includes('import-json')) {
+            const handleValidJson = () => {
+                // Only advance if we're still on the paste_response step
+                const step = this.steps[this.currentStep];
+                const substep = step?.substeps?.[this.currentSubstep];
+                if (substep?.id === 'paste_response') {
+                    document.removeEventListener('quicksite:import-json-valid', handleValidJson);
+                    setTimeout(() => this.nextSubstep(), 500);
+                }
+            };
+            document.addEventListener('quicksite:import-json-valid', handleValidJson);
+        }
+        
+        // Scroll target into view if needed, then reposition bubble after scroll completes
         target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Reposition bubble after scroll animation (smooth scroll takes ~300-500ms)
+        // Skip for certain substeps where initial positioning is already correct
+        const step = this.steps[this.currentStep];
+        const substepData = step?.substeps?.[this.currentSubstep];
+        const skipRepositionSubsteps = ['select_spec'];
+        
+        if (!skipRepositionSubsteps.includes(substepData?.id)) {
+            setTimeout(() => {
+                this.positionBubble();
+            }, 400);
+        }
     }
     
     /**
@@ -820,9 +1184,34 @@ class QuickSiteTutorial {
     async onTargetClick(event, target) {
         // Check if target is a link that will navigate
         const isLink = target.tagName === 'A' && target.href;
+        const isExternalLink = isLink && target.target === '_blank';
         const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+        const isSelect = target.tagName === 'SELECT';
         
-        if (isLink) {
+        if (isExternalLink) {
+            // Link opens in new tab - don't advance automatically
+            // Set flag to allow nextSubstep() to work when user clicks Finish button
+            this.externalLinkClicked = true;
+            
+            // Show the Next/Finish button so user can click it when ready
+            const nextBtn = this.bubbleElement?.querySelector('.tutorial-btn-primary');
+            if (nextBtn) {
+                const t = this.translations;
+                const step = this.steps[this.currentStep];
+                const totalSubsteps = Object.keys(step.substeps).length;
+                const isLastSubstep = this.currentSubstep === totalSubsteps;
+                
+                if (isLastSubstep) {
+                    const finishText = t.finishStep || 'Finish Step';
+                    nextBtn.innerHTML = `${finishText} ${this.currentStep} <i class="bi bi-check-lg"></i>`;
+                } else {
+                    nextBtn.innerHTML = `${t.next || 'Next'} <i class="bi bi-arrow-right"></i>`;
+                }
+                nextBtn.style.display = 'inline-flex';
+            }
+            // Let the link open in new tab naturally
+            return;
+        } else if (isLink) {
             // Update progress for next substep
             this.currentSubstep++;
             const step = this.steps[this.currentStep];
@@ -836,6 +1225,15 @@ class QuickSiteTutorial {
             this.saveProgressBeacon();
             
             // Let the link navigate naturally
+        } else if (isSelect) {
+            // For select elements, wait for change event
+            const handleSelectChange = () => {
+                target.removeEventListener('change', handleSelectChange);
+                setTimeout(() => {
+                    this.nextSubstep();
+                }, 300);
+            };
+            target.addEventListener('change', handleSelectChange);
         } else if (isInput) {
             // For input/textarea, wait for actual input and then blur
             // Don't advance on click - wait for them to type something
@@ -849,10 +1247,43 @@ class QuickSiteTutorial {
             };
             target.addEventListener('blur', handleInputComplete);
         } else {
-            // Not a link or input, advance after a short delay
-            setTimeout(() => {
-                this.nextSubstep();
-            }, 300);
+            // Check if this is a "confirm dialog" substep (like clear_queue)
+            const step = this.steps[this.currentStep];
+            const substep = step?.substeps[this.currentSubstep];
+            const isConfirmSubstep = substep && ['clear_queue'].includes(substep.id);
+            
+            if (isConfirmSubstep) {
+                // Hide overlay so confirm dialog is visible
+                this.hideOverlay();
+                
+                // Watch for queue to be emptied (user clicked OK on confirm)
+                const queueContainer = document.querySelector('#batch-queue');
+                if (queueContainer) {
+                    const checkQueueCleared = () => {
+                        const queueItems = queueContainer.querySelectorAll('.batch-queue-item');
+                        if (queueItems.length === 0) {
+                            // Queue is empty - user confirmed!
+                            this.showOverlay();
+                            this.nextSubstep();
+                        } else {
+                            // Check again in 200ms (user might have cancelled)
+                            setTimeout(checkQueueCleared, 200);
+                        }
+                    };
+                    // Start checking after a brief delay (let confirm dialog appear)
+                    setTimeout(checkQueueCleared, 300);
+                } else {
+                    // Fallback: just advance
+                    setTimeout(() => {
+                        this.nextSubstep();
+                    }, 300);
+                }
+            } else {
+                // Not a link or input, advance after a short delay
+                setTimeout(() => {
+                    this.nextSubstep();
+                }, 300);
+            }
         }
     }
     
@@ -909,6 +1340,21 @@ class QuickSiteTutorial {
      * Position bubble near target
      */
     positionBubble() {
+        // If user has dragged the bubble, use their position
+        if (this.userDragPosition) {
+            this.bubbleElement.style.left = this.userDragPosition.x + 'px';
+            this.bubbleElement.style.top = this.userDragPosition.y + 'px';
+            this.bubbleElement.style.right = 'auto';
+            this.bubbleElement.style.bottom = 'auto';
+            this.bubbleElement.style.transform = 'none';
+            // Keep current class without arrows
+            this.bubbleElement.className = this.bubbleElement.className.replace(/arrow-\w+/g, '').trim();
+            if (!this.bubbleElement.classList.contains('tutorial-bubble')) {
+                this.bubbleElement.classList.add('tutorial-bubble');
+            }
+            return;
+        }
+        
         if (!this.targetElement) {
             // Center on screen if no target
             this.bubbleElement.style.bottom = '100px';
@@ -943,10 +1389,30 @@ class QuickSiteTutorial {
                         this.targetElement.getAttribute('onclick');
         const isInput = this.targetElement.tagName === 'INPUT' || 
                        this.targetElement.tagName === 'TEXTAREA';
+        const isSelect = this.targetElement.tagName === 'SELECT';
         const isLargeElement = targetRect.height > 100 || targetRect.width > 400;
         
+        // For SELECT elements: always position to the side so dropdown is accessible
+        if (isSelect) {
+            if (spaceRight > bubbleWidth + padding) {
+                // Position right of select
+                this.bubbleElement.style.top = Math.max(10, targetRect.top - 20) + 'px';
+                this.bubbleElement.style.left = (targetRect.right + padding) + 'px';
+                this.bubbleElement.className = 'tutorial-bubble arrow-left';
+            } else if (spaceLeft > bubbleWidth + padding) {
+                // Position left of select
+                this.bubbleElement.style.top = Math.max(10, targetRect.top - 20) + 'px';
+                this.bubbleElement.style.right = (window.innerWidth - targetRect.left + padding) + 'px';
+                this.bubbleElement.className = 'tutorial-bubble arrow-right';
+            } else {
+                // Fallback: position below but offset to the side
+                this.bubbleElement.style.top = (targetRect.bottom + padding) + 'px';
+                this.bubbleElement.style.right = '20px';
+                this.bubbleElement.className = 'tutorial-bubble arrow-top';
+            }
+        }
         // For inputs/textareas and large elements: prefer above with compact mode, then sides
-        if (isInput || isLargeElement) {
+        else if (isInput || isLargeElement) {
             const compactHeight = 120; // Compact bubble is shorter
             const compactWidth = 500; // Compact bubble is wider
             
@@ -956,17 +1422,21 @@ class QuickSiteTutorial {
                 const leftPos = Math.max(10, targetRect.left + (targetRect.width / 2) - (compactWidth / 2));
                 const adjustedLeft = Math.min(leftPos, window.innerWidth - compactWidth - 10);
                 
-                this.bubbleElement.style.bottom = (window.innerHeight - targetRect.top + padding) + 'px';
+                // Use top positioning instead of bottom for more predictable placement
+                const topPos = targetRect.top - compactHeight - padding;
+                this.bubbleElement.style.top = Math.max(10, topPos) + 'px';
                 this.bubbleElement.style.left = Math.max(10, adjustedLeft) + 'px';
                 this.bubbleElement.className = 'tutorial-bubble compact arrow-bottom';
             } else if (spaceRight > bubbleWidth + padding) {
-                // Position right (standard mode)
-                this.bubbleElement.style.top = Math.max(10, targetRect.top) + 'px';
+                // Position right (standard mode) - align to top of target but stay in viewport
+                const topPos = Math.min(targetRect.top, window.innerHeight - bubbleHeight - 20);
+                this.bubbleElement.style.top = Math.max(10, topPos) + 'px';
                 this.bubbleElement.style.left = (targetRect.right + padding) + 'px';
                 this.bubbleElement.className = 'tutorial-bubble arrow-left';
             } else if (spaceLeft > bubbleWidth + padding) {
-                // Position left (standard mode)
-                this.bubbleElement.style.top = Math.max(10, targetRect.top) + 'px';
+                // Position left (standard mode) - align to top of target but stay in viewport
+                const topPos = Math.min(targetRect.top, window.innerHeight - bubbleHeight - 20);
+                this.bubbleElement.style.top = Math.max(10, topPos) + 'px';
                 this.bubbleElement.style.right = (window.innerWidth - targetRect.left + padding) + 'px';
                 this.bubbleElement.className = 'tutorial-bubble arrow-right';
             } else {
@@ -1039,24 +1509,48 @@ class QuickSiteTutorial {
         const step = this.steps[this.currentStep];
         if (!step) return;
         
+        const substep = step.substeps[this.currentSubstep];
         const totalSubsteps = Object.keys(step.substeps).length;
+        const isLastSubstep = this.currentSubstep === totalSubsteps;
+        
+        // External link substeps require user to click link first, then click Finish button
+        const externalLinkSubsteps = ['view_site', 'view_blank_site', 'view_starter_site'];
+        if (externalLinkSubsteps.includes(substep?.id) && !this.externalLinkClicked) {
+            // User hasn't clicked the external link yet - don't advance
+            console.log('Tutorial: Waiting for external link click before advancing');
+            return;
+        }
+        
+        // Reset the flag
+        this.externalLinkClicked = false;
         
         if (this.currentSubstep < totalSubsteps) {
             this.currentSubstep++;
+            // Reset user drag position for fresh positioning on each substep
+            this.userDragPosition = null;
+            await this.saveProgress();
+            this.showCurrentStep();
         } else {
-            // Move to next step
-            if (this.currentStep < 6) {
+            // End of current step - show step complete modal
+            const completedStepNum = this.currentStep;
+            const totalSteps = Object.keys(this.steps).length;
+            
+            if (this.currentStep < totalSteps) {
+                // Move to next step
                 this.currentStep++;
                 this.currentSubstep = 1;
+                // Reset user drag position for new step (fresh positioning)
+                this.userDragPosition = null;
+                await this.saveProgress();
+                // Show step complete modal instead of immediately continuing
+                this.hideAll();
+                this.showStepComplete(completedStepNum);
             } else {
                 // Tutorial complete!
                 await this.complete();
                 return;
             }
         }
-        
-        await this.saveProgress();
-        this.showCurrentStep();
     }
     
     /**
@@ -1138,10 +1632,12 @@ class QuickSiteTutorial {
         this.status = 'completed';
         this.isActive = false;
         
+        // Save to both server and localStorage
         await this.saveProgress();
+        this.saveLocalProgress();
         
-        this.hideOverlay();
-        this.bubbleElement.style.display = 'none';
+        // Fully hide all tutorial UI
+        this.hideAll();
         
         // Show completion message
         this.showCompletion();
@@ -1171,7 +1667,7 @@ class QuickSiteTutorial {
                         <li><span class="step-num">🚀</span><span class="step-text">${t.nextPublish || 'Publish your website to the world'}</span></li>
                     </ul>
                     <div class="tutorial-welcome-actions">
-                        <button class="tutorial-btn tutorial-btn-primary" onclick="document.getElementById('tutorial-complete').remove()">
+                        <button class="tutorial-btn tutorial-btn-primary" onclick="tutorial.dismissCompletion()">
                             ${t.startCreating || 'Start Creating!'} <i class="bi bi-arrow-right"></i>
                         </button>
                     </div>
@@ -1180,6 +1676,22 @@ class QuickSiteTutorial {
         `;
         
         document.body.appendChild(modal);
+    }
+    
+    /**
+     * Dismiss completion modal and ensure all UI is hidden
+     */
+    dismissCompletion() {
+        const modal = document.getElementById('tutorial-complete');
+        if (modal) modal.remove();
+        
+        // Ensure status stays completed
+        this.status = 'completed';
+        this.isActive = false;
+        this.saveLocalProgress();
+        
+        // Ensure everything is hidden
+        this.hideAll();
     }
     
     /**
@@ -1211,7 +1723,8 @@ class QuickSiteTutorial {
      */
     updateMiniProgress() {
         const circumference = 176; // 2 * PI * 28
-        const progress = (this.currentStep - 1) / 6;
+        const totalSteps = Object.keys(this.steps).length;
+        const progress = (this.currentStep - 1) / totalSteps;
         const offset = circumference - (progress * circumference);
         
         const progressCircle = this.minimizedElement.querySelector('.progress');
@@ -1226,12 +1739,16 @@ class QuickSiteTutorial {
     restore() {
         this.minimizedElement.style.display = 'none';
         this.isMinimized = false;
-        this.isActive = true;
         
         if (this.status === 'skipped' || this.status === 'completed') {
             // Ask if they want to restart
             this.showResume();
+        } else if (this.status === 'paused') {
+            // Show resume modal for paused state
+            this.showResume();
         } else {
+            // Active state - show current step
+            this.isActive = true;
             this.showCurrentStep();
         }
     }

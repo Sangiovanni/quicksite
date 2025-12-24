@@ -2,16 +2,13 @@
 /**
  * Admin Tutorial System
  * 
- * Manages the 6-step onboarding tutorial for new QuickSite users.
+ * Manages the 3-step onboarding tutorial for new QuickSite users.
  * Progress is stored server-side in auth.php token data.
  * 
  * Tutorial Steps:
  * 1. AI Integration - Create website with AI
- * 2. Build & Preview - Generate the site
- * 3. Exploring Your Site - Navigate the structure
- * 4. Quick Edits - Make simple modifications
- * 5. Add a Page - Create a new route
- * 6. Publish & Beyond - Final steps
+ * 2. Batch Basics - Learn batch operations with templates
+ * 3. Understanding Commands - Learn how commands are structured
  */
 
 class AdminTutorial {
@@ -30,64 +27,61 @@ class AdminTutorial {
             'substeps' => [
                 1 => ['id' => 'click_create', 'title' => 'Click "AI Integration"', 'focus' => '.admin-nav__link[href*="ai"]'],
                 2 => ['id' => 'select_spec', 'title' => 'Select "Create Website"', 'focus' => '.admin-ai-spec-card[data-spec-id="create-website"]'],
-                3 => ['id' => 'enter_goal', 'title' => 'Describe your website goal', 'focus' => '#user-goal, .user-goal-input'],
-                4 => ['id' => 'preview_prompt', 'title' => 'Preview the full prompt', 'focus' => '[onclick*="previewFullPrompt"], .preview-full-btn'],
-                5 => ['id' => 'copy_prompt', 'title' => 'Copy and use in your AI', 'focus' => '[onclick*="copyFullPrompt"], .copy-full-btn'],
-                6 => ['id' => 'paste_response', 'title' => 'Paste AI response', 'focus' => '#ai-response, .ai-response-textarea'],
-                7 => ['id' => 'apply_structure', 'title' => 'Apply the structure', 'focus' => '[onclick*="applyStructure"], .apply-structure-btn']
+                3 => ['id' => 'enter_goal', 'title' => 'Describe your website goal', 'focus' => '#user-goal'],
+                4 => ['id' => 'preview_prompt', 'title' => 'Preview the full prompt', 'focus' => '[onclick*="previewFullPrompt"]'],
+                5 => ['id' => 'copy_prompt', 'title' => 'Copy the prompt', 'focus' => '[onclick*="copyFullPrompt"]'],
+                6 => ['id' => 'use_ai_chatbot', 'title' => 'Use your AI chatbot', 'focus' => '.admin-ai-import-hint'],
+                7 => ['id' => 'paste_response', 'title' => 'Paste AI response', 'focus' => '#import-json'],
+                8 => ['id' => 'apply_structure', 'title' => 'Apply the structure', 'focus' => '#execute-btn'],
+                9 => ['id' => 'view_site', 'title' => 'View your site', 'focus' => '#back-to-site-btn']
             ]
         ],
         2 => [
-            'id' => 'build_preview',
-            'title' => 'Build & Preview',
-            'description' => 'Generate your website files',
+            'id' => 'batch_basics',
+            'title' => 'Batch Basics',
+            'description' => 'Learn batch operations with templates',
             'substeps' => [
-                1 => ['id' => 'go_build', 'title' => 'Go to Build page', 'focus' => '.admin-nav__link[href*="command/build"]'],
-                2 => ['id' => 'click_build', 'title' => 'Click Execute', 'focus' => '.admin-btn--primary[type="submit"], .execute-btn'],
-                3 => ['id' => 'preview_site', 'title' => 'Preview your site', 'focus' => '.admin-btn--ghost[target="_blank"], .preview-link']
+                1 => ['id' => 'go_batch', 'title' => 'Go to Batch page', 'focus' => '.admin-nav__link[href*="batch"]'],
+                2 => ['id' => 'select_fresh_start', 'title' => 'Find "Fresh Start" template', 'focus' => '.admin-template[data-template="fresh-start"] .admin-template__title'],
+                3 => ['id' => 'generate_fresh_start', 'title' => 'Generate & Load', 'focus' => '.admin-template[data-template="fresh-start"] .admin-btn--primary'],
+                4 => ['id' => 'execute_fresh_start', 'title' => 'Execute & Clear Queue', 'focus' => '#batch-controls .admin-btn--primary'],
+                5 => ['id' => 'view_blank_site', 'title' => 'View blank site', 'focus' => '#back-to-site-btn'],
+                6 => ['id' => 'select_starter_multilingual', 'title' => 'Select "Starter Business (Multilingual)"', 'focus' => '.admin-template[data-template="starter-business-multilingual"] .admin-template__title'],
+                7 => ['id' => 'load_starter', 'title' => 'Load template', 'focus' => '.admin-template[data-template="starter-business-multilingual"] .admin-btn--primary'],
+                8 => ['id' => 'execute_starter', 'title' => 'Execute & Clear Queue', 'focus' => '#batch-controls .admin-btn--primary'],
+                9 => ['id' => 'view_starter_site', 'title' => 'View your new site', 'focus' => '#back-to-site-btn']
             ]
         ],
         3 => [
-            'id' => 'explore_site',
-            'title' => 'Explore Your Site',
-            'description' => 'Understand the structure',
+            'id' => 'understanding_commands',
+            'title' => 'Understanding Commands',
+            'description' => 'Learn how commands are structured',
             'substeps' => [
-                1 => ['id' => 'go_structure', 'title' => 'Go to Structure page', 'focus' => '.admin-nav__link[href*="structure"]'],
-                2 => ['id' => 'expand_route', 'title' => 'Expand a route', 'focus' => '.structure-node, .tree-item'],
-                3 => ['id' => 'view_content', 'title' => 'View content block', 'focus' => '.structure-content, .content-block']
+                1 => ['id' => 'select_starter_again', 'title' => 'Select "Starter Business (Multilingual)"', 'focus' => '.admin-template[data-template="starter-business-multilingual"] .admin-template__title'],
+                2 => ['id' => 'preview_template', 'title' => 'Click Preview', 'focus' => '.admin-template[data-template="starter-business-multilingual"] .admin-btn--secondary'],
+                3 => ['id' => 'understand_structure', 'title' => 'Understand command structure', 'focus' => '#template-preview-content'],
+                4 => ['id' => 'load_to_queue', 'title' => 'Load to queue', 'focus' => '.admin-template[data-template="starter-business-multilingual"] .admin-btn--primary'],
+                5 => ['id' => 'view_queue', 'title' => 'View the queue', 'focus' => '#batch-queue'],
+                6 => ['id' => 'clear_queue', 'title' => 'Clear All (don\'t execute)', 'focus' => '.admin-card__actions [onclick*="clearQueue"]'],
+                7 => ['id' => 'commands_done', 'title' => 'Commands understood!', 'focus' => null]
             ]
         ],
         4 => [
-            'id' => 'quick_edits',
-            'title' => 'Quick Edits',
-            'description' => 'Make simple modifications',
+            'id' => 'understanding_structure',
+            'title' => 'Understanding Structure',
+            'description' => 'Learn how page structures work',
             'substeps' => [
-                1 => ['id' => 'find_title', 'title' => 'Find Edit Title command', 'focus' => '.admin-command-link[href*="editTitle"]'],
-                2 => ['id' => 'edit_title', 'title' => 'Edit a title', 'focus' => 'input[name="title"], .title-input'],
-                3 => ['id' => 'rebuild', 'title' => 'Rebuild your site', 'focus' => '.admin-nav__link[href*="command/build"]']
-            ]
-        ],
-        5 => [
-            'id' => 'add_page',
-            'title' => 'Add a Page',
-            'description' => 'Create a new route',
-            'substeps' => [
-                1 => ['id' => 'go_routes', 'title' => 'Go to Add Route', 'focus' => '.admin-command-link[href*="addRoute"]'],
-                2 => ['id' => 'enter_name', 'title' => 'Enter route name', 'focus' => 'input[name="route"], .route-input'],
-                3 => ['id' => 'enter_title', 'title' => 'Enter page title', 'focus' => 'input[name="title"], .page-title-input'],
-                4 => ['id' => 'confirm_add', 'title' => 'Execute command', 'focus' => '.admin-btn--primary[type="submit"]'],
-                5 => ['id' => 'preview_page', 'title' => 'Check structure', 'focus' => '.admin-nav__link[href*="structure"]']
-            ],
-            'suggestedRoute' => 'test-quicksite'
-        ],
-        6 => [
-            'id' => 'publish_beyond',
-            'title' => 'Publish & Beyond',
-            'description' => 'Final steps and resources',
-            'substeps' => [
-                1 => ['id' => 'learn_hosting', 'title' => 'Visit Documentation', 'focus' => '.admin-nav__link[href*="docs"]'],
-                2 => ['id' => 'explore_settings', 'title' => 'Explore Settings', 'focus' => '.admin-nav__link[href*="settings"]'],
-                3 => ['id' => 'complete', 'title' => 'Complete tutorial!', 'focus' => null]
+                1 => ['id' => 'go_structure', 'title' => 'Go to Structure page', 'focus' => '.admin-nav__link[href*="structure"]'],
+                2 => ['id' => 'select_menu_type', 'title' => 'Select "Menu" type', 'focus' => '#structure-type'],
+                3 => ['id' => 'load_menu_structure', 'title' => 'Load Structure', 'focus' => '#load-structure'],
+                4 => ['id' => 'expand_menu', 'title' => 'Expand All', 'focus' => '[onclick="expandAll()"]'],
+                5 => ['id' => 'observe_menu', 'title' => 'Observe the menu structure', 'focus' => '#structure-tree'],
+                6 => ['id' => 'select_page_type', 'title' => 'Select "Page" type', 'focus' => '#structure-type'],
+                7 => ['id' => 'select_home_page', 'title' => 'Select "home" page', 'focus' => '#structure-name'],
+                8 => ['id' => 'load_page_structure', 'title' => 'Load Structure', 'focus' => '#load-structure'],
+                9 => ['id' => 'expand_page', 'title' => 'Expand All', 'focus' => '[onclick="expandAll()"]'],
+                10 => ['id' => 'understand_colors', 'title' => 'Understand the colors', 'focus' => '#structure-tree'],
+                11 => ['id' => 'structure_done', 'title' => 'Tutorial complete!', 'focus' => null]
             ]
         ]
     ];
@@ -230,7 +224,8 @@ class AdminTutorial {
     public function getCurrentStepInfo() {
         $progress = $this->getOnboardingStatus();
         
-        if (!$progress || $progress['status'] !== 'pending') {
+        // Allow both 'pending' (legacy) and 'active' statuses
+        if (!$progress || !in_array($progress['status'], ['pending', 'active', 'paused'])) {
             return null;
         }
         
@@ -243,16 +238,18 @@ class AdminTutorial {
         
         $stepData = $this->tutorialSteps[$step];
         $substepData = $stepData['substeps'][$substep] ?? null;
+        $totalSteps = count($this->tutorialSteps);
+        $lastStepSubsteps = count($this->tutorialSteps[$totalSteps]['substeps']);
         
         return [
             'step' => $step,
             'substep' => $substep,
-            'totalSteps' => count($this->tutorialSteps),
+            'totalSteps' => $totalSteps,
             'totalSubsteps' => count($stepData['substeps']),
             'stepInfo' => $stepData,
             'substepInfo' => $substepData,
             'isFirstStep' => ($step === 1 && $substep === 1),
-            'isLastStep' => ($step === 6 && $substep === 3)
+            'isLastStep' => ($step === $totalSteps && $substep === $lastStepSubsteps)
         ];
     }
     
@@ -262,7 +259,8 @@ class AdminTutorial {
     public function advanceProgress() {
         $progress = $this->getOnboardingStatus();
         
-        if (!$progress || $progress['status'] !== 'pending') {
+        // Allow both 'pending' (legacy) and 'active' statuses
+        if (!$progress || !in_array($progress['status'], ['pending', 'active'])) {
             return ['success' => false, 'error' => 'Tutorial not active'];
         }
         
