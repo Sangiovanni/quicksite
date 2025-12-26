@@ -2556,21 +2556,36 @@ async function copyFullPrompt() {
     
     console.log('Attempting to copy, length:', fullPrompt.length);
     
-    try {
-        await navigator.clipboard.writeText(fullPrompt);
-        QuickSiteAdmin.showToast('Full prompt copied! Paste in your AI chat.', 'success');
-    } catch (e) {
-        console.error('Clipboard API failed:', e);
-        // Fallback
+    // Try clipboard API first (requires HTTPS), fall back to execCommand
+    let copied = false;
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+            await navigator.clipboard.writeText(fullPrompt);
+            copied = true;
+        } catch (e) {
+            console.warn('Clipboard API failed:', e);
+        }
+    }
+    
+    // Fallback for HTTP or if clipboard API failed
+    if (!copied) {
         const textarea = document.getElementById('ai-spec-content');
         if (textarea) {
             textarea.value = fullPrompt;
             textarea.select();
-            document.execCommand('copy');
-            QuickSiteAdmin.showToast('Full prompt copied!', 'success');
-        } else {
-            QuickSiteAdmin.showToast('Could not copy to clipboard', 'error');
+            try {
+                copied = document.execCommand('copy');
+            } catch (e) {
+                console.error('execCommand copy failed:', e);
+            }
         }
+    }
+    
+    if (copied) {
+        QuickSiteAdmin.showToast('Full prompt copied! Paste in your AI chat.', 'success');
+    } else {
+        QuickSiteAdmin.showToast('Could not copy to clipboard', 'error');
     }
 }
 
@@ -2592,16 +2607,36 @@ async function copySpecOnly() {
         return;
     }
     
-    try {
-        await navigator.clipboard.writeText(spec);
-        QuickSiteAdmin.showToast('Spec copied! Don\'t forget to add your goal.', 'success');
-    } catch (e) {
-        // Fallback
+    // Try clipboard API first (requires HTTPS), fall back to execCommand
+    let copied = false;
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+            await navigator.clipboard.writeText(spec);
+            copied = true;
+        } catch (e) {
+            console.warn('Clipboard API failed:', e);
+        }
+    }
+    
+    // Fallback for HTTP or if clipboard API failed
+    if (!copied) {
         const textarea = document.getElementById('ai-spec-content');
-        textarea.value = spec;
-        textarea.select();
-        document.execCommand('copy');
-        QuickSiteAdmin.showToast('Spec copied!', 'success');
+        if (textarea) {
+            textarea.value = spec;
+            textarea.select();
+            try {
+                copied = document.execCommand('copy');
+            } catch (e) {
+                console.error('execCommand copy failed:', e);
+            }
+        }
+    }
+    
+    if (copied) {
+        QuickSiteAdmin.showToast('Spec copied! Don\'t forget to add your goal.', 'success');
+    } else {
+        QuickSiteAdmin.showToast('Could not copy to clipboard', 'error');
     }
 }
 
