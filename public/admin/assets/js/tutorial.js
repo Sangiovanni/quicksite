@@ -501,7 +501,8 @@ class QuickSiteTutorial {
             { title: t.step7Preview || 'Edit Structure', substeps: 19 },
             { title: t.step8Preview || 'CSS Styling', substeps: 9 },
             { title: t.step9Preview || 'Theme Customization', substeps: 11 },
-            { title: t.step10Preview || 'Add Languages', substeps: 10 }
+            { title: t.step10Preview || 'Add Languages', substeps: 10 },
+            { title: t.step11Preview || 'Manage Translations', substeps: 11 }
         ];
         
         const totalSteps = stepInfo.length;
@@ -1133,7 +1134,17 @@ class QuickSiteTutorial {
             'check_footer_structure', // Check getStructure footer
             'add_footer_lang_link',   // Configure + execute editStructure
             'view_website_lang',      // View website
-            'lang_complete'           // Final message
+            'lang_complete',          // Final message
+            // Step 11: Manage Translations
+            'find_translation_section', // Expand translation category
+            'understand_trans_commands', // Read about commands
+            'indicate_translate_spec',  // Highlight the spec card
+            'select_translate_spec',    // Select spec card
+            'prepare_translation',      // Write prompt
+            'copy_translate_prompt',    // Copy to clipboard
+            'execute_translation',      // Paste and execute AI response
+            'view_translated_site',     // View translated site
+            'translation_complete'      // Final message
         ].includes(substep?.id);
     }
     
@@ -1310,7 +1321,20 @@ class QuickSiteTutorial {
             'check_footer_structure': '🔍 <strong>Check the footer structure!</strong><br><br>Go to <strong>getStructure</strong>, select type <strong>footer</strong>, and load it.<br><br>Find the nodes containing <code>__RAW__English</code> and <code>__RAW__Français</code> - these are the language switch links. Note the node ID of <code>__RAW__Français</code> (should be around <strong>0.0.2.1.1</strong>).<br><br>We\'ll add Spanish after it!<br><br>Click <strong>Next</strong> when ready.',
             'add_footer_lang_link': '✏️ <strong>Add the Spanish link to footer!</strong><br><br>Go to <strong>editStructure</strong> and configure:<br>• Type: <code>footer</code><br>• Name: <em>(leave empty)</em><br>• Node ID: <code>0.0.2.1.1</code><br>• Action: <code>Insert After (Add sibling after)</code><br><br>In the structure field, paste:<br><pre style="background:#1e1e1e;padding:8px;border-radius:4px;margin:8px 0;font-size:10px;color:#e0e0e0;white-space:pre-wrap">{\n  "tag": "a",\n  "params": {\n    "href": "{{__current_page;lang=es}}",\n    "class": "lang-link"\n  },\n  "children": [\n    { "textKey": "__RAW__Español" }\n  ]\n}</pre><span class="substep-description">💡 <strong>Note:</strong> If your footer structure is different, adjust the node ID accordingly.<br><br>Click <strong>Execute Command</strong>, then <strong>Next</strong>.</span>',
             'view_website_lang': '👀 <strong>Check your website!</strong><br><br>Visit your site and scroll to the footer. You should now see <strong>Español</strong> as a language option!<br><br>⚠️ Note: Clicking it will switch to Spanish, but translations don\'t exist yet - you\'ll see the translation keys. We\'ll cover translations in the next step!<br><br>Click <strong>Next</strong> when done.',
-            'lang_complete': '🎉 <strong>Languages Step Complete!</strong><br><br>You\'ve learned:<br>• How language commands work<br>• How to add a new language with <code>addLang</code><br>• How to add language switch links to structure<br><br>Your website now supports English, French, and Spanish! Click <strong>"Finish Step 10"</strong>!'
+            'lang_complete': '🎉 <strong>Languages Step Complete!</strong><br><br>You\'ve learned:<br>• How language commands work<br>• How to add a new language with <code>addLang</code><br>• How to add language switch links to structure<br><br>Your website now supports English, French, and Spanish! Click <strong>"Finish Step 10"</strong>!',
+            
+            // Step 11: Manage Translations
+            'go_commands_trans': '🌐 <strong>Time to add translations!</strong><br><br>Now that Spanish is available, let\'s add the actual translations so your content displays in Spanish. Click <strong>"Commands"</strong> in the sidebar.',
+            'find_translation_section': '📂 Find and expand the <strong>"Translation"</strong> category in the command list.<br><br>This section contains all commands for managing translations on your website.<br><br>Click <strong>Next</strong> when you\'ve expanded it.',
+            'understand_trans_commands': '📚 <strong>Translation Commands Overview:</strong><br><br>• <code>getTranslations</code> - Get all translations for all languages<br>• <code>getTranslation</code> - Get translations for a specific language<br>• <code>setTranslationKeys</code> - Add or update translation keys (merges safely)<br>• <code>deleteTranslationKeys</code> - Remove translation keys<br>• <code>validateTranslations</code> - Check for missing translations<br>• <code>analyzeTranslations</code> - Full health check of translations<br><br>Click <strong>Next</strong> to use AI for translations!',
+            'go_ai_translate': '🤖 <strong>Let AI do the heavy lifting!</strong><br><br>Instead of manually translating every key, we\'ll use AI to translate the entire site at once. Click <strong>"AI Integration"</strong> in the sidebar.',
+            'indicate_translate_spec': '👀 Look for the <strong>"Translate Language"</strong> spec card. This spec will load your default language translations and ask the AI to provide a complete translation for the target language.<br><br>Click <strong>Next</strong> when you\'ve found it.',
+            'select_translate_spec': '🎯 Now click on the <strong>"Translate Language"</strong> card to select it.',
+            'prepare_translation': '✍️ <strong>Request the Spanish translation!</strong><br><br>In the text area, describe what you want:<br><br>Example: <em>"Translate all content to Spanish (es). Keep a professional but friendly tone."</em><br><br>You can also click one of the example buttons like "🇪🇸 Translate to Spanish".<br><br>Click <strong>Next</strong> when you\'ve entered your request.',
+            'copy_translate_prompt': '📋 Click <strong>"Preview Full Prompt"</strong> to see the complete prompt (with all your current translations included), then click <strong>"Copy Full Prompt"</strong>.<br><br>Paste this into your favorite AI chatbot (ChatGPT, Claude, etc.). The AI will return a JSON command with the complete Spanish translations!<br><br>Click <strong>Next</strong> after copying.',
+            'execute_translation': '🚀 <strong>Apply the translations!</strong><br><br>1. Paste your AI\'s response in the <strong>"Import & Execute JSON"</strong> textarea below<br>2. Click <strong>"Execute"</strong><br>3. The translations will be merged into your Spanish language file!<br><br>⚠️ Note: AI translations may need minor adjustments for perfect accuracy.<br><br>Click <strong>Next</strong> when done.',
+            'view_translated_site': '🌍 <strong>Check your translated site!</strong><br><br>Visit your website and click the <strong>Español</strong> link in the footer.<br><br>Your site should now display in Spanish! All the menu items, page content, and footer text should be translated.<br><br>Click <strong>Next</strong> when you\'ve verified.',
+            'translation_complete': '🎉 <strong>Tutorial Complete!</strong><br><br>Congratulations! You\'ve learned:<br>• How to create websites with AI<br>• Batch operations and templates<br>• Structure editing and assets<br>• CSS styling and themes<br>• Adding languages and translations<br><br>You now have a fully multilingual website! Click <strong>"Finish Step 11"</strong> to complete the tutorial!'
         };
         
         return descriptions[substep.id] || substep.title;
@@ -1336,8 +1360,8 @@ class QuickSiteTutorial {
             return;
         }
         
-        // Steps 5, 6, 7, 8, 9, and 10 have different page requirements per substep
-        if (this.currentStep >= 5 && this.currentStep <= 10) {
+        // Steps 5, 6, 7, 8, 9, 10, and 11 have different page requirements per substep
+        if (this.currentStep >= 5 && this.currentStep <= 11) {
             const currentPage = this.getCurrentPage();
             
             // Substeps that need the command LIST page (not form page)
@@ -1358,8 +1382,10 @@ class QuickSiteTutorial {
                 // Step 9 - only getRootVariables needs command page redirect (it's a search step)
                 'find_get_root_variables',
                 // Step 10 - find language section needs command list
-                'find_language_section'
-                // Note: other step 10 substeps are manual - user navigates themselves
+                'find_language_section',
+                // Step 11 - find translation section needs command list
+                'find_translation_section'
+                // Note: other step 10/11 substeps are manual - user navigates themselves
             ];
             
             if (needsCommandList.includes(substep?.id)) {
@@ -1399,6 +1425,32 @@ class QuickSiteTutorial {
                     }
                 }
                 // Steps 9.1-9.4 stay on whatever page user is on (no redirect)
+            }
+            
+            // Step 11: After command exploration, needs AI Integration page
+            if (this.currentStep === 11) {
+                // Steps 11.5+ need AI Integration page (after go_ai_translate)
+                const needsAiPage = [
+                    'indicate_translate_spec',
+                    'select_translate_spec',
+                    'prepare_translation',
+                    'copy_translate_prompt',
+                    'execute_translation',
+                    'view_translated_site',
+                    'translation_complete'
+                ];
+                
+                if (needsAiPage.includes(substep?.id)) {
+                    if (currentPage !== 'ai') {
+                        const link = document.querySelector('.admin-nav__link[href*="ai"]');
+                        if (link) {
+                            const url = new URL(link.href);
+                            url.searchParams.set('tutorial', 'continue');
+                            window.location.href = url.toString();
+                        }
+                    }
+                }
+                // Steps 11.1-11.3 stay on command page (no redirect)
             }
             // For other substeps (select_*, execute_*, view_*, services_challenge, etc.), stay on current page
             return;
@@ -1880,8 +1932,8 @@ class QuickSiteTutorial {
         const isLargeElement = targetRect.height > 100 || targetRect.width > 400;
         const isSpecCard = this.targetElement.classList.contains('admin-ai-spec-card');
         
-        // For spec cards (like indicate_global_design): position to the side to not block the card
-        if (isSpecCard || substep?.id === 'indicate_global_design') {
+        // For spec cards (like indicate_global_design, indicate_translate_spec): position to the side to not block the card
+        if (isSpecCard || substep?.id === 'indicate_global_design' || substep?.id === 'indicate_translate_spec') {
             if (spaceRight > bubbleWidth + padding) {
                 // Position right of card
                 this.bubbleElement.style.top = Math.max(10, targetRect.top) + 'px';

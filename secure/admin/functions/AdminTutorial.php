@@ -217,6 +217,27 @@ class AdminTutorial {
                 9 => ['id' => 'view_website_lang', 'title' => 'Check your website', 'focus' => null],
                 10 => ['id' => 'lang_complete', 'title' => 'Languages done!', 'focus' => null]
             ]
+        ],
+        11 => [
+            'id' => 'manage_translations',
+            'title' => 'Manage Translations',
+            'description' => 'Translate your website with AI',
+            'substeps' => [
+                // Discover translation commands
+                1 => ['id' => 'go_commands_trans', 'title' => 'Go to Commands', 'focus' => '.admin-nav__link[href*="command"]'],
+                2 => ['id' => 'find_translation_section', 'title' => 'Find Translation Section', 'focus' => '.admin-command-category[data-category="translation"]'],
+                3 => ['id' => 'understand_trans_commands', 'title' => 'Understand Translation Commands', 'focus' => null],
+                // AI Integration for translation
+                4 => ['id' => 'go_ai_translate', 'title' => 'Go to AI Integration', 'focus' => '.admin-nav__link[href*="ai"]'],
+                5 => ['id' => 'indicate_translate_spec', 'title' => 'Find Translate Language', 'focus' => '.admin-ai-spec-card[data-spec-id="translate-language"]'],
+                6 => ['id' => 'select_translate_spec', 'title' => 'Select Translate Language', 'focus' => '.admin-ai-spec-card[data-spec-id="translate-language"]'],
+                7 => ['id' => 'prepare_translation', 'title' => 'Request Spanish translation', 'focus' => '#user-goal'],
+                8 => ['id' => 'copy_translate_prompt', 'title' => 'Copy for your AI', 'focus' => '[onclick*="copyFullPrompt"]'],
+                // Execute translation
+                9 => ['id' => 'execute_translation', 'title' => 'Apply translations', 'focus' => '#import-json'],
+                10 => ['id' => 'view_translated_site', 'title' => 'View translated site', 'focus' => null],
+                11 => ['id' => 'translation_complete', 'title' => 'Translations done!', 'focus' => null]
+            ]
         ]
     ];
     
