@@ -114,6 +114,18 @@ if ($imageInfo[2] !== IMAGETYPE_PNG) {
 $faviconPath = PUBLIC_FOLDER_ROOT . '/assets/images/favicon.png';
 $backupName = null;
 
+// Check if source and destination are the same file
+if (realpath($imagePath) === realpath($faviconPath)) {
+    // Already using this image as favicon - nothing to do
+    ApiResponse::create(200, 'success.favicon_unchanged')
+        ->withMessage('This image is already set as the favicon')
+        ->withData([
+            'favicon' => 'favicon.png',
+            'note' => 'No changes made - file is already the favicon'
+        ])
+        ->send();
+}
+
 // Backup existing favicon if it exists
 if (file_exists($faviconPath)) {
     $backupName = 'favicon_backup_' . date('Ymd_His') . '.png';
@@ -126,10 +138,25 @@ if (file_exists($faviconPath)) {
     }
 }
 
+// Verify source still exists before copy (defensive check)
+if (!file_exists($imagePath)) {
+    // Restore backup if it was created
+    if ($backupName && file_exists($backupPath)) {
+        rename($backupPath, $faviconPath);
+    }
+    
+    ApiResponse::create(404, 'file.not_found')
+        ->withMessage('Source image no longer exists')
+        ->withData([
+            'requested_file' => $imageName
+        ])
+        ->send();
+}
+
 // Copy new image as favicon
 if (!copy($imagePath, $faviconPath)) {
     // Restore backup if copy failed
-    if ($backupName) {
+    if ($backupName && file_exists(PUBLIC_FOLDER_ROOT . '/assets/images/' . $backupName)) {
         rename(PUBLIC_FOLDER_ROOT . '/assets/images/' . $backupName, $faviconPath);
     }
     

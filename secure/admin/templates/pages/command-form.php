@@ -1198,7 +1198,7 @@ async function initListAssetsForm() {
 }
 
 /**
- * Initialize uploadAsset form with category select and file upload
+ * Initialize uploadAsset form with category select and multi-file upload
  */
 async function initUploadAssetForm() {
     const form = document.getElementById('command-form');
@@ -1214,8 +1214,270 @@ async function initUploadAssetForm() {
         await QuickSiteAdmin.populateSelect(categorySelect, 'asset-categories', [], 'Select category...');
     }
     
-    // Also init file upload styling
-    initFileUploadForm();
+    // Initialize multi-file upload instead of single file
+    initMultiFileUploadForm();
+}
+
+/**
+ * Initialize multi-file upload with progress tracking
+ */
+function initMultiFileUploadForm() {
+    const form = document.getElementById('command-form');
+    const fileInput = form.querySelector('input[type="file"]');
+    if (!fileInput) return;
+    
+    // Enable multiple file selection
+    fileInput.setAttribute('multiple', 'multiple');
+    
+    // Create wrapper structure
+    const wrapper = document.createElement('div');
+    wrapper.className = 'admin-file-input admin-file-input--multi';
+    fileInput.parentNode.insertBefore(wrapper, fileInput);
+    wrapper.appendChild(fileInput);
+    
+    // Add label
+    const label = document.createElement('div');
+    label.className = 'admin-file-input__label';
+    label.innerHTML = `
+        <svg class="admin-file-input__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <div class="admin-file-input__text">
+            <span>Click to select files or drag and drop</span>
+            <span class="admin-file-input__hint">You can select multiple files • Max 10MB per file</span>
+        </div>
+    `;
+    wrapper.appendChild(label);
+    
+    // File list container
+    const fileList = document.createElement('div');
+    fileList.className = 'admin-file-list';
+    fileList.id = 'multi-file-list';
+    wrapper.appendChild(fileList);
+    
+    // Store selected files
+    let selectedFiles = [];
+    
+    // Handle file selection
+    fileInput.addEventListener('change', () => {
+        const newFiles = Array.from(fileInput.files);
+        
+        // Add new files to the list (avoid duplicates)
+        newFiles.forEach(file => {
+            const exists = selectedFiles.some(f => f.name === file.name && f.size === file.size);
+            if (!exists) {
+                selectedFiles.push(file);
+            }
+        });
+        
+        renderFileList();
+    });
+    
+    // Drag and drop handling
+    wrapper.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        wrapper.classList.add('admin-file-input--dragover');
+    });
+    
+    wrapper.addEventListener('dragleave', () => {
+        wrapper.classList.remove('admin-file-input--dragover');
+    });
+    
+    wrapper.addEventListener('drop', (e) => {
+        e.preventDefault();
+        wrapper.classList.remove('admin-file-input--dragover');
+        
+        const droppedFiles = Array.from(e.dataTransfer.files);
+        droppedFiles.forEach(file => {
+            const exists = selectedFiles.some(f => f.name === file.name && f.size === file.size);
+            if (!exists) {
+                selectedFiles.push(file);
+            }
+        });
+        
+        renderFileList();
+    });
+    
+    // Render file list
+    function renderFileList() {
+        if (selectedFiles.length === 0) {
+            fileList.innerHTML = '';
+            fileList.style.display = 'none';
+            return;
+        }
+        
+        fileList.style.display = 'block';
+        fileList.innerHTML = `
+            <div class="admin-file-list__header">
+                <span>${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected</span>
+                <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="clearAllFiles()">
+                    Clear All
+                </button>
+            </div>
+            <ul class="admin-file-list__items">
+                ${selectedFiles.map((file, index) => `
+                    <li class="admin-file-list__item" data-index="${index}">
+                        <span class="admin-file-list__icon">${getFileIcon(file.type)}</span>
+                        <span class="admin-file-list__name">${file.name}</span>
+                        <span class="admin-file-list__size">${formatFileSize(file.size)}</span>
+                        <span class="admin-file-list__status" id="file-status-${index}"></span>
+                        <button type="button" class="admin-file-list__remove" onclick="removeFile(${index})" title="Remove">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </button>
+                    </li>
+                `).join('')}
+            </ul>
+        `;
+    }
+    
+    // Get icon based on file type
+    function getFileIcon(type) {
+        if (type.startsWith('image/')) return '🖼️';
+        if (type.startsWith('video/')) return '🎬';
+        if (type.startsWith('audio/')) return '🎵';
+        if (type === 'application/pdf') return '📄';
+        if (type.includes('javascript') || type.includes('css')) return '📝';
+        return '📁';
+    }
+    
+    // Remove file from list
+    window.removeFile = function(index) {
+        selectedFiles.splice(index, 1);
+        renderFileList();
+    };
+    
+    // Clear all files
+    window.clearAllFiles = function() {
+        selectedFiles = [];
+        fileInput.value = '';
+        renderFileList();
+    };
+    
+    // Store reference for form submission
+    window.getSelectedFiles = function() {
+        return selectedFiles;
+    };
+    
+    // Override form submission for multi-file upload
+    const submitBtn = document.getElementById('submit-btn');
+    const originalSubmitHandler = form.onsubmit;
+    
+    form.addEventListener('submit', async function(e) {
+        // Check if we have multiple files to upload
+        if (selectedFiles.length <= 1) {
+            // Single file or no file - let the normal handler work
+            return;
+        }
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Get category
+        const categorySelect = form.querySelector('[name="category"]');
+        const category = categorySelect?.value;
+        
+        if (!category) {
+            QuickSiteAdmin.showToast('Please select a category first', 'error');
+            return;
+        }
+        
+        submitBtn.disabled = true;
+        const originalBtnText = submitBtn.innerHTML;
+        
+        const responseDiv = document.getElementById('command-response');
+        responseDiv.innerHTML = `
+            <div class="admin-upload-progress">
+                <h4>Uploading ${selectedFiles.length} files...</h4>
+                <div id="upload-progress-list"></div>
+            </div>
+        `;
+        
+        const progressList = document.getElementById('upload-progress-list');
+        const results = [];
+        
+        // Upload files sequentially
+        for (let i = 0; i < selectedFiles.length; i++) {
+            const file = selectedFiles[i];
+            const statusEl = document.getElementById(`file-status-${i}`);
+            
+            // Update button
+            submitBtn.innerHTML = `<span class="admin-spinner"></span> Uploading ${i + 1}/${selectedFiles.length}...`;
+            
+            // Update status in file list
+            if (statusEl) {
+                statusEl.innerHTML = '<span class="admin-spinner" style="width:16px;height:16px;"></span>';
+            }
+            
+            // Add progress item
+            progressList.innerHTML += `
+                <div class="admin-upload-progress__item" id="progress-item-${i}">
+                    <span class="admin-upload-progress__name">${file.name}</span>
+                    <span class="admin-upload-progress__status" id="progress-status-${i}">
+                        <span class="admin-spinner" style="width:14px;height:14px;"></span> Uploading...
+                    </span>
+                </div>
+            `;
+            
+            try {
+                // Create FormData for this file
+                const formData = new FormData();
+                formData.append('category', category);
+                formData.append('file', file);
+                
+                const result = await QuickSiteAdmin.apiUpload('uploadAsset', formData);
+                results.push({ file: file.name, success: result.ok, data: result.data });
+                
+                // Update status
+                const progressStatus = document.getElementById(`progress-status-${i}`);
+                if (result.ok) {
+                    if (statusEl) statusEl.innerHTML = '<span style="color:var(--admin-success)">✓</span>';
+                    if (progressStatus) progressStatus.innerHTML = '<span style="color:var(--admin-success)">✓ Uploaded</span>';
+                } else {
+                    if (statusEl) statusEl.innerHTML = '<span style="color:var(--admin-error)">✗</span>';
+                    if (progressStatus) progressStatus.innerHTML = `<span style="color:var(--admin-error)">✗ ${result.data?.message || 'Failed'}</span>`;
+                }
+            } catch (error) {
+                results.push({ file: file.name, success: false, error: error.message });
+                
+                const progressStatus = document.getElementById(`progress-status-${i}`);
+                if (statusEl) statusEl.innerHTML = '<span style="color:var(--admin-error)">✗</span>';
+                if (progressStatus) progressStatus.innerHTML = `<span style="color:var(--admin-error)">✗ ${error.message}</span>`;
+            }
+        }
+        
+        // Summary
+        const successCount = results.filter(r => r.success).length;
+        const failCount = results.filter(r => !r.success).length;
+        
+        submitBtn.innerHTML = originalBtnText;
+        submitBtn.disabled = false;
+        
+        // Show summary
+        if (failCount === 0) {
+            QuickSiteAdmin.showToast(`All ${successCount} files uploaded successfully!`, 'success');
+            // Clear the file list
+            selectedFiles = [];
+            fileInput.value = '';
+            renderFileList();
+        } else if (successCount === 0) {
+            QuickSiteAdmin.showToast(`All ${failCount} uploads failed`, 'error');
+        } else {
+            QuickSiteAdmin.showToast(`${successCount} uploaded, ${failCount} failed`, 'warning');
+        }
+        
+        // Trigger success event for successful uploads
+        if (successCount > 0) {
+            form.dispatchEvent(new CustomEvent('command-success', { 
+                detail: { results, successCount, failCount } 
+            }));
+        }
+        
+    }, true); // Use capture to run before other handlers
 }
 
 /**

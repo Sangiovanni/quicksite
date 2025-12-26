@@ -1086,8 +1086,33 @@ Warm, literary theme with earthy tones.`
             }
         },
         {
-            id: 'restyle',
+            id: 'global-design',
             icon: '🎨',
+            title: 'Global Design Rework',
+            desc: 'Redesign your site\'s color scheme and design variables using CSS :root.',
+            tags: ['creative', 'landing', 'website'],
+            examples: {
+                'design-modern': {
+                    title: '✨ Modern Palette',
+                    text: `Create a modern, clean color palette: professional blues and grays, subtle gradients, increased contrast, modern spacing values.`
+                },
+                'design-dark': {
+                    title: '🌙 Dark Mode',
+                    text: `Convert to a dark theme: dark backgrounds (#1a1a2e or similar), light text colors, vibrant accent colors that pop on dark, maintain good contrast ratios.`
+                },
+                'design-warm': {
+                    title: '🌅 Warm & Inviting',
+                    text: `Create a warm, inviting palette: earth tones, warm oranges and browns, soft creams for backgrounds, welcoming feel.`
+                },
+                'design-corporate': {
+                    title: '💼 Corporate Professional',
+                    text: `Professional corporate look: navy blues, clean whites, subtle grays, sharp contrast, trustworthy and authoritative feel.`
+                }
+            }
+        },
+        {
+            id: 'restyle',
+            icon: '🖌️',
             title: 'Restyle Site',
             desc: 'Update the visual style of your site while keeping content intact.',
             tags: ['creative', 'landing', 'website'],
@@ -1310,18 +1335,41 @@ function previewFullPrompt() {
     const preview = document.getElementById('spec-preview');
     preview.style.display = 'block';
     
-    // Generate spec if not cached
+    // Generate spec if not cached (handle async specs)
     if (!specsCache[currentSpec.id]) {
-        generateSpec(currentSpec);
+        if (currentSpec.id === 'global-design') {
+            // Show loading state
+            document.getElementById('ai-spec-content').value = 'Loading current design variables...';
+            generateGlobalDesignSpec().then(content => {
+                specsCache[currentSpec.id] = content;
+                displayFullPreview(content);
+            });
+            return;
+        } else if (currentSpec.id === 'restyle') {
+            // Show loading state
+            document.getElementById('ai-spec-content').value = 'Loading current styles...';
+            generateRestyleSpec().then(content => {
+                specsCache[currentSpec.id] = content;
+                displayFullPreview(content);
+            });
+            return;
+        } else {
+            generateSpec(currentSpec);
+        }
     }
     
     const spec = specsCache[currentSpec.id];
-    const userGoal = document.getElementById('user-goal')?.value?.trim() || '';
     
     if (!spec) {
         QuickSiteAdmin.showToast('Specification not ready', 'warning');
         return;
     }
+    
+    displayFullPreview(spec);
+}
+
+function displayFullPreview(spec) {
+    const userGoal = document.getElementById('user-goal')?.value?.trim() || '';
     
     let fullContent = spec;
     
@@ -1373,8 +1421,9 @@ function generateSpec(spec) {
     
     const specId = spec.id;
     
-    // Check cache
-    if (specsCache[specId]) {
+    // Check cache (skip cache for specs that fetch live data)
+    const liveDataSpecs = ['global-design', 'restyle'];
+    if (specsCache[specId] && !liveDataSpecs.includes(specId)) {
         displaySpec(specsCache[specId]);
         return specsCache[specId];
     }
@@ -1388,6 +1437,20 @@ function generateSpec(spec) {
         case 'create-website':
             specContent = generateCreateWebsiteSpec();
             break;
+        case 'global-design':
+            // This is async, handled separately
+            generateGlobalDesignSpec().then(content => {
+                specsCache[specId] = content;
+                displaySpec(content);
+            });
+            return null; // Will be displayed async
+        case 'restyle':
+            // This is async, fetches current CSS
+            generateRestyleSpec().then(content => {
+                specsCache[specId] = content;
+                displaySpec(content);
+            });
+            return null; // Will be displayed async
         default:
             // For other spec types, generate a generic spec
             specContent = generateGenericSpec(spec);
@@ -1693,6 +1756,191 @@ ${relevantCommands.map(cmd => commands[cmd] ? formatCommandDetailed(cmd, command
 ---
 
 Complete the task based on the user's requirements. Use only the commands shown above.`;
+}
+
+async function generateGlobalDesignSpec() {
+    const commands = commandsData.commands || {};
+    
+    // Fetch current root variables from the API
+    let currentVariables = {};
+    try {
+        const result = await QuickSiteAdmin.apiRequest('getRootVariables', 'GET');
+        if (result.ok && result.data?.data?.variables) {
+            currentVariables = result.data.data.variables;
+        }
+    } catch (e) {
+        console.error('Failed to fetch root variables:', e);
+    }
+    
+    // Format variables for display
+    const variablesJson = JSON.stringify(currentVariables, null, 2);
+    
+    // Get command documentation
+    const setRootVarsCmd = commands['setRootVariables'];
+    const cmdDoc = setRootVarsCmd ? formatCommandDetailed('setRootVariables', setRootVarsCmd) : '';
+    
+    return `# QuickSite Global Design Rework Specification
+
+You are redesigning the color scheme and design variables of an existing website. The site uses CSS custom properties (variables) defined in the \`:root\` selector. Your task is to create a new cohesive design by updating these variables.
+
+## Output Format
+\`\`\`json
+[
+  { "command": "setRootVariables", "params": { "variables": { "--var-name": "value" } } }
+]
+\`\`\`
+
+---
+
+## Current Design Variables
+
+These are the existing CSS variables used by this website:
+
+\`\`\`json
+${variablesJson}
+\`\`\`
+
+---
+
+## Command Reference
+
+${cmdDoc}
+
+---
+
+## Guidelines
+
+1. **Preserve all variable names** - Only change values, not names
+2. **Maintain semantic meaning** - \`--color-primary\` should stay the main brand color
+3. **Ensure contrast** - Text colors must be readable against their backgrounds
+4. **Be consistent** - Related colors should work harmoniously together
+5. **Consider accessibility** - Aim for WCAG AA contrast ratios (4.5:1 for text)
+
+### Common Variable Categories:
+- **Colors**: \`--color-primary\`, \`--color-secondary\`, \`--color-accent\`, \`--color-text\`, \`--color-bg\`
+- **Spacing**: \`--spacing-sm\`, \`--spacing-md\`, \`--spacing-lg\`
+- **Typography**: \`--font-family\`, \`--font-size-base\`, \`--line-height\`
+- **Effects**: \`--border-radius\`, \`--shadow\`, \`--transition\`
+
+---
+
+Based on the user's request, generate a single \`setRootVariables\` command that transforms the design while keeping the site functional and visually appealing.`;
+}
+
+async function generateRestyleSpec() {
+    const commands = commandsData.commands || {};
+    
+    // Fetch current CSS
+    let currentCss = '';
+    try {
+        const result = await QuickSiteAdmin.apiRequest('getStyles', 'GET');
+        if (result.ok && result.data?.data?.content) {
+            currentCss = result.data.data.content;
+        }
+    } catch (e) {
+        console.error('Failed to fetch styles:', e);
+    }
+    
+    // Fetch current root variables
+    let currentVariables = {};
+    try {
+        const result = await QuickSiteAdmin.apiRequest('getRootVariables', 'GET');
+        if (result.ok && result.data?.data?.variables) {
+            currentVariables = result.data.data.variables;
+        }
+    } catch (e) {
+        console.error('Failed to fetch root variables:', e);
+    }
+    
+    // Format variables for display
+    const variablesJson = JSON.stringify(currentVariables, null, 2);
+    
+    // Get command documentation
+    const editStylesCmd = commands['editStyles'];
+    const setRootVarsCmd = commands['setRootVariables'];
+    const editStylesDoc = editStylesCmd ? formatCommandDetailed('editStyles', editStylesCmd) : '';
+    const setRootVarsDoc = setRootVarsCmd ? formatCommandDetailed('setRootVariables', setRootVarsCmd) : '';
+    
+    // Truncate CSS if too long (keep first and last parts)
+    let cssDisplay = currentCss;
+    if (currentCss.length > 8000) {
+        const firstPart = currentCss.substring(0, 4000);
+        const lastPart = currentCss.substring(currentCss.length - 2000);
+        cssDisplay = firstPart + '\n\n/* ... (truncated for brevity) ... */\n\n' + lastPart;
+    }
+    
+    return `# QuickSite Restyle Site Specification
+
+You are restyling an existing website. You have access to the complete current CSS and can modify it using either \`editStyles\` (full CSS replacement) or \`setRootVariables\` (just update CSS variables).
+
+## Output Format
+\`\`\`json
+[
+  { "command": "commandName", "params": { ... } }
+]
+\`\`\`
+
+---
+
+## Current CSS Variables (:root)
+
+These are the design tokens currently in use:
+
+\`\`\`json
+${variablesJson}
+\`\`\`
+
+---
+
+## Current Full CSS
+
+\`\`\`css
+${cssDisplay}
+\`\`\`
+
+---
+
+## Available Commands
+
+### Option 1: setRootVariables (Recommended for color/theme changes)
+Use this when you only need to change colors, spacing, or other CSS variables.
+
+${setRootVarsDoc}
+
+---
+
+### Option 2: editStyles (Full CSS replacement)
+Use this when you need to modify selectors, add new rules, or restructure the CSS.
+
+${editStylesDoc}
+
+---
+
+## Guidelines
+
+### When to use \`setRootVariables\`:
+- Changing color scheme (primary, secondary, accent colors)
+- Adjusting spacing values
+- Modifying typography variables
+- Quick theme changes without structural CSS modifications
+
+### When to use \`editStyles\`:
+- Adding new CSS selectors/rules
+- Modifying existing selectors
+- Restructuring the CSS organization
+- Adding animations or complex styles
+- Complete visual overhaul
+
+### Best Practices:
+1. **Preserve functionality** - Don't break existing layouts
+2. **Maintain consistency** - Keep related colors harmonious
+3. **Ensure accessibility** - Text must be readable (WCAG AA: 4.5:1 contrast)
+4. **Keep CSS organized** - Use comments to separate sections
+5. **Use variables** - Reference \`var(--variable-name)\` in editStyles when possible
+
+---
+
+Based on the user's request, generate the appropriate command(s) to restyle the website.`;
 }
 
 function generateCreateWebsiteSpec() {
@@ -2105,10 +2353,24 @@ async function copyFullPrompt() {
         return;
     }
     
-    // Generate spec if not cached
+    // Generate spec if not cached (handle async specs)
     if (!specsCache[currentSpec.id]) {
         console.log('Generating spec for:', currentSpec.id);
-        generateSpec(currentSpec);
+        if (currentSpec.id === 'global-design') {
+            // Wait for async generation
+            QuickSiteAdmin.showToast('Loading current design variables...', 'info');
+            const content = await generateGlobalDesignSpec();
+            specsCache[currentSpec.id] = content;
+            displaySpec(content);
+        } else if (currentSpec.id === 'restyle') {
+            // Wait for async generation
+            QuickSiteAdmin.showToast('Loading current styles...', 'info');
+            const content = await generateRestyleSpec();
+            specsCache[currentSpec.id] = content;
+            displaySpec(content);
+        } else {
+            generateSpec(currentSpec);
+        }
     }
     
     const spec = specsCache[currentSpec.id];

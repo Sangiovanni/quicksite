@@ -429,7 +429,7 @@ async function loadTutorialStatus() {
             };
             
             const status = statusLabels[data.status] || statusLabels['pending'];
-            const totalSteps = 4;
+            const totalSteps = 10;
             let stepText;
             if (data.status === 'completed') {
                 stepText = 'Completed';

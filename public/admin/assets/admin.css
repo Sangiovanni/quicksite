@@ -1148,6 +1148,115 @@ code{
     color: var(--admin-success);
 }
 
+.admin-file-input--dragover .admin-file-input__label {
+    border-color: var(--admin-accent);
+    background: var(--admin-accent-bg);
+}
+
+/* Multi-file list */
+.admin-file-list {
+    margin-top: var(--space-md);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    background: var(--admin-bg-secondary);
+}
+
+.admin-file-list__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--admin-border);
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+}
+
+.admin-file-list__items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.admin-file-list__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-file-list__item:last-child {
+    border-bottom: none;
+}
+
+.admin-file-list__icon {
+    font-size: 1.25rem;
+}
+
+.admin-file-list__name {
+    flex: 1;
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.admin-file-list__size {
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+}
+
+.admin-file-list__status {
+    width: 24px;
+    text-align: center;
+}
+
+.admin-file-list__remove {
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: var(--admin-text-muted);
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.admin-file-list__remove:hover {
+    background: var(--admin-error-bg);
+    color: var(--admin-error);
+}
+
+/* Upload progress */
+.admin-upload-progress {
+    padding: var(--space-md);
+}
+
+.admin-upload-progress h4 {
+    margin: 0 0 var(--space-md);
+    font-size: var(--font-size-base);
+}
+
+.admin-upload-progress__item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-xs) 0;
+    font-size: var(--font-size-sm);
+}
+
+.admin-upload-progress__name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-upload-progress__status {
+    margin-left: var(--space-md);
+}
+
 /* Danger button variant */
 .admin-btn--danger {
     background: var(--admin-error);

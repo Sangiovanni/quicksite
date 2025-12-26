@@ -1,2 +1,13 @@
 {
+    "images/404.png": {
+        "size": 616645,
+        "uploaded": "2025-08-19T12:50:58+00:00",
+        "mime_type": "image/png",
+        "width": 1024,
+        "height": 1024,
+        "dimensions": "1024x1024",
+        "description": "an image describing a crying robot use for 404 error on website",
+        "alt": "an image describing a crying robot",
+        "meta_updated": "2025-12-25T15:49:11+00:00"
+    }
 }
