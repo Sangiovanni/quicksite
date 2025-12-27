@@ -491,9 +491,9 @@ class QuickSiteTutorial {
             { title: t.step6Preview || 'Change Favicon', substeps: 5 },
             { title: t.step7Preview || 'Edit Structure', substeps: 19 },
             { title: t.step8Preview || 'CSS Styling', substeps: 9 },
-            { title: t.step9Preview || 'Theme Customization', substeps: 11 },
+            { title: t.step9Preview || 'Theme Customization', substeps: 10 },
             { title: t.step10Preview || 'Add Languages', substeps: 10 },
-            { title: t.step11Preview || 'Manage Translations', substeps: 11 }
+            { title: t.step11Preview || 'Manage Translations', substeps: 10 }
         ];
         
         const totalSteps = stepInfo.length;
@@ -1110,8 +1110,6 @@ class QuickSiteTutorial {
             'find_edit_styles_root',  // View editStyles command (manual)
             'execute_get_root_variables', // Execute and observe
             'find_set_root_variables', // View setRootVariables (manual)
-            'indicate_global_design', // Highlight the spec card
-            'select_global_design',   // Select spec card
             'prepare_prompt',         // Write prompt
             'copy_prompt',            // Copy to clipboard
             'execute_ai_result',      // Paste and execute AI response
@@ -1129,8 +1127,6 @@ class QuickSiteTutorial {
             // Step 11: Manage Translations
             'find_translation_section', // Expand translation category
             'understand_trans_commands', // Read about commands
-            'indicate_translate_spec',  // Highlight the spec card
-            'select_translate_spec',    // Select spec card
             'prepare_translation',      // Write prompt
             'copy_translate_prompt',    // Copy to clipboard
             'execute_translation',      // Paste and execute AI response
@@ -1295,8 +1291,7 @@ class QuickSiteTutorial {
             'execute_get_root_variables': '▶️ <strong>Execute the command!</strong><br><br>Click <strong>Execute Command</strong> to see your current CSS variables. Notice how the response shows the same variables from the <code>:root</code> section, but in a clean JSON format.<br><br>Click <strong>Next</strong> after viewing the result.',
             'find_set_root_variables': '✏️ Go to the <strong>setRootVariables</strong> command. This command lets you <strong>modify</strong> one or more variables without touching the rest of your CSS.<br><br>Look at the form - you can change individual variables safely. But don\'t execute anything yet! We have a smarter way...<br><br>Click <strong>Next</strong> when ready.',
             'go_ai_integration': '🤖 <strong>Let AI help!</strong><br><br>Instead of manually picking colors, let\'s use AI to generate a cohesive theme. Click <strong>"AI Integration"</strong> in the sidebar.',
-            'indicate_global_design': '👀 Look for the <strong>"Global Design Rework"</strong> spec card. This spec is designed specifically for theme customization - it will show the AI your current variables and ask for harmonious new values.<br><br>Click <strong>Next</strong> when you\'ve found it.',
-            'select_global_design': '🎯 Now click on the <strong>"Global Design Rework"</strong> card to select it.',
+            'select_global_design': '🎯 <strong>Select Global Design Rework!</strong><br><br>Find the <strong>"Global Design Rework"</strong> spec card - it\'s designed specifically for theme customization. It will show the AI your current variables and ask for harmonious new values.<br><br>Click on the card to select it.',
             'prepare_prompt': '✍️ <strong>Craft your design request!</strong><br><br>You can either:<br>• Click one of the example buttons (Modern Minimalist, Dark Mode, etc.)<br>• Or write your own vision in the text area<br><br>Be creative! Try things like:<br>• "Ocean vibes with teal and sandy colors"<br>• "Professional law firm look"<br>• "Playful and colorful for kids"<br><br>Click <strong>Next</strong> when you\'ve entered your idea.',
             'copy_prompt': '📋 Click <strong>"Preview Full Prompt"</strong> to see the complete prompt (with your current variables included), then click <strong>"Copy Full Prompt"</strong>.<br><br>Paste this into your favorite AI chatbot (ChatGPT, Claude, etc.). The AI will return a JSON command to transform your theme!<br><br>Click <strong>Next</strong> after copying.',
             'execute_ai_result': '🚀 <strong>Apply the transformation!</strong><br><br>1. Paste your AI\'s response in the <strong>"Import & Execute JSON"</strong> textarea below<br>2. Click <strong>"Execute"</strong><br>3. Visit your website to see the new theme!<br><br>⚠️ Note: AI results vary - if you don\'t like it, try a different prompt or run it again.<br><br>Click <strong>Next</strong> when done.',
@@ -1319,8 +1314,7 @@ class QuickSiteTutorial {
             'find_translation_section': '📂 Find and expand the <strong>"Translation"</strong> category in the command list.<br><br>This section contains all commands for managing translations on your website.<br><br>Click <strong>Next</strong> when you\'ve expanded it.',
             'understand_trans_commands': '📚 <strong>Translation Commands Overview:</strong><br><br>• <code>getTranslations</code> - Get all translations for all languages<br>• <code>getTranslation</code> - Get translations for a specific language<br>• <code>setTranslationKeys</code> - Add or update translation keys (merges safely)<br>• <code>deleteTranslationKeys</code> - Remove translation keys<br>• <code>validateTranslations</code> - Check for missing translations<br>• <code>analyzeTranslations</code> - Full health check of translations<br><br>Click <strong>Next</strong> to use AI for translations!',
             'go_ai_translate': '🤖 <strong>Let AI do the heavy lifting!</strong><br><br>Instead of manually translating every key, we\'ll use AI to translate the entire site at once. Click <strong>"AI Integration"</strong> in the sidebar.',
-            'indicate_translate_spec': '👀 Look for the <strong>"Translate Language"</strong> spec card. This spec will load your default language translations and ask the AI to provide a complete translation for the target language.<br><br>Click <strong>Next</strong> when you\'ve found it.',
-            'select_translate_spec': '🎯 Now click on the <strong>"Translate Language"</strong> card to select it.',
+            'select_translate_spec': '🎯 <strong>Select Translate Language!</strong><br><br>Find the <strong>"Translate Language"</strong> spec card - it will load your default language translations and ask the AI to provide a complete translation for the target language.<br><br>Click on the card to select it.',
             'prepare_translation': '✍️ <strong>Request the Spanish translation!</strong><br><br>In the text area, describe what you want:<br><br>Example: <em>"Translate all content to Spanish (es). Keep a professional but friendly tone."</em><br><br>You can also click one of the example buttons like "🇪🇸 Translate to Spanish".<br><br>Click <strong>Next</strong> when you\'ve entered your request.',
             'copy_translate_prompt': '📋 Click <strong>"Preview Full Prompt"</strong> to see the complete prompt (with all your current translations included), then click <strong>"Copy Full Prompt"</strong>.<br><br>Paste this into your favorite AI chatbot (ChatGPT, Claude, etc.). The AI will return a JSON command with the complete Spanish translations!<br><br>Click <strong>Next</strong> after copying.',
             'execute_translation': '🚀 <strong>Apply the translations!</strong><br><br>1. Paste your AI\'s response in the <strong>"Import & Execute JSON"</strong> textarea below<br>2. Click <strong>"Execute"</strong><br>3. The translations will be merged into your Spanish language file!<br><br>⚠️ Note: AI translations may need minor adjustments for perfect accuracy.<br><br>Click <strong>Next</strong> when done.',
@@ -1397,7 +1391,6 @@ class QuickSiteTutorial {
             if (this.currentStep === 9) {
                 // Steps 9.6+ need AI Integration page (after go_ai_integration)
                 const needsAiPage = [
-                    'indicate_global_design',
                     'select_global_design',
                     'prepare_prompt',
                     'copy_prompt',
@@ -1422,7 +1415,6 @@ class QuickSiteTutorial {
             if (this.currentStep === 11) {
                 // Steps 11.5+ need AI Integration page (after go_ai_translate)
                 const needsAiPage = [
-                    'indicate_translate_spec',
                     'select_translate_spec',
                     'prepare_translation',
                     'copy_translate_prompt',
@@ -1923,8 +1915,8 @@ class QuickSiteTutorial {
         const isLargeElement = targetRect.height > 100 || targetRect.width > 400;
         const isSpecCard = this.targetElement.classList.contains('admin-ai-spec-card');
         
-        // For spec cards (like indicate_global_design, indicate_translate_spec): position to the side to not block the card
-        if (isSpecCard || substep?.id === 'indicate_global_design' || substep?.id === 'indicate_translate_spec') {
+        // For spec cards (select_global_design, select_translate_spec): position to the side to not block the card
+        if (isSpecCard || substep?.id === 'select_global_design' || substep?.id === 'select_translate_spec') {
             if (spaceRight > bubbleWidth + padding) {
                 // Position right of card
                 this.bubbleElement.style.top = Math.max(10, targetRect.top) + 'px';
@@ -2125,6 +2117,9 @@ class QuickSiteTutorial {
      * Save progress to server
      */
     async saveProgress() {
+        // Save to localStorage first (synchronous, instant backup)
+        this.saveLocalProgress();
+        
         try {
             console.log('Tutorial: Saving progress...', {
                 step: this.currentStep,

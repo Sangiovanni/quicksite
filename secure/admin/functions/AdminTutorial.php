@@ -187,15 +187,14 @@ class AdminTutorial {
                 2 => ['id' => 'find_get_root_variables', 'title' => 'Find getRootVariables', 'focus' => '#command-search'],
                 3 => ['id' => 'execute_get_root_variables', 'title' => 'Execute getRootVariables', 'focus' => '#submit-btn'],
                 4 => ['id' => 'find_set_root_variables', 'title' => 'Find setRootVariables', 'focus' => '.admin-command-item[data-command="setRootVariables"]'],
-                // AI Integration
+                // AI Integration - clicking the card advances directly
                 5 => ['id' => 'go_ai_integration', 'title' => 'Go to AI Integration', 'focus' => '.admin-nav__link[href*="ai"]'],
-                6 => ['id' => 'indicate_global_design', 'title' => 'Find Global Design Rework', 'focus' => '.admin-ai-spec-card[data-spec-id="global-design"]'],
-                7 => ['id' => 'select_global_design', 'title' => 'Select Global Design Rework', 'focus' => '.admin-ai-spec-card[data-spec-id="global-design"]'],
-                8 => ['id' => 'prepare_prompt', 'title' => 'Craft your design request', 'focus' => '#user-goal'],
-                9 => ['id' => 'copy_prompt', 'title' => 'Copy for your AI', 'focus' => '[onclick*="copyFullPrompt"]'],
+                6 => ['id' => 'select_global_design', 'title' => 'Select Global Design Rework', 'focus' => '.admin-ai-spec-card[data-spec-id="global-design"]'],
+                7 => ['id' => 'prepare_prompt', 'title' => 'Craft your design request', 'focus' => '#user-goal'],
+                8 => ['id' => 'copy_prompt', 'title' => 'Copy for your AI', 'focus' => '[onclick*="copyFullPrompt"]'],
                 // Execute and experiment
-                10 => ['id' => 'execute_ai_result', 'title' => 'Apply the transformation', 'focus' => '#import-json'],
-                11 => ['id' => 'theme_experiment', 'title' => 'Try another style?', 'focus' => null]
+                9 => ['id' => 'execute_ai_result', 'title' => 'Apply the transformation', 'focus' => '#import-json'],
+                10 => ['id' => 'theme_experiment', 'title' => 'Try another style?', 'focus' => null]
             ]
         ],
         10 => [
@@ -227,16 +226,15 @@ class AdminTutorial {
                 1 => ['id' => 'go_commands_trans', 'title' => 'Go to Commands', 'focus' => '.admin-nav__link[href*="command"]'],
                 2 => ['id' => 'find_translation_section', 'title' => 'Find Translation Section', 'focus' => '.admin-command-category[data-category="translation"]'],
                 3 => ['id' => 'understand_trans_commands', 'title' => 'Understand Translation Commands', 'focus' => null],
-                // AI Integration for translation
+                // AI Integration for translation - clicking the card advances directly
                 4 => ['id' => 'go_ai_translate', 'title' => 'Go to AI Integration', 'focus' => '.admin-nav__link[href*="ai"]'],
-                5 => ['id' => 'indicate_translate_spec', 'title' => 'Find Translate Language', 'focus' => '.admin-ai-spec-card[data-spec-id="translate-language"]'],
-                6 => ['id' => 'select_translate_spec', 'title' => 'Select Translate Language', 'focus' => '.admin-ai-spec-card[data-spec-id="translate-language"]'],
-                7 => ['id' => 'prepare_translation', 'title' => 'Request Spanish translation', 'focus' => '#user-goal'],
-                8 => ['id' => 'copy_translate_prompt', 'title' => 'Copy for your AI', 'focus' => '[onclick*="copyFullPrompt"]'],
+                5 => ['id' => 'select_translate_spec', 'title' => 'Select Translate Language', 'focus' => '.admin-ai-spec-card[data-spec-id="translate-language"]'],
+                6 => ['id' => 'prepare_translation', 'title' => 'Request Spanish translation', 'focus' => '#user-goal'],
+                7 => ['id' => 'copy_translate_prompt', 'title' => 'Copy for your AI', 'focus' => '[onclick*="copyFullPrompt"]'],
                 // Execute translation
-                9 => ['id' => 'execute_translation', 'title' => 'Apply translations', 'focus' => '#import-json'],
-                10 => ['id' => 'view_translated_site', 'title' => 'View translated site', 'focus' => null],
-                11 => ['id' => 'translation_complete', 'title' => 'Translations done!', 'focus' => null]
+                8 => ['id' => 'execute_translation', 'title' => 'Apply translations', 'focus' => '#import-json'],
+                9 => ['id' => 'view_translated_site', 'title' => 'View translated site', 'focus' => null],
+                10 => ['id' => 'translation_complete', 'title' => 'Translations done!', 'focus' => null]
             ]
         ]
     ];

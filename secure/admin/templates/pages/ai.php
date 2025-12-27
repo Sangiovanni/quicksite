@@ -2568,17 +2568,27 @@ async function copyFullPrompt() {
         }
     }
     
-    // Fallback for HTTP or if clipboard API failed
+    // Fallback for HTTP or if clipboard API failed - use temporary textarea
     if (!copied) {
-        const textarea = document.getElementById('ai-spec-content');
-        if (textarea) {
-            textarea.value = fullPrompt;
-            textarea.select();
-            try {
-                copied = document.execCommand('copy');
-            } catch (e) {
-                console.error('execCommand copy failed:', e);
-            }
+        const tempTextarea = document.createElement('textarea');
+        tempTextarea.value = fullPrompt;
+        tempTextarea.style.position = 'fixed';
+        tempTextarea.style.left = '-9999px';
+        tempTextarea.style.top = '0';
+        document.body.appendChild(tempTextarea);
+        tempTextarea.focus();
+        tempTextarea.select();
+        try {
+            copied = document.execCommand('copy');
+        } catch (e) {
+            console.error('execCommand copy failed:', e);
+        }
+        document.body.removeChild(tempTextarea);
+        
+        // Also update the visible textarea for reference
+        const specTextarea = document.getElementById('ai-spec-content');
+        if (specTextarea) {
+            specTextarea.value = fullPrompt;
         }
     }
     
