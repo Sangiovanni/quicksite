@@ -402,16 +402,7 @@ class QuickSiteTutorial {
                 <div class="tutorial-welcome-body">
                     <h3>${t.whatYouLearn || 'In this tutorial, you\'ll learn:'}</h3>
                     <ul class="tutorial-steps-preview">
-                        <li><span class="step-num">1</span><span class="step-text">${t.step1Preview || 'Create a website with AI'}</span></li>
-                        <li><span class="step-num">2</span><span class="step-text">${t.step2Preview || 'Batch Basics'}</span></li>
-                        <li><span class="step-num">3</span><span class="step-text">${t.step3Preview || 'Understanding Commands'}</span></li>
-                        <li><span class="step-num">4</span><span class="step-text">${t.step4Preview || 'Understanding Structure'}</span></li>
-                        <li><span class="step-num">5</span><span class="step-text">${t.step5Preview || 'Assets Management'}</span></li>
-                        <li><span class="step-num">6</span><span class="step-text">${t.step6Preview || 'Change Favicon'}</span></li>
-                        <li><span class="step-num">7</span><span class="step-text">${t.step7Preview || 'Edit Structure'}</span></li>
-                        <li><span class="step-num">8</span><span class="step-text">${t.step8Preview || 'CSS Styling'}</span></li>
-                        <li><span class="step-num">9</span><span class="step-text">${t.step9Preview || 'Theme Customization'}</span></li>
-                        <li><span class="step-num">10</span><span class="step-text">${t.step10Preview || 'Add Languages'}</span></li>
+                        ${this.renderStepsList(0)}
                     </ul>
                     <div class="tutorial-warning">
                         <span class="icon">⚠️</span>
