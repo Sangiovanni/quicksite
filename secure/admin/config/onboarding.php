@@ -2,7 +2,7 @@
 /**
  * Admin Panel Onboarding/Tutorial State
  * 
- * Auto-updated: 2025-12-25 15:47:18
+ * Auto-updated: 2025-12-28 22:47:42
  */
 
 return array (

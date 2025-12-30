@@ -1,0 +1,197 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "quicksite-ai-spec-schema",
+  "title": "QuickSite AI Spec",
+  "description": "Schema for AI specification files used in QuickSite admin panel",
+  "type": "object",
+  "required": ["id", "version", "meta", "dataRequirements", "relatedCommands"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Reference to this schema"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Unique identifier for the spec (kebab-case)"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of this spec"
+    },
+    "meta": {
+      "type": "object",
+      "required": ["icon", "titleKey", "descriptionKey", "category"],
+      "properties": {
+        "icon": {
+          "type": "string",
+          "description": "Emoji icon for display"
+        },
+        "titleKey": {
+          "type": "string",
+          "description": "Translation key for the spec title"
+        },
+        "descriptionKey": {
+          "type": "string",
+          "description": "Translation key for the spec description"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["creation", "modification", "content", "style", "advanced", "wip"],
+          "description": "Category for organizing specs"
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tags for filtering and search"
+        },
+        "difficulty": {
+          "type": "string",
+          "enum": ["beginner", "intermediate", "advanced"],
+          "description": "Complexity level for user guidance"
+        }
+      }
+    },
+    "parameters": {
+      "type": "array",
+      "description": "User-configurable parameters shown in the UI",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "labelKey"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Parameter identifier"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["text", "textarea", "select", "multiselect", "checkbox", "number"],
+            "description": "Input type for the parameter"
+          },
+          "labelKey": {
+            "type": "string",
+            "description": "Translation key for the label"
+          },
+          "placeholderKey": {
+            "type": "string",
+            "description": "Translation key for placeholder text"
+          },
+          "helpKey": {
+            "type": "string",
+            "description": "Translation key for help text"
+          },
+          "required": {
+            "type": "boolean",
+            "default": false
+          },
+          "default": {
+            "description": "Default value for the parameter"
+          },
+          "options": {
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["value", "labelKey"],
+                  "properties": {
+                    "value": { "type": "string" },
+                    "labelKey": { "type": "string" }
+                  }
+                }
+              },
+              {
+                "type": "string",
+                "pattern": "^dynamic:",
+                "description": "Dynamic options from a command, e.g., 'dynamic:getLangList.data.languages'"
+              }
+            ]
+          },
+          "validation": {
+            "type": "object",
+            "properties": {
+              "minLength": { "type": "integer" },
+              "maxLength": { "type": "integer" },
+              "pattern": { "type": "string" },
+              "min": { "type": "number" },
+              "max": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "type": "array",
+      "description": "Pre-defined example prompts",
+      "items": {
+        "type": "object",
+        "required": ["id", "titleKey", "promptKey"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Example identifier"
+          },
+          "titleKey": {
+            "type": "string",
+            "description": "Translation key for example title"
+          },
+          "promptKey": {
+            "type": "string",
+            "description": "Translation key for the example prompt text"
+          },
+          "params": {
+            "type": "object",
+            "description": "Pre-filled parameter values for this example"
+          }
+        }
+      }
+    },
+    "dataRequirements": {
+      "type": "array",
+      "description": "List of data needed from the system via CommandRunner",
+      "items": {
+        "type": "object",
+        "required": ["id", "command"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier used in prompt template"
+          },
+          "command": {
+            "type": "string",
+            "description": "Command name from CommandRunner whitelist"
+          },
+          "params": {
+            "type": "object",
+            "description": "Parameters to pass to the command"
+          },
+          "urlParams": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "URL parameters for the command"
+          },
+          "extract": {
+            "type": "string",
+            "description": "Dot-notation path to extract specific data (e.g., 'data.languages')"
+          }
+        }
+      }
+    },
+    "relatedCommands": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "API commands that will be used in the generated output"
+    },
+    "promptTemplate": {
+      "type": "string",
+      "description": "Filename of the .md prompt template (same folder as spec)"
+    },
+    "outputFormat": {
+      "type": "string",
+      "enum": ["json-commands", "json-structure", "text"],
+      "default": "json-commands",
+      "description": "Expected output format from AI"
+    }
+  }
+}

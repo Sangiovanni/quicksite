@@ -90,6 +90,13 @@ $langNames = [
             </a>
         </div>
         
+        <?php
+            // Determine which nav group should be highlighted
+            $buildPages = ['ai', 'batch', 'command'];
+            $inspectPages = ['structure', 'history', 'docs'];
+            $isBuildActive = in_array($currentPage, $buildPages);
+            $isInspectActive = in_array($currentPage, $inspectPages);
+        ?>
         <nav class="admin-nav">
             <a href="<?= $router->url('dashboard') ?>" 
                class="admin-nav__link<?= $currentPage === 'dashboard' ? ' admin-nav__link--active' : '' ?>">
@@ -102,73 +109,90 @@ $langNames = [
                 <span><?= __admin('nav.dashboard') ?></span>
             </a>
             
-            <a href="<?= $router->url('command') ?>" 
-               class="admin-nav__link<?= $currentPage === 'command' ? ' admin-nav__link--active' : '' ?>">
-                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="16 18 22 12 16 6"/>
-                    <polyline points="8 6 2 12 8 18"/>
-                </svg>
-                <span><?= __admin('nav.commands') ?></span>
-            </a>
+            <!-- Build Tools Group -->
+            <div class="admin-nav__group<?= $isBuildActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="build">
+                <button type="button" class="admin-nav__group-toggle">
+                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                    </svg>
+                    <span><?= __admin('nav.build') ?></span>
+                    <svg class="admin-nav__group-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </button>
+                <div class="admin-nav__group-dropdown">
+                    <a href="<?= $router->url('ai') ?>" 
+                       class="admin-nav__link<?= $currentPage === 'ai' ? ' admin-nav__link--active' : '' ?>">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+                            <circle cx="7.5" cy="14.5" r="1.5"/>
+                            <circle cx="16.5" cy="14.5" r="1.5"/>
+                        </svg>
+                        <span><?= __admin('nav.ai') ?></span>
+                    </a>
+                    <a href="<?= $router->url('batch') ?>" 
+                       class="admin-nav__link<?= $currentPage === 'batch' ? ' admin-nav__link--active' : '' ?>">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="8" y1="6" x2="21" y2="6"/>
+                            <line x1="8" y1="12" x2="21" y2="12"/>
+                            <line x1="8" y1="18" x2="21" y2="18"/>
+                            <line x1="3" y1="6" x2="3.01" y2="6"/>
+                            <line x1="3" y1="12" x2="3.01" y2="12"/>
+                            <line x1="3" y1="18" x2="3.01" y2="18"/>
+                        </svg>
+                        <span><?= __admin('nav.batch') ?></span>
+                    </a>
+                    <a href="<?= $router->url('command') ?>" 
+                       class="admin-nav__link<?= $currentPage === 'command' ? ' admin-nav__link--active' : '' ?>">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="16 18 22 12 16 6"/>
+                            <polyline points="8 6 2 12 8 18"/>
+                        </svg>
+                        <span><?= __admin('nav.commands') ?></span>
+                    </a>
+                </div>
+            </div>
             
-            <a href="<?= $router->url('history') ?>" 
-               class="admin-nav__link<?= $currentPage === 'history' ? ' admin-nav__link--active' : '' ?>">
-                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <polyline points="12 6 12 12 16 14"/>
-                </svg>
-                <span><?= __admin('nav.history') ?></span>
-            </a>
-            
-            <a href="<?= $router->url('favorites') ?>" 
-               class="admin-nav__link<?= $currentPage === 'favorites' ? ' admin-nav__link--active' : '' ?>">
-                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                </svg>
-                <span><?= __admin('nav.favorites') ?></span>
-            </a>
-            
-            <a href="<?= $router->url('structure') ?>" 
-               class="admin-nav__link<?= $currentPage === 'structure' ? ' admin-nav__link--active' : '' ?>">
-                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                    <line x1="12" y1="22.08" x2="12" y2="12"/>
-                </svg>
-                <span><?= __admin('nav.structure') ?></span>
-            </a>
-            
-            <a href="<?= $router->url('batch') ?>" 
-               class="admin-nav__link<?= $currentPage === 'batch' ? ' admin-nav__link--active' : '' ?>">
-                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="8" y1="6" x2="21" y2="6"/>
-                    <line x1="8" y1="12" x2="21" y2="12"/>
-                    <line x1="8" y1="18" x2="21" y2="18"/>
-                    <line x1="3" y1="6" x2="3.01" y2="6"/>
-                    <line x1="3" y1="12" x2="3.01" y2="12"/>
-                    <line x1="3" y1="18" x2="3.01" y2="18"/>
-                </svg>
-                <span><?= __admin('nav.batch') ?></span>
-            </a>
-            
-            <a href="<?= $router->url('docs') ?>" 
-               class="admin-nav__link<?= $currentPage === 'docs' ? ' admin-nav__link--active' : '' ?>">
-                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                </svg>
-                <span><?= __admin('nav.docs') ?></span>
-            </a>
-            
-            <a href="<?= $router->url('ai') ?>" 
-               class="admin-nav__link<?= $currentPage === 'ai' ? ' admin-nav__link--active' : '' ?>">
-                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
-                    <circle cx="7.5" cy="14.5" r="1.5"/>
-                    <circle cx="16.5" cy="14.5" r="1.5"/>
-                </svg>
-                <span><?= __admin('nav.ai') ?></span>
-            </a>
+            <!-- Inspect Tools Group -->
+            <div class="admin-nav__group<?= $isInspectActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="inspect">
+                <button type="button" class="admin-nav__group-toggle">
+                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <span><?= __admin('nav.inspect') ?></span>
+                    <svg class="admin-nav__group-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </button>
+                <div class="admin-nav__group-dropdown">
+                    <a href="<?= $router->url('structure') ?>" 
+                       class="admin-nav__link<?= $currentPage === 'structure' ? ' admin-nav__link--active' : '' ?>">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                            <line x1="12" y1="22.08" x2="12" y2="12"/>
+                        </svg>
+                        <span><?= __admin('nav.structure') ?></span>
+                    </a>
+                    <a href="<?= $router->url('history') ?>" 
+                       class="admin-nav__link<?= $currentPage === 'history' ? ' admin-nav__link--active' : '' ?>">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                        <span><?= __admin('nav.history') ?></span>
+                    </a>
+                    <a href="<?= $router->url('docs') ?>" 
+                       class="admin-nav__link<?= $currentPage === 'docs' ? ' admin-nav__link--active' : '' ?>">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                        </svg>
+                        <span><?= __admin('nav.docs') ?></span>
+                    </a>
+                </div>
+            </div>
             
             <a href="<?= $router->url('settings') ?>" 
                class="admin-nav__link<?= $currentPage === 'settings' ? ' admin-nav__link--active' : '' ?>">

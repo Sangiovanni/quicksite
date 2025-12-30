@@ -106,7 +106,6 @@ class QuickSiteTutorial {
             this.showMinimized();
         } else if (this.status === 'skipped') {
             // Show minimized widget for restart option
-            this.showMinimized();
         } else if (this.status === 'completed') {
             // Tutorial completed - don't show anything, user is done!
             // They can restart from Settings page if needed
@@ -1479,6 +1478,33 @@ class QuickSiteTutorial {
     }
     
     /**
+     * Auto-expand navigation group if selector targets an item inside it
+     * @param {string} selector - CSS selector
+     */
+    autoExpandNavGroupForSelector(selector) {
+        // Map of href patterns to their nav group
+        const navGroupMap = {
+            'ai': 'build',
+            'batch': 'build',
+            'command': 'build',
+            'structure': 'inspect',
+            'history': 'inspect',
+            'docs': 'inspect'
+        };
+        
+        // Check if selector targets a nav link
+        for (const [page, group] of Object.entries(navGroupMap)) {
+            if (selector.includes(`href*="${page}"`)) {
+                // Expand the appropriate nav group
+                if (typeof QuickSiteAdmin !== 'undefined' && QuickSiteAdmin.expandNavGroup) {
+                    QuickSiteAdmin.expandNavGroup(group);
+                }
+                break;
+            }
+        }
+    }
+    
+    /**
      * Highlight an element
      */
     highlightElement(selector, retryCount = 0) {
@@ -1486,6 +1512,9 @@ class QuickSiteTutorial {
         document.querySelectorAll('.tutorial-highlight').forEach(el => {
             el.classList.remove('tutorial-highlight');
         });
+        
+        // Auto-expand nav groups if selector targets items inside them
+        this.autoExpandNavGroupForSelector(selector);
         
         // Find target element
         const selectors = selector.split(',').map(s => s.trim());

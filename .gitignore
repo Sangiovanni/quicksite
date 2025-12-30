@@ -49,3 +49,5 @@ dist/
 tmp/
 temp/
 *.tmp
+# Personal notes
+NOTES.txt

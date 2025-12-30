@@ -3,12 +3,10 @@
  * Admin Dashboard Page
  * 
  * Main admin panel landing page after login.
- * Shows site stats, quick actions, and command categories.
+ * Shows site stats, site map, and recent commands.
  * 
- * @version 1.6.0
+ * @version 1.7.0
  */
-
-$categories = getCommandCategories();
 ?>
 
 <div class="admin-page-header">
@@ -39,34 +37,16 @@ $categories = getCommandCategories();
     </div>
 </section>
 
-<!-- Command Categories -->
+<!-- Site Map -->
 <section class="admin-section">
-    <h2 class="admin-section__title"><?= __admin('dashboard.categories.title') ?></h2>
-    <div class="admin-categories">
-        <?php foreach ($categories as $categoryKey => $category): ?>
-        <div class="admin-category">
-            <div class="admin-category__header">
-                <svg class="admin-category__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <?php echo getCategoryIcon($category['icon']); ?>
-                </svg>
-                <h3 class="admin-category__title"><?= adminEscape($category['label']) ?></h3>
-                <span class="admin-category__count"><?= count($category['commands']) ?></span>
-                <svg class="admin-category__toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="6 9 12 15 18 9"/>
-                </svg>
-            </div>
-            <div class="admin-category__commands">
-                <?php foreach ($category['commands'] as $command): ?>
-                <a href="<?= $router->url('command', $command) ?>" class="admin-command-link">
-                    <span class="admin-command-link__name"><?= adminEscape($command) ?></span>
-                    <svg class="admin-command-link__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                        <polyline points="9 18 15 12 9 6"/>
-                    </svg>
-                </a>
-                <?php endforeach; ?>
+    <h2 class="admin-section__title"><?= __admin('dashboard.sitemap.title') ?></h2>
+    <div class="admin-card">
+        <div class="admin-card__body" id="sitemap-container">
+            <div class="admin-loading">
+                <span class="admin-spinner"></span>
+                <span><?= __admin('common.loading') ?></span>
             </div>
         </div>
-        <?php endforeach; ?>
     </div>
 </section>
 
@@ -91,37 +71,14 @@ $categories = getCommandCategories();
     </div>
 </section>
 
-<?php
-/**
- * Get SVG icon paths for categories
- */
-function getCategoryIcon(string $icon): string {
-    return match($icon) {
-        'folder' => '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
-        'route' => '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.12 15.88M14.47 14.48L20 20M8.12 8.12L12 12"/>',
-        'structure' => '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>',
-        'link' => '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
-        'translate' => '<path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2v3"/><path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/>',
-        'language' => '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
-        'image' => '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
-        'palette' => '<circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.555C21.965 6.012 17.461 2 12 2z"/>',
-        'css' => '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
-        'animation' => '<polygon points="5 3 19 12 5 21 5 3"/><line x1="12" y1="12" x2="12" y2="12"/>',
-        'settings' => '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
-        'package' => '<line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
-        'history' => '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
-        'key' => '<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>',
-        'book' => '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
-        default => '<circle cx="12" cy="12" r="10"/>'
-    };
-}
-?>
-
 <script>
 // Load dashboard data
 document.addEventListener('DOMContentLoaded', async function() {
-    await loadDashboardStats();
-    await loadRecentCommands();
+    await Promise.all([
+        loadDashboardStats(),
+        loadSiteMap(),
+        loadRecentCommands()
+    ]);
 });
 
 async function loadDashboardStats() {
@@ -154,10 +111,212 @@ async function loadDashboardStats() {
     }
 }
 
+async function loadSiteMap() {
+    const container = document.getElementById('sitemap-container');
+    const t = window.QUICKSITE_CONFIG?.translations || {};
+    const sitemap = t.dashboard?.sitemap || {};
+    
+    try {
+        // Load sitemap and translation coverage in parallel
+        const [sitemapResult, validationResult] = await Promise.all([
+            QuickSiteAdmin.apiRequest('getSiteMap'),
+            QuickSiteAdmin.apiRequest('validateTranslations')
+        ]);
+        
+        if (!sitemapResult.ok) {
+            throw new Error('Failed to load sitemap');
+        }
+        
+        const data = sitemapResult.data.data;
+        const coverage = validationResult.ok ? validationResult.data.data?.validation_results : {};
+        const baseUrl = data.baseUrl;
+        const multilingual = data.multilingual;
+        const defaultLang = data.defaultLang;
+        const languages = data.languages || [];
+        const languageNames = data.languageNames || {};
+        const routes = data.routes || [];
+        
+        let html = '<div class="sitemap">';
+        
+        // Summary bar - adjust for mono/multilingual
+        if (multilingual) {
+            html += `<div class="sitemap__summary">
+                <span class="sitemap__total">${data.totalUrls} ${sitemap.urls || 'URLs'}</span>
+                <span class="sitemap__divider">•</span>
+                <span>${routes.length} ${sitemap.routes || 'routes'}</span>
+                <span class="sitemap__divider">•</span>
+                <span>${languages.length} ${sitemap.languages || 'languages'}</span>
+            </div>`;
+        } else {
+            html += `<div class="sitemap__summary">
+                <span class="sitemap__total">${data.totalUrls} ${sitemap.urls || 'URLs'}</span>
+                <span class="sitemap__divider">•</span>
+                <span>${routes.length} ${sitemap.routes || 'routes'}</span>
+                <span class="sitemap__divider">•</span>
+                <span class="badge badge--ghost">${sitemap.monolingual || 'Single language'}</span>
+            </div>`;
+        }
+        
+        if (multilingual) {
+            // Sort languages to put default first
+            const sortedLangs = [...languages].sort((a, b) => {
+                if (a === defaultLang) return -1;
+                if (b === defaultLang) return 1;
+                return a.localeCompare(b);
+            });
+            
+            // Language groups
+            html += '<div class="sitemap__languages">';
+            
+            sortedLangs.forEach((lang, idx) => {
+                const langName = languageNames[lang] || lang.toUpperCase();
+                const isDefault = lang === defaultLang;
+                const isOpen = isDefault; // Auto-expand default language
+                const langCoverage = coverage[lang];
+                const coveragePercent = langCoverage?.coverage_percent ?? null;
+                
+                html += `<div class="sitemap__lang ${isOpen ? 'sitemap__lang--open' : ''}" data-lang="${lang}">`;
+                
+                // Language header - use data attribute instead of onclick to prevent event issues
+                html += `<div class="sitemap__lang-header" data-toggle-lang="${lang}">
+                    <svg class="sitemap__lang-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                    <span class="sitemap__lang-flag">${getFlagEmoji(lang)}</span>
+                    <span class="sitemap__lang-name">${QuickSiteAdmin.escapeHtml(langName)}</span>
+                    ${isDefault ? `<span class="badge badge--primary">${sitemap.default || 'Default'}</span>` : ''}
+                    <span class="sitemap__lang-count">${routes.length} ${sitemap.pages || 'pages'}</span>
+                    ${coveragePercent !== null ? `<span class="sitemap__lang-coverage ${getCoverageClass(coveragePercent)}">${coveragePercent}%</span>` : ''}
+                </div>`;
+                
+                // Routes list
+                html += '<div class="sitemap__routes">';
+                routes.forEach(route => {
+                    const url = route.urls[lang] || route.urls['default'];
+                    const routePath = route.path;
+                    const routeName = route.name;
+                    const isHome = routeName === 'home';
+                    
+                    html += `<a href="${QuickSiteAdmin.escapeHtml(url)}" target="_blank" class="sitemap__route" title="${QuickSiteAdmin.escapeHtml(url)}">
+                        <svg class="sitemap__route-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            ${isHome ? '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>' : '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>'}
+                        </svg>
+                        <span class="sitemap__route-name">${routeName}</span>
+                        <span class="sitemap__route-path">${routePath}</span>
+                        <svg class="sitemap__route-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                        </svg>
+                    </a>`;
+                });
+                html += '</div>'; // .sitemap__routes
+                
+                html += '</div>'; // .sitemap__lang
+            });
+            
+            html += '</div>'; // .sitemap__languages
+        } else {
+            // Monolingual mode - simple flat list of routes
+            html += '<div class="sitemap__routes sitemap__routes--flat">';
+            routes.forEach(route => {
+                const url = route.urls['default'];
+                const routePath = route.path;
+                const routeName = route.name;
+                const isHome = routeName === 'home';
+                
+                html += `<a href="${QuickSiteAdmin.escapeHtml(url)}" target="_blank" class="sitemap__route" title="${QuickSiteAdmin.escapeHtml(url)}">
+                    <svg class="sitemap__route-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        ${isHome ? '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>' : '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>'}
+                    </svg>
+                    <span class="sitemap__route-name">${routeName}</span>
+                    <span class="sitemap__route-path">${routePath}</span>
+                    <svg class="sitemap__route-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                </a>`;
+            });
+            html += '</div>'; // .sitemap__routes--flat
+        }
+        
+        html += '</div>'; // .sitemap
+        
+        container.innerHTML = html;
+        
+        // Add event listeners for language toggles (using event delegation)
+        container.addEventListener('click', function(e) {
+            const header = e.target.closest('[data-toggle-lang]');
+            if (header) {
+                e.preventDefault();
+                e.stopPropagation();
+                const langEl = header.closest('.sitemap__lang');
+                if (langEl) {
+                    langEl.classList.toggle('sitemap__lang--open');
+                }
+            }
+        });
+        
+    } catch (error) {
+        console.error('Failed to load sitemap:', error);
+        container.innerHTML = `
+            <div class="admin-empty" style="padding: var(--space-lg);">
+                <p>${sitemap.error || 'Failed to load site map'}</p>
+            </div>
+        `;
+    }
+}
+
+function getCoverageClass(percent) {
+    if (percent >= 95) return 'sitemap__coverage--excellent';
+    if (percent >= 80) return 'sitemap__coverage--good';
+    if (percent >= 50) return 'sitemap__coverage--warning';
+    return 'sitemap__coverage--poor';
+}
+
+function getFlagEmoji(langCode) {
+    const flags = {
+        'en': '🇬🇧',
+        'fr': '🇫🇷',
+        'es': '🇪🇸',
+        'de': '🇩🇪',
+        'it': '🇮🇹',
+        'pt': '🇵🇹',
+        'nl': '🇳🇱',
+        'ru': '🇷🇺',
+        'zh': '🇨🇳',
+        'ja': '🇯🇵',
+        'ko': '🇰🇷',
+        'ar': '🇸🇦',
+        'hi': '🇮🇳',
+        'tr': '🇹🇷',
+        'pl': '🇵🇱',
+        'sv': '🇸🇪',
+        'da': '🇩🇰',
+        'fi': '🇫🇮',
+        'no': '🇳🇴',
+        'cs': '🇨🇿',
+        'el': '🇬🇷',
+        'he': '🇮🇱',
+        'th': '🇹🇭',
+        'vi': '🇻🇳',
+        'id': '🇮🇩',
+        'ms': '🇲🇾',
+        'uk': '🇺🇦',
+        'ro': '🇷🇴',
+        'hu': '🇭🇺',
+        'bg': '🇧🇬',
+        'sk': '🇸🇰',
+        'hr': '🇭🇷',
+        'sl': '🇸🇮',
+        'et': '🇪🇪',
+        'lv': '🇱🇻',
+        'lt': '🇱🇹'
+    };
+    return flags[langCode.toLowerCase()] || '🌐';
+}
+
 async function loadRecentCommands() {
     const container = document.getElementById('recent-commands');
     const t = window.QUICKSITE_CONFIG?.translations || {};
-    const cols = t.dashboard?.columns || {};
+    const cols = t.dashboard?.history?.columns || {};
     const common = t.common || {};
     
     try {
@@ -229,8 +388,195 @@ async function loadRecentCommands() {
     margin: 0;
 }
 
-.admin-categories {
-    display: grid;
+/* Sitemap Styles */
+.sitemap {
+    padding: var(--space-md);
+}
+
+.sitemap__summary {
+    display: flex;
+    align-items: center;
     gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--admin-bg-tertiary);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-lg);
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+}
+
+.sitemap__total {
+    font-weight: var(--font-weight-semibold);
+    color: var(--admin-text);
+}
+
+.sitemap__divider {
+    color: var(--admin-border);
+}
+
+.sitemap__languages {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.sitemap__lang {
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    transition: border-color var(--transition-fast);
+}
+
+.sitemap__lang:hover {
+    border-color: var(--admin-accent);
+}
+
+.sitemap__lang-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    background: var(--admin-surface);
+    cursor: pointer;
+    user-select: none;
+    transition: background var(--transition-fast);
+}
+
+.sitemap__lang-header:hover {
+    background: var(--admin-bg-tertiary);
+}
+
+.sitemap__lang-toggle {
+    color: var(--admin-text-muted);
+    transition: transform var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.sitemap__lang--open .sitemap__lang-toggle {
+    transform: rotate(90deg);
+}
+
+.sitemap__lang-flag {
+    font-size: 1.25em;
+    line-height: 1;
+}
+
+.sitemap__lang-name {
+    font-weight: var(--font-weight-medium);
+    color: var(--admin-text);
+    flex: 1;
+}
+
+.sitemap__lang-count {
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+}
+
+.sitemap__lang-coverage {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+}
+
+.sitemap__coverage--excellent {
+    background: var(--admin-success-bg);
+    color: var(--admin-success);
+}
+
+.sitemap__coverage--good {
+    background: rgba(34, 197, 94, 0.15);
+    color: #16a34a;
+}
+
+.sitemap__coverage--warning {
+    background: var(--admin-warning-bg);
+    color: var(--admin-warning);
+}
+
+.sitemap__coverage--poor {
+    background: var(--admin-error-bg);
+    color: var(--admin-error);
+}
+
+.sitemap__routes {
+    display: none;
+    padding: var(--space-sm);
+    background: var(--admin-bg);
+    border-top: 1px solid var(--admin-border);
+}
+
+.sitemap__lang--open .sitemap__routes {
+    display: block;
+}
+
+.sitemap__route {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    color: var(--admin-text);
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.sitemap__route:hover {
+    background: var(--admin-surface);
+    color: var(--admin-accent);
+}
+
+.sitemap__route-icon {
+    color: var(--admin-text-muted);
+    flex-shrink: 0;
+}
+
+.sitemap__route:hover .sitemap__route-icon {
+    color: var(--admin-accent);
+}
+
+.sitemap__route-name {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.sitemap__route-path {
+    flex: 1;
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+    text-align: right;
+}
+
+.sitemap__route-external {
+    color: var(--admin-text-muted);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.sitemap__route:hover .sitemap__route-external {
+    opacity: 1;
+}
+
+/* Flat routes list for monolingual mode */
+.sitemap__routes--flat {
+    display: block;
+    padding: var(--space-sm);
+    background: var(--admin-surface);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--admin-border);
+}
+
+/* Responsive sitemap */
+@media (max-width: 600px) {
+    .sitemap__summary {
+        flex-wrap: wrap;
+        gap: var(--space-xs);
+    }
+    
+    .sitemap__route-path {
+        display: none;
+    }
 }
 </style>

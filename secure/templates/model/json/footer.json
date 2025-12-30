@@ -21,28 +21,7 @@
                         ]
                     },
                     {
-                        "tag": "div",
-                        "params": {
-                            "class": "lang-buttons"
-                        },
-                        "children": [
-                            {
-                                "component": "footer-link",
-                                "data": {
-                                    "href": "{{__current_page;lang=en}}",
-                                    "label": "__RAW__English",
-                                    "target": "_self"
-                                }
-                            },
-                            {
-                                "component": "footer-link",
-                                "data": {
-                                    "href": "{{__current_page;lang=fr}}",
-                                    "label": "__RAW__Français",
-                                    "target": "_self"
-                                }
-                            }
-                        ]
+                        "component": "lang-switch"
                     }
                 ]
             },

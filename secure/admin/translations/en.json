@@ -76,6 +76,17 @@
             "components": "Components",
             "languages": "Languages"
         },
+        "sitemap": {
+            "title": "Site Map",
+            "urls": "URLs",
+            "routes": "routes",
+            "languages": "languages",
+            "pages": "pages",
+            "default": "Default",
+            "monolingual": "Single language",
+            "coverage": "Translation Coverage",
+            "error": "Failed to load site map"
+        },
         "categories": {
             "title": "Commands by Category"
         },
@@ -224,12 +235,13 @@
         "command": "Command",
         "history": "History",
         "settings": "Settings",
-        "favorites": "Favorites",
         "structure": "Structure",
         "batch": "Batch",
         "docs": "Docs",
         "ai": "AI Integration",
-        "logout": "Logout"
+        "logout": "Logout",
+        "build": "Build",
+        "inspect": "Inspect"
     },
     "settings": {
         "title": "Settings",
@@ -534,7 +546,249 @@
         "executeNow": "Execute Now",
         "openInBatch": "Open in Batch",
         "executionComplete": "Execution Complete",
-        "clear": "Clear"
+        "clear": "Clear",
+        "browser": {
+            "title": "AI Specifications",
+            "subtitle": "Generate AI-ready prompts for common QuickSite tasks",
+            "howItWorks": "How it works",
+            "step1": "Select a specification below",
+            "step2": "Describe your goal in detail",
+            "step3": "Copy the generated prompt to your AI assistant",
+            "step4": "Execute the AI response in the Batch panel",
+            "noSpecs": "No AI specifications available yet.",
+            "legacyLink": "Use legacy AI page (all specs)",
+            "createSpec": "Create Custom Spec",
+            "importSpec": "Import Spec",
+            "importSuccess": "Spec imported successfully!",
+            "importError": "Import failed:",
+            "invalidImport": "Invalid import file: must contain spec and template"
+        },
+        "editor": {
+            "new": "New Spec",
+            "edit": "Edit Spec",
+            "title": {
+                "new": "Create Custom Spec",
+                "edit": "Edit Spec"
+            },
+            "info": {
+                "title": "Creating a Custom Spec",
+                "text": "Custom specs are saved to the secure/admin/ai_specs/custom/ folder. They will appear alongside core specs in the browser. Make sure to add translation keys to your locale files for labels and descriptions."
+            },
+            "notFound": {
+                "title": "Spec Not Found",
+                "message": "The requested AI specification could not be found for editing."
+            },
+            "definition": "Spec Definition (JSON)",
+            "template": "Prompt Template (Markdown)",
+            "tab": {
+                "template": "Template",
+                "preview": "Preview",
+                "schema": "Schema Reference"
+            },
+            "preview": "Preview",
+            "save": "Save Spec",
+            "valid": "Valid JSON",
+            "validJson": "Valid JSON - All required fields present",
+            "invalidJson": "Invalid JSON",
+            "validationErrors": "Validation Errors",
+            "fixErrors": "Please fix JSON errors before previewing",
+            "templateRequired": "Prompt template is required",
+            "previewEmpty": "Click \"Preview\" to see the rendered prompt",
+            "loading": "Loading...",
+            "saving": "Saving...",
+            "saved": "Spec saved successfully!"
+        },
+        "categories": {
+            "creation": {
+                "title": "Creation",
+                "desc": "Create new websites and pages from scratch"
+            },
+            "modification": {
+                "title": "Modification",
+                "desc": "Modify existing structures and content"
+            },
+            "content": {
+                "title": "Content",
+                "desc": "Add or update page content and text"
+            },
+            "style": {
+                "title": "Style",
+                "desc": "Change appearance and design"
+            },
+            "advanced": {
+                "title": "Advanced",
+                "desc": "Complex operations and configurations"
+            },
+            "wip": {
+                "title": "Work in Progress",
+                "desc": "Experimental specs in development"
+            }
+        },
+        "difficulty": {
+            "beginner": "Beginner",
+            "intermediate": "Intermediate",
+            "advanced": "Advanced"
+        },
+        "spec": {
+            "notFound": {
+                "title": "Spec Not Found",
+                "message": "The requested AI specification could not be found."
+            },
+            "backToList": "Back to Specs",
+            "validationError": "Spec Validation Errors",
+            "parameters": "Parameters",
+            "examples": "Examples",
+            "relatedCommands": "Related Commands",
+            "generatedPrompt": "Generated Prompt",
+            "generating": "Generating prompt...",
+            "promptPlaceholder": "Fill in the parameters and click Generate to create a prompt...",
+            "custom": "Custom",
+            "edit": "Edit Spec",
+            "export": "Export",
+            "generatePrompt": "Generate Prompt",
+            "copyPrompt": "Copy",
+            "copied": "Copied!",
+            "goToBatch": "Go to Batch Panel",
+            "chars": "chars",
+            "words": "words"
+        },
+        "specs": {
+            "addLanguage": {
+                "title": "Add Language",
+                "description": "Add a new language to your multilingual website with translations and language switcher updates.",
+                "params": {
+                    "targetLanguage": {
+                        "label": "Language Code",
+                        "placeholder": "e.g., es, de, it",
+                        "help": "ISO 639-1 language code (2-3 letters)"
+                    },
+                    "languageName": {
+                        "label": "Language Name",
+                        "placeholder": "e.g., Español, Deutsch",
+                        "help": "Native name of the language"
+                    }
+                },
+                "examples": {
+                    "spanish": { "title": "Add Spanish", "prompt": "Add Spanish language support" },
+                    "german": { "title": "Add German", "prompt": "Add German language support" },
+                    "japanese": { "title": "Add Japanese", "prompt": "Add Japanese language support" }
+                }
+            },
+            "createLanding": {
+                "title": "Create Landing Page",
+                "description": "Generate a complete single-page landing website from scratch with hero, features, testimonials, and contact sections.",
+                "params": {
+                    "multilingual": {
+                        "label": "Enable multilingual",
+                        "help": "Create with multiple language support"
+                    },
+                    "languages": {
+                        "label": "Languages",
+                        "placeholder": "en, fr, es",
+                        "help": "Comma-separated language codes"
+                    }
+                },
+                "examples": {
+                    "coffeeShop": { "title": "Coffee Shop", "prompt": "Create a landing page for a coffee shop with hero, menu highlights, and contact form" },
+                    "saas": { "title": "SaaS Product", "prompt": "Create a modern landing for a project management SaaS with features, pricing, testimonials" },
+                    "portfolio": { "title": "Portfolio", "prompt": "Create a minimalist portfolio landing for a photographer with gallery and contact" }
+                }
+            },
+            "createWebsite": {
+                "title": "Create Multi-Page Website",
+                "description": "Generate a complete multi-page website with navigation, multiple pages, shared header/footer, and consistent styling.",
+                "params": {
+                    "multilingual": {
+                        "label": "Enable multilingual",
+                        "help": "Create with multiple language support"
+                    },
+                    "languages": {
+                        "label": "Languages",
+                        "placeholder": "en, fr, es",
+                        "help": "Comma-separated language codes"
+                    },
+                    "pages": {
+                        "label": "Pages to create",
+                        "placeholder": "home, about, services, contact",
+                        "help": "Comma-separated page names (home is always included)"
+                    }
+                },
+                "examples": {
+                    "business": { "title": "Business", "prompt": "Create a professional website for a consulting firm with home, about, services, team, contact" },
+                    "restaurant": { "title": "Restaurant", "prompt": "Create a restaurant website with home, menu, about, gallery, reservations, contact" },
+                    "agency": { "title": "Creative Agency", "prompt": "Create a creative agency website with home, work, services, team, blog, contact" }
+                }
+            },
+            "addPage": {
+                "title": "Add New Page",
+                "description": "Add a new page to an existing website with proper navigation links and translations for all languages.",
+                "params": {
+                    "navPlacement": {
+                        "label": "Navigation placement",
+                        "help": "Where to add the link to the new page",
+                        "options": {
+                            "menu": "Menu only",
+                            "footer": "Footer only",
+                            "both": "Menu & Footer",
+                            "none": "No navigation (hidden)"
+                        }
+                    }
+                },
+                "examples": {
+                    "blog": { "title": "Blog Page", "prompt": "Add a blog page with recent articles list and category sidebar" },
+                    "faq": { "title": "FAQ Page", "prompt": "Add a FAQ page with collapsible questions organized by topic" },
+                    "privacy": { "title": "Privacy Policy", "prompt": "Add a privacy policy page (footer link only) with GDPR-compliant sections" }
+                }
+            },
+            "addSection": {
+                "title": "Add Section to Page",
+                "description": "Add a new section to an existing page at a specific position (before/after another section).",
+                "params": {
+                    "targetPage": {
+                        "label": "Target page",
+                        "help": "Select the page to add the section to"
+                    }
+                },
+                "examples": {
+                    "testimonials": { "title": "Testimonials", "prompt": "Add a testimonials section after features with 3 customer quotes" },
+                    "cta": { "title": "CTA Banner", "prompt": "Add a call-to-action banner before footer with newsletter signup" },
+                    "stats": { "title": "Statistics", "prompt": "Add a statistics section with animated counters showing achievements" }
+                }
+            },
+            "translateLanguage": {
+                "title": "Translate Content",
+                "description": "Translate all website content from the default language to a target language using natural, accurate translations.",
+                "params": {
+                    "targetLanguage": {
+                        "label": "Target language",
+                        "help": "Select the language to translate into"
+                    }
+                },
+                "examples": {
+                    "french": { "title": "To French", "prompt": "Translate all content to French with formal tone" },
+                    "spanish": { "title": "To Spanish", "prompt": "Translate to Spanish (Spain) with friendly tone" },
+                    "improve": { "title": "Improve Existing", "prompt": "Review and improve existing German translations for naturalness" }
+                }
+            },
+            "globalDesign": {
+                "title": "Change Design Theme",
+                "description": "Update the website's color scheme and design variables for a fresh look without changing structure.",
+                "examples": {
+                    "darkMode": { "title": "Dark Mode", "prompt": "Convert to dark theme with dark backgrounds and light text" },
+                    "warmPalette": { "title": "Warm Palette", "prompt": "Change to warm earth tones (oranges, browns, creams)" },
+                    "corporateBlue": { "title": "Corporate Blue", "prompt": "Apply professional blue corporate theme with navy and light blue" }
+                }
+            },
+            "restyle": {
+                "title": "Restyle Website",
+                "description": "Completely restyle the website's visual appearance including CSS rules, colors, typography, spacing, and effects.",
+                "examples": {
+                    "minimalist": { "title": "Minimalist", "prompt": "Restyle with minimalist aesthetic: whitespace, clean typography, subtle shadows" },
+                    "boldColorful": { "title": "Bold & Colorful", "prompt": "Make bold and vibrant with bright colors, large typography, dynamic elements" },
+                    "glassmorphism": { "title": "Glassmorphism", "prompt": "Apply glassmorphism with frosted glass effects, blur backgrounds, gradients" }
+                }
+            }
+        }
     },
     "footer": {
         "version": "QuickSite v:version",

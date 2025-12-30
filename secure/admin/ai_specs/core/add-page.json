@@ -1,0 +1,95 @@
+{
+    "$schema": "../schema.json",
+    "id": "add-page",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "📄",
+        "titleKey": "ai.specs.addPage.title",
+        "descriptionKey": "ai.specs.addPage.description",
+        "category": "modification",
+        "tags": ["add", "page", "content", "navigation"],
+        "difficulty": "intermediate"
+    },
+    "parameters": [
+        {
+            "id": "navPlacement",
+            "type": "select",
+            "labelKey": "ai.specs.addPage.params.navPlacement.label",
+            "helpKey": "ai.specs.addPage.params.navPlacement.help",
+            "options": [
+                {"value": "menu", "labelKey": "ai.specs.addPage.params.navPlacement.options.menu"},
+                {"value": "footer", "labelKey": "ai.specs.addPage.params.navPlacement.options.footer"},
+                {"value": "both", "labelKey": "ai.specs.addPage.params.navPlacement.options.both"},
+                {"value": "none", "labelKey": "ai.specs.addPage.params.navPlacement.options.none"}
+            ],
+            "default": "menu"
+        }
+    ],
+    "examples": [
+        {
+            "id": "blog",
+            "titleKey": "ai.specs.addPage.examples.blog.title",
+            "promptKey": "ai.specs.addPage.examples.blog.prompt"
+        },
+        {
+            "id": "faq",
+            "titleKey": "ai.specs.addPage.examples.faq.title",
+            "promptKey": "ai.specs.addPage.examples.faq.prompt"
+        },
+        {
+            "id": "privacy",
+            "titleKey": "ai.specs.addPage.examples.privacy.title",
+            "promptKey": "ai.specs.addPage.examples.privacy.prompt"
+        }
+    ],
+    "dataRequirements": [
+        {
+            "id": "routes",
+            "command": "listRoutes",
+            "extract": "data.routes"
+        },
+        {
+            "id": "languages",
+            "command": "getLangList",
+            "extract": "data"
+        },
+        {
+            "id": "menuStructure",
+            "command": "getStructure",
+            "urlParams": ["menu", "showIds"],
+            "extract": "data.structure"
+        },
+        {
+            "id": "footerStructure",
+            "command": "getStructure",
+            "urlParams": ["footer", "showIds"],
+            "extract": "data.structure"
+        },
+        {
+            "id": "styles",
+            "command": "getStyles",
+            "extract": "data"
+        },
+        {
+            "id": "helpAddRoute",
+            "command": "help",
+            "urlParams": ["addRoute"],
+            "extract": "data"
+        },
+        {
+            "id": "helpEditStructure",
+            "command": "help",
+            "urlParams": ["editStructure"],
+            "extract": "data"
+        },
+        {
+            "id": "helpSetTranslationKeys",
+            "command": "help",
+            "urlParams": ["setTranslationKeys"],
+            "extract": "data"
+        }
+    ],
+    "relatedCommands": ["addRoute", "editStructure", "setTranslationKeys"],
+    "promptTemplate": "add-page.md",
+    "outputFormat": "json-commands"
+}

@@ -83,7 +83,7 @@ function getCommandCategories(): array {
         'route_management' => [
             'label' => 'Route Management',
             'icon' => 'route',
-            'commands' => ['addRoute', 'deleteRoute', 'getRoutes']
+            'commands' => ['addRoute', 'deleteRoute', 'getRoutes', 'getSiteMap']
         ],
         'structure_management' => [
             'label' => 'Structure Management',

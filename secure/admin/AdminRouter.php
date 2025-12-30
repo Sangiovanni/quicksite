@@ -12,6 +12,7 @@ class AdminRouter {
     private string $page = 'login';
     private string $command = '';
     private array $params = [];
+    private ?string $specId = null;  // For AI spec routing
     private array $validPages = [
         'login',      // Authentication page
         'dashboard',  // Main admin panel after login
@@ -59,6 +60,19 @@ class AdminRouter {
             $this->command = array_shift($parts);
         }
         
+        // For AI pages, second segment is the spec ID (if present)
+        // Can be: {specId}, 'new', or 'edit/{specId}'
+        if ($this->page === 'ai' && !empty($parts)) {
+            $specPart = array_shift($parts);
+            
+            // Handle edit/{specId} pattern
+            if ($specPart === 'edit' && !empty($parts)) {
+                $this->specId = 'edit/' . array_shift($parts);
+            } else {
+                $this->specId = $specPart;
+            }
+        }
+        
         // Remaining segments are parameters
         $this->params = $parts;
     }
@@ -75,6 +89,13 @@ class AdminRouter {
      */
     public function getCommand(): string {
         return $this->command;
+    }
+
+    /**
+     * Get AI spec ID (for /admin/ai/{specId} routes)
+     */
+    public function getSpecId(): ?string {
+        return $this->specId;
     }
 
     /**
@@ -272,6 +293,29 @@ class AdminRouter {
         
         // Determine which template to load
         $templatePath = SECURE_FOLDER_PATH . '/admin/templates/pages/' . $this->page . '.php';
+        
+        // Special handling for AI specs with specId
+        if ($this->page === 'ai' && $this->specId !== null) {
+            // Check for editor routes (new or edit/*)
+            if ($this->specId === 'new' || str_starts_with($this->specId, 'edit/')) {
+                $editorPath = SECURE_FOLDER_PATH . '/admin/templates/pages/ai/editor.php';
+                if (file_exists($editorPath)) {
+                    $templatePath = $editorPath;
+                }
+            } else {
+                // Load spec-specific template for viewing
+                $specTemplatePath = SECURE_FOLDER_PATH . '/admin/templates/pages/ai/spec.php';
+                if (file_exists($specTemplatePath)) {
+                    $templatePath = $specTemplatePath;
+                }
+            }
+        } elseif ($this->page === 'ai' && $this->specId === null) {
+            // Load AI index (spec browser) if it exists, otherwise fall back to legacy ai.php
+            $indexPath = SECURE_FOLDER_PATH . '/admin/templates/pages/ai/index.php';
+            if (file_exists($indexPath)) {
+                $templatePath = $indexPath;
+            }
+        }
         
         if (!file_exists($templatePath)) {
             // Show 404 page

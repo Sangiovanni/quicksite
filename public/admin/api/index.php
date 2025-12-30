@@ -485,6 +485,264 @@ switch ($action) {
             echo json_encode(['success' => false, 'error' => $result['error']]);
         }
         break;
+    
+    // ========================================================================
+    // AI Spec System Endpoints
+    // ========================================================================
+    
+    case 'ai-specs':
+        // List all available AI specs
+        require_once SECURE_FOLDER_PATH . '/src/classes/AiSpecManager.php';
+        $manager = new AiSpecManager();
+        $specs = $manager->listSpecs();
+        
+        // Return just the metadata for listing
+        $specList = array_map(function($spec) {
+            return [
+                'id' => $spec['id'],
+                'version' => $spec['version'],
+                'meta' => $spec['meta'],
+                'source' => $spec['_source'] ?? 'core'
+            ];
+        }, $specs);
+        
+        echo json_encode(['success' => true, 'data' => $specList]);
+        break;
+    
+    case 'ai-spec':
+        // Get a specific AI spec (rendered with data)
+        if (empty($params[0])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Missing spec ID']);
+            break;
+        }
+        
+        require_once SECURE_FOLDER_PATH . '/src/classes/AiSpecManager.php';
+        $manager = new AiSpecManager();
+        $specId = $params[0];
+        
+        // Load the spec
+        $spec = $manager->loadSpec($specId);
+        if (!$spec) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Spec not found: ' . $specId]);
+            break;
+        }
+        
+        // Validate the spec
+        $validation = $manager->validateSpec($spec);
+        if (!$validation['valid']) {
+            http_response_code(500);
+            echo json_encode([
+                'error' => 'Invalid spec',
+                'validationErrors' => $validation['errors']
+            ]);
+            break;
+        }
+        
+        // Get user parameters from query string
+        $userParams = [];
+        foreach ($_GET as $key => $value) {
+            if (!in_array($key, ['action'])) {
+                $userParams[$key] = $value;
+            }
+        }
+        
+        // Fetch data requirements
+        $data = $manager->fetchDataRequirements($spec);
+        
+        // Render the prompt
+        $prompt = $manager->renderPrompt($spec, $data, $userParams);
+        
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'id' => $spec['id'],
+                'version' => $spec['version'],
+                'meta' => $spec['meta'],
+                'prompt' => $prompt,
+                'dataFetched' => array_keys($data),
+                'userParams' => $userParams
+            ]
+        ]);
+        break;
+    
+    case 'ai-spec-raw':
+        // Get raw spec JSON (for debugging/editing)
+        if (empty($params[0])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Missing spec ID']);
+            break;
+        }
+        
+        require_once SECURE_FOLDER_PATH . '/src/classes/AiSpecManager.php';
+        $manager = new AiSpecManager();
+        $spec = $manager->loadSpec($params[0]);
+        
+        if (!$spec) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Spec not found: ' . $params[0]]);
+            break;
+        }
+        
+        // Include template content for debugging
+        $templateFile = $spec['promptTemplate'] ?? $spec['id'] . '.md';
+        $templatePath = $spec['_folder'] . '/' . $templateFile;
+        $templateContent = file_exists($templatePath) ? file_get_contents($templatePath) : null;
+        
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'spec' => $spec,
+                'template' => $templateContent,
+                'validation' => $manager->validateSpec($spec)
+            ]
+        ]);
+        break;
+    
+    case 'ai-spec-preview':
+        // Preview a spec with custom JSON and template
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+            break;
+        }
+        
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input || !isset($input['spec']) || !isset($input['template'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Missing spec or template data']);
+            break;
+        }
+        
+        require_once SECURE_FOLDER_PATH . '/src/classes/AiSpecManager.php';
+        $manager = new AiSpecManager();
+        
+        $spec = $input['spec'];
+        $template = $input['template'];
+        
+        // Validate the spec
+        $validation = $manager->validateSpec($spec);
+        if (!$validation['valid']) {
+            http_response_code(400);
+            echo json_encode([
+                'error' => 'Invalid spec',
+                'validationErrors' => $validation['errors']
+            ]);
+            break;
+        }
+        
+        // Fetch data requirements (if any exist and are valid)
+        $data = [];
+        try {
+            $data = $manager->fetchDataRequirements($spec);
+        } catch (Exception $e) {
+            // If data fetching fails, continue with empty data for preview
+            $data = ['_error' => $e->getMessage()];
+        }
+        
+        // Render the prompt using the provided template
+        $prompt = $manager->renderTemplateString($template, $data);
+        
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'prompt' => $prompt,
+                'dataFetched' => array_keys($data),
+                'validation' => $validation
+            ]
+        ]);
+        break;
+    
+    case 'ai-spec-save':
+        // Save a custom spec to the custom folder
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+            break;
+        }
+        
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input || !isset($input['spec']) || !isset($input['template'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Missing spec or template data']);
+            break;
+        }
+        
+        require_once SECURE_FOLDER_PATH . '/src/classes/AiSpecManager.php';
+        $manager = new AiSpecManager();
+        
+        $spec = $input['spec'];
+        $template = $input['template'];
+        $isNew = $input['isNew'] ?? true;
+        $originalSpecId = $input['originalSpecId'] ?? '';
+        
+        // Validate the spec
+        $validation = $manager->validateSpec($spec);
+        if (!$validation['valid']) {
+            http_response_code(400);
+            echo json_encode([
+                'error' => 'Invalid spec: ' . implode(', ', $validation['errors']),
+                'validationErrors' => $validation['errors']
+            ]);
+            break;
+        }
+        
+        $specId = $spec['id'];
+        $customFolder = SECURE_FOLDER_PATH . '/admin/ai_specs/custom';
+        
+        // Ensure custom folder exists
+        if (!is_dir($customFolder)) {
+            mkdir($customFolder, 0755, true);
+        }
+        
+        // Check if trying to overwrite a core spec
+        $coreFolder = SECURE_FOLDER_PATH . '/admin/ai_specs/core';
+        if (file_exists($coreFolder . '/' . $specId . '.json')) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Cannot overwrite core spec: ' . $specId]);
+            break;
+        }
+        
+        // If editing and ID changed, delete old files
+        if (!$isNew && $originalSpecId && $originalSpecId !== $specId) {
+            $oldJsonPath = $customFolder . '/' . $originalSpecId . '.json';
+            $oldMdPath = $customFolder . '/' . $originalSpecId . '.md';
+            if (file_exists($oldJsonPath)) unlink($oldJsonPath);
+            if (file_exists($oldMdPath)) unlink($oldMdPath);
+        }
+        
+        // Set the promptTemplate reference
+        $spec['promptTemplate'] = $specId . '.md';
+        
+        // Write JSON file
+        $jsonPath = $customFolder . '/' . $specId . '.json';
+        $jsonContent = json_encode($spec, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if (file_put_contents($jsonPath, $jsonContent) === false) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Failed to write spec JSON file']);
+            break;
+        }
+        
+        // Write MD file
+        $mdPath = $customFolder . '/' . $specId . '.md';
+        if (file_put_contents($mdPath, $template) === false) {
+            // Clean up JSON if MD write failed
+            unlink($jsonPath);
+            http_response_code(500);
+            echo json_encode(['error' => 'Failed to write template MD file']);
+            break;
+        }
+        
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'id' => $specId,
+                'jsonPath' => $jsonPath,
+                'mdPath' => $mdPath
+            ]
+        ]);
+        break;
         
     default:
         http_response_code(404);

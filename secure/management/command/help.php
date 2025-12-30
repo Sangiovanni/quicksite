@@ -1,7 +1,21 @@
 <?php
+/**
+ * help - API Documentation for all management commands
+ * 
+ * @method GET
+ * @url /management/help
+ * @url /management/help/{commandName}
+ * @auth required
+ * @permission read
+ * 
+ * Returns comprehensive documentation for all API commands,
+ * or detailed documentation for a specific command.
+ */
+
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 
-$commands = [
+// Define commands in global scope for access from __command_help()
+$GLOBALS['__help_commands'] = [
     'setPublicSpace' => [
         'description' => 'Sets the URL space/prefix for the public site. Creates a subdirectory inside the public folder and moves all content there. Use empty destination to restore to root. Note: Site URL changes (e.g., http://domain/web/ when set to "web")',
         'method' => 'PATCH',
@@ -709,6 +723,50 @@ $commands = [
         ],
         'error_responses' => [],
         'notes' => 'Returns the current list of registered routes. Useful for validation before creating menu/footer links.'
+    ],
+    
+    'getSiteMap' => [
+        'description' => 'Generates a complete sitemap of all routes × all languages. Useful for SEO sitemap.txt generation and Dashboard insights.',
+        'method' => 'GET',
+        'url_structure' => '/management/getSiteMap/{format?}',
+        'parameters' => [
+            '{format}' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Output format (URL segment)',
+                'example' => 'json',
+                'validation' => 'json|text',
+                'default' => 'json'
+            ]
+        ],
+        'example_get' => 'GET /management/getSiteMap or GET /management/getSiteMap/text',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Sitemap generated successfully',
+            'data' => [
+                'baseUrl' => 'https://example.com',
+                'multilingual' => true,
+                'languages' => ['en', 'fr'],
+                'defaultLang' => 'en',
+                'languageNames' => ['en' => 'English', 'fr' => 'Français'],
+                'routes' => [
+                    ['name' => 'home', 'path' => '/', 'urls' => ['en' => 'https://example.com/en', 'fr' => 'https://example.com/fr']],
+                    ['name' => 'about', 'path' => '/about', 'urls' => ['en' => 'https://example.com/en/about', 'fr' => 'https://example.com/fr/about']]
+                ],
+                'urls' => ['https://example.com/en', 'https://example.com/fr', 'https://example.com/en/about', 'https://example.com/fr/about'],
+                'totalUrls' => 4,
+                'coverage' => [
+                    'en' => ['code' => 'en', 'name' => 'English', 'isDefault' => true, 'hasTranslations' => true, 'translationKeyCount' => 150],
+                    'fr' => ['code' => 'fr', 'name' => 'Français', 'isDefault' => false, 'hasTranslations' => true, 'translationKeyCount' => 145]
+                ]
+            ]
+        ],
+        'text_response' => 'When format=text, returns plain text with one URL per line (Content-Type: text/plain). Suitable for saving directly as sitemap.txt for SEO crawlers.',
+        'error_responses' => [
+            '400.validation.invalid_format' => 'Invalid format parameter (must be text or json)'
+        ],
+        'notes' => 'Use format=json (default) for programmatic access and Dashboard. Use format=text to generate sitemap.txt for SEO. Coverage data includes translation key counts per language to help identify incomplete translations.'
     ],
     
     'getStructure' => [
@@ -2199,82 +2257,95 @@ $commands = [
     ]
 ];
 
-// Check if specific command requested via URL segment
-// URL format: /management/help/{commandName}
-$urlSegments = $trimParametersManagement->additionalParams();
-
-if (!empty($urlSegments) && isset($urlSegments[0])) {
-    $cmd = $urlSegments[0];
+/**
+ * Command function for internal execution via CommandRunner
+ * 
+ * @param array $params Body parameters (unused for this command)
+ * @param array $urlParams URL segments - [0] = command name (optional)
+ * @return ApiResponse
+ */
+function __command_help(array $params = [], array $urlParams = []): ApiResponse {
+    // Access the commands defined in global scope
+    $commands = $GLOBALS['__help_commands'];
     
-    if (isset($commands[$cmd])) {
-        ApiResponse::create(200, 'operation.success')
-            ->withMessage('Command documentation retrieved')
-            ->withData($commands[$cmd])
-            ->send();
-    } else {
-        ApiResponse::create(404, 'route.not_found')
-            ->withMessage("Command documentation not found")
-            ->withData([
-                'requested_command' => $cmd,
-                'available_commands' => array_keys($commands)
-            ])
-            ->send();
+    // Check if specific command requested via URL segment
+    if (!empty($urlParams) && isset($urlParams[0])) {
+        $cmd = $urlParams[0];
+        
+        if (isset($commands[$cmd])) {
+            return ApiResponse::create(200, 'operation.success')
+                ->withMessage('Command documentation retrieved')
+                ->withData($commands[$cmd]);
+        } else {
+            return ApiResponse::create(404, 'route.not_found')
+                ->withMessage("Command documentation not found")
+                ->withData([
+                    'requested_command' => $cmd,
+                    'available_commands' => array_keys($commands)
+                ]);
+        }
     }
+
+    // Return all commands if no specific command requested
+    return ApiResponse::create(200, 'operation.success')
+        ->withMessage('All command documentation retrieved')
+        ->withData([
+            'commands' => $commands,
+            'total' => count($commands),
+            'base_url' => rtrim(BASE_URL, '/') . '/management',
+            'command_categories' => [
+                'folder_management' => ['setPublicSpace', 'renameSecureFolder', 'renamePublicFolder'],
+                'route_management' => ['addRoute', 'deleteRoute', 'getRoutes', 'getSiteMap'],
+                'structure_management' => ['getStructure', 'editStructure', 'listComponents', 'listPages'],
+                'alias_management' => ['createAlias', 'deleteAlias', 'listAliases'],
+                'translation_management' => ['getTranslation', 'getTranslations', 'setTranslationKeys', 'deleteTranslationKeys', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations'],
+                'language_management' => ['getLangList', 'setMultilingual', 'checkStructureMulti', 'addLang', 'deleteLang', 'setDefaultLang'],
+                'asset_management' => ['uploadAsset', 'deleteAsset', 'listAssets', 'updateAssetMeta'],
+                'style_management' => ['getStyles', 'editStyles'],
+                'css_variables_rules' => ['getRootVariables', 'setRootVariables', 'listStyleRules', 'getStyleRule', 'setStyleRule', 'deleteStyleRule'],
+                'css_animations' => ['getKeyframes', 'setKeyframes', 'deleteKeyframes'],
+                'site_customization' => ['editFavicon', 'editTitle'],
+                'build_deployment' => ['build', 'listBuilds', 'getBuild', 'deleteBuild', 'cleanBuilds', 'deployBuild', 'downloadBuild'],
+                'command_history' => ['getCommandHistory', 'clearCommandHistory'],
+                'authentication' => ['generateToken', 'listTokens', 'revokeToken'],
+                'documentation' => ['help']
+            ],
+            'authentication' => [
+                'required' => true,
+                'header' => 'Authorization: Bearer <your-token>',
+                'token_format' => 'tvt_<48 hex characters>',
+                'default_token' => 'tvt_dev_default_change_me_in_production (CHANGE IN PRODUCTION!)',
+                'permissions' => [
+                    '*' => 'Full access to all commands',
+                    'read' => 'get*, list*, validate*, help',
+                    'write' => 'set*, edit*, add*, delete*, upload*',
+                    'admin' => 'setPublicSpace, rename*, build, token management'
+                ],
+                'config_file' => 'secure/config/auth.php'
+            ],
+            'cors' => [
+                'development_mode' => 'Allows localhost:* origins automatically',
+                'config_file' => 'secure/config/auth.php',
+                'allowed_methods' => ['GET', 'POST', 'OPTIONS']
+            ],
+            'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getSiteMap, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listTokens, listComponents, listPages, listAliases. POST commands: all others.',
+            'note' => 'For GET commands with URL parameters, use URL segments (e.g., /getStructure/menu, /validateTranslations/en, /getStyleRule/.btn-primary, /getSiteMap/text). For POST commands, send parameters as JSON in request body. For file uploads, use multipart/form-data encoding.',
+            'workflows' => [
+                'translation_workflow' => '1) analyzeTranslations for full health check, OR 2) validateTranslations to find missing, 3) getUnusedTranslationKeys to find orphans, 4) setTranslationKeys to add/update, 5) deleteTranslationKeys to clean up.',
+                'asset_workflow' => '1) listAssets to see existing files with metadata, 2) uploadAsset to add new files (with optional description), 3) updateAssetMeta to add/update descriptions and alt text, 4) deleteAsset to remove files.',
+                'style_workflow' => '1) getStyles to retrieve current CSS, 2) editStyles to update (response includes backup for rollback).',
+                'css_granular_workflow' => '1) getRootVariables to see all CSS variables, 2) setRootVariables to update colors/spacing/etc, 3) listStyleRules to see all selectors, 4) getStyleRule to inspect specific rules, 5) setStyleRule to add/update rules, 6) deleteStyleRule to remove rules.',
+                'animation_workflow' => '1) getKeyframes to list all animations, 2) setKeyframes to add/update animations, 3) deleteKeyframes to remove animations.',
+                'token_workflow' => '1) listTokens to see existing tokens, 2) generateToken to create new ones, 3) revokeToken to delete old tokens.',
+                'alias_workflow' => '1) listAliases to see existing redirects, 2) createAlias to add URL redirects, 3) deleteAlias to remove redirects.',
+                'component_workflow' => '1) listComponents to see available reusable components, 2) getStructure/component/{name} to view details, 3) editStructure with type="component" to create/update/delete.',
+                'sitemap_workflow' => '1) getSiteMap for JSON data with route details and coverage, 2) getSiteMap/text to generate plain text sitemap.txt for SEO crawlers.'
+            ]
+        ]);
 }
 
-// Return all commands if no specific command requested
-ApiResponse::create(200, 'operation.success')
-    ->withMessage('All command documentation retrieved')
-    ->withData([
-        'commands' => $commands,
-        'total' => count($commands),
-        'base_url' => rtrim(BASE_URL, '/') . '/management',
-        'command_categories' => [
-            'folder_management' => ['setPublicSpace', 'renameSecureFolder', 'renamePublicFolder'],
-            'route_management' => ['addRoute', 'deleteRoute', 'getRoutes'],
-            'structure_management' => ['getStructure', 'editStructure', 'listComponents', 'listPages'],
-            'alias_management' => ['createAlias', 'deleteAlias', 'listAliases'],
-            'translation_management' => ['getTranslation', 'getTranslations', 'setTranslationKeys', 'deleteTranslationKeys', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations'],
-            'language_management' => ['getLangList', 'setMultilingual', 'checkStructureMulti', 'addLang', 'deleteLang', 'setDefaultLang'],
-            'asset_management' => ['uploadAsset', 'deleteAsset', 'listAssets', 'updateAssetMeta'],
-            'style_management' => ['getStyles', 'editStyles'],
-            'css_variables_rules' => ['getRootVariables', 'setRootVariables', 'listStyleRules', 'getStyleRule', 'setStyleRule', 'deleteStyleRule'],
-            'css_animations' => ['getKeyframes', 'setKeyframes', 'deleteKeyframes'],
-            'site_customization' => ['editFavicon', 'editTitle'],
-            'build_deployment' => ['build', 'listBuilds', 'getBuild', 'deleteBuild', 'cleanBuilds', 'deployBuild', 'downloadBuild'],
-            'command_history' => ['getCommandHistory', 'clearCommandHistory'],
-            'authentication' => ['generateToken', 'listTokens', 'revokeToken'],
-            'documentation' => ['help']
-        ],
-        'authentication' => [
-            'required' => true,
-            'header' => 'Authorization: Bearer <your-token>',
-            'token_format' => 'tvt_<48 hex characters>',
-            'default_token' => 'tvt_dev_default_change_me_in_production (CHANGE IN PRODUCTION!)',
-            'permissions' => [
-                '*' => 'Full access to all commands',
-                'read' => 'get*, list*, validate*, help',
-                'write' => 'set*, edit*, add*, delete*, upload*',
-                'admin' => 'setPublicSpace, rename*, build, token management'
-            ],
-            'config_file' => 'secure/config/auth.php'
-        ],
-        'cors' => [
-            'development_mode' => 'Allows localhost:* origins automatically',
-            'config_file' => 'secure/config/auth.php',
-            'allowed_methods' => ['GET', 'POST', 'OPTIONS']
-        ],
-        'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listTokens, listComponents, listPages, listAliases. POST commands: all others.',
-        'note' => 'For GET commands with URL parameters, use URL segments (e.g., /getStructure/menu, /validateTranslations/en, /getStyleRule/.btn-primary). For POST commands, send parameters as JSON in request body. For file uploads, use multipart/form-data encoding.',
-        'workflows' => [
-            'translation_workflow' => '1) analyzeTranslations for full health check, OR 2) validateTranslations to find missing, 3) getUnusedTranslationKeys to find orphans, 4) setTranslationKeys to add/update, 5) deleteTranslationKeys to clean up.',
-            'asset_workflow' => '1) listAssets to see existing files with metadata, 2) uploadAsset to add new files (with optional description), 3) updateAssetMeta to add/update descriptions and alt text, 4) deleteAsset to remove files.',
-            'style_workflow' => '1) getStyles to retrieve current CSS, 2) editStyles to update (response includes backup for rollback).',
-            'css_granular_workflow' => '1) getRootVariables to see all CSS variables, 2) setRootVariables to update colors/spacing/etc, 3) listStyleRules to see all selectors, 4) getStyleRule to inspect specific rules, 5) setStyleRule to add/update rules, 6) deleteStyleRule to remove rules.',
-            'animation_workflow' => '1) getKeyframes to list all animations, 2) setKeyframes to add/update animations, 3) deleteKeyframes to remove animations.',
-            'token_workflow' => '1) listTokens to see existing tokens, 2) generateToken to create new ones, 3) revokeToken to delete old tokens.',
-            'alias_workflow' => '1) listAliases to see existing redirects, 2) createAlias to add URL redirects, 3) deleteAlias to remove redirects.',
-            'component_workflow' => '1) listComponents to see available reusable components, 2) getStructure/component/{name} to view details, 3) editStructure with type="component" to create/update/delete.'
-        ]
-    ])
-    ->send();
+// Execute via HTTP (only when not called internally)
+if (!defined('COMMAND_INTERNAL_CALL')) {
+    $urlSegments = $trimParametersManagement->additionalParams();
+    __command_help([], $urlSegments)->send();
+}

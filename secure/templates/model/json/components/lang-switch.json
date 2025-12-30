@@ -1,0 +1,32 @@
+{
+    "tag": "div",
+    "params": {
+        "class": "lang-switch"
+    },
+    "children": [
+        {
+            "tag": "a",
+            "params": {
+                "href": "{{__current_page;lang=en}}",
+                "class": "lang-link"
+            },
+            "children": [
+                {
+                    "textKey": "__RAW__English"
+                }
+            ]
+        },
+        {
+            "tag": "a",
+            "params": {
+                "href": "{{__current_page;lang=fr}}",
+                "class": "lang-link"
+            },
+            "children": [
+                {
+                    "textKey": "__RAW__Français"
+                }
+            ]
+        }
+    ]
+}

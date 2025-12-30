@@ -1,0 +1,47 @@
+{
+    "$schema": "../schema.json",
+    "id": "global-design",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "🎨",
+        "titleKey": "ai.specs.globalDesign.title",
+        "descriptionKey": "ai.specs.globalDesign.description",
+        "category": "style",
+        "tags": ["design", "colors", "variables", "theme"],
+        "difficulty": "beginner"
+    },
+    "parameters": [],
+    "examples": [
+        {
+            "id": "darkMode",
+            "titleKey": "ai.specs.globalDesign.examples.darkMode.title",
+            "promptKey": "ai.specs.globalDesign.examples.darkMode.prompt"
+        },
+        {
+            "id": "warmPalette",
+            "titleKey": "ai.specs.globalDesign.examples.warmPalette.title",
+            "promptKey": "ai.specs.globalDesign.examples.warmPalette.prompt"
+        },
+        {
+            "id": "corporateBlue",
+            "titleKey": "ai.specs.globalDesign.examples.corporateBlue.title",
+            "promptKey": "ai.specs.globalDesign.examples.corporateBlue.prompt"
+        }
+    ],
+    "dataRequirements": [
+        {
+            "id": "rootVariables",
+            "command": "getRootVariables",
+            "extract": "data.variables"
+        },
+        {
+            "id": "helpSetRootVariables",
+            "command": "help",
+            "urlParams": ["setRootVariables"],
+            "extract": "data"
+        }
+    ],
+    "relatedCommands": ["setRootVariables"],
+    "promptTemplate": "global-design.md",
+    "outputFormat": "json-commands"
+}

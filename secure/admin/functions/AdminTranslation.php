@@ -176,9 +176,30 @@ class AdminTranslation {
 
 /**
  * Helper function for quick translation
+ * 
+ * @param string $key Translation key in dot notation
+ * @param array|string $paramsOrFallback Either params array or fallback string
+ * @param array $params Parameters when fallback is provided
+ * @return string Translated string, fallback, or key if not found
  */
-function __admin(string $key, array $params = []): string {
-    return AdminTranslation::getInstance()->t($key, $params);
+function __admin(string $key, array|string $paramsOrFallback = [], array $params = []): string {
+    $instance = AdminTranslation::getInstance();
+    
+    // Handle second parameter being either params array or fallback string
+    if (is_string($paramsOrFallback)) {
+        $fallback = $paramsOrFallback;
+        $actualParams = $params;
+    } else {
+        $fallback = null;
+        $actualParams = $paramsOrFallback;
+    }
+    
+    // Check if key exists
+    if (!$instance->has($key)) {
+        return $fallback ?? $key;
+    }
+    
+    return $instance->t($key, $actualParams);
 }
 
 /**

@@ -1,0 +1,103 @@
+{
+    "$schema": "../schema.json",
+    "id": "create-website",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "🌐",
+        "titleKey": "ai.specs.createWebsite.title",
+        "descriptionKey": "ai.specs.createWebsite.description",
+        "category": "creation",
+        "tags": ["create", "website", "multi-page", "from-scratch"],
+        "difficulty": "advanced"
+    },
+    "parameters": [
+        {
+            "id": "multilingual",
+            "type": "checkbox",
+            "labelKey": "ai.specs.createWebsite.params.multilingual.label",
+            "helpKey": "ai.specs.createWebsite.params.multilingual.help",
+            "default": false
+        },
+        {
+            "id": "languages",
+            "type": "text",
+            "labelKey": "ai.specs.createWebsite.params.languages.label",
+            "placeholderKey": "ai.specs.createWebsite.params.languages.placeholder",
+            "helpKey": "ai.specs.createWebsite.params.languages.help",
+            "default": "en",
+            "condition": "multilingual === true"
+        },
+        {
+            "id": "pages",
+            "type": "text",
+            "labelKey": "ai.specs.createWebsite.params.pages.label",
+            "placeholderKey": "ai.specs.createWebsite.params.pages.placeholder",
+            "helpKey": "ai.specs.createWebsite.params.pages.help",
+            "default": "home, about, services, contact"
+        }
+    ],
+    "examples": [
+        {
+            "id": "business",
+            "titleKey": "ai.specs.createWebsite.examples.business.title",
+            "promptKey": "ai.specs.createWebsite.examples.business.prompt"
+        },
+        {
+            "id": "restaurant",
+            "titleKey": "ai.specs.createWebsite.examples.restaurant.title",
+            "promptKey": "ai.specs.createWebsite.examples.restaurant.prompt"
+        },
+        {
+            "id": "agency",
+            "titleKey": "ai.specs.createWebsite.examples.agency.title",
+            "promptKey": "ai.specs.createWebsite.examples.agency.prompt"
+        }
+    ],
+    "dataRequirements": [
+        {
+            "id": "helpSetMultilingual",
+            "command": "help",
+            "urlParams": ["setMultilingual"],
+            "extract": "data"
+        },
+        {
+            "id": "helpAddLang",
+            "command": "help",
+            "urlParams": ["addLang"],
+            "extract": "data"
+        },
+        {
+            "id": "helpAddRoute",
+            "command": "help",
+            "urlParams": ["addRoute"],
+            "extract": "data"
+        },
+        {
+            "id": "helpEditStructure",
+            "command": "help",
+            "urlParams": ["editStructure"],
+            "extract": "data"
+        },
+        {
+            "id": "helpSetTranslationKeys",
+            "command": "help",
+            "urlParams": ["setTranslationKeys"],
+            "extract": "data"
+        },
+        {
+            "id": "helpEditStyles",
+            "command": "help",
+            "urlParams": ["editStyles"],
+            "extract": "data"
+        },
+        {
+            "id": "helpSetRootVariables",
+            "command": "help",
+            "urlParams": ["setRootVariables"],
+            "extract": "data"
+        }
+    ],
+    "relatedCommands": ["setMultilingual", "addLang", "addRoute", "editStructure", "setTranslationKeys", "editStyles", "setRootVariables"],
+    "promptTemplate": "create-website.md",
+    "outputFormat": "json-commands"
+}

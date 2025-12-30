@@ -37,11 +37,78 @@ const QuickSiteAdmin = {
      */
     init() {
         this.loadPreferences();
+        this.initNavGroups();
         this.initCategoryToggles();
         this.initForms();
         this.initCopyButtons();
         this.initKeyboardShortcuts();
         this.checkPendingMessage();
+    },
+
+    /**
+     * Initialize collapsible navigation groups (hover-based)
+     */
+    initNavGroups() {
+        const groups = document.querySelectorAll('.admin-nav__group');
+        let closeTimeout = null;
+        
+        groups.forEach(group => {
+            const toggle = group.querySelector('.admin-nav__group-toggle');
+            if (!toggle) return;
+            
+            // Open on hover
+            group.addEventListener('mouseenter', () => {
+                // Clear any pending close
+                if (closeTimeout) {
+                    clearTimeout(closeTimeout);
+                    closeTimeout = null;
+                }
+                
+                // Close other groups immediately
+                groups.forEach(other => {
+                    if (other !== group) {
+                        other.classList.remove('admin-nav__group--open');
+                    }
+                });
+                
+                // Open this group
+                group.classList.add('admin-nav__group--open');
+            });
+            
+            // Close on mouse leave (with small delay for better UX)
+            group.addEventListener('mouseleave', () => {
+                closeTimeout = setTimeout(() => {
+                    group.classList.remove('admin-nav__group--open');
+                }, 150); // Small delay to prevent accidental close
+            });
+            
+            // Also support click for accessibility/mobile
+            toggle.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                group.classList.toggle('admin-nav__group--open');
+            });
+        });
+        
+        // Close on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                groups.forEach(group => {
+                    group.classList.remove('admin-nav__group--open');
+                });
+            }
+        });
+    },
+    
+    /**
+     * Expand a nav group (used by tutorial)
+     * @param {string} groupName - 'build' or 'inspect'
+     */
+    expandNavGroup(groupName) {
+        const group = document.querySelector(`.admin-nav__group[data-nav-group="${groupName}"]`);
+        if (group) {
+            group.classList.add('admin-nav__group--open');
+        }
     },
 
     /**

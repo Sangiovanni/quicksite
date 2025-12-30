@@ -1268,9 +1268,27 @@ footer, .footer {
     color: var(--color-accent);
 }
 
-.lang-buttons {
+.lang-buttons,
+.lang-switch {
     display: flex;
     gap: var(--space-sm);
+}
+
+.lang-link {
+    padding: var(--space-xs) var(--space-sm);
+    background: transparent;
+    border: 1px solid rgba(250, 246, 241, 0.3);
+    color: var(--color-text-inverse);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-decoration: none;
+}
+
+.lang-link:hover {
+    background: rgba(250, 246, 241, 0.1);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
 }
 
 .lang-btn {

@@ -76,6 +76,17 @@
             "components": "Composants",
             "languages": "Langues"
         },
+        "sitemap": {
+            "title": "Plan du site",
+            "urls": "URLs",
+            "routes": "routes",
+            "languages": "langues",
+            "pages": "pages",
+            "default": "Par défaut",
+            "monolingual": "Monolingue",
+            "coverage": "Couverture des traductions",
+            "error": "Échec du chargement du plan du site"
+        },
         "categories": {
             "title": "Commandes par catégorie"
         },
@@ -224,12 +235,13 @@
         "command": "Commande",
         "history": "Historique",
         "settings": "Paramètres",
-        "favorites": "Favoris",
         "structure": "Structure",
         "batch": "Batch",
         "docs": "Documentation",
         "ai": "Intégration IA",
-        "logout": "Déconnexion"
+        "logout": "Déconnexion",
+        "build": "Construire",
+        "inspect": "Inspecter"
     },
     "settings": {
         "title": "Paramètres",
@@ -534,7 +546,249 @@
         "executeNow": "Exécuter maintenant",
         "openInBatch": "Ouvrir dans Batch",
         "executionComplete": "Exécution terminée",
-        "clear": "Effacer"
+        "clear": "Effacer",
+        "browser": {
+            "title": "Spécifications IA",
+            "subtitle": "Générez des prompts prêts pour l'IA pour les tâches QuickSite courantes",
+            "howItWorks": "Comment ça marche",
+            "step1": "Sélectionnez une spécification ci-dessous",
+            "step2": "Décrivez votre objectif en détail",
+            "step3": "Copiez le prompt généré vers votre assistant IA",
+            "step4": "Exécutez la réponse IA dans le panneau Batch",
+            "noSpecs": "Aucune spécification IA disponible pour le moment.",
+            "legacyLink": "Utiliser la page IA legacy (toutes les specs)",
+            "createSpec": "Créer une Spec Perso",
+            "importSpec": "Importer une Spec",
+            "importSuccess": "Spec importée avec succès !",
+            "importError": "Échec de l'import :",
+            "invalidImport": "Fichier d'import invalide : doit contenir spec et template"
+        },
+        "editor": {
+            "new": "Nouvelle Spec",
+            "edit": "Modifier la Spec",
+            "title": {
+                "new": "Créer une Spec Personnalisée",
+                "edit": "Modifier la Spec"
+            },
+            "info": {
+                "title": "Création d'une Spec Personnalisée",
+                "text": "Les specs personnalisées sont enregistrées dans le dossier secure/admin/ai_specs/custom/. Elles apparaîtront aux côtés des specs principales dans le navigateur. N'oubliez pas d'ajouter les clés de traduction dans vos fichiers de langue pour les libellés et descriptions."
+            },
+            "notFound": {
+                "title": "Spec Introuvable",
+                "message": "La spécification IA demandée n'a pas pu être trouvée pour modification."
+            },
+            "definition": "Définition de la Spec (JSON)",
+            "template": "Modèle de Prompt (Markdown)",
+            "tab": {
+                "template": "Modèle",
+                "preview": "Aperçu",
+                "schema": "Référence du Schéma"
+            },
+            "preview": "Aperçu",
+            "save": "Enregistrer la Spec",
+            "valid": "JSON Valide",
+            "validJson": "JSON Valide - Tous les champs requis présents",
+            "invalidJson": "JSON Invalide",
+            "validationErrors": "Erreurs de Validation",
+            "fixErrors": "Veuillez corriger les erreurs JSON avant de prévisualiser",
+            "templateRequired": "Le modèle de prompt est requis",
+            "previewEmpty": "Cliquez sur \"Aperçu\" pour voir le prompt rendu",
+            "loading": "Chargement...",
+            "saving": "Enregistrement...",
+            "saved": "Spec enregistrée avec succès !"
+        },
+        "categories": {
+            "creation": {
+                "title": "Création",
+                "desc": "Créer de nouveaux sites et pages à partir de zéro"
+            },
+            "modification": {
+                "title": "Modification",
+                "desc": "Modifier les structures et le contenu existants"
+            },
+            "content": {
+                "title": "Contenu",
+                "desc": "Ajouter ou mettre à jour le contenu des pages"
+            },
+            "style": {
+                "title": "Style",
+                "desc": "Changer l'apparence et le design"
+            },
+            "advanced": {
+                "title": "Avancé",
+                "desc": "Opérations et configurations complexes"
+            },
+            "wip": {
+                "title": "En développement",
+                "desc": "Specs expérimentales en cours de développement"
+            }
+        },
+        "difficulty": {
+            "beginner": "Débutant",
+            "intermediate": "Intermédiaire",
+            "advanced": "Avancé"
+        },
+        "spec": {
+            "notFound": {
+                "title": "Spec non trouvée",
+                "message": "La spécification IA demandée n'a pas été trouvée."
+            },
+            "backToList": "Retour aux specs",
+            "validationError": "Erreurs de validation de la spec",
+            "parameters": "Paramètres",
+            "examples": "Exemples",
+            "relatedCommands": "Commandes associées",
+            "generatedPrompt": "Prompt généré",
+            "generating": "Génération du prompt...",
+            "promptPlaceholder": "Remplissez les paramètres et cliquez sur Générer pour créer un prompt...",
+            "custom": "Personnalisée",
+            "edit": "Modifier la Spec",
+            "export": "Exporter",
+            "generatePrompt": "Générer le prompt",
+            "copyPrompt": "Copier",
+            "copied": "Copié !",
+            "goToBatch": "Aller au panneau Batch",
+            "chars": "caractères",
+            "words": "mots"
+        },
+        "specs": {
+            "addLanguage": {
+                "title": "Ajouter une langue",
+                "description": "Ajouter une nouvelle langue à votre site multilingue avec les traductions et la mise à jour du sélecteur de langue.",
+                "params": {
+                    "targetLanguage": {
+                        "label": "Code de langue",
+                        "placeholder": "ex: es, de, it",
+                        "help": "Code de langue ISO 639-1 (2-3 lettres)"
+                    },
+                    "languageName": {
+                        "label": "Nom de la langue",
+                        "placeholder": "ex: Español, Deutsch",
+                        "help": "Nom natif de la langue"
+                    }
+                },
+                "examples": {
+                    "spanish": { "title": "Ajouter l'espagnol", "prompt": "Ajouter le support de l'espagnol" },
+                    "german": { "title": "Ajouter l'allemand", "prompt": "Ajouter le support de l'allemand" },
+                    "japanese": { "title": "Ajouter le japonais", "prompt": "Ajouter le support du japonais" }
+                }
+            },
+            "createLanding": {
+                "title": "Créer une Landing Page",
+                "description": "Générer un site landing page complet à partir de zéro avec sections hero, fonctionnalités, témoignages et contact.",
+                "params": {
+                    "multilingual": {
+                        "label": "Activer le multilingue",
+                        "help": "Créer avec support de plusieurs langues"
+                    },
+                    "languages": {
+                        "label": "Langues",
+                        "placeholder": "en, fr, es",
+                        "help": "Codes de langue séparés par des virgules"
+                    }
+                },
+                "examples": {
+                    "coffeeShop": { "title": "Café", "prompt": "Créer une landing page pour un café avec hero, menu en vedette et formulaire de contact" },
+                    "saas": { "title": "Produit SaaS", "prompt": "Créer une landing moderne pour un SaaS de gestion de projet avec fonctionnalités, tarifs, témoignages" },
+                    "portfolio": { "title": "Portfolio", "prompt": "Créer une landing portfolio minimaliste pour un photographe avec galerie et contact" }
+                }
+            },
+            "createWebsite": {
+                "title": "Créer un Site Multi-Pages",
+                "description": "Générer un site web multi-pages complet avec navigation, plusieurs pages, en-tête/pied de page partagés et style cohérent.",
+                "params": {
+                    "multilingual": {
+                        "label": "Activer le multilingue",
+                        "help": "Créer avec support de plusieurs langues"
+                    },
+                    "languages": {
+                        "label": "Langues",
+                        "placeholder": "en, fr, es",
+                        "help": "Codes de langue séparés par des virgules"
+                    },
+                    "pages": {
+                        "label": "Pages à créer",
+                        "placeholder": "home, about, services, contact",
+                        "help": "Noms de pages séparés par des virgules (home toujours inclus)"
+                    }
+                },
+                "examples": {
+                    "business": { "title": "Entreprise", "prompt": "Créer un site professionnel pour un cabinet de conseil avec accueil, à propos, services, équipe, contact" },
+                    "restaurant": { "title": "Restaurant", "prompt": "Créer un site de restaurant avec accueil, menu, à propos, galerie, réservations, contact" },
+                    "agency": { "title": "Agence Créative", "prompt": "Créer un site d'agence créative avec accueil, réalisations, services, équipe, blog, contact" }
+                }
+            },
+            "addPage": {
+                "title": "Ajouter une Page",
+                "description": "Ajouter une nouvelle page à un site existant avec liens de navigation et traductions pour toutes les langues.",
+                "params": {
+                    "navPlacement": {
+                        "label": "Emplacement navigation",
+                        "help": "Où ajouter le lien vers la nouvelle page",
+                        "options": {
+                            "menu": "Menu seulement",
+                            "footer": "Pied de page seulement",
+                            "both": "Menu et Pied de page",
+                            "none": "Sans navigation (cachée)"
+                        }
+                    }
+                },
+                "examples": {
+                    "blog": { "title": "Page Blog", "prompt": "Ajouter une page blog avec liste d'articles récents et barre latérale catégories" },
+                    "faq": { "title": "Page FAQ", "prompt": "Ajouter une page FAQ avec questions dépliables organisées par sujet" },
+                    "privacy": { "title": "Confidentialité", "prompt": "Ajouter une page politique de confidentialité (lien pied de page) avec sections RGPD" }
+                }
+            },
+            "addSection": {
+                "title": "Ajouter une Section",
+                "description": "Ajouter une nouvelle section à une page existante à une position spécifique (avant/après une autre section).",
+                "params": {
+                    "targetPage": {
+                        "label": "Page cible",
+                        "help": "Sélectionnez la page où ajouter la section"
+                    }
+                },
+                "examples": {
+                    "testimonials": { "title": "Témoignages", "prompt": "Ajouter une section témoignages après fonctionnalités avec 3 citations clients" },
+                    "cta": { "title": "Bannière CTA", "prompt": "Ajouter une bannière d'appel à l'action avant le pied de page avec inscription newsletter" },
+                    "stats": { "title": "Statistiques", "prompt": "Ajouter une section statistiques avec compteurs animés montrant les réalisations" }
+                }
+            },
+            "translateLanguage": {
+                "title": "Traduire le Contenu",
+                "description": "Traduire tout le contenu du site depuis la langue par défaut vers une langue cible avec des traductions naturelles et précises.",
+                "params": {
+                    "targetLanguage": {
+                        "label": "Langue cible",
+                        "help": "Sélectionnez la langue vers laquelle traduire"
+                    }
+                },
+                "examples": {
+                    "french": { "title": "En français", "prompt": "Traduire tout le contenu en français avec un ton formel" },
+                    "spanish": { "title": "En espagnol", "prompt": "Traduire en espagnol (Espagne) avec un ton amical" },
+                    "improve": { "title": "Améliorer existant", "prompt": "Réviser et améliorer les traductions allemandes existantes pour plus de naturel" }
+                }
+            },
+            "globalDesign": {
+                "title": "Changer le Thème",
+                "description": "Mettre à jour le schéma de couleurs et les variables de design pour un nouveau look sans changer la structure.",
+                "examples": {
+                    "darkMode": { "title": "Mode Sombre", "prompt": "Convertir en thème sombre avec fonds foncés et texte clair" },
+                    "warmPalette": { "title": "Palette Chaude", "prompt": "Changer pour des tons chauds terreux (oranges, bruns, crèmes)" },
+                    "corporateBlue": { "title": "Bleu Corporate", "prompt": "Appliquer un thème corporate bleu professionnel avec bleu marine et bleu clair" }
+                }
+            },
+            "restyle": {
+                "title": "Restyler le Site",
+                "description": "Restyler complètement l'apparence visuelle du site incluant règles CSS, couleurs, typographie, espacements et effets.",
+                "examples": {
+                    "minimalist": { "title": "Minimaliste", "prompt": "Restyler avec esthétique minimaliste : espaces blancs, typographie épurée, ombres subtiles" },
+                    "boldColorful": { "title": "Audacieux & Coloré", "prompt": "Rendre audacieux et vibrant avec couleurs vives, grande typographie, éléments dynamiques" },
+                    "glassmorphism": { "title": "Glassmorphism", "prompt": "Appliquer le glassmorphism avec effets verre dépoli, arrière-plans flous, dégradés" }
+                }
+            }
+        }
     },
     "footer": {
         "version": "QuickSite v:version",

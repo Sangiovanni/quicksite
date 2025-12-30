@@ -7,6 +7,157 @@
  * 
  * @version 1.6.0
  */
+
+// ============================================================================
+// SERVER-SIDE PRE-COMPUTATION FOR AI SPECS
+// ============================================================================
+// Compute detection data server-side for robustness (no JS race conditions)
+
+$aiPrecomputedData = [];
+
+// Helper: Check if a structure contains a lang-switch component
+function aiDetectLangSwitchInStructure($structure, &$nodeId = null) {
+    if (!is_array($structure)) return false;
+    
+    // Check if this node is a lang-switch component
+    if (isset($structure['component']) && $structure['component'] === 'lang-switch') {
+        $nodeId = $structure['_nodeId'] ?? null;
+        return true;
+    }
+    
+    // Recursively check children
+    if (isset($structure['children']) && is_array($structure['children'])) {
+        foreach ($structure['children'] as $child) {
+            if (aiDetectLangSwitchInStructure($child, $nodeId)) {
+                return true;
+            }
+        }
+    }
+    
+    return false;
+}
+
+// Helper: Find parent container of lang-switch or lang-links
+function aiFindLangSwitcherParent($structure, &$nodeId = null) {
+    if (!is_array($structure)) return false;
+    
+    // Check if this node contains lang-switch component or lang-related classes
+    if (isset($structure['children']) && is_array($structure['children'])) {
+        foreach ($structure['children'] as $child) {
+            // Check if child is lang-switch component
+            if (isset($child['component']) && $child['component'] === 'lang-switch') {
+                $nodeId = $structure['_nodeId'] ?? null;
+                return true;
+            }
+            // Check if child has lang-related class
+            if (isset($child['class']) && (
+                strpos($child['class'], 'lang-') !== false ||
+                strpos($child['class'], 'language') !== false ||
+                strpos($child['class'], 'locale') !== false
+            )) {
+                $nodeId = $structure['_nodeId'] ?? null;
+                return true;
+            }
+        }
+        // Recurse into children
+        foreach ($structure['children'] as $child) {
+            if (aiFindLangSwitcherParent($child, $nodeId)) {
+                return true;
+            }
+        }
+    }
+    
+    return false;
+}
+
+// 1. Load footer structure and detect lang-switch
+$footerPath = SECURE_FOLDER_PATH . '/templates/model/json/footer.json';
+$aiPrecomputedData['footer'] = [
+    'exists' => false,
+    'structure' => null,
+    'langSwitchFound' => false,
+    'langSwitchNodeId' => null,
+    'langSwitcherParentNodeId' => null
+];
+
+if (file_exists($footerPath)) {
+    $footerJson = file_get_contents($footerPath);
+    $footerStructure = json_decode($footerJson, true);
+    if ($footerStructure) {
+        $aiPrecomputedData['footer']['exists'] = true;
+        $aiPrecomputedData['footer']['structure'] = $footerStructure;
+        
+        // Detect lang-switch component
+        $langSwitchNodeId = null;
+        if (aiDetectLangSwitchInStructure($footerStructure, $langSwitchNodeId)) {
+            $aiPrecomputedData['footer']['langSwitchFound'] = true;
+            $aiPrecomputedData['footer']['langSwitchNodeId'] = $langSwitchNodeId;
+        }
+        
+        // Find parent container for lang links
+        $parentNodeId = null;
+        aiFindLangSwitcherParent($footerStructure, $parentNodeId);
+        $aiPrecomputedData['footer']['langSwitcherParentNodeId'] = $parentNodeId;
+    }
+}
+
+// 2. Check if lang-switch component exists
+$langSwitchComponentPath = SECURE_FOLDER_PATH . '/templates/model/json/components/lang-switch.json';
+$aiPrecomputedData['langSwitchComponent'] = [
+    'exists' => file_exists($langSwitchComponentPath),
+    'path' => $langSwitchComponentPath
+];
+
+if ($aiPrecomputedData['langSwitchComponent']['exists']) {
+    $componentJson = file_get_contents($langSwitchComponentPath);
+    $aiPrecomputedData['langSwitchComponent']['structure'] = json_decode($componentJson, true);
+}
+
+// 3. Get available site languages
+$translationsDir = SECURE_FOLDER_PATH . '/translate';
+$aiPrecomputedData['languages'] = [];
+if (is_dir($translationsDir)) {
+    $files = glob($translationsDir . '/*.json');
+    foreach ($files as $file) {
+        $lang = basename($file, '.json');
+        if (strlen($lang) === 2) { // Only 2-letter codes
+            $aiPrecomputedData['languages'][] = $lang;
+        }
+    }
+    sort($aiPrecomputedData['languages']);
+}
+
+// 4. List all components for reference
+$componentsDir = SECURE_FOLDER_PATH . '/templates/model/json/components';
+$aiPrecomputedData['components'] = [];
+if (is_dir($componentsDir)) {
+    $files = glob($componentsDir . '/*.json');
+    foreach ($files as $file) {
+        $componentName = basename($file, '.json');
+        $componentJson = file_get_contents($file);
+        $componentData = json_decode($componentJson, true);
+        $aiPrecomputedData['components'][$componentName] = [
+            'path' => $file,
+            'hasVariables' => isset($componentData['_variables']),
+            'hasSlots' => isset($componentData['_slots']),
+            'variables' => $componentData['_variables'] ?? [],
+            'slots' => $componentData['_slots'] ?? []
+        ];
+    }
+}
+
+// 5. Get all pages (routes)
+$routesPath = SECURE_FOLDER_PATH . '/routes.php';
+$aiPrecomputedData['routes'] = [];
+if (file_exists($routesPath)) {
+    $routes = include $routesPath;
+    if (is_array($routes)) {
+        $aiPrecomputedData['routes'] = array_keys($routes);
+    }
+}
+
+// Encode for JavaScript usage
+$aiPrecomputedJson = json_encode($aiPrecomputedData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 ?>
 
 <div class="admin-page-header">
@@ -162,6 +313,45 @@
             <!-- Spec Description -->
             <div class="admin-ai-spec-desc" id="spec-description">
                 <p id="selected-spec-description"></p>
+            </div>
+            
+            <!-- Page Selector (only for add-section spec) -->
+            <div class="admin-ai-page-selector" id="page-selector-container" style="display: none;">
+                <label class="admin-ai-page-selector__label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                    <span>Select target page:</span>
+                    <span class="admin-required">*</span>
+                </label>
+                <select id="target-page-select" class="admin-select" onchange="onTargetPageChange()">
+                    <option value="">-- Select a page --</option>
+                </select>
+                <div class="admin-ai-page-selector__hint" id="page-selector-hint">
+                    ⚠️ Please select a page where you want to add the section
+                </div>
+            </div>
+            
+            <!-- Navigation Placement Selector (only for add-page spec) -->
+            <div class="admin-ai-page-selector" id="nav-placement-container" style="display: none;">
+                <label class="admin-ai-page-selector__label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <path d="M3 3h18v18H3zM3 9h18M9 21V9"></path>
+                    </svg>
+                    <span>Where should the page link appear?</span>
+                    <span class="admin-required">*</span>
+                </label>
+                <select id="nav-placement-select" class="admin-select" onchange="onNavPlacementChange()">
+                    <option value="">-- Select navigation placement --</option>
+                    <option value="menu">Menu - Add to main navigation</option>
+                    <option value="footer">Footer - Add to footer links</option>
+                    <option value="both">Both - Add to menu and footer</option>
+                    <option value="none">I'll handle it myself</option>
+                </select>
+                <div class="admin-ai-page-selector__hint" id="nav-placement-hint">
+                    ⚠️ Please select where you want the page link to appear
+                </div>
             </div>
         
             <!-- Step 2: Describe Your Goal -->
@@ -950,15 +1140,94 @@ Include details like:
     flex: 1;
     word-break: break-all;
 }
+
+/* Page Selector for add-section spec */
+.admin-ai-page-selector {
+    background: var(--admin-bg-tertiary);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    margin-bottom: var(--space-lg);
+}
+
+.admin-ai-page-selector__label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-weight: 500;
+    margin-bottom: var(--space-sm);
+    color: var(--admin-text);
+}
+
+.admin-ai-page-selector__label .admin-required {
+    color: #ef4444;
+}
+
+.admin-ai-page-selector .admin-select {
+    width: 100%;
+    margin-bottom: var(--space-xs);
+}
+
+.admin-ai-page-selector__hint {
+    font-size: var(--font-size-sm);
+    color: #f59e0b;
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.admin-ai-page-selector__hint.valid {
+    color: #22c55e;
+}
 </style>
 
 <script>
+// Pre-computed data from server (for robust detection without API race conditions)
+const AI_PRECOMPUTED = <?= $aiPrecomputedJson ?>;
+
 // Current state
 let currentSpec = null;
 let currentTag = 'all';
 let searchQuery = '';
 let specsCache = {};
 let commandsData = null;
+let selectedTargetPage = null; // For add-section spec
+let selectedNavPlacement = null; // For add-page spec
+let availablePages = []; // Cached list of pages
+
+// Helper: Build components section from pre-computed data (no API call needed)
+function getPrecomputedComponentsSection() {
+    const comps = AI_PRECOMPUTED.components || {};
+    if (Object.keys(comps).length === 0) return '';
+    
+    let section = `
+---
+
+## Existing Components
+
+The project already has these components you can reuse:
+
+`;
+    
+    for (const [name, info] of Object.entries(comps)) {
+        const vars = info.variables && Object.keys(info.variables).length > 0
+            ? Object.keys(info.variables).map(v => `\`${v}\``).join(', ')
+            : '*no variables*';
+        const slots = info.slots && info.slots.length > 0
+            ? ' | slots: ' + info.slots.map(s => `\`${s}\``).join(', ')
+            : '';
+        section += `- **\`${name}\`** — variables: ${vars}${slots}\n`;
+    }
+    
+    section += `
+**Usage:**
+\`\`\`json
+{ "component": "component-name", "data": { "var1": "value1", "var2": "value2" } }
+\`\`\`
+`;
+    
+    return section;
+}
 
 // AI Specs Definition - organized by section with tags
 const aiSpecs = {
@@ -1148,19 +1417,7 @@ Warm, literary theme with earthy tones.`
                 }
             }
         },
-        {
-            id: 'improve-seo',
-            icon: '🔍',
-            title: 'Improve SEO',
-            desc: 'Enhance meta tags, titles, and content structure for better search visibility.',
-            tags: ['business', 'website'],
-            examples: {
-                'seo-basic': {
-                    title: '📈 Basic SEO Setup',
-                    text: `Set up SEO for my site: create unique meta titles and descriptions for each page, add proper heading hierarchy, ensure all pages have descriptive URLs.`
-                }
-            }
-        }
+
     ]
 };
 
@@ -1276,6 +1533,30 @@ function selectSpec(spec) {
     document.getElementById('selected-spec-name').textContent = spec.title;
     document.getElementById('selected-spec-description').textContent = spec.desc;
     
+    // Handle page selector for add-section spec
+    const pageSelectorContainer = document.getElementById('page-selector-container');
+    if (spec.id === 'add-section') {
+        pageSelectorContainer.style.display = 'block';
+        loadAvailablePages();
+    } else {
+        pageSelectorContainer.style.display = 'none';
+        selectedTargetPage = null;
+    }
+    
+    // Handle navigation placement selector for add-page spec
+    const navPlacementContainer = document.getElementById('nav-placement-container');
+    if (spec.id === 'add-page') {
+        navPlacementContainer.style.display = 'block';
+        // Reset selector
+        document.getElementById('nav-placement-select').value = '';
+        document.getElementById('nav-placement-hint').textContent = '⚠️ Please select where you want the page link to appear';
+        document.getElementById('nav-placement-hint').classList.remove('valid');
+        selectedNavPlacement = null;
+    } else {
+        navPlacementContainer.style.display = 'none';
+        selectedNavPlacement = null;
+    }
+    
     // Show panel
     document.getElementById('selected-spec-panel').style.display = 'block';
     
@@ -1287,13 +1568,103 @@ function selectSpec(spec) {
     document.getElementById('example-prompt-select').value = '';
 }
 
+// Load available pages for the page selector
+async function loadAvailablePages() {
+    const select = document.getElementById('target-page-select');
+    select.innerHTML = '<option value="">-- Loading pages... --</option>';
+    
+    try {
+        const result = await QuickSiteAdmin.apiRequest('getRoutes', 'GET');
+        if (result.ok && result.data?.data?.routes) {
+            availablePages = result.data.data.routes;
+            select.innerHTML = '<option value="">-- Select a page --</option>';
+            availablePages.forEach(page => {
+                const option = document.createElement('option');
+                option.value = page;
+                option.textContent = page;
+                select.appendChild(option);
+            });
+        } else {
+            select.innerHTML = '<option value="">-- Error loading pages --</option>';
+        }
+    } catch (e) {
+        console.error('Failed to load pages:', e);
+        select.innerHTML = '<option value="">-- Error loading pages --</option>';
+    }
+}
+
+// Handle target page selection change
+function onTargetPageChange() {
+    const select = document.getElementById('target-page-select');
+    const hint = document.getElementById('page-selector-hint');
+    
+    selectedTargetPage = select.value || null;
+    
+    if (selectedTargetPage) {
+        hint.textContent = '✅ Page selected: ' + selectedTargetPage;
+        hint.classList.add('valid');
+        // Clear the spec cache so it regenerates with the new page
+        delete specsCache['add-section'];
+    } else {
+        hint.textContent = '⚠️ Please select a page where you want to add the section';
+        hint.classList.remove('valid');
+    }
+}
+
+// Handle navigation placement selection change
+function onNavPlacementChange() {
+    const select = document.getElementById('nav-placement-select');
+    const hint = document.getElementById('nav-placement-hint');
+    
+    selectedNavPlacement = select.value || null;
+    
+    const labels = {
+        'menu': 'Menu',
+        'footer': 'Footer',
+        'both': 'Menu & Footer',
+        'none': 'Handle manually'
+    };
+    
+    if (selectedNavPlacement) {
+        hint.textContent = '✅ Navigation: ' + labels[selectedNavPlacement];
+        hint.classList.add('valid');
+        // Clear the spec cache so it regenerates with the new placement
+        delete specsCache['add-page'];
+    } else {
+        hint.textContent = '⚠️ Please select where you want the page link to appear';
+        hint.classList.remove('valid');
+    }
+}
+
 // Deselect spec and go back
 function deselectSpec() {
     currentSpec = null;
+    selectedTargetPage = null;
+    selectedNavPlacement = null;
     
     // Hide panel
     document.getElementById('selected-spec-panel').style.display = 'none';
     document.getElementById('spec-preview').style.display = 'none';
+    document.getElementById('page-selector-container').style.display = 'none';
+    document.getElementById('nav-placement-container').style.display = 'none';
+    
+    // Reset page selector
+    const select = document.getElementById('target-page-select');
+    const hint = document.getElementById('page-selector-hint');
+    if (select) select.value = '';
+    if (hint) {
+        hint.textContent = '⚠️ Please select a page where you want to add the section';
+        hint.classList.remove('valid');
+    }
+    
+    // Reset navigation placement selector
+    const navSelect = document.getElementById('nav-placement-select');
+    const navHint = document.getElementById('nav-placement-hint');
+    if (navSelect) navSelect.value = '';
+    if (navHint) {
+        navHint.textContent = '⚠️ Please select where you want the page link to appear';
+        navHint.classList.remove('valid');
+    }
     
     // Show specs container
     document.getElementById('specs-container').style.display = 'flex';
@@ -1453,11 +1824,40 @@ function generateSpec(spec) {
     
     switch (specId) {
         case 'create-landing':
-            specContent = generateCreateLandingSpec();
-            break;
+            // This is async, fetches components
+            generateCreateLandingSpec().then(content => {
+                specsCache[specId] = content;
+                displaySpec(content);
+            });
+            return null; // Will be displayed async
         case 'create-website':
-            specContent = generateCreateWebsiteSpec();
-            break;
+            // This is async, fetches components
+            generateCreateWebsiteSpec().then(content => {
+                specsCache[specId] = content;
+                displaySpec(content);
+            });
+            return null; // Will be displayed async
+        case 'add-section':
+            // This is async, fetches page structure
+            generateAddSectionSpec(selectedTargetPage).then(content => {
+                specsCache[specId] = content;
+                displaySpec(content);
+            });
+            return null; // Will be displayed async
+        case 'add-page':
+            // This is async, fetches routes and translations
+            generateAddPageSpec(selectedNavPlacement).then(content => {
+                specsCache[specId] = content;
+                displaySpec(content);
+            });
+            return null; // Will be displayed async
+        case 'add-language':
+            // This is async, fetches translations and structures
+            generateAddLanguageSpec().then(content => {
+                specsCache[specId] = content;
+                displaySpec(content);
+            });
+            return null; // Will be displayed async
         case 'global-design':
             // This is async, handled separately
             generateGlobalDesignSpec().then(content => {
@@ -1515,9 +1915,12 @@ function displaySpec(specContent) {
     `;
 }
 
-function generateCreateLandingSpec() {
+async function generateCreateLandingSpec() {
     const commands = commandsData.commands || {};
     const creationCommands = ['setMultilingual', 'addLang', 'editStructure', 'setTranslationKeys', 'editStyles', 'setRootVariables'];
+    
+    // Use pre-computed components (no API call needed)
+    const existingComponentsSection = getPrecomputedComponentsSection();
     
     return `# QuickSite Create Landing Page Specification
 
@@ -1619,28 +2022,53 @@ Call with \`component\` and \`data\`:
 \`\`\`
 
 **Note:** Nested components require all variables passed from the outer call (global scope).
-
+${existingComponentsSection}
 ---
 
 ## Special Syntax
 
-### Raw HTML
-Prefix with \`__RAW__\` for HTML entities:
+### Direct Text (No Translation)
+Use \`__RAW__\` prefix when you want text displayed directly WITHOUT translation lookup:
 \`\`\`json
-{ "textKey": "__RAW__footer.copyright" }
+{ "textKey": "__RAW__Français" }
 \`\`\`
-Translation: \`"copyright": "&copy; 2025 Company"\`
+This displays "Français" directly - no translation key needed! Useful for language names in switchers.
 
 ### Language Switcher (Multilingual)
+
+For multilingual sites, create a reusable \`lang-switch\` component. The URL pattern \`{{__current_page;lang=XX}}\` keeps users on the same page when switching languages.
+
+**1. Create the component:**
 \`\`\`json
-{ "tag": "a", "params": { "href": "{{__current_page;lang=fr}}" }, "children": [{ "textKey": "lang.french" }] }
+{
+  "command": "editStructure",
+  "params": {
+    "type": "component",
+    "name": "lang-switch",
+    "structure": {
+      "tag": "div",
+      "params": { "class": "lang-switch" },
+      "children": [
+        { "tag": "a", "params": { "href": "{{__current_page;lang=en}}", "class": "lang-link" }, "children": [{ "textKey": "__RAW__English" }] },
+        { "tag": "a", "params": { "href": "{{__current_page;lang=fr}}", "class": "lang-link" }, "children": [{ "textKey": "__RAW__Français" }] }
+      ]
+    }
+  }
+}
 \`\`\`
+
+**2. Use in footer/menu:**
+\`\`\`json
+{ "component": "lang-switch", "data": {} }
+\`\`\`
+
+**⚠️ For multilingual sites:** Always add the lang-switch component in the footer or menu so users can switch languages!
 
 ---
 
 ## Available Commands
 
-${creationCommands.map(cmd => commands[cmd] ? formatCommandDetailed(cmd, commands[cmd]) : '').filter(Boolean).join('\n---\n')}
+${creationCommands.map(cmd => commands[cmd] ? formatCommandForCreation(cmd, commands[cmd]) : '').filter(Boolean).join('\n---\n')}
 
 ---
 
@@ -1737,6 +2165,981 @@ ${creationCommands.map(cmd => commands[cmd] ? formatCommandDetailed(cmd, command
 Create a landing page based on the user's requirements. Ensure ALL textKeys have matching translations.`;
 }
 
+async function generateAddSectionSpec(targetPage = null) {
+    const commands = commandsData.commands || {};
+    
+    // Use pre-computed data where possible
+    const routes = AI_PRECOMPUTED.routes.length > 0 ? AI_PRECOMPUTED.routes : ['home'];
+    const languages = AI_PRECOMPUTED.languages.length > 0 ? AI_PRECOMPUTED.languages : ['en'];
+    
+    // Fetch current translations to get available languages (for actual content)
+    let translations = {};
+    try {
+        const result = await QuickSiteAdmin.apiRequest('getTranslations', 'GET');
+        if (result.ok && result.data?.data) {
+            translations = result.data.data.translations || {};
+        }
+    } catch (e) {
+        console.error('Failed to fetch translations:', e);
+    }
+    
+    // Fetch target page structure if specified (this needs to be dynamic)
+    let pageStructure = null;
+    let structureWithIds = '';
+    if (targetPage) {
+        try {
+            const result = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, ['page', targetPage, 'showIds']);
+            if (result.ok && result.data?.data?.structure) {
+                pageStructure = result.data.data.structure;
+                structureWithIds = JSON.stringify(pageStructure, null, 2);
+            }
+        } catch (e) {
+            console.error('Failed to fetch page structure:', e);
+        }
+    }
+    
+    // Use pre-computed components
+    const existingComponentsSection = getPrecomputedComponentsSection();
+    
+    // Fetch current CSS for class reference
+    let cssContent = '';
+    try {
+        const result = await QuickSiteAdmin.apiRequest('getStyles', 'GET');
+        if (result.ok && result.data?.data?.css) {
+            cssContent = result.data.data.css;
+        }
+    } catch (e) {
+        console.error('Failed to fetch CSS:', e);
+    }
+    
+    // Extract CSS class names
+    const classMatches = cssContent.match(/\\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g) || [];
+    const cssClasses = [...new Set(classMatches.map(c => c.substring(1)))].sort();
+    
+    const editStructureCmd = commands['editStructure'] ? formatCommandDetailed('editStructure', commands['editStructure']) : '';
+    const setTransKeysCmd = commands['setTranslationKeys'] ? formatCommandDetailed('setTranslationKeys', commands['setTranslationKeys']) : '';
+    
+    let spec = `# QuickSite Add Section Specification
+
+You are adding a new section to an existing page. Generate a JSON command sequence.
+
+## Output Format
+\`\`\`json
+[
+  { "command": "commandName", "params": { "key": "value" } }
+]
+\`\`\`
+
+---
+
+## Current Website Info
+
+**Available Pages:** ${routes.length > 0 ? routes.join(', ') : 'home (default)'}
+**Available Languages:** ${languages.join(', ')}
+**Target Page:** ${targetPage ? `**${targetPage}**` : '⚠️ NO PAGE SELECTED - Ask user which page to add section to!'}
+
+---
+
+## Understanding Node IDs
+
+Each element in a page structure has a unique \`__nodeId\`. These are used to specify WHERE to insert new content.
+
+**Actions available:**
+- \`insertBefore\` - Insert new content BEFORE the specified nodeId
+- \`insertAfter\` - Insert new content AFTER the specified nodeId
+- \`appendChild\` - Add content as last child inside the specified nodeId
+- \`prependChild\` - Add content as first child inside the specified nodeId
+- \`replaceNode\` - Replace the entire node with new content
+
+**User describes position naturally** (e.g., "after the hero section", "before the footer", "at the end of the features section"). Your job is to find the corresponding nodeId from the structure below.
+`;
+
+    if (targetPage && structureWithIds) {
+        spec += `
+---
+
+## Current "${targetPage}" Page Structure (with nodeIds)
+
+Use these nodeIds to position your new section:
+
+\`\`\`json
+${structureWithIds}
+\`\`\`
+
+`;
+    } else if (!targetPage) {
+        spec += `
+---
+
+## ⚠️ PAGE STRUCTURE NOT LOADED
+
+No target page was selected. Before proceeding:
+1. Ask the user which page they want to add the section to
+2. Use getStructure with \`showIds: true\` to see the current structure with nodeIds
+
+`;
+    }
+
+    // Always include the components section using pre-computed data
+    spec += `
+---
+
+## Structure Types
+
+| type | Description | Required params |
+|------|-------------|-----------------|
+| \`menu\` | Navigation (shared) | type + structure |
+| \`footer\` | Footer (shared) | type + structure |
+| \`page\` | Page content | type + **name** + structure |
+| \`component\` | Reusable template | type + **name** + structure |
+
+**Important:** For \`page\` and \`component\`, the \`name\` parameter is REQUIRED.
+
+---
+
+## Components (Reusable Templates)
+
+Components are reusable structure fragments with variable placeholders using \`{{varName}}\` syntax.
+
+### Creating a Component
+\`\`\`json
+{
+  "command": "editStructure",
+  "params": {
+    "type": "component",
+    "name": "feature-card",
+    "structure": {
+      "tag": "div",
+      "params": { "class": "card" },
+      "children": [
+        { "tag": "h3", "children": [{ "textKey": "{{titleKey}}" }] },
+        { "tag": "p", "children": [{ "textKey": "{{descKey}}" }] }
+      ]
+    }
+  }
+}
+\`\`\`
+
+### Using a Component
+\`\`\`json
+{
+  "component": "feature-card",
+  "data": { "titleKey": "features.card1.title", "descKey": "features.card1.desc" }
+}
+\`\`\`
+
+**Note:** Nested components require all variables passed from the outer call (global scope).
+${existingComponentsSection}
+`;
+
+    if (cssClasses.length > 0) {
+        spec += `
+---
+
+## Available CSS Classes
+
+These classes are defined in the current stylesheet:
+
+\`${cssClasses.slice(0, 50).join('`, `')}\`${cssClasses.length > 50 ? ` ... and ${cssClasses.length - 50} more` : ''}
+
+`;
+    }
+
+    spec += `
+---
+
+## CRITICAL RULES
+
+### ⚠️ NO HARDCODED TEXT!
+ALL text must use \`textKey\` references:
+\`\`\`json
+{ "tag": "h2", "children": [{ "textKey": "home.newSection.title" }] }
+\`\`\`
+
+### ⚠️ TRANSLATIONS FOR ALL LANGUAGES!
+You MUST provide translations for ALL available languages: **${languages.join(', ')}**
+
+\`\`\`json
+[
+  {
+    "command": "setTranslationKeys",
+    "params": {
+      "language": "${languages[0]}",
+      "translations": { "home": { "newSection": { "title": "English Title" } } }
+    }
+  }${languages.slice(1).map(lang => `,
+  {
+    "command": "setTranslationKeys",
+    "params": {
+      "language": "${lang}",
+      "translations": { "home": { "newSection": { "title": "Title in ${lang}" } } }
+    }
+  }`).join('')}
+]
+\`\`\`
+
+---
+
+## Command Reference
+
+${editStructureCmd}
+
+${setTransKeysCmd}
+
+---
+
+## Example: Adding a Section
+
+\`\`\`json
+[
+  {
+    "command": "editStructure",
+    "params": {
+      "type": "page",
+      "name": "home",
+      "action": "insertAfter",
+      "nodeId": "abc123",
+      "structure": {
+        "tag": "section",
+        "params": { "class": "testimonials-section", "id": "testimonials" },
+        "children": [
+          { "tag": "h2", "children": [{ "textKey": "home.testimonials.title" }] },
+          {
+            "tag": "div",
+            "params": { "class": "testimonial-grid" },
+            "children": [
+              {
+                "tag": "div",
+                "params": { "class": "testimonial-card" },
+                "children": [
+                  { "tag": "p", "children": [{ "textKey": "home.testimonials.quote1" }] },
+                  { "tag": "span", "children": [{ "textKey": "home.testimonials.author1" }] }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "command": "setTranslationKeys",
+    "params": {
+      "language": "en",
+      "translations": {
+        "home": {
+          "testimonials": {
+            "title": "What Our Customers Say",
+            "quote1": "\\"Excellent service!\\"",
+            "author1": "- John Doe, CEO"
+          }
+        }
+      }
+    }
+  }
+]
+\`\`\`
+
+---
+
+Add the requested section to the specified page. Ensure translations are provided for ALL languages: **${languages.join(', ')}**.`;
+
+    return spec;
+}
+
+async function generateAddPageSpec(navPlacement = null) {
+    const commands = commandsData.commands || {};
+    
+    // Use pre-computed data
+    const routes = AI_PRECOMPUTED.routes.length > 0 ? AI_PRECOMPUTED.routes : ['home'];
+    const languages = AI_PRECOMPUTED.languages.length > 0 ? AI_PRECOMPUTED.languages : ['en'];
+    
+    // Use pre-computed components
+    const existingComponentsSection = getPrecomputedComponentsSection();
+    
+    // Fetch menu/footer structure if needed for navigation placement (dynamic)
+    let menuStructure = null;
+    let footerStructure = null;
+    let menuNodeId = null;
+    let footerNodeId = null;
+    
+    if (navPlacement === 'menu' || navPlacement === 'both') {
+        try {
+            const result = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, ['menu', 'showIds']);
+            if (result.ok && result.data?.data?.structure) {
+                menuStructure = result.data.data.structure;
+                // Try to find a suitable container (nav element or similar)
+                menuNodeId = findNavContainer(menuStructure);
+            }
+        } catch (e) {
+            console.error('Failed to fetch menu structure:', e);
+        }
+    }
+    
+    if (navPlacement === 'footer' || navPlacement === 'both') {
+        try {
+            const result = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, ['footer', 'showIds']);
+            if (result.ok && result.data?.data?.structure) {
+                footerStructure = result.data.data.structure;
+                footerNodeId = findNavContainer(footerStructure);
+            }
+        } catch (e) {
+            console.error('Failed to fetch footer structure:', e);
+        }
+    }
+    
+    // Fetch current CSS for class reference
+    let cssContent = '';
+    try {
+        const result = await QuickSiteAdmin.apiRequest('getStyles', 'GET');
+        if (result.ok && result.data?.data?.css) {
+            cssContent = result.data.data.css;
+        }
+    } catch (e) {
+        console.error('Failed to fetch CSS:', e);
+    }
+    
+    // Extract CSS class names
+    const classMatches = cssContent.match(/\\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g) || [];
+    const cssClasses = [...new Set(classMatches.map(c => c.substring(1)))].sort();
+    
+    // Use creation-specific command formatter
+    const addRouteCmd = commands['addRoute'] ? formatCommandForCreation('addRoute', commands['addRoute']) : '';
+    const editStructureCmd = commands['editStructure'] ? formatCommandForCreation('editStructure', commands['editStructure']) : '';
+    const setTransKeysCmd = commands['setTranslationKeys'] ? formatCommandForCreation('setTranslationKeys', commands['setTranslationKeys']) : '';
+    
+    // Build command order based on navigation placement
+    let commandOrder = '';
+    if (navPlacement === 'menu') {
+        commandOrder = `1. **addRoute** - Create the new page route FIRST
+2. **editStructure** (menu) - Add navigation link to menu
+3. **editStructure** (page) - Add page content
+4. **setTranslationKeys** - Provide translations for ALL languages`;
+    } else if (navPlacement === 'footer') {
+        commandOrder = `1. **addRoute** - Create the new page route FIRST
+2. **editStructure** (footer) - Add navigation link to footer
+3. **editStructure** (page) - Add page content
+4. **setTranslationKeys** - Provide translations for ALL languages`;
+    } else if (navPlacement === 'both') {
+        commandOrder = `1. **addRoute** - Create the new page route FIRST
+2. **editStructure** (menu) - Add navigation link to menu
+3. **editStructure** (footer) - Add navigation link to footer
+4. **editStructure** (page) - Add page content
+5. **setTranslationKeys** - Provide translations for ALL languages`;
+    } else if (navPlacement === 'none') {
+        commandOrder = `1. **addRoute** - Create the new page route FIRST
+2. **editStructure** (page) - Add page content
+3. **setTranslationKeys** - Provide translations for ALL languages`;
+    } else {
+        // No selection yet
+        commandOrder = `⚠️ **Navigation placement not selected** - Please select where the page link should appear.`;
+    }
+    
+    // Build navigation structure info
+    let navStructureInfo = '';
+    if (navPlacement === 'menu' || navPlacement === 'both') {
+        if (menuStructure) {
+            navStructureInfo += `
+### Menu Structure (with nodeIds)
+
+\`\`\`json
+${JSON.stringify(menuStructure, null, 2)}
+\`\`\`
+
+${menuNodeId ? `**Suggested nodeId for appendChild:** \`${menuNodeId}\`` : '**Note:** Review the structure to find the best nodeId for inserting the link.'}
+
+`;
+        }
+    }
+    if (navPlacement === 'footer' || navPlacement === 'both') {
+        if (footerStructure) {
+            navStructureInfo += `
+### Footer Structure (with nodeIds)
+
+\`\`\`json
+${JSON.stringify(footerStructure, null, 2)}
+\`\`\`
+
+${footerNodeId ? `**Suggested nodeId for appendChild:** \`${footerNodeId}\`` : '**Note:** Review the structure to find the best nodeId for inserting the link.'}
+
+`;
+        }
+    }
+    
+    // Build example based on navigation placement
+    let exampleJson = '';
+    if (navPlacement === 'menu') {
+        exampleJson = `[
+  {
+    "command": "addRoute",
+    "params": { "name": "blog" }
+  },
+  {
+    "command": "editStructure",
+    "params": {
+      "type": "menu",
+      "action": "appendChild",
+      "nodeId": "${menuNodeId || 'FIND_APPROPRIATE_NODEID'}",
+      "structure": {
+        "tag": "a",
+        "params": { "href": "/blog" },
+        "children": [{ "textKey": "menu.blog" }]
+      }
+    }
+  },
+  {
+    "command": "editStructure",
+    "params": {
+      "type": "page",
+      "name": "blog",
+      "structure": [
+        {
+          "tag": "section",
+          "children": [
+            { "tag": "h1", "children": [{ "textKey": "blog.title" }] },
+            { "tag": "p", "children": [{ "textKey": "blog.intro" }] }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "command": "setTranslationKeys",
+    "params": {
+      "language": "en",
+      "translations": {
+        "page": { "titles": { "blog": "Blog | My Website" } },
+        "menu": { "blog": "Blog" },
+        "blog": { "title": "Our Blog", "intro": "Latest news and updates" }
+      }
+    }
+  }${languages.length > 1 ? `,
+  {
+    "command": "setTranslationKeys",
+    "params": {
+      "language": "${languages[1]}",
+      "translations": {
+        "page": { "titles": { "blog": "Blog | Mon Site" } },
+        "menu": { "blog": "Blog" },
+        "blog": { "title": "Notre Blog", "intro": "Dernières nouvelles" }
+      }
+    }
+  }` : ''}
+]`;
+    } else if (navPlacement === 'footer') {
+        exampleJson = `[
+  {
+    "command": "addRoute",
+    "params": { "name": "blog" }
+  },
+  {
+    "command": "editStructure",
+    "params": {
+      "type": "footer",
+      "action": "appendChild",
+      "nodeId": "${footerNodeId || 'FIND_APPROPRIATE_NODEID'}",
+      "structure": {
+        "tag": "a",
+        "params": { "href": "/blog" },
+        "children": [{ "textKey": "footer.blog" }]
+      }
+    }
+  },
+  {
+    "command": "editStructure",
+    "params": {
+      "type": "page",
+      "name": "blog",
+      "structure": [
+        {
+          "tag": "section",
+          "children": [
+            { "tag": "h1", "children": [{ "textKey": "blog.title" }] },
+            { "tag": "p", "children": [{ "textKey": "blog.intro" }] }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "command": "setTranslationKeys",
+    "params": {
+      "language": "en",
+      "translations": {
+        "page": { "titles": { "blog": "Blog | My Website" } },
+        "footer": { "blog": "Blog" },
+        "blog": { "title": "Our Blog", "intro": "Latest news and updates" }
+      }
+    }
+  }${languages.length > 1 ? `,
+  {
+    "command": "setTranslationKeys",
+    "params": {
+      "language": "${languages[1]}",
+      "translations": {
+        "page": { "titles": { "blog": "Blog | Mon Site" } },
+        "footer": { "blog": "Blog" },
+        "blog": { "title": "Notre Blog", "intro": "Dernières nouvelles" }
+      }
+    }
+  }` : ''}
+]`;
+    } else if (navPlacement === 'none') {
+        exampleJson = `[
+  {
+    "command": "addRoute",
+    "params": { "name": "blog" }
+  },
+  {
+    "command": "editStructure",
+    "params": {
+      "type": "page",
+      "name": "blog",
+      "structure": [
+        {
+          "tag": "section",
+          "children": [
+            { "tag": "h1", "children": [{ "textKey": "blog.title" }] },
+            { "tag": "p", "children": [{ "textKey": "blog.intro" }] }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "command": "setTranslationKeys",
+    "params": {
+      "language": "en",
+      "translations": {
+        "page": { "titles": { "blog": "Blog | My Website" } },
+        "blog": { "title": "Our Blog", "intro": "Latest news and updates" }
+      }
+    }
+  }${languages.length > 1 ? `,
+  {
+    "command": "setTranslationKeys",
+    "params": {
+      "language": "${languages[1]}",
+      "translations": {
+        "page": { "titles": { "blog": "Blog | Mon Site" } },
+        "blog": { "title": "Notre Blog", "intro": "Dernières nouvelles" }
+      }
+    }
+  }` : ''}
+]`;
+    } else {
+        exampleJson = `// Select navigation placement first`;
+    }
+    
+    // Translation requirements based on placement
+    let translationReqs = `- \`page.titles.$routeName\` - Page <title> tag
+- All page content textKeys`;
+    if (navPlacement === 'menu' || navPlacement === 'both') {
+        translationReqs = `- \`page.titles.$routeName\` - Page <title> tag
+- \`menu.$routeName\` - Menu link text
+- All page content textKeys`;
+    }
+    if (navPlacement === 'footer') {
+        translationReqs = `- \`page.titles.$routeName\` - Page <title> tag
+- \`footer.$routeName\` - Footer link text
+- All page content textKeys`;
+    }
+    if (navPlacement === 'both') {
+        translationReqs = `- \`page.titles.$routeName\` - Page <title> tag
+- \`menu.$routeName\` - Menu link text
+- \`footer.$routeName\` - Footer link text
+- All page content textKeys`;
+    }
+    
+    let spec = `# QuickSite Add New Page Specification
+
+You are adding a new page to an existing website. Generate a JSON command sequence.
+
+## Output Format
+\`\`\`json
+[
+  { "command": "commandName", "params": { "key": "value" } }
+]
+\`\`\`
+
+---
+
+## Current Website Info
+
+**Existing Pages:** ${routes.length > 0 ? routes.join(', ') : 'home (default)'}
+**Available Languages:** ${languages.join(', ')}
+**Navigation Placement:** ${navPlacement === 'menu' ? 'Menu' : navPlacement === 'footer' ? 'Footer' : navPlacement === 'both' ? 'Menu & Footer' : navPlacement === 'none' ? 'None (user handles)' : '⚠️ NOT SELECTED'}
+
+---
+
+## CRITICAL: Command Order
+
+${commandOrder}
+
+---
+${navStructureInfo}
+## Structure Types
+
+| type | Description | Required params |
+|------|-------------|-----------------|
+| \`menu\` | Navigation (shared) | type + structure |
+| \`footer\` | Footer (shared) | type + structure |
+| \`page\` | Page content | type + **name** + structure |
+| \`component\` | Reusable template | type + **name** + structure |
+
+**Important:** For \`page\` and \`component\`, the \`name\` parameter is REQUIRED.
+
+---
+
+## Components (Reusable Templates)
+
+Components are reusable structure fragments with variable placeholders using \`{{varName}}\` syntax.
+
+### Creating a Component
+\`\`\`json
+{
+  "command": "editStructure",
+  "params": {
+    "type": "component",
+    "name": "feature-card",
+    "structure": {
+      "tag": "div",
+      "params": { "class": "card" },
+      "children": [
+        { "tag": "h3", "children": [{ "textKey": "{{titleKey}}" }] },
+        { "tag": "p", "children": [{ "textKey": "{{descKey}}" }] }
+      ]
+    }
+  }
+}
+\`\`\`
+
+### Using a Component
+\`\`\`json
+{
+  "component": "feature-card",
+  "data": { "titleKey": "features.card1.title", "descKey": "features.card1.desc" }
+}
+\`\`\`
+
+**Note:** Nested components require all variables passed from the outer call (global scope).
+${existingComponentsSection}
+${cssClasses.length > 0 ? `## Available CSS Classes
+
+\`${cssClasses.slice(0, 50).join('`, `')}\`${cssClasses.length > 50 ? ` ... and ${cssClasses.length - 50} more` : ''}
+
+---
+
+` : ''}## CRITICAL RULES
+
+### ⚠️ NO HARDCODED TEXT!
+ALL text must use \`textKey\` references:
+\`\`\`json
+{ "tag": "h1", "children": [{ "textKey": "newpage.title" }] }
+\`\`\`
+
+### ⚠️ TRANSLATIONS FOR ALL LANGUAGES!
+You MUST provide translations for ALL available languages: **${languages.join(', ')}**
+
+Required translation keys:
+${translationReqs}
+
+---
+
+## Command Reference
+
+${addRouteCmd}
+
+---
+
+${editStructureCmd}
+
+---
+
+${setTransKeysCmd}
+
+---
+
+## Example: Adding a Blog Page
+
+\`\`\`json
+${exampleJson}
+\`\`\`
+
+---
+
+Add the requested page. Provide translations for ALL languages: **${languages.join(', ')}**.`;
+
+    return spec;
+}
+
+// Helper to find a navigation container in a structure
+function findNavContainer(structure) {
+    if (!structure) return null;
+    
+    function search(node, path = '') {
+        if (Array.isArray(node)) {
+            for (let i = 0; i < node.length; i++) {
+                const result = search(node[i], path ? `${path}.${i}` : `${i}`);
+                if (result) return result;
+            }
+        } else if (typeof node === 'object' && node !== null) {
+            // Look for nav, ul, or div with navigation-related class
+            if (node.tag === 'nav' || node.tag === 'ul') {
+                return node.__nodeId || path;
+            }
+            if (node.params?.class && /nav|menu|links/i.test(node.params.class)) {
+                return node.__nodeId || path;
+            }
+            // Check children
+            if (node.children) {
+                const result = search(node.children, path);
+                if (result) return result;
+            }
+        }
+        return null;
+    }
+    
+    return search(structure);
+}
+
+async function generateAddLanguageSpec() {
+    const commands = commandsData.commands || {};
+    
+    // Use pre-computed server-side data for robust detection
+    const precomputed = AI_PRECOMPUTED;
+    
+    // Get languages from pre-computed data
+    const languages = precomputed.languages.length > 0 ? precomputed.languages : ['en'];
+    const defaultLang = languages[0] || 'en';
+    
+    // Fetch current translations for the keys (we still need the actual content)
+    let translations = {};
+    try {
+        const result = await QuickSiteAdmin.apiRequest('getTranslations', 'GET');
+        if (result.ok && result.data?.data) {
+            translations = result.data.data.translations || {};
+        }
+    } catch (e) {
+        console.error('Failed to fetch translations:', e);
+    }
+    
+    // Get source translations
+    const sourceTranslations = translations[defaultLang] || {};
+    const sourceJson = JSON.stringify(sourceTranslations, null, 2);
+    
+    // Use pre-computed detection for lang-switch (much more reliable than JS API calls)
+    const footerData = precomputed.footer || {};
+    const hasLangSwitchComponent = precomputed.langSwitchComponent?.exists || false;
+    const footerHasLangSwitch = footerData.langSwitchFound || false;
+    const footerLangSwitchNodeId = footerData.langSwitchNodeId || footerData.langSwitcherParentNodeId || null;
+    
+    // Check footer structure for lang pattern as fallback
+    const footerHasLangPattern = footerData.structure 
+        ? JSON.stringify(footerData.structure).includes('{{__current_page;lang=')
+        : false;
+    
+    // Build the expected lang-switch structure with all existing languages + NEW_LANG placeholder
+    const langNames = {
+        'en': 'English', 'fr': 'Français', 'es': 'Español', 'de': 'Deutsch', 
+        'it': 'Italiano', 'pt': 'Português', 'nl': 'Nederlands', 'ru': 'Русский',
+        'zh': '中文', 'ja': '日本語', 'ko': '한국어', 'ar': 'العربية'
+    };
+    
+    const existingLangLinks = languages.map(lang => {
+        const name = langNames[lang] || lang.toUpperCase();
+        return `        { "tag": "a", "params": { "href": "{{__current_page;lang=${lang}}}", "class": "lang-link" }, "children": [{ "textKey": "__RAW__${name}" }] }`;
+    }).join(',\n');
+    
+    const fullLangSwitchTemplate = `{
+  "tag": "div",
+  "params": { "class": "lang-switch" },
+  "children": [
+${existingLangLinks},
+        { "tag": "a", "params": { "href": "{{__current_page;lang=NEW_LANG}}", "class": "lang-link" }, "children": [{ "textKey": "__RAW__NativeLanguageName" }] }
+  ]
+}`;
+    
+    const addLangCmd = commands['addLang'] ? formatCommandDetailed('addLang', commands['addLang']) : '';
+    const editStructureCmd = commands['editStructure'] ? formatCommandDetailed('editStructure', commands['editStructure']) : '';
+    const setTransKeysCmd = commands['setTranslationKeys'] ? formatCommandDetailed('setTranslationKeys', commands['setTranslationKeys']) : '';
+    
+    // Build components list
+    let componentsListHtml = '';
+    if (precomputed.components && Object.keys(precomputed.components).length > 0) {
+        componentsListHtml = '\n\n## Available Components\n\n';
+        for (const [name, info] of Object.entries(precomputed.components)) {
+            const extras = [];
+            if (info.hasVariables) extras.push(`vars: ${Object.keys(info.variables).join(', ')}`);
+            if (info.hasSlots) extras.push(`slots: ${info.slots.join(', ')}`);
+            const extrasStr = extras.length > 0 ? ` (${extras.join('; ')})` : '';
+            componentsListHtml += `- \`${name}\`${extrasStr}\n`;
+        }
+    }
+    
+    let spec = `# QuickSite Add Language Specification
+
+You are adding a new language to an existing multilingual website. Generate a JSON command sequence.
+
+## Output Format
+\`\`\`json
+[
+  { "command": "commandName", "params": { "key": "value" } }
+]
+\`\`\`
+
+---
+
+## Current Website Info
+
+**Existing Languages:** ${languages.join(', ')}
+**Default Language:** ${defaultLang}
+**lang-switch Component:** ${hasLangSwitchComponent ? '✅ Exists' : '❌ Not found'}
+**lang-switch in Footer:** ${footerHasLangSwitch ? '✅ Yes (component)' : footerHasLangPattern ? '⚠️ Pattern only' : '❌ No'}
+${componentsListHtml}
+---
+
+## CRITICAL: Command Order
+
+1. **addLang** - Add the new language code FIRST
+2. **editStructure** - Update the \`lang-switch\` component to include the new language
+3. **setTranslationKeys** - Provide ALL translations for the new language
+
+---
+
+## The lang-switch Component
+
+QuickSite uses a \`lang-switch\` component for language switching. Each language link follows this pattern:
+\`\`\`json
+{ "tag": "a", "params": { "href": "{{__current_page;lang=XX}}", "class": "lang-link" }, "children": [{ "textKey": "__RAW__LanguageName" }] }
+\`\`\`
+
+- Replace \`XX\` with the language code (e.g., \`es\`, \`de\`, \`it\`)
+- Replace \`LanguageName\` with the native name (e.g., \`Español\`, \`Deutsch\`, \`Italiano\`)
+- Use \`__RAW__\` prefix so the name displays directly without translation lookup
+
+${hasLangSwitchComponent ? `### Current lang-switch Component
+
+The project has a \`lang-switch\` component. Here's the expected structure with existing languages + the new one:
+
+\`\`\`json
+${fullLangSwitchTemplate}
+\`\`\`
+
+**To add the new language, update the component:**
+\`\`\`json
+{
+  "command": "editStructure",
+  "params": {
+    "type": "component",
+    "name": "lang-switch",
+    "structure": ${fullLangSwitchTemplate.split('\n').map((line, i) => i === 0 ? line : '    ' + line).join('\n')}
+  }
+}
+\`\`\`
+` : `### Create the lang-switch Component
+
+The project doesn't have a \`lang-switch\` component yet. Create it with all languages:
+
+\`\`\`json
+{
+  "command": "editStructure",
+  "params": {
+    "type": "component",
+    "name": "lang-switch",
+    "structure": ${fullLangSwitchTemplate.split('\n').map((line, i) => i === 0 ? line : '    ' + line).join('\n')}
+  }
+}
+\`\`\`
+
+Then add the component to the footer or menu using \`editStructure\` with \`action: "appendChild"\`.
+`}
+`;
+
+    if (footerHasLangSwitch && footerLangSwitchNodeId) {
+        spec += `### Footer lang-switch Location
+
+Found in footer at nodeId: \`${footerLangSwitchNodeId}\`
+The component will be automatically updated when you modify the \`lang-switch\` component definition.
+
+`;
+    }
+
+    spec += `
+---
+
+## Source Translations (${defaultLang})
+
+These are the translation keys you need to translate. Keep the EXACT same structure:
+
+\`\`\`json
+${sourceJson}
+\`\`\`
+
+---
+
+## Command Reference
+
+${addLangCmd}
+
+---
+
+${editStructureCmd}
+
+---
+
+${setTransKeysCmd}
+
+---
+
+## Example: Adding Spanish
+
+\`\`\`json
+[
+  {
+    "command": "addLang",
+    "params": { "language": "es" }
+  },
+  {
+    "command": "editStructure",
+    "params": {
+      "type": "component",
+      "name": "lang-switch",
+      "structure": {
+        "tag": "div",
+        "params": { "class": "lang-switch" },
+        "children": [
+${languages.map(lang => `          { "tag": "a", "params": { "href": "{{__current_page;lang=${lang}}}", "class": "lang-link" }, "children": [{ "textKey": "__RAW__${langNames[lang] || lang.toUpperCase()}" }] }`).join(',\n')},
+          { "tag": "a", "params": { "href": "{{__current_page;lang=es}}", "class": "lang-link" }, "children": [{ "textKey": "__RAW__Español" }] }
+        ]
+      }
+    }
+  },
+  {
+    "command": "setTranslationKeys",
+    "params": {
+      "language": "es",
+      "translations": {
+        "page": { "titles": { "home": "Inicio | Mi Sitio" } },
+        "menu": { "home": "Inicio", "about": "Sobre Nosotros" },
+        "home": { "title": "Bienvenido", "subtitle": "Su sitio web" },
+        "footer": { "copyright": "&copy; 2025 Mi Empresa" }
+      }
+    }
+  }
+]
+\`\`\`
+
+---
+
+Add the requested language. Include:
+1. The addLang command with the new language code
+2. Language switcher updates (modify the \`lang-switch\` component to add the new language link)
+3. Complete translations matching the source structure above`;
+
+    return spec;
+}
+
 function generateGenericSpec(spec) {
     const commands = commandsData.commands || {};
     
@@ -1754,9 +3157,6 @@ function generateGenericSpec(spec) {
     }
     if (spec.id.includes('language')) {
         relevantCommands.push('addLang', 'setTranslationKeys');
-    }
-    if (spec.id.includes('seo')) {
-        relevantCommands.push('editStructure', 'setTranslationKeys');
     }
     
     // Default fallback
@@ -2104,9 +3504,12 @@ For Spanish (es), output:
 Based on the user's request, generate a \`setTranslationKeys\` command with complete translations for the target language. The user will specify which language to translate to.`;
 }
 
-function generateCreateWebsiteSpec() {
+async function generateCreateWebsiteSpec() {
     const commands = commandsData.commands || {};
     const creationCommands = ['setMultilingual', 'addLang', 'addRoute', 'editStructure', 'setTranslationKeys', 'editStyles', 'setRootVariables'];
+    
+    // Use pre-computed components (no API call needed)
+    const existingComponentsSection = getPrecomputedComponentsSection();
     
     return `# QuickSite Create Website Specification
 
@@ -2242,33 +3645,53 @@ Components can contain other components. **Important:** Variables are NOT scoped
 \`\`\`
 
 If \`card-with-image\` internally uses \`img-dynamic\` component, you must pass imgSrc and imgAlt in the outer call.
-
+${existingComponentsSection}
 ---
 
 ## Special Syntax
 
-### Raw HTML (no escaping)
-Prefix textKey with \`__RAW__\` for HTML entities:
+### Direct Text (No Translation)
+Use \`__RAW__\` prefix when you want text displayed directly WITHOUT translation lookup:
 \`\`\`json
-{ "textKey": "__RAW__footer.copyright" }
+{ "textKey": "__RAW__Français" }
 \`\`\`
-Translation: \`"copyright": "&copy; 2025 Company Name"\`
+This displays "Français" directly - no translation key needed! Useful for language names in switchers.
 
-### Language Switcher URLs
-Use \`{{__current_page;lang=xx}}\` for dynamic language links:
+### Language Switcher (Multilingual Sites)
+
+For multilingual sites, create a \`lang-switch\` component. The pattern \`{{__current_page;lang=XX}}\` keeps users on the same page when switching languages.
+
+**1. Create the component:**
 \`\`\`json
 {
-  "tag": "a",
-  "params": { "href": "{{__current_page;lang=en}}" },
-  "children": [{ "textKey": "lang.english" }]
+  "command": "editStructure",
+  "params": {
+    "type": "component",
+    "name": "lang-switch",
+    "structure": {
+      "tag": "div",
+      "params": { "class": "lang-switch" },
+      "children": [
+        { "tag": "a", "params": { "href": "{{__current_page;lang=en}}", "class": "lang-link" }, "children": [{ "textKey": "__RAW__English" }] },
+        { "tag": "a", "params": { "href": "{{__current_page;lang=fr}}", "class": "lang-link" }, "children": [{ "textKey": "__RAW__Français" }] }
+      ]
+    }
+  }
 }
 \`\`\`
+
+**2. Use in footer (or menu):**
+\`\`\`json
+{ "component": "lang-switch", "data": {} }
+\`\`\`
+
+**⚠️ For multilingual sites:** Always include a lang-switch in the footer or menu so users can change language!
 
 ---
 
 ## Available Commands
 
-${creationCommands.map(cmd => commands[cmd] ? formatCommandDetailed(cmd, commands[cmd]) : '').filter(Boolean).join('\n---\n')}
+${creationCommands.map(cmd => commands[cmd] ? formatCommandForCreation(cmd, commands[cmd]) : '').filter(Boolean).join('\n---\n')}
 
 ---
 
@@ -2470,6 +3893,46 @@ You can also define variables directly in editStyles - setRootVariables is just 
 Create a complete website based on the user's requirements. Ensure ALL textKeys in structures have corresponding translations.`;
 }
 
+// Simplified command formatter for creation specs (excludes editing-related params)
+function formatCommandForCreation(name, cmd) {
+    let text = `### ${name}\n`;
+    text += `**Method:** \`${cmd.method || 'GET'}\`\n\n`;
+    
+    // Simplified descriptions for creation context
+    const creationDescriptions = {
+        'editStructure': 'Creates JSON structure for page, menu, footer, or component.',
+        'setTranslationKeys': 'Sets translation keys for a language.'
+    };
+    text += `**Description:** ${creationDescriptions[name] || cmd.description || 'No description'}\n\n`;
+    
+    // Parameters to exclude in creation context (editing-only params)
+    const excludeParams = ['nodeId', 'action'];
+    
+    if (cmd.parameters && Object.keys(cmd.parameters).length > 0) {
+        const filteredParams = Object.entries(cmd.parameters)
+            .filter(([pName]) => !excludeParams.includes(pName));
+        
+        if (filteredParams.length > 0) {
+            text += `**Parameters:**\n`;
+            for (const [pName, pData] of filteredParams) {
+                const required = pData.required ? ' *(required)*' : ' *(optional)*';
+                const type = pData.type ? ` \`${pData.type}\`` : '';
+                // Simplified descriptions for creation context
+                let desc = pData.description || 'No description';
+                if (pName === 'translations') {
+                    desc = 'Object containing translation key-value pairs';
+                } else if (pName === 'structure') {
+                    desc = 'JSON structure to create';
+                }
+                text += `- \`${pName}\`${type}${required}: ${desc}\n`;
+            }
+            text += '\n';
+        }
+    }
+    
+    return text;
+}
+
 function formatCommandDetailed(name, cmd) {
     let text = `### ${name}\n`;
     text += `**Method:** \`${cmd.method || 'GET'}\`\n\n`;
@@ -2499,6 +3962,36 @@ function formatCommandBrief(name, cmd) {
     }
     
     return text;
+}
+
+// Build rich component description with slots/variables
+function buildExistingComponentsSection(components) {
+    if (!components || components.length === 0) return '';
+    
+    let section = `
+---
+
+## Existing Components
+
+The project already has these components you can reuse:
+
+`;
+    
+    for (const comp of components) {
+        const slots = comp.slots && comp.slots.length > 0 
+            ? comp.slots.map(s => `\`${s}\``).join(', ')
+            : '*no variables*';
+        section += `- **\`${comp.name}\`** — variables: ${slots}\n`;
+    }
+    
+    section += `
+**Usage:**
+\`\`\`json
+{ "component": "component-name", "data": { "var1": "value1", "var2": "value2" } }
+\`\`\`
+`;
+    
+    return section;
 }
 
 async function copyFullPrompt() {

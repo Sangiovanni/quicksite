@@ -606,23 +606,6 @@ code{
     .admin-grid--cols-4 {
         grid-template-columns: 1fr;
     }
-    
-    .admin-header {
-        flex-wrap: wrap;
-        height: auto;
-        padding: var(--space-md);
-    }
-    
-    .admin-nav {
-        order: 3;
-        width: 100%;
-        margin-top: var(--space-md);
-        justify-content: center;
-    }
-    
-    .admin-header__actions {
-        order: 2;
-    }
 }
 
 /* =============================================================================
@@ -1321,41 +1304,156 @@ code{
 /* =============================================================================
    RESPONSIVE NAVIGATION
    ============================================================================= */
+/* =============================================================================
+   COLLAPSIBLE NAV GROUPS
+   ============================================================================= */
+.admin-nav__group {
+    position: relative;
+}
+
+.admin-nav__group-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    color: var(--admin-text-muted);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-size: var(--font-size-sm);
+    font-family: inherit;
+}
+
+.admin-nav__group-toggle:hover {
+    color: var(--admin-text);
+    background: var(--admin-surface);
+}
+
+.admin-nav__group-toggle .admin-nav__icon {
+    width: 18px;
+    height: 18px;
+}
+
+.admin-nav__group-arrow {
+    width: 12px;
+    height: 12px;
+    transition: transform var(--transition-fast);
+    margin-left: var(--space-xs);
+}
+
+.admin-nav__group--open .admin-nav__group-arrow {
+    transform: rotate(180deg);
+}
+
+.admin-nav__group-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 180px;
+    background: var(--admin-bg-secondary);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    padding: var(--space-xs);
+    z-index: 200;
+}
+
+.admin-nav__group--open .admin-nav__group-dropdown {
+    display: block;
+}
+
+.admin-nav__group-dropdown .admin-nav__link {
+    width: 100%;
+    justify-content: flex-start;
+}
+
+/* Highlight group toggle when child is active */
+.admin-nav__group--has-active > .admin-nav__group-toggle {
+    color: var(--admin-accent);
+    background: var(--admin-accent-muted);
+}
+
 @media (max-width: 1200px) {
-    .admin-nav__link span {
+    .admin-nav__link span,
+    .admin-nav__group-toggle > span {
         display: none;
     }
     
-    .admin-nav__link {
+    .admin-nav__link,
+    .admin-nav__group-toggle {
         padding: var(--space-sm);
     }
     
     .admin-nav__icon {
         margin-right: 0;
     }
+    
+    .admin-nav__group-arrow {
+        display: none;
+    }
+    
+    .admin-nav__group-dropdown .admin-nav__link span {
+        display: inline;
+    }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     .admin-header {
         flex-wrap: wrap;
         height: auto;
         padding: var(--space-md);
+        gap: var(--space-sm);
     }
     
     .admin-header__brand {
+        flex: 0 0 auto;
         margin-right: auto;
     }
     
     .admin-nav {
         order: 3;
+        flex: 0 0 100%;
         width: 100%;
-        margin-top: var(--space-md);
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
+        margin-top: var(--space-sm);
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: var(--space-xs);
     }
     
     .admin-header__actions {
         order: 2;
+        flex: 0 0 auto;
+    }
+    
+    /* Hide button text on small screens */
+    .admin-header__actions .admin-btn span {
+        display: none;
+    }
+    
+    .admin-header__actions .admin-btn {
+        padding: var(--space-sm);
+    }
+    
+    /* Make nav groups work better on smaller screens */
+    .admin-nav__group-dropdown {
+        position: fixed;
+        top: auto;
+        left: 50%;
+        transform: translateX(-50%);
+        min-width: 200px;
+    }
+}
+
+@media (max-width: 600px) {
+    .admin-header__brand span {
+        display: none;
+    }
+    
+    .admin-nav {
+        justify-content: space-around;
     }
     
     .admin-shortcuts-grid {

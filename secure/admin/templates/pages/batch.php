@@ -1729,6 +1729,16 @@ a { transition: all 0.3s ease; }
             { command: 'addRoute', params: { route: 'services' } },
             { command: 'addRoute', params: { route: 'contact' } },
             { command: 'addLang', params: { code: 'fr', name: 'Francais' } },
+            { command: 'editStructure', params: {
+                type: 'component',
+                name: 'lang-switch',
+                structure: {
+                    tag: 'div', params: { class: 'lang-switch' }, children: [
+                        { tag: 'a', params: { href: '{{__current_page;lang=en}}', class: 'lang-link' }, children: [{ textKey: '__RAW__English' }] },
+                        { tag: 'a', params: { href: '{{__current_page;lang=fr}}', class: 'lang-link' }, children: [{ textKey: '__RAW__Français' }] }
+                    ]
+                }
+            }},
             { command: 'editStructure', params: { 
                 type: 'menu',
                 structure: [
@@ -1756,10 +1766,7 @@ a { transition: all 0.3s ease; }
                             ]},
                             { tag: 'div', params: { class: 'footer-lang' }, children: [
                                 { tag: 'span', params: { class: 'lang-label' }, children: [{ textKey: 'footer.language' }] },
-                                { tag: 'div', params: { class: 'lang-buttons' }, children: [
-                                    { tag: 'a', params: { href: '{{__current_page;lang=en}}', class: 'lang-link' }, children: [{ textKey: '__RAW__English' }] },
-                                    { tag: 'a', params: { href: '{{__current_page;lang=fr}}', class: 'lang-link' }, children: [{ textKey: '__RAW__Français' }] }
-                                ]}
+                                { component: 'lang-switch' }
                             ]}
                         ]},
                         { tag: 'div', params: { class: 'footer-bottom' }, children: [
@@ -1962,7 +1969,7 @@ a { transition: all 0.3s ease; }
 .footer-nav a:hover { color: var(--color-primary); }
 .footer-lang { display: flex; align-items: center; gap: 1rem; }
 .lang-label { color: var(--color-text-muted); font-size: 0.9rem; font-weight: 500; }
-.lang-buttons { display: flex; gap: 0.5rem; }
+.lang-switch { display: flex; gap: 0.5rem; }
 .lang-link { color: var(--color-text-muted); text-decoration: none; padding: 0.4rem 1rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600; border: 1px solid rgba(245, 158, 11, 0.3); background: rgba(245, 158, 11, 0.1); transition: all 0.3s ease; }
 .lang-link:hover { color: var(--color-text-dark); background: var(--color-primary); border-color: var(--color-primary); box-shadow: 0 0 20px var(--shadow-primary); }
 .footer-bottom { text-align: center; padding-top: 2.5rem; margin-top: 3rem; border-top: 1px solid rgba(255, 255, 255, 0.08); color: var(--color-text-muted); font-size: 0.9rem; }`
@@ -2154,6 +2161,16 @@ a { transition: all 0.3s ease; }
         commands: [
             { command: 'setMultilingual', params: { enabled: true } },
             { command: 'addLang', params: { code: 'fr', name: 'Francais' } },
+            { command: 'editStructure', params: {
+                type: 'component',
+                name: 'lang-switch',
+                structure: {
+                    tag: 'div', params: { class: 'lang-switch' }, children: [
+                        { tag: 'a', params: { href: '{{__current_page;lang=en}}', class: 'lang-link' }, children: [{ textKey: '__RAW__English' }] },
+                        { tag: 'a', params: { href: '{{__current_page;lang=fr}}', class: 'lang-link' }, children: [{ textKey: '__RAW__Français' }] }
+                    ]
+                }
+            }},
             { command: 'editStructure', params: { 
                 type: 'menu',
                 structure: [
@@ -2174,10 +2191,7 @@ a { transition: all 0.3s ease; }
                             { tag: 'p', children: [{ textKey: 'footer.copyright' }] },
                             { tag: 'div', params: { class: 'footer-lang' }, children: [
                                 { tag: 'span', params: { class: 'lang-label' }, children: [{ textKey: 'footer.language' }] },
-                                { tag: 'div', params: { class: 'lang-buttons' }, children: [
-                                    { tag: 'a', params: { href: '{{__current_page;lang=en}}', class: 'lang-link' }, children: [{ textKey: '__RAW__English' }] },
-                                    { tag: 'a', params: { href: '{{__current_page;lang=fr}}', class: 'lang-link' }, children: [{ textKey: '__RAW__Français' }] }
-                                ]}
+                                { component: 'lang-switch' }
                             ]}
                         ]}
                     ]}
@@ -2308,7 +2322,7 @@ a { transition: all 0.3s ease; }
 .landing-footer p { color: var(--color-text-light); font-size: 0.95rem; }
 .footer-lang { display: flex; align-items: center; gap: 1rem; }
 .lang-label { color: var(--color-text-light); font-size: 0.9rem; font-weight: 500; }
-.lang-buttons { display: flex; gap: 0.5rem; }
+.lang-switch { display: flex; gap: 0.5rem; }
 .lang-link { color: #C4B5FD; text-decoration: none; padding: 0.4rem 1rem; border-radius: 20px; font-size: 0.85rem; font-weight: 500; border: 1px solid var(--color-border-footer); background: rgba(var(--primary-rgb), 0.1); transition: all 0.3s ease; }
 .lang-link:hover { color: var(--color-text-white); background: rgba(var(--primary-rgb), 0.3); border-color: var(--color-primary); box-shadow: 0 0 15px rgba(var(--primary-rgb), 0.4); }`
             }},

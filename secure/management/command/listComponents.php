@@ -1,86 +1,17 @@
 <?php
 /**
  * listComponents - List all available reusable components
- * Method: GET
- * URL: /management/listComponents
+ * 
+ * @method GET
+ * @url /management/listComponents
+ * @auth required
+ * @permission read
  * 
  * Returns all components from secure/templates/model/json/components/
  * with their structure and metadata.
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
-
-$componentsDir = SECURE_FOLDER_PATH . '/templates/model/json/components';
-
-// Check directory exists
-if (!is_dir($componentsDir)) {
-    ApiResponse::create(200, 'operation.success')
-        ->withMessage('Components directory not found, no components available')
-        ->withData([
-            'components' => [],
-            'count' => 0
-        ])
-        ->send();
-}
-
-// Get all JSON files
-$files = glob($componentsDir . '/*.json');
-$components = [];
-
-foreach ($files as $file) {
-    $name = basename($file, '.json');
-    
-    // Read component structure
-    $content = @file_get_contents($file);
-    if ($content === false) {
-        continue; // Skip unreadable files
-    }
-    
-    $structure = json_decode($content, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        // Include but mark as invalid
-        $components[] = [
-            'name' => $name,
-            'file' => $name . '.json',
-            'valid' => false,
-            'error' => 'Invalid JSON: ' . json_last_error_msg(),
-            'structure' => null,
-            'slots' => [],
-            'size' => filesize($file),
-            'modified' => date('Y-m-d H:i:s', filemtime($file))
-        ];
-        continue;
-    }
-    
-    // Extract slots (placeholders like {{name}})
-    $slots = extractSlots($structure);
-    
-    // Detect if component uses other components
-    $usesComponents = findUsedComponents($structure);
-    
-    $components[] = [
-        'name' => $name,
-        'file' => $name . '.json',
-        'valid' => true,
-        'structure' => $structure,
-        'slots' => array_unique($slots),
-        'uses_components' => $usesComponents,
-        'size' => filesize($file),
-        'modified' => date('Y-m-d H:i:s', filemtime($file))
-    ];
-}
-
-// Sort by name
-usort($components, fn($a, $b) => strcasecmp($a['name'], $b['name']));
-
-ApiResponse::create(200, 'operation.success')
-    ->withMessage('Components listed successfully')
-    ->withData([
-        'components' => $components,
-        'count' => count($components),
-        'directory' => 'secure/templates/model/json/components/'
-    ])
-    ->send();
 
 /**
  * Extract placeholder slots from component structure
@@ -153,4 +84,88 @@ function findUsedComponents($node, &$used = []) {
     }
     
     return array_unique($used);
+}
+
+/**
+ * Command function for internal execution via CommandRunner
+ * 
+ * @param array $params Body parameters (unused for this command)
+ * @param array $urlParams URL segments (unused for this command)
+ * @return ApiResponse
+ */
+function __command_listComponents(array $params = [], array $urlParams = []): ApiResponse {
+    $componentsDir = SECURE_FOLDER_PATH . '/templates/model/json/components';
+
+    // Check directory exists
+    if (!is_dir($componentsDir)) {
+        return ApiResponse::create(200, 'operation.success')
+            ->withMessage('Components directory not found, no components available')
+            ->withData([
+                'components' => [],
+                'count' => 0
+            ]);
+    }
+
+    // Get all JSON files
+    $files = glob($componentsDir . '/*.json');
+    $components = [];
+
+    foreach ($files as $file) {
+        $name = basename($file, '.json');
+        
+        // Read component structure
+        $content = @file_get_contents($file);
+        if ($content === false) {
+            continue; // Skip unreadable files
+        }
+        
+        $structure = json_decode($content, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            // Include but mark as invalid
+            $components[] = [
+                'name' => $name,
+                'file' => $name . '.json',
+                'valid' => false,
+                'error' => 'Invalid JSON: ' . json_last_error_msg(),
+                'structure' => null,
+                'slots' => [],
+                'size' => filesize($file),
+                'modified' => date('Y-m-d H:i:s', filemtime($file))
+            ];
+            continue;
+        }
+        
+        // Extract slots (placeholders like {{name}})
+        $slots = extractSlots($structure);
+        
+        // Detect if component uses other components
+        $usesComponents = findUsedComponents($structure);
+        
+        $components[] = [
+            'name' => $name,
+            'file' => $name . '.json',
+            'valid' => true,
+            'structure' => $structure,
+            'slots' => array_unique($slots),
+            'uses_components' => $usesComponents,
+            'size' => filesize($file),
+            'modified' => date('Y-m-d H:i:s', filemtime($file))
+        ];
+    }
+
+    // Sort by name
+    usort($components, fn($a, $b) => strcasecmp($a['name'], $b['name']));
+
+    return ApiResponse::create(200, 'operation.success')
+        ->withMessage('Components listed successfully')
+        ->withData([
+            'components' => $components,
+            'count' => count($components),
+            'directory' => 'secure/templates/model/json/components/'
+        ]);
+}
+
+// Execute via HTTP (only when not called internally)
+if (!defined('COMMAND_INTERNAL_CALL')) {
+    __command_listComponents()->send();
 }
