@@ -15,9 +15,10 @@ You are creating a complete multi-page website from a blank QuickSite project. G
 
 **⚠️ MANDATORY ORDER:**
 
-1. **Multilingual FIRST** (if needed):
+{{#if param.multilingual === true}}
+1. **Multilingual FIRST**:
    - `setMultilingual` → enables multi-language mode
-   - `addLang` → for each additional language (default is "en")
+   - `addLang` → for each additional language (languages: {{param.languages}})
 
 2. **Routes**:
    - `addRoute` → creates new pages (home exists by default)
@@ -30,11 +31,30 @@ You are creating a complete multi-page website from a blank QuickSite project. G
 
 4. **Translations**:
    - `setTranslationKeys` → MUST cover ALL textKeys used in structures
+   - **Repeat for each language:** {{param.languages}}
    - Note: `addRoute` auto-creates `page.titles.$routeName` - set this too!
 
 5. **Styles LAST** (order matters!):
    - `editStyles` → MUST come BEFORE setRootVariables
    - `setRootVariables` → AFTER editStyles (optional)
+{{else}}
+1. **Routes**:
+   - `addRoute` → creates new pages (home exists by default)
+   - Note: "home" route exists by default (accessible as "/" or "/home")
+
+2. **Structures** (in this order):
+   - `editStructure` type="menu" → navigation (shared across all pages)
+   - `editStructure` type="footer" → footer (shared across all pages)
+   - `editStructure` type="page", name="$routeName" → each page content
+
+3. **Translations**:
+   - `setTranslationKeys` → MUST cover ALL textKeys used in structures
+   - Note: `addRoute` auto-creates `page.titles.$routeName` - set this too!
+
+4. **Styles LAST** (order matters!):
+   - `editStyles` → MUST come BEFORE setRootVariables
+   - `setRootVariables` → AFTER editStyles (optional)
+{{/if}}
 
 ---
 
@@ -101,7 +121,7 @@ Components let you define reusable structures with variables:
 
 ---
 
-{{#if multilingual}}
+{{#if param.multilingual === true}}
 ## Language Switcher (Required for Multilingual)
 
 **Create the lang-switch component:**
@@ -125,9 +145,9 @@ Components let you define reusable structures with variables:
 ```
 
 **Add to footer using:** `{ "component": "lang-switch", "data": {} }`
-{{/if}}
 
 ---
+{{/if}}
 
 ## Available Commands
 

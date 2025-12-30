@@ -136,9 +136,10 @@ class AiSpecManager {
      * Fetch all data requirements for a spec
      * 
      * @param array $spec The spec definition
+     * @param array $userParams User-provided parameters (for condition evaluation)
      * @return array Fetched data keyed by requirement ID
      */
-    public function fetchDataRequirements(array $spec): array {
+    public function fetchDataRequirements(array $spec, array $userParams = []): array {
         $data = [];
         
         if (!isset($spec['dataRequirements'])) {
@@ -147,10 +148,31 @@ class AiSpecManager {
         
         foreach ($spec['dataRequirements'] as $req) {
             $id = $req['id'];
+            
+            // Check condition if present
+            if (isset($req['condition'])) {
+                $condition = $req['condition'];
+                $conditionMet = $this->evaluateDataCondition($condition, $userParams);
+                
+                if (!$conditionMet) {
+                    // Skip this data requirement
+                    $data[$id] = null;
+                    continue;
+                }
+            }
+            
             $command = $req['command'];
             $params = $req['params'] ?? [];
             $urlParams = $req['urlParams'] ?? [];
             $extract = $req['extract'] ?? null;
+            
+            // Replace placeholders in urlParams with actual user param values
+            $urlParams = array_map(function($param) use ($userParams) {
+                if (preg_match('/^\{\{(\w+)\}\}$/', $param, $matches)) {
+                    return $userParams[$matches[1]] ?? $param;
+                }
+                return $param;
+            }, $urlParams);
             
             try {
                 if ($extract) {
@@ -170,6 +192,47 @@ class AiSpecManager {
         }
         
         return $data;
+    }
+    
+    /**
+     * Evaluate a condition for data requirements
+     * 
+     * @param string $condition Condition string (param name or expression)
+     * @param array $userParams User parameters
+     * @return bool Whether the condition is met
+     */
+    private function evaluateDataCondition(string $condition, array $userParams): bool {
+        // Check for comparison operators
+        if (preg_match('/^(.+?)\s*(===|!==|==|!=)\s*(.+)$/', $condition, $parts)) {
+            $paramName = trim($parts[1]);
+            $operator = $parts[2];
+            $compareValue = trim($parts[3]);
+            
+            $paramValue = $userParams[$paramName] ?? null;
+            
+            // Normalize values for comparison
+            if ($compareValue === 'true') $compareValue = true;
+            elseif ($compareValue === 'false') $compareValue = false;
+            elseif ($compareValue === 'null') $compareValue = null;
+            
+            if ($paramValue === 'true') $paramValue = true;
+            elseif ($paramValue === 'false') $paramValue = false;
+            
+            switch ($operator) {
+                case '===':
+                    return $paramValue === $compareValue;
+                case '!==':
+                    return $paramValue !== $compareValue;
+                case '==':
+                    return $paramValue == $compareValue;
+                case '!=':
+                    return $paramValue != $compareValue;
+            }
+        }
+        
+        // Simple check: does the param exist and have a truthy value?
+        $value = $userParams[$condition] ?? null;
+        return !empty($value) && $value !== 'false';
     }
     
     /**
@@ -236,6 +299,10 @@ class AiSpecManager {
      * - {{variable}} - Simple variable substitution
      * - {{object.property}} - Dot notation access
      * - {{#if condition}}...{{else}}...{{/if}} - Conditionals
+     *   - Simple: {{#if variableName}} (truthiness check)
+     *   - Equality: {{#if var === value}}, {{#if var == value}}
+     *   - Inequality: {{#if var !== value}}, {{#if var != value}}
+     *   - Literals: true, false, null, "string", 123
      * - {{#each array}}...{{/each}} - Iteration
      * - {{json variable}} - JSON encode
      * - {{langName code}} - Get language name
@@ -365,6 +432,12 @@ class AiSpecManager {
     
     /**
      * Process {{#if}} blocks
+     * 
+     * Supports:
+     * - Simple truthiness: {{#if variableName}}
+     * - Equality: {{#if variable === value}}, {{#if variable == value}}
+     * - Inequality: {{#if variable !== value}}, {{#if variable != value}}
+     * - Boolean comparison: {{#if param.multilingual === true}}
      */
     private function processIfBlocks(string $template, array $context): string {
         // Handle if/else/endif
@@ -375,14 +448,79 @@ class AiSpecManager {
             $trueBlock = $matches[2];
             $falseBlock = $matches[3] ?? '';
             
-            $value = $this->resolveValue($condition, $context);
-            $isTruthy = !empty($value) && $value !== false && $value !== null;
+            $isTruthy = $this->evaluateCondition($condition, $context);
             
             $result = $isTruthy ? $trueBlock : $falseBlock;
             
             // Recursively process nested blocks
             return $this->processIfBlocks($result, $context);
         }, $template);
+    }
+    
+    /**
+     * Evaluate a condition expression
+     * 
+     * @param string $condition Condition string
+     * @param array $context Data context
+     * @return bool Whether the condition is truthy
+     */
+    private function evaluateCondition(string $condition, array $context): bool {
+        // Check for comparison operators
+        if (preg_match('/^(.+?)\s*(===|!==|==|!=)\s*(.+)$/', $condition, $parts)) {
+            $leftExpr = trim($parts[1]);
+            $operator = $parts[2];
+            $rightExpr = trim($parts[3]);
+            
+            $leftValue = $this->resolveConditionValue($leftExpr, $context);
+            $rightValue = $this->resolveConditionValue($rightExpr, $context);
+            
+            switch ($operator) {
+                case '===':
+                    return $leftValue === $rightValue;
+                case '!==':
+                    return $leftValue !== $rightValue;
+                case '==':
+                    return $leftValue == $rightValue;
+                case '!=':
+                    return $leftValue != $rightValue;
+            }
+        }
+        
+        // Simple truthiness check
+        $value = $this->resolveValue($condition, $context);
+        return !empty($value) && $value !== false && $value !== null && $value !== 'false';
+    }
+    
+    /**
+     * Resolve a value in a condition expression
+     * Handles literals (true, false, null, strings, numbers) and variables
+     */
+    private function resolveConditionValue(string $expr, array $context) {
+        $expr = trim($expr);
+        
+        // Boolean literals
+        if ($expr === 'true') return true;
+        if ($expr === 'false') return false;
+        if ($expr === 'null') return null;
+        
+        // String literals (single or double quotes)
+        if (preg_match('/^["\'](.*)["\']\s*$/', $expr, $m)) {
+            return $m[1];
+        }
+        
+        // Numeric literals
+        if (is_numeric($expr)) {
+            return strpos($expr, '.') !== false ? (float)$expr : (int)$expr;
+        }
+        
+        // Variable - resolve from context
+        $value = $this->resolveValue($expr, $context);
+        
+        // Normalize string "true"/"false" to actual booleans for comparison
+        if ($value === 'true') return true;
+        if ($value === 'false') return false;
+        
+        return $value;
     }
     
     /**

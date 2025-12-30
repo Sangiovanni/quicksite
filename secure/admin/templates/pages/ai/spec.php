@@ -219,6 +219,68 @@ $specData = $specManager->fetchDataRequirements($spec);
     resize: vertical;
 }
 
+/* Checkbox */
+.ai-spec-form__checkbox-group {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.ai-spec-form__checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.ai-spec-form__checkbox-label {
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--admin-text);
+    font-size: var(--font-size-sm);
+}
+
+/* Conditional fields */
+.ai-spec-form__group--hidden {
+    display: none;
+}
+
+/* User Prompt Section */
+.ai-spec-user-prompt {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-xl);
+}
+
+@media (max-width: 900px) {
+    .ai-spec-user-prompt {
+        grid-template-columns: 1fr;
+    }
+}
+
+.ai-spec-user-prompt--single {
+    grid-template-columns: 1fr;
+}
+
+.ai-spec-user-prompt__textarea {
+    width: 100%;
+    min-height: 150px;
+    padding: var(--space-md);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    line-height: 1.6;
+    background: var(--admin-bg);
+    color: var(--admin-text);
+    resize: vertical;
+}
+
+.ai-spec-user-prompt__textarea:focus {
+    outline: none;
+    border-color: var(--admin-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
 /* Examples */
 .ai-spec-examples {
     display: flex;
@@ -238,6 +300,12 @@ $specData = $specManager->fetchDataRequirements($spec);
 .ai-spec-example:hover {
     border-color: var(--admin-primary);
     background: var(--admin-bg-secondary);
+}
+
+.ai-spec-example--selected {
+    border-color: var(--admin-primary);
+    background: rgba(59, 130, 246, 0.1);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
 .ai-spec-example__title {
@@ -415,6 +483,56 @@ $specData = $specManager->fetchDataRequirements($spec);
         <?php endif; ?>
     </header>
     
+    <!-- Examples + User Prompt Section -->
+    <div class="ai-spec-user-prompt<?= empty($examples) ? ' ai-spec-user-prompt--single' : '' ?>">
+        <?php if (!empty($examples)): ?>
+        <!-- Examples -->
+        <div class="ai-spec-card">
+            <div class="ai-spec-card__header">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <path d="M14 2v6h6"/>
+                    <path d="M16 13H8"/>
+                    <path d="M16 17H8"/>
+                </svg>
+                <?= __admin('ai.spec.examples', 'Examples') ?>
+            </div>
+            <div class="ai-spec-card__body">
+                <div class="ai-spec-examples">
+                    <?php foreach ($examples as $example): ?>
+                    <div class="ai-spec-example" 
+                         data-params='<?= htmlspecialchars(json_encode($example['params'] ?? [])) ?>'
+                         data-prompt="<?= htmlspecialchars(__admin($example['promptKey'] ?? '', '')) ?>">
+                        <div class="ai-spec-example__title"><?= __admin($example['titleKey'] ?? '', $example['id']) ?></div>
+                        <?php if (isset($example['promptKey'])): ?>
+                        <div class="ai-spec-example__desc"><?= __admin($example['promptKey'], '') ?></div>
+                        <?php endif; ?>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+        
+        <!-- User Prompt -->
+        <div class="ai-spec-card">
+            <div class="ai-spec-card__header">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                <?= __admin('ai.spec.yourPrompt', 'Your Prompt') ?>
+            </div>
+            <div class="ai-spec-card__body">
+                <textarea 
+                    id="user-prompt" 
+                    class="ai-spec-user-prompt__textarea" 
+                    placeholder="<?= __admin('ai.spec.yourPromptPlaceholder', 'Describe what you want to create... Click an example to fill this automatically.') ?>"
+                ></textarea>
+            </div>
+        </div>
+    </div>
+    
     <div class="ai-spec__layout">
         <!-- Sidebar -->
         <aside class="ai-spec__sidebar">
@@ -431,7 +549,25 @@ $specData = $specManager->fetchDataRequirements($spec);
                 <div class="ai-spec-card__body">
                     <form id="spec-params-form" class="ai-spec-form">
                         <?php foreach ($parameters as $param): ?>
-                        <div class="ai-spec-form__group">
+                        <?php if (($param['type'] ?? 'text') === 'checkbox'): ?>
+                        <div class="ai-spec-form__group ai-spec-form__checkbox-group"<?php if (isset($param['condition'])): ?> data-condition="<?= htmlspecialchars($param['condition']) ?>"<?php endif; ?>>
+                            <input 
+                                type="checkbox"
+                                id="param-<?= htmlspecialchars($param['id']) ?>"
+                                name="<?= htmlspecialchars($param['id']) ?>"
+                                class="ai-spec-form__checkbox"
+                                value="true"
+                                <?= ($param['default'] ?? false) ? 'checked' : '' ?>
+                            />
+                            <label class="ai-spec-form__checkbox-label" for="param-<?= htmlspecialchars($param['id']) ?>">
+                                <?= __admin($param['labelKey'] ?? '', $param['id']) ?>
+                            </label>
+                            <?php if (isset($param['helpKey'])): ?>
+                            <span class="ai-spec-form__help" style="margin-left: auto;"><?= __admin($param['helpKey'], '') ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <?php else: ?>
+                        <div class="ai-spec-form__group"<?php if (isset($param['condition'])): ?> data-condition="<?= htmlspecialchars($param['condition']) ?>"<?php endif; ?>>
                             <label class="ai-spec-form__label" for="param-<?= htmlspecialchars($param['id']) ?>">
                                 <?= __admin($param['labelKey'] ?? '', $param['id']) ?>
                                 <?php if ($param['required'] ?? false): ?>
@@ -474,39 +610,13 @@ $specData = $specManager->fetchDataRequirements($spec);
                             <span class="ai-spec-form__help"><?= __admin($param['helpKey'], '') ?></span>
                             <?php endif; ?>
                         </div>
+                        <?php endif; ?>
                         <?php endforeach; ?>
                         
                         <button type="submit" class="admin-btn admin-btn--primary" style="margin-top: var(--space-sm);">
                             <?= __admin('ai.spec.generatePrompt', 'Generate Prompt') ?>
                         </button>
                     </form>
-                </div>
-            </div>
-            <?php endif; ?>
-            
-            <?php if (!empty($examples)): ?>
-            <!-- Examples -->
-            <div class="ai-spec-card">
-                <div class="ai-spec-card__header">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <path d="M14 2v6h6"/>
-                        <path d="M16 13H8"/>
-                        <path d="M16 17H8"/>
-                    </svg>
-                    <?= __admin('ai.spec.examples', 'Examples') ?>
-                </div>
-                <div class="ai-spec-card__body">
-                    <div class="ai-spec-examples">
-                        <?php foreach ($examples as $example): ?>
-                        <div class="ai-spec-example" data-params='<?= htmlspecialchars(json_encode($example['params'] ?? [])) ?>'>
-                            <div class="ai-spec-example__title"><?= __admin($example['titleKey'] ?? '', $example['id']) ?></div>
-                            <?php if (isset($example['promptKey'])): ?>
-                            <div class="ai-spec-example__desc"><?= __admin($example['promptKey'], '') ?></div>
-                            <?php endif; ?>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
                 </div>
             </div>
             <?php endif; ?>
@@ -601,6 +711,65 @@ $specData = $specManager->fetchDataRequirements($spec);
     const goBatchBtn = document.getElementById('go-batch');
     const charCount = document.getElementById('char-count');
     const wordCount = document.getElementById('word-count');
+    const userPromptTextarea = document.getElementById('user-prompt');
+    
+    // Evaluate condition expression
+    function evaluateCondition(condition, formData) {
+        // Simple condition parser for expressions like "multilingual === true"
+        // Supports: ===, !==, ==, !=, &&, ||
+        try {
+            // Replace parameter names with their values
+            let expr = condition;
+            for (const [key, value] of Object.entries(formData)) {
+                // Handle boolean-like values
+                let actualValue = value;
+                if (value === 'true') actualValue = true;
+                else if (value === 'false' || value === '') actualValue = false;
+                
+                // Replace the variable with its JSON value
+                const regex = new RegExp(`\\b${key}\\b`, 'g');
+                expr = expr.replace(regex, JSON.stringify(actualValue));
+            }
+            // Also replace any remaining undefined params with false
+            expr = expr.replace(/\b[a-zA-Z_][a-zA-Z0-9_]*\b(?!\s*:)/g, (match) => {
+                if (match === 'true' || match === 'false' || match === 'null') return match;
+                return 'false';
+            });
+            return eval(expr);
+        } catch (e) {
+            console.warn('Condition evaluation failed:', condition, e);
+            return true; // Default to showing the field
+        }
+    }
+    
+    // Update conditional fields visibility
+    function updateConditionalFields() {
+        if (!form) return;
+        
+        // Get current form values
+        const formData = {};
+        form.querySelectorAll('input, select, textarea').forEach(input => {
+            if (input.type === 'checkbox') {
+                formData[input.name] = input.checked ? 'true' : 'false';
+            } else {
+                formData[input.name] = input.value;
+            }
+        });
+        
+        // Check all conditional fields
+        form.querySelectorAll('[data-condition]').forEach(group => {
+            const condition = group.dataset.condition;
+            const shouldShow = evaluateCondition(condition, formData);
+            group.classList.toggle('ai-spec-form__group--hidden', !shouldShow);
+        });
+    }
+    
+    // Listen for form changes to update conditionals
+    if (form) {
+        form.addEventListener('change', updateConditionalFields);
+        // Initial evaluation
+        updateConditionalFields();
+    }
     
     // Update stats
     function updateStats(text) {
@@ -630,10 +799,19 @@ $specData = $specManager->fetchDataRequirements($spec);
             const data = await response.json();
             
             if (data.success && data.data?.prompt) {
-                promptOutput.value = data.data.prompt;
+                // Get user's custom prompt
+                const userPrompt = userPromptTextarea ? userPromptTextarea.value.trim() : '';
+                
+                // Combine spec prompt with user prompt
+                let finalPrompt = data.data.prompt;
+                if (userPrompt) {
+                    finalPrompt += '\n\n---\n\n**User Request:**\n' + userPrompt;
+                }
+                
+                promptOutput.value = finalPrompt;
                 copyBtn.disabled = false;
                 goBatchBtn.style.display = 'inline-flex';
-                updateStats(data.data.prompt);
+                updateStats(finalPrompt);
             } else {
                 promptOutput.value = 'Error: ' + (data.error || 'Failed to generate prompt');
                 updateStats('');
@@ -660,20 +838,35 @@ $specData = $specManager->fetchDataRequirements($spec);
         });
     }
     
-    // Example click
+    // Example click - fill user prompt textarea
     document.querySelectorAll('.ai-spec-example').forEach(example => {
         example.addEventListener('click', function() {
             const params = JSON.parse(this.dataset.params || '{}');
+            const examplePrompt = this.dataset.prompt || '';
+            
+            // Fill user prompt textarea with example description
+            if (userPromptTextarea && examplePrompt) {
+                userPromptTextarea.value = examplePrompt;
+                userPromptTextarea.focus();
+            }
             
             // Fill form with example params
             if (form) {
                 Object.entries(params).forEach(([key, value]) => {
                     const input = form.querySelector(`[name="${key}"]`);
-                    if (input) input.value = value;
+                    if (input) {
+                        if (input.type === 'checkbox') {
+                            input.checked = value === true || value === 'true';
+                        } else {
+                            input.value = value;
+                        }
+                    }
                 });
             }
             
-            generatePrompt(params);
+            // Highlight the selected example
+            document.querySelectorAll('.ai-spec-example').forEach(ex => ex.classList.remove('ai-spec-example--selected'));
+            this.classList.add('ai-spec-example--selected');
         });
     });
     

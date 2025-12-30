@@ -16,7 +16,7 @@
             "type": "checkbox",
             "labelKey": "ai.specs.createLanding.params.multilingual.label",
             "helpKey": "ai.specs.createLanding.params.multilingual.help",
-            "default": false
+            "default": true
         },
         {
             "id": "languages",
@@ -50,13 +50,15 @@
             "id": "helpSetMultilingual",
             "command": "help",
             "urlParams": ["setMultilingual"],
-            "extract": "data"
+            "extract": "data",
+            "condition": "multilingual === true"
         },
         {
             "id": "helpAddLang",
             "command": "help",
             "urlParams": ["addLang"],
-            "extract": "data"
+            "extract": "data",
+            "condition": "multilingual === true"
         },
         {
             "id": "helpEditStructure",

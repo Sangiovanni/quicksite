@@ -117,6 +117,10 @@
               "min": { "type": "number" },
               "max": { "type": "number" }
             }
+          },
+          "condition": {
+            "type": "string",
+            "description": "Conditional expression to show/hide this parameter. Supports: paramId === value, paramId !== value, paramId (truthy). Example: 'multilingual === true'"
           }
         }
       }
@@ -174,6 +178,10 @@
           "extract": {
             "type": "string",
             "description": "Dot-notation path to extract specific data (e.g., 'data.languages')"
+          },
+          "condition": {
+            "type": "string",
+            "description": "Parameter ID or expression. Data is only fetched when this evaluates to truthy. Example: 'targetPage' or 'multilingual === true'"
           }
         }
       }

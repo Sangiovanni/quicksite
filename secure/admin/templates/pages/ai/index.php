@@ -266,23 +266,92 @@ $categoryOrder = ['creation', 'modification', 'content', 'style', 'advanced', 'w
     opacity: 0.5;
 }
 
-.ai-legacy-link {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
-    color: var(--admin-text-muted);
-    font-size: var(--font-size-sm);
-    margin-top: var(--space-lg);
-    padding: var(--space-sm) var(--space-md);
-    border: 1px dashed var(--admin-border);
+/* Search and Filter Bar */
+.ai-browser__filters {
+    display: flex;
+    gap: var(--space-md);
+    margin-bottom: var(--space-xl);
+    flex-wrap: wrap;
+}
+
+.ai-browser__search {
+    flex: 1;
+    min-width: 250px;
+    position: relative;
+}
+
+.ai-browser__search-input {
+    width: 100%;
+    padding: var(--space-sm) var(--space-md) var(--space-sm) 40px;
+    border: 1px solid var(--admin-border);
     border-radius: var(--radius-md);
-    text-decoration: none;
+    font-size: var(--font-size-sm);
+    background: var(--admin-card-bg);
+    color: var(--admin-text);
+}
+
+.ai-browser__search-input:focus {
+    outline: none;
+    border-color: var(--admin-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.ai-browser__search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--admin-text-muted);
+    pointer-events: none;
+}
+
+.ai-browser__tags {
+    display: flex;
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.ai-browser__tag-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-full);
+    background: var(--admin-card-bg);
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
     transition: all 0.2s ease;
 }
 
-.ai-legacy-link:hover {
+.ai-browser__tag-btn:hover {
     border-color: var(--admin-primary);
     color: var(--admin-primary);
+}
+
+.ai-browser__tag-btn--active {
+    background: var(--admin-primary);
+    border-color: var(--admin-primary);
+    color: white;
+}
+
+.ai-browser__tag-btn--active:hover {
+    background: var(--admin-primary-dark, #2563eb);
+    color: white;
+}
+
+.ai-browser__no-results {
+    text-align: center;
+    padding: var(--space-xl);
+    color: var(--admin-text-muted);
+    display: none;
+}
+
+.ai-spec-card--hidden {
+    display: none;
+}
+
+.ai-category--hidden {
+    display: none;
 }
 </style>
 
@@ -340,6 +409,52 @@ $categoryOrder = ['creation', 'modification', 'content', 'style', 'advanced', 'w
         </div>
     </div>
     
+    <!-- Search and Filter Bar -->
+    <div class="ai-browser__filters">
+        <div class="ai-browser__search">
+            <svg class="ai-browser__search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="M21 21l-4.35-4.35"/>
+            </svg>
+            <input 
+                type="text" 
+                id="spec-search" 
+                class="ai-browser__search-input" 
+                placeholder="<?= __admin('ai.browser.searchPlaceholder', 'Search specifications...') ?>"
+            />
+        </div>
+        <div class="ai-browser__tags" id="tag-filters">
+            <button type="button" class="ai-browser__tag-btn ai-browser__tag-btn--active" data-tag="all">
+                <?= __admin('ai.browser.allTags', 'All') ?>
+            </button>
+            <?php
+            // Collect all unique tags
+            $allTags = [];
+            foreach ($specsByCategory as $specs) {
+                foreach ($specs as $spec) {
+                    if (!empty($spec['meta']['tags'])) {
+                        foreach ($spec['meta']['tags'] as $tag) {
+                            $allTags[$tag] = ($allTags[$tag] ?? 0) + 1;
+                        }
+                    }
+                }
+            }
+            arsort($allTags); // Sort by frequency
+            $topTags = array_slice(array_keys($allTags), 0, 8); // Show top 8 tags
+            foreach ($topTags as $tag):
+            ?>
+            <button type="button" class="ai-browser__tag-btn" data-tag="<?= htmlspecialchars($tag) ?>">
+                <?= htmlspecialchars($tag) ?>
+            </button>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    
+    <div class="ai-browser__no-results" id="no-results">
+        <div class="ai-empty-state__icon">🔍</div>
+        <p><?= __admin('ai.browser.noResults', 'No specifications match your search.') ?></p>
+    </div>
+    
     <?php 
     $hasSpecs = false;
     foreach ($categoryOrder as $category): 
@@ -359,8 +474,16 @@ $categoryOrder = ['creation', 'modification', 'content', 'style', 'advanced', 'w
             <?php foreach ($specs as $spec): 
                 $meta = $spec['meta'] ?? [];
                 $difficulty = $meta['difficulty'] ?? 'intermediate';
+                $specTags = implode(',', $meta['tags'] ?? []);
+                $specTitle = __admin($meta['titleKey'] ?? '', $spec['id']);
+                $specDesc = __admin($meta['descriptionKey'] ?? '', '');
             ?>
-            <a href="<?= $router->url('ai', $spec['id']) ?>" class="ai-spec-card">
+            <a href="<?= $router->url('ai', $spec['id']) ?>" 
+               class="ai-spec-card" 
+               data-tags="<?= htmlspecialchars($specTags) ?>"
+               data-title="<?= htmlspecialchars(strtolower($specTitle)) ?>"
+               data-desc="<?= htmlspecialchars(strtolower($specDesc)) ?>"
+               data-id="<?= htmlspecialchars($spec['id']) ?>">
                 <div class="ai-spec-card__header">
                     <span class="ai-spec-card__icon"><?= htmlspecialchars($meta['icon'] ?? '📋') ?></span>
                     <span class="ai-spec-card__title"><?= __admin($meta['titleKey'] ?? '', $spec['id']) ?></span>
@@ -390,15 +513,6 @@ $categoryOrder = ['creation', 'modification', 'content', 'style', 'advanced', 'w
         <p><?= __admin('ai.browser.noSpecs', 'No AI specifications available yet.') ?></p>
     </div>
     <?php endif; ?>
-    
-    <!-- Link to legacy AI page while migration is in progress -->
-    <a href="<?= $router->getBaseUrl() ?>/ai-legacy" class="ai-legacy-link">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 8v4l3 3"/>
-            <circle cx="12" cy="12" r="10"/>
-        </svg>
-        <?= __admin('ai.browser.legacyLink', 'Use legacy AI page (all specs)') ?>
-    </a>
 </div>
 
 <!-- Hidden file input for import -->
@@ -406,6 +520,79 @@ $categoryOrder = ['creation', 'modification', 'content', 'style', 'advanced', 'w
 
 <script>
 (function() {
+    // Search and Filter functionality
+    const searchInput = document.getElementById('spec-search');
+    const tagButtons = document.querySelectorAll('.ai-browser__tag-btn');
+    const specCards = document.querySelectorAll('.ai-spec-card');
+    const categories = document.querySelectorAll('.ai-category');
+    const noResults = document.getElementById('no-results');
+    
+    let currentSearch = '';
+    let currentTag = 'all';
+    
+    function filterSpecs() {
+        let visibleCount = 0;
+        
+        specCards.forEach(card => {
+            const tags = card.dataset.tags || '';
+            const title = card.dataset.title || '';
+            const desc = card.dataset.desc || '';
+            const id = card.dataset.id || '';
+            
+            // Check tag match
+            const tagMatch = currentTag === 'all' || tags.split(',').includes(currentTag);
+            
+            // Check search match
+            const searchLower = currentSearch.toLowerCase();
+            const searchMatch = !currentSearch || 
+                title.includes(searchLower) || 
+                desc.includes(searchLower) || 
+                id.includes(searchLower) ||
+                tags.toLowerCase().includes(searchLower);
+            
+            const isVisible = tagMatch && searchMatch;
+            card.classList.toggle('ai-spec-card--hidden', !isVisible);
+            
+            if (isVisible) visibleCount++;
+        });
+        
+        // Update category visibility
+        categories.forEach(category => {
+            const grid = category.querySelector('.ai-specs-grid');
+            const visibleCards = grid.querySelectorAll('.ai-spec-card:not(.ai-spec-card--hidden)');
+            category.classList.toggle('ai-category--hidden', visibleCards.length === 0);
+            
+            // Update count
+            const countBadge = category.querySelector('.ai-category__count');
+            if (countBadge) {
+                countBadge.textContent = visibleCards.length;
+            }
+        });
+        
+        // Show/hide no results message
+        noResults.style.display = visibleCount === 0 ? 'block' : 'none';
+    }
+    
+    // Search input handler
+    searchInput.addEventListener('input', function() {
+        currentSearch = this.value;
+        filterSpecs();
+    });
+    
+    // Tag button handler
+    tagButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            currentTag = this.dataset.tag;
+            
+            // Update active state
+            tagButtons.forEach(b => b.classList.remove('ai-browser__tag-btn--active'));
+            this.classList.add('ai-browser__tag-btn--active');
+            
+            filterSpecs();
+        });
+    });
+    
+    // Import functionality
     const importBtn = document.getElementById('import-spec');
     const fileInput = document.getElementById('import-file-input');
     

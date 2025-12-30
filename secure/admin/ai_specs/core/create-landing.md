@@ -15,19 +15,24 @@ You are creating a complete single-page landing website from a blank QuickSite p
 
 **⚠️ MANDATORY ORDER:**
 
-1. **Multilingual FIRST** (if needed):
+{{#if param.multilingual === true}}
+1. **Multilingual FIRST**:
    - `setMultilingual` → enables multi-language mode
-   - `addLang` → for each additional language (default is "en")
+   - `addLang` → for each additional language (languages: {{param.languages}})
+{{/if}}
 
-2. **Structures** (in this order):
+{{#if param.multilingual === true}}2{{else}}1{{/if}}. **Structures** (in this order):
    - `editStructure` type="menu" → navigation (can be minimal for landing)
    - `editStructure` type="footer" → footer with copyright, links
    - `editStructure` type="page", name="home" → main landing page content
 
-3. **Translations**:
+{{#if param.multilingual === true}}3{{else}}2{{/if}}. **Translations**:
    - `setTranslationKeys` → MUST cover ALL textKeys used in structures
+{{#if param.multilingual === true}}
+   - Repeat for each language: {{param.languages}}
+{{/if}}
 
-4. **Styles LAST** (order matters!):
+{{#if param.multilingual === true}}4{{else}}3{{/if}}. **Styles LAST** (order matters!):
    - `editStyles` → MUST come BEFORE setRootVariables
    - `setRootVariables` → AFTER editStyles (optional helper)
 
@@ -97,7 +102,7 @@ Components are reusable structure fragments with variable placeholders using `{{
 
 ---
 
-{{#if multilingual}}
+{{#if param.multilingual === true}}
 ## Language Switcher (Required for Multilingual)
 
 **Create the lang-switch component:**
@@ -117,9 +122,9 @@ Components are reusable structure fragments with variable placeholders using `{{
 ```json
 { "component": "lang-switch", "data": {} }
 ```
-{{/if}}
 
 ---
+{{/if}}
 
 ## Available Commands
 

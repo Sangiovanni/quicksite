@@ -548,8 +548,8 @@ switch ($action) {
             }
         }
         
-        // Fetch data requirements
-        $data = $manager->fetchDataRequirements($spec);
+        // Fetch data requirements (pass userParams for condition evaluation)
+        $data = $manager->fetchDataRequirements($spec, $userParams);
         
         // Render the prompt
         $prompt = $manager->renderPrompt($spec, $data, $userParams);
