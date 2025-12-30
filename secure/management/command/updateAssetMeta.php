@@ -122,7 +122,7 @@ if ($description === null && $alt === null) {
 }
 
 // Load metadata file
-$metadataPath = SECURE_FOLDER_PATH . '/config/assets_metadata.json';
+$metadataPath = PROJECT_PATH . '/data/assets_metadata.json';
 $metadata = [];
 if (file_exists($metadataPath)) {
     $metadataContent = file_get_contents($metadataPath);

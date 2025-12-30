@@ -94,7 +94,7 @@ function findUsedComponents($node, &$used = []) {
  * @return ApiResponse
  */
 function __command_listComponents(array $params = [], array $urlParams = []): ApiResponse {
-    $componentsDir = SECURE_FOLDER_PATH . '/templates/model/json/components';
+    $componentsDir = PROJECT_PATH . '/templates/model/json/components';
 
     // Check directory exists
     if (!is_dir($componentsDir)) {

@@ -60,7 +60,7 @@ if (in_array($route_name, ROUTES)) {
 }
 
 // --- CREATE PHP PAGE FILE ---
-$target_dir = SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'templates' . DIRECTORY_SEPARATOR . 'pages';
+$target_dir = PROJECT_PATH . DIRECTORY_SEPARATOR . 'templates' . DIRECTORY_SEPARATOR . 'pages';
 $target_file = $target_dir . DIRECTORY_SEPARATOR . $route_name . '.php';
 
 // Ensure directory exists
@@ -85,7 +85,7 @@ if (file_put_contents($target_file, $page_content, LOCK_EX) === false) {
 }
 
 // --- CREATE JSON STRUCTURE FILE ---
-$json_dir = SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'templates' . DIRECTORY_SEPARATOR . 'model' . DIRECTORY_SEPARATOR . 'json' . DIRECTORY_SEPARATOR . 'pages';
+$json_dir = PROJECT_PATH . DIRECTORY_SEPARATOR . 'templates' . DIRECTORY_SEPARATOR . 'model' . DIRECTORY_SEPARATOR . 'json' . DIRECTORY_SEPARATOR . 'pages';
 $json_file = $json_dir . DIRECTORY_SEPARATOR . $route_name . '.json';
 
 // Ensure JSON directory exists

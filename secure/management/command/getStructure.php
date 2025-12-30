@@ -122,13 +122,13 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
         
         // Build file path based on type
         if ($type === 'page') {
-            $json_file = SECURE_FOLDER_PATH . '/templates/model/json/pages/' . $name . '.json';
+            $json_file = PROJECT_PATH . '/templates/model/json/pages/' . $name . '.json';
         } else { // component
-            $json_file = SECURE_FOLDER_PATH . '/templates/model/json/components/' . $name . '.json';
+            $json_file = PROJECT_PATH . '/templates/model/json/components/' . $name . '.json';
         }
     } else {
         // For menu/footer, use the type directly
-        $json_file = SECURE_FOLDER_PATH . '/templates/model/json/' . $type . '.json';
+        $json_file = PROJECT_PATH . '/templates/model/json/' . $type . '.json';
         $name = null;
     }
 

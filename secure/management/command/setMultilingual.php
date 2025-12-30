@@ -61,8 +61,8 @@ if ($currentState === $enabled) {
         ->send();
 }
 
-$configPath = SECURE_FOLDER_PATH . '/config.php';
-$translatePath = SECURE_FOLDER_PATH . '/translate/';
+$configPath = PROJECT_PATH . '/config.php';
+$translatePath = PROJECT_PATH . '/translate/';
 $defaultFile = $translatePath . 'default.json';
 $defaultLang = CONFIG['LANGUAGE_DEFAULT'] ?? 'en';
 $defaultLangFile = $translatePath . $defaultLang . '.json';
@@ -185,7 +185,7 @@ $config['MULTILINGUAL_SUPPORT'] = $enabled;
 $configContent = "<?php\n\nreturn " . var_export($config, true) . ";\n";
 
 // Use file locking for safety
-$lockFile = SECURE_FOLDER_PATH . '/config.lock';
+$lockFile = PROJECT_PATH . '/config.lock';
 $lock = @fopen($lockFile, 'w');
 
 if ($lock === false) {

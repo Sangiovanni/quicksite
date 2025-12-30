@@ -2254,6 +2254,317 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [],
         'notes' => 'Returns empty array if no aliases defined. Use createAlias to add new aliases.'
+    ],
+    
+    // ==========================================
+    // PROJECT MANAGEMENT COMMANDS
+    // ==========================================
+    
+    'listProjects' => [
+        'description' => 'Lists all available projects with metadata (name, site name, routes, languages, size)',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/listProjects',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Projects listed successfully',
+            'data' => [
+                'projects' => [
+                    [
+                        'name' => 'quicksite',
+                        'path' => 'secure/projects/quicksite',
+                        'site_name' => 'QuickSite Demo',
+                        'routes_count' => 5,
+                        'pages_count' => 5,
+                        'languages' => ['en', 'fr'],
+                        'size' => '2.5 MB',
+                        'size_bytes' => 2621440,
+                        'is_active' => true
+                    ]
+                ],
+                'count' => 1,
+                'active_project' => 'quicksite'
+            ]
+        ],
+        'error_responses' => [],
+        'notes' => 'Use to get overview of all managed projects. The is_active flag shows which project is currently being served.'
+    ],
+    
+    'getActiveProject' => [
+        'description' => 'Returns information about the currently active project',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/getActiveProject',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Active project: quicksite',
+            'data' => [
+                'project' => 'quicksite',
+                'path' => 'secure/projects/quicksite',
+                'exists' => true,
+                'site_name' => 'QuickSite Demo'
+            ]
+        ],
+        'error_responses' => [
+            '500.config.target_missing' => 'target.php configuration not found'
+        ],
+        'notes' => 'Shows which project is currently being served by the website.'
+    ],
+    
+    'switchProject' => [
+        'description' => 'Switches the active project. Optionally copies project public files to live public folder.',
+        'method' => 'PATCH',
+        'parameters' => [
+            'project' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Project name to switch to',
+                'example' => 'quicksite'
+            ],
+            'copy_public' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Copy project public files (assets, styles, build) to live public folder',
+                'default' => true
+            ]
+        ],
+        'example_patch' => 'PATCH /management/switchProject with body: {"project": "mysite", "copy_public": true}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => "Switched to project 'mysite'",
+            'data' => [
+                'previous_project' => 'quicksite',
+                'new_project' => 'mysite',
+                'project_path' => 'secure/projects/mysite',
+                'public_deployed' => true
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.missing_field' => 'Missing name parameter',
+            '400.validation.same_project' => 'Already on this project',
+            '404.resource.not_found' => 'Project not found'
+        ],
+        'notes' => 'The website will immediately start serving the new project. Use deploy_public=true to update public assets.'
+    ],
+    
+    'createProject' => [
+        'description' => 'Creates a new empty project with basic structure and templates',
+        'method' => 'POST',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Project name (alphanumeric, starts with letter)',
+                'example' => 'my_new_site',
+                'validation' => 'Max 50 chars, alphanumeric/dash/underscore only, must start with letter'
+            ],
+            'site_name' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Display name for the site',
+                'default' => 'Capitalized project name'
+            ],
+            'language' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Default language code',
+                'default' => 'en',
+                'validation' => 'ISO format: en, fr, de, en-US, etc.'
+            ],
+            'switch_to' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Switch to this project after creation',
+                'default' => false
+            ]
+        ],
+        'example_post' => 'POST /management/createProject with body: {"name": "mysite", "site_name": "My Website", "language": "en", "switch_to": true}',
+        'success_response' => [
+            'status' => 201,
+            'code' => 'resource.created',
+            'message' => "Project 'mysite' created successfully",
+            'data' => [
+                'project' => 'mysite',
+                'path' => 'secure/projects/mysite',
+                'site_name' => 'My Website',
+                'default_language' => 'en',
+                'created' => true,
+                'switched_to' => true
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.missing_field' => 'Missing name parameter',
+            '400.validation.invalid_format' => 'Invalid project name format',
+            '400.validation.reserved_name' => 'Project name is reserved for system use',
+            '409.resource.already_exists' => 'Project already exists'
+        ],
+        'notes' => 'Creates complete project structure: config.php, routes.php, templates/, translate/, etc. with basic home page template.'
+    ],
+    
+    'deleteProject' => [
+        'description' => 'Permanently deletes a project and all its files',
+        'method' => 'DELETE',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Project name to delete'
+            ],
+            'confirm' => [
+                'required' => true,
+                'type' => 'boolean',
+                'description' => 'Safety confirmation (must be true)',
+                'validation' => 'Must be true to proceed'
+            ],
+            'force' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Force delete even if project is active',
+                'default' => false
+            ]
+        ],
+        'example_delete' => 'DELETE /management/deleteProject with body: {"name": "oldsite", "confirm": true}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'resource.deleted',
+            'message' => "Project 'oldsite' deleted successfully",
+            'data' => [
+                'project' => 'oldsite',
+                'deleted' => true,
+                'files_deleted' => 45,
+                'directories_deleted' => 12,
+                'size_freed' => '1.2 MB'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.missing_field' => 'Missing name parameter',
+            '400.validation.confirmation_required' => 'Must set confirm=true',
+            '400.validation.active_project' => 'Cannot delete active project (use force=true)',
+            '404.resource.not_found' => 'Project not found'
+        ],
+        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. If deleting active project, system will auto-switch to another available project.'
+    ],
+    
+    'exportProject' => [
+        'description' => 'Exports a project as a downloadable ZIP file',
+        'method' => 'GET',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Project name to export'
+            ],
+            'include_public' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Include public folder in export',
+                'default' => true
+            ],
+            'download' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Stream file directly as download',
+                'default' => false
+            ]
+        ],
+        'example_get' => 'GET /management/exportProject?name=quicksite or GET /management/exportProject?name=quicksite&download=true',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'resource.exported',
+            'message' => "Project 'quicksite' exported successfully",
+            'data' => [
+                'project' => 'quicksite',
+                'filename' => 'quicksite_export_20250120_143022.zip',
+                'size' => '2.1 MB',
+                'download_url' => '/management/downloadExport?file=quicksite_export_20250120_143022.zip',
+                'expires' => '2025-01-21 14:30:22'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.missing_field' => 'Missing name parameter',
+            '404.resource.not_found' => 'Project not found',
+            '500.server.missing_extension' => 'PHP ZIP extension not available'
+        ],
+        'notes' => 'Exports are stored in secure/exports/ and auto-cleaned (keeps last 5). Use download=true to stream directly.'
+    ],
+    
+    'importProject' => [
+        'description' => 'Imports a project from an uploaded ZIP file',
+        'method' => 'POST',
+        'content_type' => 'multipart/form-data',
+        'parameters' => [
+            'file' => [
+                'required' => true,
+                'type' => 'file',
+                'description' => 'ZIP file containing project',
+                'validation' => 'Must be valid ZIP with config.php or routes.php'
+            ],
+            'name' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Override project name',
+                'default' => 'Uses folder name from ZIP'
+            ],
+            'overwrite' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Overwrite if project exists',
+                'default' => false
+            ],
+            'switch_to' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Switch to imported project',
+                'default' => false
+            ]
+        ],
+        'example_post' => 'POST /management/importProject (multipart/form-data with file)',
+        'success_response' => [
+            'status' => 201,
+            'code' => 'resource.imported',
+            'message' => "Project 'mysite' imported successfully",
+            'data' => [
+                'project' => 'mysite',
+                'imported' => true,
+                'files_count' => 45,
+                'site_name' => 'My Website',
+                'routes_count' => 5,
+                'switched_to' => true
+            ]
+        ],
+        'error_responses' => [
+            '400.upload.failed' => 'File upload failed',
+            '400.validation.invalid_zip' => 'Invalid or corrupted ZIP',
+            '400.validation.invalid_structure' => 'ZIP missing required project files',
+            '409.resource.already_exists' => 'Project exists (use overwrite=true)'
+        ],
+        'notes' => 'Compatible with exports from exportProject. ZIP must contain project folder with config.php or routes.php.'
+    ],
+    
+    'downloadExport' => [
+        'description' => 'Downloads a previously exported project ZIP file',
+        'method' => 'GET',
+        'parameters' => [
+            'file' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Export filename to download',
+                'example' => 'quicksite_export_20250120_143022.zip'
+            ]
+        ],
+        'example_get' => 'GET /management/downloadExport?file=quicksite_export_20250120_143022.zip',
+        'success_response' => [
+            'description' => 'Streams ZIP file with appropriate headers'
+        ],
+        'error_responses' => [
+            '400.validation.missing_field' => 'Missing file parameter',
+            '400.validation.invalid_filename' => 'Invalid filename (path traversal blocked)',
+            '404.resource.not_found' => 'Export file not found or expired'
+        ],
+        'notes' => 'Export files expire after 24 hours. Use exportProject with download=true for immediate download.'
     ]
 ];
 
@@ -2321,11 +2632,11 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                     'write' => 'set*, edit*, add*, delete*, upload*',
                     'admin' => 'setPublicSpace, rename*, build, token management'
                 ],
-                'config_file' => 'secure/config/auth.php'
+                'config_file' => 'secure/management/config/auth.php'
             ],
             'cors' => [
                 'development_mode' => 'Allows localhost:* origins automatically',
-                'config_file' => 'secure/config/auth.php',
+                'config_file' => 'secure/management/config/auth.php',
                 'allowed_methods' => ['GET', 'POST', 'OPTIONS']
             ],
             'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getSiteMap, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listTokens, listComponents, listPages, listAliases. POST commands: all others.',

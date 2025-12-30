@@ -97,6 +97,43 @@
                 "duration": "Durée",
                 "time": "Heure"
             }
+        },
+        "projects": {
+            "title": "Gestionnaire de Projets",
+            "current": "Projet actuel",
+            "switch": "Changer de projet",
+            "create": "Créer un projet",
+            "export": "Exporter",
+            "import": "Importer",
+            "delete": "Supprimer",
+            "confirmDelete": "Êtes-vous sûr de vouloir supprimer ce projet ? Cette action est irréversible.",
+            "createModal": {
+                "title": "Créer un nouveau projet",
+                "name": "Nom du projet",
+                "namePlaceholder": "mon-nouveau-projet",
+                "nameHelp": "Minuscules, chiffres et tirets uniquement",
+                "activate": "Activer immédiatement",
+                "submit": "Créer le projet"
+            },
+            "importModal": {
+                "title": "Importer un projet",
+                "file": "Fichier ZIP du projet",
+                "activate": "Activer après l'import",
+                "submit": "Importer le projet"
+            },
+            "deleteModal": {
+                "title": "Supprimer le projet",
+                "warning": "Cette action supprimera définitivement le projet et tous ses fichiers.",
+                "confirm": "Tapez DELETE pour confirmer",
+                "submit": "Supprimer définitivement"
+            },
+            "messages": {
+                "switched": "Basculé vers le projet",
+                "created": "Projet créé avec succès",
+                "deleted": "Projet supprimé avec succès",
+                "exported": "Export du projet démarré",
+                "imported": "Projet importé avec succès"
+            }
         }
     },
     "commands": {

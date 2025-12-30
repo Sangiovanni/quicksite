@@ -300,7 +300,7 @@ class JsonToPhpCompiler {
         }
         
         // Load component JSON from development location
-        $componentPath = SECURE_FOLDER_PATH . '/templates/model/json/components/' . $componentName . '.json';
+        $componentPath = PROJECT_PATH . '/templates/model/json/components/' . $componentName . '.json';
         
         if (!file_exists($componentPath)) {
             return "// Component not found: {$componentName}\n";

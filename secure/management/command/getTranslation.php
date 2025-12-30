@@ -69,7 +69,7 @@ function __command_getTranslation(array $params = [], array $urlParams = []): Ap
             ->withErrors([RegexPatterns::validationError('language_code_extended', 'language', $language)]);
     }
 
-    $translations_file = SECURE_FOLDER_PATH . '/translate/' . $language . '.json';
+    $translations_file = PROJECT_PATH . '/translate/' . $language . '.json';
 
     // Check if file exists
     if (!file_exists($translations_file)) {

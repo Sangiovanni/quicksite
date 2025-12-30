@@ -331,7 +331,7 @@ if (file_exists(SERVER_ROOT . '/LICENSE')) {
 // Step 3: Copy secure folder files (selective)
 
 // Copy routes.php
-if (!copy(SECURE_FOLDER_PATH . '/routes.php', $buildFullPath . '/' . $buildSecureName . '/routes.php')) {
+if (!copy(PROJECT_PATH . '/routes.php', $buildFullPath . '/' . $buildSecureName . '/routes.php')) {
     release_build_lock();
     ApiResponse::create(500, 'server.file_write_failed')
         ->withMessage("Failed to copy routes.php")
@@ -339,7 +339,7 @@ if (!copy(SECURE_FOLDER_PATH . '/routes.php', $buildFullPath . '/' . $buildSecur
 }
 
 // Copy and sanitize config.php (remove DB credentials)
-$configContent = file_get_contents(SECURE_FOLDER_PATH . '/config.php');
+$configContent = file_get_contents(PROJECT_PATH . '/config.php');
 if ($configContent === false) {
     release_build_lock();
     ApiResponse::create(500, 'server.file_write_failed')
@@ -406,7 +406,7 @@ if (!is_dir($translateDestPath)) {
 
 if (MULTILINGUAL_SUPPORT) {
     // Multilingual: copy all translation files
-    if (!copyDirectory(SECURE_FOLDER_PATH . '/translate', $translateDestPath)) {
+    if (!copyDirectory(PROJECT_PATH . '/translate', $translateDestPath)) {
         release_build_lock();
         ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage("Failed to copy /translate/ directory")
@@ -414,7 +414,7 @@ if (MULTILINGUAL_SUPPORT) {
     }
 } else {
     // Mono-language: copy only default.json
-    $defaultJsonPath = SECURE_FOLDER_PATH . '/translate/default.json';
+    $defaultJsonPath = PROJECT_PATH . '/translate/default.json';
     if (file_exists($defaultJsonPath)) {
         if (!copy($defaultJsonPath, $translateDestPath . '/default.json')) {
             release_build_lock();
@@ -434,7 +434,7 @@ if (MULTILINGUAL_SUPPORT) {
 $compiler = new JsonToPhpCompiler();
 
 // Compile menu
-$menuJsonPath = SECURE_FOLDER_PATH . '/templates/model/json/menu.json';
+$menuJsonPath = PROJECT_PATH . '/templates/model/json/menu.json';
 if (file_exists($menuJsonPath)) {
     $menuJson = json_decode(file_get_contents($menuJsonPath), true);
     if ($menuJson === null) {
@@ -454,7 +454,7 @@ if (file_exists($menuJsonPath)) {
 }
 
 // Compile footer
-$footerJsonPath = SECURE_FOLDER_PATH . '/templates/model/json/footer.json';
+$footerJsonPath = PROJECT_PATH . '/templates/model/json/footer.json';
 if (file_exists($footerJsonPath)) {
     $footerJson = json_decode(file_get_contents($footerJsonPath), true);
     if ($footerJson === null) {
@@ -477,7 +477,7 @@ if (file_exists($footerJsonPath)) {
 $compiledPages = [];
 
 // First compile 404 page (special case)
-$page404JsonPath = SECURE_FOLDER_PATH . '/templates/model/json/pages/404.json';
+$page404JsonPath = PROJECT_PATH . '/templates/model/json/pages/404.json';
 if (file_exists($page404JsonPath)) {
     $page404Json = json_decode(file_get_contents($page404JsonPath), true);
     if ($page404Json === null) {
@@ -502,7 +502,7 @@ if (file_exists($page404JsonPath)) {
 
 // Then compile regular route pages
 foreach (ROUTES as $route) {
-    $pageJsonPath = SECURE_FOLDER_PATH . '/templates/model/json/pages/' . $route . '.json';
+    $pageJsonPath = PROJECT_PATH . '/templates/model/json/pages/' . $route . '.json';
     
     if (!file_exists($pageJsonPath)) {
         // Skip if page JSON doesn't exist

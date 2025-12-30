@@ -23,7 +23,7 @@ function __command_getTranslationKeys(array $params = [], array $urlParams = [])
     $scannedFiles = [];
 
     // 1. Scan all page structures
-    $pagesDir = SECURE_FOLDER_PATH . '/templates/model/json/pages';
+    $pagesDir = PROJECT_PATH . '/templates/model/json/pages';
     if (is_dir($pagesDir)) {
         $pageFiles = glob($pagesDir . '/*.json');
         
@@ -46,7 +46,7 @@ function __command_getTranslationKeys(array $params = [], array $urlParams = [])
     }
 
     // 2. Scan menu structure
-    $menuFile = SECURE_FOLDER_PATH . '/templates/model/json/menu.json';
+    $menuFile = PROJECT_PATH . '/templates/model/json/menu.json';
     $menuStructure = loadJsonStructure($menuFile);
 
     if ($menuStructure !== null) {
@@ -61,7 +61,7 @@ function __command_getTranslationKeys(array $params = [], array $urlParams = [])
     }
 
     // 3. Scan footer structure
-    $footerFile = SECURE_FOLDER_PATH . '/templates/model/json/footer.json';
+    $footerFile = PROJECT_PATH . '/templates/model/json/footer.json';
     $footerStructure = loadJsonStructure($footerFile);
 
     if ($footerStructure !== null) {

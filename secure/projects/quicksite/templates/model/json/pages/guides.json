@@ -177,6 +177,22 @@
                             {
                                 "tag": "a",
                                 "params": {
+                                    "href": "#project-management"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "guides.toc.projects"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "li",
+                        "children": [
+                            {
+                                "tag": "a",
+                                "params": {
                                     "href": "#api-documentation"
                                 },
                                 "children": [
@@ -1679,6 +1695,180 @@
                         "children": [
                             {
                                 "textKey": "__RAW__# List all tokens (values are masked)\ncurl http://yoursite.local/management/listTokens \\\n  -H \"Authorization: Bearer YOUR_TOKEN\"\n\n# Revoke a token\ncurl -X POST http://yoursite.local/management/revokeToken \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -d '{\"token_preview\": \"tvt_abc1...xyz9\"}'"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "guide-section",
+            "id": "project-management"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "section-title"
+                },
+                "children": [
+                    {
+                        "textKey": "guides.projects.title"
+                    }
+                ]
+            },
+            {
+                "tag": "p",
+                "params": {
+                    "class": "section-intro"
+                },
+                "children": [
+                    {
+                        "textKey": "guides.projects.intro"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "guide-commands"
+                },
+                "children": [
+                    {
+                        "tag": "span",
+                        "params": {
+                            "class": "command-tag"
+                        },
+                        "children": [
+                            {
+                                "textKey": "__RAW__listProjects"
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "span",
+                        "params": {
+                            "class": "command-tag"
+                        },
+                        "children": [
+                            {
+                                "textKey": "__RAW__switchProject"
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "span",
+                        "params": {
+                            "class": "command-tag"
+                        },
+                        "children": [
+                            {
+                                "textKey": "__RAW__createProject"
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "span",
+                        "params": {
+                            "class": "command-tag"
+                        },
+                        "children": [
+                            {
+                                "textKey": "__RAW__exportProject"
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "span",
+                        "params": {
+                            "class": "command-tag"
+                        },
+                        "children": [
+                            {
+                                "textKey": "__RAW__importProject"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "tag": "h3",
+                "children": [
+                    {
+                        "textKey": "__RAW__Multi-Project Architecture"
+                    }
+                ]
+            },
+            {
+                "tag": "p",
+                "children": [
+                    {
+                        "textKey": "guides.projects.architecture.desc"
+                    }
+                ]
+            },
+            {
+                "tag": "h3",
+                "children": [
+                    {
+                        "textKey": "__RAW__Working with Projects"
+                    }
+                ]
+            },
+            {
+                "tag": "p",
+                "children": [
+                    {
+                        "textKey": "guides.projects.working.desc"
+                    }
+                ]
+            },
+            {
+                "tag": "pre",
+                "params": {
+                    "class": "code-block"
+                },
+                "children": [
+                    {
+                        "tag": "code",
+                        "children": [
+                            {
+                                "textKey": "__RAW__# List all available projects\ncurl http://yoursite.local/management/listProjects \\\n  -H \"Authorization: Bearer YOUR_TOKEN\"\n\n# Switch to a different project\ncurl -X PATCH http://yoursite.local/management/switchProject \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -d '{\"project\": \"myproject\"}'\n\n# Create a new project\ncurl -X POST http://yoursite.local/management/createProject \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -d '{\"name\": \"newsite\", \"activate\": true}'"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "tag": "h3",
+                "children": [
+                    {
+                        "textKey": "__RAW__Backup & Migration"
+                    }
+                ]
+            },
+            {
+                "tag": "p",
+                "children": [
+                    {
+                        "textKey": "guides.projects.backup.desc"
+                    }
+                ]
+            },
+            {
+                "tag": "pre",
+                "params": {
+                    "class": "code-block"
+                },
+                "children": [
+                    {
+                        "tag": "code",
+                        "children": [
+                            {
+                                "textKey": "__RAW__# Export current project to ZIP\ncurl http://yoursite.local/management/exportProject \\\n  -H \"Authorization: Bearer YOUR_TOKEN\"\n\n# Download the exported file\ncurl http://yoursite.local/management/downloadExport/quicksite_2025-12-30.zip \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  --output backup.zip\n\n# Import project from ZIP (multipart form)\ncurl -X POST http://yoursite.local/management/importProject \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -F \"file=@backup.zip\" \\\n  -F \"activate=true\""
                             }
                         ]
                     }

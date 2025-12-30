@@ -31,7 +31,7 @@ if (!$token) {
 }
 
 // Validate token exists in auth.php
-$authConfigPath = SECURE_FOLDER_PATH . '/config/auth.php';
+$authConfigPath = SECURE_FOLDER_PATH . '/management/config/auth.php';
 $authConfig = include $authConfigPath;
 if (!isset($authConfig['authentication']['tokens'][$token])) {
     http_response_code(401);

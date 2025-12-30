@@ -105,7 +105,7 @@ if ($translationSize > $maxSize) {
         ->send();
 }
 
-$translations_file = SECURE_FOLDER_PATH . '/translate/' . $language . '.json';
+$translations_file = PROJECT_PATH . '/translate/' . $language . '.json';
 
 // Load existing translations (or empty array if file doesn't exist)
 $existingTranslations = [];
@@ -233,7 +233,7 @@ if (file_put_contents($translations_file, $json_content, LOCK_EX) === false) {
 // This ensures mono-lingual mode works correctly and default always has minimal requirements
 $defaultUpdated = false;
 if (!$isDefault) {
-    $default_file = SECURE_FOLDER_PATH . '/translate/default.json';
+    $default_file = PROJECT_PATH . '/translate/default.json';
     
     // Load existing default translations
     $existingDefault = [];

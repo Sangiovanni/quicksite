@@ -22,7 +22,7 @@ function extractAllKeys_validate() {
     $allKeys = [];
     
     // Scan pages
-    $pagesDir = SECURE_FOLDER_PATH . '/templates/model/json/pages';
+    $pagesDir = PROJECT_PATH . '/templates/model/json/pages';
     if (is_dir($pagesDir)) {
         foreach (glob($pagesDir . '/*.json') as $file) {
             $structure = loadJsonStructure($file);
@@ -35,7 +35,7 @@ function extractAllKeys_validate() {
     }
     
     // Scan menu
-    $menuFile = SECURE_FOLDER_PATH . '/templates/model/json/menu.json';
+    $menuFile = PROJECT_PATH . '/templates/model/json/menu.json';
     $menuStructure = loadJsonStructure($menuFile);
     if (is_array($menuStructure)) {
         foreach ($menuStructure as $node) {
@@ -44,7 +44,7 @@ function extractAllKeys_validate() {
     }
     
     // Scan footer
-    $footerFile = SECURE_FOLDER_PATH . '/templates/model/json/footer.json';
+    $footerFile = PROJECT_PATH . '/templates/model/json/footer.json';
     $footerStructure = loadJsonStructure($footerFile);
     if (is_array($footerStructure)) {
         foreach ($footerStructure as $node) {
@@ -53,7 +53,7 @@ function extractAllKeys_validate() {
     }
     
     // Scan components
-    $componentsDir = SECURE_FOLDER_PATH . '/templates/model/json/components';
+    $componentsDir = PROJECT_PATH . '/templates/model/json/components';
     if (is_dir($componentsDir)) {
         foreach (glob($componentsDir . '/*.json') as $file) {
             $structure = loadJsonStructure($file);
@@ -66,7 +66,7 @@ function extractAllKeys_validate() {
     }
     
     // Also include page.titles.{route} keys which are used dynamically
-    $routesFile = SECURE_FOLDER_PATH . '/routes.php';
+    $routesFile = PROJECT_PATH . '/routes.php';
     if (file_exists($routesFile)) {
         $routes = include $routesFile;
         if (is_array($routes)) {
@@ -143,7 +143,7 @@ function __command_validateTranslations(array $params = [], array $urlParams = [
     $validationResults = [];
 
     foreach ($languagesToValidate as $lang) {
-        $translationFile = SECURE_FOLDER_PATH . '/translate/' . $lang . '.json';
+        $translationFile = PROJECT_PATH . '/translate/' . $lang . '.json';
         
         if (!file_exists($translationFile)) {
             $validationResults[$lang] = [

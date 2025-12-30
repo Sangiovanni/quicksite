@@ -73,7 +73,7 @@ if ($origin) {
             'code' => 'cors.origin_not_allowed',
             'message' => 'Origin not allowed by CORS policy',
             'origin' => $origin,
-            'hint' => 'Add this origin to allowed_origins in ' . SECURE_FOLDER_NAME . '/config/auth.php'
+            'hint' => 'Add this origin to allowed_origins in ' . SECURE_FOLDER_NAME . '/management/config/auth.php'
         ]);
         exit;
     }

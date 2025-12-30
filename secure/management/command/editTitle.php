@@ -197,7 +197,7 @@ if (strlen($title) > 200) {
 }
 
 // Load translation file
-$translationFile = SECURE_FOLDER_PATH . '/translate/' . $lang . '.json';
+$translationFile = PROJECT_PATH . '/translate/' . $lang . '.json';
 
 if (!file_exists($translationFile)) {
     ApiResponse::create(404, 'file.not_found')

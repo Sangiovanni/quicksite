@@ -127,8 +127,8 @@ if (function_exists('opcache_invalidate')) {
 // --- CREATE TRANSLATION FILE ---
 // Copy from default language
 $default_lang = CONFIG['LANGUAGE_DEFAULT'];
-$source_file = SECURE_FOLDER_PATH . '/translate/' . $default_lang . '.json';
-$target_file = SECURE_FOLDER_PATH . '/translate/' . $langCode . '.json';
+$source_file = PROJECT_PATH . '/translate/' . $default_lang . '.json';
+$target_file = PROJECT_PATH . '/translate/' . $langCode . '.json';
 
 if (!file_exists($source_file)) {
     // Fallback: create empty translation file

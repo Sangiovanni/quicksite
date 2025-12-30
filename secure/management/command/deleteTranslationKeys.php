@@ -100,7 +100,7 @@ foreach ($keysToDelete as $index => $key) {
     }
 }
 
-$translations_file = SECURE_FOLDER_PATH . '/translate/' . $language . '.json';
+$translations_file = PROJECT_PATH . '/translate/' . $language . '.json';
 
 // Check if file exists
 if (!file_exists($translations_file)) {

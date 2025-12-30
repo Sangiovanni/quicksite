@@ -89,7 +89,8 @@
             "customize": "Site Customization",
             "build": "Build & Deploy",
             "auth": "Token Management",
-            "docs": "Documentation"
+            "docs": "Documentation",
+            "project": "Project Management"
         },
         "cmd": {
             "setPublicSpace": {
@@ -388,6 +389,51 @@
             },
             "help": {
                 "desc": "Returns documentation for all available commands"
+            },
+            "listProjects": {
+                "desc": "Lists all available projects in the multi-project environment"
+            },
+            "getActiveProject": {
+                "desc": "Returns the currently active project name"
+            },
+            "switchProject": {
+                "desc": "Switches to a different project context",
+                "params": {
+                    "project": "Name of the project to switch to"
+                }
+            },
+            "createProject": {
+                "desc": "Creates a new project from the template",
+                "params": {
+                    "name": "Name for the new project (lowercase, alphanumeric, hyphens allowed)",
+                    "activate": "Whether to switch to the new project after creation (default: false)"
+                }
+            },
+            "deleteProject": {
+                "desc": "Permanently deletes a project and all its files",
+                "params": {
+                    "project": "Name of the project to delete",
+                    "confirm": "Must be 'DELETE' to confirm deletion"
+                }
+            },
+            "exportProject": {
+                "desc": "Creates a ZIP archive of a project for backup or transfer",
+                "params": {
+                    "project": "Project to export (default: active project)"
+                }
+            },
+            "importProject": {
+                "desc": "Imports a project from a ZIP archive",
+                "params": {
+                    "file": "Base64-encoded ZIP file content",
+                    "activate": "Whether to switch to the imported project (default: false)"
+                }
+            },
+            "downloadExport": {
+                "desc": "Downloads a previously exported project archive",
+                "params": {
+                    "filename": "Name of the export file to download"
+                }
             }
         },
         "labels": {
@@ -431,6 +477,19 @@
         }
     },
     "guides": {
+        "projects": {
+            "title": "Project Management",
+            "intro": "Manage multiple projects within a single QuickSite installation. Create, switch, export, and import projects.",
+            "architecture": {
+                "desc": "Projects are stored in secure/projects/{name}. Each project has its own templates, translations, and configuration."
+            },
+            "working": {
+                "desc": "Use switchProject to change context. All subsequent API calls operate on the active project until you switch again."
+            },
+            "backup": {
+                "desc": "Use exportProject to create ZIP backups. Import them later with importProject to restore or duplicate projects."
+            }
+        },
         "i18n": {
             "title": "Internationalization",
             "add": {
@@ -479,6 +538,7 @@
         },
         "title": "Practical Guides",
         "toc": {
+            "projects": "Project Management",
             "assets": "Assets & Branding",
             "deploy": "Deployment",
             "security": "API Security",

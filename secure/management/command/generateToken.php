@@ -80,7 +80,7 @@ foreach ($permissions as $perm) {
 $newToken = generateApiToken();
 
 // Load current config
-$configPath = SECURE_FOLDER_PATH . '/config/auth.php';
+$configPath = SECURE_FOLDER_PATH . '/management/config/auth.php';
 $config = require $configPath;
 
 // Add new token

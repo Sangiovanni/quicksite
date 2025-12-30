@@ -25,8 +25,30 @@ if(!defined('SERVER_ROOT')){
     define('SERVER_ROOT', preg_replace($folderPattern, '', PUBLIC_FOLDER_ROOT));
 }
 
+if (!defined('SECURE_FOLDER_PATH')) {
+    // SECURE_FOLDER_PATH = engine files (admin, management, src)
+    define('SECURE_FOLDER_PATH', SERVER_ROOT . DIRECTORY_SEPARATOR . SECURE_FOLDER_NAME);
+}
+
+// ============================================================================
+// PROJECT PATH - Points to the active project in secure/projects/{name}/
+// ============================================================================
+if (!defined('PROJECT_PATH')) {
+    $targetConfigPath = SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'management' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'target.php';
+    if (file_exists($targetConfigPath)) {
+        $targetConfig = require $targetConfigPath;
+        $projectName = $targetConfig['project'] ?? 'quicksite';
+        define('PROJECT_PATH', SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'projects' . DIRECTORY_SEPARATOR . $projectName);
+        define('PROJECT_NAME', $projectName);
+    } else {
+        // Fallback: no target.php, use legacy path (secure/ directly)
+        define('PROJECT_PATH', SECURE_FOLDER_PATH);
+        define('PROJECT_NAME', 'default');
+    }
+}
+
 if(!defined('CONFIG_PATH')){
-    define('CONFIG_PATH', SERVER_ROOT . DIRECTORY_SEPARATOR . SECURE_FOLDER_NAME . DIRECTORY_SEPARATOR.'config.php');
+    define('CONFIG_PATH', PROJECT_PATH . DIRECTORY_SEPARATOR . 'config.php');
 }
 if (!file_exists(CONFIG_PATH)) {
     // Handle error: configuration file not found
@@ -42,7 +64,7 @@ if(!defined('MULTILINGUAL_SUPPORT')){
 }
 
 if(!defined('ROUTES_PATH')){
-    define('ROUTES_PATH', SERVER_ROOT . DIRECTORY_SEPARATOR . SECURE_FOLDER_NAME . DIRECTORY_SEPARATOR.'routes.php');
+    define('ROUTES_PATH', PROJECT_PATH . DIRECTORY_SEPARATOR . 'routes.php');
 }
 if (!file_exists(ROUTES_PATH)) {
     // Handle error: routes file not found
@@ -51,11 +73,6 @@ if (!file_exists(ROUTES_PATH)) {
 }
 if(!defined('ROUTES')){
     define('ROUTES', require ROUTES_PATH);
-}
-
-if (!defined('SECURE_FOLDER_PATH')) {
-    // This value comes directly from the config file, ensuring it's correct
-    define('SECURE_FOLDER_PATH', SERVER_ROOT . DIRECTORY_SEPARATOR . SECURE_FOLDER_NAME);
 }
 
 if (!defined('BASE_URL')) {

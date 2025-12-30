@@ -121,7 +121,7 @@ class AdminRouter {
         
         // Validate token against auth.php
         $token = $_SESSION['admin_token'];
-        $authConfigPath = SECURE_FOLDER_PATH . '/config/auth.php';
+        $authConfigPath = SECURE_FOLDER_PATH . '/management/config/auth.php';
         
         if (!file_exists($authConfigPath)) {
             return false;

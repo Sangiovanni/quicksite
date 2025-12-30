@@ -110,7 +110,55 @@
             "customize": "Site Customization",
             "build": "Build & Deploy",
             "auth": "Token Management",
-            "docs": "Documentation"
+            "docs": "Documentation",
+            "project": "Project Management"
+        },
+        "cmd": {
+            "listProjects": {
+                "desc": "List all available projects with metadata including routes, pages, languages, and size."
+            },
+            "getActiveProject": {
+                "desc": "Get information about the currently active project."
+            },
+            "switchProject": {
+                "desc": "Switch to a different project. Updates target.php and copies project files to public folder.",
+                "params": {
+                    "project": "Name of the project to switch to."
+                }
+            },
+            "createProject": {
+                "desc": "Create a new project with default structure and configuration.",
+                "params": {
+                    "name": "Name for the new project (lowercase, alphanumeric, hyphens, underscores).",
+                    "activate": "Whether to switch to the new project after creation (default: false)."
+                }
+            },
+            "deleteProject": {
+                "desc": "Permanently delete a project and all its data.",
+                "params": {
+                    "project": "Name of the project to delete.",
+                    "confirm": "Must be true to confirm deletion (safety parameter)."
+                }
+            },
+            "exportProject": {
+                "desc": "Export a project as a ZIP archive for backup or migration.",
+                "params": {
+                    "project": "Project to export (default: active project)."
+                }
+            },
+            "importProject": {
+                "desc": "Import a project from a ZIP archive.",
+                "params": {
+                    "file": "ZIP file containing the project to import.",
+                    "activate": "Whether to switch to the imported project (default: false)."
+                }
+            },
+            "downloadExport": {
+                "desc": "Download a previously exported project ZIP file.",
+                "params": {
+                    "filename": "Name of the export file to download."
+                }
+            }
         }
     },
     "tutorial": {
@@ -201,7 +249,8 @@
             "i18n": "Internationalization",
             "docs": "Documentation",
             "title": "Table of Contents",
-            "pages": "Building Pages"
+            "pages": "Building Pages",
+            "projects": "Project Management"
         },
         "intro": "Learn QuickSite through task-oriented tutorials. Each guide covers related API commands in real-world workflows.",
         "footer": {
@@ -251,6 +300,19 @@
             "intro": "Access built-in help for all API endpoints. The help command provides detailed documentation.",
             "help": {
                 "desc": "Get comprehensive documentation for all commands or detailed help for a specific endpoint."
+            }
+        },
+        "projects": {
+            "title": "Project Management",
+            "intro": "Manage multiple projects from a single QuickSite installation. Switch between projects, create backups, and migrate data.",
+            "architecture": {
+                "desc": "QuickSite uses a multi-project architecture where all project data lives in secure/projects/. Each project has its own templates, translations, routes, and configuration. The active project is determined by secure/config/target.php."
+            },
+            "working": {
+                "desc": "Use listProjects to see all available projects with metadata. Switch between projects with switchProject - this updates target.php and copies the project's public files. Create new projects with createProject for isolated testing environments."
+            },
+            "backup": {
+                "desc": "Export projects as ZIP archives for backup or migration. Use exportProject to create a timestamped ZIP in secure/exports/, then downloadExport to retrieve it. Import projects with importProject by uploading a ZIP file."
             }
         },
         "pages": {

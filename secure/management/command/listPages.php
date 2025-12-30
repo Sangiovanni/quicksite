@@ -80,7 +80,7 @@ function findComponentsInStructure($node, &$components) {
  * @return ApiResponse
  */
 function __command_listPages(array $params = [], array $urlParams = []): ApiResponse {
-    $pagesDir = SECURE_FOLDER_PATH . '/templates/model/json/pages';
+    $pagesDir = PROJECT_PATH . '/templates/model/json/pages';
 
     // Check directory exists
     if (!is_dir($pagesDir)) {
@@ -97,7 +97,7 @@ function __command_listPages(array $params = [], array $urlParams = []): ApiResp
     $pages = [];
 
     // Also get routes for cross-reference
-    $routesFile = SECURE_FOLDER_PATH . '/routes.php';
+    $routesFile = PROJECT_PATH . '/routes.php';
     $routes = file_exists($routesFile) ? require($routesFile) : [];
 
     foreach ($files as $file) {

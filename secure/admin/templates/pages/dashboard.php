@@ -14,6 +14,137 @@
     <p class="admin-page-header__subtitle"><?= __admin('dashboard.subtitle') ?></p>
 </div>
 
+<!-- Project Manager -->
+<section class="admin-section">
+    <h2 class="admin-section__title"><?= __admin('dashboard.projects.title') ?></h2>
+    <div class="admin-card">
+        <div class="admin-card__body">
+            <div class="project-manager">
+                <!-- Current Project Info -->
+                <div class="project-manager__current" id="current-project-info">
+                    <div class="admin-loading">
+                        <span class="admin-spinner"></span>
+                        <span><?= __admin('common.loading') ?></span>
+                    </div>
+                </div>
+                
+                <!-- Project Actions -->
+                <div class="project-manager__actions">
+                    <!-- Switch Project -->
+                    <div class="project-manager__action-group">
+                        <label class="admin-label"><?= __admin('dashboard.projects.switch') ?></label>
+                        <div class="project-manager__select-row">
+                            <select id="project-selector" class="admin-input admin-input--select" disabled>
+                                <option value=""><?= __admin('common.loading') ?></option>
+                            </select>
+                            <button type="button" id="btn-switch-project" class="admin-btn admin-btn--primary" disabled>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                                </svg>
+                                <?= __admin('dashboard.projects.switchBtn') ?>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Actions Row -->
+                    <div class="project-manager__quick-actions">
+                        <!-- Create Project -->
+                        <button type="button" id="btn-create-project" class="admin-btn admin-btn--ghost">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                                <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+                            </svg>
+                            <?= __admin('dashboard.projects.create') ?>
+                        </button>
+                        
+                        <!-- Export Project -->
+                        <button type="button" id="btn-export-project" class="admin-btn admin-btn--ghost">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            <?= __admin('dashboard.projects.export') ?>
+                        </button>
+                        
+                        <!-- Import Project -->
+                        <button type="button" id="btn-import-project" class="admin-btn admin-btn--ghost">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                            <?= __admin('dashboard.projects.import') ?>
+                        </button>
+                        
+                        <!-- Delete Project -->
+                        <button type="button" id="btn-delete-project" class="admin-btn admin-btn--ghost admin-btn--danger">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                            <?= __admin('dashboard.projects.delete') ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Hidden file input for import -->
+<input type="file" id="import-file-input" accept=".zip" style="display: none;">
+
+<!-- Create Project Modal -->
+<div id="modal-create-project" class="admin-modal" style="display: none;">
+    <div class="admin-modal__backdrop"></div>
+    <div class="admin-modal__content">
+        <div class="admin-modal__header">
+            <h3 class="admin-modal__title"><?= __admin('dashboard.projects.createTitle') ?></h3>
+            <button type="button" class="admin-modal__close" data-close-modal>×</button>
+        </div>
+        <div class="admin-modal__body">
+            <div class="admin-form-group">
+                <label class="admin-label"><?= __admin('dashboard.projects.nameLabel') ?></label>
+                <input type="text" id="create-project-name" class="admin-input" placeholder="my-new-site" pattern="[a-z0-9_-]+" />
+                <small class="admin-help"><?= __admin('dashboard.projects.nameHelp') ?></small>
+            </div>
+            <div class="admin-form-group">
+                <label class="admin-checkbox">
+                    <input type="checkbox" id="create-project-activate" checked />
+                    <span><?= __admin('dashboard.projects.activateAfterCreate') ?></span>
+                </label>
+            </div>
+        </div>
+        <div class="admin-modal__footer">
+            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>
+            <button type="button" id="btn-confirm-create" class="admin-btn admin-btn--primary"><?= __admin('dashboard.projects.createBtn') ?></button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Project Modal -->
+<div id="modal-delete-project" class="admin-modal" style="display: none;">
+    <div class="admin-modal__backdrop"></div>
+    <div class="admin-modal__content">
+        <div class="admin-modal__header">
+            <h3 class="admin-modal__title"><?= __admin('dashboard.projects.deleteTitle') ?></h3>
+            <button type="button" class="admin-modal__close" data-close-modal>×</button>
+        </div>
+        <div class="admin-modal__body">
+            <p class="admin-warning"><?= __admin('dashboard.projects.deleteWarning') ?></p>
+            <div class="admin-form-group">
+                <label class="admin-label"><?= __admin('dashboard.projects.selectToDelete') ?></label>
+                <select id="delete-project-selector" class="admin-input admin-input--select">
+                    <option value=""><?= __admin('dashboard.projects.selectProject') ?></option>
+                </select>
+            </div>
+        </div>
+        <div class="admin-modal__footer">
+            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>
+            <button type="button" id="btn-confirm-delete" class="admin-btn admin-btn--danger" disabled><?= __admin('dashboard.projects.deleteBtn') ?></button>
+        </div>
+    </div>
+</div>
+
 <!-- Quick Stats (loaded via AJAX) -->
 <section class="admin-section">
     <h2 class="admin-section__title"><?= __admin('dashboard.stats.title') ?></h2>
@@ -77,8 +208,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     await Promise.all([
         loadDashboardStats(),
         loadSiteMap(),
-        loadRecentCommands()
+        loadRecentCommands(),
+        loadProjectManager()
     ]);
+    
+    // Setup project manager event listeners
+    setupProjectManagerEvents();
 });
 
 async function loadDashboardStats() {
@@ -363,6 +498,277 @@ async function loadRecentCommands() {
         `;
     }
 }
+
+// ============================================================================
+// Project Manager Functions
+// ============================================================================
+
+let currentProject = null;
+let allProjects = [];
+
+async function loadProjectManager() {
+    const infoContainer = document.getElementById('current-project-info');
+    const selector = document.getElementById('project-selector');
+    const switchBtn = document.getElementById('btn-switch-project');
+    const t = window.QUICKSITE_CONFIG?.translations || {};
+    const proj = t.dashboard?.projects || {};
+    
+    try {
+        // Load active project and list in parallel
+        const [activeResult, listResult] = await Promise.all([
+            QuickSiteAdmin.apiRequest('getActiveProject'),
+            QuickSiteAdmin.apiRequest('listProjects')
+        ]);
+        
+        if (activeResult.ok) {
+            currentProject = activeResult.data.data.project;
+            const created = activeResult.data.data.created_at;
+            
+            infoContainer.innerHTML = `
+                <div class="project-manager__info">
+                    <div class="project-manager__name">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <span>${QuickSiteAdmin.escapeHtml(currentProject)}</span>
+                        <span class="badge badge--primary">${proj.active || 'Active'}</span>
+                    </div>
+                    ${created ? `<div class="project-manager__meta">${proj.created || 'Created'}: ${new Date(created).toLocaleDateString()}</div>` : ''}
+                </div>
+            `;
+        }
+        
+        if (listResult.ok) {
+            allProjects = listResult.data.data.projects || [];
+            
+            // Populate selector
+            selector.innerHTML = '';
+            allProjects.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.name;
+                opt.textContent = p.name + (p.is_active ? ` (${proj.active || 'active'})` : '');
+                opt.selected = p.is_active;
+                selector.appendChild(opt);
+            });
+            
+            selector.disabled = false;
+            switchBtn.disabled = false;
+            
+            // Also populate delete selector
+            updateDeleteSelector();
+        }
+        
+    } catch (error) {
+        console.error('Failed to load project manager:', error);
+        infoContainer.innerHTML = `<p class="admin-error">${proj.error || 'Failed to load project info'}</p>`;
+    }
+}
+
+function updateDeleteSelector() {
+    const deleteSelector = document.getElementById('delete-project-selector');
+    const t = window.QUICKSITE_CONFIG?.translations || {};
+    const proj = t.dashboard?.projects || {};
+    
+    deleteSelector.innerHTML = `<option value="">${proj.selectProject || 'Select a project...'}</option>`;
+    
+    // Only show non-active projects for deletion (or all if there's only one)
+    const deletable = allProjects.filter(p => !p.is_active);
+    deletable.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.name;
+        opt.textContent = p.name;
+        deleteSelector.appendChild(opt);
+    });
+    
+    if (deletable.length === 0 && allProjects.length > 0) {
+        // If only one project, show warning
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = proj.cannotDeleteActive || 'Cannot delete active project';
+        opt.disabled = true;
+        deleteSelector.appendChild(opt);
+    }
+}
+
+function setupProjectManagerEvents() {
+    const t = window.QUICKSITE_CONFIG?.translations || {};
+    const proj = t.dashboard?.projects || {};
+    const common = t.common || {};
+    
+    // Switch project
+    document.getElementById('btn-switch-project').addEventListener('click', async function() {
+        const selector = document.getElementById('project-selector');
+        const newProject = selector.value;
+        
+        if (!newProject || newProject === currentProject) return;
+        
+        this.disabled = true;
+        try {
+            const result = await QuickSiteAdmin.apiRequest('switchProject', 'PATCH', { project: newProject });
+            if (result.ok) {
+                QuickSiteAdmin.showToast(proj.switched || 'Project switched successfully', 'success');
+                // Reload page to reflect new project
+                setTimeout(() => window.location.reload(), 500);
+            } else {
+                QuickSiteAdmin.showToast(result.data?.message || 'Failed to switch project', 'error');
+            }
+        } catch (error) {
+            QuickSiteAdmin.showToast('Failed to switch project', 'error');
+        }
+        this.disabled = false;
+    });
+    
+    // Create project modal
+    document.getElementById('btn-create-project').addEventListener('click', function() {
+        document.getElementById('modal-create-project').style.display = 'flex';
+        document.getElementById('create-project-name').focus();
+    });
+    
+    // Confirm create project
+    document.getElementById('btn-confirm-create').addEventListener('click', async function() {
+        const nameInput = document.getElementById('create-project-name');
+        const activateCheckbox = document.getElementById('create-project-activate');
+        const name = nameInput.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+        
+        if (!name) {
+            QuickSiteAdmin.showToast(proj.nameRequired || 'Project name is required', 'error');
+            return;
+        }
+        
+        this.disabled = true;
+        try {
+            const result = await QuickSiteAdmin.apiRequest('createProject', 'POST', {
+                name: name,
+                activate: activateCheckbox.checked
+            });
+            
+            if (result.ok) {
+                QuickSiteAdmin.showToast(proj.created || 'Project created successfully', 'success');
+                closeAllModals();
+                if (activateCheckbox.checked) {
+                    setTimeout(() => window.location.reload(), 500);
+                } else {
+                    loadProjectManager();
+                }
+            } else {
+                QuickSiteAdmin.showToast(result.data?.message || 'Failed to create project', 'error');
+            }
+        } catch (error) {
+            QuickSiteAdmin.showToast('Failed to create project', 'error');
+        }
+        this.disabled = false;
+    });
+    
+    // Export project
+    document.getElementById('btn-export-project').addEventListener('click', async function() {
+        this.disabled = true;
+        try {
+            const result = await QuickSiteAdmin.apiRequest('exportProject');
+            if (result.ok && result.data.data?.download_url) {
+                QuickSiteAdmin.showToast(proj.exported || 'Project exported', 'success');
+                // Trigger download
+                window.location.href = result.data.data.download_url;
+            } else {
+                QuickSiteAdmin.showToast(result.data?.message || 'Failed to export project', 'error');
+            }
+        } catch (error) {
+            QuickSiteAdmin.showToast('Failed to export project', 'error');
+        }
+        this.disabled = false;
+    });
+    
+    // Import project
+    document.getElementById('btn-import-project').addEventListener('click', function() {
+        document.getElementById('import-file-input').click();
+    });
+    
+    document.getElementById('import-file-input').addEventListener('change', async function() {
+        if (!this.files || !this.files[0]) return;
+        
+        const file = this.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('activate', 'false');
+        
+        try {
+            QuickSiteAdmin.showToast(proj.importing || 'Importing project...', 'info');
+            
+            const response = await fetch(window.QUICKSITE_CONFIG.apiBase + '/importProject', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + window.QUICKSITE_CONFIG.token
+                },
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.status === 'success') {
+                QuickSiteAdmin.showToast(proj.imported || 'Project imported successfully', 'success');
+                loadProjectManager();
+            } else {
+                QuickSiteAdmin.showToast(result.message || 'Failed to import project', 'error');
+            }
+        } catch (error) {
+            QuickSiteAdmin.showToast('Failed to import project', 'error');
+        }
+        
+        this.value = ''; // Reset file input
+    });
+    
+    // Delete project modal
+    document.getElementById('btn-delete-project').addEventListener('click', function() {
+        updateDeleteSelector();
+        document.getElementById('modal-delete-project').style.display = 'flex';
+    });
+    
+    // Enable delete button only when project selected
+    document.getElementById('delete-project-selector').addEventListener('change', function() {
+        document.getElementById('btn-confirm-delete').disabled = !this.value;
+    });
+    
+    // Confirm delete project
+    document.getElementById('btn-confirm-delete').addEventListener('click', async function() {
+        const selector = document.getElementById('delete-project-selector');
+        const projectToDelete = selector.value;
+        
+        if (!projectToDelete) return;
+        
+        this.disabled = true;
+        try {
+            const result = await QuickSiteAdmin.apiRequest('deleteProject', 'DELETE', {
+                project: projectToDelete,
+                confirm: true
+            });
+            
+            if (result.ok) {
+                QuickSiteAdmin.showToast(proj.deleted || 'Project deleted', 'success');
+                closeAllModals();
+                loadProjectManager();
+            } else {
+                QuickSiteAdmin.showToast(result.data?.message || 'Failed to delete project', 'error');
+            }
+        } catch (error) {
+            QuickSiteAdmin.showToast('Failed to delete project', 'error');
+        }
+        this.disabled = false;
+    });
+    
+    // Modal close handlers
+    document.querySelectorAll('[data-close-modal]').forEach(btn => {
+        btn.addEventListener('click', closeAllModals);
+    });
+    
+    document.querySelectorAll('.admin-modal__backdrop').forEach(backdrop => {
+        backdrop.addEventListener('click', closeAllModals);
+    });
+}
+
+function closeAllModals() {
+    document.querySelectorAll('.admin-modal').forEach(modal => {
+        modal.style.display = 'none';
+    });
+}
 </script>
 
 <style>
@@ -577,6 +983,218 @@ async function loadRecentCommands() {
     
     .sitemap__route-path {
         display: none;
+    }
+}
+
+/* Project Manager Styles */
+.project-manager {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    padding: var(--space-md);
+}
+
+.project-manager__current {
+    min-height: 50px;
+}
+
+.project-manager__info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.project-manager__name {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--admin-text);
+}
+
+.project-manager__name svg {
+    color: var(--admin-accent);
+}
+
+.project-manager__meta {
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+    margin-left: 28px;
+}
+
+.project-manager__actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--admin-border);
+}
+
+.project-manager__action-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.project-manager__select-row {
+    display: flex;
+    gap: var(--space-sm);
+}
+
+.project-manager__select-row select {
+    flex: 1;
+}
+
+.project-manager__quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.project-manager__quick-actions .admin-btn {
+    flex: 1;
+    min-width: 140px;
+    justify-content: center;
+}
+
+/* Modal Styles */
+.admin-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.admin-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.admin-modal__content {
+    position: relative;
+    background: var(--admin-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    max-width: 480px;
+    width: 90%;
+    max-height: 90vh;
+    overflow: auto;
+}
+
+.admin-modal__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-lg);
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-modal__title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    margin: 0;
+}
+
+.admin-modal__close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.admin-modal__close:hover {
+    color: var(--admin-text);
+}
+
+.admin-modal__body {
+    padding: var(--space-lg);
+}
+
+.admin-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+    padding: var(--space-lg);
+    border-top: 1px solid var(--admin-border);
+}
+
+.admin-warning {
+    padding: var(--space-md);
+    background: var(--admin-warning-bg);
+    border-radius: var(--radius-md);
+    color: var(--admin-warning);
+    margin-bottom: var(--space-md);
+}
+
+.admin-form-group {
+    margin-bottom: var(--space-md);
+}
+
+.admin-form-group:last-child {
+    margin-bottom: 0;
+}
+
+.admin-help {
+    display: block;
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+    margin-top: var(--space-xs);
+}
+
+.admin-checkbox {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    cursor: pointer;
+}
+
+.admin-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+}
+
+.admin-btn--danger {
+    color: var(--admin-error);
+    border-color: var(--admin-error);
+}
+
+.admin-btn--danger:hover {
+    background: var(--admin-error);
+    color: white;
+}
+
+/* Ghost danger button - needs visible text on transparent bg */
+.admin-btn--ghost.admin-btn--danger {
+    background: transparent;
+    border-color: transparent;
+    color: var(--admin-error);
+}
+
+.admin-btn--ghost.admin-btn--danger:hover {
+    background: var(--admin-error-bg, rgba(239, 68, 68, 0.1));
+    border-color: transparent;
+    color: var(--admin-error);
+}
+
+/* Responsive project manager */
+@media (max-width: 600px) {
+    .project-manager__select-row {
+        flex-direction: column;
+    }
+    
+    .project-manager__quick-actions {
+        flex-direction: column;
+    }
+    
+    .project-manager__quick-actions .admin-btn {
+        min-width: auto;
     }
 }
 </style>

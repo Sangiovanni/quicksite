@@ -27,13 +27,13 @@ class Page {
 </head>
 <body>
     <header>
-        <?php require_once SECURE_FOLDER_PATH . '/templates/menu.php'; ?>
+        <?php require_once PROJECT_PATH . '/templates/menu.php'; ?>
     </header>
     <main>
         <?= $content ?>
     </main>
     <footer>
-        <?php require_once SECURE_FOLDER_PATH . '/templates/footer.php'; ?>
+        <?php require_once PROJECT_PATH . '/templates/footer.php'; ?>
     </footer>
 </body>
 </html>

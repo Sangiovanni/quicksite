@@ -59,7 +59,7 @@ if (!in_array($route_name, ROUTES)) {
 }
 
 // --- DELETE PHP PAGE FILE ---
-$target_dir = SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'templates' . DIRECTORY_SEPARATOR . 'pages';
+$target_dir = PROJECT_PATH . DIRECTORY_SEPARATOR . 'templates' . DIRECTORY_SEPARATOR . 'pages';
 $target_file = $target_dir . DIRECTORY_SEPARATOR . $route_name . '.php';
 
 if (!file_exists($target_file)) {
@@ -77,7 +77,7 @@ if (!unlink($target_file)) {
 }
 
 // --- DELETE JSON STRUCTURE FILE ---
-$json_dir = SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'templates' . DIRECTORY_SEPARATOR . 'model' . DIRECTORY_SEPARATOR . 'json' . DIRECTORY_SEPARATOR . 'pages';
+$json_dir = PROJECT_PATH . DIRECTORY_SEPARATOR . 'templates' . DIRECTORY_SEPARATOR . 'model' . DIRECTORY_SEPARATOR . 'json' . DIRECTORY_SEPARATOR . 'pages';
 $json_file = $json_dir . DIRECTORY_SEPARATOR . $route_name . '.json';
 
 // Try to delete JSON file (might not exist if created before JSON system)
@@ -120,7 +120,7 @@ if (file_put_contents($routes_file_path, $new_file_content, LOCK_EX) === false) 
 }
 
 // --- CLEAN UP ALIASES POINTING TO THIS ROUTE ---
-$aliasesFile = SECURE_FOLDER_PATH . '/config/aliases.json';
+$aliasesFile = PROJECT_PATH . '/data/aliases.json';
 $deletedAliases = [];
 
 if (file_exists($aliasesFile)) {

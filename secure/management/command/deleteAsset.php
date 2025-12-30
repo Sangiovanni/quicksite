@@ -151,7 +151,7 @@ if (!unlink($filePath)) {
 }
 
 // Remove metadata for this asset if exists
-$metadataPath = SECURE_FOLDER_PATH . '/config/assets_metadata.json';
+$metadataPath = PROJECT_PATH . '/data/assets_metadata.json';
 if (file_exists($metadataPath)) {
     $metadataContent = file_get_contents($metadataPath);
     $metadata = json_decode($metadataContent, true) ?: [];

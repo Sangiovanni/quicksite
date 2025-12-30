@@ -44,6 +44,15 @@ class CommandRunner {
         'validateTranslations',
         'analyzeTranslations',
         'checkStructureMulti',
+        // Project management commands
+        'listProjects',
+        'getActiveProject',
+        'switchProject',
+        'createProject',
+        'deleteProject',
+        'exportProject',
+        'importProject',
+        'downloadExport',
     ];
     
     /**

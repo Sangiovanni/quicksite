@@ -19,7 +19,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
  */
 function __command_listAliases(array $params = [], array $urlParams = []): ApiResponse {
     // Load aliases file
-    $aliasesFile = SECURE_FOLDER_PATH . '/config/aliases.json';
+    $aliasesFile = PROJECT_PATH . '/data/aliases.json';
 
     if (!file_exists($aliasesFile)) {
         return ApiResponse::create(200, 'operation.success')

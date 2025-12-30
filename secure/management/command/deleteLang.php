@@ -64,7 +64,7 @@ if (count(CONFIG['LANGUAGES_SUPPORTED']) === 1) {
 }
 
 // --- DELETE TRANSLATION FILE FIRST (safer - file can be recreated, config corruption is worse) ---
-$translation_file = SECURE_FOLDER_PATH . '/translate/' . $langCode . '.json';
+$translation_file = PROJECT_PATH . '/translate/' . $langCode . '.json';
 $deleted = false;
 
 if (file_exists($translation_file)) {

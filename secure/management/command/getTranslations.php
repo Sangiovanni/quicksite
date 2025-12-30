@@ -20,7 +20,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
  * @return ApiResponse
  */
 function __command_getTranslations(array $params = [], array $urlParams = []): ApiResponse {
-    $translateFolder = SECURE_FOLDER_PATH . '/translate/';
+    $translateFolder = PROJECT_PATH . '/translate/';
 
     // Check if translate folder exists
     if (!is_dir($translateFolder)) {

@@ -92,7 +92,7 @@ function __command_checkStructureMulti(array $params = [], array $urlParams = []
     $scannedFiles = [];
 
     // Scan pages
-    $pagesDir = SECURE_FOLDER_PATH . '/templates/model/json/pages';
+    $pagesDir = PROJECT_PATH . '/templates/model/json/pages';
     if (is_dir($pagesDir)) {
         $pageFiles = glob($pagesDir . '/*.json');
         foreach ($pageFiles as $pageFile) {
@@ -104,7 +104,7 @@ function __command_checkStructureMulti(array $params = [], array $urlParams = []
     }
 
     // Scan menu
-    $menuPath = SECURE_FOLDER_PATH . '/templates/model/json/menu.json';
+    $menuPath = PROJECT_PATH . '/templates/model/json/menu.json';
     if (file_exists($menuPath)) {
         $findings = scanJsonFile_check($menuPath, 'menu');
         $allFindings = array_merge($allFindings, $findings);
@@ -112,7 +112,7 @@ function __command_checkStructureMulti(array $params = [], array $urlParams = []
     }
 
     // Scan footer
-    $footerPath = SECURE_FOLDER_PATH . '/templates/model/json/footer.json';
+    $footerPath = PROJECT_PATH . '/templates/model/json/footer.json';
     if (file_exists($footerPath)) {
         $findings = scanJsonFile_check($footerPath, 'footer');
         $allFindings = array_merge($allFindings, $findings);
@@ -120,7 +120,7 @@ function __command_checkStructureMulti(array $params = [], array $urlParams = []
     }
 
     // Scan components
-    $componentsDir = SECURE_FOLDER_PATH . '/templates/model/json/components';
+    $componentsDir = PROJECT_PATH . '/templates/model/json/components';
     if (is_dir($componentsDir)) {
         $componentFiles = glob($componentsDir . '/*.json');
         foreach ($componentFiles as $componentFile) {

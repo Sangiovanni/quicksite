@@ -11,7 +11,7 @@
  * @return array Auth configuration
  */
 function loadAuthConfig(): array {
-    $configPath = SECURE_FOLDER_PATH . '/config/auth.php';
+    $configPath = SECURE_FOLDER_PATH . '/management/config/auth.php';
     
     if (!file_exists($configPath)) {
         // Return default restrictive config if file missing

@@ -244,6 +244,16 @@ curl -H "Authorization: Bearer your_token_here" \
 - `POST /management/deployBuild` - Deploy build to production paths
 - `GET /management/downloadBuild/{name}` - Get download URL for build ZIP
 
+#### **Project Management**
+- `GET /management/listProjects` - List all projects with metadata (routes, pages, languages, size)
+- `GET /management/getActiveProject` - Get current active project info
+- `PATCH /management/switchProject` - Switch to different project (copies public files)
+- `POST /management/createProject` - Create new project from template
+- `DELETE /management/deleteProject` - Delete project (requires confirmation)
+- `GET /management/exportProject` - Export project as downloadable ZIP
+- `POST /management/importProject` - Import project from uploaded ZIP
+- `GET /management/downloadExport` - Download previously exported ZIP
+
 #### **Command History**
 - `GET /management/getCommandHistory` - Get command execution history with filtering
 - `POST /management/clearCommandHistory` - Delete old command logs
@@ -258,45 +268,61 @@ curl http://yoursite.local/management/help
 
 ### File Structure
 
+The QuickSite Template uses a **multi-project architecture** that separates the core system from individual projects:
+
 ```
-quicksite/                    # (or your chosen project name)
-├── public/                   # Public web root
-│   ├── assets/              # Static assets (images, scripts, fonts, videos)
-│   ├── management/          # Management API endpoint
-│   ├── style/               # CSS stylesheets
-│   ├── index.php            # Main entry point
-│   ├── init.php             # Configuration & constants
-│   └── .htaccess            # URL rewriting rules
+quicksite/                    # Root installation
+├── public/                   # Public web root (shared entry point)
+│   ├── index.php            # Main entry point - loads active project
+│   ├── init.php             # Bootstrap - defines paths & loads target.php
+│   ├── .htaccess            # URL rewriting rules
+│   ├── admin/               # Admin panel interface
+│   └── build/               # Built/compiled output (generated)
 │
-├── secure/                  # Backend (renamed from secure_template)
-│   ├── config/              # Configuration files
-│   │   ├── auth.php         # Authentication & CORS settings
-│   │   └── aliases.json     # URL alias definitions
-│   ├── management/          # Management API implementation
-│   │   ├── command/         # API endpoints (55 commands)
-│   │   └── routes.php       # Management routes
-│   ├── material/            # Core classes
-│   │   └── Page.php         # Page rendering engine
-│   ├── src/                 # Utilities & functions
-│   │   ├── classes/         # JsonToPhpCompiler, ApiResponse, CssParser, etc.
-│   │   └── functions/       # PathManagement, AuthManagement, etc.
-│   ├── templates/           # Page templates & structures
-│   │   ├── model/           # Component templates
-│   │   └── pages/           # Page JSON structures
-│   ├── translate/           # Translation files
-│   │   ├── default.json
-│   │   ├── en.json
-│   │   └── fr.json
-│   ├── config.php           # Main configuration
-│   └── routes.php           # Public route definitions
+├── secure/                  # Backend (core system + projects)
+│   ├── admin/               # Admin panel backend
+│   │   ├── ai_specs/        # AI specification files for commands
+│   │   ├── functions/       # Admin helper functions
+│   │   └── templates/       # Admin panel templates
+│   │
+│   ├── config/              # Global configuration
+│   │   └── target.php       # Active project selector
+│   │
+│   ├── exports/             # Project export files (.zip)
+│   ├── logs/                # System logs
+│   │
+│   ├── management/          # Core Management API (shared)
+│   │   ├── command/         # API command handlers (63+ commands)
+│   │   ├── classes/         # ApiResponse, CssParser, JsonCompiler, etc.
+│   │   ├── functions/       # PathManagement, AuthManagement, etc.
+│   │   └── routes.php       # Management route definitions
+│   │
+│   ├── projects/            # Individual project data
+│   │   ├── quicksite/       # Example project (default)
+│   │   │   ├── config/      # Project-specific config (auth.php, aliases.json)
+│   │   │   ├── material/    # Page rendering engine (Page.php)
+│   │   │   ├── templates/   # Page templates & JSON structures
+│   │   │   │   ├── model/   # Component templates (json/, php/, css/)
+│   │   │   │   └── pages/   # Page JSON definitions
+│   │   │   ├── translate/   # Translation files (default.json, en.json, fr.json)
+│   │   │   └── routes.php   # Public route definitions
+│   │   │
+│   │   └── [other-project]/ # Additional projects follow same structure
+│   │
+│   └── src/                 # Shared utilities (legacy location)
 │
-├── docs/                    # Documentation
-├── tests/                   # Test suite (gitignored)
+├── docs/                    # Documentation & notebooks
+├── tests/                   # Test suite (gitignored in production)
 ├── LICENSE                  # MIT License
+├── NOTES.txt                # Development notes & future ideas
 └── README.md               # This file
 ```
-└── README.md               # This file
-```
+
+**Key Concepts:**
+- **Active Project**: Defined in `secure/config/target.php` - determines which project is loaded
+- **Shared Core**: The `secure/management/` directory contains the API that works with any project
+- **Project Isolation**: Each project in `secure/projects/` has its own templates, translations, and routes
+- **Export/Import**: Projects can be exported as `.zip` files and imported to other installations
 
 ## 🔧 Advanced Usage
 

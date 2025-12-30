@@ -71,7 +71,7 @@ function aiFindLangSwitcherParent($structure, &$nodeId = null) {
 }
 
 // 1. Load footer structure and detect lang-switch
-$footerPath = SECURE_FOLDER_PATH . '/templates/model/json/footer.json';
+$footerPath = PROJECT_PATH . '/templates/model/json/footer.json';
 $aiPrecomputedData['footer'] = [
     'exists' => false,
     'structure' => null,
@@ -102,7 +102,7 @@ if (file_exists($footerPath)) {
 }
 
 // 2. Check if lang-switch component exists
-$langSwitchComponentPath = SECURE_FOLDER_PATH . '/templates/model/json/components/lang-switch.json';
+$langSwitchComponentPath = PROJECT_PATH . '/templates/model/json/components/lang-switch.json';
 $aiPrecomputedData['langSwitchComponent'] = [
     'exists' => file_exists($langSwitchComponentPath),
     'path' => $langSwitchComponentPath
@@ -114,7 +114,7 @@ if ($aiPrecomputedData['langSwitchComponent']['exists']) {
 }
 
 // 3. Get available site languages
-$translationsDir = SECURE_FOLDER_PATH . '/translate';
+$translationsDir = PROJECT_PATH . '/translate';
 $aiPrecomputedData['languages'] = [];
 if (is_dir($translationsDir)) {
     $files = glob($translationsDir . '/*.json');
@@ -128,7 +128,7 @@ if (is_dir($translationsDir)) {
 }
 
 // 4. List all components for reference
-$componentsDir = SECURE_FOLDER_PATH . '/templates/model/json/components';
+$componentsDir = PROJECT_PATH . '/templates/model/json/components';
 $aiPrecomputedData['components'] = [];
 if (is_dir($componentsDir)) {
     $files = glob($componentsDir . '/*.json');
@@ -147,7 +147,7 @@ if (is_dir($componentsDir)) {
 }
 
 // 5. Get all pages (routes)
-$routesPath = SECURE_FOLDER_PATH . '/routes.php';
+$routesPath = PROJECT_PATH . '/routes.php';
 $aiPrecomputedData['routes'] = [];
 if (file_exists($routesPath)) {
     $routes = include $routesPath;

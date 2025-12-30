@@ -110,7 +110,7 @@ function __command_getSiteMap(array $params = [], array $urlParams = []): ApiRes
         $sitemapData['coverage'] = [];
         foreach ($languages as $lang) {
             // Check how many routes have translations
-            $translationsFile = SECURE_FOLDER_PATH . '/translate/' . $lang . '.json';
+            $translationsFile = PROJECT_PATH . '/translate/' . $lang . '.json';
             $translationCount = 0;
             $hasTranslations = false;
             

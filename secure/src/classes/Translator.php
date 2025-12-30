@@ -21,12 +21,12 @@ class Translator {
     public static function loadTranslations() {
         $lang = self::$lang ?: self::determineLang();
         
-        $fileTranslate = SECURE_FOLDER_PATH . "/translate/{$lang}.json";        
+        $fileTranslate = PROJECT_PATH . "/translate/{$lang}.json";        
         if(!MULTILINGUAL_SUPPORT){
-            $fileTranslate = SECURE_FOLDER_PATH . "/translate/default.json";
+            $fileTranslate = PROJECT_PATH . "/translate/default.json";
         }
         if (!file_exists($fileTranslate)) {
-             $fileTranslate = SECURE_FOLDER_PATH . "/translate/default.json";
+             $fileTranslate = PROJECT_PATH . "/translate/default.json";
         }
 
         $json = @file_get_contents($fileTranslate);

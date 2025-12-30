@@ -76,7 +76,7 @@ if ($alias === $target) {
 }
 
 // Check alias doesn't conflict with existing routes
-$routesFile = SECURE_FOLDER_PATH . '/routes.php';
+$routesFile = PROJECT_PATH . '/routes.php';
 $routes = file_exists($routesFile) ? require($routesFile) : [];
 
 // Extract alias path segment (first part after /)
@@ -101,7 +101,7 @@ if (in_array($aliasSegment, $reservedPaths)) {
 }
 
 // Load existing aliases
-$aliasesFile = SECURE_FOLDER_PATH . '/config/aliases.json';
+$aliasesFile = PROJECT_PATH . '/data/aliases.json';
 $configDir = dirname($aliasesFile);
 
 // Ensure config directory exists
@@ -129,7 +129,7 @@ if (strpos($targetSegment, '/') !== false) {
 }
 
 $targetIsRoute = in_array($targetSegment, $routes);
-$targetIsPage = file_exists(SECURE_FOLDER_PATH . '/templates/model/json/pages/' . $targetSegment . '.json');
+$targetIsPage = file_exists(PROJECT_PATH . '/templates/model/json/pages/' . $targetSegment . '.json');
 $targetIsAlias = isset($aliases[$target]);
 
 if (!$targetIsRoute && !$targetIsPage && !$targetIsAlias && $target !== '/') {

@@ -22,7 +22,7 @@ class JsonToHtmlRenderer {
     public function __construct($translator, $context = []) {
         $this->translator = $translator;
         $this->context = $context;
-        $this->componentsPath = SECURE_FOLDER_PATH . '/templates/model/json/components/';
+        $this->componentsPath = PROJECT_PATH . '/templates/model/json/components/';
     }
 
     /**
@@ -52,11 +52,11 @@ class JsonToHtmlRenderer {
     /**
      * Render JSON file
      * 
-     * @param string $relativePath Path relative to SECURE_FOLDER_PATH
+     * @param string $relativePath Path relative to PROJECT_PATH
      * @return string Rendered HTML
      */
     private function renderJsonFile(string $relativePath): string {
-        $jsonPath = SECURE_FOLDER_PATH . $relativePath;
+        $jsonPath = PROJECT_PATH . $relativePath;
         
         if (!file_exists($jsonPath)) {
             error_log("JSON file not found: {$jsonPath}");

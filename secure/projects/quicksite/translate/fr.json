@@ -107,7 +107,8 @@
             "customize": "Personnalisation du Site",
             "build": "Build & Déploiement",
             "auth": "Gestion des Tokens",
-            "docs": "Documentation"
+            "docs": "Documentation",
+            "project": "Gestion des Projets"
         },
         "cmd": {
             "setPublicSpace": {
@@ -406,6 +407,51 @@
             },
             "help": {
                 "desc": "Retourne la documentation pour toutes les commandes disponibles"
+            },
+            "listProjects": {
+                "desc": "Liste tous les projets disponibles dans l'environnement multi-projet"
+            },
+            "getActiveProject": {
+                "desc": "Retourne le nom du projet actuellement actif"
+            },
+            "switchProject": {
+                "desc": "Bascule vers un contexte de projet différent",
+                "params": {
+                    "project": "Nom du projet vers lequel basculer"
+                }
+            },
+            "createProject": {
+                "desc": "Crée un nouveau projet à partir du template",
+                "params": {
+                    "name": "Nom pour le nouveau projet (minuscules, alphanumériques, tirets autorisés)",
+                    "activate": "S'il faut basculer vers le nouveau projet après création (défaut: false)"
+                }
+            },
+            "deleteProject": {
+                "desc": "Supprime définitivement un projet et tous ses fichiers",
+                "params": {
+                    "project": "Nom du projet à supprimer",
+                    "confirm": "Doit être 'DELETE' pour confirmer la suppression"
+                }
+            },
+            "exportProject": {
+                "desc": "Crée une archive ZIP d'un projet pour sauvegarde ou transfert",
+                "params": {
+                    "project": "Projet à exporter (défaut: projet actif)"
+                }
+            },
+            "importProject": {
+                "desc": "Importe un projet depuis une archive ZIP",
+                "params": {
+                    "file": "Contenu du fichier ZIP encodé en Base64",
+                    "activate": "S'il faut basculer vers le projet importé (défaut: false)"
+                }
+            },
+            "downloadExport": {
+                "desc": "Télécharge une archive de projet précédemment exportée",
+                "params": {
+                    "filename": "Nom du fichier d'export à télécharger"
+                }
             }
         },
         "labels": {
@@ -453,6 +499,7 @@
         "intro": "Apprenez QuickSite à travers des tutoriels orientés tâches. Chaque guide couvre des commandes API liées dans des workflows réels.",
         "toc": {
             "title": "Table des Matières",
+            "projects": "Gestion des Projets",
             "pages": "Créer des Pages",
             "structure": "Édition de Structure",
             "i18n": "Internationalisation",
@@ -462,6 +509,19 @@
             "deploy": "Déploiement",
             "security": "Sécurité API",
             "docs": "Documentation"
+        },
+        "projects": {
+            "title": "Gestion des Projets",
+            "intro": "Gérez plusieurs projets au sein d'une seule installation QuickSite. Créez, basculez, exportez et importez des projets.",
+            "architecture": {
+                "desc": "Les projets sont stockés dans secure/projects/{nom}. Chaque projet a ses propres templates, traductions et configuration."
+            },
+            "working": {
+                "desc": "Utilisez switchProject pour changer de contexte. Tous les appels API suivants opèrent sur le projet actif jusqu'à ce que vous basculiez à nouveau."
+            },
+            "backup": {
+                "desc": "Utilisez exportProject pour créer des sauvegardes ZIP. Importez-les plus tard avec importProject pour restaurer ou dupliquer des projets."
+            }
         },
         "pages": {
             "title": "Créer des Pages",

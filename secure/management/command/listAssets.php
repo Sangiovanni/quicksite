@@ -25,7 +25,7 @@ function __command_listAssets(array $params = [], array $urlParams = []): ApiRes
     $validCategories = require SECURE_FOLDER_PATH . '/management/config/assetCategories.php';
 
     // Load asset metadata
-    $metadataPath = SECURE_FOLDER_PATH . '/config/assets_metadata.json';
+    $metadataPath = PROJECT_PATH . '/data/assets_metadata.json';
     $allMetadata = [];
     if (file_exists($metadataPath)) {
         $metadataContent = file_get_contents($metadataPath);

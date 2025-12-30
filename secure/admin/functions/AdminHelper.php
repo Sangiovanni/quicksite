@@ -135,6 +135,11 @@ function getCommandCategories(): array {
             'icon' => 'package',
             'commands' => ['build', 'listBuilds', 'getBuild', 'deleteBuild', 'cleanBuilds', 'deployBuild', 'downloadBuild']
         ],
+        'project_management' => [
+            'label' => 'Project Management',
+            'icon' => 'folder-tree',
+            'commands' => ['listProjects', 'getActiveProject', 'switchProject', 'createProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport']
+        ],
         'command_history' => [
             'label' => 'Command History',
             'icon' => 'history',

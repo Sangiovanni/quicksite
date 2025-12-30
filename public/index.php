@@ -2,7 +2,7 @@
 require_once 'init.php';
 
 // --- Check for URL aliases BEFORE TrimParameters processes routes ---
-$aliasesFile = SECURE_FOLDER_PATH . '/config/aliases.json';
+$aliasesFile = PROJECT_PATH . '/data/aliases.json';
 $aliasRewrite = null;
 
 if (file_exists($aliasesFile)) {
@@ -67,4 +67,4 @@ if($requestedPage == ''){
 if($page == "404"){
     http_response_code(404);
 }
-require_once SECURE_FOLDER_PATH . '/templates/pages/'. $page .'.php';
+require_once PROJECT_PATH . '/templates/pages/'. $page .'.php';

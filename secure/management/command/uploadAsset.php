@@ -344,7 +344,7 @@ if ($actualSize !== $file['size']) {
 // ============================================================
 // Store Asset Metadata
 // ============================================================
-$metadataPath = SECURE_FOLDER_PATH . '/config/assets_metadata.json';
+$metadataPath = PROJECT_PATH . '/data/assets_metadata.json';
 $assetKey = $category . '/' . $finalFilename;
 $metadata = [];
 
