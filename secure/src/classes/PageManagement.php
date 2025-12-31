@@ -48,13 +48,17 @@ class PageManagement {
         $translator = new Translator($this->lang);
         $trimParameters = new TrimParameters();
 
-        // Pass context with baseUrl and lang
+        // Pass context with baseUrl, lang, and route info
         $context = [
             'baseUrl' => BASE_URL,
             'lang' => MULTILINGUAL_SUPPORT ? $trimParameters->lang() : '',
-            'page' => $trimParameters->page(),
-            'id' => $trimParameters->id(),
-            'params' => $trimParameters->params()
+            // New nested route properties
+            'route' => $trimParameters->route(),           // ['guides', 'installation']
+            'routePath' => $trimParameters->routePath(),   // 'guides/installation'
+            'params' => $trimParameters->params(),
+            // Legacy compatibility (deprecated)
+            'page' => $trimParameters->page(),             // Last segment for backward compat
+            'id' => $trimParameters->id(),                 // First param for backward compat
         ];
 
         $renderer = new JsonToHtmlRenderer($translator, $context);

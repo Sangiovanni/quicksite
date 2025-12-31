@@ -21,12 +21,11 @@ if (file_exists($aliasesFile)) {
         $langCode = array_shift($parts);
     }
     
-    // Get the potential page/alias
-    $potentialPage = count($parts) > 0 ? $parts[0] : '';
-    $aliasPath = '/' . $potentialPage;
+    // Get the potential page/alias (now supports nested paths)
+    $potentialPath = count($parts) > 0 ? '/' . implode('/', $parts) : '';
     
-    if (isset($aliases[$aliasPath])) {
-        $aliasInfo = $aliases[$aliasPath];
+    if (isset($aliases[$potentialPath])) {
+        $aliasInfo = $aliases[$potentialPath];
         $targetPath = ltrim($aliasInfo['target'], '/');
         $aliasType = $aliasInfo['type'] ?? 'redirect';
         
@@ -52,19 +51,84 @@ if ($aliasRewrite !== null) {
 require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';
 $trimParameters = new TrimParameters();
 
-$requestedPage = $trimParameters->page();
+// --- Route Resolution with Nested Routes Support ---
+$route = $trimParameters->route();         // e.g., ['guides', 'installation']
+$routePath = $trimParameters->routePath(); // e.g., 'guides/installation'
+$routeFound = $trimParameters->routeFound();
 
-// --- Route resolution ---
-if(in_array($requestedPage, ROUTES)){
-    $page = $requestedPage;
-} else {
-    $page = '404';
-}
-if($requestedPage == ''){
-    $page = 'home';
-}
-
-if($page == "404"){
+// Handle 404
+if (!$routeFound || $routePath === '404') {
     http_response_code(404);
+    $templateFile = PROJECT_PATH . '/templates/pages/404/404.php';
+    if (!file_exists($templateFile)) {
+        // Fallback to flat structure during migration
+        $templateFile = PROJECT_PATH . '/templates/pages/404.php';
+    }
+    if (file_exists($templateFile)) {
+        require_once $templateFile;
+    } else {
+        echo '<h1>404 - Page Not Found</h1>';
+    }
+    exit;
 }
-require_once PROJECT_PATH . '/templates/pages/'. $page .'.php';
+
+// --- Resolve route to file path ---
+// Convention:
+//   - Route without children: guides/installation → guides/installation.php
+//   - Route with children: guides → guides/guides.php (because it has children)
+
+/**
+ * Resolve route path to template file
+ */
+function resolveTemplateFile(array $route, array $routes, string $projectPath): string {
+    $basePath = $projectPath . '/templates/pages/';
+    $routeName = end($route);
+    
+    // Navigate to the route's config to check for children
+    $routeConfig = $routes;
+    foreach ($route as $segment) {
+        $routeConfig = $routeConfig[$segment] ?? [];
+    }
+    $hasChildren = !empty($routeConfig);
+    
+    // Build file path based on whether route has children
+    if ($hasChildren) {
+        // Route has children: guides → guides/guides.php
+        return $basePath . implode('/', $route) . '/' . $routeName . '.php';
+    } else {
+        // Leaf route: guides/installation → guides/installation.php
+        return $basePath . implode('/', $route) . '.php';
+    }
+}
+
+$templateFile = resolveTemplateFile($route, ROUTES, PROJECT_PATH);
+
+// Fallback: try flat structure (for backward compatibility during migration)
+if (!file_exists($templateFile)) {
+    // Try simple flat file: routePath.php (e.g., guides.php)
+    $flatFile = PROJECT_PATH . '/templates/pages/' . $routePath . '.php';
+    if (file_exists($flatFile)) {
+        $templateFile = $flatFile;
+    } else {
+        // Try legacy single-segment fallback
+        $legacyFile = PROJECT_PATH . '/templates/pages/' . $route[0] . '.php';
+        if (file_exists($legacyFile)) {
+            $templateFile = $legacyFile;
+        }
+    }
+}
+
+// Final check - if still not found, 404
+if (!file_exists($templateFile)) {
+    http_response_code(404);
+    $notFoundFile = PROJECT_PATH . '/templates/pages/404.php';
+    if (file_exists($notFoundFile)) {
+        require_once $notFoundFile;
+    } else {
+        echo '<h1>404 - Page Not Found</h1>';
+        echo '<p>Template file not found: ' . htmlspecialchars(str_replace(PROJECT_PATH, '', $templateFile)) . '</p>';
+    }
+    exit;
+}
+
+require_once $templateFile;
