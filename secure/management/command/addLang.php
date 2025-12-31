@@ -2,44 +2,55 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
-// Check if multilingual mode is enabled
-if (!MULTILINGUAL_SUPPORT) {
-    ApiResponse::create(403, 'mode.requires_multilingual')
-        ->withMessage('The addLang command requires multilingual mode. Use setMultilingual to enable it first.')
-        ->withData(['current_mode' => 'mono-language'])
-        ->send();
-}
+// NOTE: addLang works regardless of MULTILINGUAL_SUPPORT setting
+// This allows adding languages BEFORE enabling multilingual mode
+// (setMultilingual requires 2+ languages to enable)
 
 $params = $trimParametersManagement->params();
 
+// Support both 'code'/'name' (full form) and 'lang' (shorthand with auto-generated name)
+// If only 'lang' is provided, use it as both code and generate a display name
+$langCode = $params['code'] ?? $params['lang'] ?? null;
+$langName = $params['name'] ?? null;
+
 // Validate required parameters
-if (!isset($params['code']) || !isset($params['name'])) {
-    $missing = [];
-    if (!isset($params['code'])) $missing[] = 'code';
-    if (!isset($params['name'])) $missing[] = 'name';
-    
+if ($langCode === null) {
     ApiResponse::create(400, 'validation.required')
-        ->withErrors(array_map(fn($f) => ['field' => $f, 'reason' => 'missing'], $missing))
+        ->withMessage('Language code is required')
+        ->withErrors([['field' => 'code', 'reason' => 'missing', 'hint' => 'Use "code" and "name", or just "lang" for shorthand']])
         ->send();
 }
 
-// Validate parameter types (must be strings, not arrays/objects/etc)
-if (!is_string($params['code'])) {
+// If name not provided, generate from code (e.g., 'fr' -> 'French', 'es' -> 'Spanish')
+if ($langName === null) {
+    $commonLanguages = [
+        'en' => 'English', 'fr' => 'French', 'es' => 'Spanish', 'de' => 'German',
+        'it' => 'Italian', 'pt' => 'Portuguese', 'nl' => 'Dutch', 'ru' => 'Russian',
+        'zh' => 'Chinese', 'ja' => 'Japanese', 'ko' => 'Korean', 'ar' => 'Arabic',
+        'hi' => 'Hindi', 'pl' => 'Polish', 'sv' => 'Swedish', 'da' => 'Danish',
+        'no' => 'Norwegian', 'fi' => 'Finnish', 'tr' => 'Turkish', 'cs' => 'Czech',
+        'el' => 'Greek', 'he' => 'Hebrew', 'th' => 'Thai', 'vi' => 'Vietnamese'
+    ];
+    $langName = $commonLanguages[strtolower($langCode)] ?? ucfirst($langCode);
+}
+
+// Type validation - must be strings
+if (!is_string($langCode)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage("Invalid parameter type")
-        ->withErrors([['field' => 'code', 'reason' => 'must be a string', 'received_type' => gettype($params['code'])]])
+        ->withErrors([['field' => 'code', 'reason' => 'must be a string', 'received_type' => gettype($langCode)]])
         ->send();
 }
 
-if (!is_string($params['name'])) {
+if (!is_string($langName)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage("Invalid parameter type")
-        ->withErrors([['field' => 'name', 'reason' => 'must be a string', 'received_type' => gettype($params['name'])]])
+        ->withErrors([['field' => 'name', 'reason' => 'must be a string', 'received_type' => gettype($langName)]])
         ->send();
 }
 
-$langCode = trim($params['code']);
-$langName = trim($params['name']);
+$langCode = trim($langCode);
+$langName = trim($langName);
 
 // Validate language code format (2-3 lowercase letters)
 if (!RegexPatterns::match('language_code', $langCode)) {

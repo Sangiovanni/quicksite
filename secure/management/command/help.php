@@ -126,18 +126,19 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'addRoute' => [
-        'description' => 'Creates a new route with PHP page template and empty JSON structure',
+        'description' => 'Creates a new route with PHP page template and empty JSON structure. Supports nested routes (e.g., "guides/getting-started").',
         'method' => 'POST',
         'parameters' => [
             'route' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Route name (will be used in URL)',
+                'description' => 'Route path (will be used in URL). Can use "name" as alias for simple routes.',
                 'example' => 'about-us',
-                'validation' => 'Lowercase letters, numbers, and hyphens only'
+                'validation' => 'Lowercase letters, numbers, and hyphens only. Max depth: 5 levels.',
+                'alias' => 'name'
             ]
         ],
-        'example_post' => 'POST /management/addRoute with body: {"route": "about-us"}',
+        'example_post' => 'POST /management/addRoute with body: {"route": "about-us"} or {"name": "about-us"}',
         'success_response' => [
             'status' => 201,
             'code' => 'route.created',
@@ -1048,29 +1049,29 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'setMultilingual' => [
-        'description' => 'Enable or disable multilingual support. Syncs translations between default.json and default language file.',
+        'description' => 'Enable or disable multilingual support. Requires at least 2 languages to enable. Syncs translations between default.json and default language file.',
         'method' => 'PATCH',
         'parameters' => [
             'enabled' => [
                 'required' => true,
                 'type' => 'boolean',
                 'description' => 'true for multilingual mode, false for mono-language mode',
-                'example' => false,
+                'example' => true,
                 'validation' => 'Must be boolean true/false'
             ]
         ],
-        'example_patch' => 'PATCH /management/setMultilingual with body: {"enabled": false}',
+        'example_patch' => 'PATCH /management/setMultilingual with body: {"enabled": true}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => 'Successfully switched to mono-language mode',
+            'message' => 'Successfully switched to multilingual mode',
             'data' => [
-                'multilingual_enabled' => false,
+                'multilingual_enabled' => true,
                 'changed' => true,
-                'mode' => 'mono-language',
+                'mode' => 'multilingual',
                 'default_language' => 'en',
                 'sync' => [
-                    'direction' => 'en.json → default.json',
+                    'direction' => 'default.json → en.json',
                     'keys_added' => 42
                 ]
             ]
@@ -1078,10 +1079,10 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'Missing enabled parameter',
             '400.validation.invalid_type' => 'enabled must be boolean',
-            '400.validation.invalid_format' => 'Multilingual mode requires at least 2 languages',
+            '400.validation.invalid_format' => 'Multilingual mode requires at least 2 languages (use addLang first)',
             '500.server.file_write_failed' => 'Failed to update config.php or translation files'
         ],
-        'notes' => 'When switching modes, translations are synced: mono→multi copies default.json keys to default language file, multi→mono copies default language to default.json. Use language="default" with setTranslationKeys in mono-language mode.'
+        'notes' => 'To enable multilingual: 1) Use addLang to add languages first, 2) Then use setMultilingual(enabled=true). When switching modes, translations are synced: mono→multi copies default.json keys to default language file, multi→mono copies default language to default.json.'
     ],
     
     'checkStructureMulti' => [
@@ -1117,26 +1118,27 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'addLang' => [
-        'description' => 'Adds a new language to the system. Requires MULTILINGUAL_SUPPORT = true.',
+        'description' => 'Adds a new language to the system. Can be used before or after enabling multilingual mode.',
         'method' => 'POST',
-        'requires_mode' => 'multilingual',
         'parameters' => [
             'code' => [
-                'required' => true,
+                'required' => false,
                 'type' => 'string',
-                'description' => 'Language code (ISO 639-1)',
+                'description' => 'Language code (ISO 639-1). Can use "lang" as shorthand alias.',
                 'example' => 'es',
-                'validation' => '2-3 lowercase letters'
+                'validation' => '2-3 lowercase letters',
+                'alias' => 'lang'
             ],
             'name' => [
-                'required' => true,
+                'required' => false,
                 'type' => 'string',
-                'description' => 'Language display name',
+                'description' => 'Language display name. Auto-generated if not provided (e.g., "fr" → "French").',
                 'example' => 'Español',
-                'validation' => 'Any string'
+                'validation' => 'Any string',
+                'default' => 'Auto-generated from language code'
             ]
         ],
-        'example_post' => 'POST /management/addLang with body: {"code": "es", "name": "Español"}',
+        'example_post' => 'POST /management/addLang with body: {"lang": "fr"} or {"code": "es", "name": "Español"}',
         'success_response' => [
             'status' => 201,
             'code' => 'operation.success',
@@ -1150,13 +1152,12 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '400.validation.required' => 'Missing code or name parameter',
+            '400.validation.required' => 'Missing code/lang parameter',
             '400.validation.invalid_format' => 'Invalid language code format',
-            '403.mode.requires_multilingual' => 'This command requires multilingual mode',
             '409.conflict.duplicate' => 'Language already exists',
             '500.server.file_write_failed' => 'Failed to update config or create translation file'
         ],
-        'notes' => 'Only available when MULTILINGUAL_SUPPORT = true. Use setMultilingual to enable multilingual mode first. Updates config.php and creates translation file by copying from default language.'
+        'notes' => 'Can be used before enabling multilingual mode (to add languages first). Use setMultilingual to enable multilingual mode after adding 2+ languages. Updates config.php and creates translation file by copying from default language.'
     ],
     
     'deleteLang' => [
@@ -1615,12 +1616,13 @@ $GLOBALS['__help_commands'] = [
             'content' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Complete CSS/SCSS content (replaces existing file)',
+                'description' => 'Complete CSS/SCSS content (replaces existing file). Can use "css" as alias.',
                 'example' => 'body { margin: 0; }',
-                'validation' => 'Must be string, max 2MB'
+                'validation' => 'Must be string, max 2MB',
+                'alias' => 'css'
             ]
         ],
-        'example_put' => 'PUT /management/editStyles with body: {"content": "body { margin: 0; }"}',
+        'example_put' => 'PUT /management/editStyles with body: {"content": "body { margin: 0; }"} or {"css": "body { margin: 0; }"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',

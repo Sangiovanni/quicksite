@@ -16,9 +16,10 @@ You are creating a complete single-page landing website from a blank QuickSite p
 **⚠️ MANDATORY ORDER:**
 
 {{#if param.multilingual === true}}
-1. **Multilingual FIRST**:
-   - `setMultilingual` → enables multi-language mode
-   - `addLang` → for each additional language (languages: {{param.languages}})
+1. **Languages FIRST** (required for multilingual):
+   - `addLang` → add each additional language BEFORE enabling multilingual
+   - `setMultilingual` → enable multi-language mode AFTER having 2+ languages
+   - Languages: {{param.languages}}
 {{/if}}
 
 {{#if param.multilingual === true}}2{{else}}1{{/if}}. **Structures** (in this order):

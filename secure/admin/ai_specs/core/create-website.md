@@ -16,9 +16,10 @@ You are creating a complete multi-page website from a blank QuickSite project. G
 **⚠️ MANDATORY ORDER:**
 
 {{#if param.multilingual === true}}
-1. **Multilingual FIRST**:
-   - `setMultilingual` → enables multi-language mode
-   - `addLang` → for each additional language (languages: {{param.languages}})
+1. **Languages FIRST** (required for multilingual):
+   - `addLang` → add each additional language BEFORE enabling multilingual
+   - `setMultilingual` → enable multi-language mode AFTER having 2+ languages
+   - Languages: {{param.languages}}
 
 2. **Routes**:
    - `addRoute` → creates new pages (home exists by default)

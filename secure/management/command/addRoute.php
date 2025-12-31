@@ -34,15 +34,18 @@ const MAX_PATH_LENGTH = 200;
 // VALIDATION
 // ============================================================================
 
+$params = $trimParametersManagement->params();
+
+// Support both 'route' (full form) and 'name' (shorthand for simple routes)
+$routePath = $params['route'] ?? $params['name'] ?? null;
+
 // Check required parameter
-if (!array_key_exists('route', $trimParametersManagement->params())) {
+if ($routePath === null) {
     ApiResponse::create(400, 'validation.required')
         ->withMessage('Route path is required')
-        ->withErrors([['field' => 'route', 'reason' => 'missing']])
+        ->withErrors([['field' => 'route', 'reason' => 'missing', 'hint' => 'Use "route" or "name" parameter']])
         ->send();
 }
-
-$routePath = $trimParametersManagement->params()['route'];
 
 // Type validation
 if (is_int($routePath) || is_float($routePath)) {
