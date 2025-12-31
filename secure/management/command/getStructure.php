@@ -2,6 +2,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 /**
  * getStructure - Retrieves JSON structure for pages, menu, footer, or components
@@ -58,7 +59,7 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
             ]);
     }
 
-// For pages and components, name is the second URL segment
+// For pages and components, name is from URL segments
     if ($type === 'page' || $type === 'component') {
         if (!isset($urlParams[1]) || empty($urlParams[1])) {
             return ApiResponse::create(400, 'validation.required')
@@ -66,7 +67,22 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
                 ->withErrors([['field' => 'name', 'reason' => 'missing', 'usage' => "GET /management/getStructure/{$type}/{name}"]]);
         }
         
-        $name = $urlParams[1];
+        // For pages, support nested routes: getStructure/page/guides/getting-started
+        // Collect all URL segments after type as the route path
+        if ($type === 'page') {
+            $routeSegments = array_slice($urlParams, 1);
+            // Filter out empty segments and 'showIds' option if present
+            $routeSegments = array_filter($routeSegments, fn($s) => $s !== '' && $s !== 'showIds');
+            $name = implode('/', $routeSegments);
+            
+            // Check if last segment is actually an option (for backward compat)
+            $lastSegment = end($urlParams);
+            if ($lastSegment === 'showIds') {
+                $name = implode('/', array_slice($routeSegments, 0, -1));
+            }
+        } else {
+            $name = $urlParams[1];
+        }
         
         // Type validation - name must be string (allow numeric for routes like "404")
         if (is_int($name) || is_float($name)) {
@@ -81,18 +97,18 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
                 ]);
         }
         
-        // Length validation - max 100 characters for name
-        if (strlen($name) > 100) {
+        // Length validation - max 200 characters for route path
+        if (strlen($name) > 200) {
             return ApiResponse::create(400, 'validation.invalid_length')
-                ->withMessage("The name parameter must not exceed 100 characters.")
+                ->withMessage("The name parameter must not exceed 200 characters.")
                 ->withErrors([
-                    ['field' => 'name', 'value' => $name, 'max_length' => 100]
+                    ['field' => 'name', 'value' => $name, 'max_length' => 200]
                 ]);
         }
         
         // Check for path traversal attempts in name (BEFORE other validations)
+        // Allow forward slashes for nested routes, but block dangerous patterns
         if (strpos($name, '..') !== false || 
-            strpos($name, '/') !== false || 
             strpos($name, '\\') !== false ||
             strpos($name, "\0") !== false) {
             return ApiResponse::create(400, 'validation.invalid_format')
@@ -102,11 +118,14 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
                 ]);
         }
         
-        // Validate name format (alphanumeric, hyphens, underscores) for both pages and components
-        if (!RegexPatterns::match('identifier_alphanum', $name)) {
-            return ApiResponse::create(400, 'validation.invalid_format')
-                ->withMessage("Invalid name format. Use only alphanumeric, hyphens, and underscores")
-                ->withErrors([RegexPatterns::validationError('identifier_alphanum', 'name', $name)]);
+        // Validate each segment of the route path
+        $segments = array_filter(explode('/', $name), fn($s) => $s !== '');
+        foreach ($segments as $segment) {
+            if (!RegexPatterns::match('identifier_alphanum', $segment)) {
+                return ApiResponse::create(400, 'validation.invalid_format')
+                    ->withMessage("Invalid segment '$segment'. Use only alphanumeric, hyphens, and underscores")
+                    ->withErrors([RegexPatterns::validationError('identifier_alphanum', 'name', $segment)]);
+            }
         }
         
         // Special pages that exist but are not in ROUTES (error pages, etc.)
@@ -114,15 +133,21 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
         
         // Validate page exists (only for pages, not components)
         // Allow special pages (404, 500, etc.) even if not in ROUTES
-        if ($type === 'page' && !in_array($name, ROUTES, true) && !in_array($name, $specialPages, true)) {
+        if ($type === 'page' && !routeExists($name, ROUTES) && !in_array($name, $specialPages, true)) {
             return ApiResponse::create(404, 'route.not_found')
                 ->withMessage("Page '{$name}' does not exist")
-                ->withData(['available_routes' => ROUTES, 'special_pages' => $specialPages]);
+                ->withData(['available_routes' => flattenRoutes(ROUTES), 'special_pages' => $specialPages]);
         }
         
         // Build file path based on type
         if ($type === 'page') {
-            $json_file = PROJECT_PATH . '/templates/model/json/pages/' . $name . '.json';
+            // Use helper to resolve JSON path (supports folder structure)
+            $json_file = resolvePageJsonPath($name);
+            if ($json_file === null) {
+                return ApiResponse::create(404, 'file.not_found')
+                    ->withMessage("Structure file not found for page '{$name}'")
+                    ->withData(['route' => $name]);
+            }
         } else { // component
             $json_file = PROJECT_PATH . '/templates/model/json/components/' . $name . '.json';
         }
@@ -152,8 +177,12 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
             ->withMessage("Invalid JSON in structure file: " . json_last_error_msg());
     }
 
-// Check for additional parameters: nodeId or showIds
-    // For page/component: urlParams[2] would be the option
+    // Check for additional parameters: nodeId or showIds
+    // For nested routes, showIds might be at the end
+    $lastSegment = end($urlParams);
+    $showIds = ($lastSegment === 'showIds');
+    
+    // For page/component: look for option after the route segments
     // For menu/footer: urlParams[1] would be the option
     $optionSegment = ($type === 'page' || $type === 'component') 
         ? ($urlParams[2] ?? null) 

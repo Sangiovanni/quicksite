@@ -12,6 +12,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 /**
  * Count nodes in page structure
@@ -92,16 +93,18 @@ function __command_listPages(array $params = [], array $urlParams = []): ApiResp
             ]);
     }
 
-    // Get all JSON files
-    $files = glob($pagesDir . '/*.json');
+    // Get all JSON files recursively (supports folder structure)
+    $pageFiles = scanAllPageJsonFiles();
     $pages = [];
 
-    // Also get routes for cross-reference
+    // Also get routes for cross-reference (flatten nested routes)
     $routesFile = PROJECT_PATH . '/routes.php';
     $routes = file_exists($routesFile) ? require($routesFile) : [];
+    $flatRoutes = flattenRoutes($routes);
 
-    foreach ($files as $file) {
-        $name = basename($file, '.json');
+    foreach ($pageFiles as $pageInfo) {
+        $name = $pageInfo['route'];
+        $file = $pageInfo['path'];
         
         // Read page structure
         $content = @file_get_contents($file);
@@ -114,10 +117,10 @@ function __command_listPages(array $params = [], array $urlParams = []): ApiResp
             // Include but mark as invalid
             $pages[] = [
                 'name' => $name,
-                'file' => $name . '.json',
+                'file' => str_replace(PROJECT_PATH . '/templates/model/json/pages/', '', $file),
                 'valid' => false,
                 'error' => 'Invalid JSON: ' . json_last_error_msg(),
-                'has_route' => in_array($name, $routes),
+                'has_route' => in_array($name, $flatRoutes),
                 'components_used' => [],
                 'node_count' => 0,
                 'size' => filesize($file),
@@ -135,10 +138,10 @@ function __command_listPages(array $params = [], array $urlParams = []): ApiResp
         
         $pages[] = [
             'name' => $name,
-            'file' => $name . '.json',
+            'file' => str_replace(PROJECT_PATH . '/templates/model/json/pages/', '', $file),
             'valid' => true,
-            'has_route' => in_array($name, $routes),
-            'route_url' => in_array($name, $routes) ? '/' . $name : null,
+            'has_route' => in_array($name, $flatRoutes),
+            'route_url' => in_array($name, $flatRoutes) ? '/' . $name : null,
             'components_used' => array_unique($componentsUsed),
             'node_count' => $nodeCount,
             'size' => filesize($file),

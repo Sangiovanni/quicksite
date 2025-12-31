@@ -22,6 +22,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/LockManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/ZipUtilities.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 // Get optional parameters for renaming folders in build
 $params = $trimParametersManagement->params();
@@ -476,9 +477,9 @@ if (file_exists($footerJsonPath)) {
 // Step 5: Compile all pages based on ROUTES
 $compiledPages = [];
 
-// First compile 404 page (special case)
-$page404JsonPath = PROJECT_PATH . '/templates/model/json/pages/404.json';
-if (file_exists($page404JsonPath)) {
+// First compile 404 page (special case) - supports folder structure
+$page404JsonPath = resolvePageJsonPath('404');
+if ($page404JsonPath !== null && file_exists($page404JsonPath)) {
     $page404Json = json_decode(file_get_contents($page404JsonPath), true);
     if ($page404Json === null) {
         release_build_lock();
@@ -488,7 +489,9 @@ if (file_exists($page404JsonPath)) {
     }
     
     $page404Php = $compiler->compilePage($page404Json, '404');
-    $page404FilePath = $buildFullPath . '/' . $buildSecureName . '/templates/pages/404.php';
+    // Create folder structure in build
+    @mkdir($buildFullPath . '/' . $buildSecureName . '/templates/pages/404', 0755, true);
+    $page404FilePath = $buildFullPath . '/' . $buildSecureName . '/templates/pages/404/404.php';
     
     if (file_put_contents($page404FilePath, $page404Php) === false) {
         release_build_lock();
@@ -500,11 +503,12 @@ if (file_exists($page404JsonPath)) {
     $compiledPages[] = '404';
 }
 
-// Then compile regular route pages
-foreach (ROUTES as $route) {
-    $pageJsonPath = PROJECT_PATH . '/templates/model/json/pages/' . $route . '.json';
+// Then compile regular route pages (supports nested routes)
+$allRoutes = flattenRoutes(ROUTES);
+foreach ($allRoutes as $route) {
+    $pageJsonPath = resolvePageJsonPath($route);
     
-    if (!file_exists($pageJsonPath)) {
+    if ($pageJsonPath === null || !file_exists($pageJsonPath)) {
         // Skip if page JSON doesn't exist
         continue;
     }
@@ -517,11 +521,16 @@ foreach (ROUTES as $route) {
             ->send();
     }
     
-    // Use route name as title (capitalize first letter)
-    $pageTitle = ucfirst(str_replace('-', ' ', $route));
+    // Use route name as title (capitalize first letter of last segment)
+    $routeName = basename($route);
+    $pageTitle = ucfirst(str_replace('-', ' ', $routeName));
     
     $pagePhp = $compiler->compilePage($pageJson, $route);
-    $pageFilePath = $buildFullPath . '/' . $buildSecureName . '/templates/pages/' . $route . '.php';
+    
+    // Create folder structure in build: route/route.php
+    $buildPageDir = $buildFullPath . '/' . $buildSecureName . '/templates/pages/' . $route;
+    @mkdir($buildPageDir, 0755, true);
+    $pageFilePath = $buildPageDir . '/' . $routeName . '.php';
     
     if (file_put_contents($pageFilePath, $pagePhp) === false) {
         release_build_lock();

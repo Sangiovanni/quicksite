@@ -218,8 +218,15 @@ function createDefaultTranslations(string $siteName): array {
 
 /**
  * Create basic page templates
+ * Uses folder structure: pages/home/home.php, pages/404/404.php
  */
 function createBasicPageTemplates(string $projectPath): void {
+    // Create directories for folder structure
+    @mkdir($projectPath . '/templates/pages/home', 0755, true);
+    @mkdir($projectPath . '/templates/pages/404', 0755, true);
+    @mkdir($projectPath . '/templates/model/json/pages/home', 0755, true);
+    @mkdir($projectPath . '/templates/model/json/pages/404', 0755, true);
+    
     // home.php - matches quicksite template structure
     $homePhp = <<<'PHP'
 <?php
@@ -244,7 +251,7 @@ $pageTitle = $translator->translate('page.titles.home');
 $page = new PageManagement($pageTitle, $content, $lang);
 $page->render();
 PHP;
-    file_put_contents($projectPath . '/templates/pages/home.php', $homePhp, LOCK_EX);
+    file_put_contents($projectPath . '/templates/pages/home/home.php', $homePhp, LOCK_EX);
     
     // 404.php - matches quicksite template structure
     $notFoundPhp = <<<'PHP'
@@ -270,7 +277,7 @@ $pageTitle = $translator->translate('page.titles.404');
 $page = new PageManagement($pageTitle, $content, $lang);
 $page->render();
 PHP;
-    file_put_contents($projectPath . '/templates/pages/404.php', $notFoundPhp, LOCK_EX);
+    file_put_contents($projectPath . '/templates/pages/404/404.php', $notFoundPhp, LOCK_EX);
     
     // home.json
     $homeJson = [
@@ -279,7 +286,7 @@ PHP;
             ['tag' => 'p', 'children' => [['textKey' => 'site.tagline']]]
         ]]
     ];
-    file_put_contents($projectPath . '/templates/model/json/pages/home.json', json_encode($homeJson, JSON_PRETTY_PRINT), LOCK_EX);
+    file_put_contents($projectPath . '/templates/model/json/pages/home/home.json', json_encode($homeJson, JSON_PRETTY_PRINT), LOCK_EX);
     
     // 404.json
     $notFoundJson = [
@@ -289,7 +296,7 @@ PHP;
             ['tag' => 'a', 'params' => ['href' => '/'], 'children' => [['textKey' => '404.backHome']]]
         ]]
     ];
-    file_put_contents($projectPath . '/templates/model/json/pages/404.json', json_encode($notFoundJson, JSON_PRETTY_PRINT), LOCK_EX);
+    file_put_contents($projectPath . '/templates/model/json/pages/404/404.json', json_encode($notFoundJson, JSON_PRETTY_PRINT), LOCK_EX);
 }
 
 /**

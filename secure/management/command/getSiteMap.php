@@ -14,6 +14,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 /**
  * Recursively count non-empty translation values
@@ -55,8 +56,8 @@ function __command_getSiteMap(array $params = [], array $urlParams = []): ApiRes
     $defaultLang = CONFIG['LANGUAGE_DEFAULT'] ?? 'en';
     $languageNames = CONFIG['LANGUAGES_NAME'] ?? [];
 
-    // Get all routes
-    $routes = ROUTES;
+    // Get all routes (flatten nested structure)
+    $routes = flattenRoutes(ROUTES);
 
     // Build sitemap data
     $sitemapData = [

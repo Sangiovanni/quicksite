@@ -21,15 +21,13 @@ require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 function extractAllUsedKeys(): array {
     $allKeys = [];
     
-    // Scan pages
-    $pagesDir = PROJECT_PATH . '/templates/model/json/pages';
-    if (is_dir($pagesDir)) {
-        foreach (glob($pagesDir . '/*.json') as $file) {
-            $structure = loadJsonStructure($file);
-            if (is_array($structure)) {
-                foreach ($structure as $node) {
-                    extractTextKeys($node, $allKeys, 0, 20);
-                }
+    // Scan all pages recursively (supports folder structure)
+    $pageFiles = scanAllPageJsonFiles();
+    foreach ($pageFiles as $pageInfo) {
+        $structure = loadJsonStructure($pageInfo['path']);
+        if (is_array($structure)) {
+            foreach ($structure as $node) {
+                extractTextKeys($node, $allKeys, 0, 20);
             }
         }
     }

@@ -16,6 +16,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 // Get request body
 $rawBody = defined('REQUEST_BODY_RAW') ? REQUEST_BODY_RAW : file_get_contents('php://input');
@@ -123,18 +124,20 @@ if (isset($aliases[$alias])) {
 }
 
 // Verify target route exists (either as a route or page)
-$targetSegment = trim($target, '/');
-if (strpos($targetSegment, '/') !== false) {
-    $targetSegment = explode('/', $targetSegment)[0];
-}
+$targetPath = trim($target, '/');
 
-$targetIsRoute = in_array($targetSegment, $routes);
-$targetIsPage = file_exists(PROJECT_PATH . '/templates/model/json/pages/' . $targetSegment . '.json');
+// Check if target exists in routes (supports nested routes)
+$targetIsRoute = routeExists($targetPath, $routes);
+
+// Check if page JSON exists (supports folder structure)
+$targetIsPage = resolvePageJsonPath($targetPath) !== null;
+
 $targetIsAlias = isset($aliases[$target]);
 
 if (!$targetIsRoute && !$targetIsPage && !$targetIsAlias && $target !== '/') {
     ApiResponse::create(400, 'api.error.invalid_parameter')
         ->withMessage("Target '$target' does not exist as a route or page")
+        ->withData(['available_routes' => flattenRoutes($routes)])
         ->send();
 }
 

@@ -137,31 +137,19 @@ if ($type === 'page' || $type === 'component') {
             ->send();
     }
     
-    // Length validation - max 100 characters for name
-    if (strlen($name) > 100) {
+    // Length validation - max 200 characters for route paths
+    if (strlen($name) > 200) {
         ApiResponse::create(400, 'validation.invalid_length')
-            ->withMessage("The name parameter must not exceed 100 characters.")
+            ->withMessage("The name parameter must not exceed 200 characters.")
             ->withErrors([
-                ['field' => 'name', 'value' => $name, 'max_length' => 100]
+                ['field' => 'name', 'value' => $name, 'max_length' => 200]
             ])
             ->send();
     }
     
-    // Special pages that exist but are not in ROUTES (error pages, etc.)
-    $specialPages = ['404', '500', '403', '401'];
-    
-    // Validate page exists (only for pages, not components - components can be created)
-    // Allow special pages (404, 500, etc.) even if not in ROUTES
-    if ($type === 'page' && !in_array($name, ROUTES, true) && !in_array($name, $specialPages, true)) {
-        ApiResponse::create(404, 'route.not_found')
-            ->withMessage("Page '{$name}' does not exist")
-            ->withData(['available_routes' => ROUTES, 'special_pages' => $specialPages])
-            ->send();
-    }
-    
     // Check for path traversal attempts in name
+    // Allow forward slashes for nested page routes
     if (strpos($name, '..') !== false || 
-        strpos($name, '/') !== false || 
         strpos($name, '\\') !== false ||
         strpos($name, "\0") !== false) {
         ApiResponse::create(400, 'validation.invalid_format')
@@ -172,17 +160,47 @@ if ($type === 'page' || $type === 'component') {
             ->send();
     }
     
-    // Validate component name format (alphanumeric, hyphens, underscores)
-    if ($type === 'component' && !RegexPatterns::match('identifier_alphanum', $name)) {
+    // For components, block slashes entirely
+    if ($type === 'component' && strpos($name, '/') !== false) {
         ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage("Invalid component name. Use only alphanumeric, hyphens, and underscores")
-            ->withErrors([RegexPatterns::validationError('identifier_alphanum', 'name', $name)])
+            ->withMessage('Component name cannot contain slashes')
+            ->withErrors([
+                ['field' => 'name', 'reason' => 'invalid_character']
+            ])
             ->send();
+    }
+    
+    // Special pages that exist but are not in ROUTES (error pages, etc.)
+    $specialPages = ['404', '500', '403', '401'];
+    
+    // Validate page exists (only for pages, not components - components can be created)
+    // Allow special pages (404, 500, etc.) even if not in ROUTES
+    if ($type === 'page' && !routeExists($name, ROUTES) && !in_array($name, $specialPages, true)) {
+        ApiResponse::create(404, 'route.not_found')
+            ->withMessage("Page '{$name}' does not exist")
+            ->withData(['available_routes' => flattenRoutes(ROUTES), 'special_pages' => $specialPages])
+            ->send();
+    }
+    
+    // Validate each segment of the name
+    $segments = array_filter(explode('/', $name), fn($s) => $s !== '');
+    foreach ($segments as $segment) {
+        if (!RegexPatterns::match('identifier_alphanum', $segment)) {
+            ApiResponse::create(400, 'validation.invalid_format')
+                ->withMessage("Invalid segment '$segment'. Use only alphanumeric, hyphens, and underscores")
+                ->withErrors([RegexPatterns::validationError('identifier_alphanum', 'name', $segment)])
+                ->send();
+        }
     }
     
     // Build file path
     if ($type === 'page') {
-        $json_file = PROJECT_PATH . '/templates/model/json/pages/' . $name . '.json';
+        // Use helper to resolve JSON path (supports folder structure)
+        $json_file = resolvePageJsonPath($name);
+        if ($json_file === null) {
+            // For new pages that don't exist yet, use folder structure
+            $json_file = getNewPagePath($name, 'json');
+        }
     } else { // component
         $json_file = PROJECT_PATH . '/templates/model/json/components/' . $name . '.json';
     }

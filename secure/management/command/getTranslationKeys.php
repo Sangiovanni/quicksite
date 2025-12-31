@@ -22,26 +22,21 @@ function __command_getTranslationKeys(array $params = [], array $urlParams = [])
     $allKeys = [];
     $scannedFiles = [];
 
-    // 1. Scan all page structures
-    $pagesDir = PROJECT_PATH . '/templates/model/json/pages';
-    if (is_dir($pagesDir)) {
-        $pageFiles = glob($pagesDir . '/*.json');
+    // 1. Scan all page structures (supports folder structure)
+    $pageFiles = scanAllPageJsonFiles();
+    foreach ($pageFiles as $pageInfo) {
+        $structure = loadJsonStructure($pageInfo['path']);
         
-        foreach ($pageFiles as $pageFile) {
-            $pageName = basename($pageFile, '.json');
-            $structure = loadJsonStructure($pageFile);
-            
-            if ($structure !== null) {
-                $pageKeys = [];
-                if (is_array($structure)) {
-                    foreach ($structure as $node) {
-                        extractTextKeys($node, $pageKeys, 0, 20); // Max 20 levels depth
-                    }
+        if ($structure !== null) {
+            $pageKeys = [];
+            if (is_array($structure)) {
+                foreach ($structure as $node) {
+                    extractTextKeys($node, $pageKeys, 0, 20); // Max 20 levels depth
                 }
-                
-                $allKeys[$pageName] = array_unique($pageKeys);
-                $scannedFiles['pages'][] = $pageName;
             }
+            
+            $allKeys[$pageInfo['route']] = array_unique($pageKeys);
+            $scannedFiles['pages'][] = $pageInfo['route'];
         }
     }
 
