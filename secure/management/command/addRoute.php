@@ -140,35 +140,8 @@ $jsonDir = PROJECT_PATH . '/templates/model/json/pages';
 $phpFilePath = resolveNewRoutePhpPath($segments, $currentRoutes, $pagesDir);
 $jsonFilePath = resolveNewRouteJsonPath($segments, $jsonDir);
 
-// Check if we need to restructure parent (convert leaf to branch)
-$parentNeedsRestructure = false;
-$parentOldFile = null;
-$parentNewFile = null;
-
-if (count($segments) > 1) {
-    $parentSegments = array_slice($segments, 0, -1);
-    $parentName = end($parentSegments);
-    
-    // Check if parent currently has no children (is a leaf)
-    $parentChildren = getRouteChildren($parentSegments, $currentRoutes);
-    
-    if (empty($parentChildren)) {
-        // Parent is currently a leaf - needs restructure
-        // Old location: /parent.php or /grandparent/parent.php
-        // New location: /parent/parent.php or /grandparent/parent/parent.php
-        $parentNeedsRestructure = true;
-        
-        $parentPath = implode('/', $parentSegments);
-        $parentOldFile = $pagesDir . '/' . $parentPath . '.php';
-        $parentNewDir = $pagesDir . '/' . $parentPath;
-        $parentNewFile = $parentNewDir . '/' . $parentName . '.php';
-        
-        // Also for JSON
-        $parentOldJson = $jsonDir . '/' . $parentPath . '.json';
-        $parentNewJsonDir = $jsonDir . '/' . $parentPath;
-        $parentNewJson = $parentNewJsonDir . '/' . $parentName . '.json';
-    }
-}
+// NOTE: Parent restructuring removed - all routes now use folder structure
+// Parent is already at parent/parent.php, no move needed
 
 // ============================================================================
 // CREATE DIRECTORY STRUCTURE
@@ -194,35 +167,6 @@ try {
             throw new Exception("Failed to create directory: $jsonFileDir");
         }
         $createdDirs[] = $jsonFileDir;
-    }
-    
-    // ========================================================================
-    // RESTRUCTURE PARENT IF NEEDED
-    // ========================================================================
-    
-    if ($parentNeedsRestructure && file_exists($parentOldFile)) {
-        // Create parent's new directory
-        if (!is_dir($parentNewDir) && !mkdir($parentNewDir, 0755, true)) {
-            throw new Exception("Failed to create parent directory: $parentNewDir");
-        }
-        $createdDirs[] = $parentNewDir;
-        
-        // Move parent PHP file
-        if (!rename($parentOldFile, $parentNewFile)) {
-            throw new Exception("Failed to move parent file from $parentOldFile to $parentNewFile");
-        }
-        
-        // Move parent JSON file if exists
-        if (file_exists($parentOldJson)) {
-            if (!is_dir($parentNewJsonDir) && !mkdir($parentNewJsonDir, 0755, true)) {
-                throw new Exception("Failed to create parent JSON directory");
-            }
-            if (!rename($parentOldJson, $parentNewJson)) {
-                // Try to restore PHP file
-                @rename($parentNewFile, $parentOldFile);
-                throw new Exception("Failed to move parent JSON file");
-            }
-        }
     }
     
     // ========================================================================
@@ -267,10 +211,6 @@ try {
     foreach (array_reverse($createdDirs) as $dir) {
         @rmdir($dir); // Only removes empty dirs
     }
-    // Try to restore parent if we moved it
-    if ($parentNeedsRestructure && isset($parentNewFile) && file_exists($parentNewFile)) {
-        @rename($parentNewFile, $parentOldFile);
-    }
     
     ApiResponse::create(500, 'server.operation_failed')
         ->withMessage($e->getMessage())
@@ -288,13 +228,6 @@ $responseData = [
     'php_file' => str_replace(PROJECT_PATH, '', $phpFilePath),
     'json_file' => str_replace(PROJECT_PATH, '', $jsonFilePath),
 ];
-
-if ($parentNeedsRestructure) {
-    $responseData['parent_restructured'] = [
-        'from' => str_replace(PROJECT_PATH, '', $parentOldFile),
-        'to' => str_replace(PROJECT_PATH, '', $parentNewFile)
-    ];
-}
 
 ApiResponse::create(201, 'route.created')
     ->withMessage("Route '$routePath' created successfully")
@@ -352,21 +285,26 @@ function addRouteToStructure(array $segments, array $routes): array {
 
 /**
  * Resolve PHP file path for new route
+ * Convention: ALL routes use folder structure - route/route.php
  */
 function resolveNewRoutePhpPath(array $segments, array $routes, string $pagesDir): string {
     $routePath = implode('/', $segments);
     $routeName = end($segments);
     
-    // New route is always a leaf when created, so: path/name.php
-    return $pagesDir . '/' . $routePath . '.php';
+    // All routes use folder structure: path/name/name.php
+    return $pagesDir . '/' . $routePath . '/' . $routeName . '.php';
 }
 
 /**
  * Resolve JSON file path for new route
+ * Convention: ALL routes use folder structure - route/route.json
  */
 function resolveNewRouteJsonPath(array $segments, string $jsonDir): string {
     $routePath = implode('/', $segments);
-    return $jsonDir . '/' . $routePath . '.json';
+    $routeName = end($segments);
+    
+    // All routes use folder structure: path/name/name.json
+    return $jsonDir . '/' . $routePath . '/' . $routeName . '.json';
 }
 
 /**

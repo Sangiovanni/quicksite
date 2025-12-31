@@ -79,29 +79,17 @@ if (!$routeFound || $routePath === '404') {
 
 /**
  * Resolve route path to template file
+ * Convention: ALL routes use folder structure - route/route.php
  */
-function resolveTemplateFile(array $route, array $routes, string $projectPath): string {
+function resolveTemplateFile(array $route, string $projectPath): string {
     $basePath = $projectPath . '/templates/pages/';
     $routeName = end($route);
     
-    // Navigate to the route's config to check for children
-    $routeConfig = $routes;
-    foreach ($route as $segment) {
-        $routeConfig = $routeConfig[$segment] ?? [];
-    }
-    $hasChildren = !empty($routeConfig);
-    
-    // Build file path based on whether route has children
-    if ($hasChildren) {
-        // Route has children: guides → guides/guides.php
-        return $basePath . implode('/', $route) . '/' . $routeName . '.php';
-    } else {
-        // Leaf route: guides/installation → guides/installation.php
-        return $basePath . implode('/', $route) . '.php';
-    }
+    // All routes use folder structure: guides → guides/guides.php
+    return $basePath . implode('/', $route) . '/' . $routeName . '.php';
 }
 
-$templateFile = resolveTemplateFile($route, ROUTES, PROJECT_PATH);
+$templateFile = resolveTemplateFile($route, PROJECT_PATH);
 
 // Fallback: try flat structure (for backward compatibility during migration)
 if (!file_exists($templateFile)) {
