@@ -28,11 +28,24 @@ class JsonToHtmlRenderer {
     /**
      * Render a page from its JSON file
      * 
-     * @param string $pageName Name of the page (e.g., 'home', 'about')
+     * @param string $pageName Name of the page (e.g., 'home', 'about') or path (e.g., 'guides/getting-started')
      * @return string Rendered HTML
      */
     public function renderPage(string $pageName): string {
-        return $this->renderJsonFile("/templates/model/json/pages/{$pageName}.json");
+        // Support both flat name ('home') and path ('guides/getting-started')
+        // Convention: ALL pages use folder structure - page/page.json
+        $routePath = trim($pageName, '/');
+        $segments = explode('/', $routePath);
+        $leafName = end($segments);
+        
+        // Try folder structure first: path/name/name.json
+        $folderPath = "/templates/model/json/pages/{$routePath}/{$leafName}.json";
+        if (file_exists(PROJECT_PATH . $folderPath)) {
+            return $this->renderJsonFile($folderPath);
+        }
+        
+        // Fallback to flat structure for backward compat: path/name.json
+        return $this->renderJsonFile("/templates/model/json/pages/{$routePath}.json");
     }
 
     /**
