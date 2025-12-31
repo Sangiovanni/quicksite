@@ -49,5 +49,13 @@ dist/
 tmp/
 temp/
 *.tmp
+
 # Personal notes
 NOTES.txt
+
+# Projects folder - ignore all except quicksite
+secure/projects/*
+!secure/projects/quicksite/
+
+# Exports folder (temporary export ZIPs)
+secure/exports/

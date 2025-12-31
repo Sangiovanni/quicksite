@@ -53,6 +53,7 @@ class CommandRunner {
         'exportProject',
         'importProject',
         'downloadExport',
+        'clearExports',
     ];
     
     /**

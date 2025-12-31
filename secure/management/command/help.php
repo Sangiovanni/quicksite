@@ -248,7 +248,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'Failed to create build directory or copy files',
             '500.server.internal_error' => 'Build compilation or ZIP creation failed'
         ],
-        'notes' => 'Compiles JSON templates to PHP using JsonToPhpCompiler. Removes management/ and material/ folders. Sanitizes config.php (removes DB credentials). Creates timestamped build folder and ZIP. The "space" parameter controls PUBLIC_FOLDER_SPACE - when set (e.g., "web"), all public files go inside {public}/{space}/ creating access URL like http://site.com/web/. Public and secure folders MUST have different root directories for security. Secure folder restricted to single name (no nesting) for init.php compatibility. Uses file locking to prevent concurrent builds.'
+        'notes' => 'Compiles JSON templates to PHP using JsonToPhpCompiler. Removes management/ folder from build. Sanitizes config.php (removes DB credentials). Creates timestamped build folder and ZIP. The "space" parameter controls PUBLIC_FOLDER_SPACE - when set (e.g., "web"), all public files go inside {public}/{space}/ creating access URL like http://site.com/web/. Public and secure folders MUST have different root directories for security. Secure folder restricted to single name (no nesting) for init.php compatibility. Uses file locking to prevent concurrent builds.'
     ],
     
     'listBuilds' => [
@@ -2453,9 +2453,9 @@ $GLOBALS['__help_commands'] = [
         'method' => 'GET',
         'parameters' => [
             'name' => [
-                'required' => true,
+                'required' => false,
                 'type' => 'string',
-                'description' => 'Project name to export'
+                'description' => 'Project name to export (defaults to active project if not specified)'
             ],
             'include_public' => [
                 'required' => false,
@@ -2470,7 +2470,7 @@ $GLOBALS['__help_commands'] = [
                 'default' => false
             ]
         ],
-        'example_get' => 'GET /management/exportProject?name=quicksite or GET /management/exportProject?name=quicksite&download=true',
+        'example_get' => 'GET /management/exportProject (exports active project) or GET /management/exportProject?name=quicksite&download=true',
         'success_response' => [
             'status' => 200,
             'code' => 'resource.exported',

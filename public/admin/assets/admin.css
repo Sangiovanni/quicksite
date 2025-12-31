@@ -1242,12 +1242,19 @@ code{
 
 /* Danger button variant */
 .admin-btn--danger {
-    background: var(--admin-error);
-    color: white;
+    background: var(--admin-error) !important;
+    color: #ffffff !important;
 }
 
-.admin-btn--danger:hover {
-    background: #d0665a;
+.admin-btn--danger:hover:not(:disabled) {
+    background: #d0665a !important;
+}
+
+.admin-btn--danger:disabled {
+    background: var(--admin-surface) !important;
+    color: var(--admin-text-muted) !important;
+    cursor: not-allowed;
+    opacity: 0.6;
 }
 
 /* =============================================================================

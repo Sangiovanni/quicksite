@@ -3,17 +3,17 @@
  * exportProject Command
  * 
  * Exports a project as a downloadable ZIP file.
- * Can be called via API or internally from admin panel.
+ * By default streams directly to browser. Use save=true to store in exports folder.
  * 
  * @method GET
  * @route /management/exportProject
  * @auth required (admin permission)
  * 
- * @param string $name Project name (required)
+ * @param string $name Project name (optional, defaults to active project)
  * @param bool $include_public Include public files (optional, default: true)
- * @param bool $download Stream as download (optional, default: false)
+ * @param bool $save Save to exports folder instead of streaming (optional, default: false)
  * 
- * @return ApiResponse|void Returns data or streams ZIP file
+ * @return ApiResponse|void Streams ZIP file or returns download URL if save=true
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
@@ -29,18 +29,18 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
     // Merge query parameters for GET requests
     $params = array_merge($_GET, $params);
     
-    // Validate project name
-    $projectName = trim($params['name'] ?? '');
+    // Get project name - default to active project if not specified
+    $projectName = trim($params['name'] ?? $params['project'] ?? '');
     
+    // If no project specified, use active project
     if (empty($projectName)) {
-        return ApiResponse::create(400, 'validation.missing_field')
-            ->withMessage('Project name is required')
-            ->withErrors(['name' => 'Required field']);
+        $projectName = PROJECT_NAME ?? 'quicksite';
     }
     
     // Options
     $includePublic = filter_var($params['include_public'] ?? true, FILTER_VALIDATE_BOOLEAN);
-    $download = filter_var($params['download'] ?? false, FILTER_VALIDATE_BOOLEAN);
+    // Default: stream directly. Use save=true to store in exports folder
+    $save = filter_var($params['save'] ?? false, FILTER_VALIDATE_BOOLEAN);
     
     // Check project exists
     $projectPath = SECURE_FOLDER_PATH . '/projects/' . $projectName;
@@ -99,48 +99,48 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
     // Get final ZIP size
     $zipSize = filesize($zipPath);
     
-    // If download requested, stream the file
-    if ($download) {
-        streamZipDownload($zipPath, $zipFileName);
-        // This function exits, so we never reach here
-    }
-    
-    // Store ZIP for later download (for API response)
-    $exportDir = SECURE_FOLDER_PATH . '/exports';
-    if (!is_dir($exportDir)) {
-        mkdir($exportDir, 0755, true);
-    }
-    
-    $finalPath = $exportDir . '/' . $zipFileName;
-    
-    // Move ZIP to exports folder
-    if (!rename($zipPath, $finalPath)) {
-        // Try copy+delete if rename fails
-        if (!copy($zipPath, $finalPath)) {
-            unlink($zipPath);
-            return ApiResponse::create(500, 'server.move_failed')
-                ->withMessage('Failed to save export file');
+    // If save=true, store in exports folder for later download
+    if ($save) {
+        $exportDir = SECURE_FOLDER_PATH . '/exports';
+        if (!is_dir($exportDir)) {
+            mkdir($exportDir, 0755, true);
         }
-        unlink($zipPath);
+        
+        $finalPath = $exportDir . '/' . $zipFileName;
+        
+        // Move ZIP to exports folder
+        if (!rename($zipPath, $finalPath)) {
+            // Try copy+delete if rename fails
+            if (!copy($zipPath, $finalPath)) {
+                unlink($zipPath);
+                return ApiResponse::create(500, 'server.move_failed')
+                    ->withMessage('Failed to save export file');
+            }
+            unlink($zipPath);
+        }
+        
+        // Clean up old exports (keep last 5 per project)
+        cleanupOldExports($exportDir, $projectName);
+        
+        return ApiResponse::create(200, 'resource.exported')
+            ->withMessage("Project '$projectName' exported and saved")
+            ->withData([
+                'project' => $projectName,
+                'filename' => $zipFileName,
+                'path' => 'secure/exports/' . $zipFileName,
+                'size' => formatExportBytes($zipSize),
+                'size_bytes' => $zipSize,
+                'files_count' => $stats['files'],
+                'directories_count' => $stats['directories'],
+                'original_size' => formatExportBytes($stats['total_size']),
+                'download_url' => '/management/downloadExport?file=' . urlencode($zipFileName),
+                'expires' => date('Y-m-d H:i:s', time() + 86400) // 24 hours
+            ]);
     }
     
-    // Clean up old exports (keep last 5)
-    cleanupOldExports($exportDir, $projectName);
-    
-    return ApiResponse::create(200, 'resource.exported')
-        ->withMessage("Project '$projectName' exported successfully")
-        ->withData([
-            'project' => $projectName,
-            'filename' => $zipFileName,
-            'path' => 'secure/exports/' . $zipFileName,
-            'size' => formatExportBytes($zipSize),
-            'size_bytes' => $zipSize,
-            'files_count' => $stats['files'],
-            'directories_count' => $stats['directories'],
-            'original_size' => formatExportBytes($stats['total_size']),
-            'download_url' => '/management/downloadExport?file=' . urlencode($zipFileName),
-            'expires' => date('Y-m-d H:i:s', time() + 86400) // 24 hours
-        ]);
+    // Default: Stream ZIP directly to browser (no file saved)
+    streamZipDownload($zipPath, $zipFileName);
+    // streamZipDownload exits, so we never reach here
 }
 
 /**

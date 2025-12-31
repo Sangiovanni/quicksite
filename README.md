@@ -300,7 +300,7 @@ quicksite/                    # Root installation
 │   ├── projects/            # Individual project data
 │   │   ├── quicksite/       # Example project (default)
 │   │   │   ├── config/      # Project-specific config (auth.php, aliases.json)
-│   │   │   ├── material/    # Page rendering engine (Page.php)
+│   │   │   ├── data/        # Config data (aliases.json, assets_metadata.json)
 │   │   │   ├── templates/   # Page templates & JSON structures
 │   │   │   │   ├── model/   # Component templates (json/, php/, css/)
 │   │   │   │   └── pages/   # Page JSON definitions

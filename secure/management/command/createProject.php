@@ -82,7 +82,6 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
         '/templates/model/json/pages',
         '/templates/model/json/components',
         '/translate',
-        '/material',
         '/data',
         '/public',
         '/public/assets',
@@ -155,8 +154,24 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
         $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
         $targetContent = "<?php\n/**\n * Active Project Target Configuration\n * Updated: " . date('Y-m-d H:i:s') . "\n */\n\nreturn [\n    'project' => '" . addslashes($projectName) . "'\n];\n";
         
-        if (file_put_contents($targetFile, $targetContent, LOCK_EX) !== false) {
-            $result['switched_to'] = true;
+        // Use fopen/fwrite/fflush for explicit sync
+        $handle = fopen($targetFile, 'w');
+        if ($handle !== false) {
+            if (flock($handle, LOCK_EX)) {
+                $bytesWritten = fwrite($handle, $targetContent);
+                fflush($handle);
+                flock($handle, LOCK_UN);
+                if ($bytesWritten === strlen($targetContent)) {
+                    $result['switched_to'] = true;
+                }
+            }
+            fclose($handle);
+            
+            // Clear all caches to ensure next request sees new file
+            clearstatcache(true, $targetFile);
+            if (function_exists('opcache_invalidate')) {
+                opcache_invalidate($targetFile, true);
+            }
         }
     }
     
@@ -205,12 +220,56 @@ function createDefaultTranslations(string $siteName): array {
  * Create basic page templates
  */
 function createBasicPageTemplates(string $projectPath): void {
-    // home.php
-    $homePhp = "<?php\n/**\n * Home page template\n */\nrequire_once SECURE_FOLDER_PATH . '/src/classes/Page.php';\n\n\$content = (new JsonToHtmlRenderer())->renderPage('home');\nPage::render(\$content);\n";
+    // home.php - matches quicksite template structure
+    $homePhp = <<<'PHP'
+<?php
+
+require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';
+$trimParameters = new TrimParameters();
+require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
+$translator = new Translator($trimParameters->lang());
+$lang = $trimParameters->lang();
+
+require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
+$renderer = new JsonToHtmlRenderer($translator);
+
+$content = $renderer->renderPage('home');
+
+// Now use this constant to include files from your src folder
+require_once SECURE_FOLDER_PATH . '/src/classes/PageManagement.php';
+
+// Get page title from translation
+$pageTitle = $translator->translate('page.titles.home');
+
+$page = new PageManagement($pageTitle, $content, $lang);
+$page->render();
+PHP;
     file_put_contents($projectPath . '/templates/pages/home.php', $homePhp, LOCK_EX);
     
-    // 404.php
-    $notFoundPhp = "<?php\n/**\n * 404 page template\n */\nrequire_once SECURE_FOLDER_PATH . '/src/classes/Page.php';\n\n\$content = (new JsonToHtmlRenderer())->renderPage('404');\nPage::render(\$content);\n";
+    // 404.php - matches quicksite template structure
+    $notFoundPhp = <<<'PHP'
+<?php
+
+require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';
+$trimParameters = new TrimParameters();
+require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
+$translator = new Translator($trimParameters->lang());
+$lang = $trimParameters->lang();
+
+require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
+$renderer = new JsonToHtmlRenderer($translator);
+
+$content = $renderer->renderPage('404');
+
+// Now use this constant to include files from your src folder
+require_once SECURE_FOLDER_PATH . '/src/classes/PageManagement.php';
+
+// Get page title from translation
+$pageTitle = $translator->translate('page.titles.404');
+
+$page = new PageManagement($pageTitle, $content, $lang);
+$page->render();
+PHP;
     file_put_contents($projectPath . '/templates/pages/404.php', $notFoundPhp, LOCK_EX);
     
     // home.json
@@ -237,7 +296,7 @@ function createBasicPageTemplates(string $projectPath): void {
  * Create menu.json and footer.json
  */
 function createMenuAndFooter(string $projectPath, string $siteName): void {
-    // menu.json
+    // menu.json - JSON structure rendered by PageManagement
     $menuJson = [
         ['tag' => 'nav', 'params' => ['class' => 'main-nav'], 'children' => [
             ['tag' => 'a', 'params' => ['href' => '/', 'class' => 'logo'], 'children' => [['textKey' => 'site.name']]],
@@ -250,11 +309,7 @@ function createMenuAndFooter(string $projectPath, string $siteName): void {
     ];
     file_put_contents($projectPath . '/templates/model/json/menu.json', json_encode($menuJson, JSON_PRETTY_PRINT), LOCK_EX);
     
-    // menu.php (PHP template)
-    $menuPhp = "<?php\n/**\n * Menu template\n */\necho (new JsonToHtmlRenderer())->renderMenu();\n";
-    file_put_contents($projectPath . '/templates/menu.php', $menuPhp, LOCK_EX);
-    
-    // footer.json
+    // footer.json - JSON structure rendered by PageManagement
     $footerJson = [
         ['tag' => 'div', 'params' => ['class' => 'footer-content'], 'children' => [
             ['tag' => 'p', 'children' => [['textKey' => 'footer.copyright']]]
@@ -262,9 +317,7 @@ function createMenuAndFooter(string $projectPath, string $siteName): void {
     ];
     file_put_contents($projectPath . '/templates/model/json/footer.json', json_encode($footerJson, JSON_PRETTY_PRINT), LOCK_EX);
     
-    // footer.php (PHP template)
-    $footerPhp = "<?php\n/**\n * Footer template\n */\necho (new JsonToHtmlRenderer())->renderFooter();\n";
-    file_put_contents($projectPath . '/templates/footer.php', $footerPhp, LOCK_EX);
+    // Note: No menu.php or footer.php needed - PageManagement renders JSON directly
 }
 
 /**

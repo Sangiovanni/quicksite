@@ -39,7 +39,8 @@
             "privacy": "Privacy Policy - QuickSite",
             "terms": "Terms of Use - QuickSite",
             "guides": "Guides - QuickSite",
-            "test": "test title"
+            "test": "test title",
+            "404": "Page Not Found - QuickSite"
         }
     },
     "footer": {

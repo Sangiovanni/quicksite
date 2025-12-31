@@ -97,12 +97,37 @@ function __command_switchProject(array $params = [], array $urlParams = []): Api
             ]);
     }
     
-    // Write new target.php
+    // Write new target.php with explicit sync to ensure file is fully written before response
     $targetContent = "<?php\n/**\n * Active Project Target Configuration\n * \n * Updated: " . date('Y-m-d H:i:s') . "\n * Previous: " . ($previousProject ?? 'none') . "\n */\n\nreturn [\n    'project' => '" . addslashes($projectName) . "'\n];\n";
     
-    if (file_put_contents($targetFile, $targetContent, LOCK_EX) === false) {
+    // Use fopen/fwrite/fflush for explicit sync instead of file_put_contents
+    $handle = fopen($targetFile, 'w');
+    if ($handle === false) {
         return ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage('Failed to update target configuration');
+            ->withMessage('Failed to open target configuration for writing');
+    }
+    
+    if (flock($handle, LOCK_EX)) {
+        $bytesWritten = fwrite($handle, $targetContent);
+        fflush($handle);  // Flush PHP buffers to OS
+        flock($handle, LOCK_UN);
+    } else {
+        fclose($handle);
+        return ApiResponse::create(500, 'server.file_lock_failed')
+            ->withMessage('Failed to acquire lock on target configuration');
+    }
+    fclose($handle);
+    
+    // Verify write succeeded by checking bytes written
+    if ($bytesWritten !== strlen($targetContent)) {
+        return ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Target configuration write incomplete');
+    }
+    
+    // Clear caches to ensure fresh read on next request
+    clearstatcache(true, $targetFile);
+    if (function_exists('opcache_invalidate')) {
+        opcache_invalidate($targetFile, true);
     }
     
     $result = [

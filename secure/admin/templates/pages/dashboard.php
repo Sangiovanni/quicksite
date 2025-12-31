@@ -104,7 +104,7 @@
         <div class="admin-modal__body">
             <div class="admin-form-group">
                 <label class="admin-label"><?= __admin('dashboard.projects.nameLabel') ?></label>
-                <input type="text" id="create-project-name" class="admin-input" placeholder="my-new-site" pattern="[a-z0-9_-]+" />
+                <input type="text" id="create-project-name" class="admin-input" placeholder="my-new-site" pattern="[a-z0-9_\-]+" />
                 <small class="admin-help"><?= __admin('dashboard.projects.nameHelp') ?></small>
             </div>
             <div class="admin-form-group">
@@ -520,7 +520,7 @@ async function loadProjectManager() {
             QuickSiteAdmin.apiRequest('listProjects')
         ]);
         
-        if (activeResult.ok) {
+        if (activeResult.ok && activeResult.data?.data?.project) {
             currentProject = activeResult.data.data.project;
             const created = activeResult.data.data.created_at;
             
@@ -536,9 +536,14 @@ async function loadProjectManager() {
                     ${created ? `<div class="project-manager__meta">${proj.created || 'Created'}: ${new Date(created).toLocaleDateString()}</div>` : ''}
                 </div>
             `;
+        } else {
+            // API returned error or no project - show error state
+            currentProject = null;
+            const errorMsg = activeResult.data?.message || proj.error || 'Failed to load active project';
+            infoContainer.innerHTML = `<p class="admin-error">${QuickSiteAdmin.escapeHtml(errorMsg)}</p>`;
         }
         
-        if (listResult.ok) {
+        if (listResult.ok && listResult.data?.data?.projects) {
             allProjects = listResult.data.data.projects || [];
             
             // Populate selector
@@ -603,19 +608,23 @@ function setupProjectManagerEvents() {
         if (!newProject || newProject === currentProject) return;
         
         this.disabled = true;
+        this.innerHTML = '<span class="spinner"></span> ' + (common.loading || 'Switching...');
         try {
-            const result = await QuickSiteAdmin.apiRequest('switchProject', 'PATCH', { project: newProject });
+            const result = await QuickSiteAdmin.apiRequest('switchProject', 'POST', { project: newProject });
             if (result.ok) {
-                QuickSiteAdmin.showToast(proj.switched || 'Project switched successfully', 'success');
-                // Reload page to reflect new project
-                setTimeout(() => window.location.reload(), 500);
+                QuickSiteAdmin.showToast((proj.switched || 'Switched to project') + ': ' + newProject, 'success');
+                // Server guarantees target.php is written before response, reload with cache bust
+                window.location.href = window.location.pathname + '?t=' + Date.now();
             } else {
                 QuickSiteAdmin.showToast(result.data?.message || 'Failed to switch project', 'error');
+                this.disabled = false;
+                this.textContent = proj.switch || 'Switch';
             }
         } catch (error) {
             QuickSiteAdmin.showToast('Failed to switch project', 'error');
+            this.disabled = false;
+            this.textContent = proj.switch || 'Switch';
         }
-        this.disabled = false;
     });
     
     // Create project modal
@@ -636,45 +645,84 @@ function setupProjectManagerEvents() {
         }
         
         this.disabled = true;
+        this.innerHTML = '<span class="spinner"></span> ' + (common.loading || 'Creating...');
         try {
             const result = await QuickSiteAdmin.apiRequest('createProject', 'POST', {
                 name: name,
-                activate: activateCheckbox.checked
+                switch_to: activateCheckbox.checked
             });
             
             if (result.ok) {
-                QuickSiteAdmin.showToast(proj.created || 'Project created successfully', 'success');
+                QuickSiteAdmin.showToast((proj.created || 'Project created') + ': ' + name, 'success');
                 closeAllModals();
                 if (activateCheckbox.checked) {
-                    setTimeout(() => window.location.reload(), 500);
+                    // Server guarantees target.php is written, reload with cache bust
+                    window.location.href = window.location.pathname + '?t=' + Date.now();
                 } else {
+                    // Just refresh the project list
                     loadProjectManager();
+                    this.disabled = false;
+                    this.textContent = proj.createModal?.submit || 'Create Project';
                 }
             } else {
                 QuickSiteAdmin.showToast(result.data?.message || 'Failed to create project', 'error');
+                this.disabled = false;
+                this.textContent = proj.createModal?.submit || 'Create Project';
             }
         } catch (error) {
             QuickSiteAdmin.showToast('Failed to create project', 'error');
+            this.disabled = false;
+            this.textContent = proj.createModal?.submit || 'Create Project';
         }
-        this.disabled = false;
     });
     
     // Export project
     document.getElementById('btn-export-project').addEventListener('click', async function() {
         this.disabled = true;
+        const originalText = this.textContent;
+        this.innerHTML = '<span class="spinner"></span> ' + (proj.exporting || 'Exporting...');
+        
         try {
-            const result = await QuickSiteAdmin.apiRequest('exportProject');
-            if (result.ok && result.data.data?.download_url) {
+            // Request export - streams directly by default
+            const response = await fetch(window.QUICKSITE_CONFIG.apiBase + '/exportProject?name=' + encodeURIComponent(currentProject), {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + QuickSiteAdmin.getToken()
+                }
+            });
+            
+            if (response.ok) {
+                // Get filename from Content-Disposition header or generate one
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = currentProject + '_export.zip';
+                if (contentDisposition) {
+                    const match = contentDisposition.match(/filename="?([^";\n]+)"?/);
+                    if (match) filename = match[1];
+                }
+                
+                // Create blob and trigger download
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+                
                 QuickSiteAdmin.showToast(proj.exported || 'Project exported', 'success');
-                // Trigger download
-                window.location.href = result.data.data.download_url;
             } else {
-                QuickSiteAdmin.showToast(result.data?.message || 'Failed to export project', 'error');
+                const errorData = await response.json().catch(() => ({}));
+                QuickSiteAdmin.showToast(errorData.message || 'Failed to export project', 'error');
             }
         } catch (error) {
+            console.error('Export error:', error);
             QuickSiteAdmin.showToast('Failed to export project', 'error');
         }
+        
         this.disabled = false;
+        this.textContent = originalText;
     });
     
     // Import project
@@ -696,15 +744,15 @@ function setupProjectManagerEvents() {
             const response = await fetch(window.QUICKSITE_CONFIG.apiBase + '/importProject', {
                 method: 'POST',
                 headers: {
-                    'Authorization': 'Bearer ' + window.QUICKSITE_CONFIG.token
+                    'Authorization': 'Bearer ' + QuickSiteAdmin.getToken()
                 },
                 body: formData
             });
             
             const result = await response.json();
             
-            if (response.ok && result.status === 'success') {
-                QuickSiteAdmin.showToast(proj.imported || 'Project imported successfully', 'success');
+            if (response.ok) {
+                QuickSiteAdmin.showToast(result.message || proj.imported || 'Project imported successfully', 'success');
                 loadProjectManager();
             } else {
                 QuickSiteAdmin.showToast(result.message || 'Failed to import project', 'error');
@@ -736,8 +784,8 @@ function setupProjectManagerEvents() {
         
         this.disabled = true;
         try {
-            const result = await QuickSiteAdmin.apiRequest('deleteProject', 'DELETE', {
-                project: projectToDelete,
+            const result = await QuickSiteAdmin.apiRequest('deleteProject', 'POST', {
+                name: projectToDelete,
                 confirm: true
             });
             
