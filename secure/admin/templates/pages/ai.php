@@ -469,12 +469,13 @@ Include details like:
                     </div>
                 </div>
                 
-                <div class="admin-ai-import-actions">
-                    <button type="button" class="admin-btn admin-btn--success admin-btn--large" id="execute-btn" onclick="executeImportedJson()" disabled>
+                <div class="admin-ai-import-actions" id="import-actions">
+                    <button type="button" class="admin-btn admin-btn--primary admin-btn--large" id="preview-btn" onclick="showPreview()" disabled>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                            <polygon points="5 3 19 12 5 21 5 3"/>
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
                         </svg>
-                        Execute Now
+                        Preview Commands
                     </button>
                     <a href="<?= $router->url('batch') ?>" class="admin-btn admin-btn--ghost">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -484,6 +485,42 @@ Include details like:
                         </svg>
                         Open in Batch →
                     </a>
+                </div>
+                
+                <!-- Command Preview Section -->
+                <div id="command-preview" class="admin-ai-preview" style="display: none;">
+                    <div class="admin-ai-preview-header">
+                        <h4 class="admin-ai-preview-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <line x1="8" y1="6" x2="21" y2="6"/>
+                                <line x1="8" y1="12" x2="21" y2="12"/>
+                                <line x1="8" y1="18" x2="21" y2="18"/>
+                                <line x1="3" y1="6" x2="3.01" y2="6"/>
+                                <line x1="3" y1="12" x2="3.01" y2="12"/>
+                                <line x1="3" y1="18" x2="3.01" y2="18"/>
+                            </svg>
+                            <span id="preview-title">Commands to Execute</span>
+                        </h4>
+                        <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" onclick="hidePreview()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                            Cancel
+                        </button>
+                    </div>
+                    <div class="admin-ai-preview-list" id="preview-list"></div>
+                    <div class="admin-ai-preview-actions">
+                        <button type="button" class="admin-btn admin-btn--success admin-btn--large" id="execute-btn" onclick="executeImportedJson()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                            Execute All
+                        </button>
+                        <button type="button" class="admin-btn admin-btn--ghost" onclick="hidePreview()">
+                            Cancel
+                        </button>
+                    </div>
                 </div>
                 
                 <!-- Execution Results -->
@@ -1049,6 +1086,120 @@ Include details like:
     color: var(--admin-text-muted);
     cursor: not-allowed;
     opacity: 0.6;
+}
+
+/* Command Preview */
+.admin-ai-preview {
+    margin-top: var(--space-lg);
+    padding: var(--space-md);
+    background: var(--admin-bg);
+    border-radius: var(--radius-lg);
+    border: 2px solid var(--admin-accent);
+}
+
+.admin-ai-preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-md);
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-ai-preview-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin: 0;
+    font-size: var(--font-size-base);
+    color: var(--admin-accent);
+}
+
+.admin-ai-preview-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: var(--space-md);
+}
+
+.admin-ai-preview-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--admin-bg-secondary);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-xs);
+    font-size: var(--font-size-sm);
+}
+
+.admin-ai-preview-item:last-child {
+    margin-bottom: 0;
+}
+
+.admin-ai-preview-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: var(--admin-border);
+    border-radius: 50%;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--admin-text-muted);
+    flex-shrink: 0;
+}
+
+.admin-ai-preview-method {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.admin-ai-preview-method--get {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+}
+
+.admin-ai-preview-method--post {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+}
+
+.admin-ai-preview-command {
+    font-family: var(--font-mono);
+    font-weight: var(--font-weight-semibold);
+    color: var(--admin-text);
+    flex-shrink: 0;
+}
+
+.admin-ai-preview-params {
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-ai-preview-params em {
+    font-style: italic;
+    opacity: 0.7;
+}
+
+.admin-ai-preview-params strong {
+    color: var(--admin-text);
+    font-weight: var(--font-weight-medium);
+}
+
+.admin-ai-preview-actions {
+    display: flex;
+    gap: var(--space-sm);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--admin-border);
 }
 
 /* Execution Results */
@@ -4161,13 +4312,16 @@ const GET_COMMANDS = [
 function validateImportJson() {
     const textarea = document.getElementById('import-json');
     const statusEl = document.getElementById('import-status');
-    const executeBtn = document.getElementById('execute-btn');
+    const previewBtn = document.getElementById('preview-btn');
     const jsonText = textarea.value.trim();
     
     // Reset state
     parsedCommands = null;
-    executeBtn.disabled = true;
+    previewBtn.disabled = true;
     statusEl.className = 'admin-ai-import-status';
+    
+    // Hide preview if validation changes
+    hidePreview();
     
     if (!jsonText) {
         statusEl.innerHTML = '<span class="admin-ai-import-status__text">Paste JSON to begin</span>';
@@ -4206,7 +4360,7 @@ function validateImportJson() {
         
         // Success - store parsed commands
         parsedCommands = validCommands;
-        executeBtn.disabled = false;
+        previewBtn.disabled = false;
         statusEl.className = 'admin-ai-import-status admin-ai-import-status--valid';
         
         // Show summary
@@ -4240,6 +4394,89 @@ function validateImportJson() {
     }
 }
 
+/**
+ * Show the command preview before execution
+ */
+function showPreview() {
+    if (!parsedCommands || parsedCommands.length === 0) {
+        QuickSiteAdmin.showToast('No valid commands to preview', 'warning');
+        return;
+    }
+    
+    const previewEl = document.getElementById('command-preview');
+    const previewListEl = document.getElementById('preview-list');
+    const previewTitleEl = document.getElementById('preview-title');
+    const importActionsEl = document.getElementById('import-actions');
+    
+    // Hide import actions, show preview
+    importActionsEl.style.display = 'none';
+    previewEl.style.display = 'block';
+    
+    // Update title
+    previewTitleEl.textContent = `${parsedCommands.length} Command${parsedCommands.length !== 1 ? 's' : ''} to Execute`;
+    
+    // Render command list
+    let html = '';
+    parsedCommands.forEach((cmd, idx) => {
+        const isGet = GET_COMMANDS.includes(cmd.command);
+        const methodBadge = isGet ? 'GET' : 'POST';
+        const methodClass = isGet ? 'admin-ai-preview-method--get' : 'admin-ai-preview-method--post';
+        
+        html += `
+            <div class="admin-ai-preview-item">
+                <span class="admin-ai-preview-number">${idx + 1}</span>
+                <span class="admin-ai-preview-method ${methodClass}">${methodBadge}</span>
+                <span class="admin-ai-preview-command">${QuickSiteAdmin.escapeHtml(cmd.command)}</span>
+                <span class="admin-ai-preview-params">${formatPreviewParams(cmd.params)}</span>
+            </div>
+        `;
+    });
+    
+    previewListEl.innerHTML = html;
+    
+    // Scroll preview into view
+    previewEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/**
+ * Hide the command preview
+ */
+function hidePreview() {
+    const previewEl = document.getElementById('command-preview');
+    const importActionsEl = document.getElementById('import-actions');
+    
+    if (previewEl) previewEl.style.display = 'none';
+    if (importActionsEl) importActionsEl.style.display = 'flex';
+}
+
+/**
+ * Format params for preview display
+ */
+function formatPreviewParams(params) {
+    if (!params || Object.keys(params).length === 0) return '<em>no params</em>';
+    
+    const parts = [];
+    
+    // Show key params first
+    if (params.lang) parts.push(`<strong>lang:</strong> ${QuickSiteAdmin.escapeHtml(params.lang)}`);
+    if (params.route) parts.push(`<strong>route:</strong> ${QuickSiteAdmin.escapeHtml(params.route)}`);
+    if (params.name) parts.push(`<strong>name:</strong> ${QuickSiteAdmin.escapeHtml(params.name)}`);
+    if (params.type) parts.push(`<strong>type:</strong> ${QuickSiteAdmin.escapeHtml(params.type)}`);
+    if (params.title) {
+        const truncTitle = params.title.length > 30 ? params.title.substring(0, 30) + '...' : params.title;
+        parts.push(`<strong>title:</strong> "${QuickSiteAdmin.escapeHtml(truncTitle)}"`);
+    }
+    
+    // Count remaining params
+    const shownKeys = ['lang', 'route', 'name', 'type', 'title'];
+    const otherCount = Object.keys(params).filter(k => !shownKeys.includes(k)).length;
+    if (otherCount > 0) {
+        parts.push(`<em>+${otherCount} more</em>`);
+    }
+    
+    return parts.length > 0 ? parts.join(', ') : JSON.stringify(params).substring(0, 60) + '...';
+}
+
 async function executeImportedJson() {
     if (!parsedCommands || parsedCommands.length === 0) {
         QuickSiteAdmin.showToast('No valid commands to execute', 'warning');
@@ -4251,6 +4488,10 @@ async function executeImportedJson() {
     const summaryEl = document.getElementById('execution-summary');
     const detailsEl = document.getElementById('execution-details');
     const titleEl = document.getElementById('execution-title');
+    const previewEl = document.getElementById('command-preview');
+    
+    // Hide preview during execution
+    if (previewEl) previewEl.style.display = 'none';
     
     // Show loading state
     executeBtn.disabled = true;
@@ -4321,10 +4562,10 @@ async function executeImportedJson() {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
             <polygon points="5 3 19 12 5 21 5 3"/>
         </svg>
-        Execute Now
+        Execute All
     `;
     
-    // Show results
+    // Show results (import actions stay hidden)
     resultsEl.style.display = 'block';
     resultsEl.className = errorCount > 0 
         ? 'admin-ai-execution-results admin-ai-execution-results--error'
@@ -4388,7 +4629,12 @@ function summarizeParams(params) {
 
 function clearExecutionResults() {
     const resultsEl = document.getElementById('execution-results');
+    const importActionsEl = document.getElementById('import-actions');
+    
     resultsEl.style.display = 'none';
     resultsEl.className = 'admin-ai-execution-results';
+    
+    // Show import actions again so user can try again
+    if (importActionsEl) importActionsEl.style.display = 'flex';
 }
 </script>

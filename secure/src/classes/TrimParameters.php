@@ -105,6 +105,9 @@ class TrimParameters {
     /**
      * Resolve URL segments against nested routes structure
      * 
+     * A route is only "found" if ALL URL segments are matched.
+     * Partial matches (e.g., /about/you when only /about/us exists) return 404.
+     * 
      * @param array $urlParts URL segments to resolve
      * @param array $routes Routes structure to match against
      * @return array ['route' => [...], 'params' => [...], 'found' => bool]
@@ -124,12 +127,15 @@ class TrimParameters {
                 $current = $current[$segment];
                 $depth++;
             } else {
+                // Segment not found - this is a 404
+                // Don't partially match (e.g., /about/you should NOT resolve to /about)
                 break;
             }
         }
         
-        // If nothing matched, it's a 404
-        if (empty($matched)) {
+        // Route is only found if we matched ALL segments
+        // If there are remaining unmatched segments, it's a 404
+        if (empty($matched) || !empty($remaining)) {
             return [
                 'route' => ['404'],
                 'params' => $urlParts,
@@ -139,7 +145,7 @@ class TrimParameters {
         
         return [
             'route' => $matched,
-            'params' => $remaining,
+            'params' => [],  // All segments matched, no remaining params
             'found' => true
         ];
     }

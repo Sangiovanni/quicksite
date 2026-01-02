@@ -15,6 +15,31 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 
 /**
+ * Count routes recursively in a nested routes structure
+ * 
+ * Handles both new format: ['home' => [], 'about' => ['us' => []]]
+ * And legacy format: [0 => 'home', 'about' => ['us' => []]]
+ * 
+ * @param array $routes Nested routes array
+ * @return int Total count of routes
+ */
+function countRoutesRecursive(array $routes): int {
+    $count = 0;
+    
+    foreach ($routes as $key => $value) {
+        // Count this route
+        $count++;
+        
+        // If it has children (value is array with contents), recurse
+        if (is_array($value) && !empty($value)) {
+            $count += countRoutesRecursive($value);
+        }
+    }
+    
+    return $count;
+}
+
+/**
  * Command function for internal execution via CommandRunner or direct PHP call
  * 
  * @param array $params Body parameters (unused)
@@ -101,10 +126,15 @@ function getProjectInfo(string $projectPath, string $projectName): array {
         }
     }
     
-    // Get routes count
+    // Get routes count (recursively flatten to count all routes including nested)
     if ($info['has_routes']) {
         $routes = @include($projectPath . '/routes.php');
-        $info['routes_count'] = is_array($routes) ? count($routes) : 0;
+        if (is_array($routes)) {
+            // Use countRoutes helper to count recursively
+            $info['routes_count'] = countRoutesRecursive($routes);
+        } else {
+            $info['routes_count'] = 0;
+        }
     }
     
     // Get pages count (JSON files)

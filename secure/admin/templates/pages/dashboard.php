@@ -271,6 +271,9 @@ async function loadSiteMap() {
         const languageNames = data.languageNames || {};
         const routes = data.routes || [];
         
+        // Build tree structure from flat routes
+        const routeTree = buildRouteTree(routes);
+        
         let html = '<div class="sitemap">';
         
         // Summary bar - adjust for mono/multilingual
@@ -324,25 +327,9 @@ async function loadSiteMap() {
                     ${coveragePercent !== null ? `<span class="sitemap__lang-coverage ${getCoverageClass(coveragePercent)}">${coveragePercent}%</span>` : ''}
                 </div>`;
                 
-                // Routes list
-                html += '<div class="sitemap__routes">';
-                routes.forEach(route => {
-                    const url = route.urls[lang] || route.urls['default'];
-                    const routePath = route.path;
-                    const routeName = route.name;
-                    const isHome = routeName === 'home';
-                    
-                    html += `<a href="${QuickSiteAdmin.escapeHtml(url)}" target="_blank" class="sitemap__route" title="${QuickSiteAdmin.escapeHtml(url)}">
-                        <svg class="sitemap__route-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                            ${isHome ? '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>' : '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>'}
-                        </svg>
-                        <span class="sitemap__route-name">${routeName}</span>
-                        <span class="sitemap__route-path">${routePath}</span>
-                        <svg class="sitemap__route-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-                        </svg>
-                    </a>`;
-                });
+                // Routes tree
+                html += '<div class="sitemap__routes sitemap__routes--tree">';
+                html += renderRouteTree(routeTree, lang);
                 html += '</div>'; // .sitemap__routes
                 
                 html += '</div>'; // .sitemap__lang
@@ -350,25 +337,9 @@ async function loadSiteMap() {
             
             html += '</div>'; // .sitemap__languages
         } else {
-            // Monolingual mode - simple flat list of routes
-            html += '<div class="sitemap__routes sitemap__routes--flat">';
-            routes.forEach(route => {
-                const url = route.urls['default'];
-                const routePath = route.path;
-                const routeName = route.name;
-                const isHome = routeName === 'home';
-                
-                html += `<a href="${QuickSiteAdmin.escapeHtml(url)}" target="_blank" class="sitemap__route" title="${QuickSiteAdmin.escapeHtml(url)}">
-                    <svg class="sitemap__route-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                        ${isHome ? '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>' : '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>'}
-                    </svg>
-                    <span class="sitemap__route-name">${routeName}</span>
-                    <span class="sitemap__route-path">${routePath}</span>
-                    <svg class="sitemap__route-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-                    </svg>
-                </a>`;
-            });
+            // Monolingual mode - tree view of routes
+            html += '<div class="sitemap__routes sitemap__routes--flat sitemap__routes--tree">';
+            html += renderRouteTree(routeTree, 'default');
             html += '</div>'; // .sitemap__routes--flat
         }
         
@@ -376,7 +347,7 @@ async function loadSiteMap() {
         
         container.innerHTML = html;
         
-        // Add event listeners for language toggles (using event delegation)
+        // Add event listeners for language toggles and tree toggles (using event delegation)
         container.addEventListener('click', function(e) {
             const header = e.target.closest('[data-toggle-lang]');
             if (header) {
@@ -385,6 +356,17 @@ async function loadSiteMap() {
                 const langEl = header.closest('.sitemap__lang');
                 if (langEl) {
                     langEl.classList.toggle('sitemap__lang--open');
+                }
+            }
+            
+            // Handle tree node toggle
+            const treeToggle = e.target.closest('.sitemap__tree-toggle');
+            if (treeToggle) {
+                e.preventDefault();
+                e.stopPropagation();
+                const nodeEl = treeToggle.closest('.sitemap__tree-node');
+                if (nodeEl) {
+                    nodeEl.classList.toggle('sitemap__tree-node--open');
                 }
             }
         });
@@ -446,6 +428,100 @@ function getFlagEmoji(langCode) {
         'lt': '🇱🇹'
     };
     return flags[langCode.toLowerCase()] || '🌐';
+}
+
+/**
+ * Build a tree structure from flat route list
+ * Input: [{name: "home", urls: {...}}, {name: "about", urls: {...}}, {name: "about/us", urls: {...}}]
+ * Output: {home: {_route: {...}}, about: {_route: {...}, us: {_route: {...}}}}
+ */
+function buildRouteTree(routes) {
+    const tree = {};
+    
+    routes.forEach(route => {
+        const parts = route.name.split('/');
+        let current = tree;
+        
+        parts.forEach((part, index) => {
+            if (!current[part]) {
+                current[part] = {};
+            }
+            // On the last segment, store the route data
+            if (index === parts.length - 1) {
+                current[part]._route = route;
+            }
+            current = current[part];
+        });
+    });
+    
+    return tree;
+}
+
+/**
+ * Render route tree as HTML
+ */
+function renderRouteTree(tree, lang, depth = 0) {
+    let html = '';
+    const entries = Object.entries(tree).filter(([key]) => key !== '_route');
+    
+    // Sort: home first, then alphabetically
+    entries.sort(([a], [b]) => {
+        if (a === 'home') return -1;
+        if (b === 'home') return 1;
+        return a.localeCompare(b);
+    });
+    
+    entries.forEach(([name, node]) => {
+        const route = node._route;
+        const children = Object.entries(node).filter(([key]) => key !== '_route');
+        const hasChildren = children.length > 0;
+        const isHome = name === 'home';
+        
+        if (route) {
+            const url = route.urls[lang] || route.urls['default'];
+            const routePath = route.path;
+            
+            if (hasChildren) {
+                // Node with children - make it expandable
+                html += `<div class="sitemap__tree-node sitemap__tree-node--open" style="--depth: ${depth}">
+                    <div class="sitemap__tree-header">
+                        <button class="sitemap__tree-toggle" type="button" aria-label="Toggle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                                <polyline points="9 18 15 12 9 6"/>
+                            </svg>
+                        </button>
+                        <a href="${QuickSiteAdmin.escapeHtml(url)}" target="_blank" class="sitemap__route sitemap__route--parent" title="${QuickSiteAdmin.escapeHtml(url)}">
+                            <svg class="sitemap__route-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                            </svg>
+                            <span class="sitemap__route-name">${name}</span>
+                            <span class="sitemap__route-path">${routePath}</span>
+                            <svg class="sitemap__route-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                            </svg>
+                        </a>
+                    </div>
+                    <div class="sitemap__tree-children">
+                        ${renderRouteTree(node, lang, depth + 1)}
+                    </div>
+                </div>`;
+            } else {
+                // Leaf node - simple route link
+                html += `<a href="${QuickSiteAdmin.escapeHtml(url)}" target="_blank" class="sitemap__route sitemap__route--leaf" style="--depth: ${depth}" title="${QuickSiteAdmin.escapeHtml(url)}">
+                    <svg class="sitemap__route-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        ${isHome ? '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>' : '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>'}
+                    </svg>
+                    <span class="sitemap__route-name">${name}</span>
+                    <span class="sitemap__route-path">${routePath}</span>
+                    <svg class="sitemap__route-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                </a>`;
+            }
+        }
+    });
+    
+    return html;
 }
 
 async function loadRecentCommands() {
@@ -1020,6 +1096,69 @@ function closeAllModals() {
     background: var(--admin-surface);
     border-radius: var(--radius-md);
     border: 1px solid var(--admin-border);
+}
+
+/* Tree view styles */
+.sitemap__routes--tree {
+    display: block;
+}
+
+.sitemap__tree-node {
+    margin-left: calc(var(--depth, 0) * var(--space-md));
+}
+
+.sitemap__tree-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.sitemap__tree-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.sitemap__tree-toggle:hover {
+    background: var(--admin-bg-tertiary);
+    color: var(--admin-text);
+}
+
+.sitemap__tree-toggle svg {
+    transition: transform var(--transition-fast);
+}
+
+.sitemap__tree-node--open > .sitemap__tree-header > .sitemap__tree-toggle svg {
+    transform: rotate(90deg);
+}
+
+.sitemap__tree-children {
+    display: none;
+    margin-left: var(--space-sm);
+    padding-left: var(--space-sm);
+    border-left: 1px dashed var(--admin-border);
+}
+
+.sitemap__tree-node--open > .sitemap__tree-children {
+    display: block;
+}
+
+.sitemap__route--leaf {
+    margin-left: calc(var(--depth, 0) * var(--space-md) + 24px); /* 24px = toggle button width + gap */
+}
+
+.sitemap__route--parent {
+    flex: 1;
 }
 
 /* Responsive sitemap */

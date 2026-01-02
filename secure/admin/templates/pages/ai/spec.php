@@ -44,6 +44,9 @@ $relatedCommands = $spec['relatedCommands'] ?? [];
 
 // Get initial data for display
 $specData = $specManager->fetchDataRequirements($spec);
+
+// Check if spec has 'create' tag (requires fresh start)
+$hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
 ?>
 
 <style>
@@ -433,6 +436,285 @@ $specData = $specManager->fetchDataRequirements($spec);
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* AI Response Section */
+.ai-response-hint {
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--space-sm);
+}
+
+.ai-response-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm) var(--space-md);
+    color: #dc2626;
+    font-size: var(--font-size-sm);
+    margin-top: var(--space-sm);
+}
+
+/* Command Preview */
+.command-count {
+    background: var(--admin-primary);
+    color: white;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    margin-left: auto;
+}
+
+.command-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.command-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--admin-bg-secondary);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--admin-border);
+}
+
+.command-item__number {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    background: var(--admin-bg-tertiary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    color: var(--admin-text-muted);
+}
+
+.command-item__content {
+    flex: 1;
+    min-width: 0;
+}
+
+.command-item__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xs);
+}
+
+.command-item__method {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+}
+
+.command-item__method--get {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.command-item__method--post {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.command-item__method--put,
+.command-item__method--patch {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.command-item__method--delete {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.command-item__command {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--admin-text);
+}
+
+.command-item__params {
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+    word-break: break-all;
+}
+
+/* Execution Results */
+.execution-progress {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    padding: var(--space-lg);
+    color: var(--admin-text-muted);
+}
+
+.execution-results {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.result-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--admin-border);
+}
+
+.result-item--success {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+}
+
+.result-item--error {
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+
+.result-item--pending {
+    background: var(--admin-bg-secondary);
+    opacity: 0.6;
+}
+
+.result-item__icon {
+    flex-shrink: 0;
+    font-size: 1rem;
+}
+
+.result-item__content {
+    flex: 1;
+    min-width: 0;
+}
+
+.result-item__command {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: #1f2937;
+}
+
+.result-item--success .result-item__command {
+    color: #166534;
+}
+
+.result-item--error .result-item__command {
+    color: #991b1b;
+}
+
+.result-item__message {
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+    margin-top: 2px;
+}
+
+.result-item__error {
+    font-size: var(--font-size-xs);
+    color: #dc2626;
+    margin-top: 2px;
+}
+
+/* Fresh Start Checkbox */
+.fresh-start-option {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-md);
+}
+
+.fresh-start-option__checkbox {
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    cursor: pointer;
+}
+
+.fresh-start-option__content {
+    flex: 1;
+}
+
+.fresh-start-option__label {
+    font-weight: 500;
+    color: var(--admin-text);
+    cursor: pointer;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.fresh-start-option__hint {
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+}
+
+/* Warning Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+    max-width: 450px;
+    width: 90%;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.modal-icon {
+    font-size: 3rem;
+    text-align: center;
+    margin-bottom: var(--space-md);
+}
+
+.modal-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: var(--space-sm);
+}
+
+.modal-message {
+    color: var(--admin-text-muted);
+    text-align: center;
+    margin-bottom: var(--space-lg);
+    line-height: 1.5;
+}
+
+.modal-actions {
+    display: flex;
+    gap: var(--space-sm);
+    justify-content: center;
+}
+
+.modal-actions .admin-btn {
+    min-width: 120px;
+}
 </style>
 
 <div class="ai-spec">
@@ -683,13 +965,13 @@ $specData = $specManager->fetchDataRequirements($spec);
                             </svg>
                             <?= __admin('ai.spec.copyPrompt', 'Copy') ?>
                         </button>
-                        <a href="<?= $router->url('batch') ?>" id="go-batch" class="admin-btn admin-btn--primary" style="display: none;">
-                            <?= __admin('ai.spec.goToBatch', 'Go to Batch Panel') ?>
+                        <span id="prompt-next-step" class="admin-btn admin-btn--ghost" style="display: none; cursor: default; opacity: 0.8;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M5 12h14"/>
-                                <path d="M12 5l7 7-7 7"/>
+                                <path d="M12 5v14"/>
+                                <path d="M19 12l-7 7-7-7"/>
                             </svg>
-                        </a>
+                            <?= __admin('ai.spec.pasteBelow', 'Paste AI response below') ?>
+                        </span>
                         <div class="ai-spec-prompt__stats">
                             <span id="char-count">0 <?= __admin('ai.spec.chars', 'chars') ?></span>
                             <span id="word-count">0 <?= __admin('ai.spec.words', 'words') ?></span>
@@ -697,18 +979,142 @@ $specData = $specManager->fetchDataRequirements($spec);
                     </div>
                 </div>
             </div>
+            
+            <!-- AI Response Section -->
+            <div class="ai-spec-card ai-response-section" style="display: none;">
+                <div class="ai-spec-card__header">
+                    <span style="display: flex; align-items: center; gap: var(--space-sm);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+                        </svg>
+                        <?= __admin('ai.spec.aiResponse', 'AI Response') ?>
+                    </span>
+                </div>
+                <div class="ai-spec-card__body">
+                    <p class="ai-response-hint"><?= __admin('ai.spec.pasteJsonHint', 'Paste the JSON response from the AI below:') ?></p>
+                    <textarea id="ai-response-input" class="ai-spec-prompt__textarea" placeholder='{"commands": [...]}'></textarea>
+                    <div id="ai-response-error" class="ai-response-error" style="display: none;"></div>
+                    <div class="ai-spec-prompt__actions">
+                        <button type="button" id="validate-response" class="admin-btn admin-btn--secondary">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            <?= __admin('ai.spec.validateJson', 'Validate JSON') ?>
+                        </button>
+                        <button type="button" id="preview-commands" class="admin-btn admin-btn--primary" style="display: none;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            <?= __admin('ai.spec.previewCommands', 'Preview Commands') ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Command Preview Section -->
+            <div class="ai-spec-card command-preview-section" style="display: none;">
+                <div class="ai-spec-card__header">
+                    <span style="display: flex; align-items: center; gap: var(--space-sm);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="4 17 10 11 4 5"/>
+                            <line x1="12" y1="19" x2="20" y2="19"/>
+                        </svg>
+                        <?= __admin('ai.spec.commandPreview', 'Command Preview') ?>
+                    </span>
+                    <span id="command-count" class="command-count"></span>
+                </div>
+                <div class="ai-spec-card__body">
+                    <div id="fresh-start-option" class="fresh-start-option" style="display: none;">
+                        <input type="checkbox" id="fresh-start-checkbox" class="fresh-start-option__checkbox" checked>
+                        <div class="fresh-start-option__content">
+                            <label for="fresh-start-checkbox" class="fresh-start-option__label">
+                                <?= __admin('ai.spec.freshStartLabel', 'Fresh Start (reset project before execution)') ?>
+                            </label>
+                            <span class="fresh-start-option__hint">
+                                <?= __admin('ai.spec.freshStartHint', 'Recommended for "create" specs - clears existing routes, assets, and structures') ?>
+                            </span>
+                        </div>
+                    </div>
+                    <div id="command-list" class="command-list"></div>
+                    <div class="ai-spec-prompt__actions" style="margin-top: var(--space-md);">
+                        <button type="button" id="back-to-json" class="admin-btn admin-btn--secondary">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 12H5"/>
+                                <path d="M12 19l-7-7 7-7"/>
+                            </svg>
+                            <?= __admin('ai.spec.backToJson', 'Back') ?>
+                        </button>
+                        <button type="button" id="execute-commands" class="admin-btn admin-btn--primary">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                            <?= __admin('ai.spec.executeCommands', 'Execute All') ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Execution Results Section -->
+            <div class="ai-spec-card execution-results-section" style="display: none;">
+                <div class="ai-spec-card__header">
+                    <span style="display: flex; align-items: center; gap: var(--space-sm);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                            <polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                        <?= __admin('ai.spec.executionResults', 'Execution Results') ?>
+                    </span>
+                </div>
+                <div class="ai-spec-card__body">
+                    <div id="execution-progress" class="execution-progress" style="display: none;">
+                        <div class="ai-spec-loading__spinner"></div>
+                        <span id="progress-text"><?= __admin('ai.spec.executing', 'Executing commands...') ?></span>
+                    </div>
+                    <div id="execution-results" class="execution-results"></div>
+                    <div class="ai-spec-prompt__actions" style="margin-top: var(--space-md);">
+                        <button type="button" id="reset-workflow" class="admin-btn admin-btn--secondary">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                <path d="M3 3v5h5"/>
+                            </svg>
+                            <?= __admin('ai.spec.startOver', 'Start Over') ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </main>
+    </div>
+</div>
+
+<!-- Fresh Start Warning Modal -->
+<div id="fresh-start-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-icon">⚠️</div>
+        <h3 class="modal-title"><?= __admin('ai.spec.freshStartRecommended', 'Fresh Start Recommended') ?></h3>
+        <p class="modal-message">
+            <?= __admin('ai.spec.freshStartWarning', 'This spec is designed to create a new project from scratch. Running without Fresh Start may cause conflicts with existing content.') ?>
+        </p>
+        <div class="modal-actions">
+            <button type="button" id="modal-cancel" class="admin-btn admin-btn--secondary">
+                <?= __admin('ai.spec.cancel', 'Cancel') ?>
+            </button>
+            <button type="button" id="modal-proceed" class="admin-btn admin-btn--primary">
+                <?= __admin('ai.spec.proceedAnyway', 'Proceed Anyway') ?>
+            </button>
+        </div>
     </div>
 </div>
 
 <script>
 (function() {
     const specId = <?= json_encode($specId) ?>;
+    const isCreateSpec = <?= json_encode($hasCreateTag) ?>;
     const form = document.getElementById('spec-params-form');
     const promptOutput = document.getElementById('prompt-output');
     const promptLoading = document.getElementById('prompt-loading');
     const copyBtn = document.getElementById('copy-prompt');
-    const goBatchBtn = document.getElementById('go-batch');
+    const promptNextStep = document.getElementById('prompt-next-step');
     const charCount = document.getElementById('char-count');
     const wordCount = document.getElementById('word-count');
     const userPromptTextarea = document.getElementById('user-prompt');
@@ -784,7 +1190,7 @@ $specData = $specManager->fetchDataRequirements($spec);
         promptLoading.style.display = 'flex';
         promptOutput.style.display = 'none';
         copyBtn.disabled = true;
-        goBatchBtn.style.display = 'none';
+        promptNextStep.style.display = 'none';
         
         try {
             const queryString = new URLSearchParams(params).toString();
@@ -810,7 +1216,7 @@ $specData = $specManager->fetchDataRequirements($spec);
                 
                 promptOutput.value = finalPrompt;
                 copyBtn.disabled = false;
-                goBatchBtn.style.display = 'inline-flex';
+                promptNextStep.style.display = 'inline-flex';
                 updateStats(finalPrompt);
             } else {
                 promptOutput.value = 'Error: ' + (data.error || 'Failed to generate prompt');
@@ -924,5 +1330,411 @@ $specData = $specManager->fetchDataRequirements($spec);
     <?php if (empty($parameters)): ?>
     generatePrompt({});
     <?php endif; ?>
+    
+    // === AI Response & Command Preview ===
+    const aiResponseSection = document.querySelector('.ai-response-section');
+    const aiResponseInput = document.getElementById('ai-response-input');
+    const aiResponseError = document.getElementById('ai-response-error');
+    const validateBtn = document.getElementById('validate-response');
+    const previewBtn = document.getElementById('preview-commands');
+    const commandPreviewSection = document.querySelector('.command-preview-section');
+    const commandList = document.getElementById('command-list');
+    const commandCount = document.getElementById('command-count');
+    const backToJsonBtn = document.getElementById('back-to-json');
+    const executeBtn = document.getElementById('execute-commands');
+    const executionResultsSection = document.querySelector('.execution-results-section');
+    const executionProgress = document.getElementById('execution-progress');
+    const progressText = document.getElementById('progress-text');
+    const executionResults = document.getElementById('execution-results');
+    const resetBtn = document.getElementById('reset-workflow');
+    const freshStartOption = document.getElementById('fresh-start-option');
+    const freshStartCheckbox = document.getElementById('fresh-start-checkbox');
+    const freshStartModal = document.getElementById('fresh-start-modal');
+    const modalCancelBtn = document.getElementById('modal-cancel');
+    const modalProceedBtn = document.getElementById('modal-proceed');
+    
+    let parsedCommands = [];
+    let pendingExecution = false;
+    
+    // Show AI response section after prompt is generated
+    const originalGeneratePrompt = generatePrompt;
+    generatePrompt = async function(params) {
+        await originalGeneratePrompt(params);
+        if (promptOutput.value && !promptOutput.value.startsWith('Error:')) {
+            aiResponseSection.style.display = 'block';
+        }
+    };
+    
+    // Validate JSON
+    function validateJson() {
+        const jsonText = aiResponseInput.value.trim();
+        aiResponseError.style.display = 'none';
+        previewBtn.style.display = 'none';
+        
+        if (!jsonText) {
+            aiResponseError.textContent = 'Please paste the JSON response from the AI.';
+            aiResponseError.style.display = 'block';
+            return null;
+        }
+        
+        try {
+            const data = JSON.parse(jsonText);
+            
+            // Check for commands array
+            let commands = null;
+            if (Array.isArray(data)) {
+                commands = data;
+            } else if (data.commands && Array.isArray(data.commands)) {
+                commands = data.commands;
+            } else if (data.command) {
+                commands = [data];
+            }
+            
+            if (!commands || commands.length === 0) {
+                aiResponseError.textContent = 'No commands found. Expected format: {"commands": [...]} or an array of commands.';
+                aiResponseError.style.display = 'block';
+                return null;
+            }
+            
+            // Validate each command
+            for (let i = 0; i < commands.length; i++) {
+                const cmd = commands[i];
+                if (!cmd.command) {
+                    aiResponseError.textContent = `Command #${i + 1} is missing the "command" field.`;
+                    aiResponseError.style.display = 'block';
+                    return null;
+                }
+            }
+            
+            return commands;
+        } catch (e) {
+            aiResponseError.textContent = 'Invalid JSON: ' + e.message;
+            aiResponseError.style.display = 'block';
+            return null;
+        }
+    }
+    
+    // Validate button click
+    validateBtn.addEventListener('click', function() {
+        const commands = validateJson();
+        if (commands) {
+            parsedCommands = commands;
+            previewBtn.style.display = 'inline-flex';
+            aiResponseError.style.display = 'none';
+        }
+    });
+    
+    // Format parameters for preview
+    function formatParams(params) {
+        if (!params || Object.keys(params).length === 0) return '';
+        const parts = [];
+        for (const [key, value] of Object.entries(params)) {
+            if (typeof value === 'object') {
+                parts.push(`${key}={...}`);
+            } else if (typeof value === 'string' && value.length > 50) {
+                parts.push(`${key}="${value.substring(0, 50)}..."`);
+            } else {
+                parts.push(`${key}=${JSON.stringify(value)}`);
+            }
+        }
+        return parts.join(', ');
+    }
+    
+    // Get HTTP method for command
+    function getMethod(cmd) {
+        if (cmd.method) return cmd.method.toUpperCase();
+        if (cmd.params && Object.keys(cmd.params).length > 0) return 'POST';
+        return 'GET';
+    }
+    
+    // Preview commands
+    previewBtn.addEventListener('click', function() {
+        commandList.innerHTML = '';
+        
+        parsedCommands.forEach((cmd, index) => {
+            const method = getMethod(cmd);
+            const methodClass = 'command-item__method--' + method.toLowerCase();
+            
+            const item = document.createElement('div');
+            item.className = 'command-item';
+            item.innerHTML = `
+                <span class="command-item__number">${index + 1}</span>
+                <div class="command-item__content">
+                    <div class="command-item__header">
+                        <span class="command-item__method ${methodClass}">${method}</span>
+                        <span class="command-item__command">${cmd.command}</span>
+                    </div>
+                    ${cmd.params ? `<div class="command-item__params">${formatParams(cmd.params)}</div>` : ''}
+                </div>
+            `;
+            commandList.appendChild(item);
+        });
+        
+        commandCount.textContent = parsedCommands.length + ' command' + (parsedCommands.length > 1 ? 's' : '');
+        
+        // Show fresh start option for create specs
+        if (isCreateSpec) {
+            freshStartOption.style.display = 'flex';
+            freshStartCheckbox.checked = true; // Default to checked
+        } else {
+            freshStartOption.style.display = 'none';
+        }
+        
+        aiResponseSection.style.display = 'none';
+        commandPreviewSection.style.display = 'block';
+    });
+    
+    // Back to JSON
+    backToJsonBtn.addEventListener('click', function() {
+        commandPreviewSection.style.display = 'none';
+        aiResponseSection.style.display = 'block';
+    });
+    
+    // Modal handlers
+    modalCancelBtn.addEventListener('click', function() {
+        freshStartModal.style.display = 'none';
+        pendingExecution = false;
+    });
+    
+    modalProceedBtn.addEventListener('click', function() {
+        freshStartModal.style.display = 'none';
+        executeCommands(false); // Execute without fresh start
+    });
+    
+    // Generate fresh start commands (same logic as batch.php)
+    async function generateFreshStartCommands() {
+        const commands = [];
+        const managementUrl = '<?= rtrim(BASE_URL, '/') ?>/management/';
+        const token = '<?= $router->getToken() ?>';
+        
+        async function apiCall(command, params = {}) {
+            const hasParams = Object.keys(params).length > 0;
+            const url = managementUrl + command;
+            const options = {
+                method: hasParams ? 'POST' : 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                }
+            };
+            if (hasParams) options.body = JSON.stringify(params);
+            const response = await fetch(url, options);
+            return await response.json();
+        }
+        
+        try {
+            // 1. Delete routes (except 404 and home)
+            // API returns: { routes: {nested object}, flat_routes: ["home", "about", ...] }
+            const routesResponse = await apiCall('getRoutes');
+            if ((routesResponse.status === 200 || routesResponse.success) && routesResponse.data?.flat_routes) {
+                const protectedRoutes = ['404', 'home'];
+                for (const routeName of routesResponse.data.flat_routes) {
+                    if (!protectedRoutes.includes(routeName)) {
+                        commands.push({ command: 'deleteRoute', params: { route: routeName } });
+                    }
+                }
+            }
+            
+            // 2. Delete all assets
+            const assetsResponse = await apiCall('listAssets');
+            if ((assetsResponse.status === 200 || assetsResponse.success) && assetsResponse.data?.assets) {
+                for (const [category, files] of Object.entries(assetsResponse.data.assets)) {
+                    for (const file of files) {
+                        commands.push({ 
+                            command: 'deleteAsset', 
+                            params: { category: category, filename: file.filename } 
+                        });
+                    }
+                }
+            }
+            
+            // 3. Delete all components
+            const componentsResponse = await apiCall('listComponents');
+            if ((componentsResponse.status === 200 || componentsResponse.success) && componentsResponse.data?.components) {
+                for (const component of componentsResponse.data.components) {
+                    commands.push({ 
+                        command: 'editStructure', 
+                        params: { type: 'component', name: component.name, structure: [] } 
+                    });
+                }
+            }
+            
+            // 4. Clear translation keys (except 404.*)
+            const translationsResponse = await apiCall('getTranslations');
+            if ((translationsResponse.status === 200 || translationsResponse.success) && translationsResponse.data?.translations) {
+                for (const [lang, keys] of Object.entries(translationsResponse.data.translations)) {
+                    const topLevelKeys = Object.keys(keys).filter(key => key !== '404');
+                    if (topLevelKeys.length > 0) {
+                        commands.push({ 
+                            command: 'deleteTranslationKeys', 
+                            params: { language: lang, keys: topLevelKeys } 
+                        });
+                    }
+                }
+            }
+            
+            // 5. Clear structures
+            commands.push({ command: 'editStructure', params: { type: 'menu', structure: [] } });
+            commands.push({ command: 'editStructure', params: { type: 'footer', structure: [] } });
+            commands.push({ command: 'editStructure', params: { type: 'page', name: 'home', structure: [] } });
+            
+            // 6. Minimize 404 page
+            commands.push({ 
+                command: 'editStructure', 
+                params: { 
+                    type: 'page',
+                    name: '404', 
+                    structure: [
+                        { tag: 'section', params: { class: 'error-page' }, children: [
+                            { tag: 'h1', children: [{ textKey: '404.pageNotFound' }] },
+                            { tag: 'p', children: [{ textKey: '404.message' }] }
+                        ]}
+                    ]
+                } 
+            });
+            
+            // 7. Clear CSS
+            commands.push({ command: 'editStyles', params: { content: '/* Fresh Start - CSS cleared */\n' } });
+            
+            return commands;
+        } catch (error) {
+            console.error('Error generating fresh start commands:', error);
+            return [];
+        }
+    }
+    
+    // Execute commands (with optional fresh start)
+    async function executeCommands(withFreshStart = true) {
+        commandPreviewSection.style.display = 'none';
+        executionResultsSection.style.display = 'block';
+        executionProgress.style.display = 'flex';
+        executionResults.innerHTML = '';
+        
+        let allCommands = [...parsedCommands];
+        let freshStartCount = 0;
+        
+        // If fresh start is enabled, prepend fresh start commands
+        if (withFreshStart) {
+            progressText.textContent = 'Analyzing project for Fresh Start...';
+            const freshStartCommands = await generateFreshStartCommands();
+            freshStartCount = freshStartCommands.length;
+            allCommands = [...freshStartCommands, ...parsedCommands];
+        }
+        
+        // Create result items for all commands
+        allCommands.forEach((cmd, index) => {
+            const isFreshStart = index < freshStartCount;
+            const item = document.createElement('div');
+            item.className = 'result-item result-item--pending';
+            item.id = 'result-' + index;
+            item.innerHTML = `
+                <span class="result-item__icon">⏳</span>
+                <div class="result-item__content">
+                    <div class="result-item__command">${isFreshStart ? '🧹 ' : ''}${cmd.command}</div>
+                    <div class="result-item__message">${isFreshStart ? 'Fresh Start: ' : ''}Pending...</div>
+                </div>
+            `;
+            executionResults.appendChild(item);
+        });
+        
+        // Add separator after fresh start commands
+        if (freshStartCount > 0) {
+            const separator = document.createElement('div');
+            separator.style.cssText = 'text-align: center; padding: 8px; color: var(--admin-text-muted); font-size: 12px; border-top: 1px dashed var(--admin-border); margin-top: 8px;';
+            separator.textContent = '— AI Commands —';
+            executionResults.insertBefore(separator, executionResults.children[freshStartCount]);
+        }
+        
+        const managementUrl = '<?= rtrim(BASE_URL, '/') ?>/management/';
+        const token = '<?= $router->getToken() ?>';
+        
+        for (let i = 0; i < allCommands.length; i++) {
+            const cmd = allCommands[i];
+            const isFreshStart = i < freshStartCount;
+            progressText.textContent = `${isFreshStart ? '🧹 Fresh Start: ' : ''}Executing command ${i + 1} of ${allCommands.length}: ${cmd.command}`;
+            
+            const resultItem = document.getElementById('result-' + i);
+            
+            try {
+                const method = getMethod(cmd);
+                const url = managementUrl + cmd.command;
+                
+                const options = {
+                    method: method,
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
+                };
+                
+                if (method !== 'GET' && cmd.params) {
+                    options.body = JSON.stringify(cmd.params);
+                }
+                
+                const response = await fetch(url, options);
+                const data = await response.json();
+                
+                // API returns status codes: 200 (OK), 201 (Created), etc.
+                // Check for any 2xx status or success:true
+                const isSuccess = (data.status >= 200 && data.status < 300) || data.success === true;
+                const errorMsg = data.error || data.message || 'Failed';
+                
+                if (isSuccess) {
+                    resultItem.className = 'result-item result-item--success';
+                    resultItem.innerHTML = `
+                        <span class="result-item__icon">✅</span>
+                        <div class="result-item__content">
+                            <div class="result-item__command">${isFreshStart ? '🧹 ' : ''}${cmd.command}</div>
+                            <div class="result-item__message">${data.message || 'Success'}</div>
+                        </div>
+                    `;
+                } else {
+                    resultItem.className = 'result-item result-item--error';
+                    resultItem.innerHTML = `
+                        <span class="result-item__icon">❌</span>
+                        <div class="result-item__content">
+                            <div class="result-item__command">${isFreshStart ? '🧹 ' : ''}${cmd.command}</div>
+                            <div class="result-item__error">${errorMsg}</div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultItem.className = 'result-item result-item--error';
+                resultItem.innerHTML = `
+                    <span class="result-item__icon">❌</span>
+                    <div class="result-item__content">
+                        <div class="result-item__command">${isFreshStart ? '🧹 ' : ''}${cmd.command}</div>
+                        <div class="result-item__error">${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+        
+        executionProgress.style.display = 'none';
+    }
+    
+    // Execute commands button
+    executeBtn.addEventListener('click', async function() {
+        const shouldFreshStart = isCreateSpec && freshStartCheckbox.checked;
+        
+        // If it's a create spec and fresh start is unchecked, show warning
+        if (isCreateSpec && !freshStartCheckbox.checked) {
+            pendingExecution = true;
+            freshStartModal.style.display = 'flex';
+            return;
+        }
+        
+        // Execute with fresh start if applicable
+        executeCommands(shouldFreshStart);
+    });
+    
+    // Reset workflow
+    resetBtn.addEventListener('click', function() {
+        executionResultsSection.style.display = 'none';
+        aiResponseSection.style.display = 'block';
+        aiResponseInput.value = '';
+        previewBtn.style.display = 'none';
+        parsedCommands = [];
+    });
 })();
 </script>

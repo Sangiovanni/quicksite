@@ -2,10 +2,10 @@
 /**
  * Active Project Target Configuration
  * 
- * Updated: 2025-12-31 10:58:08
- * Previous: test-p
+ * Updated: 2026-01-02 12:14:16
+ * Previous: test-b
  */
 
 return [
-    'project' => 'quicksite'
+    'project' => 'test-p'
 ];
