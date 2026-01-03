@@ -26,27 +26,27 @@ if (!is_string($relative_path_input)) {
         ->send();
 }
 
-// Validate: must be single folder name (depth = 1), not empty for secure folder
+// Validate: secure folder path cannot be empty
 if ($relative_path_input === '') {
     ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage("Secure folder name cannot be empty")
+        ->withMessage("Secure folder path cannot be empty")
         ->withErrors([
             ['field' => 'destination', 'reason' => 'empty_not_allowed']
         ])
         ->send();
 }
 
-// Validate path: max_depth = 1 (single folder name only)
-if (!is_valid_relative_path($relative_path_input, 255, 1, false)) {
+// Validate path: max_depth = 5 (allows nested paths like 'backends/project1')
+if (!is_valid_relative_path($relative_path_input, 255, 5, false)) {
     ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage("Secure folder must be a single folder name (no subdirectories)")
+        ->withMessage("Secure folder path must be valid (max 5 levels deep, e.g., 'backends/project1')")
         ->withErrors([
             ['field' => 'destination', 'value' => $relative_path_input],
             ['constraints' => [
                 'max_length' => 255,
-                'max_depth' => 1,
-                'allowed_chars' => 'a-z, A-Z, 0-9, hyphen, underscore',
-                'no_subdirectories' => true
+                'max_depth' => 5,
+                'allowed_chars' => 'a-z, A-Z, 0-9, hyphen, underscore, forward slash',
+                'empty_not_allowed' => true
             ]]
         ])
         ->send();
@@ -90,6 +90,21 @@ if (!is_dir($template_source_path)) {
             'source_path' => $template_source_path
         ])
         ->send();
+}
+
+// Create parent directories if destination is nested (e.g., 'backends/project1' needs 'backends/')
+$parent_dir = dirname($target_destination_path);
+if ($parent_dir !== SERVER_ROOT && !is_dir($parent_dir)) {
+    if (!mkdir($parent_dir, 0755, true)) {
+        releaseLock($lock);
+        
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to create parent directory for nested secure folder")
+            ->withData([
+                'parent_dir' => $parent_dir
+            ])
+            ->send();
+    }
 }
 
 // Use the recursive move function (still inside lock)

@@ -52,18 +52,18 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'renameSecureFolder' => [
-        'description' => 'Renames the secure/backend folder at server root level. Updates SECURE_FOLDER_NAME constant. Management URL stays the same.',
+        'description' => 'Renames or moves the secure/backend folder. Supports nested paths for organizing multiple deployments (e.g., backends/project1). Updates SECURE_FOLDER_NAME constant. Management URL stays the same.',
         'method' => 'PATCH',
         'parameters' => [
             'destination' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Single folder name only (no paths/slashes allowed, cannot be empty)',
-                'example' => 'app_backend or secure_v2',
-                'validation' => 'Max 255 chars, max 1 level (single folder name), alphanumeric/hyphens/underscores only, cannot be empty'
+                'description' => 'New folder path relative to server root. Can be nested (e.g., backends/project1) up to 5 levels deep. Cannot be empty.',
+                'example' => 'app_backend, secure_v2, or backends/project1',
+                'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/hyphens/underscores/forward-slashes only, cannot be empty'
             ]
         ],
-        'example_patch' => 'PATCH /management/renameSecureFolder with body: {"destination": "app"}',
+        'example_patch' => 'PATCH /management/renameSecureFolder with body: {"destination": "backends/mysite"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
