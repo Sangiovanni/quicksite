@@ -138,12 +138,22 @@ function getCommandCategories(): array {
         'project_management' => [
             'label' => 'Project Management',
             'icon' => 'folder-tree',
-            'commands' => ['listProjects', 'getActiveProject', 'switchProject', 'createProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
+            'commands' => ['listProjects', 'getActiveProject', 'switchProject', 'createProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'clearExports', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
+        ],
+        'storage_monitoring' => [
+            'label' => 'Storage',
+            'icon' => 'database',
+            'commands' => ['getSizeInfo']
         ],
         'command_history' => [
             'label' => 'Command History',
             'icon' => 'history',
             'commands' => ['getCommandHistory', 'clearCommandHistory']
+        ],
+        'role_management' => [
+            'label' => 'Roles & Permissions',
+            'icon' => 'shield',
+            'commands' => ['listRoles', 'getMyPermissions', 'createRole', 'editRole', 'deleteRole']
         ],
         'authentication' => [
             'label' => 'Authentication',

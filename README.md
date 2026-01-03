@@ -20,7 +20,7 @@ That question turned a template into a CMS. The file-based architecture wasn't a
 - **JSON-Driven Templates**: Define page structures, menus, and components in JSON, compiled to optimized PHP
 - **Multilingual Support**: Built-in translation system with language switching and validation
 - **Production Builds**: One-command deployment with compilation, optimization, and ZIP packaging
-- **RESTful Management API**: 72 endpoints for complete site management
+- **RESTful Management API**: 77 endpoints for complete site management
 - **File-Based Storage**: No database required - all configuration in JSON/PHP files
 - **Flexible Architecture**: Separate public and secure folders for clean deployment
 - **🔐 API Authentication**: Bearer token authentication with role-based permissions
@@ -152,14 +152,17 @@ curl -H "Authorization: Bearer your_token_here" \
   http://yoursite.local/management/help
 ```
 
-**Permission Levels:**
-| Permission | Access |
-|------------|--------|
-| `*` | Full access to all commands |
-| `read` | Read-only: get*, list*, validate*, help |
-| `write` | Modifications: edit*, add*, delete*, upload* |
-| `admin` | Administrative: set*, rename*, build, tokens |
-| `command:name` | Specific command only (e.g., `command:build`) |
+**Role-Based Permissions:**
+| Role | Access |
+|------|--------|
+| `viewer` | Read-only (22 commands): get*, list*, help |
+| `editor` | Content editing (40 commands): edit*, add*, delete content |
+| `designer` | Styling (48 commands): CSS, styles, visual design |
+| `developer` | Build & deploy (53 commands): build, deploy, downloads |
+| `admin` | Full admin (71 commands): everything except token/role management |
+| `*` (superadmin) | Full access including token and role management |
+
+Tokens are assigned a role via `generateToken`. Use `getMyPermissions` to check current access.
 
 **CORS Support:**
 - Development mode automatically allows `localhost:*` origins
@@ -270,6 +273,13 @@ curl -H "Authorization: Bearer your_token_here" \
 - `GET /management/getCommandHistory` - Get command execution history with filtering
 - `POST /management/clearCommandHistory` - Delete old command logs
 
+#### **Role Management**
+- `GET /management/listRoles` - List all roles (superadmin sees command lists)
+- `GET /management/getMyPermissions` - Get current token's role and allowed commands
+- `POST /management/createRole` - Create custom role with command list (superadmin only)
+- `PATCH /management/editRole` - Modify role description or commands (superadmin only)
+- `DELETE /management/deleteRole` - Delete custom role (superadmin only)
+
 #### **Documentation**
 - `GET /management/help/{command?}` - API documentation (all commands or specific)
 
@@ -304,7 +314,7 @@ quicksite/                    # Root installation
 │   ├── logs/                # System logs
 │   │
 │   ├── management/          # Core Management API (shared)
-│   │   ├── command/         # API command handlers (72 commands)
+│   │   ├── command/         # API command handlers (77 commands)
 │   │   ├── classes/         # ApiResponse, CssParser, JsonCompiler, etc.
 │   │   ├── functions/       # PathManagement, AuthManagement, etc.
 │   │   └── routes.php       # Management route definitions
