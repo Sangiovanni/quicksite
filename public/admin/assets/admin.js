@@ -32,6 +32,152 @@ const QuickSiteAdmin = {
         prefsStorageKey: 'quicksite_admin_prefs'
     },
 
+    // ============================================
+    // Permission System
+    // ============================================
+    
+    /**
+     * Current user's permissions (loaded from API)
+     */
+    permissions: {
+        loaded: false,
+        role: null,
+        commands: [],
+        isSuperAdmin: false
+    },
+
+    /**
+     * Load user permissions from API
+     * Call this on page load before rendering command lists
+     */
+    async loadPermissions() {
+        const token = this.getToken();
+        if (!token) {
+            this.permissions = { loaded: true, role: null, commands: [], isSuperAdmin: false, tokenName: null };
+            this.updateUserBadge();
+            return;
+        }
+
+        try {
+            const response = await this.apiRequest('getMyPermissions', 'POST');
+            if (response.ok && response.data?.data) {
+                this.permissions = {
+                    loaded: true,
+                    role: response.data.data.role,
+                    commands: response.data.data.commands || [],
+                    isSuperAdmin: response.data.data.is_superadmin || false,
+                    tokenName: response.data.data.token_name || null
+                };
+            } else {
+                // Fallback - treat as no permissions if API fails
+                this.permissions = { loaded: true, role: 'unknown', commands: [], isSuperAdmin: false, tokenName: null };
+            }
+        } catch (error) {
+            console.error('Failed to load permissions:', error);
+            this.permissions = { loaded: true, role: 'error', commands: [], isSuperAdmin: false, tokenName: null };
+        }
+        
+        // Update user badge in header
+        this.updateUserBadge();
+        
+        // Trigger permission-based filtering
+        this.filterByPermissions();
+    },
+
+    /**
+     * Update the user badge in the header with current user info
+     */
+    updateUserBadge() {
+        const nameEl = document.getElementById('admin-user-name');
+        const roleEl = document.getElementById('admin-user-role');
+        
+        if (!nameEl || !roleEl) return;
+        
+        if (!this.permissions.loaded || !this.permissions.role) {
+            nameEl.textContent = 'Not logged in';
+            roleEl.textContent = '';
+            roleEl.removeAttribute('data-role');
+            return;
+        }
+        
+        // Display token name (shortened if too long)
+        const name = this.permissions.tokenName || 'Unknown';
+        nameEl.textContent = name.length > 20 ? name.substring(0, 20) + '...' : name;
+        nameEl.title = name;
+        
+        // Display role with special formatting for superadmin
+        const role = this.permissions.role;
+        roleEl.textContent = role === '*' ? 'Superadmin' : role;
+        roleEl.setAttribute('data-role', role);
+    },
+
+    /**
+     * Check if current user has permission for a command
+     */
+    hasPermission(command) {
+        if (this.permissions.isSuperAdmin) return true;
+        return this.permissions.commands.includes(command);
+    },
+
+    /**
+     * Check if user has all commands in a list
+     */
+    hasAllPermissions(commands) {
+        if (this.permissions.isSuperAdmin) return true;
+        return commands.every(cmd => this.permissions.commands.includes(cmd));
+    },
+
+    /**
+     * Check if user has any command in a list
+     */
+    hasAnyPermission(commands) {
+        if (this.permissions.isSuperAdmin) return true;
+        return commands.some(cmd => this.permissions.commands.includes(cmd));
+    },
+
+    /**
+     * Filter UI elements based on permissions
+     * Hides elements with data-requires-command that user doesn't have access to
+     */
+    filterByPermissions() {
+        // Skip if permissions not loaded yet
+        if (!this.permissions.loaded) return;
+        
+        // Superadmin sees everything
+        if (this.permissions.isSuperAdmin) return;
+        
+        // Filter command links
+        document.querySelectorAll('[data-command]').forEach(el => {
+            const command = el.dataset.command;
+            if (!this.hasPermission(command)) {
+                el.classList.add('admin-hidden-permission');
+                el.setAttribute('aria-hidden', 'true');
+            }
+        });
+        
+        // Filter elements requiring specific commands
+        document.querySelectorAll('[data-requires-command]').forEach(el => {
+            const required = el.dataset.requiresCommand.split(',').map(c => c.trim());
+            if (!this.hasAllPermissions(required)) {
+                el.classList.add('admin-hidden-permission');
+                el.setAttribute('aria-hidden', 'true');
+            }
+        });
+        
+        // Update category counts after filtering
+        document.querySelectorAll('.admin-category').forEach(category => {
+            const visible = category.querySelectorAll('.admin-command-link:not(.admin-hidden-permission)');
+            const countEl = category.querySelector('.admin-category__count');
+            if (countEl) {
+                countEl.textContent = visible.length;
+            }
+            // Hide category if no visible commands
+            if (visible.length === 0) {
+                category.classList.add('admin-hidden-permission');
+            }
+        });
+    },
+
     /**
      * Initialize the admin panel
      */
@@ -43,6 +189,9 @@ const QuickSiteAdmin = {
         this.initCopyButtons();
         this.initKeyboardShortcuts();
         this.checkPendingMessage();
+        
+        // Load permissions (async - will filter UI when complete)
+        this.loadPermissions();
     },
 
     /**

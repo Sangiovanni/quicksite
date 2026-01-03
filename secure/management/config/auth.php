@@ -1,6 +1,8 @@
 <?php
 /**
  * Authentication & CORS Configuration
+ * 
+ * Auto-updated: 2026-01-03 14:45:00
  */
 
 return array (
@@ -11,41 +13,45 @@ return array (
     array (
       'tvt_dev_default_change_me_in_production' => 
       array (
-        'name' => 'Default Development Token',
-        'permissions' => 
-        array (
-          0 => '*',
-        ),
+        'name' => 'Default Superadmin Token',
+        'role' => '*',
         'created' => '2025-12-11',
         'note' => 'Replace this token before deploying to production',
       ),
-      'tvt_57653b93fb720480faa7388dfe81ee07d22c1b8c2f61a6d8' => 
+      'tvt_viewer_default_change_me_in_production' => 
       array (
-        'name' => 'Read-Only API Access',
-        'permissions' => 
-        array (
-          0 => 'read',
-        ),
-        'created' => '2025-12-15 13:05:09',
+        'name' => 'Default Viewer Token',
+        'role' => 'viewer',
+        'created' => '2026-01-03',
+        'note' => 'Read-only access - Replace before production',
       ),
-      'tvt_7bc9bf8672ead4b1d8b0e93e72e9a6517991fbe9fb90a05e' => 
+      'tvt_editor_default_change_me_in_production' => 
       array (
-        'name' => 'Collaborator Token',
-        'permissions' => 
-        array (
-          0 => 'read',
-          1 => 'write',
-        ),
-        'created' => '2025-12-15 13:05:55',
+        'name' => 'Default Editor Token',
+        'role' => 'editor',
+        'created' => '2026-01-03',
+        'note' => 'Content editing access - Replace before production',
       ),
-      'tvt_978867529f614b601565e305d1e05fffe9b0cdb2e698015c' => 
+      'tvt_designer_default_change_me_in_production' => 
       array (
-        'name' => 'Developer Token',
-        'permissions' => 
-        array (
-          0 => '*',
-        ),
-        'created' => '2025-12-15 13:06:19',
+        'name' => 'Default Designer Token',
+        'role' => 'designer',
+        'created' => '2026-01-03',
+        'note' => 'Style editing access - Replace before production',
+      ),
+      'tvt_developer_default_change_me_in_production' => 
+      array (
+        'name' => 'Default Developer Token',
+        'role' => 'developer',
+        'created' => '2026-01-03',
+        'note' => 'Build and deploy access - Replace before production',
+      ),
+      'tvt_admin_default_change_me_in_production' => 
+      array (
+        'name' => 'Default Admin Token',
+        'role' => 'admin',
+        'created' => '2026-01-03',
+        'note' => 'Full admin access (no token management) - Replace before production',
       ),
     ),
   ),

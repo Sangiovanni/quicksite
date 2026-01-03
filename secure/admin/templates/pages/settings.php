@@ -164,6 +164,24 @@
     </div>
 </div>
 
+<!-- Your Permissions -->
+<div class="admin-card" style="margin-top: var(--space-lg);">
+    <div class="admin-card__header">
+        <h2 class="admin-card__title">
+            <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            Your Permissions
+        </h2>
+    </div>
+    <div class="admin-card__body">
+        <div id="permissions-info" class="admin-loading">
+            <span class="admin-spinner"></span>
+            Loading permissions...
+        </div>
+    </div>
+</div>
+
 <!-- Tutorial Settings -->
 <div class="admin-card" style="margin-top: var(--space-lg);">
     <div class="admin-card__header">
@@ -203,7 +221,72 @@ document.addEventListener('DOMContentLoaded', function() {
     loadLanguages();
     loadPreferences();
     loadTutorialStatus();
+    loadPermissionsInfo();
 });
+
+async function loadPermissionsInfo() {
+    const container = document.getElementById('permissions-info');
+    
+    try {
+        const result = await QuickSiteAdmin.apiCall('getMyPermissions', 'GET');
+        
+        if (result.ok && result.data?.data) {
+            const data = result.data.data;
+            const role = data.role;
+            const isSuperAdmin = data.is_superadmin;
+            const commandCount = data.command_count;
+            
+            // Determine badge class
+            let badgeClass = 'info';
+            if (isSuperAdmin) badgeClass = 'warning';
+            else if (role === 'admin') badgeClass = 'success';
+            else if (role === 'developer' || role === 'designer') badgeClass = 'info';
+            else if (role === 'editor') badgeClass = 'info';
+            else badgeClass = 'muted';
+            
+            // Role descriptions
+            const roleDescriptions = {
+                '*': 'Full system access including token and role management',
+                'admin': 'Full access except token and role management',
+                'developer': 'Build, deploy, and full content editing',
+                'designer': 'Style editing plus content management',
+                'editor': 'Content editing including structure, translations, assets',
+                'viewer': 'Read-only access to view content and settings'
+            };
+            
+            container.innerHTML = `
+                <dl class="admin-definition-list">
+                    <dt>Your Role</dt>
+                    <dd>
+                        <span class="admin-badge admin-badge--${badgeClass}">
+                            ${isSuperAdmin ? '⭐ Superadmin' : role}
+                        </span>
+                    </dd>
+                    
+                    <dt>Access Level</dt>
+                    <dd>${roleDescriptions[role] || 'Custom role'}</dd>
+                    
+                    <dt>Available Commands</dt>
+                    <dd>${isSuperAdmin ? 'All (77 commands)' : commandCount + ' commands'}</dd>
+                </dl>
+                ${!isSuperAdmin ? `
+                <details style="margin-top: var(--space-md);">
+                    <summary class="admin-text-muted" style="cursor: pointer;">View your accessible commands</summary>
+                    <div style="margin-top: var(--space-sm); max-height: 200px; overflow-y: auto;">
+                        <div style="display: flex; flex-wrap: wrap; gap: var(--space-xs);">
+                            ${data.commands.map(cmd => `<code style="font-size: var(--font-size-xs);">${cmd}</code>`).join('')}
+                        </div>
+                    </div>
+                </details>
+                ` : ''}
+            `;
+        } else {
+            container.innerHTML = '<p class="admin-text-muted">Could not load permissions</p>';
+        }
+    } catch (error) {
+        container.innerHTML = `<p class="admin-text-error">Error: ${error.message}</p>`;
+    }
+}
 
 async function loadSystemInfo() {
     const container = document.getElementById('system-info');

@@ -890,11 +890,39 @@ function filterBatchCommands(query) {
     const commands = document.querySelectorAll('.admin-batch-add');
     const categories = document.querySelectorAll('.admin-batch-category');
     const lowerQuery = query.toLowerCase();
+    let totalVisible = 0;
     
     commands.forEach(cmd => {
         const name = cmd.dataset.command.toLowerCase();
-        cmd.style.display = name.includes(lowerQuery) ? '' : 'none';
+        const matches = name.includes(lowerQuery);
+        const hasPermission = QuickSiteAdmin.hasPermission(cmd.dataset.command);
+        
+        // Reset classes
+        cmd.classList.remove('admin-hidden-permission', 'admin-disabled-permission');
+        
+        if (!matches) {
+            cmd.style.display = 'none';
+        } else if (!hasPermission) {
+            cmd.style.display = 'none';
+            cmd.classList.add('admin-hidden-permission');
+        } else {
+            cmd.style.display = '';
+            totalVisible++;
+        }
     });
+    
+    // If search has ≤3 results, show hidden items as disabled
+    if (lowerQuery && totalVisible <= 3) {
+        commands.forEach(cmd => {
+            const name = cmd.dataset.command.toLowerCase();
+            if (name.includes(lowerQuery) && cmd.classList.contains('admin-hidden-permission')) {
+                cmd.classList.remove('admin-hidden-permission');
+                cmd.classList.add('admin-disabled-permission');
+                cmd.style.display = '';
+                cmd.disabled = true;
+            }
+        });
+    }
     
     // Hide empty categories
     categories.forEach(cat => {
@@ -903,6 +931,32 @@ function filterBatchCommands(query) {
         cat.style.display = visible ? '' : 'none';
     });
 }
+
+// Initial permission filtering on page load
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        if (QuickSiteAdmin.permissions.loaded && !QuickSiteAdmin.permissions.isSuperAdmin) {
+            // Hide commands user doesn't have access to
+            document.querySelectorAll('.admin-batch-add').forEach(btn => {
+                if (!QuickSiteAdmin.hasPermission(btn.dataset.command)) {
+                    btn.classList.add('admin-hidden-permission');
+                }
+            });
+            
+            // Update category counts
+            document.querySelectorAll('.admin-batch-category').forEach(cat => {
+                const visible = cat.querySelectorAll('.admin-batch-add:not(.admin-hidden-permission)');
+                const countEl = cat.querySelector('.admin-batch-category__count');
+                if (countEl) {
+                    countEl.textContent = visible.length;
+                }
+                if (visible.length === 0) {
+                    cat.classList.add('admin-hidden-permission');
+                }
+            });
+        }
+    }, 500);
+});
 
 // Commands that use GET method
 const GET_COMMANDS = [

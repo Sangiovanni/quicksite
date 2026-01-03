@@ -221,6 +221,16 @@ $langNames = [
                 <span><?= __admin('common.backToSite') ?></span>
             </a>
             
+            <!-- Current User Role Badge -->
+            <div class="admin-user-badge" id="admin-user-badge">
+                <svg class="admin-user-badge__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+                <span class="admin-user-badge__name" id="admin-user-name">...</span>
+                <span class="admin-user-badge__role" id="admin-user-role"></span>
+            </div>
+            
             <a href="<?= $router->url('logout') ?>" class="admin-btn admin-btn--outline">
                 <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>

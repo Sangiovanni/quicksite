@@ -96,13 +96,14 @@ function getCategoryIcon(string $icon): string {
 ?>
 
 <script>
-// Command search functionality
+// Command search functionality with permission-aware filtering
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('command-search');
     const categories = document.querySelectorAll('.admin-category');
     
     searchInput.addEventListener('input', function() {
         const query = this.value.toLowerCase().trim();
+        let totalVisible = 0;
         
         categories.forEach(category => {
             const commands = category.querySelectorAll('.admin-command-link');
@@ -111,9 +112,24 @@ document.addEventListener('DOMContentLoaded', function() {
             commands.forEach(link => {
                 const commandName = link.dataset.command.toLowerCase();
                 const matches = !query || commandName.includes(query);
-                link.style.display = matches ? '' : 'none';
-                if (matches) visibleCount++;
+                const hasPermission = QuickSiteAdmin.hasPermission(link.dataset.command);
+                
+                // Reset classes
+                link.classList.remove('admin-hidden-permission', 'admin-disabled-permission');
+                
+                if (!matches) {
+                    link.style.display = 'none';
+                } else if (!hasPermission) {
+                    // Will decide visibility after counting
+                    link.style.display = '';
+                    link.classList.add('admin-hidden-permission');
+                } else {
+                    link.style.display = '';
+                    visibleCount++;
+                }
             });
+            
+            totalVisible += visibleCount;
             
             // Show/hide category based on matches
             category.style.display = visibleCount > 0 ? '' : 'none';
@@ -131,7 +147,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 category.classList.remove('admin-category--open');
             }
         });
+        
+        // If search has ≤3 results, show hidden items as disabled
+        if (query && totalVisible <= 3) {
+            categories.forEach(category => {
+                const hiddenCommands = category.querySelectorAll('.admin-command-link.admin-hidden-permission');
+                hiddenCommands.forEach(link => {
+                    const commandName = link.dataset.command.toLowerCase();
+                    if (commandName.includes(query)) {
+                        // Show as disabled instead of hidden
+                        link.classList.remove('admin-hidden-permission');
+                        link.classList.add('admin-disabled-permission');
+                        link.style.display = '';
+                    }
+                });
+                
+                // Recalculate category visibility
+                const visibleOrDisabled = category.querySelectorAll('.admin-command-link:not([style*="display: none"])');
+                if (visibleOrDisabled.length > 0) {
+                    category.style.display = '';
+                    category.classList.add('admin-category--open');
+                }
+            });
+        }
     });
+    
+    // Initial filter based on permissions (after QuickSiteAdmin loads permissions)
+    setTimeout(() => {
+        if (QuickSiteAdmin.permissions.loaded && !QuickSiteAdmin.permissions.isSuperAdmin) {
+            QuickSiteAdmin.filterByPermissions();
+        }
+    }, 500);
 });
 </script>
 

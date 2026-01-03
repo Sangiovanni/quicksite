@@ -52,6 +52,43 @@ if (!is_valid_relative_path($relative_path_input, 255, 5, false)) {
         ->send();
 }
 
+// Validate: check for reserved/conflicting folder names
+// Get all path segments to check each one
+$path_segments = explode('/', str_replace('\\', '/', $relative_path_input));
+
+// Reserved names that could cause conflicts or issues
+$reserved_names = [
+    // Project structure conflicts
+    'public',           // Would conflict with public folder
+    // Development folders
+    '.git', '.svn', '.hg',
+    '.venv', 'venv', 'env',
+    'node_modules', 'vendor',
+    '__pycache__', '.cache',
+    // Windows reserved names (case-insensitive)
+    'con', 'prn', 'aux', 'nul',
+    'com1', 'com2', 'com3', 'com4', 'com5', 'com6', 'com7', 'com8', 'com9',
+    'lpt1', 'lpt2', 'lpt3', 'lpt4', 'lpt5', 'lpt6', 'lpt7', 'lpt8', 'lpt9',
+    // Special directories
+    '.', '..'
+];
+
+foreach ($path_segments as $segment) {
+    $segment_lower = strtolower($segment);
+    // Also check without extension for Windows reserved (e.g., "con.txt" is also reserved)
+    $segment_base = strtolower(pathinfo($segment, PATHINFO_FILENAME));
+    
+    if (in_array($segment_lower, $reserved_names) || in_array($segment_base, array_slice($reserved_names, -13))) {
+        ApiResponse::create(400, 'validation.reserved_name')
+            ->withMessage("Path contains a reserved or conflicting folder name: '$segment'")
+            ->withErrors([
+                ['field' => 'destination', 'segment' => $segment],
+                ['reserved_names' => ['public', '.git', '.venv', 'node_modules', 'vendor', 'Windows reserved names (CON, PRN, AUX, NUL, COM1-9, LPT1-9)']]
+            ])
+            ->send();
+    }
+}
+
 // Define Source and Destination paths
 $template_source_path = SERVER_ROOT . DIRECTORY_SEPARATOR . SECURE_FOLDER_NAME;
 $target_destination_path = SERVER_ROOT . DIRECTORY_SEPARATOR . $relative_path_input;
@@ -108,7 +145,9 @@ if ($parent_dir !== SERVER_ROOT && !is_dir($parent_dir)) {
 }
 
 // Use the recursive move function (still inside lock)
-if (!recursive_move_template($template_source_path, $target_destination_path, $relative_path_input)) {
+// Pass empty string for exclude_folder_name since source and destination are siblings
+// (the exclusion is only needed for setPublicSpace where dest can be inside source)
+if (!recursive_move_template($template_source_path, $target_destination_path, '')) {
     releaseLock($lock);
     
     ApiResponse::create(500, 'server.file_write_failed')

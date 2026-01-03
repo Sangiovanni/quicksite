@@ -1588,6 +1588,33 @@ document.addEventListener('DOMContentLoaded', async function() {
     renderSpecs();
 });
 
+// Required commands for AI specs (minimum requirements)
+// Specs need at least editStructure for most operations
+const AI_SPEC_REQUIRED_COMMANDS = {
+    'create-landing': ['addRoute', 'editStructure', 'setTranslationKeys'],
+    'create-website': ['addRoute', 'editStructure', 'setTranslationKeys'],
+    'add-page': ['addRoute', 'editStructure'],
+    'add-section': ['editStructure'],
+    'add-language': ['addLang', 'setTranslationKeys'],
+    'translate-language': ['setTranslationKeys'],
+    'global-design': ['setRootVariables', 'editStyles'],
+    'restyle': ['editStyles', 'setStyleRule'],
+    'rename-site': ['editTitle', 'setTranslationKeys'],
+    'change-favicon': ['editFavicon'],
+    'optimize-assets': ['listAssets', 'deleteAsset'],
+    'build-deploy': ['build', 'deployBuild'],
+    'default': ['editStructure']  // Fallback for unlisted specs
+};
+
+// Check if user has permission for a spec
+function hasSpecPermission(specId) {
+    // Superadmin always has access
+    if (QuickSiteAdmin.permissions.isSuperAdmin) return true;
+    
+    const required = AI_SPEC_REQUIRED_COMMANDS[specId] || AI_SPEC_REQUIRED_COMMANDS['default'];
+    return required.every(cmd => QuickSiteAdmin.permissions.commands.includes(cmd));
+}
+
 // Render all spec cards
 function renderSpecs() {
     for (const [section, specs] of Object.entries(aiSpecs)) {
@@ -1600,13 +1627,22 @@ function renderSpecs() {
         
         filteredSpecs.forEach(spec => {
             const card = createSpecCard(spec);
+            
+            // Check permission
+            if (!hasSpecPermission(spec.id)) {
+                card.classList.add('admin-hidden-permission');
+            }
+            
             container.appendChild(card);
         });
+        
+        // Count visible specs (excluding hidden by permission)
+        const visibleCount = filteredSpecs.filter(spec => hasSpecPermission(spec.id)).length;
         
         // Show/hide section based on whether it has visible specs
         const sectionEl = container.closest('.admin-ai-section');
         if (sectionEl) {
-            sectionEl.dataset.visible = filteredSpecs.length > 0 ? 'true' : 'false';
+            sectionEl.dataset.visible = visibleCount > 0 ? 'true' : 'false';
         }
     }
 }

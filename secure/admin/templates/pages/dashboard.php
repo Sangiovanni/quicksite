@@ -617,8 +617,9 @@ function renderRouteTree(tree, lang, depth = 0) {
             const routePath = route.path;
             
             if (hasChildren) {
-                // Node with children - make it expandable
-                html += `<div class="sitemap__tree-node sitemap__tree-node--open" style="--depth: ${depth}">
+                // Node with children - make it expandable (collapsed by default, expanded at depth 0)
+                const isExpanded = depth === 0;
+                html += `<div class="sitemap__tree-node${isExpanded ? ' sitemap__tree-node--open' : ''}" style="--depth: ${depth}">
                     <div class="sitemap__tree-header">
                         <button class="sitemap__tree-toggle" type="button" aria-label="Toggle">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">

@@ -1500,3 +1500,122 @@ code{
 .admin-quick-actions {
     max-width: 700px;
 }
+/* =============================================================================
+   PERMISSION-BASED VISIBILITY
+   ============================================================================= */
+/* Hidden by default when user lacks permission */
+.admin-hidden-permission {
+    display: none !important;
+}
+
+/* Disabled state for restricted commands (shown in search with ≤3 results) */
+.admin-disabled-permission {
+    opacity: 0.5;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.admin-disabled-permission::after {
+    content: '🔒';
+    margin-left: var(--space-sm);
+    font-size: var(--font-size-xs);
+}
+
+/* Permission indicator badge */
+.admin-permission-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    border-radius: var(--radius-sm);
+    background: var(--admin-surface);
+    color: var(--admin-text-muted);
+}
+
+.admin-permission-badge--superadmin {
+    background: rgba(139, 92, 246, 0.2);
+    color: #a78bfa;
+}
+
+.admin-permission-badge--admin {
+    background: rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
+}
+
+.admin-permission-badge--limited {
+    background: rgba(234, 179, 8, 0.2);
+    color: #fde047;
+}
+
+/* =============================================================================
+   USER BADGE (Header)
+   ============================================================================= */
+.admin-user-badge {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+}
+
+.admin-user-badge__icon {
+    width: 16px;
+    height: 16px;
+    color: var(--admin-text-muted);
+}
+
+.admin-user-badge__name {
+    color: var(--admin-text);
+    font-weight: var(--font-weight-medium);
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-user-badge__role {
+    padding: 2px 6px;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-radius: var(--radius-sm);
+    background: var(--admin-primary);
+    color: var(--admin-primary-text);
+}
+
+/* Role-specific colors */
+.admin-user-badge__role[data-role="*"] {
+    background: linear-gradient(135deg, #8b5cf6, #ec4899);
+    color: white;
+}
+
+.admin-user-badge__role[data-role="admin"] {
+    background: #3b82f6;
+    color: white;
+}
+
+.admin-user-badge__role[data-role="developer"] {
+    background: #10b981;
+    color: white;
+}
+
+.admin-user-badge__role[data-role="designer"] {
+    background: #f59e0b;
+    color: white;
+}
+
+.admin-user-badge__role[data-role="editor"] {
+    background: #6366f1;
+    color: white;
+}
+
+.admin-user-badge__role[data-role="viewer"] {
+    background: #6b7280;
+    color: white;
+}

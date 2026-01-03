@@ -1980,7 +1980,7 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'generateToken' => [
-        'description' => 'Creates a new API authentication token with specified permissions. Requires admin permission.',
+        'description' => 'Creates a new API authentication token with specified role. Requires superadmin (*) permission.',
         'method' => 'POST',
         'parameters' => [
             'name' => [
@@ -1989,43 +1989,51 @@ $GLOBALS['__help_commands'] = [
                 'description' => 'Descriptive name for the token (1-100 characters)',
                 'example' => 'Collaborator Token'
             ],
-            'permissions' => [
-                'required' => false,
-                'type' => 'array',
-                'description' => 'Array of permissions for the token',
-                'default' => "['read']",
+            'role' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Role to assign to the token',
                 'valid_values' => [
-                    '*' => 'Full access to all commands',
-                    'read' => 'Read-only commands (get*, list*, validate*, help)',
-                    'write' => 'Write commands (edit*, add*, delete*, upload*)',
-                    'admin' => 'Administrative commands (set*, rename*, build, token management)',
-                    'command:name' => 'Access to a specific command (e.g., command:build)'
+                    '*' => 'Superadmin - full access to all commands including token/role management',
+                    'viewer' => 'Read-only access (26 commands)',
+                    'editor' => 'Content editing - structure, translations, assets (45 commands)',
+                    'designer' => 'Style editing - CSS, animations, visual elements (54 commands)',
+                    'developer' => 'Build and deploy access (59 commands)',
+                    'admin' => 'Full access except token/role management (72 commands)',
+                    '<custom>' => 'Any custom role name created via createRole'
                 ],
-                'example' => "['read', 'write'] or ['*'] or ['command:build', 'command:getRoutes']"
+                'example' => 'editor or designer or admin'
+            ],
+            'note' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Optional note about the token purpose',
+                'example' => 'For the design team'
             ]
         ],
-        'example_post' => 'POST /management/generateToken with body: {"name": "Collaborator Token", "permissions": ["read", "write"]}',
+        'example_post' => 'POST /management/generateToken with body: {"name": "Design Team", "role": "designer", "note": "For external designers"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
             'message' => 'Token generated successfully',
             'data' => [
                 'token' => 'tvt_a1b2c3d4e5f6... (52 characters)',
-                'name' => 'Collaborator Token',
-                'permissions' => ['read', 'write'],
-                'created' => '2025-12-11 10:30:00',
+                'name' => 'Design Team',
+                'role' => 'designer',
+                'command_count' => 54,
+                'created' => '2026-01-03 10:30:00',
                 'warning' => 'Save this token securely - it cannot be retrieved later!'
             ]
         ],
         'error_responses' => [
-            '400.validation.required' => 'name parameter is required',
-            '400.validation.invalid_type' => 'name must be string, permissions must be array',
+            '400.validation.required' => 'name and role parameters are required',
+            '400.validation.invalid_type' => 'name must be string',
             '400.validation.invalid_length' => 'name must be between 1 and 100 characters',
-            '400.validation.invalid_format' => 'Invalid permission value',
-            '403.auth.forbidden' => 'Insufficient permissions (requires admin)',
+            '400.validation.invalid_role' => 'Role does not exist',
+            '403.auth.forbidden' => 'Insufficient permissions (requires * superadmin)',
             '500.server.file_write_failed' => 'Failed to save new token'
         ],
-        'notes' => 'Token format: tvt_ prefix + 48 hex characters. Store the token immediately as it cannot be retrieved again. Use listTokens to see masked previews of existing tokens.'
+        'notes' => 'Token format: tvt_ prefix + 48 hex characters. Store the token immediately as it cannot be retrieved again. Use listTokens to see masked previews of existing tokens. Use listRoles to see available roles.'
     ],
     
     'listTokens' => [
@@ -2781,6 +2789,195 @@ $GLOBALS['__help_commands'] = [
             '500.server.delete_failed' => 'Failed to delete some export files'
         ],
         'notes' => 'Deletes all .zip files in secure/exports/ folder. Does not affect project data or backups.'
+    ],
+
+    // ==========================================
+    // ROLE MANAGEMENT COMMANDS
+    // ==========================================
+    
+    'listRoles' => [
+        'description' => 'Lists all available roles in the system. Superadmin (*) users see full command lists; other users see names and descriptions only.',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/listRoles',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Roles retrieved successfully',
+            'data' => [
+                'roles' => [
+                    'viewer' => [
+                        'description' => 'Read-only access for viewing content and structure',
+                        'builtin' => true,
+                        'command_count' => 26,
+                        'commands' => ['getRoutes', 'getStructure', '...'] // Only for * users
+                    ],
+                    'editor' => [
+                        'description' => 'Content editing including structure, translations, and assets',
+                        'builtin' => true,
+                        'command_count' => 45
+                    ],
+                    // ... other roles
+                ],
+                'total_roles' => 5
+            ]
+        ],
+        'notes' => 'For non-superadmin users, the commands array is omitted from each role. This prevents information disclosure about system capabilities. Custom roles created via createRole also appear here.'
+    ],
+    
+    'getMyPermissions' => [
+        'description' => 'Returns the current token\'s role and the full list of commands accessible with that role.',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/getMyPermissions',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Permissions retrieved successfully',
+            'data' => [
+                'role' => 'editor',
+                'role_description' => 'Content editing including structure, translations, and assets',
+                'commands' => [
+                    'getRoutes', 'getStructure', 'listProjects', 'listBackups',
+                    'editStructure', 'addRoute', 'deleteRoute', '...'
+                ],
+                'command_count' => 45,
+                'is_superadmin' => false
+            ]
+        ],
+        'notes' => 'Use this to determine what commands the current token can execute. Useful for building permission-aware UIs. Superadmin (*) users have is_superadmin=true and access to all 77 commands.'
+    ],
+    
+    'createRole' => [
+        'description' => 'Creates a new custom role with specified commands. Requires superadmin (*) permission.',
+        'method' => 'POST',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Role name (lowercase alphanumeric with underscores, 2-50 characters)',
+                'example' => 'content_manager'
+            ],
+            'description' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Human-readable description of the role',
+                'example' => 'Manages blog content and translations'
+            ],
+            'commands' => [
+                'required' => true,
+                'type' => 'array',
+                'description' => 'Array of command names this role can execute',
+                'example' => "['getRoutes', 'listProjects', 'editStructure', 'addRoute']"
+            ]
+        ],
+        'example_post' => 'POST /management/createRole with body: {"name": "content_manager", "description": "Manages blog content", "commands": ["getRoutes", "editStructure", "addRoute"]}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Role created successfully',
+            'data' => [
+                'name' => 'content_manager',
+                'description' => 'Manages blog content',
+                'builtin' => false,
+                'command_count' => 3,
+                'commands' => ['getRoutes', 'editStructure', 'addRoute']
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'name, description, and commands are required',
+            '400.validation.invalid_format' => 'Role name must be lowercase alphanumeric with underscores',
+            '400.validation.invalid_command' => 'One or more commands do not exist',
+            '400.validation.role_exists' => 'A role with this name already exists',
+            '403.auth.forbidden' => 'Requires superadmin (*) permission'
+        ],
+        'notes' => 'Custom roles are stored in secure/config/roles.php. Commands must be valid existing commands. Use listRoles to see all available roles. Restricted commands (generateToken, revokeToken, listTokens, createRole, editRole, deleteRole) can only be assigned to custom roles by superadmin users with * permission.'
+    ],
+    
+    'editRole' => [
+        'description' => 'Edits an existing role. Builtin roles can only have description changed. Requires superadmin (*) permission.',
+        'method' => 'PUT',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Name of the role to edit',
+                'example' => 'content_manager'
+            ],
+            'description' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'New description for the role',
+                'example' => 'Updated description for content management'
+            ],
+            'commands' => [
+                'required' => false,
+                'type' => 'array',
+                'description' => 'New array of commands (only for custom roles)',
+                'example' => "['getRoutes', 'editStructure', 'addRoute', 'deleteRoute']"
+            ]
+        ],
+        'example_put' => 'PUT /management/editRole with body: {"name": "content_manager", "description": "Updated description", "commands": ["getRoutes", "editStructure"]}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Role updated successfully',
+            'data' => [
+                'name' => 'content_manager',
+                'description' => 'Updated description',
+                'builtin' => false,
+                'command_count' => 2,
+                'commands' => ['getRoutes', 'editStructure'],
+                'changes' => ['description', 'commands']
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'name parameter is required',
+            '400.validation.no_changes' => 'No changes provided',
+            '400.validation.invalid_command' => 'One or more commands do not exist',
+            '400.validation.builtin_commands' => 'Cannot modify commands for builtin roles',
+            '404.role.not_found' => 'Role does not exist',
+            '403.auth.forbidden' => 'Requires superadmin (*) permission'
+        ],
+        'notes' => 'Builtin roles (viewer, editor, designer, developer, admin) can only have their description changed. Use createRole to add a custom role if you need different commands.'
+    ],
+    
+    'deleteRole' => [
+        'description' => 'Deletes a custom role. Builtin roles cannot be deleted. Requires superadmin (*) permission.',
+        'method' => 'DELETE',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Name of the role to delete',
+                'example' => 'content_manager'
+            ],
+            'force' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'If true, reassigns tokens using this role to viewer role',
+                'default' => false,
+                'example' => true
+            ]
+        ],
+        'example_delete' => 'DELETE /management/deleteRole with body: {"name": "content_manager", "force": true}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Role deleted successfully',
+            'data' => [
+                'name' => 'content_manager',
+                'tokens_reassigned' => 2 // Only if force=true
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'name parameter is required',
+            '400.validation.builtin_role' => 'Cannot delete builtin roles',
+            '400.validation.role_in_use' => 'Role is assigned to tokens. Use force=true to reassign to viewer',
+            '404.role.not_found' => 'Role does not exist',
+            '403.auth.forbidden' => 'Requires superadmin (*) permission'
+        ],
+        'notes' => 'Builtin roles (viewer, editor, designer, developer, admin) cannot be deleted. If tokens are using this role, deletion will fail unless force=true, which reassigns those tokens to the viewer role.'
     ]
 ];
 
@@ -2839,6 +3036,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'storage_monitoring' => ['getSizeInfo'],
                 'command_history' => ['getCommandHistory', 'clearCommandHistory'],
                 'authentication' => ['generateToken', 'listTokens', 'revokeToken'],
+                'role_management' => ['listRoles', 'getMyPermissions', 'createRole', 'editRole', 'deleteRole'],
                 'documentation' => ['help']
             ],
             'authentication' => [
@@ -2846,13 +3044,23 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'header' => 'Authorization: Bearer <your-token>',
                 'token_format' => 'tvt_<48 hex characters>',
                 'default_token' => 'tvt_dev_default_change_me_in_production (CHANGE IN PRODUCTION!)',
-                'permissions' => [
-                    '*' => 'Full access to all commands',
-                    'read' => 'get*, list*, validate*, help',
-                    'write' => 'set*, edit*, add*, delete*, upload*',
-                    'admin' => 'setPublicSpace, rename*, build, token management'
+                'role_system' => [
+                    '*' => 'Superadmin - full access to all 77 commands including token/role management',
+                    'viewer' => 'Read-only access (26 commands) - get*, list*, validate*, help',
+                    'editor' => 'Content editing (45 commands) - viewer + structure, translations, assets',
+                    'designer' => 'Style editing (54 commands) - editor + CSS, animations, visual elements',
+                    'developer' => 'Build access (59 commands) - designer + build, deploy, projects',
+                    'admin' => 'Full except tokens (72 commands) - developer + all except token/role management'
                 ],
-                'config_file' => 'secure/management/config/auth.php'
+                'endpoints' => [
+                    'listRoles' => 'View available roles (* sees commands, others see names only)',
+                    'getMyPermissions' => 'See your role and accessible commands',
+                    'createRole' => 'Create custom role (* only)',
+                    'editRole' => 'Edit role (* only, builtin description only)',
+                    'deleteRole' => 'Delete custom role (* only)'
+                ],
+                'config_file' => 'secure/management/config/auth.php',
+                'roles_config' => 'secure/config/roles.php'
             ],
             'cors' => [
                 'development_mode' => 'Allows localhost:* origins automatically',
@@ -2867,7 +3075,8 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'style_workflow' => '1) getStyles to retrieve current CSS, 2) editStyles to update (response includes backup for rollback).',
                 'css_granular_workflow' => '1) getRootVariables to see all CSS variables, 2) setRootVariables to update colors/spacing/etc, 3) listStyleRules to see all selectors, 4) getStyleRule to inspect specific rules, 5) setStyleRule to add/update rules, 6) deleteStyleRule to remove rules.',
                 'animation_workflow' => '1) getKeyframes to list all animations, 2) setKeyframes to add/update animations, 3) deleteKeyframes to remove animations.',
-                'token_workflow' => '1) listTokens to see existing tokens, 2) generateToken to create new ones, 3) revokeToken to delete old tokens.',
+                'token_workflow' => '1) listTokens to see existing tokens, 2) generateToken to create new ones with role, 3) revokeToken to delete old tokens.',
+                'role_workflow' => '1) listRoles to see available roles and commands, 2) getMyPermissions to check current access, 3) createRole to add custom roles, 4) editRole to modify roles, 5) deleteRole to remove custom roles.',
                 'alias_workflow' => '1) listAliases to see existing redirects, 2) createAlias to add URL redirects, 3) deleteAlias to remove redirects.',
                 'component_workflow' => '1) listComponents to see available reusable components, 2) getStructure/component/{name} to view details, 3) editStructure with type="component" to create/update/delete.',
                 'sitemap_workflow' => '1) getSiteMap for JSON data with route details and coverage, 2) getSiteMap/text to generate plain text sitemap.txt for SEO crawlers.',

@@ -1,2 +1,6 @@
 RewriteEngine On
+
+# Forward Authorization header (stripped by Apache's mod_rewrite by default)
+SetEnvIf Authorization .+ HTTP_AUTHORIZATION=$0
+
 FallbackResource /management/index.php
