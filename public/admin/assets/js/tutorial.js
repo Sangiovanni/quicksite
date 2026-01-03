@@ -708,9 +708,11 @@ class QuickSiteTutorial {
             
             // 1. Fetch and delete all routes except 404 and home
             const routesResponse = await this.executeApiCall('getRoutes', {});
-            if (routesResponse.ok && routesResponse.data?.routes) {
+            if (routesResponse.ok && routesResponse.data?.flat_routes) {
                 const protectedRoutes = ['404', 'home'];
-                for (const routeName of routesResponse.data.routes) {
+                // Sort by path length descending to delete children before parents
+                const sortedRoutes = [...routesResponse.data.flat_routes].sort((a, b) => b.length - a.length);
+                for (const routeName of sortedRoutes) {
                     if (!protectedRoutes.includes(routeName)) {
                         commands.push({ command: 'deleteRoute', params: { route: routeName } });
                     }

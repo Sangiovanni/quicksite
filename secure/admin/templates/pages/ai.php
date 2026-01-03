@@ -146,13 +146,13 @@ if (is_dir($componentsDir)) {
     }
 }
 
-// 5. Get all pages (routes)
+// 5. Get all pages (routes) - use flattenRoutes for nested structure
 $routesPath = PROJECT_PATH . '/routes.php';
 $aiPrecomputedData['routes'] = [];
 if (file_exists($routesPath)) {
     $routes = include $routesPath;
     if (is_array($routes)) {
-        $aiPrecomputedData['routes'] = array_keys($routes);
+        $aiPrecomputedData['routes'] = flattenRoutes($routes);
     }
 }
 
@@ -1726,8 +1726,8 @@ async function loadAvailablePages() {
     
     try {
         const result = await QuickSiteAdmin.apiRequest('getRoutes', 'GET');
-        if (result.ok && result.data?.data?.routes) {
-            availablePages = result.data.data.routes;
+        if (result.ok && result.data?.data?.flat_routes) {
+            availablePages = result.data.data.flat_routes;
             select.innerHTML = '<option value="">-- Select a page --</option>';
             availablePages.forEach(page => {
                 const option = document.createElement('option');

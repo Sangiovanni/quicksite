@@ -1,0 +1,9 @@
+{
+  "tag": "img",
+  "params": {
+    "src": "{{src}}",
+    "alt": "{{alt}}",
+    "class": "{{class}}"
+  },
+  "children": null
+}

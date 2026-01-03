@@ -40,8 +40,8 @@
     "dataRequirements": [
         {
             "id": "routes",
-            "command": "listRoutes",
-            "extract": "data.routes"
+            "command": "getRoutes",
+            "extract": "data.flat_routes"
         },
         {
             "id": "languages",

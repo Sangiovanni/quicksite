@@ -1249,18 +1249,21 @@ async function generateFreshStartCommands() {
     const summary = { routes: 0, assets: 0, translations: 0, structures: 0, components: 0 };
     
     try {
-        // 1. Fetch current routes (returns array of strings: ['home', 'about', ...])
+        // 1. Fetch current routes
+        // API returns: { routes: {nested object}, flat_routes: ["home", "about", "guides/installation", ...], count: N }
         const routesResponse = await executeApiCall('getRoutes', {});
-        if (routesResponse.ok && routesResponse.data?.routes) {
-            const routes = routesResponse.data.routes;
+        if (routesResponse.ok && routesResponse.data?.flat_routes) {
+            const routes = routesResponse.data.flat_routes;
             // Delete all routes except 404 and home (home is protected)
+            // Delete children first (longer paths) to avoid cascade issues
             const protectedRoutes = ['404', 'home'];
+            const routesToDelete = routes
+                .filter(routeName => !protectedRoutes.includes(routeName))
+                .sort((a, b) => b.length - a.length); // Longer paths first (children before parents)
             
-            for (const routeName of routes) {
-                if (!protectedRoutes.includes(routeName)) {
-                    commands.push({ command: 'deleteRoute', params: { route: routeName } });
-                    summary.routes++;
-                }
+            for (const routeName of routesToDelete) {
+                commands.push({ command: 'deleteRoute', params: { route: routeName } });
+                summary.routes++;
             }
         }
         

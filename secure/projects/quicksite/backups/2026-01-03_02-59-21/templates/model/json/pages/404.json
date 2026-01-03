@@ -1,0 +1,37 @@
+[
+  {
+    "tag": "section",
+    "params": {"class": "error-page page-404"},
+    "children": [
+      {
+        "tag": "div",
+        "params": {"class": "center"},
+        "children": [
+          {
+            "component": "img-dynamic",
+            "data": {
+              "src": "/assets/images/404.png",
+              "alt": "404 Illustration",
+              "class": "img-fluid mb-4"
+            }
+          }
+        ]
+      },
+      {
+        "tag": "h1",
+        "params": {"class": "display-4 mb-3"},
+        "children": [{"textKey": "404.pageNotFound"}]
+      },
+      {
+        "tag": "p",
+        "params": {"class": "lead text-muted mb-4"},
+        "children": [{"textKey": "404.message"}]
+      },
+      {
+        "tag": "a",
+        "params": {"href": "/", "class": "btn btn-primary"},
+        "children": [{"textKey": "404.backHome"}]
+      }
+    ]
+  }
+]

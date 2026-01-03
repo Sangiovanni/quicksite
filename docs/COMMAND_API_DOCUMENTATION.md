@@ -1,17 +1,21 @@
 # Quicksite - Command API Documentation
 
-> ⚠️ **NOTICE (December 2024)**: This static documentation is outdated. Several commands have been renamed for consistency:
+> ⚠️ **NOTICE (January 2025)**: This static documentation is **OUTDATED**. The API now has **72 commands** (this doc only covers ~20 legacy commands).
+>
+> **Key changes since this doc was written:**
 > - `movePublicRoot` → `setPublicSpace`
 > - `moveSecureRoot` → `renameSecureFolder`  
 > - `changeFavicon` → `editFavicon`
 > - `modifyTitle` → `editTitle`
 > - `removeLang` → `deleteLang`
-> - **New**: `renamePublicFolder`
+> - `editTranslation` → `setTranslationKeys` (merged with delete)
+> - **New commands**: `renamePublicFolder`, `getSiteMap`, `checkStructureMulti`, `backupProject`, `listBackups`, `restoreBackup`, `deleteBackup`, `getSizeInfo`, `clearExports`, and many more
 >
-> **For up-to-date documentation, use the live API:**
+> **👉 For accurate, up-to-date documentation, use the live API:**
 > ```bash
 > curl -H "Authorization: Bearer your_token" http://yoursite.local/management/help
 > ```
+> The `/management/help` endpoint provides real-time documentation with all current command names, parameters, examples, and validation rules.
 
 Complete reference for all management commands with parameters, validation rules, and responses.
 

@@ -2,8 +2,16 @@
 /**
  * exportProject Command
  * 
- * Exports a project as a downloadable ZIP file.
- * By default streams directly to browser. Use save=true to store in exports folder.
+ * Exports a project as a downloadable ZIP file with secure JSON-only format.
+ * PHP files are NOT exported - they will be rebuilt on import from JSON structures.
+ * 
+ * Export format v2.0:
+ * - config.json (sanitized from config.php)
+ * - routes.json (from routes.php)
+ * - templates/model/json/ (JSON structures only)
+ * - translate/*.json
+ * - data/*.json
+ * - public/assets/, public/style/, public/build/
  * 
  * @method GET
  * @route /management/exportProject
@@ -17,6 +25,16 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+
+// Allowed keys in config.json export (security: no arbitrary PHP execution)
+const EXPORT_ALLOWED_CONFIG_KEYS = [
+    'SITE_NAME',
+    'LANGUAGES_SUPPORTED',
+    'DEFAULT_LANGUAGE',
+    'MULTILINGUAL_SUPPORT',
+    'TITLE',
+    'FAVICON'
+];
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -73,14 +91,43 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
             ->withData(['error_code' => $result]);
     }
     
-    // Add project files to ZIP
+    // Add project files to ZIP (secure JSON-only format)
     $stats = ['files' => 0, 'directories' => 0, 'total_size' => 0];
     
     try {
-        // Add project files
-        addDirectoryToZip($zip, $projectPath, $projectName, $stats, $includePublic ? null : ['public']);
+        // 1. Export config.php as config.json (sanitized)
+        exportConfigAsJson($zip, $projectPath, $projectName, $stats);
         
-        // Add metadata file
+        // 2. Export routes.php as routes.json
+        exportRoutesAsJson($zip, $projectPath, $projectName, $stats);
+        
+        // 3. Export templates/model/json/ (JSON structures only - no PHP!)
+        $jsonModelPath = $projectPath . '/templates/model/json';
+        if (is_dir($jsonModelPath)) {
+            addDirectoryToZip($zip, $jsonModelPath, $projectName . '/templates/model/json', $stats);
+        }
+        
+        // 4. Export translate/*.json
+        $translatePath = $projectPath . '/translate';
+        if (is_dir($translatePath)) {
+            addJsonFilesOnly($zip, $translatePath, $projectName . '/translate', $stats);
+        }
+        
+        // 5. Export data/*.json
+        $dataPath = $projectPath . '/data';
+        if (is_dir($dataPath)) {
+            addJsonFilesOnly($zip, $dataPath, $projectName . '/data', $stats);
+        }
+        
+        // 6. Export public/ (assets only, no PHP)
+        if ($includePublic) {
+            $publicPath = $projectPath . '/public';
+            if (is_dir($publicPath)) {
+                addPublicAssetsToZip($zip, $publicPath, $projectName . '/public', $stats);
+            }
+        }
+        
+        // 7. Add metadata file
         $metadata = createExportMetadata($projectName, $projectPath, $stats);
         $zip->addFromString($projectName . '/export_info.json', json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         $stats['files']++;
@@ -134,7 +181,9 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
                 'directories_count' => $stats['directories'],
                 'original_size' => formatExportBytes($stats['total_size']),
                 'download_url' => '/management/downloadExport?file=' . urlencode($zipFileName),
-                'expires' => date('Y-m-d H:i:s', time() + 86400) // 24 hours
+                'expires' => date('Y-m-d H:i:s', time() + 86400), // 24 hours
+                'format' => 'v2.0-secure',
+                'note' => 'Secure format: PHP files excluded, will be rebuilt on import'
             ]);
     }
     
@@ -144,24 +193,63 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
 }
 
 /**
- * Recursively add directory contents to ZIP
- * 
- * @param ZipArchive $zip ZIP archive instance
- * @param string $dir Directory to add
- * @param string $zipBase Base path in ZIP
- * @param array &$stats Stats counter
- * @param array|null $exclude Folders to exclude
+ * Export config.php as sanitized config.json
  */
-function addDirectoryToZip(ZipArchive $zip, string $dir, string $zipBase, array &$stats, ?array $exclude = null): void {
+function exportConfigAsJson(ZipArchive $zip, string $projectPath, string $projectName, array &$stats): void {
+    $configFile = $projectPath . '/config.php';
+    
+    if (!file_exists($configFile)) {
+        // Create minimal default config
+        $configJson = [
+            'SITE_NAME' => $projectName,
+            'LANGUAGES_SUPPORTED' => ['en'],
+            'DEFAULT_LANGUAGE' => 'en',
+            'MULTILINGUAL_SUPPORT' => false
+        ];
+    } else {
+        $config = require $configFile;
+        
+        // Filter to allowed keys only (security)
+        $configJson = [];
+        foreach (EXPORT_ALLOWED_CONFIG_KEYS as $key) {
+            if (isset($config[$key])) {
+                $configJson[$key] = $config[$key];
+            }
+        }
+    }
+    
+    $content = json_encode($configJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    $zip->addFromString($projectName . '/config.json', $content);
+    $stats['files']++;
+    $stats['total_size'] += strlen($content);
+}
+
+/**
+ * Export routes.php as routes.json
+ */
+function exportRoutesAsJson(ZipArchive $zip, string $projectPath, string $projectName, array &$stats): void {
+    $routesFile = $projectPath . '/routes.php';
+    
+    if (!file_exists($routesFile)) {
+        $routes = ['home' => []];
+    } else {
+        $routes = require $routesFile;
+    }
+    
+    $content = json_encode($routes, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    $zip->addFromString($projectName . '/routes.json', $content);
+    $stats['files']++;
+    $stats['total_size'] += strlen($content);
+}
+
+/**
+ * Add only JSON files from a directory (no PHP)
+ */
+function addJsonFilesOnly(ZipArchive $zip, string $dir, string $zipBase, array &$stats): void {
     $items = scandir($dir);
     
     foreach ($items as $item) {
         if ($item === '.' || $item === '..') {
-            continue;
-        }
-        
-        // Check exclusions
-        if ($exclude !== null && in_array($item, $exclude)) {
             continue;
         }
         
@@ -171,7 +259,91 @@ function addDirectoryToZip(ZipArchive $zip, string $dir, string $zipBase, array 
         if (is_dir($path)) {
             $zip->addEmptyDir($zipPath);
             $stats['directories']++;
-            addDirectoryToZip($zip, $path, $zipPath, $stats, null);
+            addJsonFilesOnly($zip, $path, $zipPath, $stats);
+        } elseif (pathinfo($item, PATHINFO_EXTENSION) === 'json') {
+            // Only JSON files
+            $zip->addFile($path, $zipPath);
+            $stats['files']++;
+            $stats['total_size'] += filesize($path);
+        }
+        // Skip non-JSON files (especially .php)
+    }
+}
+
+/**
+ * Add public assets to ZIP (images, CSS, JS - no PHP)
+ */
+function addPublicAssetsToZip(ZipArchive $zip, string $dir, string $zipBase, array &$stats): void {
+    // Allowed folders in public/
+    $allowedFolders = ['assets', 'style', 'build'];
+    
+    foreach ($allowedFolders as $folder) {
+        $folderPath = $dir . '/' . $folder;
+        if (is_dir($folderPath)) {
+            addSafeFilesToZip($zip, $folderPath, $zipBase . '/' . $folder, $stats);
+        }
+    }
+}
+
+/**
+ * Add files to ZIP excluding dangerous extensions
+ */
+function addSafeFilesToZip(ZipArchive $zip, string $dir, string $zipBase, array &$stats): void {
+    // Dangerous extensions that could execute code
+    $dangerousExtensions = ['php', 'phtml', 'php3', 'php4', 'php5', 'php7', 'phps', 'phar', 'htaccess'];
+    
+    $items = scandir($dir);
+    
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+        
+        $path = $dir . '/' . $item;
+        $zipPath = $zipBase . '/' . $item;
+        
+        if (is_dir($path)) {
+            $zip->addEmptyDir($zipPath);
+            $stats['directories']++;
+            addSafeFilesToZip($zip, $path, $zipPath, $stats);
+        } else {
+            $ext = strtolower(pathinfo($item, PATHINFO_EXTENSION));
+            
+            // Skip dangerous file types
+            if (in_array($ext, $dangerousExtensions)) {
+                continue;
+            }
+            
+            $zip->addFile($path, $zipPath);
+            $stats['files']++;
+            $stats['total_size'] += filesize($path);
+        }
+    }
+}
+
+/**
+ * Recursively add directory contents to ZIP (used for templates/model/json)
+ * 
+ * @param ZipArchive $zip ZIP archive instance
+ * @param string $dir Directory to add
+ * @param string $zipBase Base path in ZIP
+ * @param array &$stats Stats counter
+ */
+function addDirectoryToZip(ZipArchive $zip, string $dir, string $zipBase, array &$stats): void {
+    $items = scandir($dir);
+    
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+        
+        $path = $dir . '/' . $item;
+        $zipPath = $zipBase . '/' . $item;
+        
+        if (is_dir($path)) {
+            $zip->addEmptyDir($zipPath);
+            $stats['directories']++;
+            addDirectoryToZip($zip, $path, $zipPath, $stats);
         } else {
             $zip->addFile($path, $zipPath);
             $stats['files']++;
@@ -191,12 +363,12 @@ function createExportMetadata(string $projectName, string $projectPath, array $s
         $config = require $configFile;
     }
     
-    // Count routes
+    // Count routes recursively
     $routesCount = 0;
     $routesFile = $projectPath . '/routes.php';
     if (file_exists($routesFile)) {
         $routes = require $routesFile;
-        $routesCount = count($routes);
+        $routesCount = countRoutesRecursive($routes);
     }
     
     // Count languages
@@ -212,10 +384,12 @@ function createExportMetadata(string $projectName, string $projectPath, array $s
     
     return [
         'export_info' => [
-            'version' => '1.0',
+            'version' => '2.0',
+            'format' => 'secure-json-only',
             'exported_at' => date('Y-m-d H:i:s'),
             'exported_by' => 'QuickSite Engine',
-            'php_version' => PHP_VERSION
+            'php_version' => PHP_VERSION,
+            'note' => 'PHP files excluded for security. They will be rebuilt on import from JSON structures.'
         ],
         'project' => [
             'name' => $projectName,
@@ -230,6 +404,20 @@ function createExportMetadata(string $projectName, string $projectPath, array $s
             'total_size_bytes' => $stats['total_size']
         ]
     ];
+}
+
+/**
+ * Count routes recursively in nested structure
+ */
+function countRoutesRecursive(array $routes): int {
+    $count = 0;
+    foreach ($routes as $name => $children) {
+        $count++; // Count this route
+        if (is_array($children) && !empty($children)) {
+            $count += countRoutesRecursive($children); // Count children
+        }
+    }
+    return $count;
 }
 
 /**

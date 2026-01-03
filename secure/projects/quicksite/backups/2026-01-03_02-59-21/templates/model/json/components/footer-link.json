@@ -1,0 +1,19 @@
+{
+  "tag": "div",
+  "params": {},
+  "children": [
+    {
+      "tag": "a",
+      "params": {
+        "href": "{{href}}",
+        "class": "footer-option",
+        "target": "{{target}}"
+      },
+      "children": [
+        {
+          "textKey": "{{label}}"
+        }
+      ]
+    }
+  ]
+}

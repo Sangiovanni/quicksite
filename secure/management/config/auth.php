@@ -66,7 +66,10 @@ return array (
     array (
       0 => 'GET',
       1 => 'POST',
-      2 => 'OPTIONS',
+      2 => 'PUT',
+      3 => 'PATCH',
+      4 => 'DELETE',
+      5 => 'OPTIONS',
     ),
     'allowed_headers' => 
     array (

@@ -1,9 +1,15 @@
 <?php
 /**
- * importProject Command
+ * importProject Command (Secure Version)
  * 
- * Imports a project from an uploaded ZIP file.
- * Can be called via API or internally from admin panel.
+ * Imports a project from an uploaded ZIP file with secure rebuild approach.
+ * PHP files in the ZIP are IGNORED - all PHP is rebuilt from JSON structures.
+ * 
+ * Security measures:
+ * - PHP files in ZIP are skipped (logged as warnings)
+ * - config.php rebuilt from validated config.json
+ * - routes.php rebuilt from validated routes.json
+ * - All page/component PHP rebuilt from JSON using JsonToPhpCompiler
  * 
  * @method POST
  * @route /management/importProject
@@ -18,6 +24,20 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/JsonToPhpCompiler.php';
+
+// Allowed keys in config.json import (security: whitelist only)
+const IMPORT_ALLOWED_CONFIG_KEYS = [
+    'SITE_NAME',
+    'LANGUAGES_SUPPORTED',
+    'DEFAULT_LANGUAGE',
+    'MULTILINGUAL_SUPPORT',
+    'TITLE',
+    'FAVICON'
+];
+
+// Dangerous file extensions to skip
+const DANGEROUS_EXTENSIONS = ['php', 'phtml', 'php3', 'php4', 'php5', 'php7', 'phps', 'phar'];
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -27,6 +47,9 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
  * @return ApiResponse
  */
 function __command_importProject(array $params = [], array $urlParams = []): ApiResponse {
+    // Merge query parameters for POST with multipart (query params in URL)
+    $params = array_merge($_GET, $_POST, $params);
+    
     // Check ZipArchive is available
     if (!class_exists('ZipArchive')) {
         return ApiResponse::create(500, 'server.missing_extension')
@@ -94,7 +117,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         $zip->close();
         return ApiResponse::create(400, 'validation.invalid_structure')
             ->withMessage('Invalid project structure in ZIP')
-            ->withErrors(['structure' => 'ZIP must contain a project folder with config.php or routes.php']);
+            ->withErrors(['structure' => 'ZIP must contain a project folder with config.json, routes.json, or templates/model/json/']);
     }
     
     // Determine project name
@@ -134,16 +157,36 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         deleteImportDirectory($projectPath);
     }
     
-    // Create project directory
+    // Create project directory structure
     if (!mkdir($projectPath, 0755, true)) {
         $zip->close();
         return ApiResponse::create(500, 'server.directory_create_failed')
             ->withMessage('Failed to create project directory');
     }
     
-    // Extract files
-    $stats = ['files' => 0, 'directories' => 0, 'total_size' => 0];
-    $extractResult = extractProjectFromZip($zip, $projectFolder['prefix'], $projectPath, $stats);
+    // Create required subdirectories
+    $requiredDirs = [
+        '/templates',
+        '/templates/pages',
+        '/templates/components',
+        '/templates/model',
+        '/templates/model/json',
+        '/templates/model/json/pages',
+        '/templates/model/json/components',
+        '/translate',
+        '/data',
+        '/public',
+        '/public/assets',
+        '/public/style',
+        '/public/build'
+    ];
+    foreach ($requiredDirs as $dir) {
+        @mkdir($projectPath . $dir, 0755, true);
+    }
+    
+    // Extract files (secure: skip PHP, track warnings)
+    $stats = ['files' => 0, 'directories' => 0, 'total_size' => 0, 'skipped_php' => []];
+    $extractResult = extractProjectFromZipSecure($zip, $projectFolder['prefix'], $projectPath, $stats);
     
     $zip->close();
     
@@ -154,7 +197,17 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
             ->withData(['error' => $extractResult['error']]);
     }
     
-    // Validate extracted project has required files
+    // Rebuild PHP files from JSON (secure approach)
+    $rebuildResult = rebuildPhpFromJson($projectPath);
+    
+    if (!$rebuildResult['success']) {
+        deleteImportDirectory($projectPath);
+        return ApiResponse::create(500, 'server.rebuild_failed')
+            ->withMessage('Failed to rebuild PHP files from JSON')
+            ->withData(['error' => $rebuildResult['error']]);
+    }
+    
+    // Validate imported project has required files
     $validation = validateImportedProject($projectPath);
     
     if (!$validation['valid']) {
@@ -178,7 +231,14 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         'site_name' => $projectInfo['site_name'],
         'routes_count' => $projectInfo['routes_count'],
         'languages' => $projectInfo['languages'],
-        'switched_to' => false
+        'switched_to' => false,
+        'security' => [
+            'format' => 'v2.0-secure',
+            'php_rebuilt_from_json' => true,
+            'skipped_php_files' => count($stats['skipped_php']),
+            'skipped_files' => $stats['skipped_php']
+        ],
+        'rebuild_stats' => $rebuildResult['stats'] ?? []
     ];
     
     // Switch to project if requested
@@ -192,31 +252,49 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
     }
     
     return ApiResponse::create(201, 'resource.imported')
-        ->withMessage("Project '$projectName' imported successfully")
+        ->withMessage("Project '$projectName' imported successfully (secure rebuild)")
         ->withData($result);
 }
 
 /**
- * Find project folder in ZIP archive
+ * Find project folder in ZIP archive (v2.0 format)
  */
 function findProjectFolderInZip(ZipArchive $zip): ?array {
-    $candidates = [];
-    
-    // Look for config.php or routes.php at various levels
+    // Look for v2.0 format indicators: config.json, routes.json, or templates/model/json/
     for ($i = 0; $i < $zip->numFiles; $i++) {
         $name = $zip->getNameIndex($i);
         $parts = explode('/', $name);
         
-        // Check for project indicators
         $filename = basename($name);
-        if ($filename === 'config.php' || $filename === 'routes.php') {
-            // Determine project folder
+        
+        // Check for v2.0 JSON format
+        if ($filename === 'config.json' || $filename === 'routes.json') {
             if (count($parts) === 1) {
-                // Root level - project files at root
-                return ['name' => 'imported_project', 'prefix' => ''];
+                return ['name' => 'imported_project', 'prefix' => '', 'format' => 'v2.0'];
             } elseif (count($parts) === 2) {
-                // One level deep - standard structure
-                return ['name' => $parts[0], 'prefix' => $parts[0] . '/'];
+                return ['name' => $parts[0], 'prefix' => $parts[0] . '/', 'format' => 'v2.0'];
+            }
+        }
+        
+        // Check for templates/model/json/ structure
+        if (strpos($name, 'templates/model/json/') !== false) {
+            // Extract project folder name from path
+            $jsonPos = strpos($name, '/templates/model/json/');
+            if ($jsonPos > 0) {
+                $projectFolder = substr($name, 0, $jsonPos);
+                $firstSlash = strpos($projectFolder, '/');
+                if ($firstSlash === false) {
+                    return ['name' => $projectFolder, 'prefix' => $projectFolder . '/', 'format' => 'v2.0'];
+                }
+            }
+        }
+        
+        // Legacy: check for config.php or routes.php (v1.0 format - still supported)
+        if ($filename === 'config.php' || $filename === 'routes.php') {
+            if (count($parts) === 1) {
+                return ['name' => 'imported_project', 'prefix' => '', 'format' => 'v1.0'];
+            } elseif (count($parts) === 2) {
+                return ['name' => $parts[0], 'prefix' => $parts[0] . '/', 'format' => 'v1.0'];
             }
         }
     }
@@ -225,9 +303,9 @@ function findProjectFolderInZip(ZipArchive $zip): ?array {
 }
 
 /**
- * Extract project from ZIP
+ * Extract project from ZIP (secure: skip PHP files)
  */
-function extractProjectFromZip(ZipArchive $zip, string $prefix, string $destPath, array &$stats): array {
+function extractProjectFromZipSecure(ZipArchive $zip, string $prefix, string $destPath, array &$stats): array {
     $prefixLen = strlen($prefix);
     
     for ($i = 0; $i < $zip->numFiles; $i++) {
@@ -248,6 +326,21 @@ function extractProjectFromZip(ZipArchive $zip, string $prefix, string $destPath
         
         // Skip export_info.json (metadata file)
         if ($relativePath === 'export_info.json') {
+            continue;
+        }
+        
+        // Get file extension
+        $ext = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
+        
+        // SECURITY: Skip PHP and other dangerous files
+        if (in_array($ext, DANGEROUS_EXTENSIONS)) {
+            $stats['skipped_php'][] = $relativePath;
+            continue;
+        }
+        
+        // Skip .htaccess files
+        if (basename($relativePath) === '.htaccess') {
+            $stats['skipped_php'][] = $relativePath . ' (htaccess)';
             continue;
         }
         
@@ -285,17 +378,337 @@ function extractProjectFromZip(ZipArchive $zip, string $prefix, string $destPath
 }
 
 /**
+ * Rebuild PHP files from JSON structures
+ */
+function rebuildPhpFromJson(string $projectPath): array {
+    $stats = [
+        'config_rebuilt' => false,
+        'routes_rebuilt' => false,
+        'pages_rebuilt' => 0,
+        'components_rebuilt' => 0,
+        'menu_rebuilt' => false,
+        'footer_rebuilt' => false
+    ];
+    
+    // 1. Rebuild config.php from config.json
+    $configJsonPath = $projectPath . '/config.json';
+    if (file_exists($configJsonPath)) {
+        $configJson = json_decode(file_get_contents($configJsonPath), true);
+        if ($configJson === null) {
+            return ['success' => false, 'error' => 'Invalid config.json format'];
+        }
+        
+        // Validate and filter config keys
+        $validConfig = [];
+        foreach (IMPORT_ALLOWED_CONFIG_KEYS as $key) {
+            if (isset($configJson[$key])) {
+                $validConfig[$key] = $configJson[$key];
+            }
+        }
+        
+        // Set defaults for required keys
+        if (!isset($validConfig['SITE_NAME'])) {
+            $validConfig['SITE_NAME'] = basename($projectPath);
+        }
+        if (!isset($validConfig['LANGUAGES_SUPPORTED'])) {
+            $validConfig['LANGUAGES_SUPPORTED'] = ['en'];
+        }
+        if (!isset($validConfig['DEFAULT_LANGUAGE'])) {
+            $validConfig['DEFAULT_LANGUAGE'] = 'en';
+        }
+        if (!isset($validConfig['MULTILINGUAL_SUPPORT'])) {
+            $validConfig['MULTILINGUAL_SUPPORT'] = false;
+        }
+        
+        $configPhp = "<?php\n/**\n * Site Configuration\n * Rebuilt from JSON on import: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($validConfig, true) . ";\n";
+        
+        if (file_put_contents($projectPath . '/config.php', $configPhp) === false) {
+            return ['success' => false, 'error' => 'Failed to write config.php'];
+        }
+        
+        $stats['config_rebuilt'] = true;
+        
+        // Remove config.json after successful rebuild
+        unlink($configJsonPath);
+    } else {
+        // Create default config if no config.json
+        $defaultConfig = [
+            'SITE_NAME' => basename($projectPath),
+            'LANGUAGES_SUPPORTED' => ['en'],
+            'DEFAULT_LANGUAGE' => 'en',
+            'MULTILINGUAL_SUPPORT' => false
+        ];
+        $configPhp = "<?php\n/**\n * Site Configuration (default)\n * Created on import: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($defaultConfig, true) . ";\n";
+        file_put_contents($projectPath . '/config.php', $configPhp);
+        $stats['config_rebuilt'] = true;
+    }
+    
+    // 2. Rebuild routes.php from routes.json
+    $routesJsonPath = $projectPath . '/routes.json';
+    if (file_exists($routesJsonPath)) {
+        $routesJson = json_decode(file_get_contents($routesJsonPath), true);
+        if ($routesJson === null) {
+            return ['success' => false, 'error' => 'Invalid routes.json format'];
+        }
+        
+        // Validate routes structure (should be nested array)
+        if (!is_array($routesJson)) {
+            return ['success' => false, 'error' => 'routes.json must be an array'];
+        }
+        
+        $routesPhp = "<?php\n/**\n * Route Definitions\n * Rebuilt from JSON on import: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($routesJson, true) . ";\n";
+        
+        if (file_put_contents($projectPath . '/routes.php', $routesPhp) === false) {
+            return ['success' => false, 'error' => 'Failed to write routes.php'];
+        }
+        
+        $stats['routes_rebuilt'] = true;
+        
+        // Remove routes.json after successful rebuild
+        unlink($routesJsonPath);
+    } else {
+        // Create default routes if no routes.json
+        $defaultRoutes = ['home' => []];
+        $routesPhp = "<?php\n/**\n * Route Definitions (default)\n * Created on import: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($defaultRoutes, true) . ";\n";
+        file_put_contents($projectPath . '/routes.php', $routesPhp);
+        $stats['routes_rebuilt'] = true;
+    }
+    
+    // 3. Rebuild page PHP files from JSON structures
+    $compiler = new JsonToPhpCompiler();
+    $pagesJsonDir = $projectPath . '/templates/model/json/pages';
+    
+    if (is_dir($pagesJsonDir)) {
+        $result = rebuildPagesFromJson($pagesJsonDir, $projectPath . '/templates/pages', $compiler, $stats);
+        if (!$result['success']) {
+            return $result;
+        }
+    }
+    
+    // 4. Rebuild component PHP files from JSON structures
+    $componentsJsonDir = $projectPath . '/templates/model/json/components';
+    
+    if (is_dir($componentsJsonDir)) {
+        $result = rebuildComponentsFromJson($componentsJsonDir, $projectPath . '/templates/components', $compiler, $stats);
+        if (!$result['success']) {
+            return $result;
+        }
+    }
+    
+    // 5. Rebuild menu.php from menu.json
+    $menuJsonPath = $projectPath . '/templates/model/json/menu.json';
+    if (file_exists($menuJsonPath)) {
+        $menuJson = json_decode(file_get_contents($menuJsonPath), true);
+        if ($menuJson !== null) {
+            $menuPhp = $compiler->compileMenuOrFooter($menuJson);
+            file_put_contents($projectPath . '/templates/menu.php', $menuPhp);
+            $stats['menu_rebuilt'] = true;
+        }
+    }
+    
+    // 6. Rebuild footer.php from footer.json
+    $footerJsonPath = $projectPath . '/templates/model/json/footer.json';
+    if (file_exists($footerJsonPath)) {
+        $footerJson = json_decode(file_get_contents($footerJsonPath), true);
+        if ($footerJson !== null) {
+            $footerPhp = $compiler->compileMenuOrFooter($footerJson);
+            file_put_contents($projectPath . '/templates/footer.php', $footerPhp);
+            $stats['footer_rebuilt'] = true;
+        }
+    }
+    
+    return ['success' => true, 'stats' => $stats];
+}
+
+/**
+ * Rebuild page PHP files from JSON directory (recursive for nested routes)
+ * 
+ * JSON structure: pages/home/home.json OR pages/404.json
+ * PHP structure:  pages/home/home.php, pages/404/404.php
+ * 
+ * Rule: If JSON is in folder matching its name (home/home.json), create same structure
+ *       If JSON is at root (404.json), create folder (404/404.php)
+ */
+function rebuildPagesFromJson(string $jsonDir, string $phpDir, JsonToPhpCompiler $compiler, array &$stats, string $prefix = ''): array {
+    $items = scandir($jsonDir);
+    
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+        
+        $jsonPath = $jsonDir . '/' . $item;
+        
+        if (is_dir($jsonPath)) {
+            // It's a directory - check if it contains a JSON file with same name
+            $expectedJsonFile = $item . '.json';
+            $hasMatchingJson = file_exists($jsonPath . '/' . $expectedJsonFile);
+            
+            // Calculate current route
+            $currentRoute = $prefix ? $prefix . '/' . $item : $item;
+            
+            // Create matching PHP directory
+            $subPhpDir = $phpDir . '/' . $item;
+            @mkdir($subPhpDir, 0755, true);
+            
+            // If this folder has a matching JSON file, compile it
+            if ($hasMatchingJson) {
+                $pageJsonFile = $jsonPath . '/' . $expectedJsonFile;
+                $pageJson = json_decode(file_get_contents($pageJsonFile), true);
+                if ($pageJson !== null) {
+                    $pagePhp = $compiler->compilePage($pageJson, $currentRoute);
+                    $phpPath = $subPhpDir . '/' . $item . '.php';
+                    
+                    if (file_put_contents($phpPath, $pagePhp) === false) {
+                        return ['success' => false, 'error' => "Failed to write: $item.php at $phpPath"];
+                    }
+                    $stats['pages_rebuilt']++;
+                }
+            }
+            
+            // Recurse for nested routes (but skip the already-processed matching JSON)
+            $result = rebuildPagesFromJsonSubdir($jsonPath, $subPhpDir, $compiler, $stats, $currentRoute, $expectedJsonFile);
+            if (!$result['success']) {
+                return $result;
+            }
+        } elseif (pathinfo($item, PATHINFO_EXTENSION) === 'json') {
+            // It's a JSON file at this level (not in a matching folder)
+            // Example: pages/404.json → pages/404/404.php
+            
+            $routeName = pathinfo($item, PATHINFO_FILENAME);
+            $currentRoute = $prefix ? $prefix . '/' . $routeName : $routeName;
+            
+            $pageJson = json_decode(file_get_contents($jsonPath), true);
+            if ($pageJson === null) {
+                return ['success' => false, 'error' => "Invalid JSON in: $currentRoute.json"];
+            }
+            
+            $pagePhp = $compiler->compilePage($pageJson, $currentRoute);
+            
+            // Create folder for this page
+            $pageDir = $phpDir . '/' . $routeName;
+            @mkdir($pageDir, 0755, true);
+            
+            $phpPath = $pageDir . '/' . $routeName . '.php';
+            if (file_put_contents($phpPath, $pagePhp) === false) {
+                return ['success' => false, 'error' => "Failed to write: $routeName.php"];
+            }
+            
+            $stats['pages_rebuilt']++;
+        }
+    }
+    
+    return ['success' => true];
+}
+
+/**
+ * Helper to recurse into subdirectories, skipping already-processed files
+ */
+function rebuildPagesFromJsonSubdir(string $jsonDir, string $phpDir, JsonToPhpCompiler $compiler, array &$stats, string $prefix, string $skipFile): array {
+    $items = scandir($jsonDir);
+    
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..' || $item === $skipFile) {
+            continue;
+        }
+        
+        $jsonPath = $jsonDir . '/' . $item;
+        
+        if (is_dir($jsonPath)) {
+            // Nested subdirectory
+            $subName = $item;
+            $currentRoute = $prefix . '/' . $subName;
+            $expectedJsonFile = $subName . '.json';
+            $hasMatchingJson = file_exists($jsonPath . '/' . $expectedJsonFile);
+            
+            $subPhpDir = $phpDir . '/' . $subName;
+            @mkdir($subPhpDir, 0755, true);
+            
+            if ($hasMatchingJson) {
+                $pageJsonFile = $jsonPath . '/' . $expectedJsonFile;
+                $pageJson = json_decode(file_get_contents($pageJsonFile), true);
+                if ($pageJson !== null) {
+                    $pagePhp = $compiler->compilePage($pageJson, $currentRoute);
+                    $phpPath = $subPhpDir . '/' . $subName . '.php';
+                    file_put_contents($phpPath, $pagePhp);
+                    $stats['pages_rebuilt']++;
+                }
+            }
+            
+            $result = rebuildPagesFromJsonSubdir($jsonPath, $subPhpDir, $compiler, $stats, $currentRoute, $expectedJsonFile);
+            if (!$result['success']) {
+                return $result;
+            }
+        } elseif (pathinfo($item, PATHINFO_EXTENSION) === 'json') {
+            // Loose JSON file in subdirectory
+            $routeName = pathinfo($item, PATHINFO_FILENAME);
+            $currentRoute = $prefix . '/' . $routeName;
+            
+            $pageJson = json_decode(file_get_contents($jsonPath), true);
+            if ($pageJson !== null) {
+                $pagePhp = $compiler->compilePage($pageJson, $currentRoute);
+                $phpPath = $phpDir . '/' . $routeName . '.php';
+                file_put_contents($phpPath, $pagePhp);
+                $stats['pages_rebuilt']++;
+            }
+        }
+    }
+    
+    return ['success' => true];
+}
+
+/**
+ * Rebuild component PHP files from JSON directory
+ */
+function rebuildComponentsFromJson(string $jsonDir, string $phpDir, JsonToPhpCompiler $compiler, array &$stats): array {
+    $items = scandir($jsonDir);
+    
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+        
+        $jsonPath = $jsonDir . '/' . $item;
+        
+        if (pathinfo($item, PATHINFO_EXTENSION) === 'json') {
+            // Compile JSON to PHP (components use compileMenuOrFooter style)
+            $componentJson = json_decode(file_get_contents($jsonPath), true);
+            if ($componentJson === null) {
+                continue; // Skip invalid JSON
+            }
+            
+            $componentName = pathinfo($item, PATHINFO_FILENAME);
+            $componentPhp = $compiler->compileMenuOrFooter($componentJson);
+            
+            $phpPath = $phpDir . '/' . $componentName . '.php';
+            if (file_put_contents($phpPath, $componentPhp) !== false) {
+                $stats['components_rebuilt']++;
+            }
+        }
+    }
+    
+    return ['success' => true];
+}
+
+/**
  * Validate imported project structure
  */
 function validateImportedProject(string $projectPath): array {
     $errors = [];
     
-    // Check for config.php or routes.php (at least one required)
-    $hasConfig = file_exists($projectPath . '/config.php');
-    $hasRoutes = file_exists($projectPath . '/routes.php');
+    // Check for config.php (should have been rebuilt)
+    if (!file_exists($projectPath . '/config.php')) {
+        $errors['config'] = 'config.php missing (rebuild failed)';
+    }
     
-    if (!$hasConfig && !$hasRoutes) {
-        $errors['structure'] = 'Project must have config.php or routes.php';
+    // Check for routes.php (should have been rebuilt)
+    if (!file_exists($projectPath . '/routes.php')) {
+        $errors['routes'] = 'routes.php missing (rebuild failed)';
+    }
+    
+    // Check templates directory exists
+    if (!is_dir($projectPath . '/templates')) {
+        $errors['templates'] = 'templates directory missing';
     }
     
     return [
@@ -320,10 +733,10 @@ function getImportedProjectInfo(string $projectPath): array {
         $info['site_name'] = $config['SITE_NAME'] ?? 'Unknown';
     }
     
-    // Count routes
+    // Count routes (recursive for nested)
     if (file_exists($projectPath . '/routes.php')) {
         $routes = require $projectPath . '/routes.php';
-        $info['routes_count'] = count($routes);
+        $info['routes_count'] = countRoutesRecursive($routes);
     }
     
     // List languages
@@ -337,6 +750,20 @@ function getImportedProjectInfo(string $projectPath): array {
     }
     
     return $info;
+}
+
+/**
+ * Count routes recursively
+ */
+function countRoutesRecursive(array $routes): int {
+    $count = 0;
+    foreach ($routes as $name => $children) {
+        $count++;
+        if (is_array($children) && !empty($children)) {
+            $count += countRoutesRecursive($children);
+        }
+    }
+    return $count;
 }
 
 /**

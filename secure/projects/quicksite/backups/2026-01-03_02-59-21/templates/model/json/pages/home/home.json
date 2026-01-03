@@ -1,0 +1,345 @@
+[
+    {
+        "tag": "section",
+        "params": {
+            "class": "hero"
+        },
+        "children": [
+            {
+                "tag": "div",
+                "params": {
+                    "class": "hero-content"
+                },
+                "children": [
+                    {
+                        "tag": "h1",
+                        "params": {
+                            "class": "hero-title"
+                        },
+                        "children": [
+                            {
+                                "textKey": "home.hero.title"
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "p",
+                        "params": {
+                            "class": "hero-subtitle"
+                        },
+                        "children": [
+                            {
+                                "textKey": "home.hero.subtitle"
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "hero-buttons"
+                        },
+                        "children": [
+                            {
+                                "tag": "a",
+                                "params": {
+                                    "href": "/get-started",
+                                    "class": "btn btn-primary"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "home.hero.cta_start"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "a",
+                                "params": {
+                                    "href": "/docs",
+                                    "class": "btn btn-secondary"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "home.hero.cta_docs"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "features"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "section-title"
+                },
+                "children": [
+                    {
+                        "textKey": "home.features.title"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "features-grid"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "feature-card"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "feature-icon"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__⚡"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "h3",
+                                "children": [
+                                    {
+                                        "textKey": "home.features.api.title"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "children": [
+                                    {
+                                        "textKey": "home.features.api.desc"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "feature-card"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "feature-icon"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__🌍"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "h3",
+                                "children": [
+                                    {
+                                        "textKey": "home.features.i18n.title"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "children": [
+                                    {
+                                        "textKey": "home.features.i18n.desc"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "feature-card"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "feature-icon"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__🎨"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "h3",
+                                "children": [
+                                    {
+                                        "textKey": "home.features.css.title"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "children": [
+                                    {
+                                        "textKey": "home.features.css.desc"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "feature-card"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "feature-icon"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__📦"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "h3",
+                                "children": [
+                                    {
+                                        "textKey": "home.features.build.title"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "children": [
+                                    {
+                                        "textKey": "home.features.build.desc"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "stats"
+        },
+        "children": [
+            {
+                "tag": "div",
+                "params": {
+                    "class": "stats-grid"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "stat"
+                        },
+                        "children": [
+                            {
+                                "tag": "span",
+                                "params": {
+                                    "class": "stat-number"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__45+"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "span",
+                                "params": {
+                                    "class": "stat-label"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "home.stats.commands"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "stat"
+                        },
+                        "children": [
+                            {
+                                "tag": "span",
+                                "params": {
+                                    "class": "stat-number"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__100%"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "span",
+                                "params": {
+                                    "class": "stat-label"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "home.stats.api"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "stat"
+                        },
+                        "children": [
+                            {
+                                "tag": "span",
+                                "params": {
+                                    "class": "stat-number"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__0"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "span",
+                                "params": {
+                                    "class": "stat-label"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "home.stats.dependencies"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+]

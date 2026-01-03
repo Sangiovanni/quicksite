@@ -1524,14 +1524,17 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
         
         try {
             // 1. Delete routes (except 404 and home)
-            // API returns: { routes: {nested object}, flat_routes: ["home", "about", ...] }
+            // API returns: { routes: {nested object}, flat_routes: ["home", "about", "guides/installation", ...] }
             const routesResponse = await apiCall('getRoutes');
             if ((routesResponse.status === 200 || routesResponse.success) && routesResponse.data?.flat_routes) {
                 const protectedRoutes = ['404', 'home'];
-                for (const routeName of routesResponse.data.flat_routes) {
-                    if (!protectedRoutes.includes(routeName)) {
-                        commands.push({ command: 'deleteRoute', params: { route: routeName } });
-                    }
+                // Sort by path length descending - delete children before parents to avoid cascade issues
+                const routesToDelete = routesResponse.data.flat_routes
+                    .filter(routeName => !protectedRoutes.includes(routeName))
+                    .sort((a, b) => b.length - a.length);
+                    
+                for (const routeName of routesToDelete) {
+                    commands.push({ command: 'deleteRoute', params: { route: routeName } });
                 }
             }
             

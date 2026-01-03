@@ -20,7 +20,7 @@ That question turned a template into a CMS. The file-based architecture wasn't a
 - **JSON-Driven Templates**: Define page structures, menus, and components in JSON, compiled to optimized PHP
 - **Multilingual Support**: Built-in translation system with language switching and validation
 - **Production Builds**: One-command deployment with compilation, optimization, and ZIP packaging
-- **RESTful Management API**: 55 endpoints for complete site management
+- **RESTful Management API**: 72 endpoints for complete site management
 - **File-Based Storage**: No database required - all configuration in JSON/PHP files
 - **Flexible Architecture**: Separate public and secure folders for clean deployment
 - **🔐 API Authentication**: Bearer token authentication with role-based permissions
@@ -182,11 +182,13 @@ curl -H "Authorization: Bearer your_token_here" \
 - `POST /management/addRoute` - Create new page route
 - `POST /management/deleteRoute` - Remove page route
 - `GET /management/getRoutes` - List all routes
+- `GET /management/getSiteMap` - Get full site map with all routes and languages
 
 #### **Structure Management**
 - `GET /management/getStructure/{type}/{name?}/{option?}` - Get page/menu/footer/component JSON
   - Options: `showIds` (add node identifiers), `summary` (tree overview), `{nodeId}` (specific node)
 - `POST /management/editStructure` - Update structure JSON (full replacement or targeted nodeId edit)
+- `GET /management/checkStructureMulti` - Validate all structures for multilingual consistency
 
 #### **Translation Management**
 - `GET /management/getTranslation/{lang}` - Get language translations
@@ -253,6 +255,16 @@ curl -H "Authorization: Bearer your_token_here" \
 - `GET /management/exportProject` - Export project as downloadable ZIP
 - `POST /management/importProject` - Import project from uploaded ZIP
 - `GET /management/downloadExport` - Download previously exported ZIP
+- `POST /management/clearExports` - Delete old export files
+
+#### **Backup & Restore**
+- `POST /management/backupProject` - Create project backup (ZIP in secure/backups/)
+- `GET /management/listBackups` - List available backups with metadata
+- `POST /management/restoreBackup` - Restore project from backup
+- `DELETE /management/deleteBackup` - Delete specific backup file
+
+#### **Storage Monitoring**
+- `GET /management/getSizeInfo` - Get storage usage breakdown by category
 
 #### **Command History**
 - `GET /management/getCommandHistory` - Get command execution history with filtering
@@ -292,7 +304,7 @@ quicksite/                    # Root installation
 │   ├── logs/                # System logs
 │   │
 │   ├── management/          # Core Management API (shared)
-│   │   ├── command/         # API command handlers (63+ commands)
+│   │   ├── command/         # API command handlers (72 commands)
 │   │   ├── classes/         # ApiResponse, CssParser, JsonCompiler, etc.
 │   │   ├── functions/       # PathManagement, AuthManagement, etc.
 │   │   └── routes.php       # Management route definitions

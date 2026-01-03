@@ -14,6 +14,49 @@
     <p class="admin-page-header__subtitle"><?= __admin('dashboard.subtitle') ?></p>
 </div>
 
+<!-- Storage Overview -->
+<section class="admin-section">
+    <div class="storage-overview" id="storage-overview">
+        <div class="storage-overview__header">
+            <h3 class="storage-overview__title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                    <path d="M22 12H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+                </svg>
+                <?= __admin('dashboard.storage.title') ?>
+            </h3>
+            <span class="storage-overview__total" id="storage-total">--</span>
+        </div>
+        <div class="storage-overview__bar" id="storage-bar">
+            <div class="storage-overview__segment storage-overview__segment--projects" id="storage-seg-projects" style="width: 0%"></div>
+            <div class="storage-overview__segment storage-overview__segment--backups" id="storage-seg-backups" style="width: 0%"></div>
+            <div class="storage-overview__segment storage-overview__segment--admin" id="storage-seg-admin" style="width: 0%"></div>
+            <div class="storage-overview__segment storage-overview__segment--other" id="storage-seg-other" style="width: 0%"></div>
+        </div>
+        <div class="storage-overview__legend">
+            <div class="storage-overview__legend-item">
+                <span class="storage-overview__legend-color storage-overview__legend-color--projects"></span>
+                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.projects') ?></span>
+                <span class="storage-overview__legend-value" id="storage-val-projects">--</span>
+            </div>
+            <div class="storage-overview__legend-item">
+                <span class="storage-overview__legend-color storage-overview__legend-color--backups"></span>
+                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.backups') ?></span>
+                <span class="storage-overview__legend-value" id="storage-val-backups">--</span>
+            </div>
+            <div class="storage-overview__legend-item">
+                <span class="storage-overview__legend-color storage-overview__legend-color--admin"></span>
+                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.admin') ?></span>
+                <span class="storage-overview__legend-value" id="storage-val-admin">--</span>
+            </div>
+            <div class="storage-overview__legend-item">
+                <span class="storage-overview__legend-color storage-overview__legend-color--other"></span>
+                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.other') ?></span>
+                <span class="storage-overview__legend-value" id="storage-val-other">--</span>
+            </div>
+        </div>
+    </div>
+</section>
+
 <!-- Project Manager -->
 <section class="admin-section">
     <h2 class="admin-section__title"><?= __admin('dashboard.projects.title') ?></h2>
@@ -58,8 +101,32 @@
                             <?= __admin('dashboard.projects.create') ?>
                         </button>
                         
+                        <!-- Backup/Restore Group -->
+                        <div class="project-manager__action-divider"></div>
+                        
+                        <!-- Backup Project -->
+                        <button type="button" id="btn-backup-project" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.backupTooltip') ?>">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                            </svg>
+                            <?= __admin('dashboard.projects.backup') ?>
+                        </button>
+                        
+                        <!-- Restore Backup -->
+                        <button type="button" id="btn-restore-backup" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.restoreTooltip') ?>">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                <path d="M3 3v5h5"/>
+                            </svg>
+                            <?= __admin('dashboard.projects.restore') ?>
+                        </button>
+                        
+                        <!-- Export/Import Group -->
+                        <div class="project-manager__action-divider"></div>
+                        
                         <!-- Export Project -->
-                        <button type="button" id="btn-export-project" class="admin-btn admin-btn--ghost">
+                        <button type="button" id="btn-export-project" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.exportTooltip') ?>">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                                 <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
@@ -68,13 +135,16 @@
                         </button>
                         
                         <!-- Import Project -->
-                        <button type="button" id="btn-import-project" class="admin-btn admin-btn--ghost">
+                        <button type="button" id="btn-import-project" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.importTooltip') ?>">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                                 <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
                             </svg>
                             <?= __admin('dashboard.projects.import') ?>
                         </button>
+                        
+                        <!-- Danger Zone -->
+                        <div class="project-manager__action-divider"></div>
                         
                         <!-- Delete Project -->
                         <button type="button" id="btn-delete-project" class="admin-btn admin-btn--ghost admin-btn--danger">
@@ -92,6 +162,70 @@
 
 <!-- Hidden file input for import -->
 <input type="file" id="import-file-input" accept=".zip" style="display: none;">
+
+<!-- Restore Backup Modal -->
+<div id="modal-restore-backup" class="admin-modal" style="display: none;">
+    <div class="admin-modal__backdrop"></div>
+    <div class="admin-modal__content admin-modal__content--wide">
+        <div class="admin-modal__header">
+            <h3 class="admin-modal__title"><?= __admin('dashboard.projects.restoreTitle') ?></h3>
+            <button type="button" class="admin-modal__close" data-close-modal>×</button>
+        </div>
+        <div class="admin-modal__body">
+            <div id="backup-list-container">
+                <div class="admin-loading">
+                    <span class="admin-spinner"></span>
+                    <span><?= __admin('common.loading') ?></span>
+                </div>
+            </div>
+        </div>
+        <div class="admin-modal__footer">
+            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.close') ?></button>
+        </div>
+    </div>
+</div>
+
+<!-- Restore Confirmation Modal -->
+<div id="modal-restore-confirm" class="admin-modal" style="display: none;">
+    <div class="admin-modal__backdrop"></div>
+    <div class="admin-modal__content">
+        <div class="admin-modal__header">
+            <h3 class="admin-modal__title"><?= __admin('dashboard.projects.confirmRestore') ?></h3>
+            <button type="button" class="admin-modal__close" data-close-modal>×</button>
+        </div>
+        <div class="admin-modal__body">
+            <p style="margin-bottom: var(--space-md);">
+                <?= __admin('dashboard.projects.restoreFrom') ?>: <strong id="restore-backup-name"></strong>
+            </p>
+            
+            <div class="admin-alert admin-alert--warning" style="margin-bottom: var(--space-md);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <div>
+                    <strong><?= __admin('dashboard.projects.restoreWarningTitle') ?></strong>
+                    <p id="restore-warning-text" style="margin: 0.25rem 0 0 0; font-size: 0.875rem;"></p>
+                </div>
+            </div>
+            
+            <label class="admin-checkbox-group" style="cursor: pointer;">
+                <input type="checkbox" id="restore-create-backup" class="admin-checkbox">
+                <span class="admin-checkbox-label"><?= __admin('dashboard.projects.createBackupBeforeRestore') ?></span>
+            </label>
+        </div>
+        <div class="admin-modal__footer">
+            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>
+            <button type="button" id="btn-confirm-restore" class="admin-btn admin-btn--primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                    <path d="M3 3v5h5"/>
+                </svg>
+                <?= __admin('dashboard.projects.restoreBtn') ?>
+            </button>
+        </div>
+    </div>
+</div>
 
 <!-- Create Project Modal -->
 <div id="modal-create-project" class="admin-modal" style="display: none;">
@@ -209,7 +343,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         loadDashboardStats(),
         loadSiteMap(),
         loadRecentCommands(),
-        loadProjectManager()
+        loadProjectManager(),
+        loadStorageOverview()
     ]);
     
     // Setup project manager event listeners
@@ -258,15 +393,15 @@ async function loadSiteMap() {
             QuickSiteAdmin.apiRequest('validateTranslations')
         ]);
         
-        if (!sitemapResult.ok) {
-            throw new Error('Failed to load sitemap');
+        if (!sitemapResult.ok || !sitemapResult.data?.data) {
+            throw new Error(sitemapResult.data?.message || 'Failed to load sitemap');
         }
         
         const data = sitemapResult.data.data;
-        const coverage = validationResult.ok ? validationResult.data.data?.validation_results : {};
-        const baseUrl = data.baseUrl;
-        const multilingual = data.multilingual;
-        const defaultLang = data.defaultLang;
+        const coverage = validationResult.ok ? validationResult.data?.data?.validation_results : {};
+        const baseUrl = data.baseUrl || '';
+        const multilingual = data.multilingual || false;
+        const defaultLang = data.defaultLang || 'en';
         const languages = data.languages || [];
         const languageNames = data.languageNames || {};
         const routes = data.routes || [];
@@ -645,6 +780,63 @@ async function loadProjectManager() {
     }
 }
 
+/**
+ * Load storage overview data
+ */
+async function loadStorageOverview() {
+    try {
+        const result = await QuickSiteAdmin.apiRequest('getSizeInfo');
+        
+        if (result.ok && result.data?.data?.summary) {
+            const summary = result.data.data.summary;
+            const byCategory = summary.by_category || {};
+            
+            // Update total
+            document.getElementById('storage-total').textContent = summary.total?.size_formatted || '--';
+            
+            // Calculate percentages
+            const totalBytes = summary.total?.size || 1;
+            const categories = ['projects', 'backups', 'admin', 'other'];
+            
+            // Combine management and core into "other"
+            const otherBytes = (byCategory.management?.size || 0) + (byCategory.core?.size || 0);
+            const sizes = {
+                projects: byCategory.projects?.size || 0,
+                backups: byCategory.backups?.size || 0,
+                admin: byCategory.admin?.size || 0,
+                other: otherBytes
+            };
+            
+            const formatSize = (bytes) => {
+                if (bytes < 1024) return bytes + ' B';
+                if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+                if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+                return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+            };
+            
+            // Update bar segments and values
+            categories.forEach(cat => {
+                const bytes = sizes[cat] || 0;
+                const pct = (bytes / totalBytes) * 100;
+                
+                const segment = document.getElementById(`storage-seg-${cat}`);
+                const value = document.getElementById(`storage-val-${cat}`);
+                
+                if (segment) {
+                    segment.style.width = pct > 0 ? Math.max(pct, 1) + '%' : '0%';
+                }
+                if (value) {
+                    value.textContent = formatSize(bytes);
+                }
+            });
+        } else {
+            console.error('getSizeInfo failed:', result.data?.message || 'Unknown error');
+        }
+    } catch (error) {
+        console.error('Failed to load storage info:', error);
+    }
+}
+
 function updateDeleteSelector() {
     const deleteSelector = document.getElementById('delete-project-selector');
     const t = window.QUICKSITE_CONFIG?.translations || {};
@@ -840,6 +1032,39 @@ function setupProjectManagerEvents() {
         this.value = ''; // Reset file input
     });
     
+    // Backup project
+    document.getElementById('btn-backup-project').addEventListener('click', async function() {
+        this.disabled = true;
+        const originalText = this.textContent;
+        this.innerHTML = '<span class="spinner"></span> ' + (proj.backing_up || 'Creating backup...');
+        
+        try {
+            const result = await QuickSiteAdmin.apiRequest('backupProject', 'GET');
+            
+            if (result.ok && result.data?.data?.backup) {
+                const data = result.data.data;
+                QuickSiteAdmin.showToast(
+                    (proj.backup_created || 'Backup created') + ': ' + data.backup.name + ' (' + data.backup.size_formatted + ')',
+                    'success'
+                );
+            } else {
+                QuickSiteAdmin.showToast(result.data?.message || 'Failed to create backup', 'error');
+            }
+        } catch (error) {
+            console.error('Backup error:', error);
+            QuickSiteAdmin.showToast('Failed to create backup', 'error');
+        }
+        
+        this.disabled = false;
+        this.innerHTML = originalText;
+    });
+    
+    // Restore backup modal
+    document.getElementById('btn-restore-backup').addEventListener('click', async function() {
+        document.getElementById('modal-restore-backup').style.display = 'flex';
+        await loadBackupList();
+    });
+    
     // Delete project modal
     document.getElementById('btn-delete-project').addEventListener('click', function() {
         updateDeleteSelector();
@@ -892,6 +1117,209 @@ function closeAllModals() {
     document.querySelectorAll('.admin-modal').forEach(modal => {
         modal.style.display = 'none';
     });
+}
+
+// Restore confirmation modal
+let pendingRestoreBackup = null;
+
+function openRestoreConfirmModal(backupName) {
+    const t = window.QUICKSITE_CONFIG?.translations || {};
+    const proj = t.dashboard?.projects || {};
+    
+    pendingRestoreBackup = backupName;
+    
+    // Set backup name in modal
+    document.getElementById('restore-backup-name').textContent = backupName;
+    
+    // Reset checkbox
+    document.getElementById('restore-create-backup').checked = false;
+    
+    // Update warning text based on checkbox state
+    updateRestoreWarning();
+    
+    // Show modal
+    document.getElementById('modal-restore-confirm').style.display = 'flex';
+}
+
+function updateRestoreWarning() {
+    const t = window.QUICKSITE_CONFIG?.translations || {};
+    const proj = t.dashboard?.projects || {};
+    const checkbox = document.getElementById('restore-create-backup');
+    const warningText = document.getElementById('restore-warning-text');
+    
+    if (checkbox.checked) {
+        warningText.textContent = proj.restoreWarningWithBackup || 'A backup of your current project will be created before restoring.';
+    } else {
+        warningText.textContent = proj.restoreWarningNoBackup || 'Your current project state will be lost! Make sure you have a backup if needed.';
+    }
+}
+
+// Initialize restore confirm modal handlers
+document.getElementById('restore-create-backup')?.addEventListener('change', updateRestoreWarning);
+
+document.getElementById('btn-confirm-restore')?.addEventListener('click', async function() {
+    if (!pendingRestoreBackup) return;
+    
+    const t = window.QUICKSITE_CONFIG?.translations || {};
+    const proj = t.dashboard?.projects || {};
+    const createBackup = document.getElementById('restore-create-backup').checked;
+    
+    this.disabled = true;
+    this.innerHTML = '<span class="admin-spinner" style="width: 16px; height: 16px;"></span> ' + (proj.restoring || 'Restoring...');
+    
+    try {
+        const result = await QuickSiteAdmin.apiRequest('restoreBackup', 'POST', { 
+            backup: pendingRestoreBackup,
+            create_backup: createBackup
+        });
+        
+        if (result.ok) {
+            QuickSiteAdmin.showToast(proj.restore_success || 'Backup restored successfully', 'success');
+            closeAllModals();
+            // Force full page reload with cache bust to refresh all data
+            window.location.href = window.location.pathname + '?restored=' + Date.now();
+        } else {
+            QuickSiteAdmin.showToast(result.data?.message || 'Failed to restore backup', 'error');
+            this.disabled = false;
+            this.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> ${proj.restoreBtn || 'Restore'}`;
+        }
+    } catch (error) {
+        QuickSiteAdmin.showToast('Failed to restore backup', 'error');
+        this.disabled = false;
+        this.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> ${proj.restoreBtn || 'Restore'}`;
+    }
+});
+
+async function loadBackupList() {
+    const container = document.getElementById('backup-list-container');
+    const t = window.QUICKSITE_CONFIG?.translations || {};
+    const proj = t.dashboard?.projects || {};
+    const common = t.common || {};
+    
+    container.innerHTML = `<div class="admin-loading"><span class="admin-spinner"></span><span>${common.loading || 'Loading...'}</span></div>`;
+    
+    try {
+        const result = await QuickSiteAdmin.apiRequest('listBackups', 'GET');
+        
+        if (!result.ok) {
+            container.innerHTML = `<p class="admin-error">${result.data?.message || 'Failed to load backups'}</p>`;
+            return;
+        }
+        
+        const data = result.data.data;
+        const backups = data.backups || [];
+        
+        if (backups.length === 0) {
+            container.innerHTML = `
+                <div class="backup-empty">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48" style="opacity: 0.4; margin-bottom: 1rem;">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                    </svg>
+                    <p style="color: var(--admin-text-muted); margin: 0;">${proj.no_backups || 'No backups yet'}</p>
+                    <p style="color: var(--admin-text-muted); font-size: 0.875rem; margin: 0.5rem 0 0 0;">${proj.backup_hint || 'Click "Backup" to create your first backup'}</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = `
+            <div class="backup-summary">
+                <span>${data.count} ${proj.backups_count || 'backup(s)'}</span>
+                <span class="backup-summary__divider">•</span>
+                <span>${data.total_size_formatted} ${proj.total_size || 'total'}</span>
+            </div>
+            <div class="backup-list">
+        `;
+        
+        backups.forEach(backup => {
+            const typeLabel = backup.type === 'pre-restore' 
+                ? `<span class="badge badge--warning">${proj.pre_restore || 'Pre-restore'}</span>` 
+                : backup.type === 'auto' 
+                    ? `<span class="badge badge--info">${proj.auto_backup || 'Auto'}</span>`
+                    : '';
+            
+            html += `
+                <div class="backup-item" data-backup="${QuickSiteAdmin.escapeHtml(backup.name)}">
+                    <div class="backup-item__info">
+                        <div class="backup-item__name">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                            </svg>
+                            <span>${QuickSiteAdmin.escapeHtml(backup.name)}</span>
+                            ${typeLabel}
+                        </div>
+                        <div class="backup-item__meta">
+                            <span>${backup.size_formatted}</span>
+                            <span class="backup-item__divider">•</span>
+                            <span>${backup.files} ${proj.files || 'files'}</span>
+                            <span class="backup-item__divider">•</span>
+                            <span>${backup.created_relative}</span>
+                        </div>
+                    </div>
+                    <div class="backup-item__actions">
+                        <button type="button" class="admin-btn admin-btn--sm admin-btn--primary btn-restore-this" data-backup="${QuickSiteAdmin.escapeHtml(backup.name)}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                <path d="M3 3v5h5"/>
+                            </svg>
+                            ${proj.restore_btn || 'Restore'}
+                        </button>
+                        <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost admin-btn--danger btn-delete-backup" data-backup="${QuickSiteAdmin.escapeHtml(backup.name)}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
+        
+        // Add restore handlers - open confirmation modal
+        container.querySelectorAll('.btn-restore-this').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const backupName = this.dataset.backup;
+                openRestoreConfirmModal(backupName);
+            });
+        });
+        
+        // Add delete handlers
+        container.querySelectorAll('.btn-delete-backup').forEach(btn => {
+            btn.addEventListener('click', async function() {
+                const backupName = this.dataset.backup;
+                if (!confirm((proj.confirm_delete_backup || 'Delete backup') + ': ' + backupName + '?')) {
+                    return;
+                }
+                
+                this.disabled = true;
+                
+                try {
+                    const result = await QuickSiteAdmin.apiRequest('deleteBackup', 'DELETE', { backup: backupName });
+                    
+                    if (result.ok) {
+                        QuickSiteAdmin.showToast(proj.backup_deleted || 'Backup deleted', 'success');
+                        // Refresh backup list
+                        await loadBackupList();
+                    } else {
+                        QuickSiteAdmin.showToast(result.data?.message || 'Failed to delete backup', 'error');
+                        this.disabled = false;
+                    }
+                } catch (error) {
+                    QuickSiteAdmin.showToast('Failed to delete backup', 'error');
+                    this.disabled = false;
+                }
+            });
+        });
+        
+    } catch (error) {
+        console.error('Failed to load backups:', error);
+        container.innerHTML = `<p class="admin-error">Failed to load backups</p>`;
+    }
 }
 </script>
 
@@ -1237,12 +1665,106 @@ function closeAllModals() {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-sm);
+    align-items: center;
 }
 
 .project-manager__quick-actions .admin-btn {
-    flex: 1;
-    min-width: 140px;
+    flex: 0 0 auto;
+    min-width: auto;
     justify-content: center;
+}
+
+.project-manager__action-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--admin-border);
+    margin: 0 var(--space-xs);
+}
+
+/* Backup List Styles */
+.backup-empty {
+    text-align: center;
+    padding: var(--space-2xl) var(--space-lg);
+}
+
+.backup-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--admin-bg-tertiary);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-md);
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+}
+
+.backup-summary__divider {
+    color: var(--admin-border);
+}
+
+.backup-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.backup-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    transition: border-color 0.15s ease;
+}
+
+.backup-item:hover {
+    border-color: var(--admin-primary);
+}
+
+.backup-item__info {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.backup-item__name {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-weight: var(--font-weight-medium);
+    margin-bottom: var(--space-xs);
+    flex-wrap: wrap;
+}
+
+.backup-item__name span {
+    word-break: break-word;
+}
+
+.backup-item__name svg {
+    flex-shrink: 0;
+    color: var(--admin-text-muted);
+}
+
+.backup-item__meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+    flex-wrap: wrap;
+}
+
+.backup-item__divider {
+    color: var(--admin-border);
+}
+
+.backup-item__actions {
+    display: flex;
+    gap: var(--space-xs);
+    justify-content: flex-end;
 }
 
 /* Modal Styles */
@@ -1270,6 +1792,10 @@ function closeAllModals() {
     width: 90%;
     max-height: 90vh;
     overflow: auto;
+}
+
+.admin-modal__content--wide {
+    max-width: 640px;
 }
 
 .admin-modal__header {
@@ -1382,6 +1908,130 @@ function closeAllModals() {
     
     .project-manager__quick-actions .admin-btn {
         min-width: auto;
+    }
+}
+
+/* Storage Overview Styles */
+.storage-overview {
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+}
+
+.storage-overview__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-md);
+}
+
+.storage-overview__title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    color: var(--admin-text);
+    margin: 0;
+}
+
+.storage-overview__title svg {
+    color: var(--admin-text-muted);
+}
+
+.storage-overview__total {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    color: var(--admin-text);
+}
+
+.storage-overview__bar {
+    display: flex;
+    height: 24px;
+    background: var(--admin-bg-tertiary);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: var(--space-md);
+}
+
+.storage-overview__segment {
+    height: 100%;
+    transition: width 0.5s ease;
+    min-width: 0;
+}
+
+.storage-overview__segment--projects {
+    background: var(--admin-primary, #3b82f6);
+}
+
+.storage-overview__segment--backups {
+    background: var(--admin-success, #22c55e);
+}
+
+.storage-overview__segment--admin {
+    background: var(--admin-warning, #f59e0b);
+}
+
+.storage-overview__segment--other {
+    background: var(--admin-text-muted, #6b7280);
+}
+
+.storage-overview__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md) var(--space-xl);
+}
+
+.storage-overview__legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.storage-overview__legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+}
+
+.storage-overview__legend-color--projects {
+    background: var(--admin-primary, #3b82f6);
+}
+
+.storage-overview__legend-color--backups {
+    background: var(--admin-success, #22c55e);
+}
+
+.storage-overview__legend-color--admin {
+    background: var(--admin-warning, #f59e0b);
+}
+
+.storage-overview__legend-color--other {
+    background: var(--admin-text-muted, #6b7280);
+}
+
+.storage-overview__legend-label {
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+}
+
+.storage-overview__legend-value {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--admin-text);
+}
+
+@media (max-width: 600px) {
+    .storage-overview__header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-xs);
+    }
+    
+    .storage-overview__legend {
+        gap: var(--space-sm) var(--space-md);
     }
 }
 </style>

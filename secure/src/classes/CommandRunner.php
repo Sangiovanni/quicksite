@@ -54,6 +54,11 @@ class CommandRunner {
         'importProject',
         'downloadExport',
         'clearExports',
+        // Backup commands
+        'backupProject',
+        'listBackups',
+        'restoreBackup',
+        'deleteBackup',
     ];
     
     /**

@@ -285,8 +285,8 @@ async function loadRoutes() {
     try {
         const result = await QuickSiteAdmin.apiRequest('getRoutes');
         
-        if (result.ok && result.data.data?.routes) {
-            const routes = result.data.data.routes;
+        if (result.ok && result.data.data?.flat_routes) {
+            const routes = result.data.data.flat_routes;
             
             if (routes.length === 0) {
                 container.innerHTML = '<p class="admin-text-muted">No routes configured</p>';

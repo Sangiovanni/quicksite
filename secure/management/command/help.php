@@ -2567,6 +2567,220 @@ $GLOBALS['__help_commands'] = [
             '404.resource.not_found' => 'Export file not found or expired'
         ],
         'notes' => 'Export files expire after 24 hours. Use exportProject with download=true for immediate download.'
+    ],
+    
+    // =========================================================================
+    // BACKUP COMMANDS
+    // =========================================================================
+    
+    'backupProject' => [
+        'description' => 'Creates a timestamped backup of a project (internal backup, not for sharing)',
+        'method' => 'GET',
+        'parameters' => [
+            'name' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Project name to backup (defaults to active project)',
+                'example' => 'quicksite'
+            ],
+            'max_backups' => [
+                'required' => false,
+                'type' => 'integer',
+                'description' => 'Maximum backups to keep (default: 5, 0 = unlimited)',
+                'example' => 5
+            ]
+        ],
+        'example_get' => 'GET /management/backupProject',
+        'example_get_with_params' => 'GET /management/backupProject?name=quicksite&max_backups=3',
+        'success_response' => [
+            'status' => 200,
+            'message' => 'Backup created successfully: 2026-01-03_14-30-00',
+            'data' => [
+                'project' => 'quicksite',
+                'backup' => [
+                    'name' => '2026-01-03_14-30-00',
+                    'path' => '/secure/projects/quicksite/backups/2026-01-03_14-30-00',
+                    'size' => 1234567,
+                    'size_formatted' => '1.18 MB',
+                    'files' => 42,
+                    'items' => ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'],
+                    'created' => '2026-01-03_14-30-00'
+                ],
+                'total_backups' => 3,
+                'max_backups' => 5,
+                'deleted_old_backups' => []
+            ]
+        ],
+        'notes' => 'Backups are stored in project/backups/ folder. Old backups are auto-deleted when max_backups is exceeded. For sharing projects externally, use exportProject instead (JSON-only, secure).'
+    ],
+    
+    'listBackups' => [
+        'description' => 'Lists all available backups for a project',
+        'method' => 'GET',
+        'parameters' => [
+            'name' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Project name (defaults to active project)',
+                'example' => 'quicksite'
+            ]
+        ],
+        'example_get' => 'GET /management/listBackups',
+        'success_response' => [
+            'status' => 200,
+            'message' => 'Found 3 backup(s)',
+            'data' => [
+                'project' => 'quicksite',
+                'backups' => [
+                    [
+                        'name' => '2026-01-03_14-30-00',
+                        'type' => 'manual',
+                        'size' => 1234567,
+                        'size_formatted' => '1.18 MB',
+                        'files' => 42,
+                        'contents' => ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'],
+                        'created' => 1704291000,
+                        'created_formatted' => '2026-01-03 14:30:00',
+                        'created_relative' => '2 hours ago'
+                    ]
+                ],
+                'count' => 3,
+                'total_size' => 3703701,
+                'total_size_formatted' => '3.53 MB'
+            ]
+        ],
+        'notes' => 'Backup types: "manual" (created via backupProject), "pre-restore" (auto-created before restore), "auto" (scheduled backups).'
+    ],
+    
+    'restoreBackup' => [
+        'description' => 'Restores a project from a backup (auto-creates pre-restore backup first)',
+        'method' => 'POST',
+        'parameters' => [
+            'backup' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Backup name (timestamp folder name)',
+                'example' => '2026-01-03_14-30-00'
+            ],
+            'name' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Project name (defaults to active project)',
+                'example' => 'quicksite'
+            ],
+            'skip_pre_backup' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Skip creating pre-restore safety backup (default: false)',
+                'example' => false
+            ]
+        ],
+        'example_post' => 'POST /management/restoreBackup\n{"backup": "2026-01-03_14-30-00"}',
+        'success_response' => [
+            'status' => 200,
+            'message' => 'Backup restored successfully',
+            'data' => [
+                'project' => 'quicksite',
+                'backup_restored' => '2026-01-03_14-30-00',
+                'restored_items' => ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'],
+                'pre_restore_backup' => 'pre-restore_2026-01-03_16-45-22',
+                'public_synced_to_live' => true
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.missing_field' => 'Backup name required',
+            '404.resource.not_found' => 'Backup not found'
+        ],
+        'notes' => 'A pre-restore backup is automatically created before restoring, allowing rollback if something goes wrong. If restoring the active project, public/ is synced to live folder.'
+    ],
+    
+    'deleteBackup' => [
+        'description' => 'Deletes a specific backup',
+        'method' => 'DELETE',
+        'parameters' => [
+            'backup' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Backup name to delete',
+                'example' => '2026-01-03_14-30-00'
+            ],
+            'name' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Project name (defaults to active project)',
+                'example' => 'quicksite'
+            ]
+        ],
+        'example_delete' => 'DELETE /management/deleteBackup?backup=2026-01-03_14-30-00',
+        'success_response' => [
+            'status' => 200,
+            'message' => 'Backup deleted successfully',
+            'data' => [
+                'project' => 'quicksite',
+                'deleted_backup' => '2026-01-03_14-30-00',
+                'freed_space' => 1234567,
+                'freed_space_formatted' => '1.18 MB',
+                'remaining_backups' => 2
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.missing_field' => 'Backup name required',
+            '400.validation.invalid_filename' => 'Invalid backup name (path traversal blocked)',
+            '404.resource.not_found' => 'Backup not found'
+        ]
+    ],
+    
+    'getSizeInfo' => [
+        'description' => 'Returns detailed storage size information for all folders in the project structure. Useful for monitoring disk usage and identifying what takes up space.',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/getSizeInfo',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'size_info.success',
+            'message' => 'Size information retrieved successfully',
+            'data' => [
+                'summary' => [
+                    'total' => ['size' => 32100000, 'size_formatted' => '30.62 MB'],
+                    'by_category' => [
+                        'projects' => ['size' => 20200000, 'size_formatted' => '19.28 MB', 'description' => 'Project files (assets, styles, builds, project data)'],
+                        'backups' => ['size' => 10100000, 'size_formatted' => '9.66 MB', 'description' => 'All project backups'],
+                        'admin' => ['size' => 3000000, 'size_formatted' => '2.88 MB', 'description' => 'Admin panel interface'],
+                        'management' => ['size' => 500000, 'size_formatted' => '500 KB', 'description' => 'API and command system'],
+                        'core' => ['size' => 300000, 'size_formatted' => '300 KB', 'description' => 'Core system files (src, config, logs)']
+                    ],
+                    'active_project' => [
+                        'name' => 'quicksite',
+                        'size' => 20200000,
+                        'size_formatted' => '19.28 MB',
+                        'backups_count' => 3
+                    ]
+                ],
+                'public' => ['total' => '...', 'folders' => '...'],
+                'secure' => ['total' => '...', 'folders' => '...', 'projects_detail' => '...']
+            ]
+        ],
+        'notes' => 'Categories combine related folders: projects (assets+style+build+secure/projects), backups (all project backups), admin (public/admin+secure/admin), management (API system), core (src+config+logs). Used by dashboard storage overview widget.'
+    ],
+    
+    'clearExports' => [
+        'description' => 'Clears all exported project ZIP files from the exports folder. Useful to free up disk space after exports have been downloaded.',
+        'method' => 'DELETE',
+        'parameters' => [],
+        'example_delete' => 'DELETE /management/clearExports',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Exports cleared successfully',
+            'data' => [
+                'deleted_count' => 5,
+                'freed_space' => '15.5 MB'
+            ]
+        ],
+        'error_responses' => [
+            '500.server.delete_failed' => 'Failed to delete some export files'
+        ],
+        'notes' => 'Deletes all .zip files in secure/exports/ folder. Does not affect project data or backups.'
     ]
 ];
 
@@ -2619,6 +2833,10 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'css_animations' => ['getKeyframes', 'setKeyframes', 'deleteKeyframes'],
                 'site_customization' => ['editFavicon', 'editTitle'],
                 'build_deployment' => ['build', 'listBuilds', 'getBuild', 'deleteBuild', 'cleanBuilds', 'deployBuild', 'downloadBuild'],
+                'project_management' => ['listProjects', 'getActiveProject', 'switchProject', 'createProject', 'deleteProject'],
+                'backup_restore' => ['backupProject', 'listBackups', 'restoreBackup', 'deleteBackup'],
+                'export_import' => ['exportProject', 'importProject', 'downloadExport', 'clearExports'],
+                'storage_monitoring' => ['getSizeInfo'],
                 'command_history' => ['getCommandHistory', 'clearCommandHistory'],
                 'authentication' => ['generateToken', 'listTokens', 'revokeToken'],
                 'documentation' => ['help']
@@ -2652,7 +2870,10 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'token_workflow' => '1) listTokens to see existing tokens, 2) generateToken to create new ones, 3) revokeToken to delete old tokens.',
                 'alias_workflow' => '1) listAliases to see existing redirects, 2) createAlias to add URL redirects, 3) deleteAlias to remove redirects.',
                 'component_workflow' => '1) listComponents to see available reusable components, 2) getStructure/component/{name} to view details, 3) editStructure with type="component" to create/update/delete.',
-                'sitemap_workflow' => '1) getSiteMap for JSON data with route details and coverage, 2) getSiteMap/text to generate plain text sitemap.txt for SEO crawlers.'
+                'sitemap_workflow' => '1) getSiteMap for JSON data with route details and coverage, 2) getSiteMap/text to generate plain text sitemap.txt for SEO crawlers.',
+                'project_workflow' => '1) listProjects to see all available projects, 2) getActiveProject to check current project, 3) createProject to start a new project, 4) switchProject to change active project, 5) deleteProject to remove (requires confirm=true).',
+                'backup_workflow' => '1) backupProject to create instant backup, 2) listBackups to see available backups with size/age info, 3) restoreBackup to restore from backup (optional pre-restore backup), 4) deleteBackup to free disk space.',
+                'export_workflow' => '1) exportProject to create shareable ZIP (JSON-only, secure), 2) downloadExport to download the ZIP, 3) importProject to import from ZIP (rebuilds PHP from JSON), 4) clearExports to clean up old exports.'
             ]
         ]);
 }
