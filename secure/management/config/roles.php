@@ -34,6 +34,7 @@ return array (
       19 => 'getBuild',
       20 => 'listRoles',
       21 => 'getMyPermissions',
+      22 => 'listAiProviders',
     ),
   ),
   'editor' => 
@@ -82,6 +83,9 @@ return array (
       37 => 'updateAssetMeta',
       38 => 'createAlias',
       39 => 'deleteAlias',
+      40 => 'listAiProviders',
+      41 => 'detectProvider',
+      42 => 'testAiKey',
     ),
   ),
   'designer' => 
@@ -138,6 +142,9 @@ return array (
       45 => 'deleteKeyframes',
       46 => 'editFavicon',
       47 => 'editTitle',
+      48 => 'listAiProviders',
+      49 => 'detectProvider',
+      50 => 'testAiKey',
     ),
   ),
   'developer' => 
@@ -199,6 +206,10 @@ return array (
       50 => 'cleanBuilds',
       51 => 'deployBuild',
       52 => 'downloadBuild',
+      53 => 'listAiProviders',
+      54 => 'detectProvider',
+      55 => 'testAiKey',
+      56 => 'callAi',
     ),
   ),
   'admin' => 
@@ -278,6 +289,10 @@ return array (
       68 => 'clearExports',
       69 => 'getCommandHistory',
       70 => 'clearCommandHistory',
+      71 => 'listAiProviders',
+      72 => 'detectProvider',
+      73 => 'testAiKey',
+      74 => 'callAi',
     ),
   ),
 );

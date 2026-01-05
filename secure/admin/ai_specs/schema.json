@@ -191,6 +191,36 @@
       "items": { "type": "string" },
       "description": "API commands that will be used in the generated output"
     },
+    "recommendedModels": {
+      "type": "object",
+      "description": "Recommended AI models per provider for this spec",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "List of recommended model IDs for a provider"
+      },
+      "examples": [
+        {
+          "openai": ["gpt-4o", "gpt-4-turbo"],
+          "anthropic": ["claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022"],
+          "google": ["gemini-1.5-pro", "gemini-2.0-flash"]
+        }
+      ]
+    },
+    "providerNotes": {
+      "type": "object",
+      "description": "Provider-specific notes or warnings for this spec",
+      "additionalProperties": {
+        "type": "string",
+        "description": "Note text for a specific provider"
+      },
+      "examples": [
+        {
+          "openai": "Works best with GPT-4o for complex website creation",
+          "anthropic": "Claude models excel at following structured JSON output format"
+        }
+      ]
+    },
     "promptTemplate": {
       "type": "string",
       "description": "Filename of the .md prompt template (same folder as spec)"

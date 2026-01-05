@@ -160,6 +160,11 @@ function getCommandCategories(): array {
             'icon' => 'key',
             'commands' => ['generateToken', 'listTokens', 'revokeToken']
         ],
+        'ai_integration' => [
+            'label' => 'AI Integration',
+            'icon' => 'bot',
+            'commands' => ['listAiProviders', 'detectProvider', 'testAiKey', 'callAi']
+        ],
         'documentation' => [
             'label' => 'Documentation',
             'icon' => 'book',

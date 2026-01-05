@@ -2978,6 +2978,193 @@ $GLOBALS['__help_commands'] = [
             '403.auth.forbidden' => 'Requires superadmin (*) permission'
         ],
         'notes' => 'Builtin roles (viewer, editor, designer, developer, admin) cannot be deleted. If tokens are using this role, deletion will fail unless force=true, which reassigns those tokens to the viewer role.'
+    ],
+    
+    // ==========================================
+    // AI INTEGRATION COMMANDS (BYOK - Bring Your Own Key)
+    // ==========================================
+    
+    'listAiProviders' => [
+        'description' => 'Lists all supported AI providers with their names, detection methods, and default models. BYOK system - use your own API keys.',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/listAiProviders',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'providers.list',
+            'message' => 'AI providers retrieved successfully',
+            'data' => [
+                'providers' => [
+                    [
+                        'id' => 'openai',
+                        'name' => 'OpenAI',
+                        'has_prefix_detection' => true,
+                        'default_models' => ['gpt-4o', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo']
+                    ],
+                    [
+                        'id' => 'anthropic',
+                        'name' => 'Anthropic',
+                        'has_prefix_detection' => true,
+                        'default_models' => ['claude-opus-4-20250514', 'claude-sonnet-4-20250514', 'claude-3-5-sonnet-latest']
+                    ]
+                ],
+                'count' => 4
+            ]
+        ],
+        'error_responses' => [
+            '500.server.error' => 'Failed to load AI providers configuration'
+        ],
+        'notes' => 'BYOK (Bring Your Own Key) system - QuickSite does not store or manage API keys. Users provide their own keys per-request. Keys are only held in memory during API calls and never written to disk.'
+    ],
+    
+    'detectProvider' => [
+        'description' => 'Detects the AI provider from an API key prefix (sk- = OpenAI, sk-ant- = Anthropic, AIza = Google). Returns fallback providers for prefix-less keys like Mistral.',
+        'method' => 'POST',
+        'parameters' => [
+            'key' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'API key to analyze (minimum 20 characters)',
+                'example' => 'sk-proj-abc123...'
+            ]
+        ],
+        'example_post' => 'POST /management/detectProvider with body: {"key": "sk-proj-abc123..."}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'provider.detected',
+            'message' => 'Provider detected: OpenAI',
+            'data' => [
+                'provider' => 'openai',
+                'name' => 'OpenAI',
+                'method' => 'prefix'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'key parameter is required',
+            '400.validation.empty' => 'API key cannot be empty',
+            '400.validation.invalid_format' => 'API key appears too short to be valid'
+        ],
+        'notes' => 'Key is analyzed in memory and never stored. If provider cannot be detected (e.g., Mistral keys have no prefix), returns fallback_providers list to try with testAiKey.'
+    ],
+    
+    'testAiKey' => [
+        'description' => 'Tests if an API key is valid by making a minimal API call. Returns available models on success. Auto-detects provider from prefix, or specify provider parameter.',
+        'method' => 'POST',
+        'parameters' => [
+            'key' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'API key to test',
+                'example' => 'sk-proj-abc123...'
+            ],
+            'provider' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Provider to test against (required for keys without detectable prefix)',
+                'example' => 'mistral',
+                'enum' => ['openai', 'anthropic', 'google', 'mistral']
+            ]
+        ],
+        'example_post' => 'POST /management/testAiKey with body: {"key": "sk-proj-abc123..."} or {"key": "abc123...", "provider": "mistral"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'key.valid',
+            'message' => 'API key is valid for OpenAI',
+            'data' => [
+                'valid' => true,
+                'provider' => 'openai',
+                'name' => 'OpenAI',
+                'models' => ['gpt-4o', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo']
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'key parameter is required',
+            '400.validation.provider_required' => 'Could not detect provider - specify provider parameter',
+            '400.validation.invalid_provider' => 'Unknown provider',
+            '401.key.invalid' => 'API key is invalid or expired'
+        ],
+        'notes' => 'Key is used for a single validation request and never stored on disk. Models returned are fetched from the provider API when possible, falling back to default list if unavailable.'
+    ],
+    
+    'callAi' => [
+        'description' => 'Makes an AI completion request via the specified provider. Server acts as proxy to avoid CORS. Key is used once and never stored.',
+        'method' => 'POST',
+        'parameters' => [
+            'key' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'API key for the provider',
+                'example' => 'sk-proj-abc123...'
+            ],
+            'provider' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Provider to use',
+                'example' => 'openai',
+                'enum' => ['openai', 'anthropic', 'google', 'mistral']
+            ],
+            'model' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Model to use (from testAiKey models list)',
+                'example' => 'gpt-4o'
+            ],
+            'messages' => [
+                'required' => true,
+                'type' => 'array',
+                'description' => 'Chat messages array with role (system/user/assistant) and content',
+                'example' => "[{\"role\": \"system\", \"content\": \"You are helpful.\"}, {\"role\": \"user\", \"content\": \"Hello!\"}]"
+            ],
+            'max_tokens' => [
+                'required' => false,
+                'type' => 'integer',
+                'description' => 'Maximum tokens in response (1-128000)',
+                'default' => 4096,
+                'example' => 2000
+            ],
+            'temperature' => [
+                'required' => false,
+                'type' => 'number',
+                'description' => 'Response randomness (0-2)',
+                'default' => 0.7,
+                'example' => 0.5
+            ],
+            'timeout' => [
+                'required' => false,
+                'type' => 'integer',
+                'description' => 'Request timeout in seconds (10-300)',
+                'default' => 120,
+                'example' => 60
+            ]
+        ],
+        'example_post' => 'POST /management/callAi with body: {"key": "sk-...", "provider": "openai", "model": "gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'ai.response',
+            'message' => 'AI response received',
+            'data' => [
+                'content' => 'Hello! How can I help you today?',
+                'provider' => 'openai',
+                'model' => 'gpt-4o',
+                'usage' => [
+                    'input_tokens' => 10,
+                    'output_tokens' => 8
+                ]
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing required parameter',
+            '400.validation.invalid_messages' => 'Messages must be a non-empty array',
+            '400.validation.invalid_provider' => 'Unknown provider',
+            '400.ai.invalid_request' => 'Invalid request format',
+            '401.ai.invalid_key' => 'API key is invalid or expired',
+            '402.ai.quota_exceeded' => 'API quota exhausted',
+            '403.ai.no_access' => 'Key does not have access to this model',
+            '429.ai.rate_limit' => 'Rate limit exceeded',
+            '502.ai.network_error' => 'Could not connect to AI provider',
+            '503.ai.overloaded' => 'AI provider is overloaded'
+        ],
+        'notes' => 'SECURITY: API key is passed per-request, used for a single API call, and immediately garbage collected. Keys are NEVER stored on disk. Server acts as proxy to bypass CORS restrictions. User controls their own AI costs and usage.'
     ]
 ];
 
@@ -3037,6 +3224,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'command_history' => ['getCommandHistory', 'clearCommandHistory'],
                 'authentication' => ['generateToken', 'listTokens', 'revokeToken'],
                 'role_management' => ['listRoles', 'getMyPermissions', 'createRole', 'editRole', 'deleteRole'],
+                'ai_integration' => ['listAiProviders', 'detectProvider', 'testAiKey', 'callAi'],
                 'documentation' => ['help']
             ],
             'authentication' => [
@@ -3045,12 +3233,12 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'token_format' => 'tvt_<48 hex characters>',
                 'default_token' => 'tvt_dev_default_change_me_in_production (CHANGE IN PRODUCTION!)',
                 'role_system' => [
-                    '*' => 'Superadmin - full access to all 77 commands including token/role management',
-                    'viewer' => 'Read-only access (26 commands) - get*, list*, validate*, help',
-                    'editor' => 'Content editing (45 commands) - viewer + structure, translations, assets',
-                    'designer' => 'Style editing (54 commands) - editor + CSS, animations, visual elements',
-                    'developer' => 'Build access (59 commands) - designer + build, deploy, projects',
-                    'admin' => 'Full except tokens (72 commands) - developer + all except token/role management'
+                    '*' => 'Superadmin - full access to all 81 commands including token/role management',
+                    'viewer' => 'Read-only access (28 commands) - get*, list*, validate*, help, listAiProviders',
+                    'editor' => 'Content editing (47 commands) - viewer + structure, translations, assets',
+                    'designer' => 'Style editing (56 commands) - editor + CSS, animations, visual elements',
+                    'developer' => 'Build access (63 commands) - designer + build, deploy, projects, AI generation',
+                    'admin' => 'Full except tokens (76 commands) - developer + all except token/role management'
                 ],
                 'endpoints' => [
                     'listRoles' => 'View available roles (* sees commands, others see names only)',
@@ -3067,7 +3255,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'config_file' => 'secure/management/config/auth.php',
                 'allowed_methods' => ['GET', 'POST', 'OPTIONS']
             ],
-            'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getSiteMap, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listTokens, listComponents, listPages, listAliases. POST commands: all others.',
+            'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getSiteMap, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listTokens, listComponents, listPages, listAliases, listAiProviders. POST commands: all others.',
             'note' => 'For GET commands with URL parameters, use URL segments (e.g., /getStructure/menu, /validateTranslations/en, /getStyleRule/.btn-primary, /getSiteMap/text). For POST commands, send parameters as JSON in request body. For file uploads, use multipart/form-data encoding.',
             'workflows' => [
                 'translation_workflow' => '1) analyzeTranslations for full health check, OR 2) validateTranslations to find missing, 3) getUnusedTranslationKeys to find orphans, 4) setTranslationKeys to add/update, 5) deleteTranslationKeys to clean up.',
@@ -3082,7 +3270,8 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'sitemap_workflow' => '1) getSiteMap for JSON data with route details and coverage, 2) getSiteMap/text to generate plain text sitemap.txt for SEO crawlers.',
                 'project_workflow' => '1) listProjects to see all available projects, 2) getActiveProject to check current project, 3) createProject to start a new project, 4) switchProject to change active project, 5) deleteProject to remove (requires confirm=true).',
                 'backup_workflow' => '1) backupProject to create instant backup, 2) listBackups to see available backups with size/age info, 3) restoreBackup to restore from backup (optional pre-restore backup), 4) deleteBackup to free disk space.',
-                'export_workflow' => '1) exportProject to create shareable ZIP (JSON-only, secure), 2) downloadExport to download the ZIP, 3) importProject to import from ZIP (rebuilds PHP from JSON), 4) clearExports to clean up old exports.'
+                'export_workflow' => '1) exportProject to create shareable ZIP (JSON-only, secure), 2) downloadExport to download the ZIP, 3) importProject to import from ZIP (rebuilds PHP from JSON), 4) clearExports to clean up old exports.',
+                'ai_workflow' => '1) listAiProviders to see supported AI providers, 2) detectProvider to identify provider from key prefix, 3) testAiKey to validate key and get available models, 4) callAi to make AI completion requests (BYOK - user provides own API key per-request).'
             ]
         ]);
 }

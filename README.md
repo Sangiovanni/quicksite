@@ -20,7 +20,7 @@ That question turned a template into a CMS. The file-based architecture wasn't a
 - **JSON-Driven Templates**: Define page structures, menus, and components in JSON, compiled to optimized PHP
 - **Multilingual Support**: Built-in translation system with language switching and validation
 - **Production Builds**: One-command deployment with compilation, optimization, and ZIP packaging
-- **RESTful Management API**: 77 endpoints for complete site management
+- **RESTful Management API**: 81 endpoints for complete site management
 - **File-Based Storage**: No database required - all configuration in JSON/PHP files
 - **Flexible Architecture**: Separate public and secure folders for clean deployment
 - **🔐 API Authentication**: Bearer token authentication with role-based permissions
@@ -155,12 +155,12 @@ curl -H "Authorization: Bearer your_token_here" \
 **Role-Based Permissions:**
 | Role | Access |
 |------|--------|
-| `viewer` | Read-only (22 commands): get*, list*, help |
-| `editor` | Content editing (40 commands): edit*, add*, delete content |
-| `designer` | Styling (48 commands): CSS, styles, visual design |
-| `developer` | Build & deploy (53 commands): build, deploy, downloads |
-| `admin` | Full admin (71 commands): everything except token/role management |
-| `*` (superadmin) | Full access including token and role management |
+| `viewer` | Read-only (23 commands): get*, list*, help |
+| `editor` | Content editing (43 commands): edit*, add*, delete content |
+| `designer` | Styling (51 commands): CSS, styles, visual design |
+| `developer` | Build & deploy (57 commands): build, deploy, downloads, AI |
+| `admin` | Full admin (75 commands): everything except token/role management |
+| `*` (superadmin) | Full access (81 commands) including token and role management |
 
 Tokens are assigned a role via `generateToken`. Use `getMyPermissions` to check current access.
 
@@ -280,6 +280,14 @@ Tokens are assigned a role via `generateToken`. Use `getMyPermissions` to check 
 - `PATCH /management/editRole` - Modify role description or commands (superadmin only)
 - `DELETE /management/deleteRole` - Delete custom role (superadmin only)
 
+#### **AI Integration (BYOK)**
+- `GET /management/listAiProviders` - List supported AI providers (OpenAI, Anthropic, Google, Mistral)
+- `POST /management/detectProvider` - Detect provider from API key prefix
+- `POST /management/testAiKey` - Validate API key and get available models
+- `POST /management/callAi` - Make AI completion request (server proxies to avoid CORS)
+
+> **BYOK (Bring Your Own Key)**: Users provide their own API keys per-request. Keys are used once, never stored on disk, and immediately garbage collected. You control your own AI costs and data.
+
 #### **Documentation**
 - `GET /management/help/{command?}` - API documentation (all commands or specific)
 
@@ -314,7 +322,7 @@ quicksite/                    # Root installation
 │   ├── logs/                # System logs
 │   │
 │   ├── management/          # Core Management API (shared)
-│   │   ├── command/         # API command handlers (77 commands)
+│   │   ├── command/         # API command handlers (81 commands)
 │   │   ├── classes/         # ApiResponse, CssParser, JsonCompiler, etc.
 │   │   ├── functions/       # PathManagement, AuthManagement, etc.
 │   │   └── routes.php       # Management route definitions
@@ -487,7 +495,7 @@ Template Vitrine follows a **file-based, zero-database philosophy** - but that d
 
 ### Current Version (v1.5.0)
 - ✅ Complete file-based CMS with JSON templates
-- ✅ RESTful API with 55 commands
+- ✅ RESTful API with 81 commands
 - ✅ Bearer token authentication with RBAC
 - ✅ CORS support for external UIs
 - ✅ Production build system

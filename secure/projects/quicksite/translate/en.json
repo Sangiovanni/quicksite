@@ -91,7 +91,10 @@
             "build": "Build & Deploy",
             "auth": "Token Management",
             "docs": "Documentation",
-            "project": "Project Management"
+            "project": "Project Management",
+            "ai": "AI Integration",
+            "roles": "Roles & Permissions",
+            "storage": "Storage Monitoring"
         },
         "cmd": {
             "setPublicSpace": {
@@ -434,6 +437,99 @@
                 "desc": "Downloads a previously exported project archive",
                 "params": {
                     "filename": "Name of the export file to download"
+                }
+            },
+            "clearExports": {
+                "desc": "Clears all exported ZIP files to free disk space"
+            },
+            "backupProject": {
+                "desc": "Creates a timestamped backup of a project for internal recovery",
+                "params": {
+                    "name": "Project name (defaults to active project)",
+                    "max_backups": "Maximum backups to keep (default: 5)"
+                }
+            },
+            "listBackups": {
+                "desc": "Lists all available backups for a project with size and date info",
+                "params": {
+                    "name": "Project name (defaults to active project)"
+                }
+            },
+            "restoreBackup": {
+                "desc": "Restores a project from a backup (auto-creates pre-restore backup first)",
+                "params": {
+                    "backup": "Backup timestamp name to restore",
+                    "name": "Project name (defaults to active project)"
+                }
+            },
+            "deleteBackup": {
+                "desc": "Deletes a specific backup to free disk space",
+                "params": {
+                    "backup": "Backup timestamp name to delete",
+                    "name": "Project name (defaults to active project)"
+                }
+            },
+            "getSiteMap": {
+                "desc": "Generates a complete sitemap of all routes × all languages for SEO",
+                "params": {
+                    "format": "Output format: json (default) or text"
+                }
+            },
+            "getSizeInfo": {
+                "desc": "Returns detailed storage information for all project folders"
+            },
+            "listAiProviders": {
+                "desc": "Lists all supported AI providers (OpenAI, Anthropic, Google, Mistral) for BYOK integration"
+            },
+            "detectProvider": {
+                "desc": "Detects the AI provider from an API key prefix (sk- = OpenAI, sk-ant- = Anthropic)",
+                "params": {
+                    "key": "API key to analyze"
+                }
+            },
+            "testAiKey": {
+                "desc": "Tests if an API key is valid by making a minimal API call",
+                "params": {
+                    "key": "API key to test",
+                    "provider": "Provider name (required if key has no detectable prefix)"
+                }
+            },
+            "callAi": {
+                "desc": "Makes an AI completion request via the specified provider (BYOK proxy)",
+                "params": {
+                    "key": "API key for the provider",
+                    "provider": "Provider to use (openai, anthropic, google, mistral)",
+                    "model": "Model name (from testAiKey models list)",
+                    "messages": "Chat messages array with role and content"
+                }
+            },
+            "listRoles": {
+                "desc": "Lists all available roles in the system with their command counts"
+            },
+            "getMyPermissions": {
+                "desc": "Returns the current token's role and accessible commands"
+            },
+            "createRole": {
+                "desc": "Creates a new custom role with specified commands (superadmin only)",
+                "params": {
+                    "name": "Role name (lowercase alphanumeric with underscores)",
+                    "description": "Human-readable description",
+                    "commands": "Array of command names this role can execute"
+                }
+            },
+            "editRole": {
+                "desc": "Edits an existing role. Builtin roles can only have description changed.",
+                "params": {
+                    "name": "Name of the role to edit",
+                    "description": "New description (optional)",
+                    "commands": "New command list (custom roles only)"
+                }
+            },
+            "deleteRole": {
+                "desc": "Deletes a custom role (builtin roles cannot be deleted)",
+                "params": {
+                    "name": "Name of the role to delete",
+                    "force": "Reassign tokens to viewer role if in use"
                 }
             }
         },

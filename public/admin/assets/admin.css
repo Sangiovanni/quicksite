@@ -93,6 +93,16 @@ code{
     flex-direction: column;
 }
 
+/* Override main site form styling within admin panel */
+.admin-body form {
+    background: transparent;
+    box-shadow: none;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+}
+
 .admin-body--login {
     background: linear-gradient(135deg, var(--admin-bg) 0%, var(--admin-bg-secondary) 100%);
 }
@@ -1257,6 +1267,16 @@ code{
     opacity: 0.6;
 }
 
+/* Success button variant */
+.admin-btn--success {
+    background: var(--admin-success) !important;
+    color: #ffffff !important;
+}
+
+.admin-btn--success:hover:not(:disabled) {
+    background: #4a9f6a !important;
+}
+
 /* =============================================================================
    KEYBOARD SHORTCUTS MODAL
    ============================================================================= */
@@ -1360,6 +1380,7 @@ code{
     top: 100%;
     left: 0;
     min-width: 180px;
+    max-width: 220px;
     background: var(--admin-bg-secondary);
     border: 1px solid var(--admin-border);
     border-radius: var(--radius-md);
@@ -1375,6 +1396,10 @@ code{
 .admin-nav__group-dropdown .admin-nav__link {
     width: 100%;
     justify-content: flex-start;
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Highlight group toggle when child is active */

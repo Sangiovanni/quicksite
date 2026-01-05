@@ -108,7 +108,10 @@
             "build": "Build & Déploiement",
             "auth": "Gestion des Tokens",
             "docs": "Documentation",
-            "project": "Gestion des Projets"
+            "project": "Gestion des Projets",
+            "ai": "Intégration IA",
+            "roles": "Rôles & Permissions",
+            "storage": "Surveillance du Stockage"
         },
         "cmd": {
             "setPublicSpace": {
@@ -451,6 +454,99 @@
                 "desc": "Télécharge une archive de projet précédemment exportée",
                 "params": {
                     "filename": "Nom du fichier d'export à télécharger"
+                }
+            },
+            "clearExports": {
+                "desc": "Supprime tous les fichiers ZIP exportés pour libérer de l'espace disque"
+            },
+            "backupProject": {
+                "desc": "Crée une sauvegarde horodatée d'un projet pour récupération interne",
+                "params": {
+                    "name": "Nom du projet (par défaut: projet actif)",
+                    "max_backups": "Nombre maximum de sauvegardes à conserver (défaut: 5)"
+                }
+            },
+            "listBackups": {
+                "desc": "Liste toutes les sauvegardes disponibles pour un projet avec taille et date",
+                "params": {
+                    "name": "Nom du projet (par défaut: projet actif)"
+                }
+            },
+            "restoreBackup": {
+                "desc": "Restaure un projet depuis une sauvegarde (crée automatiquement une sauvegarde pré-restauration)",
+                "params": {
+                    "backup": "Nom horodaté de la sauvegarde à restaurer",
+                    "name": "Nom du projet (par défaut: projet actif)"
+                }
+            },
+            "deleteBackup": {
+                "desc": "Supprime une sauvegarde spécifique pour libérer de l'espace disque",
+                "params": {
+                    "backup": "Nom horodaté de la sauvegarde à supprimer",
+                    "name": "Nom du projet (par défaut: projet actif)"
+                }
+            },
+            "getSiteMap": {
+                "desc": "Génère un sitemap complet de toutes les routes × toutes les langues pour le SEO",
+                "params": {
+                    "format": "Format de sortie: json (défaut) ou text"
+                }
+            },
+            "getSizeInfo": {
+                "desc": "Retourne des informations détaillées sur le stockage de tous les dossiers du projet"
+            },
+            "listAiProviders": {
+                "desc": "Liste tous les fournisseurs IA supportés (OpenAI, Anthropic, Google, Mistral) pour l'intégration BYOK"
+            },
+            "detectProvider": {
+                "desc": "Détecte le fournisseur IA depuis un préfixe de clé API (sk- = OpenAI, sk-ant- = Anthropic)",
+                "params": {
+                    "key": "Clé API à analyser"
+                }
+            },
+            "testAiKey": {
+                "desc": "Teste si une clé API est valide en faisant un appel API minimal",
+                "params": {
+                    "key": "Clé API à tester",
+                    "provider": "Nom du fournisseur (requis si la clé n'a pas de préfixe détectable)"
+                }
+            },
+            "callAi": {
+                "desc": "Fait une requête de complétion IA via le fournisseur spécifié (proxy BYOK)",
+                "params": {
+                    "key": "Clé API pour le fournisseur",
+                    "provider": "Fournisseur à utiliser (openai, anthropic, google, mistral)",
+                    "model": "Nom du modèle (depuis la liste testAiKey)",
+                    "messages": "Tableau de messages chat avec rôle et contenu"
+                }
+            },
+            "listRoles": {
+                "desc": "Liste tous les rôles disponibles dans le système avec leur nombre de commandes"
+            },
+            "getMyPermissions": {
+                "desc": "Retourne le rôle du token actuel et les commandes accessibles"
+            },
+            "createRole": {
+                "desc": "Crée un nouveau rôle personnalisé avec des commandes spécifiées (superadmin uniquement)",
+                "params": {
+                    "name": "Nom du rôle (alphanumérique minuscule avec underscores)",
+                    "description": "Description lisible",
+                    "commands": "Tableau des noms de commandes que ce rôle peut exécuter"
+                }
+            },
+            "editRole": {
+                "desc": "Modifie un rôle existant. Les rôles intégrés ne peuvent avoir que leur description modifiée.",
+                "params": {
+                    "name": "Nom du rôle à modifier",
+                    "description": "Nouvelle description (optionnel)",
+                    "commands": "Nouvelle liste de commandes (rôles personnalisés uniquement)"
+                }
+            },
+            "deleteRole": {
+                "desc": "Supprime un rôle personnalisé (les rôles intégrés ne peuvent pas être supprimés)",
+                "params": {
+                    "name": "Nom du rôle à supprimer",
+                    "force": "Réassigner les tokens au rôle viewer si utilisé"
                 }
             }
         },

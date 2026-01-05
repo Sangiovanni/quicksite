@@ -24,6 +24,7 @@ class AdminRouter {
         'batch',      // Batch command execution
         'docs',       // API documentation
         'ai',         // AI Integration / Communication spec
+        'ai-settings', // AI Provider Settings (BYOK)
         'logout'      // Logout action
     ];
 

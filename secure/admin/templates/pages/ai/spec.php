@@ -154,7 +154,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
 }
 
 .ai-spec-card {
-    background: var(--admin-card-bg);
+    background: var(--admin-bg);
     border: 1px solid var(--admin-border);
     border-radius: var(--radius-lg);
     overflow: hidden;
@@ -172,6 +172,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
 
 .ai-spec-card__body {
     padding: var(--space-lg);
+    overflow: hidden;
 }
 
 /* Parameter Form */
@@ -267,6 +268,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
 
 .ai-spec-user-prompt__textarea {
     width: 100%;
+    max-width: 100%;
     min-height: 150px;
     padding: var(--space-md);
     border: 1px solid var(--admin-border);
@@ -276,6 +278,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
     background: var(--admin-bg);
     color: var(--admin-text);
     resize: vertical;
+    box-sizing: border-box;
 }
 
 .ai-spec-user-prompt__textarea:focus {
@@ -329,6 +332,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
 
 .ai-spec-prompt__textarea {
     width: 100%;
+    max-width: 100%;
     min-height: 400px;
     padding: var(--space-md);
     border: 1px solid var(--admin-border);
@@ -339,21 +343,79 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
     background: var(--admin-bg);
     color: var(--admin-text);
     resize: vertical;
+    box-sizing: border-box;
 }
 
 .ai-spec-prompt__actions {
     display: flex;
     gap: var(--space-sm);
     margin-top: var(--space-md);
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.ai-spec-prompt__hint {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--admin-bg-tertiary);
+    border-radius: var(--radius-sm);
 }
 
 .ai-spec-prompt__stats {
-    margin-left: auto;
     font-size: var(--font-size-xs);
     color: var(--admin-text-muted);
     display: flex;
     align-items: center;
     gap: var(--space-md);
+}
+
+/* API Integration Section (optional) */
+.api-integration-wrapper {
+    width: 100%;
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px dashed var(--admin-border);
+}
+
+.api-integration-divider {
+    display: flex;
+    align-items: center;
+    margin-bottom: var(--space-sm);
+}
+
+.api-integration-divider span {
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.api-integration-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+}
+
+.api-integration-controls select {
+    min-width: 200px;
+    max-width: 280px;
+    font-size: var(--font-size-sm);
+}
+
+.api-integration-controls select optgroup {
+    font-weight: 600;
+    color: var(--admin-text);
+}
+
+.api-integration-controls select option {
+    font-weight: 400;
+    padding-left: var(--space-sm);
 }
 
 /* Related Commands */
@@ -452,6 +514,34 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
     color: #dc2626;
     font-size: var(--font-size-sm);
     margin-top: var(--space-sm);
+}
+
+/* Auto options */
+.ai-auto-options {
+    display: flex;
+    gap: var(--space-md);
+    margin-left: auto;
+    align-items: center;
+}
+
+.ai-auto-option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+    cursor: pointer;
+    user-select: none;
+}
+
+.ai-auto-option input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--admin-primary);
+}
+
+.ai-auto-option:hover {
+    color: var(--admin-text);
 }
 
 /* Command Preview */
@@ -958,23 +1048,46 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                     </div>
                     <textarea id="prompt-output" class="ai-spec-prompt__textarea" readonly placeholder="<?= __admin('ai.spec.promptPlaceholder', 'Fill in the parameters and click Generate to create a prompt...') ?>"></textarea>
                     <div class="ai-spec-prompt__actions">
-                        <button type="button" id="copy-prompt" class="admin-btn admin-btn--secondary" disabled>
+                        <!-- Primary Action: Copy (works for everyone) -->
+                        <button type="button" id="copy-prompt" class="admin-btn admin-btn--primary" disabled>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                             </svg>
-                            <?= __admin('ai.spec.copyPrompt', 'Copy') ?>
+                            <span id="copy-prompt-text"><?= __admin('ai.spec.copyPrompt', 'Copy Prompt') ?></span>
                         </button>
-                        <span id="prompt-next-step" class="admin-btn admin-btn--ghost" style="display: none; cursor: default; opacity: 0.8;">
+                        
+                        <!-- Hint for manual workflow -->
+                        <span id="prompt-next-step" class="ai-spec-prompt__hint" style="display: none;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 5v14"/>
-                                <path d="M19 12l-7 7-7-7"/>
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4"/>
+                                <path d="M12 8h.01"/>
                             </svg>
-                            <?= __admin('ai.spec.pasteBelow', 'Paste AI response below') ?>
+                            <?= __admin('ai.spec.pasteInAi', 'Paste in ChatGPT, Gemini, or Claude') ?>
                         </span>
+                        
                         <div class="ai-spec-prompt__stats">
                             <span id="char-count">0 <?= __admin('ai.spec.chars', 'chars') ?></span>
                             <span id="word-count">0 <?= __admin('ai.spec.words', 'words') ?></span>
+                        </div>
+                        
+                        <!-- Optional: Direct AI Integration (for users with API keys) -->
+                        <div id="api-integration-wrapper" class="api-integration-wrapper" style="display: none;">
+                            <div class="api-integration-divider">
+                                <span><?= __admin('ai.spec.orSendDirectly', 'or send directly') ?></span>
+                            </div>
+                            <div class="api-integration-controls">
+                                <select id="provider-selector" class="admin-select admin-select--sm" title="<?= __admin('ai.spec.selectModel', 'Select model') ?>">
+                                </select>
+                                <button type="button" id="send-to-ai" class="admin-btn admin-btn--secondary" disabled>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M22 2L11 13"/>
+                                        <path d="M22 2l-7 20-4-9-9-4 20-7z"/>
+                                    </svg>
+                                    <span id="send-to-ai-text"><?= __admin('ai.spec.sendToAi', 'Send') ?></span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1008,6 +1121,16 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                             </svg>
                             <?= __admin('ai.spec.previewCommands', 'Preview Commands') ?>
                         </button>
+                        <div class="ai-auto-options">
+                            <label class="ai-auto-option">
+                                <input type="checkbox" id="auto-preview-checkbox">
+                                <span><?= __admin('ai.spec.autoPreview', 'Auto preview') ?></span>
+                            </label>
+                            <label class="ai-auto-option">
+                                <input type="checkbox" id="auto-execute-checkbox">
+                                <span><?= __admin('ai.spec.autoExecute', 'Auto execute') ?></span>
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1114,10 +1237,227 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
     const promptOutput = document.getElementById('prompt-output');
     const promptLoading = document.getElementById('prompt-loading');
     const copyBtn = document.getElementById('copy-prompt');
+    const sendToAiBtn = document.getElementById('send-to-ai');
+    const sendToAiText = document.getElementById('send-to-ai-text');
     const promptNextStep = document.getElementById('prompt-next-step');
     const charCount = document.getElementById('char-count');
     const wordCount = document.getElementById('word-count');
     const userPromptTextarea = document.getElementById('user-prompt');
+    
+    // AI storage keys (v2 - multi-provider support, must match ai-settings.php)
+    const AI_STORAGE_KEYS = {
+        keysV2: 'quicksite_ai_keys_v2',
+        defaultProvider: 'quicksite_ai_default_provider',
+        persist: 'quicksite_ai_persist',
+        // Legacy v1 keys for migration
+        legacyKey: 'quicksite_ai_key',
+        legacyProvider: 'quicksite_ai_provider',
+        legacyModel: 'quicksite_ai_model'
+    };
+    
+    // Get AI configuration from storage (v2 format with v1 fallback)
+    function getAiConfig() {
+        const persist = localStorage.getItem(AI_STORAGE_KEYS.persist) === 'true';
+        const storage = persist ? localStorage : sessionStorage;
+        
+        // Try v2 format first
+        const storedData = storage.getItem(AI_STORAGE_KEYS.keysV2);
+        const defaultProvider = storage.getItem(AI_STORAGE_KEYS.defaultProvider);
+        
+        if (storedData && defaultProvider) {
+            try {
+                const providers = JSON.parse(storedData);
+                const provider = providers[defaultProvider];
+                if (provider && provider.key) {
+                    return {
+                        key: provider.key,
+                        provider: defaultProvider,
+                        model: provider.defaultModel,
+                        name: provider.name,
+                        models: provider.models || [],
+                        enabledModels: provider.enabledModels || provider.models || [],
+                        configured: true,
+                        allProviders: providers
+                    };
+                }
+            } catch (e) {
+                console.warn('Failed to parse AI config v2:', e);
+            }
+        }
+        
+        // Fallback to v1 format
+        const legacyKey = storage.getItem(AI_STORAGE_KEYS.legacyKey);
+        if (legacyKey) {
+            return {
+                key: legacyKey,
+                provider: storage.getItem(AI_STORAGE_KEYS.legacyProvider),
+                model: storage.getItem(AI_STORAGE_KEYS.legacyModel),
+                configured: true,
+                allProviders: null
+            };
+        }
+        
+        return {
+            key: null,
+            provider: null,
+            model: null,
+            configured: false,
+            allProviders: null
+        };
+    }
+    
+    // Initialize provider selector for multi-provider support
+    const apiIntegrationWrapper = document.getElementById('api-integration-wrapper');
+    const providerSelector = document.getElementById('provider-selector');
+    let selectedProviderId = null;
+    let selectedModelId = null;
+    
+    // Known models for reference (with free tier info where applicable)
+    // Note: Free tier availability changes - Google Gemini is currently the best free option
+    const knownModels = {
+        openai: {
+            recommended: ['gpt-4o', 'gpt-4-turbo', 'gpt-4'],
+            popular: ['gpt-4o-mini', 'gpt-3.5-turbo', 'o1', 'o1-mini'],
+            freeTier: false // OpenAI requires billing
+        },
+        anthropic: {
+            recommended: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
+            popular: ['claude-3-5-haiku-20241022', 'claude-3-haiku-20240307'],
+            freeTier: false // Anthropic requires billing
+        },
+        google: {
+            recommended: ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+            popular: ['gemini-2.0-flash', 'gemini-1.0-pro'],
+            freeTier: true, // Google offers generous free tier
+            freeTierModels: ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro']
+        },
+        mistral: {
+            recommended: ['mistral-large-latest', 'mistral-medium-latest'],
+            popular: ['mistral-small-latest', 'open-mixtral-8x22b', 'open-mistral-7b'],
+            freeTier: false // Mistral requires billing
+        }
+    };
+    
+    function initializeProviderSelector() {
+        const aiConfig = getAiConfig();
+        
+        // If no providers configured, hide the API integration section entirely
+        if (!aiConfig.configured || !aiConfig.allProviders) {
+            apiIntegrationWrapper.style.display = 'none';
+            selectedProviderId = aiConfig.provider;
+            selectedModelId = aiConfig.model;
+            return;
+        }
+        
+        const providers = Object.entries(aiConfig.allProviders);
+        
+        // Show the API integration section
+        apiIntegrationWrapper.style.display = 'block';
+        providerSelector.innerHTML = '';
+        
+        // Build optgroups for each provider with their models
+        providers.forEach(([providerId, data]) => {
+            const optgroup = document.createElement('optgroup');
+            const known = knownModels[providerId] || { recommended: [], popular: [], freeTier: false, freeTierModels: [] };
+            
+            // Add free tier indicator to provider label
+            optgroup.label = data.name + (known.freeTier ? ' 🆓' : '');
+            
+            // Use enabledModels if available (user-filtered), otherwise all models
+            const availableModels = data.enabledModels || data.models || [];
+            
+            // Sort models: recommended first, then popular, then rest
+            const sortedModels = sortModels(availableModels, known.recommended, known.popular, known.freeTierModels || []);
+            
+            sortedModels.forEach(modelInfo => {
+                const option = document.createElement('option');
+                option.value = `${providerId}::${modelInfo.model}`;
+                
+                // Build label with badges
+                let label = modelInfo.model;
+                if (modelInfo.isRecommended) {
+                    label = '⭐ ' + label;
+                    if (modelInfo.isFreeTier) {
+                        label += ' 🆓';
+                    }
+                } else if (modelInfo.isFreeTier) {
+                    label = '🆓 ' + label;
+                } else if (modelInfo.isNew) {
+                    label = '🆕 ' + label;
+                }
+                
+                option.textContent = label;
+                
+                // Select if this is the default model for the default provider
+                if (providerId === aiConfig.provider && modelInfo.model === data.defaultModel) {
+                    option.selected = true;
+                    selectedProviderId = providerId;
+                    selectedModelId = modelInfo.model;
+                }
+                
+                optgroup.appendChild(option);
+            });
+            
+            providerSelector.appendChild(optgroup);
+        });
+        
+        // If no selection was made, select the first option
+        if (!selectedProviderId && providerSelector.options.length > 0) {
+            providerSelector.selectedIndex = 0;
+            const firstValue = providerSelector.value;
+            if (firstValue) {
+                [selectedProviderId, selectedModelId] = firstValue.split('::');
+            }
+        }
+    }
+    
+    // Sort models: recommended first, then popular, then rest (mark new and free tier ones)
+    function sortModels(availableModels, recommended, popular, freeTierModels = []) {
+        const allKnown = [...recommended, ...popular];
+        
+        return availableModels.map(model => {
+            const isRecommended = recommended.includes(model);
+            const isPopular = popular.includes(model);
+            const isNew = !allKnown.some(known => model.includes(known) || known.includes(model));
+            const isFreeTier = freeTierModels.some(free => model.includes(free) || free.includes(model));
+            
+            return {
+                model,
+                isRecommended,
+                isPopular,
+                isNew,
+                isFreeTier,
+                sortOrder: isRecommended ? 0 : (isPopular ? 1 : (isNew ? 3 : 2))
+            };
+        }).sort((a, b) => a.sortOrder - b.sortOrder);
+    }
+    
+    // Handle provider/model selection change
+    providerSelector.addEventListener('change', function() {
+        const value = this.value;
+        if (value && value.includes('::')) {
+            [selectedProviderId, selectedModelId] = value.split('::');
+        }
+    });
+    
+    // Get config for a specific provider with optional model override
+    function getProviderConfig(providerId, modelOverride = null) {
+        const aiConfig = getAiConfig();
+        if (!aiConfig.allProviders || !aiConfig.allProviders[providerId]) {
+            return aiConfig; // Fallback to default
+        }
+        const provider = aiConfig.allProviders[providerId];
+        return {
+            key: provider.key,
+            provider: providerId,
+            model: modelOverride || provider.defaultModel,
+            name: provider.name,
+            configured: true
+        };
+    }
+    
+    // Initialize on page load
+    initializeProviderSelector();
     
     // Evaluate condition expression
     function evaluateCondition(condition, formData) {
@@ -1190,6 +1530,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
         promptLoading.style.display = 'flex';
         promptOutput.style.display = 'none';
         copyBtn.disabled = true;
+        sendToAiBtn.disabled = true;
         promptNextStep.style.display = 'none';
         
         try {
@@ -1216,6 +1557,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                 
                 promptOutput.value = finalPrompt;
                 copyBtn.disabled = false;
+                sendToAiBtn.disabled = false;
                 promptNextStep.style.display = 'inline-flex';
                 updateStats(finalPrompt);
             } else {
@@ -1276,17 +1618,237 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
         });
     });
     
-    // Copy button
+    // Copy button - primary action for manual workflow
+    const copyPromptText = document.getElementById('copy-prompt-text');
+    // promptNextStep already declared earlier in the file
+    
     copyBtn.addEventListener('click', async function() {
         try {
             await navigator.clipboard.writeText(promptOutput.value);
-            const originalText = this.innerHTML;
-            this.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> <?= __admin('ai.spec.copied', 'Copied!') ?>';
-            setTimeout(() => { this.innerHTML = originalText; }, 2000);
+            const originalText = copyPromptText.textContent;
+            copyPromptText.textContent = '<?= __admin('ai.spec.copied', 'Copied!') ?>';
+            this.classList.add('admin-btn--success');
+            
+            // Show the hint for next step
+            promptNextStep.style.display = 'flex';
+            
+            // Also show the AI Response section for pasting
+            const aiResponseSection = document.querySelector('.ai-response-section');
+            if (aiResponseSection) {
+                aiResponseSection.style.display = 'block';
+                aiResponseSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            
+            setTimeout(() => { 
+                copyPromptText.textContent = originalText;
+                this.classList.remove('admin-btn--success');
+            }, 3000);
         } catch (err) {
             // Fallback
             promptOutput.select();
             document.execCommand('copy');
+        }
+    });
+    
+    // Send to AI button
+    sendToAiBtn.addEventListener('click', async function() {
+        const baseConfig = getAiConfig();
+        
+        // Check if AI is configured
+        if (!baseConfig.configured) {
+            if (confirm('<?= __admin('ai.spec.configureAiFirst', 'No AI API key configured. Would you like to configure it now?') ?>')) {
+                window.location.href = '<?= $router->getBaseUrl() ?>/admin/ai-settings';
+            }
+            return;
+        }
+        
+        // Get the selected provider's config (for multi-provider support)
+        // Get the selected provider's config with the selected model
+        const aiConfig = selectedProviderId 
+            ? getProviderConfig(selectedProviderId, selectedModelId) 
+            : baseConfig;
+        
+        const prompt = promptOutput.value;
+        if (!prompt) {
+            alert('<?= __admin('ai.spec.noPrompt', 'Please generate a prompt first.') ?>');
+            return;
+        }
+        
+        // Reset UI state - show fresh AI Response section, hide previous results
+        const aiResponseSection = document.querySelector('.ai-response-section');
+        const aiResponseInput = document.getElementById('ai-response-input');
+        const executionResultsSection = document.querySelector('.execution-results-section');
+        
+        if (aiResponseSection) {
+            aiResponseSection.style.display = 'block';
+            if (aiResponseInput) aiResponseInput.value = '';
+        }
+        if (executionResultsSection) {
+            executionResultsSection.style.display = 'none';
+        }
+        
+        // Show loading state with timer
+        const originalText = sendToAiText.textContent;
+        sendToAiBtn.disabled = true;
+        
+        // Start countdown timer
+        const maxTimeout = 180; // 3 minutes max
+        let elapsedSeconds = 0;
+        let abortController = new AbortController();
+        
+        const formatTime = (seconds) => {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        };
+        
+        const updateTimer = () => {
+            elapsedSeconds++;
+            const remaining = maxTimeout - elapsedSeconds;
+            if (remaining >= 0) {
+                sendToAiText.textContent = `⏳ ${formatTime(elapsedSeconds)} / ${formatTime(maxTimeout)}`;
+            }
+        };
+        
+        const timerInterval = setInterval(updateTimer, 1000);
+        sendToAiText.textContent = `⏳ 0:00 / ${formatTime(maxTimeout)}`;
+        
+        // Add cancel functionality - change button temporarily
+        const originalOnClick = sendToAiBtn.onclick;
+        sendToAiBtn.disabled = false;
+        sendToAiBtn.classList.add('admin-btn--danger');
+        sendToAiBtn.onclick = () => {
+            abortController.abort();
+            clearInterval(timerInterval);
+            sendToAiText.textContent = originalText;
+            sendToAiBtn.disabled = false;
+            sendToAiBtn.classList.remove('admin-btn--danger');
+            sendToAiBtn.onclick = originalOnClick;
+        };
+        
+        try {
+            const response = await fetch('<?= rtrim(BASE_URL, '/') ?>/management/callAi', {
+                signal: abortController.signal,
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer <?= $router->getToken() ?>'
+                },
+                body: JSON.stringify({
+                    key: aiConfig.key,
+                    provider: aiConfig.provider,
+                    model: selectedModelId || aiConfig.model,
+                    messages: [
+                        { role: 'user', content: prompt }
+                    ],
+                    // Request enough tokens for complex JSON responses
+                    max_tokens: 16384,
+                    // Allow up to 3 minutes for large responses
+                    timeout: 180
+                })
+            });
+            
+            const data = await response.json();
+            
+            // Stop timer and restore button
+            clearInterval(timerInterval);
+            sendToAiBtn.classList.remove('admin-btn--danger');
+            sendToAiBtn.onclick = null;
+            
+            // Log full response for debugging
+            console.log('AI Response:', data);
+            console.log(`⏱️ AI request completed in ${formatTime(elapsedSeconds)}`);
+            
+            // Log rate limit info if available
+            if (data.data?.rate_limits) {
+                console.log('📊 Rate Limits:', data.data.rate_limits);
+            }
+            
+            // Log usage info
+            if (data.data?.usage) {
+                console.log('📈 Token Usage:', data.data.usage);
+            }
+            
+            // Check for success using status code (2xx = success)
+            const isSuccess = data.status >= 200 && data.status < 300;
+            
+            if (isSuccess) {
+                let content = data.data?.content || '';
+                
+                // If no content but has debug info, log it
+                if (!content && data.data?.debug) {
+                    console.warn('AI response parsing issue:', data.data.debug);
+                    content = '/* DEBUG: Content could not be parsed. Raw response: */\n' + (data.data.debug.raw_response_preview || 'N/A');
+                }
+                
+                // Strip markdown code fences if present (```json ... ```)
+                content = content.trim();
+                if (content.startsWith('```')) {
+                    // Remove opening fence (```json, ```JSON, ``` etc.)
+                    content = content.replace(/^```[a-zA-Z]*\n?/, '');
+                    // Remove closing fence
+                    content = content.replace(/\n?```\s*$/, '');
+                }
+                
+                // Update AI response textarea (section already visible from reset)
+                const validateBtn = document.getElementById('validate-response');
+                
+                if (aiResponseInput) {
+                    aiResponseInput.value = content;
+                    
+                    // Auto-scroll to response section
+                    aiResponseSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    
+                    // Trigger auto-preview/execute flow if enabled
+                    setTimeout(() => {
+                        triggerAutoFlow();
+                    }, 300);
+                    
+                    // Show success feedback with time taken
+                    sendToAiText.textContent = `✅ ${formatTime(elapsedSeconds)}`;
+                    setTimeout(() => {
+                        sendToAiText.textContent = originalText;
+                        sendToAiBtn.disabled = false;
+                    }, 3000);
+                }
+            } else {
+                // Show error with helpful hints
+                const errorMsg = data.error || data.message || '<?= __admin('ai.spec.aiError', 'Failed to get AI response') ?>';
+                
+                // Provide helpful hints for common errors
+                let helpHint = '';
+                const errLower = errorMsg.toLowerCase();
+                if (errLower.includes('quota') || errLower.includes('exceeded') || errLower.includes('limit')) {
+                    helpHint = '\n\n💡 This usually means:\n• OpenAI: Add billing/credits to your account\n• Google: Try "gemini-1.5-flash" (better free tier)\n• The model you selected may not be available on free tier';
+                } else if (errLower.includes('not found') || errLower.includes('does not exist')) {
+                    helpHint = '\n\n💡 This model may not exist or be available. Try a different model from the dropdown.';
+                } else if (errLower.includes('invalid') && errLower.includes('key')) {
+                    helpHint = '\n\n💡 Your API key appears to be invalid. Check the key in AI Settings.';
+                } else if (errLower.includes('rate')) {
+                    helpHint = '\n\n💡 Rate limit reached. Wait a moment and try again.';
+                }
+                
+                alert('<?= __admin('ai.spec.aiErrorPrefix', 'AI Error: ') ?>' + errorMsg + helpHint);
+                sendToAiText.textContent = originalText;
+                sendToAiBtn.disabled = false;
+                sendToAiBtn.classList.remove('admin-btn--danger');
+                sendToAiBtn.onclick = null;
+            }
+        } catch (error) {
+            // Stop timer on error
+            clearInterval(timerInterval);
+            
+            // Handle abort differently
+            if (error.name === 'AbortError') {
+                console.log('AI request cancelled by user');
+                return; // Button already restored by cancel handler
+            }
+            
+            alert('<?= __admin('ai.spec.networkError', 'Network error: ') ?>' + error.message);
+            sendToAiText.textContent = originalText;
+            sendToAiBtn.disabled = false;
+            sendToAiBtn.classList.remove('admin-btn--danger');
+            sendToAiBtn.onclick = null;
         }
     });
     
@@ -1337,6 +1899,8 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
     const aiResponseError = document.getElementById('ai-response-error');
     const validateBtn = document.getElementById('validate-response');
     const previewBtn = document.getElementById('preview-commands');
+    const autoPreviewCheckbox = document.getElementById('auto-preview-checkbox');
+    const autoExecuteCheckbox = document.getElementById('auto-execute-checkbox');
     const commandPreviewSection = document.querySelector('.command-preview-section');
     const commandList = document.getElementById('command-list');
     const commandCount = document.getElementById('command-count');
@@ -1349,6 +1913,30 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
     const resetBtn = document.getElementById('reset-workflow');
     const freshStartOption = document.getElementById('fresh-start-option');
     const freshStartCheckbox = document.getElementById('fresh-start-checkbox');
+    
+    // Auto options storage keys
+    const AUTO_OPTIONS_KEYS = {
+        autoPreview: 'quicksite_ai_auto_preview',
+        autoExecute: 'quicksite_ai_auto_execute'
+    };
+    
+    // Load auto options from localStorage
+    function loadAutoOptions() {
+        autoPreviewCheckbox.checked = localStorage.getItem(AUTO_OPTIONS_KEYS.autoPreview) === 'true';
+        autoExecuteCheckbox.checked = localStorage.getItem(AUTO_OPTIONS_KEYS.autoExecute) === 'true';
+    }
+    
+    // Save auto options to localStorage
+    autoPreviewCheckbox.addEventListener('change', function() {
+        localStorage.setItem(AUTO_OPTIONS_KEYS.autoPreview, this.checked);
+    });
+    
+    autoExecuteCheckbox.addEventListener('change', function() {
+        localStorage.setItem(AUTO_OPTIONS_KEYS.autoExecute, this.checked);
+    });
+    
+    // Load settings on page load
+    loadAutoOptions();
     const freshStartModal = document.getElementById('fresh-start-modal');
     const modalCancelBtn = document.getElementById('modal-cancel');
     const modalProceedBtn = document.getElementById('modal-proceed');
@@ -1367,7 +1955,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
     
     // Validate JSON
     function validateJson() {
-        const jsonText = aiResponseInput.value.trim();
+        let jsonText = aiResponseInput.value.trim();
         aiResponseError.style.display = 'none';
         previewBtn.style.display = 'none';
         
@@ -1375,6 +1963,13 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
             aiResponseError.textContent = 'Please paste the JSON response from the AI.';
             aiResponseError.style.display = 'block';
             return null;
+        }
+        
+        // Strip markdown code fences if present (```json ... ```)
+        if (jsonText.startsWith('```')) {
+            jsonText = jsonText.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```\s*$/, '');
+            // Update the textarea with cleaned content
+            aiResponseInput.value = jsonText;
         }
         
         try {
@@ -1422,6 +2017,43 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
             previewBtn.style.display = 'inline-flex';
             aiResponseError.style.display = 'none';
         }
+    });
+    
+    // Trigger auto-preview and auto-execute flow
+    function triggerAutoFlow() {
+        const text = aiResponseInput.value.trim();
+        if (!text) return;
+        
+        const commands = validateJson();
+        if (commands) {
+            parsedCommands = commands;
+            previewBtn.style.display = 'inline-flex';
+            aiResponseError.style.display = 'none';
+            
+            // Auto-preview if enabled
+            if (autoPreviewCheckbox.checked) {
+                previewBtn.click();
+                
+                // Auto-execute if enabled (with small delay for UX)
+                if (autoExecuteCheckbox.checked) {
+                    setTimeout(() => {
+                        executeBtn.click();
+                    }, 300);
+                }
+            }
+        }
+    }
+    
+    // Auto-validate on input change (debounced)
+    let autoValidateTimeout = null;
+    aiResponseInput.addEventListener('input', function() {
+        // Clear previous timeout
+        if (autoValidateTimeout) clearTimeout(autoValidateTimeout);
+        
+        // Debounce: wait 500ms after user stops typing
+        autoValidateTimeout = setTimeout(() => {
+            triggerAutoFlow();
+        }, 500);
     });
     
     // Format parameters for preview

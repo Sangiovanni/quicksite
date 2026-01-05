@@ -182,6 +182,50 @@
     </div>
 </div>
 
+<!-- AI Configuration Quick Access -->
+<div class="admin-card" style="margin-top: var(--space-lg);">
+    <div class="admin-card__header">
+        <h2 class="admin-card__title">
+            <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+                <circle cx="7.5" cy="14.5" r="1.5"/>
+                <circle cx="16.5" cy="14.5" r="1.5"/>
+            </svg>
+            AI Configuration
+        </h2>
+        <a href="<?= $router->url('ai-settings') ?>" class="admin-btn admin-btn--small admin-btn--secondary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9"/>
+            </svg>
+            Manage Keys
+        </a>
+    </div>
+    <div class="admin-card__body">
+        <div id="ai-config-status">
+            <div class="admin-loading">
+                <span class="admin-spinner"></span>
+                Loading AI status...
+            </div>
+        </div>
+        
+        <div class="admin-form-group" style="margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--color-border);">
+            <label class="admin-label">Automation Options</label>
+            <p class="admin-hint" style="margin-bottom: var(--space-sm);">These settings apply when using AI specs.</p>
+            
+            <div class="admin-checkbox-group" style="margin-bottom: var(--space-sm);">
+                <input type="checkbox" id="ai-auto-preview" class="admin-checkbox" onchange="updateAiAutomation('autoPreview', this.checked)">
+                <label for="ai-auto-preview" class="admin-checkbox-label">Auto-preview commands when valid JSON is detected</label>
+            </div>
+            
+            <div class="admin-checkbox-group">
+                <input type="checkbox" id="ai-auto-execute" class="admin-checkbox" onchange="updateAiAutomation('autoExecute', this.checked)">
+                <label for="ai-auto-execute" class="admin-checkbox-label">Auto-execute commands after preview <span style="color: var(--admin-warning);">(use with caution)</span></label>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Tutorial Settings -->
 <div class="admin-card" style="margin-top: var(--space-lg);">
     <div class="admin-card__header">
@@ -222,13 +266,80 @@ document.addEventListener('DOMContentLoaded', function() {
     loadPreferences();
     loadTutorialStatus();
     loadPermissionsInfo();
+    loadAiConfigStatus();
 });
+
+// AI Configuration functions
+const AI_STORAGE_KEYS = {
+    keysV2: 'quicksite_ai_keys_v2',
+    defaultProvider: 'quicksite_ai_default_provider',
+    persist: 'quicksite_ai_persist',
+    autoPreview: 'quicksite_ai_auto_preview',
+    autoExecute: 'quicksite_ai_auto_execute'
+};
+
+function loadAiConfigStatus() {
+    const container = document.getElementById('ai-config-status');
+    const persist = localStorage.getItem(AI_STORAGE_KEYS.persist) === 'true';
+    const storage = persist ? localStorage : sessionStorage;
+    
+    // Load automation settings
+    document.getElementById('ai-auto-preview').checked = localStorage.getItem(AI_STORAGE_KEYS.autoPreview) === 'true';
+    document.getElementById('ai-auto-execute').checked = localStorage.getItem(AI_STORAGE_KEYS.autoExecute) === 'true';
+    
+    // Check for configured providers
+    const storedData = storage.getItem(AI_STORAGE_KEYS.keysV2);
+    const defaultProvider = storage.getItem(AI_STORAGE_KEYS.defaultProvider);
+    
+    if (storedData && defaultProvider) {
+        try {
+            const providers = JSON.parse(storedData);
+            const providerCount = Object.keys(providers).length;
+            const defaultName = providers[defaultProvider]?.name || defaultProvider;
+            
+            container.innerHTML = `
+                <dl class="admin-definition-list">
+                    <dt>Status</dt>
+                    <dd><span class="admin-badge admin-badge--success">Configured</span></dd>
+                    
+                    <dt>Providers</dt>
+                    <dd>${providerCount} provider${providerCount > 1 ? 's' : ''} configured</dd>
+                    
+                    <dt>Default Provider</dt>
+                    <dd>${defaultName}</dd>
+                    
+                    <dt>Storage</dt>
+                    <dd>${persist ? 'Persistent (localStorage)' : 'Session only (cleared on tab close)'}</dd>
+                </dl>
+            `;
+        } catch (e) {
+            container.innerHTML = '<p class="admin-text-muted">No AI providers configured</p>';
+        }
+    } else {
+        container.innerHTML = `
+            <p class="admin-text-muted">No AI providers configured.</p>
+            <a href="<?= $router->url('ai-settings') ?>" class="admin-btn admin-btn--primary" style="margin-top: var(--space-sm);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Add API Key
+            </a>
+        `;
+    }
+}
+
+function updateAiAutomation(setting, value) {
+    const key = setting === 'autoPreview' ? AI_STORAGE_KEYS.autoPreview : AI_STORAGE_KEYS.autoExecute;
+    localStorage.setItem(key, value);
+    QuickSiteAdmin.showToast(`${setting === 'autoPreview' ? 'Auto-preview' : 'Auto-execute'} ${value ? 'enabled' : 'disabled'}`, 'success');
+}
 
 async function loadPermissionsInfo() {
     const container = document.getElementById('permissions-info');
     
     try {
-        const result = await QuickSiteAdmin.apiCall('getMyPermissions', 'GET');
+        const result = await QuickSiteAdmin.apiRequest('getMyPermissions', 'GET');
         
         if (result.ok && result.data?.data) {
             const data = result.data.data;

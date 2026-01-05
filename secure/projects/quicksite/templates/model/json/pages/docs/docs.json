@@ -817,6 +817,129 @@
                                 ]
                             }
                         ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-getSiteMap"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__getSiteMap"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/getSiteMap/{format?}"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.getSiteMap.desc"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "docs.labels.parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__format"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.optional"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.getSiteMap.params.format"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 ]
             }
@@ -7154,6 +7277,1414 @@
         "tag": "section",
         "params": {
             "class": "docs-category",
+            "id": "ai_integration"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "category-title"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.cat.ai"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "commands-list"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-listAiProviders"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__listAiProviders"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/listAiProviders"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.listAiProviders.desc"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-detectProvider"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__detectProvider"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/detectProvider"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.detectProvider.desc"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "docs.labels.parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__key"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.required"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.detectProvider.params.key"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-testAiKey"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__testAiKey"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/testAiKey"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.testAiKey.desc"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "docs.labels.parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__key"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.required"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.testAiKey.params.key"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__provider"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.optional"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.testAiKey.params.provider"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-callAi"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__callAi"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/callAi"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.callAi.desc"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "docs.labels.parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__key"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.required"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.callAi.params.key"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__provider"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.required"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.callAi.params.provider"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__model"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.required"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.callAi.params.model"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__messages"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.required"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.callAi.params.messages"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-category",
+            "id": "role_management"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "category-title"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.cat.roles"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "commands-list"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-listRoles"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__listRoles"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/listRoles"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.listRoles.desc"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-getMyPermissions"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__getMyPermissions"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/getMyPermissions"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.getMyPermissions.desc"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-createRole"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__createRole"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/createRole"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.createRole.desc"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "docs.labels.parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__name"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.required"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.createRole.params.name"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__description"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.required"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.createRole.params.description"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__commands"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.required"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.createRole.params.commands"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-editRole"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__editRole"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-put"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__PUT"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__PUT /management/editRole"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.editRole.desc"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "docs.labels.parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__name"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.required"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.editRole.params.name"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__description"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.optional"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.editRole.params.description"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__commands"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.optional"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.editRole.params.commands"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-deleteRole"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__deleteRole"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-delete"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__DELETE"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__DELETE /management/deleteRole"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.deleteRole.desc"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "docs.labels.parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__name"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.required"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.deleteRole.params.name"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__force"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.optional"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.deleteRole.params.force"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-category",
+            "id": "storage_monitoring"
+        },
+        "children": [
+            {
+                "tag": "h2",
+                "params": {
+                    "class": "category-title"
+                },
+                "children": [
+                    {
+                        "textKey": "docs.cat.storage"
+                    }
+                ]
+            },
+            {
+                "tag": "div",
+                "params": {
+                    "class": "commands-list"
+                },
+                "children": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-getSizeInfo"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__getSizeInfo"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/getSizeInfo"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.getSizeInfo.desc"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "tag": "section",
+        "params": {
+            "class": "docs-category",
             "id": "project_management"
         },
         "children": [
@@ -8137,6 +9668,673 @@
                                                         "children": [
                                                             {
                                                                 "textKey": "docs.cmd.downloadExport.params.filename"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-clearExports"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__clearExports"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-delete"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__DELETE"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__DELETE /management/clearExports"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.clearExports.desc"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-backupProject"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__backupProject"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/backupProject"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.backupProject.desc"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "docs.labels.parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__name"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.optional"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.backupProject.params.name"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__max_backups"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.optional"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.backupProject.params.max_backups"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-listBackups"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__listBackups"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/listBackups"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.listBackups.desc"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "docs.labels.parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__name"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.optional"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.listBackups.params.name"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-restoreBackup"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__restoreBackup"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-post"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__POST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__POST /management/restoreBackup"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.restoreBackup.desc"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "docs.labels.parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__backup"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.required"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.restoreBackup.params.backup"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__name"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.optional"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.restoreBackup.params.name"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-deleteBackup"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__deleteBackup"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-delete"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__DELETE"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__DELETE /management/deleteBackup"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.deleteBackup.desc"
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-params"
+                                },
+                                "tag": "div",
+                                "children": [
+                                    {
+                                        "params": {
+                                            "class": "command-params-title"
+                                        },
+                                        "tag": "div",
+                                        "children": [
+                                            {
+                                                "textKey": "docs.labels.parameters"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "ul",
+                                        "children": [
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__backup"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-required"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.required"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.deleteBackup.params.backup"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__name"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.optional"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.deleteBackup.params.name"
                                                             }
                                                         ]
                                                     }
