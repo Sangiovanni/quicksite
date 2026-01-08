@@ -1,6 +1,12 @@
 # QuickSite Add Section to Page Specification
 
-You are adding a new section to an existing page. Generate a JSON command sequence.
+You are adding a new section to an existing page.
+
+## ⚠️ IMPORTANT: Output Rules
+
+1. **OUTPUT JSON ONLY** - No explanations, no questions, no commentary
+2. **DO NOT ASK** for missing information - make reasonable assumptions
+3. Your response must be a valid JSON array and nothing else
 
 ## Output Format
 ```json
@@ -14,42 +20,60 @@ You are adding a new section to an existing page. Generate a JSON command sequen
 ## Current Website Info
 
 **Available Pages:** {{#if routes}}{{#each routes}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}home (default){{/if}}
-**Available Languages:** {{#if languages.list}}{{#each languages.list}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}en{{/if}}
-**Target Page:** {{#if targetPage}}**{{targetPage}}**{{else}}⚠️ NO PAGE SELECTED - Ask user which page to add section to!{{/if}}
+**Available Languages:** {{#if languages.languages}}{{join languages.languages ", "}}{{else}}en{{/if}}
+**Target Page:** {{#if param.targetPage}}**{{param.targetPage}}**{{else}}⚠️ NO PAGE SELECTED{{/if}}
 
 ---
 
 ## Understanding Node IDs
 
-Each element in a page structure has a unique `__nodeId`. These are used to specify WHERE to insert new content.
+Each element in a page structure has a unique `_nodeId`. These are used to specify WHERE to insert new content.
 
 **Actions available:**
 - `insertBefore` - Insert new content BEFORE the specified nodeId
 - `insertAfter` - Insert new content AFTER the specified nodeId
-- `appendChild` - Add content as last child inside the specified nodeId
-- `prependChild` - Add content as first child inside the specified nodeId
-- `replaceNode` - Replace the entire node with new content
+- `update` - Replace the node with new content
+- `delete` - Remove the node
 
 **User describes position naturally** (e.g., "after the hero section", "before the footer", "at the end of features"). Your job is to find the corresponding nodeId from the structure below.
 
 {{#if pageStructure}}
 ---
 
-## Current "{{targetPage}}" Page Structure (with nodeIds)
+## Current "{{param.targetPage}}" Page Structure (with nodeIds)
 
-Use these nodeIds to position your new section:
+Use these `_nodeId` values to position your new section:
 
 ```json
 {{json pageStructure}}
 ```
+
+**CRITICAL:** The `nodeId` parameter MUST use the `_nodeId` values shown above (e.g., `"0"`, `"0.1"`, `"0.1.0"`). Do NOT use element IDs or class names!
 {{else}}
 ---
 
 ## ⚠️ PAGE STRUCTURE NOT LOADED
 
-No target page was selected. Before proceeding:
-1. Ask the user which page they want to add the section to
-2. The structure with nodeIds will be loaded automatically
+No target page was selected. The structure will load when a page is selected.
+{{/if}}
+
+{{#if param.sectionPosition}}
+---
+
+## Section Position
+
+User specified where to add the section:
+```
+{{param.sectionPosition}}
+```
+
+Parse this value - format is: `structure:page|page:pageName|node:nodeId|action:actionType`
+
+Use this EXACT information for the editStructure command:
+- `type`: "page"
+- `name`: "{{param.targetPage}}"
+- `nodeId`: The node ID from the sectionPosition
+- `action`: insertBefore or insertAfter from the sectionPosition
 {{/if}}
 
 ---
@@ -59,6 +83,8 @@ No target page was selected. Before proceeding:
 | type | Description | Required params |
 |------|-------------|-----------------|
 | `page` | Page content | type + **name** + action + nodeId + structure |
+
+**IMPORTANT:** For `page`, the `name` parameter MUST be exactly `{{param.targetPage}}`
 
 ---
 
@@ -104,11 +130,13 @@ Use semantic class names that match your design.
 ### ⚠️ NO HARDCODED TEXT!
 ALL text must use `textKey` references:
 ```json
-{ "tag": "h2", "children": [{ "textKey": "{{targetPage}}.newSection.title" }] }
+{ "tag": "h2", "children": [{ "textKey": "{{param.targetPage}}.newSection.title" }] }
 ```
 
 ### ⚠️ TRANSLATIONS FOR ALL LANGUAGES!
-You MUST provide translations for ALL available languages: **{{#if languages.list}}{{#each languages.list}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}en{{/if}}**
+You MUST provide translations for ALL available languages: **{{#if languages.languages}}{{join languages.languages ", "}}{{else}}en{{/if}}**
+
+Generate **one setTranslationKeys command per language**.
 
 ---
 
@@ -124,6 +152,8 @@ You MUST provide translations for ALL available languages: **{{#if languages.lis
 
 ## Example: Adding a Testimonials Section
 
+If the page structure shows `_nodeId: "0"` for the hero section:
+
 ```json
 [
   {
@@ -132,7 +162,7 @@ You MUST provide translations for ALL available languages: **{{#if languages.lis
       "type": "page",
       "name": "home",
       "action": "insertAfter",
-      "nodeId": "features_section_id",
+      "nodeId": "0",
       "structure": {
         "tag": "section",
         "params": { "class": "testimonials-section", "id": "testimonials" },
@@ -176,4 +206,9 @@ You MUST provide translations for ALL available languages: **{{#if languages.lis
 
 ---
 
-Add the requested section to the specified page. Ensure translations are provided for ALL languages.
+## 🚀 NOW GENERATE
+
+Add the requested section to **{{param.targetPage}}** page.
+- Use the `_nodeId` values from the structure above
+- Provide translations for ALL languages
+- **Output ONLY the JSON array** - no explanations

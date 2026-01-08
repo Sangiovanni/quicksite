@@ -1,7 +1,7 @@
 {
     "$schema": "../schema.json",
     "id": "add-section",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "meta": {
         "icon": "➕",
         "titleKey": "ai.specs.addSection.title",
@@ -16,8 +16,18 @@
             "type": "select",
             "labelKey": "ai.specs.addSection.params.targetPage.label",
             "helpKey": "ai.specs.addSection.params.targetPage.help",
-            "dataSource": "routes",
+            "optionsFrom": {
+                "data": "routes"
+            },
             "required": true
+        },
+        {
+            "id": "sectionPosition",
+            "type": "nodeSelector",
+            "labelKey": "ai.specs.addSection.params.sectionPosition.label",
+            "helpKey": "ai.specs.addSection.params.sectionPosition.help",
+            "structures": ["page"],
+            "allowTextHint": true
         }
     ],
     "examples": [
@@ -51,9 +61,9 @@
         {
             "id": "pageStructure",
             "command": "getStructure",
-            "urlParams": ["page", "{{targetPage}}", "showIds"],
+            "urlParams": ["page", "{{param.targetPage}}", "showIds"],
             "extract": "data.structure",
-            "condition": "targetPage"
+            "condition": "param.targetPage"
         },
         {
             "id": "components",
