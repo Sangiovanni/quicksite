@@ -1,6 +1,13 @@
 # QuickSite Create Landing Page Specification
 
-You are creating a complete single-page landing website from a blank QuickSite project. Generate a JSON command sequence.
+You are creating a complete single-page landing website from a blank QuickSite project.
+
+## ⚠️ IMPORTANT: Output Rules
+
+1. **OUTPUT JSON ONLY** - No explanations, no questions, no commentary
+2. **DO NOT ASK** for missing information - make reasonable assumptions based on context
+3. **IMAGINE** what the user wants if their request is vague (colors, layout, content)
+4. Your response must be a valid JSON array and nothing else
 
 ## Output Format
 ```json
@@ -20,17 +27,32 @@ You are creating a complete single-page landing website from a blank QuickSite p
    - `addLang` → add each additional language BEFORE enabling multilingual
    - `setMultilingual` → enable multi-language mode AFTER having 2+ languages
    - Languages: {{param.languages}}
+
+   **⚠️ CRITICAL: setMultilingual EXACT syntax:**
+   ```json
+   { "command": "setMultilingual", "params": { "enabled": true } }
+   ```
+   **DO NOT use:** `{}`, `{"defaultLang": "en"}`, or any other format. ONLY `{"enabled": true}`.
 {{/if}}
 
 {{#if param.multilingual === true}}2{{else}}1{{/if}}. **Structures** (in this order):
    - `editStructure` type="menu" → navigation (can be minimal for landing)
-   - `editStructure` type="footer" → footer with copyright, links
+   - `editStructure` type="footer" → footer with copyright, links {{#if param.multilingual === true}}**⚠️ MUST include `{ "component": "lang-switch", "data": {} }`**{{/if}}
    - `editStructure` type="page", name="home" → main landing page content
 
 {{#if param.multilingual === true}}3{{else}}2{{/if}}. **Translations**:
    - `setTranslationKeys` → MUST cover ALL textKeys used in structures
 {{#if param.multilingual === true}}
    - Repeat for each language: {{param.languages}}
+
+   **⚠️ REQUIRED for EACH language - include 404 page translations:**
+   ```json
+   "404": {
+     "title": "Page Not Found",
+     "message": "The page you are looking for does not exist.",
+     "backHome": "Back to Home"
+   }
+   ```
 {{/if}}
 
 {{#if param.multilingual === true}}4{{else}}3{{/if}}. **Styles LAST** (order matters!):
@@ -38,6 +60,34 @@ You are creating a complete single-page landing website from a blank QuickSite p
    - `setRootVariables` → AFTER editStyles (optional helper)
 
 **Why order matters:** editStyles can reset CSS variables, so setRootVariables must apply after.
+
+---
+
+## Link Format Rules
+
+**⚠️ CRITICAL: Links must follow these formats:**
+
+### Internal Links (Routes & Anchors)
+For a landing page, use anchor links for sections:
+
+| Target | Link href |
+|--------|----------|
+| Page top | `/` or `/home` |
+| Section | `#features`, `#pricing`, `#contact` |
+
+```json
+{ "tag": "a", "params": { "href": "#features" }, "children": [{ "textKey": "menu.features" }] }
+```
+
+### External Links
+For links outside the site, use full URLs with `target="_blank"`:
+
+```json
+{ "tag": "a", "params": { "href": "https://github.com/user/repo", "target": "_blank" }, "children": [{ "textKey": "footer.github" }] }
+```
+
+**❌ NEVER use:** `href="?page=about"`, `href="index.php?section=x"`, `href="page.html"`
+**✅ ALWAYS use:** `href="#section"` for anchors, `href="https://..."` with `target="_blank"` for external
 
 ---
 
@@ -72,7 +122,7 @@ This system separates **structure** (HTML) from **content** (text). ALL text mus
 
 ## Components (Reusable Templates)
 
-Components are reusable structure fragments with variable placeholders using `{{varName}}` syntax.
+Components are reusable structure fragments with **variable placeholders using `{{varName}}` syntax**.
 
 ### Creating a Component
 ```json
@@ -85,8 +135,8 @@ Components are reusable structure fragments with variable placeholders using `{{
       "tag": "div",
       "params": { "class": "card" },
       "children": [
-        { "tag": "h3", "children": [{ "textKey": "{{titleKey}}" }] },
-        { "tag": "p", "children": [{ "textKey": "{{descKey}}" }] }
+        { "tag": "h3", "children": [{ "textKey": "{{$title}}" }] },
+        { "tag": "p", "children": [{ "textKey": "{{$desc}}" }] }
       ]
     }
   }
@@ -94,35 +144,58 @@ Components are reusable structure fragments with variable placeholders using `{{
 ```
 
 ### Using a Component
+When using a component, the `data` object maps variable names to their values:
+- For **translation keys**: pass the key string (e.g., `"home.features.card1.title"`)
+- For **raw/untranslated text**: prefix with `__RAW__` (e.g., `"__RAW__🚀"`)
+
 ```json
 {
   "component": "feature-card",
-  "data": { "titleKey": "home.features.card1.title", "descKey": "home.features.card1.desc" }
+  "data": {
+    "title": "home.features.card1.title",
+    "desc": "home.features.card1.desc"
+  }
 }
 ```
+
+**Tip:** Variables can also be used in `params` for attributes like `href`, `class`, etc.
 
 ---
 
 {{#if param.multilingual === true}}
-## Language Switcher (Required for Multilingual)
+## Language Switcher (REQUIRED for Multilingual)
 
-**Create the lang-switch component:**
+**⚠️ MANDATORY:** You MUST include the `lang-switch` component in your **footer structure**.
+
+The component will be auto-generated with this structure (for styling reference):
 ```json
 {
   "tag": "div",
   "params": { "class": "lang-switch" },
   "children": [
-{{#each languages}}
-    { "tag": "a", "params": { "href": "{{__current_page;lang={{this}}}}", "class": "lang-link" }, "children": [{ "textKey": "__RAW__{{langName this}}" }] }{{#unless @last}},{{/unless}}
-{{/each}}
+    { "tag": "a", "params": { "href": "{{__current_page;lang=en}}", "class": "lang-btn", "data-lang": "en" }, "children": [{ "textKey": "__RAW__English" }] },
+    { "tag": "a", "params": { "href": "{{__current_page;lang=fr}}", "class": "lang-btn", "data-lang": "fr" }, "children": [{ "textKey": "__RAW__Français" }] }
   ]
 }
 ```
 
-**Add to footer:**
+**To include it in your footer, add this child element:**
 ```json
 { "component": "lang-switch", "data": {} }
 ```
+
+**Example footer with lang-switch:**
+```json
+{
+  "tag": "footer",
+  "children": [
+    { "tag": "p", "children": [{ "textKey": "footer.copyright" }] },
+    { "component": "lang-switch", "data": {} }
+  ]
+}
+```
+
+**DO NOT recreate this component.** Just include it using the component reference above.
 
 ---
 {{/if}}
@@ -162,7 +235,13 @@ Components are reusable structure fragments with variable placeholders using `{{
     "params": {
       "type": "footer",
       "structure": [
-        { "tag": "footer", "children": [{ "tag": "p", "children": [{ "textKey": "footer.copyright" }] }] }
+        {
+          "tag": "footer",
+          "children": [
+            { "tag": "p", "children": [{ "textKey": "footer.copyright" }] },
+            { "component": "lang-switch", "data": {} }
+          ]
+        }
       ]
     }
   },
@@ -229,4 +308,21 @@ Components are reusable structure fragments with variable placeholders using `{{
 
 ---
 
-Create a landing page based on the user's requirements. Ensure ALL textKeys have matching translations.
+{{#if param.multilingual === true}}
+## ✅ FINAL CHECKLIST (Verify before outputting)
+
+- [ ] Footer contains `{ "component": "lang-switch", "data": {} }` ← **REQUIRED!**
+- [ ] Internal links use `#section` format for anchors
+- [ ] External links have `target="_blank"`
+- [ ] All text uses `textKey`, never hardcoded strings
+- [ ] Translations provided for ALL languages: {{param.languages}}
+{{/if}}
+
+---
+
+## 🚀 NOW GENERATE
+
+Create a landing page based on the user's requirements.
+- If information is missing, **assume reasonable defaults** (don't ask)
+- **Output ONLY the JSON array** - no explanations before or after
+- Ensure ALL textKeys have matching translations

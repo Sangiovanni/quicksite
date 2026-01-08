@@ -1,6 +1,6 @@
-# QuickSite Add New Page Specification
+﻿# QuickSite Add New Page Specification
 
-You are adding a new page to an existing website. Generate a JSON command sequence.
+You are adding content to a **new page** on an existing website. The route has already been created.
 
 ## Output Format
 ```json
@@ -11,66 +11,97 @@ You are adding a new page to an existing website. Generate a JSON command sequen
 
 ---
 
-## Current Website Info
+## Page Information
 
-**Existing Pages:** {{#if routes}}{{#each routes}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}home (default){{/if}}
-**Available Languages:** {{#if languages.list}}{{#each languages.list}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}en{{/if}}
+**New Page Route:** `{{param.routeName}}`{{#if param.routeParent}} (under `{{param.routeParent}}`){{/if}}
+**Full Route Path:** `{{#if param.routeParent}}{{param.routeParent}}/{{/if}}{{param.routeName}}`
+**URL Path:** `/{{#if param.routeParent}}{{param.routeParent}}/{{/if}}{{param.routeName}}`
+**Available Languages:** {{#if languages.languages}}{{join languages.languages ", "}}{{else}}en{{/if}}
+
+{{#if param.routeParent}}
+> ⚠️ **Use full route path** `{{param.routeParent}}/{{param.routeName}}` for the `name` parameter in page editStructure!
+{{/if}}
 
 ---
 
-## CRITICAL: Command Order
+## Commands to Generate
 
-1. **addRoute** - Create the new page route FIRST
 {{#if param.navPlacement === "none"}}
+Since navigation placement is "none", generate commands for:
+1. **editStructure** (page) - Add page content
+2. **setTranslationKeys** - Provide translations for ALL languages
+{{else}}
+Generate commands for:
+1. **editStructure** (menu and/or footer) - Add navigation link(s)
 2. **editStructure** (page) - Add page content
 3. **setTranslationKeys** - Provide translations for ALL languages
-{{else}}
-2. **editStructure** (menu/footer) - Add navigation link(s)
-3. **editStructure** (page) - Add page content
-4. **setTranslationKeys** - Provide translations for ALL languages
 {{/if}}
 
 ---
 
 {{#if param.navPlacement === "none"}}
-**Note:** Navigation placement set to "none" - no menu or footer link will be added. This page will only be accessible via direct URL.
+**Note:** Navigation placement is "none" - no menu or footer link will be added. This page will only be accessible via direct URL.
 {{/if}}
 
-{{#if menuStructure}}
+{{#if param.navPosition}}
+## Navigation Link Position
+
+User specified where to add the navigation link:
+```
+{{param.navPosition}}
+```
+
+Parse this value - format is: `structure:type|page:pageName (optional)|node:nodeId|action:actionType`
+
+Use this EXACT information for the editStructure command:
+- `type`: The structure type (menu, footer, or page)
+- `name`: If type is "page", use the page name from the navPosition
+- `nodeId`: The target node ID for the action
+- `action`: insertBefore, insertAfter, update, or delete
+
+Example: If navPosition is `structure:menu|node:0.1|action:insertAfter`:
+```json
+{
+  "command": "editStructure",
+  "params": {
+    "type": "menu",
+    "nodeId": "0.1",
+    "action": "insertAfter",
+    "structure": { "tag": "a", "params": { "href": "/{{param.routeName}}" }, "children": [{ "textKey": "menu.{{param.routeName}}" }] }
+  }
+}
+```
+{{else}}
 {{#if param.navPlacement === "menu"}}
 ## Menu Structure (with nodeIds)
 
-Add navigation link to the MENU. Use these nodeIds to position your link:
+Add navigation link to the MENU. Choose an appropriate position:
 
 ```json
 {{json menuStructure}}
 ```
 {{/if}}
-{{#if param.navPlacement === "both"}}
-## Menu Structure (with nodeIds)
-
-Add navigation link to the MENU. Use these nodeIds to position your link:
-
-```json
-{{json menuStructure}}
-```
-{{/if}}
-{{/if}}
-
-{{#if footerStructure}}
 {{#if param.navPlacement === "footer"}}
 ## Footer Structure (with nodeIds)
 
-Add navigation link to the FOOTER. Use these nodeIds to position your link:
+Add navigation link to the FOOTER. Choose an appropriate position:
 
 ```json
 {{json footerStructure}}
 ```
 {{/if}}
 {{#if param.navPlacement === "both"}}
+## Menu Structure (with nodeIds)
+
+Add navigation link to the MENU:
+
+```json
+{{json menuStructure}}
+```
+
 ## Footer Structure (with nodeIds)
 
-Add navigation link to the FOOTER. Use these nodeIds to position your link:
+Add navigation link to the FOOTER:
 
 ```json
 {{json footerStructure}}
@@ -88,18 +119,52 @@ Add navigation link to the FOOTER. Use these nodeIds to position your link:
 | `footer` | Footer (shared) | type + structure |
 | `page` | Page content | type + **name** + structure |
 
-**Important:** For `page`, the `name` parameter is REQUIRED and must match the route name.
+{{#if param.routeParent}}
+**IMPORTANT:** For `page`, the `name` parameter MUST be exactly `{{param.routeParent}}/{{param.routeName}}` (the full path including parent)
+{{else}}
+**IMPORTANT:** For `page`, the `name` parameter MUST be exactly `{{param.routeName}}`
+{{/if}}
 
 ---
 
-## Node Actions (for adding to menu/footer)
+## Page Structure Format
+
+**CRITICAL:** For pages, the `structure` parameter MUST be an **array** of nodes, NOT a single object!
+
+✅ **CORRECT** (array of nodes):
+```json
+{
+  "command": "editStructure",
+  "params": {
+    "type": "page",
+    "name": "{{#if param.routeParent}}{{param.routeParent}}/{{/if}}{{param.routeName}}",
+    "structure": [
+      { "tag": "section", "params": { "class": "hero" }, "children": [...] },
+      { "tag": "section", "params": { "class": "content" }, "children": [...] }
+    ]
+  }
+}
+```
+
+❌ **WRONG** (single object - will cause rendering errors):
+```json
+{
+  "structure": { "tag": "div", "children": [...] }
+}
+```
+
+---
+
+## Node Actions (for editStructure)
 
 | Action | Description |
 |--------|-------------|
 | `insertBefore` | Insert BEFORE the specified nodeId |
 | `insertAfter` | Insert AFTER the specified nodeId |
-| `appendChild` | Add as last child of nodeId |
-| `prependChild` | Add as first child of nodeId |
+| `update` | Update/replace the node with specified nodeId |
+| `delete` | Delete the node with specified nodeId |
+
+**CRITICAL:** The `nodeId` parameter MUST use the `_nodeId` values from the structure above (e.g., `"0"`, `"0.1"`, `"0.1.0"`). Do NOT use element IDs or class names!
 
 ---
 
@@ -111,7 +176,7 @@ Classes from current stylesheet:
 {{extractClasses styles.css}}
 ```
 {{else}}
-No existing CSS detected. You may add new classes.
+Use semantic class names. Example: `page-{{param.routeName}}`, `{{param.routeName}}-section`, etc.
 {{/if}}
 
 ---
@@ -126,77 +191,38 @@ No existing CSS detected. You may add new classes.
 
 ---
 
-## Example: Adding a Blog Page (Menu Link)
-
-```json
-[
-  {
-    "command": "addRoute",
-    "params": { "name": "blog" }
-  },
-  {
-    "command": "editStructure",
-    "params": {
-      "type": "menu",
-      "action": "appendChild",
-      "nodeId": "nav_links_container_id",
-      "structure": {
-        "tag": "a",
-        "params": { "href": "/blog" },
-        "children": [{ "textKey": "menu.blog" }]
-      }
-    }
-  },
-  {
-    "command": "editStructure",
-    "params": {
-      "type": "page",
-      "name": "blog",
-      "structure": [
-        {
-          "tag": "section",
-          "children": [
-            { "tag": "h1", "children": [{ "textKey": "blog.title" }] },
-            { "tag": "p", "children": [{ "textKey": "blog.intro" }] }
-          ]
-        }
-      ]
-    }
-  },
-  {
-    "command": "setTranslationKeys",
-    "params": {
-      "language": "en",
-      "translations": {
-        "page": { "titles": { "blog": "Blog | My Website" } },
-        "menu": { "blog": "Blog" },
-        "blog": { "title": "Our Blog", "intro": "Latest news and updates" }
-      }
-    }
-  }
-]
-```
-
----
-
 ## Translation Requirements
 
-You MUST provide translations for ALL languages: **{{#if languages.list}}{{#each languages.list}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}en{{/if}}**
+**IMPORTANT:** The `setTranslationKeys` command takes ONE language at a time!
+
+Format:
+```json
+{ "command": "setTranslationKeys", "params": { "language": "en", "translations": { "key": "value" } } }
+```
+
+You MUST generate **one setTranslationKeys command per language**: **{{#if languages.languages}}{{join languages.languages ", "}}{{else}}en{{/if}}**
 
 Required translation keys:
-- `page.titles.$routeName` - Page <title> tag
+- `page.titles.{{param.routeName}}` - Page <title> tag
 {{#if param.navPlacement === "menu"}}
-- `menu.$routeName` - Navigation link text in menu
+- `menu.{{param.routeName}}` - Navigation link text in menu
 {{/if}}
 {{#if param.navPlacement === "footer"}}
-- `footer.$routeName` - Navigation link text in footer
+- `footer.{{param.routeName}}` - Navigation link text in footer
 {{/if}}
 {{#if param.navPlacement === "both"}}
-- `menu.$routeName` - Navigation link text in menu
-- `footer.$routeName` - Navigation link text in footer
+- `menu.{{param.routeName}}` - Navigation link text in menu
+- `footer.{{param.routeName}}` - Navigation link text in footer
 {{/if}}
-- All page content textKeys
+- All page content textKeys (use namespace `{{param.routeName}}.xxx`)
 
 ---
 
-Add the requested page to the website. Ensure translations are provided for ALL languages.
+Add the requested page content. Remember:
+- Route already exists (do NOT use addRoute command)
+{{#if param.routeParent}}
+- Use `name: "{{param.routeParent}}/{{param.routeName}}"` in the page editStructure (FULL PATH required!)
+{{else}}
+- Use `name: "{{param.routeName}}"` in the page editStructure
+{{/if}}
+- Provide translations for ALL {{#if languages.languages}}{{languages.languages.length}}{{else}}1{{/if}} languages

@@ -93,6 +93,13 @@ class JsonToHtmlRenderer {
             return "<!-- JSON must be an array -->";
         }
 
+        // Check if this is a single node (has 'tag' or 'component' or 'textKey') vs array of nodes
+        if (isset($data['tag']) || isset($data['component']) || isset($data['textKey'])) {
+            // Single root node - render directly
+            return $this->renderNode($data);
+        }
+
+        // Array of nodes - render each
         return $this->renderNodes($data);
     }
 
@@ -272,6 +279,20 @@ class JsonToHtmlRenderer {
         // Handle null/empty values
         if ($value === null || $value === '') {
             return '';
+        }
+
+        // Translatable attributes - auto-translate if value looks like a translation key
+        $translatableAttributes = ['placeholder', 'title', 'alt', 'aria-label', 'aria-placeholder', 'aria-description'];
+        if (in_array($name, $translatableAttributes, true) && is_string($value)) {
+            // Check for __RAW__ prefix - use value as-is without translation
+            if (strpos($value, '__RAW__') === 0) {
+                $value = substr($value, 7); // Remove __RAW__ prefix
+            }
+            // Check if value looks like a translation key (contains dots, alphanumeric/underscore, no spaces)
+            elseif (preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/i', $value)) {
+                // It's a translation key - translate it
+                $value = $this->translator->translate($value);
+            }
         }
 
         // Special handling for URL attributes

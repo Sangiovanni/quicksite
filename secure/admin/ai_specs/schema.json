@@ -230,6 +230,64 @@
       "enum": ["json-commands", "json-structure", "text"],
       "default": "json-commands",
       "description": "Expected output format from AI"
+    },
+    "preCommands": {
+      "type": "array",
+      "description": "Commands to execute BEFORE the AI-generated output (e.g., fresh start)",
+      "items": {
+        "$ref": "#/definitions/specCommand"
+      }
+    },
+    "postCommands": {
+      "type": "array",
+      "description": "Commands to execute AFTER the AI-generated output (e.g., lang-switch component)",
+      "items": {
+        "$ref": "#/definitions/specCommand"
+      }
+    }
+  },
+  "definitions": {
+    "specCommand": {
+      "type": "object",
+      "description": "A command or template to execute automatically",
+      "properties": {
+        "condition": {
+          "type": "string",
+          "description": "Condition expression. Supports: param.X === value, config.MULTILINGUAL_SUPPORT === true"
+        },
+        "template": {
+          "type": "string",
+          "description": "Name of a batch template to execute (mutually exclusive with command)"
+        },
+        "command": {
+          "type": "string",
+          "description": "API command name to execute (mutually exclusive with template)"
+        },
+        "params": {
+          "type": "object",
+          "description": "Parameters for the command. Supports {{config.X}} and $each loops",
+          "additionalProperties": true
+        }
+      },
+      "oneOf": [
+        { "required": ["template"] },
+        { "required": ["command", "params"] }
+      ]
+    },
+    "eachLoop": {
+      "type": "object",
+      "description": "Loop construct for generating arrays from config data",
+      "properties": {
+        "$each": {
+          "type": "string",
+          "description": "Source to iterate over, e.g., {{config.LANGUAGES_NAME}}"
+        },
+        "$item": {
+          "type": "object",
+          "description": "Template for each item. Use {{$key}} and {{$value}} for placeholders"
+        }
+      },
+      "required": ["$each", "$item"]
     }
   }
 }

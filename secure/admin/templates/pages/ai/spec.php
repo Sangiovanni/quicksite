@@ -243,6 +243,45 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
     font-size: var(--font-size-sm);
 }
 
+/* Node Selector */
+.ai-spec-node-selector {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.ai-spec-node-selector__mode {
+    display: flex;
+    gap: var(--space-md);
+    margin-bottom: var(--space-xs);
+}
+
+.ai-spec-node-selector__mode-option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+}
+
+.ai-spec-node-selector__mode-option input {
+    cursor: pointer;
+}
+
+.ai-spec-node-selector__select-ui {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.ai-spec-node-selector__select-ui select {
+    width: 100%;
+}
+
+.ai-spec-node-selector__hint-ui input {
+    width: 100%;
+}
+
 /* Conditional fields */
 .ai-spec-form__group--hidden {
     display: none;
@@ -634,6 +673,21 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
     color: var(--admin-text);
 }
 
+.command-item__badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    background: #e0e7ff;
+    color: #4338ca;
+    text-transform: uppercase;
+}
+
+.command-item--post {
+    background: var(--admin-bg-alt);
+    border-left: 3px solid #6366f1;
+}
+
 .command-item__params {
     font-size: var(--font-size-xs);
     color: var(--admin-text-muted);
@@ -715,6 +769,53 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
     font-size: var(--font-size-xs);
     color: #dc2626;
     margin-top: 2px;
+}
+
+/* Expandable details */
+.result-item__toggle {
+    font-size: 11px;
+    color: var(--admin-primary);
+    cursor: pointer;
+    margin-left: 8px;
+    opacity: 0.7;
+    user-select: none;
+}
+
+.result-item__toggle:hover {
+    opacity: 1;
+    text-decoration: underline;
+}
+
+.result-item__details {
+    display: none;
+    margin-top: 8px;
+    padding: 8px;
+    background: #f8fafc;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 11px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.result-item__details.expanded {
+    display: block;
+}
+
+.result-item__details-section {
+    margin-bottom: 6px;
+}
+
+.result-item__details-label {
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 2px;
+}
+
+.result-item__details-value {
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: #334155;
 }
 
 /* Fresh Start Checkbox */
@@ -954,7 +1055,48 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                                 placeholder="<?= __admin($param['placeholderKey'] ?? '', '') ?>"
                                 <?= ($param['required'] ?? false) ? 'required' : '' ?>
                             ></textarea>
-                            <?php elseif (($param['type'] ?? 'text') === 'select' && isset($param['options'])): ?>
+                            <?php elseif (($param['type'] ?? 'text') === 'select' && (isset($param['options']) || isset($param['optionsFrom']))): ?>
+                            <?php
+                            // Build options from static list or dynamic data
+                            $selectOptions = [];
+                            
+                            // Static options
+                            if (isset($param['options'])) {
+                                $selectOptions = $param['options'];
+                            }
+                            
+                            // Dynamic options from data requirements
+                            if (isset($param['optionsFrom'])) {
+                                $dataKey = $param['optionsFrom']['data'] ?? $param['optionsFrom'];
+                                $valueField = $param['optionsFrom']['value'] ?? null;
+                                $labelField = $param['optionsFrom']['label'] ?? null;
+                                $prependOptions = $param['optionsFrom']['prepend'] ?? [];
+                                
+                                // Get data from specData
+                                $dynamicData = $specData[$dataKey] ?? [];
+                                
+                                // Add prepended options first (e.g., "root" for routes)
+                                foreach ($prependOptions as $prependOpt) {
+                                    $selectOptions[] = $prependOpt;
+                                }
+                                
+                                // Add dynamic options
+                                if (is_array($dynamicData)) {
+                                    foreach ($dynamicData as $key => $item) {
+                                        if (is_array($item) && $valueField) {
+                                            // Data is array of objects
+                                            $selectOptions[] = [
+                                                'value' => $item[$valueField] ?? $key,
+                                                'label' => $labelField ? ($item[$labelField] ?? $item[$valueField] ?? $key) : ($item[$valueField] ?? $key)
+                                            ];
+                                        } else {
+                                            // Data is simple array
+                                            $selectOptions[] = is_string($item) ? $item : (string)$key;
+                                        }
+                                    }
+                                }
+                            }
+                            ?>
                             <select 
                                 id="param-<?= htmlspecialchars($param['id']) ?>"
                                 name="<?= htmlspecialchars($param['id']) ?>"
@@ -962,12 +1104,101 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                                 <?= ($param['required'] ?? false) ? 'required' : '' ?>
                             >
                                 <option value=""><?= __admin($param['placeholderKey'] ?? '', '-- Select --') ?></option>
-                                <?php foreach ($param['options'] as $opt): ?>
-                                <option value="<?= htmlspecialchars($opt['value'] ?? $opt) ?>">
-                                    <?= htmlspecialchars($opt['label'] ?? $opt) ?>
+                                <?php foreach ($selectOptions as $opt): ?>
+                                <?php 
+                                    // Handle both simple strings and objects with value/label or value/labelKey
+                                    if (is_array($opt)) {
+                                        $optValue = $opt['value'] ?? '';
+                                        $optLabel = isset($opt['labelKey']) ? __admin($opt['labelKey'], $opt['value'] ?? '') : ($opt['label'] ?? $optValue);
+                                    } else {
+                                        $optValue = $opt;
+                                        $optLabel = $opt;
+                                    }
+                                ?>
+                                <option value="<?= htmlspecialchars($optValue) ?>">
+                                    <?= htmlspecialchars($optLabel) ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
+                            <?php elseif (($param['type'] ?? 'text') === 'nodeSelector'): ?>
+                            <?php
+                            // Node selector: allows selecting from page/menu/footer structures OR using text hint
+                            $structureTypes = $param['structures'] ?? ['page', 'menu', 'footer'];
+                            $allowTextHint = $param['allowTextHint'] ?? true;
+                            $includePages = in_array('page', $structureTypes);
+                            ?>
+                            <div class="ai-spec-node-selector" id="node-selector-<?= htmlspecialchars($param['id']) ?>">
+                                <!-- Mode toggle -->
+                                <div class="ai-spec-node-selector__mode">
+                                    <label class="ai-spec-node-selector__mode-option">
+                                        <input type="radio" name="<?= htmlspecialchars($param['id']) ?>_mode" value="select" checked>
+                                        <?= __admin('ai.spec.nodeSelector.selectMode', 'Select node') ?>
+                                    </label>
+                                    <?php if ($allowTextHint): ?>
+                                    <label class="ai-spec-node-selector__mode-option">
+                                        <input type="radio" name="<?= htmlspecialchars($param['id']) ?>_mode" value="hint">
+                                        <?= __admin('ai.spec.nodeSelector.hintMode', 'Describe position') ?>
+                                    </label>
+                                    <?php endif; ?>
+                                </div>
+                                
+                                <!-- Select mode UI -->
+                                <div class="ai-spec-node-selector__select-ui">
+                                    <!-- Structure type -->
+                                    <select class="ai-spec-form__input ai-spec-node-selector__structure" name="<?= htmlspecialchars($param['id']) ?>_structure">
+                                        <option value=""><?= __admin('ai.spec.nodeSelector.selectStructure', '-- Select structure type --') ?></option>
+                                        <?php if ($includePages && !empty($specData['routes'])): ?>
+                                        <option value="page"><?= __admin('ai.spec.nodeSelector.page', 'Page') ?></option>
+                                        <?php endif; ?>
+                                        <?php if (in_array('menu', $structureTypes) && !empty($specData['menuStructure'])): ?>
+                                        <option value="menu"><?= __admin('ai.spec.nodeSelector.menu', 'Menu') ?></option>
+                                        <?php endif; ?>
+                                        <?php if (in_array('footer', $structureTypes) && !empty($specData['footerStructure'])): ?>
+                                        <option value="footer"><?= __admin('ai.spec.nodeSelector.footer', 'Footer') ?></option>
+                                        <?php endif; ?>
+                                    </select>
+                                    
+                                    <!-- Page selection (only shown when structure=page) -->
+                                    <select class="ai-spec-form__input ai-spec-node-selector__page" name="<?= htmlspecialchars($param['id']) ?>_page" style="display: none;" disabled>
+                                        <option value=""><?= __admin('ai.spec.nodeSelector.selectPage', '-- Select page --') ?></option>
+                                        <?php if (!empty($specData['routes'])): ?>
+                                        <?php foreach ($specData['routes'] as $route): ?>
+                                        <?php if (is_string($route)): ?>
+                                        <option value="<?= htmlspecialchars($route) ?>"><?= htmlspecialchars($route) ?></option>
+                                        <?php endif; ?>
+                                        <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </select>
+                                    
+                                    <!-- Node selection (populated by JS based on structure) -->
+                                    <select class="ai-spec-form__input ai-spec-node-selector__node" name="<?= htmlspecialchars($param['id']) ?>_nodeId" disabled>
+                                        <option value=""><?= __admin('ai.spec.nodeSelector.selectNode', '-- Select node --') ?></option>
+                                    </select>
+                                    
+                                    <!-- Action -->
+                                    <select class="ai-spec-form__input ai-spec-node-selector__action" name="<?= htmlspecialchars($param['id']) ?>_action" disabled>
+                                        <option value=""><?= __admin('ai.spec.nodeSelector.selectAction', '-- Action --') ?></option>
+                                        <option value="insertBefore"><?= __admin('ai.spec.nodeSelector.insertBefore', 'Insert before') ?></option>
+                                        <option value="insertAfter"><?= __admin('ai.spec.nodeSelector.insertAfter', 'Insert after') ?></option>
+                                        <option value="update"><?= __admin('ai.spec.nodeSelector.update', 'Update/Replace') ?></option>
+                                        <option value="delete"><?= __admin('ai.spec.nodeSelector.delete', 'Delete') ?></option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Text hint mode UI -->
+                                <?php if ($allowTextHint): ?>
+                                <div class="ai-spec-node-selector__hint-ui" style="display: none;">
+                                    <input type="text" 
+                                        class="ai-spec-form__input" 
+                                        name="<?= htmlspecialchars($param['id']) ?>_hint"
+                                        placeholder="<?= __admin('ai.spec.nodeSelector.hintPlaceholder', 'e.g., after the About link in the menu') ?>"
+                                    />
+                                </div>
+                                <?php endif; ?>
+                                
+                                <!-- Hidden input for combined value -->
+                                <input type="hidden" name="<?= htmlspecialchars($param['id']) ?>" id="param-<?= htmlspecialchars($param['id']) ?>" />
+                            </div>
                             <?php else: ?>
                             <input 
                                 type="text"
@@ -1517,6 +1748,182 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
         updateConditionalFields();
     }
     
+    // === Node Selector Functionality ===
+    function initNodeSelectors() {
+        document.querySelectorAll('.ai-spec-node-selector').forEach(selector => {
+            const paramId = selector.id.replace('node-selector-', '');
+            const modeRadios = selector.querySelectorAll(`input[name="${paramId}_mode"]`);
+            const selectUI = selector.querySelector('.ai-spec-node-selector__select-ui');
+            const hintUI = selector.querySelector('.ai-spec-node-selector__hint-ui');
+            const structureSelect = selector.querySelector('.ai-spec-node-selector__structure');
+            const pageSelect = selector.querySelector('.ai-spec-node-selector__page');
+            const nodeSelect = selector.querySelector('.ai-spec-node-selector__node');
+            const actionSelect = selector.querySelector('.ai-spec-node-selector__action');
+            const hintInput = selector.querySelector(`input[name="${paramId}_hint"]`);
+            const hiddenInput = selector.querySelector(`input[name="${paramId}"]`);
+            
+            // Mode toggle
+            modeRadios.forEach(radio => {
+                radio.addEventListener('change', () => {
+                    const isSelectMode = radio.value === 'select';
+                    if (selectUI) selectUI.style.display = isSelectMode ? 'flex' : 'none';
+                    if (hintUI) hintUI.style.display = isSelectMode ? 'none' : 'block';
+                    updateHiddenValue();
+                });
+            });
+            
+            // Load nodes using the same API as command-form (structure-nodes endpoint)
+            async function loadNodeOptions(structureType, pageName = null) {
+                nodeSelect.innerHTML = '<option value=""><?= __admin('ai.spec.nodeSelector.loading', 'Loading...') ?></option>';
+                nodeSelect.disabled = true;
+                actionSelect.disabled = true;
+                
+                if (!structureType) {
+                    nodeSelect.innerHTML = '<option value=""><?= __admin('ai.spec.nodeSelector.selectNode', '-- Select node --') ?></option>';
+                    return;
+                }
+                
+                // Build params for structure-nodes API
+                const params = (structureType === 'page') ? [structureType, pageName] : [structureType];
+                
+                if (structureType === 'page' && !pageName) {
+                    nodeSelect.innerHTML = '<option value=""><?= __admin('ai.spec.nodeSelector.selectPageFirst', '-- Select page first --') ?></option>';
+                    return;
+                }
+                
+                try {
+                    const nodes = await QuickSiteAdmin.fetchHelperData('structure-nodes', params);
+                    nodeSelect.innerHTML = '<option value=""><?= __admin('ai.spec.nodeSelector.selectNode', '-- Select node --') ?></option>';
+                    
+                    if (nodes && nodes.length > 0) {
+                        QuickSiteAdmin.appendOptionsToSelect(nodeSelect, nodes);
+                        nodeSelect.disabled = false;
+                    } else {
+                        nodeSelect.innerHTML = '<option value=""><?= __admin('ai.spec.nodeSelector.noNodes', 'No nodes found') ?></option>';
+                    }
+                } catch (error) {
+                    console.error('Failed to load nodes:', error);
+                    nodeSelect.innerHTML = '<option value=""><?= __admin('ai.spec.nodeSelector.error', 'Error loading nodes') ?></option>';
+                }
+                
+                updateHiddenValue();
+            }
+            
+            // Structure selection change
+            if (structureSelect) {
+                structureSelect.addEventListener('change', async () => {
+                    const structureType = structureSelect.value;
+                    
+                    // Show/hide page select based on structure type
+                    if (pageSelect) {
+                        if (structureType === 'page') {
+                            pageSelect.style.display = 'block';
+                            pageSelect.disabled = false;
+                            nodeSelect.innerHTML = '<option value=""><?= __admin('ai.spec.nodeSelector.selectPageFirst', '-- Select page first --') ?></option>';
+                            nodeSelect.disabled = true;
+                            actionSelect.disabled = true;
+                        } else {
+                            pageSelect.style.display = 'none';
+                            pageSelect.disabled = true;
+                            pageSelect.value = '';
+                            // Load nodes directly for menu/footer
+                            if (structureType) {
+                                await loadNodeOptions(structureType);
+                            }
+                        }
+                    } else if (structureType) {
+                        // No page select, load nodes directly
+                        await loadNodeOptions(structureType);
+                    }
+                    
+                    if (!structureType) {
+                        nodeSelect.innerHTML = '<option value=""><?= __admin('ai.spec.nodeSelector.selectNode', '-- Select node --') ?></option>';
+                        nodeSelect.disabled = true;
+                        actionSelect.disabled = true;
+                    }
+                    
+                    updateHiddenValue();
+                });
+            }
+            
+            // Page selection change (for page structure type)
+            if (pageSelect) {
+                pageSelect.addEventListener('change', async () => {
+                    const pageName = pageSelect.value;
+                    if (pageName) {
+                        await loadNodeOptions('page', pageName);
+                    } else {
+                        nodeSelect.innerHTML = '<option value=""><?= __admin('ai.spec.nodeSelector.selectPageFirst', '-- Select page first --') ?></option>';
+                        nodeSelect.disabled = true;
+                        actionSelect.disabled = true;
+                    }
+                    updateHiddenValue();
+                });
+            }
+            
+            // Node selection change
+            if (nodeSelect) {
+                nodeSelect.addEventListener('change', () => {
+                    actionSelect.disabled = !nodeSelect.value;
+                    updateHiddenValue();
+                });
+            }
+            
+            // Action selection change
+            if (actionSelect) {
+                actionSelect.addEventListener('change', updateHiddenValue);
+            }
+            
+            // Hint input change
+            if (hintInput) {
+                hintInput.addEventListener('input', updateHiddenValue);
+            }
+            
+            // Update hidden value with combined data
+            function updateHiddenValue() {
+                const mode = selector.querySelector(`input[name="${paramId}_mode"]:checked`)?.value || 'select';
+                
+                if (mode === 'hint') {
+                    hiddenInput.value = JSON.stringify({
+                        mode: 'hint',
+                        hint: hintInput?.value || ''
+                    });
+                } else {
+                    const structure = structureSelect?.value || '';
+                    const page = pageSelect?.value || '';
+                    const nodeId = nodeSelect?.value || '';
+                    const action = actionSelect?.value || '';
+                    
+                    if (structure === 'page') {
+                        if (page && nodeId && action) {
+                            hiddenInput.value = JSON.stringify({
+                                mode: 'select',
+                                structure: 'page',
+                                page: page,
+                                nodeId: nodeId,
+                                action: action
+                            });
+                        } else {
+                            hiddenInput.value = '';
+                        }
+                    } else if (structure && nodeId && action) {
+                        hiddenInput.value = JSON.stringify({
+                            mode: 'select',
+                            structure: structure,
+                            nodeId: nodeId,
+                            action: action
+                        });
+                    } else {
+                        hiddenInput.value = '';
+                    }
+                }
+            }
+        });
+    }
+    
+    // Initialize node selectors
+    initNodeSelectors();
+    
     // Update stats
     function updateStats(text) {
         const chars = text.length;
@@ -1526,12 +1933,83 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
     }
     
     // Generate prompt
+    let specPostCommands = []; // Store post-commands from spec
+    let specPostCommandsRaw = []; // Raw definitions for late resolution
+    let specUserParams = {}; // User params for late resolution
+    let specPreCommandsExecuted = false; // Track if preCommands have been executed
+    
+    // Execute preCommands before prompt generation
+    async function executePreCommands(preCommands) {
+        if (!preCommands || preCommands.length === 0) {
+            return { success: true, results: [] };
+        }
+        
+        const managementUrl = '<?= rtrim(BASE_URL, '/') ?>/management/';
+        const token = '<?= $router->getToken() ?>';
+        const results = [];
+        
+        for (const cmd of preCommands) {
+            try {
+                const cmdUrl = managementUrl + cmd.command + (cmd.urlParams?.length ? '/' + cmd.urlParams.join('/') : '');
+                
+                const response = await fetch(cmdUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(cmd.params || {})
+                });
+                
+                const data = await response.json();
+                
+                results.push({
+                    command: cmd.command,
+                    success: response.ok && data.status < 400,
+                    data: data,
+                    abortOnFail: cmd.abortOnFail !== false // Default to true
+                });
+                
+                // Check if this command should abort on failure
+                if (!response.ok || data.status >= 400) {
+                    if (cmd.abortOnFail !== false) {
+                        return {
+                            success: false,
+                            error: data.message || `Command ${cmd.command} failed`,
+                            errorData: data,
+                            failedCommand: cmd,
+                            results: results
+                        };
+                    }
+                }
+            } catch (error) {
+                results.push({
+                    command: cmd.command,
+                    success: false,
+                    error: error.message
+                });
+                
+                if (cmd.abortOnFail !== false) {
+                    return {
+                        success: false,
+                        error: error.message,
+                        failedCommand: cmd,
+                        results: results
+                    };
+                }
+            }
+        }
+        
+        return { success: true, results: results };
+    }
+    
     async function generatePrompt(params = {}) {
         promptLoading.style.display = 'flex';
         promptOutput.style.display = 'none';
         copyBtn.disabled = true;
         sendToAiBtn.disabled = true;
         promptNextStep.style.display = 'none';
+        specPreCommandsExecuted = false;
         
         try {
             const queryString = new URLSearchParams(params).toString();
@@ -1546,6 +2024,45 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
             const data = await response.json();
             
             if (data.success && data.data?.prompt) {
+                // Execute preCommands first (if any)
+                const preCommands = data.data.preCommands || [];
+                if (preCommands.length > 0) {
+                    const loadingText = promptLoading.querySelector('span');
+                    if (loadingText) {
+                        loadingText.textContent = '<?= __admin('ai.spec.executingPreCommands', 'Executing pre-commands...') ?>';
+                    }
+                    
+                    const preResult = await executePreCommands(preCommands);
+                    
+                    if (!preResult.success) {
+                        // PreCommand failed - show error and abort
+                        let errorMessage = '❌ <?= __admin('ai.spec.preCommandFailed', 'Pre-command failed') ?>: ' + preResult.error;
+                        
+                        // Special handling for route already exists
+                        if (preResult.failedCommand?.command === 'addRoute' && 
+                            preResult.errorData?.message?.includes('already exists')) {
+                            errorMessage += '\n\n💡 <?= __admin('ai.spec.routeExistsSuggestion', 'This route already exists. Use the Edit Page spec to modify an existing page.') ?>';
+                        }
+                        
+                        promptOutput.value = errorMessage;
+                        promptLoading.style.display = 'none';
+                        promptOutput.style.display = 'block';
+                        updateStats('');
+                        return;
+                    }
+                    
+                    specPreCommandsExecuted = true;
+                    
+                    // Wait for filesystem to settle after preCommands (route/file creation)
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                }
+                
+                // Store post-commands info for later execution
+                // Note: postCommands may not be fully resolved if they depend on config that AI will set
+                specPostCommands = data.data.postCommands || [];
+                specPostCommandsRaw = data.data.postCommandsRaw || [];
+                specUserParams = data.data.userParams || {};
+                
                 // Get user's custom prompt
                 const userPrompt = userPromptTextarea ? userPromptTextarea.value.trim() : '';
                 
@@ -1999,6 +2516,26 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                     aiResponseError.style.display = 'block';
                     return null;
                 }
+                
+                // Normalize command structure: if AI put params directly on command object, wrap them
+                // Expected: { command: "X", params: { ... } }
+                // AI might generate: { command: "X", code: "fr", name: "French" }
+                if (!cmd.params) {
+                    const params = {};
+                    for (const [key, value] of Object.entries(cmd)) {
+                        if (key !== 'command') {
+                            params[key] = value;
+                        }
+                    }
+                    if (Object.keys(params).length > 0) {
+                        cmd.params = params;
+                        // Remove the direct properties now that they're in params
+                        for (const key of Object.keys(params)) {
+                            delete cmd[key];
+                        }
+                        console.log(`Normalized command ${i}: ${cmd.command}`, cmd.params);
+                    }
+                }
             }
             
             return commands;
@@ -2013,9 +2550,16 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
     validateBtn.addEventListener('click', function() {
         const commands = validateJson();
         if (commands) {
-            parsedCommands = commands;
+            // DON'T add postCommands here - they'll be resolved after AI commands execute
+            // postCommands depend on config values that AI commands will set (e.g., LANGUAGES_NAME)
+            parsedCommands = [...commands];
             previewBtn.style.display = 'inline-flex';
             aiResponseError.style.display = 'none';
+            
+            // Show info if postCommands will be added
+            if (specPostCommandsRaw.length > 0) {
+                console.log(`${specPostCommandsRaw.length} post-commands from spec will be resolved and executed after AI commands`);
+            }
         }
     });
     
@@ -2026,7 +2570,8 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
         
         const commands = validateJson();
         if (commands) {
-            parsedCommands = commands;
+            // DON'T add postCommands here - they'll be resolved after AI commands execute
+            parsedCommands = [...commands];
             previewBtn.style.display = 'inline-flex';
             aiResponseError.style.display = 'none';
             
@@ -2083,6 +2628,9 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
     previewBtn.addEventListener('click', function() {
         commandList.innerHTML = '';
         
+        // AI commands are all of parsedCommands (postCommands are resolved later)
+        const aiCommandCount = parsedCommands.length;
+        
         parsedCommands.forEach((cmd, index) => {
             const method = getMethod(cmd);
             const methodClass = 'command-item__method--' + method.toLowerCase();
@@ -2102,7 +2650,35 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
             commandList.appendChild(item);
         });
         
+        // Show placeholder for post-commands that will be resolved later
+        if (specPostCommandsRaw.length > 0) {
+            const separator = document.createElement('div');
+            separator.style.cssText = 'text-align: center; padding: 8px; color: var(--admin-text-muted); font-size: 12px; border-top: 1px dashed var(--admin-border); margin-top: 8px;';
+            separator.textContent = '— Post-Commands (resolved after execution) —';
+            commandList.appendChild(separator);
+            
+            specPostCommandsRaw.forEach((cmdDef, index) => {
+                const item = document.createElement('div');
+                item.className = 'command-item command-item--post';
+                item.innerHTML = `
+                    <span class="command-item__number">+${index + 1}</span>
+                    <div class="command-item__content">
+                        <div class="command-item__header">
+                            <span class="command-item__method command-item__method--post">POST</span>
+                            <span class="command-item__command">🔧 ${cmdDef.command || cmdDef.template || 'auto'}</span>
+                            <span class="command-item__badge">Auto</span>
+                        </div>
+                        ${cmdDef.condition ? `<div class="command-item__params" style="font-style: italic;">Condition: ${cmdDef.condition}</div>` : ''}
+                    </div>
+                `;
+                commandList.appendChild(item);
+            });
+        }
+        
         commandCount.textContent = parsedCommands.length + ' command' + (parsedCommands.length > 1 ? 's' : '');
+        if (specPostCommandsRaw.length > 0) {
+            commandCount.textContent += ` (+${specPostCommandsRaw.length} auto)`;
+        }
         
         // Show fresh start option for create specs
         if (isCreateSpec) {
@@ -2150,12 +2726,36 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                 }
             };
             if (hasParams) options.body = JSON.stringify(params);
-            const response = await fetch(url, options);
-            return await response.json();
+            try {
+                const response = await fetch(url, options);
+                const text = await response.text();
+                return text ? JSON.parse(text) : { status: response.status, message: 'Empty response' };
+            } catch (error) {
+                console.error(`API call to ${command} failed:`, error);
+                return { status: 500, message: error.message };
+            }
         }
         
         try {
-            // 1. Delete routes (except 404 and home)
+            // 1. Delete extra languages (keep only default)
+            // Note: deleteLang removes the entire translation file, so no need for deleteTranslationKeys on those
+            const langResponse = await apiCall('getLangList');
+            let defaultLang = 'en'; // fallback
+            if ((langResponse.status === 200 || langResponse.success) && langResponse.data) {
+                defaultLang = langResponse.data.default_language;
+                const allLangs = langResponse.data.languages || [];
+                
+                // Delete all non-default languages (this removes their translation files entirely)
+                const langsToDelete = allLangs.filter(lang => lang !== defaultLang);
+                for (const lang of langsToDelete) {
+                    commands.push({ command: 'deleteLang', params: { code: lang } });
+                }
+            }
+            
+            // 1b. Disable multilingual mode (resets LANGUAGES_SUPPORTED to just default, cleans up config)
+            commands.push({ command: 'setMultilingual', params: { enabled: false } });
+            
+            // 2. Delete routes (except 404 and home)
             // API returns: { routes: {nested object}, flat_routes: ["home", "about", "guides/installation", ...] }
             const routesResponse = await apiCall('getRoutes');
             if ((routesResponse.status === 200 || routesResponse.success) && routesResponse.data?.flat_routes) {
@@ -2170,7 +2770,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                 }
             }
             
-            // 2. Delete all assets
+            // 3. Delete all assets
             const assetsResponse = await apiCall('listAssets');
             if ((assetsResponse.status === 200 || assetsResponse.success) && assetsResponse.data?.assets) {
                 for (const [category, files] of Object.entries(assetsResponse.data.assets)) {
@@ -2183,9 +2783,11 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                 }
             }
             
-            // 3. Delete all components
+            // 4. Delete ALL components (list them first to know what exists)
             const componentsResponse = await apiCall('listComponents');
             if ((componentsResponse.status === 200 || componentsResponse.success) && componentsResponse.data?.components) {
+                console.log('Fresh Start: Found', componentsResponse.data.components.length, 'components to remove:', 
+                    componentsResponse.data.components.map(c => c.name).join(', '));
                 for (const component of componentsResponse.data.components) {
                     commands.push({ 
                         command: 'editStructure', 
@@ -2194,26 +2796,28 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                 }
             }
             
-            // 4. Clear translation keys (except 404.*)
+            // 5. Clear translation keys for DEFAULT language only (except 404.*)
+            // Other languages are deleted entirely by deleteLang above
             const translationsResponse = await apiCall('getTranslations');
             if ((translationsResponse.status === 200 || translationsResponse.success) && translationsResponse.data?.translations) {
-                for (const [lang, keys] of Object.entries(translationsResponse.data.translations)) {
-                    const topLevelKeys = Object.keys(keys).filter(key => key !== '404');
+                const defaultLangKeys = translationsResponse.data.translations[defaultLang];
+                if (defaultLangKeys) {
+                    const topLevelKeys = Object.keys(defaultLangKeys).filter(key => key !== '404');
                     if (topLevelKeys.length > 0) {
                         commands.push({ 
                             command: 'deleteTranslationKeys', 
-                            params: { language: lang, keys: topLevelKeys } 
+                            params: { language: defaultLang, keys: topLevelKeys } 
                         });
                     }
                 }
             }
             
-            // 5. Clear structures
+            // 6. Clear structures
             commands.push({ command: 'editStructure', params: { type: 'menu', structure: [] } });
             commands.push({ command: 'editStructure', params: { type: 'footer', structure: [] } });
             commands.push({ command: 'editStructure', params: { type: 'page', name: 'home', structure: [] } });
             
-            // 6. Minimize 404 page
+            // 7. Minimize 404 page
             commands.push({ 
                 command: 'editStructure', 
                 params: { 
@@ -2228,7 +2832,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                 } 
             });
             
-            // 7. Clear CSS
+            // 8. Clear CSS
             commands.push({ command: 'editStyles', params: { content: '/* Fresh Start - CSS cleared */\n' } });
             
             return commands;
@@ -2286,11 +2890,33 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
         for (let i = 0; i < allCommands.length; i++) {
             const cmd = allCommands[i];
             const isFreshStart = i < freshStartCount;
+            
+            // Add delay after Fresh Start completes to allow config.php to fully sync
+            // This prevents race conditions where AI commands read stale config
+            if (freshStartCount > 0 && i === freshStartCount) {
+                progressText.textContent = '⏳ Waiting for config sync...';
+                await new Promise(resolve => setTimeout(resolve, 1500));
+            }
+            
             progressText.textContent = `${isFreshStart ? '🧹 Fresh Start: ' : ''}Executing command ${i + 1} of ${allCommands.length}: ${cmd.command}`;
             
             const resultItem = document.getElementById('result-' + i);
             
             try {
+                // Normalize command structure: ensure params is properly set
+                // AI might generate: { command: "addLang", code: "fr" } instead of { command: "addLang", params: { code: "fr" } }
+                if (!cmd.params) {
+                    const params = {};
+                    for (const [key, value] of Object.entries(cmd)) {
+                        if (key !== 'command') {
+                            params[key] = value;
+                        }
+                    }
+                    if (Object.keys(params).length > 0) {
+                        cmd.params = params;
+                    }
+                }
+                
                 const method = getMethod(cmd);
                 const url = managementUrl + cmd.command;
                 
@@ -2306,21 +2932,69 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                     options.body = JSON.stringify(cmd.params);
                 }
                 
-                const response = await fetch(url, options);
-                const data = await response.json();
+                // Debug: log what's being sent
+                console.log(`[${i}] ${cmd.command}:`, cmd.params ? JSON.stringify(cmd.params) : '(no params)');
                 
-                // API returns status codes: 200 (OK), 201 (Created), etc.
+                const response = await fetch(url, options);
+                
+                // Handle empty responses gracefully
+                const responseText = await response.text();
+                let data;
+                try {
+                    data = responseText ? JSON.parse(responseText) : { status: response.status, message: 'No response body' };
+                } catch (parseError) {
+                    data = { status: 500, message: 'Invalid JSON response: ' + responseText.substring(0, 100) };
+                }
+                
+                // API returns status codes: 200 (OK), 201 (Created), 204 (No Content), etc.
                 // Check for any 2xx status or success:true
                 const isSuccess = (data.status >= 200 && data.status < 300) || data.success === true;
+                
+                // For fresh start cleanup, 404 (not found) is also acceptable - means nothing to delete
+                const isAcceptableFailure = isFreshStart && data.status === 404;
+                
                 const errorMsg = data.error || data.message || 'Failed';
                 
-                if (isSuccess) {
+                // Helper to format params for display
+                const formatParams = (params) => {
+                    if (!params) return '(none)';
+                    return JSON.stringify(params, null, 2);
+                };
+                
+                // Helper to format response for display
+                const formatResponse = (data) => {
+                    const display = { ...data };
+                    // Truncate very long data fields
+                    if (display.data && JSON.stringify(display.data).length > 500) {
+                        display.data = '(truncated - large data)';
+                    }
+                    return JSON.stringify(display, null, 2);
+                };
+                
+                const detailsId = `details-${i}`;
+                const paramsDisplay = formatParams(cmd.params);
+                const responseDisplay = formatResponse(data);
+                
+                if (isSuccess || isAcceptableFailure) {
                     resultItem.className = 'result-item result-item--success';
                     resultItem.innerHTML = `
-                        <span class="result-item__icon">✅</span>
+                        <span class="result-item__icon">${isAcceptableFailure ? '⏭️' : '✅'}</span>
                         <div class="result-item__content">
-                            <div class="result-item__command">${isFreshStart ? '🧹 ' : ''}${cmd.command}</div>
-                            <div class="result-item__message">${data.message || 'Success'}</div>
+                            <div class="result-item__command">
+                                ${isFreshStart ? '🧹 ' : ''}${cmd.command}
+                                <span class="result-item__toggle" onclick="document.getElementById('${detailsId}').classList.toggle('expanded'); this.textContent = this.textContent === '[+]' ? '[-]' : '[+]'">[+]</span>
+                            </div>
+                            <div class="result-item__message">${isAcceptableFailure ? 'Skipped (not found)' : (data.message || 'Success')}</div>
+                            <div class="result-item__details" id="${detailsId}">
+                                <div class="result-item__details-section">
+                                    <div class="result-item__details-label">Parameters:</div>
+                                    <div class="result-item__details-value">${paramsDisplay}</div>
+                                </div>
+                                <div class="result-item__details-section">
+                                    <div class="result-item__details-label">Response:</div>
+                                    <div class="result-item__details-value">${responseDisplay}</div>
+                                </div>
+                            </div>
                         </div>
                     `;
                 } else {
@@ -2328,20 +3002,217 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                     resultItem.innerHTML = `
                         <span class="result-item__icon">❌</span>
                         <div class="result-item__content">
-                            <div class="result-item__command">${isFreshStart ? '🧹 ' : ''}${cmd.command}</div>
+                            <div class="result-item__command">
+                                ${isFreshStart ? '🧹 ' : ''}${cmd.command}
+                                <span class="result-item__toggle" onclick="document.getElementById('${detailsId}').classList.toggle('expanded'); this.textContent = this.textContent === '[+]' ? '[-]' : '[+]'">[+]</span>
+                            </div>
                             <div class="result-item__error">${errorMsg}</div>
+                            <div class="result-item__details" id="${detailsId}">
+                                <div class="result-item__details-section">
+                                    <div class="result-item__details-label">Parameters:</div>
+                                    <div class="result-item__details-value">${paramsDisplay}</div>
+                                </div>
+                                <div class="result-item__details-section">
+                                    <div class="result-item__details-label">Response:</div>
+                                    <div class="result-item__details-value">${responseDisplay}</div>
+                                </div>
+                            </div>
                         </div>
                     `;
                 }
             } catch (error) {
+                const detailsIdErr = `details-err-${i}`;
+                const paramsDisplayErr = cmd.params ? JSON.stringify(cmd.params, null, 2) : '(none)';
                 resultItem.className = 'result-item result-item--error';
                 resultItem.innerHTML = `
                     <span class="result-item__icon">❌</span>
                     <div class="result-item__content">
-                        <div class="result-item__command">${isFreshStart ? '🧹 ' : ''}${cmd.command}</div>
+                        <div class="result-item__command">
+                            ${isFreshStart ? '🧹 ' : ''}${cmd.command}
+                            <span class="result-item__toggle" onclick="document.getElementById('${detailsIdErr}').classList.toggle('expanded'); this.textContent = this.textContent === '[+]' ? '[-]' : '[+]'">[+]</span>
+                        </div>
+                        <div class="result-item__error">${error.message}</div>
+                        <div class="result-item__details" id="${detailsIdErr}">
+                            <div class="result-item__details-section">
+                                <div class="result-item__details-label">Parameters:</div>
+                                <div class="result-item__details-value">${paramsDisplayErr}</div>
+                            </div>
+                            <div class="result-item__details-section">
+                                <div class="result-item__details-label">Error Stack:</div>
+                                <div class="result-item__details-value">${error.stack || error.message}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        // Wait for filesystem to settle after AI commands before post-commands
+        if (specPostCommandsRaw.length > 0) {
+            progressText.textContent = 'Waiting for filesystem to settle...';
+            await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+        
+        // After all AI commands executed, resolve and execute post-commands
+        if (specPostCommandsRaw.length > 0) {
+            progressText.textContent = 'Resolving post-commands with fresh config...';
+            
+            // Add separator
+            const postSeparator = document.createElement('div');
+            postSeparator.style.cssText = 'text-align: center; padding: 8px; color: var(--admin-text-muted); font-size: 12px; border-top: 1px dashed var(--admin-border); margin-top: 8px;';
+            postSeparator.textContent = '— Post-Commands (Auto-Generated) —';
+            executionResults.appendChild(postSeparator);
+            
+            try {
+                // Resolve post-commands with fresh config (after AI set languages etc.)
+                const resolveResponse = await fetch('<?= $router->getBaseUrl() ?>/api/ai-spec-resolve-post', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        postCommandsRaw: specPostCommandsRaw,
+                        userParams: specUserParams
+                    })
+                });
+                
+                const resolveData = await resolveResponse.json();
+                const resolvedPostCommands = resolveData.success ? (resolveData.data?.commands || []) : [];
+                
+                console.log('Resolved post-commands:', resolvedPostCommands);
+                
+                if (resolvedPostCommands.length === 0) {
+                    const noPostItem = document.createElement('div');
+                    noPostItem.style.cssText = 'padding: 8px; color: var(--admin-text-muted); font-size: 12px; text-align: center;';
+                    noPostItem.textContent = 'No post-commands to execute (conditions not met)';
+                    executionResults.appendChild(noPostItem);
+                } else {
+                    // Create result items for post-commands
+                    const postStartIndex = allCommands.length;
+                    resolvedPostCommands.forEach((cmd, idx) => {
+                        const item = document.createElement('div');
+                        item.className = 'result-item result-item--pending';
+                        item.id = 'result-post-' + idx;
+                        item.innerHTML = `
+                            <span class="result-item__icon">⏳</span>
+                            <div class="result-item__content">
+                                <div class="result-item__command">🔧 ${cmd.command}</div>
+                                <div class="result-item__message">Post-Command: Pending...</div>
+                            </div>
+                        `;
+                        executionResults.appendChild(item);
+                    });
+                    
+                    // Execute post-commands
+                    for (let j = 0; j < resolvedPostCommands.length; j++) {
+                        const cmd = resolvedPostCommands[j];
+                        const resultItem = document.getElementById('result-post-' + j);
+                        progressText.textContent = `Executing post-command ${j + 1}/${resolvedPostCommands.length}...`;
+                        
+                        try {
+                            const method = getMethod(cmd);
+                            const url = managementUrl + cmd.command;
+                            
+                            const options = {
+                                method: method,
+                                headers: {
+                                    'Authorization': 'Bearer ' + token,
+                                    'Content-Type': 'application/json'
+                                }
+                            };
+                            
+                            if (method !== 'GET' && cmd.params) {
+                                options.body = JSON.stringify(cmd.params);
+                            }
+                            
+                            console.log(`[post-${j}] ${cmd.command}:`, cmd.params ? JSON.stringify(cmd.params) : '(no params)');
+                            
+                            const response = await fetch(url, options);
+                            const responseText = await response.text();
+                            let data;
+                            try {
+                                data = responseText ? JSON.parse(responseText) : { status: response.status, message: 'No response body' };
+                            } catch (parseError) {
+                                data = { status: 500, message: 'Invalid JSON response: ' + responseText.substring(0, 100) };
+                            }
+                            
+                            const isSuccess = (data.status >= 200 && data.status < 300) || data.success === true;
+                            const errorMsg = data.error || data.message || 'Failed';
+                            
+                            const detailsId = `details-post-${j}`;
+                            const paramsDisplay = cmd.params ? JSON.stringify(cmd.params, null, 2) : '(none)';
+                            const responseDisplay = JSON.stringify(data, null, 2);
+                            
+                            if (isSuccess) {
+                                resultItem.className = 'result-item result-item--success';
+                                resultItem.innerHTML = `
+                                    <span class="result-item__icon">✅</span>
+                                    <div class="result-item__content">
+                                        <div class="result-item__command">
+                                            🔧 ${cmd.command}
+                                            <span class="result-item__toggle" onclick="document.getElementById('${detailsId}').classList.toggle('expanded'); this.textContent = this.textContent === '[+]' ? '[-]' : '[+]'">[+]</span>
+                                        </div>
+                                        <div class="result-item__message">${data.message || 'Success'}</div>
+                                        <div class="result-item__details" id="${detailsId}">
+                                            <div class="result-item__details-section">
+                                                <div class="result-item__details-label">Parameters:</div>
+                                                <div class="result-item__details-value">${paramsDisplay}</div>
+                                            </div>
+                                            <div class="result-item__details-section">
+                                                <div class="result-item__details-label">Response:</div>
+                                                <div class="result-item__details-value">${responseDisplay}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            } else {
+                                resultItem.className = 'result-item result-item--error';
+                                resultItem.innerHTML = `
+                                    <span class="result-item__icon">❌</span>
+                                    <div class="result-item__content">
+                                        <div class="result-item__command">
+                                            🔧 ${cmd.command}
+                                            <span class="result-item__toggle" onclick="document.getElementById('${detailsId}').classList.toggle('expanded'); this.textContent = this.textContent === '[+]' ? '[-]' : '[+]'">[+]</span>
+                                        </div>
+                                        <div class="result-item__error">${errorMsg}</div>
+                                        <div class="result-item__details" id="${detailsId}">
+                                            <div class="result-item__details-section">
+                                                <div class="result-item__details-label">Parameters:</div>
+                                                <div class="result-item__details-value">${paramsDisplay}</div>
+                                            </div>
+                                            <div class="result-item__details-section">
+                                                <div class="result-item__details-label">Response:</div>
+                                                <div class="result-item__details-value">${responseDisplay}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }
+                        } catch (error) {
+                            resultItem.className = 'result-item result-item--error';
+                            resultItem.innerHTML = `
+                                <span class="result-item__icon">❌</span>
+                                <div class="result-item__content">
+                                    <div class="result-item__command">🔧 ${cmd.command}</div>
+                                    <div class="result-item__error">${error.message}</div>
+                                </div>
+                            `;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error resolving post-commands:', error);
+                const errorItem = document.createElement('div');
+                errorItem.className = 'result-item result-item--error';
+                errorItem.innerHTML = `
+                    <span class="result-item__icon">❌</span>
+                    <div class="result-item__content">
+                        <div class="result-item__command">Post-Commands Resolution</div>
                         <div class="result-item__error">${error.message}</div>
                     </div>
                 `;
+                executionResults.appendChild(errorItem);
             }
         }
         

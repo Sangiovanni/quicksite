@@ -86,6 +86,32 @@
         }
     ],
     "relatedCommands": ["setMultilingual", "addLang", "editStructure", "setTranslationKeys", "editStyles", "setRootVariables"],
+    "postCommands": [
+        {
+            "condition": "param.multilingual === true",
+            "command": "editStructure",
+            "params": {
+                "type": "component",
+                "name": "lang-switch",
+                "structure": {
+                    "tag": "div",
+                    "params": { "class": "lang-switch" },
+                    "children": {
+                        "$each": "{{config.LANGUAGES_NAME}}",
+                        "$item": {
+                            "tag": "a",
+                            "params": {
+                                "href": "{{__current_page;lang={{$key}}}}",
+                                "class": "lang-btn",
+                                "data-lang": "{{$key}}"
+                            },
+                            "children": [{ "textKey": "__RAW__{{$value}}" }]
+                        }
+                    }
+                }
+            }
+        }
+    ],
     "promptTemplate": "create-landing.md",
     "outputFormat": "json-commands"
 }

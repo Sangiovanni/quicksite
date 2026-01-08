@@ -50,7 +50,7 @@ These are the translations to convert to the target language. **Preserve the exa
 
 1. **Preserve all keys** - The translation object must have the same structure as the source
 2. **Translate values only** - Keys remain in English (e.g., `menu.home` stays the same)
-3. **Keep placeholders** - Any `{{variable}}` syntax must remain unchanged
+3. **Keep placeholders** - Any `{{$variable}}` syntax must remain unchanged
 4. **Maintain tone** - Match the formality level of the original content
 5. **Adapt idioms** - Don't translate literally; use equivalent expressions
 6. **Handle special keys**:
@@ -78,7 +78,7 @@ If source (en) has:
   },
   "home": {
     "title": "Welcome to our site",
-    "subtitle": "We help {{company}} grow"
+    "subtitle": "We help {{$company}} grow"
   }
 }
 ```
@@ -97,7 +97,7 @@ For Spanish (es), output:
         },
         "home": {
           "title": "Bienvenido a nuestro sitio",
-          "subtitle": "Ayudamos a {{company}} a crecer"
+          "subtitle": "Ayudamos a {{$company}} a crecer"
         }
       }
     }

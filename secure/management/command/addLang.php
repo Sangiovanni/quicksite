@@ -8,9 +8,11 @@ require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 $params = $trimParametersManagement->params();
 
-// Support both 'code'/'name' (full form) and 'lang' (shorthand with auto-generated name)
-// If only 'lang' is provided, use it as both code and generate a display name
-$langCode = $params['code'] ?? $params['lang'] ?? null;
+// Support multiple parameter names for flexibility:
+// - 'code'/'name' (full form)
+// - 'lang' (shorthand with auto-generated name)  
+// - 'language' (AI often uses this)
+$langCode = $params['code'] ?? $params['lang'] ?? $params['language'] ?? null;
 $langName = $params['name'] ?? null;
 
 // Validate required parameters
@@ -97,11 +99,29 @@ if (!file_exists($config_path)) {
         ->send();
 }
 
-$config_content = file_get_contents($config_path);
-if ($config_content === false) {
-    ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage("Failed to read configuration file")
+// Use file locking to prevent race conditions when multiple addLang calls run in parallel
+$lockFile = $config_path . '.lock';
+$lockHandle = @fopen($lockFile, 'w');
+if ($lockHandle === false) {
+    ApiResponse::create(500, 'server.internal_error')
+        ->withMessage("Failed to create config lock file")
         ->send();
+}
+
+// Acquire exclusive lock (blocking)
+if (!flock($lockHandle, LOCK_EX)) {
+    fclose($lockHandle);
+    ApiResponse::create(500, 'server.internal_error')
+        ->withMessage("Failed to acquire config lock")
+        ->send();
+}
+
+// Clear PHP's file stat cache to ensure fresh read
+clearstatcache(true, $config_path);
+
+// Clear opcache if available
+if (function_exists('opcache_invalidate')) {
+    opcache_invalidate($config_path, true);
 }
 
 // Parse current config (use include to get fresh copy, not cached by require)
@@ -111,13 +131,33 @@ $get_fresh_config = function($path) {
 $current_config = $get_fresh_config($config_path);
 
 if (!is_array($current_config)) {
+    flock($lockHandle, LOCK_UN);
+    fclose($lockHandle);
+    @unlink($lockFile);
     ApiResponse::create(500, 'server.internal_error')
         ->withMessage("Failed to parse configuration file")
         ->send();
 }
 
+// Check again under lock if language was added by concurrent request
+if (in_array($langCode, $current_config['LANGUAGES_SUPPORTED'] ?? [])) {
+    flock($lockHandle, LOCK_UN);
+    fclose($lockHandle);
+    @unlink($lockFile);
+    ApiResponse::create(409, 'conflict.duplicate')
+        ->withMessage("Language already exists")
+        ->withData([
+            'code' => $langCode,
+            'existing_languages' => $current_config['LANGUAGES_SUPPORTED']
+        ])
+        ->send();
+}
+
 // Add new language
 $current_config['LANGUAGES_SUPPORTED'][] = $langCode;
+if (!isset($current_config['LANGUAGES_NAME'])) {
+    $current_config['LANGUAGES_NAME'] = [];
+}
 $current_config['LANGUAGES_NAME'][$langCode] = $langName;
 
 // Build new config file content using var_export for safety
@@ -125,6 +165,9 @@ $new_config_content = "<?php\n\nreturn " . var_export($current_config, true) . "
 
 // Write updated config
 if (file_put_contents($config_path, $new_config_content, LOCK_EX) === false) {
+    flock($lockHandle, LOCK_UN);
+    fclose($lockHandle);
+    @unlink($lockFile);
     ApiResponse::create(500, 'server.file_write_failed')
         ->withMessage("Failed to write configuration file")
         ->send();
@@ -153,6 +196,11 @@ if (!file_exists($source_file)) {
             ->send();
     }
 }
+
+// Release config lock
+flock($lockHandle, LOCK_UN);
+fclose($lockHandle);
+@unlink($lockFile);
 
 // Success
 ApiResponse::create(201, 'operation.success')

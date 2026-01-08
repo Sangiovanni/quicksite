@@ -71,15 +71,17 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
         // Collect all URL segments after type as the route path
         if ($type === 'page') {
             $routeSegments = array_slice($urlParams, 1);
-            // Filter out empty segments and 'showIds' option if present
-            $routeSegments = array_filter($routeSegments, fn($s) => $s !== '' && $s !== 'showIds');
-            $name = implode('/', $routeSegments);
             
-            // Check if last segment is actually an option (for backward compat)
-            $lastSegment = end($urlParams);
+            // Check if last segment is the 'showIds' option
+            $lastSegment = end($routeSegments);
             if ($lastSegment === 'showIds') {
-                $name = implode('/', array_slice($routeSegments, 0, -1));
+                // Remove showIds from route segments
+                array_pop($routeSegments);
             }
+            
+            // Filter out empty segments
+            $routeSegments = array_filter($routeSegments, fn($s) => $s !== '');
+            $name = implode('/', $routeSegments);
         } else {
             $name = $urlParams[1];
         }

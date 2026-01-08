@@ -107,9 +107,10 @@ switch ($action) {
         // Return list of routes
         $result = makeInternalApiCall('getRoutes', $token);
         if ($result['success']) {
+            // Use flat_routes which is a simple array of route names
             $routes = array_map(function($route) {
                 return ['value' => $route, 'label' => $route];
-            }, $result['data']['routes'] ?? []);
+            }, $result['data']['flat_routes'] ?? []);
             echo json_encode(['success' => true, 'data' => $routes]);
         } else {
             echo json_encode(['success' => false, 'error' => $result['error']]);
@@ -554,6 +555,12 @@ switch ($action) {
         // Render the prompt
         $prompt = $manager->renderPrompt($spec, $data, $userParams);
         
+        // Generate pre/post commands
+        $preCommands = $manager->generateSpecCommands($spec, $userParams, 'preCommands');
+        // Note: postCommands use config.LANGUAGES_NAME which won't exist until AI commands run
+        // So we pass the raw definition for late resolution
+        $postCommands = $manager->generateSpecCommands($spec, $userParams, 'postCommands');
+        
         echo json_encode([
             'success' => true,
             'data' => [
@@ -561,9 +568,38 @@ switch ($action) {
                 'version' => $spec['version'],
                 'meta' => $spec['meta'],
                 'prompt' => $prompt,
+                'preCommands' => $preCommands,
+                'postCommands' => $postCommands,
+                // Pass raw postCommands definition for late resolution (after AI commands run)
+                'postCommandsRaw' => $spec['postCommands'] ?? [],
                 'dataFetched' => array_keys($data),
                 'userParams' => $userParams
             ]
+        ]);
+        break;
+    
+    case 'ai-spec-resolve-post':
+        // Resolve postCommands with FRESH config (called after AI commands execute)
+        // This allows postCommands to use config values that were set by AI commands
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        $rawPostCommands = $body['postCommandsRaw'] ?? [];
+        $userParams = $body['userParams'] ?? [];
+        
+        if (empty($rawPostCommands)) {
+            echo json_encode(['success' => true, 'data' => ['commands' => []]]);
+            break;
+        }
+        
+        require_once SECURE_FOLDER_PATH . '/src/classes/AiSpecManager.php';
+        $manager = new AiSpecManager();
+        
+        // Create a mock spec with just the postCommands to reuse generateSpecCommands
+        $mockSpec = ['postCommands' => $rawPostCommands];
+        $resolvedCommands = $manager->generateSpecCommands($mockSpec, $userParams, 'postCommands');
+        
+        echo json_encode([
+            'success' => true,
+            'data' => ['commands' => $resolvedCommands]
         ]);
         break;
     

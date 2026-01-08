@@ -1,7 +1,7 @@
 {
     "$schema": "../schema.json",
     "id": "add-page",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "meta": {
         "icon": "📄",
         "titleKey": "ai.specs.addPage.title",
@@ -11,6 +11,27 @@
         "difficulty": "intermediate"
     },
     "parameters": [
+        {
+            "id": "routeName",
+            "type": "text",
+            "labelKey": "ai.specs.addPage.params.routeName.label",
+            "helpKey": "ai.specs.addPage.params.routeName.help",
+            "placeholderKey": "ai.specs.addPage.params.routeName.placeholder",
+            "required": true
+        },
+        {
+            "id": "routeParent",
+            "type": "select",
+            "labelKey": "ai.specs.addPage.params.routeParent.label",
+            "helpKey": "ai.specs.addPage.params.routeParent.help",
+            "optionsFrom": {
+                "data": "routes",
+                "prepend": [
+                    {"value": "", "labelKey": "ai.specs.addPage.params.routeParent.options.root"}
+                ]
+            },
+            "default": ""
+        },
         {
             "id": "navPlacement",
             "type": "select",
@@ -23,6 +44,25 @@
                 {"value": "none", "labelKey": "ai.specs.addPage.params.navPlacement.options.none"}
             ],
             "default": "menu"
+        },
+        {
+            "id": "navPosition",
+            "type": "nodeSelector",
+            "labelKey": "ai.specs.addPage.params.navPosition.label",
+            "helpKey": "ai.specs.addPage.params.navPosition.help",
+            "structures": ["page", "menu", "footer"],
+            "allowTextHint": true,
+            "condition": "navPlacement !== 'none'"
+        }
+    ],
+    "preCommands": [
+        {
+            "command": "addRoute",
+            "params": {
+                "name": "{{param.routeName}}",
+                "parent": "{{param.routeParent}}"
+            },
+            "abortOnFail": true
         }
     ],
     "examples": [
@@ -71,12 +111,6 @@
             "extract": "data"
         },
         {
-            "id": "helpAddRoute",
-            "command": "help",
-            "urlParams": ["addRoute"],
-            "extract": "data"
-        },
-        {
             "id": "helpEditStructure",
             "command": "help",
             "urlParams": ["editStructure"],
@@ -89,7 +123,7 @@
             "extract": "data"
         }
     ],
-    "relatedCommands": ["addRoute", "editStructure", "setTranslationKeys"],
+    "relatedCommands": ["editStructure", "setTranslationKeys"],
     "recommendedModels": {
         "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
         "anthropic": ["claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022"],

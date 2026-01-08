@@ -110,8 +110,8 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
             ->withMessage('Failed to create config.php');
     }
     
-    // Create routes.php with home route
-    $routesContent = "<?php\n/**\n * Route definitions for $siteName\n * Created: " . date('Y-m-d H:i:s') . "\n */\n\nreturn [\n    'home'\n];\n";
+    // Create routes.php with home route (associative array format)
+    $routesContent = "<?php\n/**\n * Route definitions for $siteName\n * Created: " . date('Y-m-d H:i:s') . "\n */\n\nreturn [\n    'home' => [],\n];\n";
     if (file_put_contents($projectPath . '/routes.php', $routesContent, LOCK_EX) === false) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage('Failed to create routes.php');
@@ -184,7 +184,15 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
  * Generate config.php content
  */
 function createProjectConfig(string $siteName, string $defaultLang): string {
-    return "<?php\n/**\n * Site Configuration\n * Created: " . date('Y-m-d H:i:s') . "\n */\n\nreturn [\n    'SITE_NAME' => '" . addslashes($siteName) . "',\n    'LANGUAGE_DEFAULT' => '$defaultLang',\n    'LANGUAGES_SUPPORTED' => ['$defaultLang'],\n    'MULTILINGUAL_SUPPORT' => false,\n    \n    // Database (optional)\n    'DB_HOST' => '',\n    'DB_NAME' => '',\n    'DB_USER' => '',\n    'DB_PASS' => ''\n];\n";
+    // Get display name for default language
+    $commonLanguages = [
+        'en' => 'English', 'fr' => 'Français', 'es' => 'Español', 'de' => 'Deutsch',
+        'it' => 'Italiano', 'pt' => 'Português', 'nl' => 'Nederlands', 'ru' => 'Русский',
+        'zh' => '中文', 'ja' => '日本語', 'ko' => '한국어', 'ar' => 'العربية'
+    ];
+    $defaultLangName = $commonLanguages[$defaultLang] ?? ucfirst($defaultLang);
+    
+    return "<?php\n/**\n * Site Configuration\n * Created: " . date('Y-m-d H:i:s') . "\n */\n\nreturn [\n    'SITE_NAME' => '" . addslashes($siteName) . "',\n    'LANGUAGE_DEFAULT' => '$defaultLang',\n    'LANGUAGES_SUPPORTED' => ['$defaultLang'],\n    'LANGUAGES_NAME' => ['$defaultLang' => '$defaultLangName'],\n    'MULTILINGUAL_SUPPORT' => false,\n    \n    // Database (optional)\n    'DB_HOST' => '',\n    'DB_NAME' => '',\n    'DB_USER' => '',\n    'DB_PASS' => ''\n];\n";
 }
 
 /**

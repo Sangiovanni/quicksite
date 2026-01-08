@@ -39,6 +39,16 @@ $params = $trimParametersManagement->params();
 // Support both 'route' (full form) and 'name' (shorthand for simple routes)
 $routePath = $params['route'] ?? $params['name'] ?? null;
 
+// Check for parent parameter - prepend to route if provided
+$parent = $params['parent'] ?? null;
+if ($parent !== null && $parent !== '') {
+    // Normalize parent (trim slashes)
+    $parent = trim(str_replace('\\', '/', $parent), '/');
+    if ($routePath !== null) {
+        $routePath = $parent . '/' . $routePath;
+    }
+}
+
 // Check required parameter
 if ($routePath === null) {
     ApiResponse::create(400, 'validation.required')
@@ -176,8 +186,8 @@ try {
     // CREATE NEW ROUTE FILES
     // ========================================================================
     
-    // Generate PHP template
-    $phpContent = generate_page_template($routeName);
+    // Generate PHP template (use full route path, not just the name)
+    $phpContent = generate_page_template($routePath);
     if (file_put_contents($phpFilePath, $phpContent, LOCK_EX) === false) {
         throw new Exception("Failed to write PHP file: $phpFilePath");
     }

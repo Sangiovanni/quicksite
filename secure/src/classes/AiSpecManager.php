@@ -305,6 +305,7 @@ class AiSpecManager {
      *   - Literals: true, false, null, "string", 123
      * - {{#each array}}...{{/each}} - Iteration
      * - {{json variable}} - JSON encode
+     * - {{join array "separator"}} - Join array with separator
      * - {{langName code}} - Get language name
      * - {{formatCommand cmdData}} - Format command documentation
      * 
@@ -325,6 +326,20 @@ class AiSpecManager {
             function ($matches) use ($context) {
                 $value = $this->resolveValue(trim($matches[1]), $context);
                 return json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            },
+            $template
+        );
+        
+        // Process {{join array "separator"}} helpers
+        $template = preg_replace_callback(
+            '/\{\{join\s+([^\s}]+)\s+"([^"]*)"\}\}/',
+            function ($matches) use ($context) {
+                $value = $this->resolveValue(trim($matches[1]), $context);
+                $separator = $matches[2];
+                if (is_array($value)) {
+                    return implode($separator, $value);
+                }
+                return is_string($value) ? $value : '';
             },
             $template
         );
@@ -355,8 +370,15 @@ class AiSpecManager {
             function ($matches) use ($context) {
                 $key = trim($matches[1]);
                 
-                // Skip escaped braces (QuickSite placeholders like {{__current_page;lang=xx}})
-                if (strpos($key, '__') === 0 || strpos($key, '{') !== false) {
+                // Skip escaped/preserved braces:
+                // - QuickSite placeholders: {{__current_page;lang=xx}}
+                // - Component variable examples: {{$icon}}, {{$title}} ($ prefix)
+                // - Nested braces
+                if (strpos($key, '__') === 0 || strpos($key, '$') === 0 || strpos($key, '{') !== false) {
+                    // For $-prefixed, strip the $ but keep the braces
+                    if (strpos($key, '$') === 0) {
+                        return '{{' . substr($key, 1) . '}}';
+                    }
                     return $matches[0];
                 }
                 
@@ -410,7 +432,11 @@ class AiSpecManager {
                     '/\{\{([^#\/][^}]*)\}\}/',
                     function ($m) use ($itemContext) {
                         $key = trim($m[1]);
-                        if (strpos($key, '__') === 0 || strpos($key, '{') !== false) {
+                        // Skip preserved variables: __, $-prefixed, or nested braces
+                        if (strpos($key, '__') === 0 || strpos($key, '$') === 0 || strpos($key, '{') !== false) {
+                            if (strpos($key, '$') === 0) {
+                                return '{{' . substr($key, 1) . '}}';
+                            }
                             return $m[0];
                         }
                         $value = $this->resolveValue($key, $itemContext);
@@ -440,21 +466,88 @@ class AiSpecManager {
      * - Boolean comparison: {{#if param.multilingual === true}}
      */
     private function processIfBlocks(string $template, array $context): string {
-        // Handle if/else/endif
-        $pattern = '/\{\{#if\s+([^}]+)\}\}(.*?)(?:\{\{else\}\}(.*?))?\{\{\/if\}\}/s';
+        // Handle if/else/endif with proper nesting support
+        // Find {{#if ...}} and match to correct {{/if}} considering nesting
         
-        return preg_replace_callback($pattern, function ($matches) use ($context) {
-            $condition = trim($matches[1]);
-            $trueBlock = $matches[2];
-            $falseBlock = $matches[3] ?? '';
+        $offset = 0;
+        while (preg_match('/\{\{#if\s+([^}]+)\}\}/s', $template, $match, PREG_OFFSET_CAPTURE, $offset)) {
+            $condition = trim($match[1][0]);
+            $startPos = $match[0][1];
+            $afterOpenTag = $startPos + strlen($match[0][0]);
             
+            // Find matching {{/if}} considering nested blocks
+            $depth = 1;
+            $pos = $afterOpenTag;
+            $endPos = null;
+            $elsePos = null;
+            
+            while ($depth > 0 && $pos < strlen($template)) {
+                // Find next {{#if, {{else}}, or {{/if}}
+                $nextIf = strpos($template, '{{#if', $pos);
+                $nextElse = strpos($template, '{{else}}', $pos);
+                $nextEndIf = strpos($template, '{{/if}}', $pos);
+                
+                // Determine which comes first
+                $positions = [];
+                if ($nextIf !== false) $positions['if'] = $nextIf;
+                if ($nextElse !== false) $positions['else'] = $nextElse;
+                if ($nextEndIf !== false) $positions['endif'] = $nextEndIf;
+                
+                if (empty($positions)) {
+                    break; // No more tags found, malformed template
+                }
+                
+                $minPos = min($positions);
+                $minType = array_search($minPos, $positions);
+                
+                if ($minType === 'if') {
+                    $depth++;
+                    $pos = $minPos + 5; // Skip past {{#if
+                } elseif ($minType === 'else') {
+                    if ($depth === 1 && $elsePos === null) {
+                        $elsePos = $minPos; // Only capture else at current depth
+                    }
+                    $pos = $minPos + 8; // Skip past {{else}}
+                } elseif ($minType === 'endif') {
+                    $depth--;
+                    if ($depth === 0) {
+                        $endPos = $minPos;
+                    }
+                    $pos = $minPos + 7; // Skip past {{/if}}
+                }
+            }
+            
+            if ($endPos === null) {
+                // No matching {{/if}} found, skip this tag
+                $offset = $afterOpenTag;
+                continue;
+            }
+            
+            // Extract blocks
+            if ($elsePos !== null) {
+                $trueBlock = substr($template, $afterOpenTag, $elsePos - $afterOpenTag);
+                $falseBlock = substr($template, $elsePos + 8, $endPos - $elsePos - 8);
+            } else {
+                $trueBlock = substr($template, $afterOpenTag, $endPos - $afterOpenTag);
+                $falseBlock = '';
+            }
+            
+            // Evaluate condition
             $isTruthy = $this->evaluateCondition($condition, $context);
-            
             $result = $isTruthy ? $trueBlock : $falseBlock;
             
-            // Recursively process nested blocks
-            return $this->processIfBlocks($result, $context);
-        }, $template);
+            // Recursively process nested blocks in the result
+            $result = $this->processIfBlocks($result, $context);
+            
+            // Replace in template
+            $fullMatch = substr($template, $startPos, $endPos + 7 - $startPos);
+            $template = substr_replace($template, $result, $startPos, strlen($fullMatch));
+            
+            // Continue from after the replacement
+            $offset = $startPos + strlen($result);
+        }
+        
+        return $template;
     }
     
     /**
@@ -616,6 +709,279 @@ class AiSpecManager {
         }
         
         return $grouped;
+    }
+    
+    /**
+     * Get project configuration
+     * 
+     * @return array Project config from config.php
+     */
+    public function getProjectConfig(): array {
+        $configPath = PROJECT_PATH . '/config.php';
+        if (file_exists($configPath)) {
+            return require $configPath;
+        }
+        return [];
+    }
+    
+    /**
+     * Generate pre/post commands for a spec
+     * 
+     * @param array $spec The spec definition
+     * @param array $userParams User-provided parameters
+     * @param string $type 'preCommands' or 'postCommands'
+     * @return array Array of resolved command objects ready for execution
+     */
+    public function generateSpecCommands(array $spec, array $userParams, string $type): array {
+        $commands = $spec[$type] ?? [];
+        if (empty($commands)) {
+            return [];
+        }
+        
+        $config = $this->getProjectConfig();
+        $result = [];
+        
+        foreach ($commands as $cmdDef) {
+            // Evaluate condition
+            if (isset($cmdDef['condition'])) {
+                if (!$this->evaluateSpecCommandCondition($cmdDef['condition'], $userParams, $config)) {
+                    continue;
+                }
+            }
+            
+            // Handle template type
+            if (!empty($cmdDef['template'])) {
+                $result[] = [
+                    'type' => 'template',
+                    'template' => $cmdDef['template'],
+                    'params' => $cmdDef['params'] ?? []
+                ];
+                continue;
+            }
+            
+            // Handle command type
+            if (!empty($cmdDef['command'])) {
+                $resolvedParams = $this->resolveCommandParams($cmdDef['params'] ?? [], $userParams, $config);
+                $result[] = [
+                    'type' => 'command',
+                    'command' => $cmdDef['command'],
+                    'params' => $resolvedParams
+                ];
+            }
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Evaluate a condition for pre/post commands
+     * 
+     * @param string $condition Condition expression
+     * @param array $userParams User parameters (param.X)
+     * @param array $config Project config (config.X)
+     * @return bool Whether condition is met
+     */
+    private function evaluateSpecCommandCondition(string $condition, array $userParams, array $config): bool {
+        // Replace param.X and config.X with actual values
+        $context = [
+            'param' => $userParams,
+            'config' => $config
+        ];
+        
+        // Check for comparison operators
+        if (preg_match('/^(.+?)\s*(===|!==|==|!=)\s*(.+)$/', $condition, $parts)) {
+            $leftExpr = trim($parts[1]);
+            $operator = $parts[2];
+            $rightExpr = trim($parts[3]);
+            
+            $leftValue = $this->resolveConditionValue($leftExpr, $context);
+            $rightValue = $this->resolveConditionValue($rightExpr, $context);
+            
+            switch ($operator) {
+                case '===':
+                    return $leftValue === $rightValue;
+                case '!==':
+                    return $leftValue !== $rightValue;
+                case '==':
+                    return $leftValue == $rightValue;
+                case '!=':
+                    return $leftValue != $rightValue;
+            }
+        }
+        
+        // Simple truthiness check
+        $value = $this->resolveValue($condition, $context);
+        return !empty($value) && $value !== false && $value !== null && $value !== 'false';
+    }
+    
+    /**
+     * Resolve command parameters, handling $each loops and {{config.X}} placeholders
+     * 
+     * @param array $params Raw params from spec
+     * @param array $userParams User parameters
+     * @param array $config Project config
+     * @return array Resolved params
+     */
+    private function resolveCommandParams(array $params, array $userParams, array $config): array {
+        $context = [
+            'param' => $userParams,
+            'config' => $config
+        ];
+        
+        return $this->resolveParamsRecursive($params, $context);
+    }
+    
+    /**
+     * Recursively resolve parameters, handling $each loops
+     * 
+     * @param mixed $data Data to resolve
+     * @param array $context Resolution context
+     * @return mixed Resolved data
+     */
+    private function resolveParamsRecursive($data, array $context) {
+        if (is_string($data)) {
+            // Resolve {{config.X}} and {{param.X}} placeholders
+            return preg_replace_callback(
+                '/\{\{([^}]+)\}\}/',
+                function ($matches) use ($context) {
+                    $key = trim($matches[1]);
+                    // Skip QuickSite placeholders ({{__current_page}}, etc.)
+                    if (strpos($key, '__') === 0) {
+                        return $matches[0];
+                    }
+                    $value = $this->resolveValue($key, $context);
+                    return is_string($value) ? $value : json_encode($value);
+                },
+                $data
+            );
+        }
+        
+        if (!is_array($data)) {
+            return $data;
+        }
+        
+        // Check for $each loop
+        if (isset($data['$each']) && isset($data['$item'])) {
+            return $this->processEachLoop($data, $context);
+        }
+        
+        // Recursively process array
+        $result = [];
+        foreach ($data as $key => $value) {
+            $result[$key] = $this->resolveParamsRecursive($value, $context);
+        }
+        return $result;
+    }
+    
+    /**
+     * Process a $each loop to generate array items
+     * 
+     * @param array $loopDef Loop definition with $each and $item
+     * @param array $context Resolution context
+     * @return array Generated items
+     */
+    private function processEachLoop(array $loopDef, array $context): array {
+        $sourceExpr = $loopDef['$each'];
+        $itemTemplate = $loopDef['$item'];
+        
+        // Resolve the source (e.g., {{config.LANGUAGES_NAME}})
+        $source = null;
+        if (preg_match('/^\{\{([^}]+)\}\}$/', $sourceExpr, $matches)) {
+            $source = $this->resolveValue(trim($matches[1]), $context);
+        }
+        
+        // Special case: if LANGUAGES_NAME is empty but LANGUAGES_SUPPORTED exists,
+        // auto-populate LANGUAGES_NAME with display names
+        if ($sourceExpr === '{{config.LANGUAGES_NAME}}' && (empty($source) || !is_array($source))) {
+            $supported = $context['config']['LANGUAGES_SUPPORTED'] ?? [];
+            if (!empty($supported)) {
+                $commonLanguages = [
+                    'en' => 'English', 'fr' => 'Français', 'es' => 'Español', 'de' => 'Deutsch',
+                    'it' => 'Italiano', 'pt' => 'Português', 'nl' => 'Nederlands', 'ru' => 'Русский',
+                    'zh' => '中文', 'ja' => '日本語', 'ko' => '한국어', 'ar' => 'العربية'
+                ];
+                $source = [];
+                foreach ($supported as $langCode) {
+                    $source[$langCode] = $commonLanguages[$langCode] ?? ucfirst($langCode);
+                }
+            }
+        }
+        
+        if (!is_array($source)) {
+            return [];
+        }
+        
+        $result = [];
+        foreach ($source as $key => $value) {
+            // Create item context with $key and $value
+            $itemContext = array_merge($context, [
+                '$key' => $key,
+                '$value' => $value
+            ]);
+            
+            // Resolve the item template
+            $item = $this->resolveItemTemplate($itemTemplate, $itemContext);
+            $result[] = $item;
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Resolve an item template within a $each loop
+     * 
+     * @param mixed $template Template to resolve
+     * @param array $context Context with $key and $value
+     * @return mixed Resolved template
+     */
+    private function resolveItemTemplate($template, array $context) {
+        if (is_string($template)) {
+            // First pass: resolve inner placeholders like {{$key}}, {{$value}} inside other placeholders
+            // This handles cases like {{__current_page;lang={{$key}}}}
+            $template = preg_replace_callback(
+                '/\{\{(\$key|\$value)\}\}/',
+                function ($matches) use ($context) {
+                    $key = $matches[1];
+                    if (isset($context[$key])) {
+                        $value = $context[$key];
+                        return is_string($value) ? $value : (is_scalar($value) ? (string)$value : json_encode($value));
+                    }
+                    return $matches[0];
+                },
+                $template
+            );
+            
+            // Second pass: resolve remaining {{...}} placeholders (skip QuickSite __ placeholders)
+            return preg_replace_callback(
+                '/\{\{([^}]+)\}\}/',
+                function ($matches) use ($context) {
+                    $key = trim($matches[1]);
+                    // Skip QuickSite placeholders (they start with __)
+                    if (strpos($key, '__') === 0) {
+                        return $matches[0];
+                    }
+                    $value = $this->resolveValue($key, $context);
+                    return is_string($value) ? $value : (is_scalar($value) ? (string)$value : json_encode($value));
+                },
+                $template
+            );
+        }
+        
+        if (!is_array($template)) {
+            return $template;
+        }
+        
+        // Check for nested $each
+        if (isset($template['$each']) && isset($template['$item'])) {
+            return $this->processEachLoop($template, $context);
+        }
+        
+        // Recursively process array
+        $result = [];
+        foreach ($template as $k => $v) {
+            $result[$k] = $this->resolveItemTemplate($v, $context);
+        }
+        return $result;
     }
     
     /**

@@ -1,11 +1,9 @@
 <?php
 /**
  * Active Project Target Configuration
- * 
- * Updated: 2026-01-05 18:42:21
- * Previous: test-p
+ * Updated: 2026-01-07 16:25:26
  */
 
 return [
-    'project' => 'quicksite'
+    'project' => 'test-fresh'
 ];

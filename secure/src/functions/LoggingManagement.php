@@ -122,6 +122,7 @@ function createLogEntry(
 
 /**
  * Write a log entry to the daily log file
+ * Uses file locking to prevent concurrent access issues on Windows
  */
 function writeLogEntry(array $entry): bool {
     if (!ensureLogsDirectory()) {
@@ -129,24 +130,56 @@ function writeLogEntry(array $entry): bool {
     }
     
     $logFile = getLogFilePath();
+    $lockFile = $logFile . '.lock';
     
-    // Read existing logs or start fresh
-    $logs = [];
-    if (file_exists($logFile)) {
-        $content = file_get_contents($logFile);
-        $logs = json_decode($content, true) ?? [];
+    // Acquire exclusive lock using a separate lock file
+    $lockHandle = fopen($lockFile, 'c');
+    if (!$lockHandle) {
+        return false;
     }
     
-    // Append new entry
-    $logs[] = $entry;
-    
-    // Write back atomically
-    $tempFile = $logFile . '.tmp';
-    if (file_put_contents($tempFile, json_encode($logs, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) !== false) {
-        return rename($tempFile, $logFile);
+    // Try to get exclusive lock (blocking with timeout)
+    $lockAcquired = false;
+    $maxRetries = 10;
+    for ($i = 0; $i < $maxRetries; $i++) {
+        if (flock($lockHandle, LOCK_EX | LOCK_NB)) {
+            $lockAcquired = true;
+            break;
+        }
+        usleep(50000); // Wait 50ms before retry
     }
     
-    return false;
+    if (!$lockAcquired) {
+        fclose($lockHandle);
+        return false; // Could not acquire lock, skip logging this entry
+    }
+    
+    try {
+        // Read existing logs or start fresh
+        $logs = [];
+        if (file_exists($logFile)) {
+            $content = @file_get_contents($logFile);
+            if ($content !== false) {
+                $logs = json_decode($content, true) ?? [];
+            }
+        }
+        
+        // Append new entry
+        $logs[] = $entry;
+        
+        // Write directly to file (we have exclusive lock)
+        $success = @file_put_contents(
+            $logFile, 
+            json_encode($logs, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+            LOCK_EX
+        ) !== false;
+        
+        return $success;
+    } finally {
+        // Always release lock and close handle
+        flock($lockHandle, LOCK_UN);
+        fclose($lockHandle);
+    }
 }
 
 /**

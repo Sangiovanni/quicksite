@@ -1300,9 +1300,25 @@ async function executeApiCall(command, params = {}) {
  */
 async function generateFreshStartCommands() {
     const commands = [];
-    const summary = { routes: 0, assets: 0, translations: 0, structures: 0, components: 0 };
+    const summary = { routes: 0, assets: 0, translations: 0, structures: 0, components: 0, langs: 0 };
     
     try {
+        // 0. Delete extra languages (keep only default) and disable multilingual mode
+        const langResponse = await executeApiCall('getLangList', {});
+        if (langResponse.ok && langResponse.data) {
+            const defaultLang = langResponse.data.default_language || 'en';
+            const allLangs = langResponse.data.languages || [];
+            
+            // Delete all non-default languages
+            const langsToDelete = allLangs.filter(lang => lang !== defaultLang);
+            for (const lang of langsToDelete) {
+                commands.push({ command: 'deleteLang', params: { code: lang } });
+                summary.langs++;
+            }
+        }
+        // Disable multilingual mode (resets config state)
+        commands.push({ command: 'setMultilingual', params: { enabled: false } });
+        
         // 1. Fetch current routes
         // API returns: { routes: {nested object}, flat_routes: ["home", "about", "guides/installation", ...], count: N }
         const routesResponse = await executeApiCall('getRoutes', {});
