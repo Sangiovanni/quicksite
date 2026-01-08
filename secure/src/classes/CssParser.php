@@ -188,9 +188,8 @@ class CssParser {
             return null;
         }
         
-        // Look in global scope (outside @media blocks)
-        // First remove @media blocks
-        $globalContent = preg_replace('/@media\s*[^{]+\s*\{(?:[^{}]*\{[^{}]*\})*\s*\}/s', '', $this->content);
+        // Look in global scope (outside @media and @keyframes blocks)
+        $globalContent = $this->getGlobalContent();
         
         if (preg_match('/' . $escapedSelector . '\s*\{([^}]*)\}/s', $globalContent, $match)) {
             return [
@@ -501,6 +500,163 @@ class CssParser {
         }
         
         return $result;
+    }
+    
+    /**
+     * Extract CSS rules that match a set of classes, IDs, and tags
+     * @param array $classes List of CSS class names (without .)
+     * @param array $ids List of element IDs (without #)
+     * @param array $tags List of HTML tag names
+     * @param bool $includeRelated Include related selectors (e.g., .class:hover, .class::before)
+     * @return array CSS rules grouped by scope (global, media queries)
+     */
+    public function getCssForSelectors(array $classes = [], array $ids = [], array $tags = [], bool $includeRelated = true): array {
+        $result = [
+            'global' => [],
+            'mediaQueries' => [],
+            'keyframes' => [],
+            'rootVariables' => []
+        ];
+        
+        // Build match patterns
+        $patterns = [];
+        
+        foreach ($classes as $class) {
+            $class = ltrim($class, '.');
+            // Match .class anywhere in selector
+            $patterns[] = '\.' . preg_quote($class, '/') . '(?![a-zA-Z0-9_-])';
+        }
+        
+        foreach ($ids as $id) {
+            $id = ltrim($id, '#');
+            $patterns[] = '#' . preg_quote($id, '/') . '(?![a-zA-Z0-9_-])';
+        }
+        
+        foreach ($tags as $tag) {
+            // Match tag at word boundaries (not preceded/followed by alphanumeric)
+            $patterns[] = '(?<![a-zA-Z0-9_-])' . preg_quote($tag, '/') . '(?![a-zA-Z0-9_-])';
+        }
+        
+        if (empty($patterns)) {
+            return $result;
+        }
+        
+        $combinedPattern = '/(' . implode('|', $patterns) . ')/i';
+        
+        // Get all selectors (returns flat array with 'selector' and 'mediaQuery' keys)
+        $allSelectors = $this->listSelectors();
+        
+        // Process each selector
+        foreach ($allSelectors as $selectorInfo) {
+            $selector = $selectorInfo['selector'];
+            $mediaQuery = $selectorInfo['mediaQuery'];
+            
+            if (preg_match($combinedPattern, $selector)) {
+                $rule = $this->getStyleRule($selector, $mediaQuery);
+                if ($rule !== null) {
+                    if ($mediaQuery === null) {
+                        // Global rule
+                        $result['global'][$selector] = $rule['styles'];
+                    } else {
+                        // Media query rule
+                        if (!isset($result['mediaQueries'][$mediaQuery])) {
+                            $result['mediaQueries'][$mediaQuery] = [];
+                        }
+                        $result['mediaQueries'][$mediaQuery][$selector] = $rule['styles'];
+                    }
+                }
+            }
+        }
+        
+        // Check if any matched rules use animations
+        $allCss = implode(' ', array_values($result['global']));
+        foreach ($result['mediaQueries'] as $rules) {
+            $allCss .= ' ' . implode(' ', array_values($rules));
+        }
+        
+        // Extract animation names used
+        if (preg_match_all('/animation(?:-name)?:\s*([a-zA-Z0-9_-]+)/i', $allCss, $animMatches)) {
+            $keyframes = $this->getKeyframes();
+            foreach (array_unique($animMatches[1]) as $animName) {
+                if (isset($keyframes[$animName])) {
+                    $result['keyframes'][$animName] = $keyframes[$animName];
+                }
+            }
+        }
+        
+        // Extract CSS variables used
+        if (preg_match_all('/var\((--[a-zA-Z0-9_-]+)\)/i', $allCss, $varMatches)) {
+            $rootVars = $this->getRootVariables();
+            foreach (array_unique($varMatches[1]) as $varName) {
+                if (isset($rootVars[$varName])) {
+                    $result['rootVariables'][$varName] = $rootVars[$varName];
+                }
+            }
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Format extracted CSS as a string
+     * @param array $cssData Output from getCssForSelectors
+     * @return string Formatted CSS
+     */
+    public function formatExtractedCss(array $cssData): string {
+        $output = '';
+        
+        // Root variables
+        if (!empty($cssData['rootVariables'])) {
+            $output .= ":root {\n";
+            foreach ($cssData['rootVariables'] as $name => $value) {
+                // $name already includes -- prefix
+                $output .= "    {$name}: {$value};\n";
+            }
+            $output .= "}\n\n";
+        }
+        
+        // Global rules
+        foreach ($cssData['global'] as $selector => $styles) {
+            $output .= "{$selector} {\n{$styles}\n}\n\n";
+        }
+        
+        // Media queries
+        foreach ($cssData['mediaQueries'] as $media => $rules) {
+            $output .= "@media {$media} {\n";
+            foreach ($rules as $selector => $styles) {
+                // Indent styles
+                $indentedStyles = preg_replace('/^/m', '    ', $styles);
+                $output .= "    {$selector} {\n{$indentedStyles}\n    }\n";
+            }
+            $output .= "}\n\n";
+        }
+        
+        // Keyframes
+        foreach ($cssData['keyframes'] as $name => $frames) {
+            $output .= "@keyframes {$name} {\n";
+            foreach ($frames as $key => $styles) {
+                $output .= "    {$key} {\n        {$styles}\n    }\n";
+            }
+            $output .= "}\n\n";
+        }
+        
+        return trim($output);
+    }
+    
+    /**
+     * Get content without @media and @keyframes blocks (global scope only)
+     * @return string CSS content with only global rules
+     */
+    private function getGlobalContent(): string {
+        $content = $this->content;
+        
+        // Remove @keyframes blocks (they have nested braces)
+        $content = preg_replace('/@keyframes\s+[\w-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/s', '', $content);
+        
+        // Remove @media blocks (they also have nested braces)
+        $content = preg_replace('/@media\s*[^{]+\s*\{(?:[^{}]*\{[^{}]*\})*\s*\}/s', '', $content);
+        
+        return $content;
     }
     
     /**
