@@ -8,12 +8,27 @@
  * - Tag nodes: {tag, params, children}
  * - Text nodes: {textKey}
  * - Components: {component, data}
+ * 
+ * Editor Mode:
+ * When editorMode is enabled, adds data attributes for visual editor:
+ * - data-qs-struct: Structure type (menu, footer, page-{name})
+ * - data-qs-node: Node path (e.g., "0", "0.1", "0.1.2")
+ * - data-qs-component: Component name (on component root elements)
+ * - data-qs-in-component: Marker for elements inside a component
  */
 class JsonToHtmlRenderer {
     private $context = [];
     private $translator;
     private $componentCache = [];
     private $componentsPath;
+    
+    // Editor mode state
+    private $editorMode = false;
+    private $currentStructure = '';      // menu, footer, page-home
+    private $currentNodePath = [];       // Path as array [0, 1, 2]
+    private $inComponent = false;        // Are we inside a component?
+    private $currentComponentName = '';  // Current component name
+    private $currentComponentNode = '';  // Node path where component started
 
     /**
      * @param Translator $translator Instance of Translator for text resolution
@@ -23,6 +38,24 @@ class JsonToHtmlRenderer {
         $this->translator = $translator;
         $this->context = $context;
         $this->componentsPath = PROJECT_PATH . '/templates/model/json/components/';
+        
+        // Auto-detect editor mode from query parameter if not explicitly set
+        // This ensures ALL renderer instances are in editor mode when ?_editor=1 is present
+        if (isset($context['editorMode'])) {
+            $this->editorMode = $context['editorMode'];
+        } else {
+            $this->editorMode = isset($_GET['_editor']) && $_GET['_editor'] === '1';
+        }
+    }
+    
+    /**
+     * Enable or disable editor mode
+     * When enabled, adds data attributes for visual editor element selection
+     * 
+     * @param bool $enabled Whether to enable editor mode
+     */
+    public function setEditorMode(bool $enabled): void {
+        $this->editorMode = $enabled;
     }
 
     /**
@@ -32,6 +65,11 @@ class JsonToHtmlRenderer {
      * @return string Rendered HTML
      */
     public function renderPage(string $pageName): string {
+        // Set structure context for editor mode
+        $this->currentStructure = 'page-' . str_replace('/', '-', $pageName);
+        $this->currentNodePath = [];
+        $this->inComponent = false;
+        
         // Support both flat name ('home') and path ('guides/getting-started')
         // Convention: ALL pages use folder structure - page/page.json
         $routePath = trim($pageName, '/');
@@ -52,6 +90,11 @@ class JsonToHtmlRenderer {
      * Render menu - just load and render the JSON
      */
     public function renderMenu(): string {
+        // Set structure context for editor mode
+        $this->currentStructure = 'menu';
+        $this->currentNodePath = [];
+        $this->inComponent = false;
+        
         return $this->renderJsonFile('/templates/model/json/menu.json');
     }
 
@@ -59,6 +102,11 @@ class JsonToHtmlRenderer {
      * Render footer - just load and render the JSON
      */
     public function renderFooter(): string {
+        // Set structure context for editor mode
+        $this->currentStructure = 'footer';
+        $this->currentNodePath = [];
+        $this->inComponent = false;
+        
         return $this->renderJsonFile('/templates/model/json/footer.json');
     }
 
@@ -111,8 +159,14 @@ class JsonToHtmlRenderer {
      */
     private function renderNodes(array $nodes): string {
         $html = '';
+        $index = 0;
         foreach ($nodes as $node) {
+            // Push current index to path
+            $this->currentNodePath[] = $index;
             $html .= $this->renderNode($node);
+            // Pop after rendering
+            array_pop($this->currentNodePath);
+            $index++;
         }
         return $html;
     }
@@ -121,9 +175,10 @@ class JsonToHtmlRenderer {
      * Render a single node
      * 
      * @param mixed $node Node object (tag, text, or component)
+     * @param bool $isComponentRoot Whether this is the root element of a component
      * @return string Rendered HTML
      */
-    private function renderNode($node): string {
+    private function renderNode($node, bool $isComponentRoot = false): string {
         if (!is_array($node)) {
             error_log("Invalid node: must be an array");
             return "<!-- Invalid node -->";
@@ -134,12 +189,26 @@ class JsonToHtmlRenderer {
             $componentName = $node['component'];
             $componentData = $node['data'] ?? [];
             
+            // Save component context before entering
+            $prevInComponent = $this->inComponent;
+            $prevComponentName = $this->currentComponentName;
+            $prevComponentNode = $this->currentComponentNode;
+            
+            // Enter component context
+            $this->inComponent = true;
+            $this->currentComponentName = $componentName;
+            $this->currentComponentNode = implode('.', $this->currentNodePath);
+            
             // Process placeholders in component data
             $componentData = $this->processDataPlaceholders($componentData);
             
             // Load component template
             $componentTemplate = $this->loadComponent($componentName);
             if ($componentTemplate === null) {
+                // Restore context
+                $this->inComponent = $prevInComponent;
+                $this->currentComponentName = $prevComponentName;
+                $this->currentComponentNode = $prevComponentNode;
                 error_log("Component not found: {$componentName}");
                 return "<!-- Component not found: {$componentName} -->";
             }
@@ -147,8 +216,15 @@ class JsonToHtmlRenderer {
             // Replace placeholders with data
             $processedTemplate = $this->processComponentTemplate($componentTemplate, $componentData);
             
-            // Render the processed template
-            return $this->renderNode($processedTemplate);
+            // Render the processed template (mark as component root)
+            $html = $this->renderNode($processedTemplate, true);
+            
+            // Restore context after exiting component
+            $this->inComponent = $prevInComponent;
+            $this->currentComponentName = $prevComponentName;
+            $this->currentComponentNode = $prevComponentNode;
+            
+            return $html;
         }
 
         // Handle text node
@@ -158,7 +234,7 @@ class JsonToHtmlRenderer {
 
         // Handle tag node
         if (isset($node['tag'])) {
-            return $this->renderTagNode($node);
+            return $this->renderTagNode($node, $isComponentRoot);
         }
 
         error_log("Unknown node type: " . json_encode($node));
@@ -192,9 +268,10 @@ class JsonToHtmlRenderer {
      * Render a tag node (HTML element)
      * 
      * @param array $node Tag node with 'tag', 'params', 'children'
+     * @param bool $isComponentRoot Whether this is the root element of a component
      * @return string Rendered HTML element
      */
-    private function renderTagNode(array $node): string {
+    private function renderTagNode(array $node, bool $isComponentRoot = false): string {
         $tag = $node['tag'] ?? null;
         
         if (empty($tag)) {
@@ -218,6 +295,11 @@ class JsonToHtmlRenderer {
 
         $html = '<' . htmlspecialchars($tag, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
+        // Add editor mode attributes if enabled
+        if ($this->editorMode) {
+            $html .= $this->renderEditorAttributes($isComponentRoot);
+        }
+
         // Render attributes
         if (is_array($params) && !empty($params)) {
             foreach ($params as $attrName => $attrValue) {
@@ -240,6 +322,37 @@ class JsonToHtmlRenderer {
         }
 
         return $html;
+    }
+    
+    /**
+     * Render editor mode data attributes
+     * 
+     * @param bool $isComponentRoot Whether this is the root element of a component
+     * @return string HTML attributes string
+     */
+    private function renderEditorAttributes(bool $isComponentRoot): string {
+        $attrs = '';
+        
+        // Always add structure identifier
+        $attrs .= ' data-qs-struct="' . htmlspecialchars($this->currentStructure, ENT_QUOTES) . '"';
+        
+        // Add node path
+        $nodePath = implode('.', $this->currentNodePath);
+        $attrs .= ' data-qs-node="' . htmlspecialchars($nodePath, ENT_QUOTES) . '"';
+        
+        // If we're inside a component
+        if ($this->inComponent) {
+            // Mark as in-component (for click handling - bubble up to component root)
+            $attrs .= ' data-qs-in-component';
+            
+            // On component root, add component name and the node where component is defined
+            if ($isComponentRoot) {
+                $attrs .= ' data-qs-component="' . htmlspecialchars($this->currentComponentName, ENT_QUOTES) . '"';
+                $attrs .= ' data-qs-component-node="' . htmlspecialchars($this->currentComponentNode, ENT_QUOTES) . '"';
+            }
+        }
+        
+        return $attrs;
     }
 
     /**

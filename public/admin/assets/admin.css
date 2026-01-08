@@ -2022,6 +2022,17 @@ code.preview-node-panel__value {
     font-size: var(--font-size-xs);
 }
 
+.preview-node-panel__value--highlight {
+    color: var(--admin-primary);
+    font-weight: 500;
+}
+
+.preview-node-panel__value--component {
+    background: rgba(37, 99, 235, 0.1);
+    color: #2563eb;
+    border: 1px solid rgba(37, 99, 235, 0.3);
+}
+
 .preview-node-panel__actions {
     display: flex;
     gap: var(--space-sm);
@@ -2048,4 +2059,317 @@ code.preview-node-panel__value {
 
 .preview-container[data-mode="style"] {
     cursor: pointer;
+}
+
+/* ========================================
+   MINIPLAYER STYLES
+   ======================================== */
+
+/* Miniplayer toggle button icon states */
+.preview-miniplayer-icon--expand,
+.preview-miniplayer-text--expand {
+    display: none;
+}
+
+/* Miniplayer mode - floating window */
+.preview-page--miniplayer .preview-container {
+    position: fixed;
+    bottom: var(--space-lg);
+    right: var(--space-lg);
+    width: 400px;
+    height: 300px;
+    z-index: 1000;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    border: 2px solid var(--admin-border);
+    background: var(--admin-bg);
+    resize: both;
+    overflow: hidden;
+    min-width: 280px;
+    min-height: 200px;
+    max-width: 90vw;
+    max-height: 80vh;
+}
+
+.preview-page--miniplayer .preview-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 28px;
+    background: var(--admin-bg-secondary);
+    border-bottom: 1px solid var(--admin-border);
+    cursor: move;
+    z-index: 1;
+}
+
+.preview-page--miniplayer .preview-frame-wrapper {
+    position: absolute;
+    top: 28px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100% !important;
+    height: calc(100% - 28px) !important;
+}
+
+.preview-page--miniplayer .preview-iframe {
+    width: 100%;
+    height: 100%;
+}
+
+/* Hide toolbar in miniplayer mode */
+.preview-page--miniplayer .preview-toolbar {
+    display: none;
+}
+
+/* Hide header content in miniplayer (show floating controls instead) */
+.preview-page--miniplayer .admin-page-header {
+    display: none;
+}
+
+/* Hide node panel in miniplayer */
+.preview-page--miniplayer .preview-node-panel {
+    display: none;
+}
+
+/* Miniplayer floating controls */
+.preview-miniplayer-controls {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    display: none;
+    gap: var(--space-xs);
+    z-index: 2;
+}
+
+.preview-page--miniplayer .preview-miniplayer-controls {
+    display: flex;
+}
+
+.preview-miniplayer-controls__btn {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--admin-text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    transition: color 0.15s, background 0.15s;
+}
+
+.preview-miniplayer-controls__btn:hover {
+    color: var(--admin-text);
+    background: var(--admin-bg-tertiary);
+}
+
+.preview-miniplayer-controls__btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Resize handle indicator */
+.preview-page--miniplayer .preview-container::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 12px;
+    height: 12px;
+    background: linear-gradient(135deg, transparent 50%, var(--admin-text-muted) 50%);
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Dragging state */
+.preview-container.preview-container--dragging {
+    opacity: 0.9;
+    cursor: move;
+}
+
+/* Toggle button state in miniplayer mode */
+.preview-page--miniplayer .preview-miniplayer-icon--minimize {
+    display: none;
+}
+.preview-page--miniplayer .preview-miniplayer-icon--expand {
+    display: block;
+}
+.preview-page--miniplayer .preview-miniplayer-text--minimize {
+    display: none;
+}
+.preview-page--miniplayer .preview-miniplayer-text--expand {
+    display: inline;
+}
+
+/* Responsive miniplayer */
+@media (max-width: 768px) {
+    .preview-page--miniplayer .preview-container {
+        width: 280px;
+        height: 200px;
+        bottom: var(--space-md);
+        right: var(--space-md);
+    }
+}
+
+/* ========================================
+   GLOBAL MINIPLAYER (Layout-Level)
+   Floating preview that persists across pages
+   ======================================== */
+
+.global-miniplayer {
+    position: fixed;
+    bottom: var(--space-lg);
+    right: var(--space-lg);
+    width: 400px;
+    height: 300px;
+    z-index: 9999;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    border: 2px solid var(--admin-border);
+    background: var(--admin-bg);
+    resize: both;
+    overflow: hidden;
+    min-width: 280px;
+    min-height: 200px;
+    max-width: 90vw;
+    max-height: 80vh;
+    display: none;
+    flex-direction: column;
+}
+
+.global-miniplayer--active {
+    display: flex;
+}
+
+/* Header / drag handle */
+.global-miniplayer__header {
+    height: 32px;
+    min-height: 32px;
+    background: var(--admin-bg-secondary);
+    border-bottom: 1px solid var(--admin-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--space-sm);
+    cursor: move;
+    user-select: none;
+}
+
+.global-miniplayer__title {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--admin-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.global-miniplayer__controls {
+    display: flex;
+    gap: var(--space-xs);
+}
+
+.global-miniplayer__btn {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--admin-text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    transition: color 0.15s, background 0.15s;
+}
+
+.global-miniplayer__btn:hover {
+    color: var(--admin-text);
+    background: var(--admin-bg-tertiary);
+}
+
+.global-miniplayer__btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Content / iframe area */
+.global-miniplayer__content {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+.global-miniplayer__iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: white;
+}
+
+/* Loading overlay */
+.global-miniplayer__loading {
+    position: absolute;
+    inset: 0;
+    background: var(--admin-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.global-miniplayer__spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--admin-border);
+    border-top-color: var(--admin-accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* Resize handle indicator */
+.global-miniplayer__resize-handle {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 12px;
+    height: 12px;
+    background: linear-gradient(135deg, transparent 50%, var(--admin-text-muted) 50%);
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Dragging state */
+.global-miniplayer--dragging {
+    opacity: 0.9;
+    cursor: move;
+}
+
+.global-miniplayer--dragging .global-miniplayer__iframe {
+    pointer-events: none;
+}
+
+/* Body class when miniplayer is active - can be used to adjust layout */
+body.has-miniplayer {
+    /* Can add padding-bottom if needed to avoid content overlap */
+}
+
+/* Hide global miniplayer on preview page (preview page has its own) */
+body[data-page="preview"] .global-miniplayer {
+    display: none !important;
+}
+
+/* Responsive global miniplayer */
+@media (max-width: 768px) {
+    .global-miniplayer {
+        width: 280px;
+        height: 200px;
+        bottom: var(--space-md);
+        right: var(--space-md);
+    }
 }

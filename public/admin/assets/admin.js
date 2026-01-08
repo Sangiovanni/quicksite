@@ -395,6 +395,14 @@ const QuickSiteAdmin = {
         if (response.status === 204) {
             result = { status: 204, code: 'operation.success', message: 'Operation completed successfully' };
         }
+        
+        // Dispatch event for successful write operations (non-GET)
+        // This allows miniplayer to auto-reload preview
+        if (response.ok && method !== 'GET') {
+            window.dispatchEvent(new CustomEvent('quicksite:command-executed', {
+                detail: { command, method, success: true }
+            }));
+        }
 
         return {
             ok: response.ok,

@@ -71,7 +71,7 @@ $langNames = [
     <!-- Bootstrap Icons for tutorial -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 </head>
-<body class="admin-body<?= $isLoginPage ? ' admin-body--login' : '' ?>">
+<body class="admin-body<?= $isLoginPage ? ' admin-body--login' : '' ?>" data-page="<?= adminEscape($currentPage) ?>">
     
     <?php if (!$isLoginPage): ?>
     <!-- Admin Header -->
@@ -455,6 +455,11 @@ $langNames = [
             tutorial.init(<?= json_encode($tutorialData) ?>);
         });
     </script>
+    
+    <!-- Global Miniplayer (not on preview page, it has its own) -->
+    <?php if ($currentPage !== 'preview'): ?>
+        <?php require __DIR__ . '/partials/_miniplayer.php'; ?>
+    <?php endif; ?>
     <?php endif; ?>
 </body>
 </html>

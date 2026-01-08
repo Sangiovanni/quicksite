@@ -910,6 +910,7 @@
         "title": "Visual Editor",
         "subtitle": "Preview and interact with your website in real-time",
         "device": "Device",
+        "language": "Language",
         "page": "Page",
         "component": "Component",
         "fullPage": "Full Page",
@@ -923,12 +924,17 @@
         "modeText": "Text (edit content)",
         "modeStyle": "Style (edit CSS)",
         "nodeInfo": "Element Info",
+        "structure": "Structure",
         "nodeId": "Node ID",
+        "componentName": "Component",
         "nodeTag": "Tag",
         "nodeClasses": "Classes",
         "nodeChildren": "Children",
         "nodeText": "Text",
         "editStructure": "Edit Structure",
-        "copyNodeId": "Copy ID"
+        "copyNodeId": "Copy Node ID",
+        "miniplayer": "Miniplayer",
+        "expand": "Expand",
+        "miniplayerClose": "Close Miniplayer"
     }
 }

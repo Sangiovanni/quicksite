@@ -47,6 +47,9 @@ class PageManagement {
 
         $translator = new Translator($this->lang);
         $trimParameters = new TrimParameters();
+        
+        // Check for editor mode (visual editor preview)
+        $editorMode = isset($_GET['_editor']) && $_GET['_editor'] === '1';
 
         // Pass context with baseUrl, lang, and route info
         $context = [
@@ -59,6 +62,8 @@ class PageManagement {
             // Legacy compatibility (deprecated)
             'page' => $trimParameters->page(),             // Last segment for backward compat
             'id' => $trimParameters->id(),                 // First param for backward compat
+            // Editor mode
+            'editorMode' => $editorMode,
         ];
 
         $renderer = new JsonToHtmlRenderer($translator, $context);
