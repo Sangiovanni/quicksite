@@ -66,7 +66,7 @@
           },
           "type": {
             "type": "string",
-            "enum": ["text", "textarea", "select", "multiselect", "checkbox", "number"],
+            "enum": ["text", "textarea", "select", "multiselect", "checkbox", "number", "nodeSelector"],
             "description": "Input type for the parameter"
           },
           "labelKey": {
@@ -121,6 +121,22 @@
           "condition": {
             "type": "string",
             "description": "Conditional expression to show/hide this parameter. Supports: paramId === value, paramId !== value, paramId (truthy). Example: 'multilingual === true'"
+          },
+          "structures": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["page", "menu", "footer", "component"]
+            },
+            "description": "For nodeSelector type: which structure types to show for node selection"
+          },
+          "allowTextHint": {
+            "type": "boolean",
+            "description": "For nodeSelector type: allow user to type a text hint instead of selecting a node"
+          },
+          "optional": {
+            "type": "boolean",
+            "description": "Whether this parameter can be left empty"
           }
         }
       }
