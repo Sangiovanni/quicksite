@@ -1650,6 +1650,13 @@ code{
    Visual Editor Phase 1 - Live Preview
    ============================================================================= */
 
+/* Preview Page Header Icon */
+.admin-page-header__icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
 /* Preview Toolbar */
 .preview-toolbar {
     display: flex;
@@ -1749,7 +1756,7 @@ code{
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    min-height: calc(100vh - 300px);
+    height: calc(100vh - 280px);
     padding: 0;
     background: var(--admin-bg-secondary);
     border-radius: var(--radius-lg);
@@ -1758,6 +1765,7 @@ code{
 
 .preview-container--device {
     padding: var(--space-lg);
+    align-items: center;
     background: 
         linear-gradient(90deg, var(--admin-surface) 1px, transparent 1px) 0 0 / 20px 20px,
         linear-gradient(0deg, var(--admin-surface) 1px, transparent 1px) 0 0 / 20px 20px,
@@ -1768,13 +1776,14 @@ code{
 .preview-frame-wrapper {
     position: relative;
     width: 100%;
-    height: calc(100vh - 300px);
+    height: 100%;
     background: white;
     transition: width 0.3s ease, height 0.3s ease;
     overflow: hidden;
 }
 
 .preview-container--device .preview-frame-wrapper {
+    height: auto;
     border-radius: 16px;
     box-shadow: 
         0 0 0 8px #333,
@@ -1854,4 +1863,189 @@ code{
     .preview-frame-wrapper {
         height: 400px;
     }
+}
+
+/* =============================================================================
+   PREVIEW PAGE - PHASE 2 STYLES
+   Editor Modes, Component Selector, Node Panel
+   ============================================================================= */
+
+/* Mode Toggle Buttons */
+.preview-toolbar__modes {
+    display: flex;
+    gap: 2px;
+    background: var(--admin-bg-secondary);
+    padding: 4px;
+    border-radius: var(--radius-md);
+}
+
+.preview-mode-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--admin-text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.preview-mode-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.preview-mode-btn:hover {
+    color: var(--admin-text);
+    background: var(--admin-surface-hover);
+}
+
+.preview-mode-btn--active {
+    color: var(--admin-primary);
+    background: var(--admin-surface);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Smaller select for component dropdown */
+.preview-toolbar__select--sm {
+    max-width: 150px;
+}
+
+/* Node Info Panel */
+.preview-node-panel {
+    position: fixed;
+    right: var(--space-lg);
+    top: 50%;
+    transform: translateY(-50%) translateX(120%);
+    width: 320px;
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: transform 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.preview-node-panel--visible {
+    transform: translateY(-50%) translateX(0);
+    opacity: 1;
+    visibility: visible;
+}
+
+.preview-node-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md);
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.preview-node-panel__title {
+    margin: 0;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--admin-text);
+}
+
+.preview-node-panel__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--admin-text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.preview-node-panel__close svg {
+    width: 16px;
+    height: 16px;
+}
+
+.preview-node-panel__close:hover {
+    color: var(--admin-text);
+    background: var(--admin-surface-hover);
+}
+
+.preview-node-panel__content {
+    padding: var(--space-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.preview-node-panel__row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+}
+
+.preview-node-panel__label {
+    flex-shrink: 0;
+    width: 80px;
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+}
+
+.preview-node-panel__value {
+    flex: 1;
+    font-size: var(--font-size-sm);
+    color: var(--admin-text);
+    word-break: break-all;
+}
+
+.preview-node-panel__value--truncate {
+    max-height: 40px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+code.preview-node-panel__value {
+    padding: 2px 6px;
+    background: var(--admin-bg-secondary);
+    border-radius: var(--radius-sm);
+    font-family: 'Fira Code', 'Monaco', monospace;
+    font-size: var(--font-size-xs);
+}
+
+.preview-node-panel__actions {
+    display: flex;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    border-top: 1px solid var(--admin-border);
+}
+
+.preview-node-panel__actions .admin-btn {
+    flex: 1;
+}
+
+/* Mode-specific container styles */
+.preview-container[data-mode="select"] {
+    cursor: crosshair;
+}
+
+.preview-container[data-mode="drag"] {
+    cursor: grab;
+}
+
+.preview-container[data-mode="text"] {
+    cursor: text;
+}
+
+.preview-container[data-mode="style"] {
+    cursor: pointer;
 }

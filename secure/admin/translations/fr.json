@@ -915,12 +915,28 @@
         "tutorialDescription": "Apprenez QuickSite étape par étape avec notre tutoriel interactif."
     },
     "preview": {
-        "title": "Aperçu en direct",
-        "subtitle": "Visualisez votre site web en temps réel avec des modes de prévisualisation responsive",
+        "title": "Éditeur Visuel",
+        "subtitle": "Prévisualisez et interagissez avec votre site en temps réel",
         "device": "Appareil",
         "page": "Page",
+        "component": "Composant",
+        "fullPage": "Page complète",
+        "componentSoon": "Isolation des composants bientôt disponible",
         "homePage": "Accueil",
         "reload": "Recharger",
-        "openNewTab": "Ouvrir dans un nouvel onglet"
+        "openNewTab": "Ouvrir dans un nouvel onglet",
+        "mode": "Mode",
+        "modeSelect": "Sélection (cliquer les éléments)",
+        "modeDrag": "Glisser (réordonner)",
+        "modeText": "Texte (modifier le contenu)",
+        "modeStyle": "Style (modifier le CSS)",
+        "nodeInfo": "Info Élément",
+        "nodeId": "ID Nœud",
+        "nodeTag": "Balise",
+        "nodeClasses": "Classes",
+        "nodeChildren": "Enfants",
+        "nodeText": "Texte",
+        "editStructure": "Modifier Structure",
+        "copyNodeId": "Copier ID"
     }
 }

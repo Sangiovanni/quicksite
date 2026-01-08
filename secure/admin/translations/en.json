@@ -907,12 +907,28 @@
         "tutorialDescription": "Learn QuickSite step-by-step with our interactive tutorial."
     },
     "preview": {
-        "title": "Live Preview",
-        "subtitle": "View your website in real-time with responsive preview modes",
+        "title": "Visual Editor",
+        "subtitle": "Preview and interact with your website in real-time",
         "device": "Device",
         "page": "Page",
+        "component": "Component",
+        "fullPage": "Full Page",
+        "componentSoon": "Component isolation coming soon",
         "homePage": "Home",
         "reload": "Reload",
-        "openNewTab": "Open in New Tab"
+        "openNewTab": "Open in New Tab",
+        "mode": "Mode",
+        "modeSelect": "Select (click elements)",
+        "modeDrag": "Drag (reorder elements)",
+        "modeText": "Text (edit content)",
+        "modeStyle": "Style (edit CSS)",
+        "nodeInfo": "Element Info",
+        "nodeId": "Node ID",
+        "nodeTag": "Tag",
+        "nodeClasses": "Classes",
+        "nodeChildren": "Children",
+        "nodeText": "Text",
+        "editStructure": "Edit Structure",
+        "copyNodeId": "Copy ID"
     }
 }
