@@ -305,6 +305,7 @@
         "batch": "Batch",
         "docs": "Docs",
         "ai": "AI Integration",
+        "preview": "Preview",
         "logout": "Logout",
         "build": "Build",
         "inspect": "Inspect"
@@ -904,5 +905,14 @@
         "restartTutorial": "Restart Tutorial",
         "tutorialSettings": "Tutorial Settings",
         "tutorialDescription": "Learn QuickSite step-by-step with our interactive tutorial."
+    },
+    "preview": {
+        "title": "Live Preview",
+        "subtitle": "View your website in real-time with responsive preview modes",
+        "device": "Device",
+        "page": "Page",
+        "homePage": "Home",
+        "reload": "Reload",
+        "openNewTab": "Open in New Tab"
     }
 }

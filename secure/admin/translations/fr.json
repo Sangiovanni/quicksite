@@ -313,6 +313,7 @@
         "batch": "Batch",
         "docs": "Documentation",
         "ai": "Intégration IA",
+        "preview": "Aperçu",
         "logout": "Déconnexion",
         "build": "Construire",
         "inspect": "Inspecter"
@@ -912,5 +913,14 @@
         "restartTutorial": "Relancer le tutoriel",
         "tutorialSettings": "Paramètres du tutoriel",
         "tutorialDescription": "Apprenez QuickSite étape par étape avec notre tutoriel interactif."
+    },
+    "preview": {
+        "title": "Aperçu en direct",
+        "subtitle": "Visualisez votre site web en temps réel avec des modes de prévisualisation responsive",
+        "device": "Appareil",
+        "page": "Page",
+        "homePage": "Accueil",
+        "reload": "Recharger",
+        "openNewTab": "Ouvrir dans un nouvel onglet"
     }
 }

@@ -25,6 +25,7 @@ class AdminRouter {
         'docs',       // API documentation
         'ai',         // AI Integration / Communication spec
         'ai-settings', // AI Provider Settings (BYOK)
+        'preview',    // Live website preview
         'logout'      // Logout action
     ];
 
