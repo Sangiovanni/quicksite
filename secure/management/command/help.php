@@ -1231,10 +1231,19 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'getTranslationKeys' => [
-        'description' => 'Scans all JSON structures and extracts required translation keys',
+        'description' => 'Scans all JSON structures and extracts required translation keys. Optionally includes translation status per key.',
         'method' => 'GET',
-        'parameters' => [],
-        'example_get' => 'GET /management/getTranslationKeys',
+        'url_structure' => '/management/getTranslationKeys/{lang?}',
+        'parameters' => [
+            '{lang}' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Language code to check translation status (URL segment). If provided, returns translated/untranslated status for each key',
+                'example' => 'en',
+                'validation' => '2-10 characters (ISO 639 or BCP 47 locale code)'
+            ]
+        ],
+        'example_get' => 'GET /management/getTranslationKeys (keys only) or GET /management/getTranslationKeys/fr (with translation status)',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1251,11 +1260,22 @@ $GLOBALS['__help_commands'] = [
                     'pages' => ['home', 'privacy', 'terms'],
                     'menu' => true,
                     'footer' => true
-                ]
+                ],
+                'keys_status' => '(only with lang parameter) [{"key": "home.title", "translated": true}, ...]',
+                'language' => '(only with lang parameter) "en"',
+                'translated_count' => '(only with lang parameter) 12',
+                'untranslated_count' => '(only with lang parameter) 3',
+                'coverage_percent' => '(only with lang parameter) 80.0'
             ]
         ],
-        'error_responses' => [],
-        'notes' => 'Recursively scans all page JSONs, menu.json, and footer.json to extract textKey values. Ignores __RAW__ prefixed keys. Useful for identifying all translation keys that need to be defined.'
+        'error_responses' => [
+            [
+                'status' => 400,
+                'code' => 'validation.invalid_format',
+                'message' => 'Invalid language code format'
+            ]
+        ],
+        'notes' => 'Recursively scans all page JSONs, menu.json, and footer.json to extract textKey values. Ignores __RAW__ prefixed keys. When language is provided, also checks if each key has a non-empty translation (empty string = untranslated).'
     ],
     
     'validateTranslations' => [
@@ -2098,7 +2118,7 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'listComponents' => [
-        'description' => 'Lists all reusable JSON components with metadata. Shows available slots (placeholders) and component dependencies.',
+        'description' => 'Lists all reusable JSON components with metadata. Shows available slots (placeholders), typed variables, and component dependencies.',
         'method' => 'GET',
         'parameters' => [],
         'example_get' => 'GET /management/listComponents',
@@ -2113,6 +2133,10 @@ $GLOBALS['__help_commands'] = [
                         'file' => 'footer-link.json',
                         'valid' => true,
                         'slots' => ['href', 'label', 'target'],
+                        'variables' => [
+                            ['name' => 'label', 'type' => 'textKey'],
+                            ['name' => 'href', 'type' => 'param']
+                        ],
                         'uses_components' => [],
                         'size' => 256,
                         'modified' => '2025-01-15 10:30:00'
@@ -2123,7 +2147,7 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [],
-        'notes' => 'Slots are {{placeholder}} values in components that can be filled when using the component. Components can reference other components. Use editStructure with type="component" to create/update/delete components.'
+        'notes' => 'Slots are {{placeholder}} names (backwards compatibility). Variables array includes type detection: textKey for translatable content, param for URL/attribute values. System placeholders (__ prefix) are filtered out. Use editStructure with type="component" to create/update/delete components.'
     ],
     
     'listPages' => [
@@ -2158,6 +2182,369 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [],
         'notes' => 'Pages without routes (orphaned) are JSON files that exist but have no route defined. Use addRoute to make them accessible. Use editStructure with type="page" to create/update/delete pages.'
+    ],
+    
+    // =========================================================================
+    // NODE MANAGEMENT (Visual Editor)
+    // =========================================================================
+    
+    'moveNode' => [
+        'description' => 'Moves a node from one position to another within a structure. Handles same-level reordering and cross-level moves with automatic index adjustment.',
+        'method' => 'PATCH',
+        'parameters' => [
+            'type' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Structure type: menu, footer, page, or component',
+                'example' => 'page'
+            ],
+            'name' => [
+                'required' => 'conditional',
+                'type' => 'string',
+                'description' => 'Structure name (required for type=page/component)',
+                'example' => 'home'
+            ],
+            'sourceNodeId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Node ID to move (dot-notation path)',
+                'example' => '0.2.1'
+            ],
+            'targetNodeId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Target position node ID',
+                'example' => '0.3'
+            ],
+            'position' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Insert before or after target (default: after)',
+                'example' => 'before'
+            ]
+        ],
+        'example_patch' => 'PATCH /management/moveNode with body: {"type": "page", "name": "home", "sourceNodeId": "0.2.1", "targetNodeId": "0.3", "position": "after"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Node moved successfully',
+            'data' => [
+                'movedNode' => '0.2.1',
+                'newNodeId' => '0.4',
+                'targetNode' => '0.3',
+                'position' => 'after',
+                'type' => 'page',
+                'name' => 'home'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing required parameter',
+            '400.validation.invalid_value' => 'Invalid type or position value',
+            '400.operation.denied' => 'Cannot move to same position or inside self',
+            '404.resource.not_found' => 'Source or target node not found'
+        ],
+        'notes' => 'Atomic move operation with proper index adjustment. Use in Visual Editor drag & drop. Components are moved as single units.'
+    ],
+    
+    'deleteNode' => [
+        'description' => 'Deletes a node and all its children from a structure.',
+        'method' => 'DELETE',
+        'parameters' => [
+            'type' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Structure type: menu, footer, page, or component',
+                'example' => 'page'
+            ],
+            'name' => [
+                'required' => 'conditional',
+                'type' => 'string',
+                'description' => 'Structure name (required for type=page/component)',
+                'example' => 'home'
+            ],
+            'nodeId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Node ID to delete (dot-notation path)',
+                'example' => '0.2.1'
+            ]
+        ],
+        'example_delete' => 'DELETE /management/deleteNode with body: {"type": "page", "name": "home", "nodeId": "0.2.1"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Node deleted successfully',
+            'data' => [
+                'deletedNode' => '0.2.1',
+                'type' => 'page',
+                'name' => 'home'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing required parameter',
+            '400.validation.invalid_value' => 'Invalid type value',
+            '404.resource.not_found' => 'Node not found'
+        ],
+        'notes' => 'Recursively deletes all children. Does not delete associated translation keys. Use in Visual Editor with Del key.'
+    ],
+    
+    'addNode' => [
+        'description' => 'Adds a new HTML tag node to a structure with automatic textKey generation and mandatory parameter validation.',
+        'method' => 'POST',
+        'parameters' => [
+            'type' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Structure type: menu, footer, page, or component',
+                'example' => 'page'
+            ],
+            'name' => [
+                'required' => 'conditional',
+                'type' => 'string',
+                'description' => 'Structure name (required for type=page/component)',
+                'example' => 'home'
+            ],
+            'targetNodeId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Reference node ID for positioning',
+                'example' => '0.2'
+            ],
+            'position' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Where to insert: before, after, or inside',
+                'example' => 'after'
+            ],
+            'tag' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'HTML tag name',
+                'example' => 'div'
+            ],
+            'params' => [
+                'required' => false,
+                'type' => 'object',
+                'description' => 'Tag attributes including mandatory ones (href for <a>, src/alt for <img>, etc.)',
+                'example' => '{"class": "card", "href": "/contact"}'
+            ],
+            'textKey' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Translation key (auto-generated if not provided for inline/block tags)',
+                'example' => 'home.greeting'
+            ]
+        ],
+        'example_post' => 'POST /management/addNode with body: {"type": "page", "name": "home", "targetNodeId": "0.2", "position": "after", "tag": "a", "params": {"href": "/contact", "class": "btn"}}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Node added successfully',
+            'data' => [
+                'nodeId' => '0.3',
+                'tag' => 'a',
+                'textKeyGenerated' => true,
+                'textKey' => 'home.item1',
+                'translationCreated' => true
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing required parameter',
+            '400.validation.invalid_value' => 'Invalid tag or position',
+            '400.validation.missing_params' => 'Missing mandatory params (e.g., href for <a>)',
+            '400.operation.denied' => 'Cannot insert inside component node',
+            '404.resource.not_found' => 'Target node not found'
+        ],
+        'notes' => 'Auto-generates textKey as {struct}.item{N}. Creates empty translation in default.json. Position "inside" moves existing text children into new node. For components, use addComponentToNode.'
+    ],
+    
+    'editNode' => [
+        'description' => 'Edits an existing tag node: change tag type, add/update/remove params, change textKey reference.',
+        'method' => 'POST',
+        'parameters' => [
+            'type' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Structure type: menu, footer, page, or component',
+                'example' => 'page'
+            ],
+            'name' => [
+                'required' => 'conditional',
+                'type' => 'string',
+                'description' => 'Structure name (required for type=page/component)',
+                'example' => 'home'
+            ],
+            'nodeId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Node ID to edit',
+                'example' => '0.2.1'
+            ],
+            'tag' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'New tag type (validates mandatory params)',
+                'example' => 'a'
+            ],
+            'addParams' => [
+                'required' => false,
+                'type' => 'object',
+                'description' => 'Params to add or update',
+                'example' => '{"href": "/new-link", "class": "btn"}'
+            ],
+            'removeParams' => [
+                'required' => false,
+                'type' => 'array',
+                'description' => 'Param names to remove (cannot remove mandatory params)',
+                'example' => '["data-old", "aria-hidden"]'
+            ],
+            'textKey' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Change textKey reference (edge case)',
+                'example' => 'home.newKey'
+            ]
+        ],
+        'example_post' => 'POST /management/editNode with body: {"type": "page", "name": "home", "nodeId": "0.2", "addParams": {"class": "highlight"}, "removeParams": ["data-temp"]}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Node updated successfully',
+            'data' => [
+                'nodeId' => '0.2',
+                'changes' => [
+                    'paramsAdded' => ['class'],
+                    'paramsRemoved' => ['data-temp']
+                ]
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing required parameter',
+            '400.validation.invalid_value' => 'Invalid tag type',
+            '400.validation.mandatory_params' => 'Cannot remove mandatory params',
+            '400.operation.denied' => 'Cannot edit component node (use editComponentToNode)',
+            '404.resource.not_found' => 'Node not found'
+        ],
+        'notes' => 'Does NOT edit translation values (use setTranslationKeys). Cannot edit component nodes or pure text nodes. After tag change, validates mandatory params are present.'
+    ],
+    
+    'addComponentToNode' => [
+        'description' => 'Adds a component instance to a structure with auto-generated textKeys for text-type variables.',
+        'method' => 'POST',
+        'parameters' => [
+            'type' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Structure type: menu, footer, page, or component',
+                'example' => 'page'
+            ],
+            'name' => [
+                'required' => 'conditional',
+                'type' => 'string',
+                'description' => 'Structure name (required for type=page/component)',
+                'example' => 'home'
+            ],
+            'targetNodeId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Reference node ID for positioning',
+                'example' => '0.2'
+            ],
+            'position' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Where to insert: before, after, or inside',
+                'example' => 'after'
+            ],
+            'component' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Component name from listComponents',
+                'example' => 'menu-card'
+            ],
+            'data' => [
+                'required' => false,
+                'type' => 'object',
+                'description' => 'Variable bindings (param-type only, textKey auto-generated)',
+                'example' => '{"href": "/contact"}'
+            ]
+        ],
+        'example_post' => 'POST /management/addComponentToNode with body: {"type": "page", "name": "home", "targetNodeId": "0.2", "position": "after", "component": "menu-card", "data": {"href": "/about"}}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Component added successfully',
+            'data' => [
+                'nodeId' => '0.3',
+                'component' => 'menu-card',
+                'instanceNumber' => 2,
+                'generatedTextKeys' => [
+                    'title' => 'home.menuCard2.title',
+                    'desc' => 'home.menuCard2.desc'
+                ],
+                'translationsCreated' => ['home.menuCard2.title', 'home.menuCard2.desc'],
+                'html' => '<div class=\"menu-card\">...</div>'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing required parameter',
+            '400.validation.invalid_value' => 'Component not found',
+            '400.operation.denied' => 'Cannot insert inside component node',
+            '404.resource.not_found' => 'Target node not found'
+        ],
+        'notes' => 'Auto-generates textKeys as {struct}.{component}{N}.{var}. Creates empty translations. Returns rendered HTML for live DOM insertion. System placeholders (__ prefix) are filtered out.'
+    ],
+    
+    'editComponentToNode' => [
+        'description' => 'Edits param-type variables in an existing component node. TextKey variables are read-only.',
+        'method' => 'POST',
+        'parameters' => [
+            'type' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Structure type: menu, footer, page, or component',
+                'example' => 'page'
+            ],
+            'name' => [
+                'required' => 'conditional',
+                'type' => 'string',
+                'description' => 'Structure name (required for type=page/component)',
+                'example' => 'home'
+            ],
+            'nodeId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Component node ID to edit',
+                'example' => '0.2'
+            ],
+            'data' => [
+                'required' => true,
+                'type' => 'object',
+                'description' => 'Updated variable bindings (param-type only)',
+                'example' => '{"href": "/new-target", "style": "primary"}'
+            ]
+        ],
+        'example_post' => 'POST /management/editComponentToNode with body: {"type": "page", "name": "home", "nodeId": "0.2", "data": {"href": "/contact"}}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Component updated successfully',
+            'data' => [
+                'nodeId' => '0.2',
+                'component' => 'menu-card',
+                'changes' => [
+                    ['name' => 'href', 'type' => 'param', 'oldValue' => '/about', 'newValue' => '/contact']
+                ],
+                'html' => '<div class=\"menu-card\">...</div>'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing required parameter',
+            '400.validation.invalid_variable' => 'Variable does not exist in component',
+            '400.operation.denied' => 'Cannot edit textKey-type variables (use setTranslationKeys)',
+            '404.resource.not_found' => 'Node not found or not a component'
+        ],
+        'notes' => 'Only param-type variables can be edited (href, src, etc.). TextKey variables are read-only - use setTranslationKeys to change translation values. Returns rendered HTML for live DOM update.'
     ],
     
     'createAlias' => [
@@ -3208,6 +3595,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'folder_management' => ['setPublicSpace', 'renameSecureFolder', 'renamePublicFolder'],
                 'route_management' => ['addRoute', 'deleteRoute', 'getRoutes', 'getSiteMap'],
                 'structure_management' => ['getStructure', 'editStructure', 'listComponents', 'listPages'],
+                'node_management' => ['moveNode', 'deleteNode', 'addNode', 'editNode', 'addComponentToNode', 'editComponentToNode'],
                 'alias_management' => ['createAlias', 'deleteAlias', 'listAliases'],
                 'translation_management' => ['getTranslation', 'getTranslations', 'setTranslationKeys', 'deleteTranslationKeys', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations'],
                 'language_management' => ['getLangList', 'setMultilingual', 'checkStructureMulti', 'addLang', 'deleteLang', 'setDefaultLang'],

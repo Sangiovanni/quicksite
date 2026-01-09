@@ -76,6 +76,12 @@ class Translator {
         // Convert to string
         $result = (string) $current;
         
+        // Empty string is considered "untranslated" - treat like missing
+        if ($result === '') {
+            error_log("Empty translation for key: {$key} for language: " . self::$lang);
+            return "{translation missing: {$key}}";
+        }
+        
         // Handle i18next-style interpolation: {{variable}}
         if (!empty($params)) {
             $result = preg_replace_callback('/\{\{(\w+)\}\}/', function($matches) use ($params) {

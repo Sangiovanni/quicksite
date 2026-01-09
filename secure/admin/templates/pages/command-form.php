@@ -744,6 +744,7 @@ async function initEnhancedFeatures() {
             break;
         case 'removeLang':
         case 'getTranslation':
+        case 'getTranslationKeys':
         case 'validateTranslations':
         case 'getUnusedTranslationKeys':
         case 'analyzeTranslations':

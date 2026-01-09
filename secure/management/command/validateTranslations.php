@@ -80,7 +80,8 @@ function extractAllKeys_validate() {
 }
 
 /**
- * Check if a key exists in translations (supports dot notation)
+ * Check if a key exists in translations AND has a non-empty value (supports dot notation)
+ * Empty string values are considered "untranslated"
  */
 function keyExistsInTranslations_validate($key, $translations) {
     $keys = explode('.', $key);
@@ -91,6 +92,11 @@ function keyExistsInTranslations_validate($key, $translations) {
             return false;
         }
         $current = $current[$segment];
+    }
+    
+    // Empty string is considered as "missing/untranslated"
+    if (is_string($current) && $current === '') {
+        return false;
     }
     
     return true;

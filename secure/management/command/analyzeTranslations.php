@@ -73,7 +73,8 @@ function extractRequiredKeys_analyze(): array {
     if (file_exists($routesFile)) {
         $routes = include $routesFile;
         if (is_array($routes)) {
-            foreach ($routes as $route) {
+            // Routes are keyed by route name, values are config arrays
+            foreach (array_keys($routes) as $route) {
                 $allKeys[] = 'page.titles.' . $route;
             }
         }
@@ -99,7 +100,8 @@ function flattenKeys_analyze(array $arr, string $prefix = ''): array {
 }
 
 /**
- * Check if a key exists in translations (dot notation)
+ * Check if a key exists in translations AND has a non-empty value (dot notation)
+ * Empty string values are considered "untranslated"
  */
 function keyExists_analyze(string $key, array $translations): bool {
     $segments = explode('.', $key);
@@ -109,6 +111,10 @@ function keyExists_analyze(string $key, array $translations): bool {
             return false;
         }
         $current = $current[$segment];
+    }
+    // Empty string is considered as "missing/untranslated"
+    if (is_string($current) && $current === '') {
+        return false;
     }
     return true;
 }

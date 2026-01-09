@@ -673,4 +673,61 @@ class JsonToHtmlRenderer {
     public function setContext(array $context) {
         $this->context = array_merge($this->context, $context);
     }
+    
+    /**
+     * Render a single node from a structure at a specific path
+     * Used for dynamic DOM updates without full page reload
+     * 
+     * @param array $structure The full structure
+     * @param string $nodePath Node path like "0.1.2"
+     * @param string $structureName Structure name for editor mode (e.g., 'page-home', 'menu')
+     * @return string|null Rendered HTML or null if node not found
+     */
+    public function renderNodeAtPath(array $structure, string $nodePath, string $structureName = ''): ?string {
+        // Set structure context for editor mode
+        if ($structureName) {
+            $this->currentStructure = $structureName;
+        }
+        $this->inComponent = false;
+        
+        // Parse the node path
+        $indices = array_map('intval', explode('.', $nodePath));
+        
+        // Navigate to the node
+        $node = null;
+        $current = $structure;
+        
+        foreach ($indices as $i => $index) {
+            if ($i === 0) {
+                // First index is into the root array
+                if (!isset($current[$index])) {
+                    return null;
+                }
+                $node = $current[$index];
+                $current = $node;
+            } else {
+                // Subsequent indices are into children
+                if (!isset($current['children'][$index])) {
+                    return null;
+                }
+                $node = $current['children'][$index];
+                $current = $node;
+            }
+        }
+        
+        if ($node === null) {
+            return null;
+        }
+        
+        // Set the node path for editor mode attributes
+        $this->currentNodePath = $indices;
+        array_pop($this->currentNodePath); // Remove last since renderNode will push it
+        
+        // Render the node
+        $this->currentNodePath[] = end($indices);
+        $html = $this->renderNode($node);
+        array_pop($this->currentNodePath);
+        
+        return $html;
+    }
 }

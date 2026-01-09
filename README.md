@@ -20,7 +20,7 @@ That question turned a template into a CMS. The file-based architecture wasn't a
 - **JSON-Driven Templates**: Define page structures, menus, and components in JSON, compiled to optimized PHP
 - **Multilingual Support**: Built-in translation system with language switching and validation
 - **Production Builds**: One-command deployment with compilation, optimization, and ZIP packaging
-- **RESTful Management API**: 81 endpoints for complete site management
+- **RESTful Management API**: 87 endpoints for complete site management
 - **File-Based Storage**: No database required - all configuration in JSON/PHP files
 - **Flexible Architecture**: Separate public and secure folders for clean deployment
 - **🔐 API Authentication**: Bearer token authentication with role-based permissions
@@ -31,6 +31,7 @@ That question turned a template into a CMS. The file-based architecture wasn't a
 - **Translation Management**: Multi-language support with validation and key extraction
 - **Asset Management**: Upload, organize, and manage images, fonts, videos, scripts
 - **Structure Editing**: Modify page structures, menus, footers, and components via API
+- **Node Management**: Visual Editor CRUD operations for structure nodes (add, edit, move, delete)
 - **Style Management**: SCSS editing with automatic dangerous pattern blocking
 - **Build System**: Create production-ready deployments with custom folder names
 - **Token Management**: Generate, list, and revoke API tokens programmatically
@@ -160,7 +161,7 @@ curl -H "Authorization: Bearer your_token_here" \
 | `designer` | Styling (51 commands): CSS, styles, visual design |
 | `developer` | Build & deploy (57 commands): build, deploy, downloads, AI |
 | `admin` | Full admin (75 commands): everything except token/role management |
-| `*` (superadmin) | Full access (81 commands) including token and role management |
+| `*` (superadmin) | Full access (87 commands) including token and role management |
 
 Tokens are assigned a role via `generateToken`. Use `getMyPermissions` to check current access.
 
@@ -322,7 +323,7 @@ quicksite/                    # Root installation
 │   ├── logs/                # System logs
 │   │
 │   ├── management/          # Core Management API (shared)
-│   │   ├── command/         # API command handlers (81 commands)
+│   │   ├── command/         # API command handlers (87 commands)
 │   │   ├── classes/         # ApiResponse, CssParser, JsonCompiler, etc.
 │   │   ├── functions/       # PathManagement, AuthManagement, etc.
 │   │   └── routes.php       # Management route definitions
@@ -495,7 +496,7 @@ Template Vitrine follows a **file-based, zero-database philosophy** - but that d
 
 ### Current Version (v1.5.0)
 - ✅ Complete file-based CMS with JSON templates
-- ✅ RESTful API with 81 commands
+- ✅ RESTful API with 87 commands
 - ✅ Bearer token authentication with RBAC
 - ✅ CORS support for external UIs
 - ✅ Production build system

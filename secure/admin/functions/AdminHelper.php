@@ -90,6 +90,11 @@ function getCommandCategories(): array {
             'icon' => 'structure',
             'commands' => ['getStructure', 'editStructure', 'listComponents', 'listPages']
         ],
+        'node_management' => [
+            'label' => 'Node Management',
+            'icon' => 'nodes',
+            'commands' => ['moveNode', 'deleteNode', 'addNode', 'editNode', 'addComponentToNode', 'editComponentToNode']
+        ],
         'alias_management' => [
             'label' => 'URL Aliases',
             'icon' => 'link',
