@@ -1,13 +1,13 @@
 :root {
- --color-primary: #8B4513;
- --color-secondary: #D2691E;
- --color-accent: #F5DEB3;
+ --color-primary: #b88863;
+ --color-secondary: #abaa7b;
+ --color-accent: #baa974;
  --color-text: #333333;
- --color-light: #FFF8DC;
+ --color-light: #944710;
  --color-white: #FFFFFF;
  --font-heading: 'Georgia', serif;
  --font-body: 'Arial', sans-serif;
- --spacing-sm: 1rem;
+ --spacing-sm: 2rem;
  --spacing-md: 2rem;
  --spacing-lg: 4rem;
 }
@@ -133,11 +133,11 @@ section {
 }
 
 .menu-card {
- background-color: var(--color-white);
- border-radius: 10px;
- padding: var(--spacing-md);
- box-shadow: 0 5px 15px rgba(0,0,0,0.08);
- transition: transform 0.3s;
+    background-color: var(--color-white);
+    border-radius: 50px;
+    padding: var(--spacing-md);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    transition: transform 0.2s;
 }
 
 .menu-card:hover {
@@ -224,10 +224,10 @@ section {
 }
 
 .lang-switch {
- margin-top: var(--spacing-sm);
- display: flex;
- justify-content: center;
- gap: 0.5rem;
+    margin-top: var(--spacing-sm);
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
 }
 
 .lang-btn {
@@ -260,4 +260,13 @@ section {
  flex-wrap: wrap;
  justify-content: center;
  }
+}
+
+@keyframes fadeIn {
+    0% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
 }

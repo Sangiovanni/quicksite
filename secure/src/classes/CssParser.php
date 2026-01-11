@@ -203,15 +203,72 @@ class CssParser {
     }
     
     /**
-     * Set/update a style rule
+     * Parse CSS style declarations into an associative array
+     * @param string $styles CSS declarations string
+     * @return array Property => value pairs
+     */
+    private function parseStyleDeclarations(string $styles): array {
+        $result = [];
+        // Split by semicolons, but be careful with values containing semicolons (rare but possible)
+        $declarations = preg_split('/;\s*/', trim($styles), -1, PREG_SPLIT_NO_EMPTY);
+        
+        foreach ($declarations as $declaration) {
+            $declaration = trim($declaration);
+            if (empty($declaration)) continue;
+            
+            // Split on first colon only
+            $colonPos = strpos($declaration, ':');
+            if ($colonPos === false) continue;
+            
+            $property = trim(substr($declaration, 0, $colonPos));
+            $value = trim(substr($declaration, $colonPos + 1));
+            
+            if (!empty($property) && $value !== '') {
+                $result[$property] = $value;
+            }
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Merge new styles with existing styles
+     * @param string $existingStyles Current CSS declarations
+     * @param string $newStyles New CSS declarations to merge
+     * @param array $removeProperties Properties to remove from the result
+     * @return string Merged and formatted CSS declarations
+     */
+    private function mergeStyles(string $existingStyles, string $newStyles, array $removeProperties = []): string {
+        $existing = $this->parseStyleDeclarations($existingStyles);
+        $new = $this->parseStyleDeclarations($newStyles);
+        
+        // Merge - new values override existing
+        $merged = array_merge($existing, $new);
+        
+        // Remove specified properties
+        foreach ($removeProperties as $prop) {
+            unset($merged[$prop]);
+        }
+        
+        // Convert back to CSS string with proper formatting
+        $lines = [];
+        foreach ($merged as $property => $value) {
+            $lines[] = '    ' . $property . ': ' . $value . ';';
+        }
+        
+        return implode("\n", $lines);
+    }
+    
+    /**
+     * Set/update a style rule (merges with existing properties)
      * @param string $selector CSS selector
      * @param string $styles CSS declarations
      * @param string|null $mediaQuery Optional media query context
+     * @param array $removeProperties Properties to remove
      * @return array Operation result
      */
-    public function setStyleRule(string $selector, string $styles, ?string $mediaQuery = null): array {
+    public function setStyleRule(string $selector, string $styles, ?string $mediaQuery = null, array $removeProperties = []): array {
         $escapedSelector = preg_quote($selector, '/');
-        $formattedStyles = $this->formatStyles($styles);
         $action = 'added';
         
         if ($mediaQuery !== null) {
@@ -225,15 +282,20 @@ class CssParser {
                 $mediaFull = $mediaMatch[0][0];
                 
                 // Check if selector exists in this media query
-                $selectorPattern = '/(' . $escapedSelector . '\s*\{)[^}]*(\})/s';
+                $selectorPattern = '/' . $escapedSelector . '\s*\{([^}]*)\}/s';
                 
                 if (preg_match($selectorPattern, $mediaContent, $match)) {
-                    // Update existing rule - escape $ to prevent backreference issues
-                    $safeStyles = str_replace(['\\', '$'], ['\\\\', '\\$'], $formattedStyles);
-                    $newMediaContent = preg_replace($selectorPattern, '${1}' . "\n" . $safeStyles . "\n" . '${2}', $mediaContent);
+                    // Merge with existing rule
+                    $existingStyles = $match[1];
+                    $mergedStyles = $this->mergeStyles($existingStyles, $styles, $removeProperties);
+                    $safeStyles = str_replace(['\\', '$'], ['\\\\', '\\$'], $mergedStyles);
+                    
+                    $replacePattern = '/(' . $escapedSelector . '\s*\{)[^}]*(\})/s';
+                    $newMediaContent = preg_replace($replacePattern, '${1}' . "\n" . $safeStyles . "\n" . '${2}', $mediaContent);
                     $action = 'updated';
                 } else {
                     // Add new rule to media query
+                    $formattedStyles = $this->formatStyles($styles);
                     $newMediaContent = rtrim($mediaContent) . "\n    " . $selector . " {\n" . $formattedStyles . "\n    }\n";
                 }
                 
@@ -242,26 +304,27 @@ class CssParser {
                 
             } else {
                 // Media query doesn't exist, create it
+                $formattedStyles = $this->formatStyles($styles);
                 $newMediaBlock = "\n\n@media " . $mediaQuery . " {\n    " . $selector . " {\n" . $formattedStyles . "\n    }\n}";
                 $this->content = $this->appendToCustomSection($newMediaBlock);
             }
             
         } else {
             // Global scope
-            $selectorPattern = '/(' . $escapedSelector . '\s*\{)[^}]*(\})/s';
             
             // Check if it exists globally (not in @media)
             $existing = $this->getStyleRule($selector, null);
             
             if ($existing !== null) {
-                // Update existing - need to be careful not to match inside @media
-                // This is complex, so we'll use a different approach
+                // Merge with existing styles
                 $action = 'updated';
+                $mergedStyles = $this->mergeStyles($existing['styles'], $styles, $removeProperties);
                 
                 // Find and replace the rule outside of @media blocks
-                $this->content = $this->replaceGlobalRule($selector, $formattedStyles);
+                $this->content = $this->replaceGlobalRule($selector, $mergedStyles);
             } else {
                 // Add new rule
+                $formattedStyles = $this->formatStyles($styles);
                 $newRule = "\n" . $selector . " {\n" . $formattedStyles . "\n}";
                 $this->content = $this->appendToCustomSection($newRule);
             }

@@ -8,7 +8,8 @@
  *   "frames": {
  *     "from": "opacity: 0;",
  *     "to": "opacity: 1;"
- *   }
+ *   },
+ *   "allowOverwrite": true  // Required when updating existing keyframe
  * }
  * 
  * Or with percentages:
@@ -19,6 +20,9 @@
  *     "50%": "transform: translateY(-20px);"
  *   }
  * }
+ * 
+ * Note: If a keyframe with the given name already exists and allowOverwrite
+ * is not set to true, the request will be rejected with a 409 Conflict error.
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
@@ -114,8 +118,22 @@ try {
         throw new Exception('Failed to read style file');
     }
     
-    // Parse and update
+    // Parse and check if keyframe already exists
     $parser = new CssParser($content);
+    $existingKeyframes = $parser->getKeyframes();
+    
+    // If keyframe exists and allowOverwrite is not true, reject the request
+    $allowOverwrite = isset($params['allowOverwrite']) && $params['allowOverwrite'] === true;
+    if (isset($existingKeyframes[$name]) && !$allowOverwrite) {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        ApiResponse::create(409, 'keyframe.already_exists')
+            ->withMessage("Keyframe '$name' already exists. Set allowOverwrite: true to replace it.")
+            ->withData(['name' => $name, 'existingFrames' => array_keys($existingKeyframes[$name])])
+            ->send();
+    }
+    
+    // Update keyframes
     $result = $parser->setKeyframes($name, $frames);
     
     // Write updated content

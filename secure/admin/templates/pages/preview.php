@@ -203,9 +203,549 @@ if (is_dir($componentsDir)) {
     </div>
 </div>
 
-<!-- Node Info Panel (shown when element selected) -->
-<div class="preview-node-panel" id="preview-node-panel">
-    <div class="preview-node-panel__header">
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     CONTEXTUAL AREA - Phase 8: Dynamic content based on selected mode
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="preview-contextual-area" id="preview-contextual-area">
+    <!-- Collapse/Expand Toggle -->
+    <button type="button" class="preview-contextual-toggle" id="preview-contextual-toggle" title="<?= __admin('preview.togglePanel') ?? 'Toggle panel' ?>">
+        <svg class="preview-contextual-toggle__icon preview-contextual-toggle__icon--collapse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="18 15 12 9 6 15"/>
+        </svg>
+        <svg class="preview-contextual-toggle__icon preview-contextual-toggle__icon--expand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+            <polyline points="6 9 12 15 18 9"/>
+        </svg>
+    </button>
+    
+    <div class="preview-contextual-content" id="preview-contextual-content">
+        <!-- SELECT MODE Content (active by default) -->
+        <div class="preview-contextual-section preview-contextual-section--select preview-contextual-section--active" id="contextual-select" data-mode="select">
+            <div class="preview-contextual-default" id="contextual-select-default">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
+                    <path d="M13 13l6 6"/>
+                </svg>
+                <span><?= __admin('preview.selectModeHint') ?? 'Click any element in the preview to inspect it' ?></span>
+            </div>
+            <div class="preview-contextual-info" id="contextual-select-info" style="display: none;">
+                <!-- Element info will be populated here -->
+                <div class="preview-contextual-info__main">
+                    <div class="preview-contextual-info__row">
+                        <span class="preview-contextual-info__label"><?= __admin('preview.structure') ?>:</span>
+                        <code class="preview-contextual-info__value preview-contextual-info__value--struct" id="ctx-node-struct">-</code>
+                    </div>
+                    <div class="preview-contextual-info__row">
+                        <span class="preview-contextual-info__label"><?= __admin('preview.nodeId') ?>:</span>
+                        <code class="preview-contextual-info__value" id="ctx-node-id">-</code>
+                    </div>
+                    <div class="preview-contextual-info__row" id="ctx-node-component-row" style="display: none;">
+                        <span class="preview-contextual-info__label"><?= __admin('preview.componentName') ?>:</span>
+                        <code class="preview-contextual-info__value preview-contextual-info__value--component" id="ctx-node-component">-</code>
+                    </div>
+                    <div class="preview-contextual-info__row">
+                        <span class="preview-contextual-info__label"><?= __admin('preview.nodeTag') ?>:</span>
+                        <code class="preview-contextual-info__value" id="ctx-node-tag">-</code>
+                    </div>
+                    <div class="preview-contextual-info__row">
+                        <span class="preview-contextual-info__label"><?= __admin('preview.nodeClasses') ?>:</span>
+                        <code class="preview-contextual-info__value" id="ctx-node-classes">-</code>
+                    </div>
+                    <div class="preview-contextual-info__row">
+                        <span class="preview-contextual-info__label"><?= __admin('preview.nodeChildren') ?>:</span>
+                        <span class="preview-contextual-info__value" id="ctx-node-children">-</span>
+                    </div>
+                    <div class="preview-contextual-info__row">
+                        <span class="preview-contextual-info__label"><?= __admin('preview.nodeText') ?>:</span>
+                        <span class="preview-contextual-info__value preview-contextual-info__value--truncate" id="ctx-node-text">-</span>
+                    </div>
+                    <div class="preview-contextual-info__row" id="ctx-node-textkey-row" style="display: none;">
+                        <span class="preview-contextual-info__label"><?= __admin('preview.textKey') ?? 'Text Key' ?>:</span>
+                        <code class="preview-contextual-info__value preview-contextual-info__value--textkey" id="ctx-node-textkey">-</code>
+                    </div>
+                </div>
+                <div class="preview-contextual-info__actions">
+                    <button type="button" class="admin-btn admin-btn--sm admin-btn--success" id="ctx-node-add" title="<?= __admin('preview.addNode') ?? 'Add Element' ?>">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        <span><?= __admin('common.add') ?? 'Add' ?></span>
+                    </button>
+                    <button type="button" class="admin-btn admin-btn--sm admin-btn--secondary" id="ctx-node-edit" title="<?= __admin('preview.editElement') ?? 'Edit Element' ?>">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        <span><?= __admin('common.edit') ?? 'Edit' ?></span>
+                    </button>
+                    <button type="button" class="admin-btn admin-btn--sm admin-btn--danger" id="ctx-node-delete" title="<?= __admin('common.delete') ?>">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                        <span><?= __admin('common.delete') ?? 'Delete' ?></span>
+                    </button>
+                    <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="ctx-node-style" title="<?= __admin('preview.editStyle') ?? 'Edit Style' ?>">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+                        </svg>
+                        <span><?= __admin('preview.style') ?? 'Style' ?></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- DRAG MODE Content -->
+        <div class="preview-contextual-section preview-contextual-section--drag" id="contextual-drag" data-mode="drag" style="display: none;">
+            <div class="preview-contextual-default">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="5 9 2 12 5 15"/>
+                    <polyline points="9 5 12 2 15 5"/>
+                    <polyline points="15 19 12 22 9 19"/>
+                    <polyline points="19 9 22 12 19 15"/>
+                    <line x1="2" y1="12" x2="22" y2="12"/>
+                    <line x1="12" y1="2" x2="12" y2="22"/>
+                </svg>
+                <span><?= __admin('preview.dragModeHint') ?? 'Drag elements to reorder them within their container' ?></span>
+            </div>
+        </div>
+        
+        <!-- TEXT MODE Content -->
+        <div class="preview-contextual-section preview-contextual-section--text" id="contextual-text" data-mode="text" style="display: none;">
+            <div class="preview-contextual-default">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="4 7 4 4 20 4 20 7"/>
+                    <line x1="9" y1="20" x2="15" y2="20"/>
+                    <line x1="12" y1="4" x2="12" y2="20"/>
+                </svg>
+                <span><?= __admin('preview.textModeHint') ?? 'Click any text in the preview to edit it inline' ?></span>
+            </div>
+        </div>
+        
+        <!-- STYLE MODE Content -->
+        <div class="preview-contextual-section preview-contextual-section--style" id="contextual-style" data-mode="style" style="display: none;">
+            <div class="preview-contextual-default" id="contextual-style-default">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+                </svg>
+                <span><?= __admin('preview.styleModeHint') ?? 'Click an element to edit its style, or use the sections below' ?></span>
+            </div>
+            <!-- Style sections will be added in Phase 8.3+ -->
+            <div class="preview-contextual-style-tabs" id="contextual-style-tabs" style="display: none;">
+                <button type="button" class="preview-contextual-style-tab preview-contextual-style-tab--active" data-tab="theme">
+                    <?= __admin('preview.themeVariables') ?? 'Theme' ?>
+                </button>
+                <button type="button" class="preview-contextual-style-tab" data-tab="selectors">
+                    <?= __admin('preview.selectors') ?? 'Selectors' ?>
+                </button>
+                <button type="button" class="preview-contextual-style-tab" data-tab="animations">
+                    <?= __admin('preview.animations') ?? 'Animations' ?>
+                </button>
+            </div>
+            <div class="preview-contextual-style-content" id="contextual-style-content" style="display: none;">
+                <!-- Theme Variables Panel -->
+                <div class="preview-theme-panel" id="theme-panel" data-tab="theme">
+                    <div class="preview-theme-loading" id="theme-loading">
+                        <svg class="preview-theme-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10" opacity="0.25"/>
+                            <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
+                        </svg>
+                        <span><?= __admin('common.loading') ?>...</span>
+                    </div>
+                    
+                    <div class="preview-theme-content" id="theme-content" style="display: none;">
+                        <!-- Colors Section -->
+                        <div class="preview-theme-section" id="theme-colors-section">
+                            <h4 class="preview-theme-section__title">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+                                </svg>
+                                <?= __admin('preview.themeColors') ?? 'Colors' ?>
+                            </h4>
+                            <div class="preview-theme-grid preview-theme-grid--colors" id="theme-colors-grid">
+                                <!-- Color inputs populated by JS -->
+                            </div>
+                        </div>
+                        
+                        <!-- Fonts Section -->
+                        <div class="preview-theme-section" id="theme-fonts-section">
+                            <h4 class="preview-theme-section__title">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <polyline points="4,7 4,4 20,4 20,7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>
+                                </svg>
+                                <?= __admin('preview.themeFonts') ?? 'Fonts' ?>
+                            </h4>
+                            <div class="preview-theme-grid preview-theme-grid--fonts" id="theme-fonts-grid">
+                                <!-- Font inputs populated by JS -->
+                            </div>
+                        </div>
+                        
+                        <!-- Spacing Section -->
+                        <div class="preview-theme-section" id="theme-spacing-section">
+                            <h4 class="preview-theme-section__title">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>
+                                </svg>
+                                <?= __admin('preview.themeSpacing') ?? 'Spacing' ?>
+                            </h4>
+                            <div class="preview-theme-grid preview-theme-grid--spacing" id="theme-spacing-grid">
+                                <!-- Spacing inputs populated by JS -->
+                            </div>
+                        </div>
+                        
+                        <!-- Other Variables Section -->
+                        <div class="preview-theme-section" id="theme-other-section" style="display: none;">
+                            <h4 class="preview-theme-section__title">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                                </svg>
+                                <?= __admin('preview.themeOther') ?? 'Other' ?>
+                            </h4>
+                            <div class="preview-theme-grid preview-theme-grid--other" id="theme-other-grid">
+                                <!-- Other variables populated by JS -->
+                            </div>
+                        </div>
+                        
+                        <!-- Actions -->
+                        <div class="preview-theme-actions">
+                            <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" id="theme-reset-btn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                    <polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                                </svg>
+                                <?= __admin('common.reset') ?? 'Reset' ?>
+                            </button>
+                            <button type="button" class="admin-btn admin-btn--primary admin-btn--sm" id="theme-save-btn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                    <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                                </svg>
+                                <?= __admin('preview.saveTheme') ?? 'Save Theme' ?>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Selectors Panel (Phase 8.4) -->
+                <div class="preview-selectors-panel" id="selectors-panel" data-tab="selectors" style="display: none;">
+                    <!-- Selector Search -->
+                    <div class="preview-selectors-search">
+                        <div class="preview-selectors-search__wrapper">
+                            <svg class="preview-selectors-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                            </svg>
+                            <input type="text" 
+                                   id="selector-search-input" 
+                                   class="preview-selectors-search__input" 
+                                   placeholder="<?= __admin('preview.searchSelectors') ?? 'Search selectors...' ?>"
+                                   autocomplete="off">
+                            <button type="button" class="preview-selectors-search__clear" id="selector-search-clear" title="<?= __admin('common.clear') ?? 'Clear' ?>" style="display: none;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="preview-selectors-info" id="selector-info">
+                            <span id="selector-count">0</span> <?= __admin('preview.selectorsFound') ?? 'selectors' ?>
+                        </div>
+                    </div>
+                    
+                    <!-- Selector Loading -->
+                    <div class="preview-selectors-loading" id="selectors-loading">
+                        <svg class="preview-theme-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10" opacity="0.25"/>
+                            <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
+                        </svg>
+                        <span><?= __admin('common.loading') ?>...</span>
+                    </div>
+                    
+                    <!-- Selector Groups (populated by JS) -->
+                    <div class="preview-selectors-groups" id="selectors-groups" style="display: none;">
+                        <!-- Tags Group -->
+                        <div class="preview-selectors-group" data-group="tags">
+                            <button type="button" class="preview-selectors-group__header preview-selectors-group__header--expanded">
+                                <svg class="preview-selectors-group__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                                <span class="preview-selectors-group__title"><?= __admin('preview.selectorsTags') ?? 'Tags' ?></span>
+                                <span class="preview-selectors-group__count" id="selectors-tags-count">0</span>
+                            </button>
+                            <div class="preview-selectors-group__list" id="selectors-tags-list"></div>
+                        </div>
+                        
+                        <!-- Classes Group -->
+                        <div class="preview-selectors-group" data-group="classes">
+                            <button type="button" class="preview-selectors-group__header preview-selectors-group__header--expanded">
+                                <svg class="preview-selectors-group__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                                <span class="preview-selectors-group__title"><?= __admin('preview.selectorsClasses') ?? 'Classes' ?></span>
+                                <span class="preview-selectors-group__count" id="selectors-classes-count">0</span>
+                            </button>
+                            <div class="preview-selectors-group__list" id="selectors-classes-list"></div>
+                        </div>
+                        
+                        <!-- IDs Group -->
+                        <div class="preview-selectors-group" data-group="ids">
+                            <button type="button" class="preview-selectors-group__header preview-selectors-group__header--expanded">
+                                <svg class="preview-selectors-group__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                                <span class="preview-selectors-group__title"><?= __admin('preview.selectorsIds') ?? 'IDs' ?></span>
+                                <span class="preview-selectors-group__count" id="selectors-ids-count">0</span>
+                            </button>
+                            <div class="preview-selectors-group__list" id="selectors-ids-list"></div>
+                        </div>
+                        
+                        <!-- Attribute Selectors Group -->
+                        <div class="preview-selectors-group" data-group="attributes">
+                            <button type="button" class="preview-selectors-group__header preview-selectors-group__header--expanded">
+                                <svg class="preview-selectors-group__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                                <span class="preview-selectors-group__title"><?= __admin('preview.selectorsAttributes') ?? 'Attributes' ?></span>
+                                <span class="preview-selectors-group__count" id="selectors-attributes-count">0</span>
+                            </button>
+                            <div class="preview-selectors-group__list" id="selectors-attributes-list"></div>
+                        </div>
+                        
+                        <!-- Media Query Selectors Group -->
+                        <div class="preview-selectors-group" data-group="media">
+                            <button type="button" class="preview-selectors-group__header">
+                                <svg class="preview-selectors-group__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                                <span class="preview-selectors-group__title"><?= __admin('preview.selectorsMedia') ?? 'Media Queries' ?></span>
+                                <span class="preview-selectors-group__count" id="selectors-media-count">0</span>
+                            </button>
+                            <div class="preview-selectors-group__list" id="selectors-media-list" style="display: none;"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Selected Selector Info (shows when a selector is selected) -->
+                    <div class="preview-selector-selected" id="selector-selected" style="display: none;">
+                        <div class="preview-selector-selected__header">
+                            <span class="preview-selector-selected__label"><?= __admin('preview.selectedSelector') ?? 'Selected' ?>:</span>
+                            <code class="preview-selector-selected__value" id="selector-selected-value"></code>
+                            <button type="button" class="preview-selector-selected__clear" id="selector-selected-clear" title="<?= __admin('common.clear') ?? 'Clear' ?>">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="preview-selector-selected__info">
+                            <span class="preview-selector-selected__matches" id="selector-matches">
+                                <?= __admin('preview.affectsElements') ?? 'Affects' ?> <strong id="selector-match-count">0</strong> <?= __admin('preview.elements') ?? 'elements' ?>
+                            </span>
+                        </div>
+                        <div class="preview-selector-selected__actions">
+                            <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="selector-edit-btn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                                <?= __admin('preview.editStyles') ?? 'Edit Styles' ?>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Animations Panel (Phase 9.2) -->
+                <div class="preview-animations-panel" id="animations-panel" data-tab="animations" style="display: none;">
+                    <!-- Animations Loading -->
+                    <div class="preview-animations-loading" id="animations-loading">
+                        <svg class="preview-theme-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10" opacity="0.25"/>
+                            <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
+                        </svg>
+                        <span><?= __admin('common.loading') ?>...</span>
+                    </div>
+                    
+                    <!-- Animations Content -->
+                    <div class="preview-animations-content" id="animations-content" style="display: none;">
+                        
+                        <!-- @keyframes Library Section -->
+                        <div class="preview-animations-section" id="keyframes-section">
+                            <div class="preview-animations-section__header">
+                                <h4 class="preview-animations-section__title">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                        <polygon points="5 3 19 12 5 21 5 3"/>
+                                    </svg>
+                                    <?= __admin('preview.keyframesLibrary') ?? '@keyframes Library' ?>
+                                </h4>
+                                <span class="preview-animations-section__count" id="keyframes-count">0</span>
+                                <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="keyframe-add-btn" title="<?= __admin('preview.createKeyframe') ?? 'Create new @keyframes' ?>">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            
+                            <div class="preview-animations-empty" id="keyframes-empty" style="display: none;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                                    <polygon points="5 3 19 12 5 21 5 3"/>
+                                </svg>
+                                <span><?= __admin('preview.noKeyframes') ?? 'No @keyframes defined yet' ?></span>
+                            </div>
+                            
+                            <div class="preview-keyframes-list" id="keyframes-list">
+                                <!-- Keyframe items will be populated by JS -->
+                            </div>
+                        </div>
+                        
+                        <!-- Animated Selectors Section -->
+                        <div class="preview-animations-section" id="animated-selectors-section">
+                            <div class="preview-animations-section__header">
+                                <h4 class="preview-animations-section__title">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                    </svg>
+                                    <?= __admin('preview.animatedSelectors') ?? 'Animated Selectors' ?>
+                                </h4>
+                            </div>
+                            
+                            <!-- Transitions Group -->
+                            <div class="preview-animations-group" data-group="transitions">
+                                <button type="button" class="preview-animations-group__header preview-animations-group__header--expanded">
+                                    <svg class="preview-animations-group__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                        <polyline points="6 9 12 15 18 9"/>
+                                    </svg>
+                                    <span class="preview-animations-group__title"><?= __admin('preview.transitions') ?? 'Transitions' ?></span>
+                                    <span class="preview-animations-group__count" id="transitions-count">0</span>
+                                </button>
+                                <div class="preview-animations-group__list" id="transitions-list">
+                                    <!-- Transition selectors will be populated by JS -->
+                                </div>
+                            </div>
+                            
+                            <!-- Animations Group -->
+                            <div class="preview-animations-group" data-group="animations">
+                                <button type="button" class="preview-animations-group__header preview-animations-group__header--expanded">
+                                    <svg class="preview-animations-group__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                        <polyline points="6 9 12 15 18 9"/>
+                                    </svg>
+                                    <span class="preview-animations-group__title"><?= __admin('preview.animationsProperty') ?? 'Animations' ?></span>
+                                    <span class="preview-animations-group__count" id="animations-count">0</span>
+                                </button>
+                                <div class="preview-animations-group__list" id="animations-list">
+                                    <!-- Animation selectors will be populated by JS -->
+                                </div>
+                            </div>
+                            
+                            <!-- Triggers Without Transition Group (pseudo-states that change properties without transition) -->
+                            <div class="preview-animations-group preview-animations-group--triggers" data-group="triggers">
+                                <button type="button" class="preview-animations-group__header">
+                                    <svg class="preview-animations-group__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                        <polyline points="6 9 12 15 18 9"/>
+                                    </svg>
+                                    <span class="preview-animations-group__title"><?= __admin('preview.triggersNoTransition') ?? 'Triggers (No Transition)' ?></span>
+                                    <span class="preview-animations-group__count preview-animations-group__count--muted" id="triggers-count">0</span>
+                                </button>
+                                <div class="preview-animations-group__list preview-animations-group__list--collapsed" id="triggers-list">
+                                    <!-- Trigger-only selectors will be populated by JS -->
+                                </div>
+                            </div>
+                            
+                            <!-- Empty State for Animated Selectors -->
+                            <div class="preview-animations-empty" id="animated-empty" style="display: none;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                                <span><?= __admin('preview.noAnimatedSelectors') ?? 'No selectors with transitions or animations' ?></span>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+                
+                <!-- Style Editor Panel (Phase 8.5) - shows when editing a selector -->
+                <div class="preview-style-editor" id="style-editor" style="display: none;">
+                    <div class="preview-style-editor__header">
+                        <button type="button" class="preview-style-editor__back" id="style-editor-back" title="<?= __admin('common.back') ?? 'Back' ?>">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <polyline points="15 18 9 12 15 6"/>
+                            </svg>
+                        </button>
+                        <div class="preview-style-editor__title">
+                            <span class="preview-style-editor__label" id="style-editor-label" title="<?= __admin('preview.clickToGoBack') ?? 'Click to go back' ?>"><?= __admin('preview.editingSelector') ?? 'Editing' ?>:</span>
+                            <code class="preview-style-editor__selector" id="style-editor-selector"></code>
+                        </div>
+                        <span class="preview-style-editor__badge" id="style-editor-badge" title="<?= __admin('preview.affectedElementsHint') ?? 'Number of elements affected by this selector' ?>">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                            </svg>
+                            <span id="style-editor-count">0</span>
+                        </span>
+                    </div>
+                    
+                    <!-- Loading State -->
+                    <div class="preview-style-editor__loading" id="style-editor-loading">
+                        <svg class="preview-theme-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10" opacity="0.25"/>
+                            <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
+                        </svg>
+                        <span><?= __admin('common.loading') ?>...</span>
+                    </div>
+                    
+                    <!-- Empty State (selector has no styles) -->
+                    <div class="preview-style-editor__empty" id="style-editor-empty" style="display: none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        <span><?= __admin('preview.noStylesDefined') ?? 'No styles defined for this selector' ?></span>
+                        <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="style-editor-add-first">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            <?= __admin('preview.addProperty') ?? 'Add Property' ?>
+                        </button>
+                    </div>
+                    
+                    <!-- Properties List -->
+                    <div class="preview-style-editor__properties" id="style-editor-properties" style="display: none;">
+                        <!-- Property rows will be inserted here by JS -->
+                    </div>
+                    
+                    <!-- Add Property Row -->
+                    <div class="preview-style-editor__add" id="style-editor-add" style="display: none;">
+                        <button type="button" class="preview-style-editor__add-btn" id="style-editor-add-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            <?= __admin('preview.addProperty') ?? 'Add Property' ?>
+                        </button>
+                    </div>
+                    
+                    <!-- Actions -->
+                    <div class="preview-style-editor__actions" id="style-editor-actions" style="display: none;">
+                        <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="style-editor-reset">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                            </svg>
+                            <?= __admin('common.reset') ?? 'Reset' ?>
+                        </button>
+                        <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="style-editor-save">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                            </svg>
+                            <?= __admin('common.save') ?? 'Save' ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Node Info Panel (DEPRECATED - kept for reference, hidden) -->
+<div class="preview-node-panel" id="preview-node-panel" style="display: none !important;">
+    <div class="preview-node-panel__header" title="<?= __admin('preview.dragToMove') ?? 'Drag to move' ?>">
+        <svg class="preview-panel-drag-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+            <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+            <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+            <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+        </svg>
         <h3 class="preview-node-panel__title"><?= __admin('preview.nodeInfo') ?></h3>
         <button type="button" class="preview-node-panel__close" id="preview-node-close" title="<?= __admin('common.close') ?>">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -243,6 +783,10 @@ if (is_dir($componentsDir)) {
             <span class="preview-node-panel__label"><?= __admin('preview.nodeText') ?>:</span>
             <span class="preview-node-panel__value preview-node-panel__value--truncate" id="node-text">-</span>
         </div>
+        <div class="preview-node-panel__row" id="node-textkey-row" style="display: none;">
+            <span class="preview-node-panel__label"><?= __admin('preview.textKey') ?? 'Text Key' ?>:</span>
+            <code class="preview-node-panel__value preview-node-panel__value--textkey" id="node-textkey">-</code>
+        </div>
     </div>
     <div class="preview-node-panel__actions">
         <button type="button" class="admin-btn admin-btn--sm admin-btn--success" id="node-add" title="<?= __admin('preview.addNode') ?? 'Add Node' ?>">
@@ -264,6 +808,120 @@ if (is_dir($componentsDir)) {
                 <line x1="10" y1="11" x2="10" y2="17"/>
                 <line x1="14" y1="11" x2="14" y2="17"/>
             </svg>
+        </button>
+    </div>
+</div>
+
+<!-- Style Panel (DEPRECATED - kept for reference, hidden) -->
+<div class="preview-style-panel" id="preview-style-panel" style="display: none !important;">
+    <div class="preview-style-panel__header" title="<?= __admin('preview.dragToMove') ?? 'Drag to move' ?>">
+        <svg class="preview-panel-drag-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+            <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+            <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+            <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+        </svg>
+        <h3 class="preview-style-panel__title"><?= __admin('preview.styleEditor') ?? 'Style Editor' ?></h3>
+        <button type="button" class="preview-style-panel__close" id="preview-style-close" title="<?= __admin('common.close') ?>">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        </button>
+    </div>
+    
+    <div class="preview-style-panel__info">
+        <div class="preview-style-panel__selector-row">
+            <span class="preview-style-panel__label"><?= __admin('preview.selector') ?? 'Selector' ?>:</span>
+            <code class="preview-style-panel__selector-value" id="style-selector">-</code>
+        </div>
+        <div class="preview-style-panel__notice">
+            <?= __admin('preview.styleNotice') ?? 'Quick CSS tweaks. For complex styling, edit the SCSS file directly.' ?>
+        </div>
+    </div>
+    
+    <div class="preview-style-panel__content" id="style-panel-content">
+        <!-- Spacing -->
+        <div class="preview-style-panel__row">
+            <label class="preview-style-panel__prop-label">padding</label>
+            <input type="text" class="preview-style-input" data-prop="padding" placeholder="e.g. 1rem">
+        </div>
+        <div class="preview-style-panel__row">
+            <label class="preview-style-panel__prop-label">margin</label>
+            <input type="text" class="preview-style-input" data-prop="margin" placeholder="e.g. 1rem auto">
+        </div>
+        
+        <!-- Colors (using QSColorPicker) -->
+        <div class="preview-style-panel__row">
+            <label class="preview-style-panel__prop-label">color</label>
+            <input type="text" class="preview-style-input preview-style-input--color" data-prop="color" placeholder="#000000">
+        </div>
+        <div class="preview-style-panel__row">
+            <label class="preview-style-panel__prop-label">background</label>
+            <input type="text" class="preview-style-input preview-style-input--color" data-prop="background-color" placeholder="#ffffff">
+        </div>
+        
+        <!-- Typography -->
+        <div class="preview-style-panel__row">
+            <label class="preview-style-panel__prop-label">font-size</label>
+            <input type="text" class="preview-style-input" data-prop="font-size" placeholder="e.g. 16px">
+        </div>
+        <div class="preview-style-panel__row">
+            <label class="preview-style-panel__prop-label">font-weight</label>
+            <select class="preview-style-input" data-prop="font-weight">
+                <option value="">-</option>
+                <option value="400">400 (normal)</option>
+                <option value="500">500</option>
+                <option value="600">600</option>
+                <option value="700">700 (bold)</option>
+            </select>
+        </div>
+        
+        <!-- Size -->
+        <div class="preview-style-panel__row">
+            <label class="preview-style-panel__prop-label">width</label>
+            <input type="text" class="preview-style-input" data-prop="width" placeholder="e.g. 100%">
+        </div>
+        <div class="preview-style-panel__row">
+            <label class="preview-style-panel__prop-label">max-width</label>
+            <input type="text" class="preview-style-input" data-prop="max-width" placeholder="e.g. 1200px">
+        </div>
+        
+        <!-- Border -->
+        <div class="preview-style-panel__row">
+            <label class="preview-style-panel__prop-label">border-radius</label>
+            <input type="text" class="preview-style-input" data-prop="border-radius" placeholder="e.g. 8px">
+        </div>
+        
+        <!-- Layout (for flex containers) -->
+        <div class="preview-style-panel__row">
+            <label class="preview-style-panel__prop-label">display</label>
+            <select class="preview-style-input" data-prop="display">
+                <option value="">-</option>
+                <option value="block">block</option>
+                <option value="flex">flex</option>
+                <option value="grid">grid</option>
+                <option value="none">none</option>
+            </select>
+        </div>
+        <div class="preview-style-panel__row">
+            <label class="preview-style-panel__prop-label">gap</label>
+            <input type="text" class="preview-style-input" data-prop="gap" placeholder="e.g. 1rem">
+        </div>
+    </div>
+    
+    <div class="preview-style-panel__actions">
+        <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="style-apply">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            <?= __admin('common.apply') ?? 'Apply' ?>
+        </button>
+        <button type="button" class="admin-btn admin-btn--sm admin-btn--secondary" id="style-reset">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+            </svg>
+            <?= __admin('common.reset') ?? 'Reset' ?>
         </button>
     </div>
 </div>
@@ -745,6 +1403,58 @@ if (is_dir($componentsDir)) {
     </div>
 </div>
 
+<!-- Keyframe Editor Modal (Phase 9.3) -->
+<div class="preview-keyframe-modal" id="preview-keyframe-modal">
+    <div class="preview-keyframe-modal__backdrop"></div>
+    <div class="preview-keyframe-modal__content">
+        <div class="preview-keyframe-modal__header">
+            <h3 id="keyframe-modal-title"><?= __admin('preview.editKeyframe') ?? 'Edit Keyframe' ?></h3>
+            <button type="button" class="preview-keyframe-modal__close" id="keyframe-modal-close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        <div class="preview-keyframe-modal__body">
+            <!-- Keyframe Name -->
+            <div class="preview-keyframe-modal__field">
+                <label for="keyframe-name"><?= __admin('preview.keyframeName') ?? 'Name' ?> <span class="admin-required">*</span>:</label>
+                <input type="text" id="keyframe-name" class="admin-input" placeholder="fadeIn" required>
+                <small class="preview-keyframe-modal__hint"><?= __admin('preview.keyframeNameHint') ?? 'Letters, numbers, hyphens. Start with letter.' ?></small>
+            </div>
+            
+            <!-- Timeline -->
+            <div class="preview-keyframe-modal__timeline-section">
+                <div class="preview-keyframe-modal__timeline-header">
+                    <label><?= __admin('preview.keyframeTimeline') ?? 'Timeline' ?>:</label>
+                    <small class="preview-keyframe-modal__timeline-hint"><?= __admin('preview.clickToAddFrame') ?? 'Click on timeline to add frames' ?></small>
+                </div>
+                <div class="preview-keyframe-modal__timeline" id="keyframe-timeline">
+                    <!-- Timeline markers populated by JS -->
+                </div>
+            </div>
+            
+            <!-- Frames Container (each frame's properties) -->
+            <div class="preview-keyframe-modal__frames" id="keyframe-frames">
+                <!-- Frame editors populated by JS -->
+            </div>
+        </div>
+        <div class="preview-keyframe-modal__footer">
+            <button type="button" class="admin-btn admin-btn--ghost" id="keyframe-preview-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                <?= __admin('preview.previewAnimation') ?? 'Preview' ?>
+            </button>
+            <div class="preview-keyframe-modal__footer-right">
+                <button type="button" class="admin-btn admin-btn--ghost" id="keyframe-cancel"><?= __admin('common.cancel') ?></button>
+                <button type="button" class="admin-btn admin-btn--primary" id="keyframe-save"><?= __admin('common.save') ?></button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Preview Frame Container -->
 <div class="preview-container" id="preview-container">
     <!-- Miniplayer floating controls (visible only in miniplayer mode) -->
@@ -788,7 +1498,15 @@ if (is_dir($componentsDir)) {
     
     <!-- Device Frame (for tablet/mobile) -->
     <div class="preview-device-frame" id="preview-device-frame"></div>
+    
+    <!-- Resize Handle at bottom (drag to adjust preview height) -->
+    <div class="preview-resize-handle" id="preview-resize-handle" title="<?= __admin('preview.dragToResize') ?? 'Drag to resize' ?>">
+        <div class="preview-resize-handle__bar"></div>
+    </div>
 </div>
+
+<!-- Color Picker (needed before inline script) -->
+<script src="<?= $baseUrl ?>/admin/assets/js/colorpicker.js"></script>
 
 <!-- Preview JavaScript -->
 <script>
@@ -799,6 +1517,7 @@ if (is_dir($componentsDir)) {
     const iframe = document.getElementById('preview-iframe');
     const container = document.getElementById('preview-container');
     const wrapper = document.getElementById('preview-frame-wrapper');
+    const previewResizeHandle = document.getElementById('preview-resize-handle');
     const loading = document.getElementById('preview-loading');
     const routeSelect = document.getElementById('preview-route');
     const langSelect = document.getElementById('preview-lang');
@@ -818,11 +1537,115 @@ if (is_dir($componentsDir)) {
     const nodeClassesEl = document.getElementById('node-classes');
     const nodeChildrenEl = document.getElementById('node-children');
     const nodeTextEl = document.getElementById('node-text');
+    const nodeTextKeyRow = document.getElementById('node-textkey-row');
+    const nodeTextKeyEl = document.getElementById('node-textkey');
     const nodeDeleteBtn = document.getElementById('node-delete');
+    
+    // Contextual area elements (Phase 8)
+    const contextualArea = document.getElementById('preview-contextual-area');
+    const contextualToggle = document.getElementById('preview-contextual-toggle');
+    const contextualSections = document.querySelectorAll('.preview-contextual-section');
+    const ctxSelectDefault = document.getElementById('contextual-select-default');
+    const ctxSelectInfo = document.getElementById('contextual-select-info');
+    const ctxNodeStruct = document.getElementById('ctx-node-struct');
+    const ctxNodeId = document.getElementById('ctx-node-id');
+    const ctxNodeComponentRow = document.getElementById('ctx-node-component-row');
+    const ctxNodeComponent = document.getElementById('ctx-node-component');
+    const ctxNodeTag = document.getElementById('ctx-node-tag');
+    const ctxNodeClasses = document.getElementById('ctx-node-classes');
+    const ctxNodeChildren = document.getElementById('ctx-node-children');
+    const ctxNodeText = document.getElementById('ctx-node-text');
+    const ctxNodeTextKeyRow = document.getElementById('ctx-node-textkey-row');
+    const ctxNodeTextKey = document.getElementById('ctx-node-textkey');
+    const ctxNodeAdd = document.getElementById('ctx-node-add');
+    const ctxNodeEdit = document.getElementById('ctx-node-edit');
+    const ctxNodeDelete = document.getElementById('ctx-node-delete');
+    const ctxNodeStyle = document.getElementById('ctx-node-style');
+    
+    // Theme panel elements (Phase 8.3)
+    const styleTabs = document.getElementById('contextual-style-tabs');
+    const styleContent = document.getElementById('contextual-style-content');
+    const themePanel = document.getElementById('theme-panel');
+    const themeLoading = document.getElementById('theme-loading');
+    const themeContent = document.getElementById('theme-content');
+    const themeColorsGrid = document.getElementById('theme-colors-grid');
+    const themeFontsGrid = document.getElementById('theme-fonts-grid');
+    const themeSpacingGrid = document.getElementById('theme-spacing-grid');
+    const themeOtherGrid = document.getElementById('theme-other-grid');
+    const themeOtherSection = document.getElementById('theme-other-section');
+    const themeResetBtn = document.getElementById('theme-reset-btn');
+    const themeSaveBtn = document.getElementById('theme-save-btn');
+    const selectorsPanel = document.getElementById('selectors-panel');
+    
+    // Selector browser elements (Phase 8.4)
+    const selectorSearchInput = document.getElementById('selector-search-input');
+    const selectorSearchClear = document.getElementById('selector-search-clear');
+    const selectorCount = document.getElementById('selector-count');
+    const selectorsLoading = document.getElementById('selectors-loading');
+    const selectorsGroups = document.getElementById('selectors-groups');
+    const selectorTagsList = document.getElementById('selectors-tags-list');
+    const selectorClassesList = document.getElementById('selectors-classes-list');
+    const selectorIdsList = document.getElementById('selectors-ids-list');
+    const selectorAttributesList = document.getElementById('selectors-attributes-list');
+    const selectorMediaList = document.getElementById('selectors-media-list');
+    const selectorTagsCount = document.getElementById('selectors-tags-count');
+    const selectorClassesCount = document.getElementById('selectors-classes-count');
+    const selectorIdsCount = document.getElementById('selectors-ids-count');
+    const selectorAttributesCount = document.getElementById('selectors-attributes-count');
+    const selectorMediaCount = document.getElementById('selectors-media-count');
+    const selectorSelected = document.getElementById('selector-selected');
+    const selectorSelectedValue = document.getElementById('selector-selected-value');
+    const selectorSelectedClear = document.getElementById('selector-selected-clear');
+    const selectorMatchCount = document.getElementById('selector-match-count');
+    const selectorEditBtn = document.getElementById('selector-edit-btn');
+    
+    // Style Editor elements (Phase 8.5)
+    const styleEditor = document.getElementById('style-editor');
+    const styleEditorBack = document.getElementById('style-editor-back');
+    const styleEditorLabel = document.getElementById('style-editor-label');
+    const styleEditorSelector = document.getElementById('style-editor-selector');
+    const styleEditorCount = document.getElementById('style-editor-count');
+    const styleEditorLoading = document.getElementById('style-editor-loading');
+    const styleEditorEmpty = document.getElementById('style-editor-empty');
+    const styleEditorProperties = document.getElementById('style-editor-properties');
+    const styleEditorAdd = document.getElementById('style-editor-add');
+    const styleEditorAddBtn = document.getElementById('style-editor-add-btn');
+    const styleEditorAddFirst = document.getElementById('style-editor-add-first');
+    const styleEditorActions = document.getElementById('style-editor-actions');
+    const styleEditorReset = document.getElementById('style-editor-reset');
+    const styleEditorSave = document.getElementById('style-editor-save');
+    
+    // Animations panel elements (Phase 9.2)
+    const animationsPanel = document.getElementById('animations-panel');
+    const animationsLoading = document.getElementById('animations-loading');
+    const animationsContent = document.getElementById('animations-content');
+    const keyframesCount = document.getElementById('keyframes-count');
+    const keyframesEmpty = document.getElementById('keyframes-empty');
+    const keyframesList = document.getElementById('keyframes-list');
+    const keyframeAddBtn = document.getElementById('keyframe-add-btn');
+    const transitionsCount = document.getElementById('transitions-count');
+    const transitionsList = document.getElementById('transitions-list');
+    const animationsCount = document.getElementById('animations-count');
+    const animationsList = document.getElementById('animations-list');
+    const animatedEmpty = document.getElementById('animated-empty');
+    
+    // Keyframe Editor Modal elements (Phase 9.3)
+    const keyframeModal = document.getElementById('preview-keyframe-modal');
+    const keyframeModalTitle = document.getElementById('keyframe-modal-title');
+    const keyframeModalClose = document.getElementById('keyframe-modal-close');
+    const keyframeNameInput = document.getElementById('keyframe-name');
+    const keyframeTimeline = document.getElementById('keyframe-timeline');
+    const keyframeFramesContainer = document.getElementById('keyframe-frames');
+    const keyframeAddFrameBtn = document.getElementById('keyframe-add-frame');
+    const keyframePreviewBtn = document.getElementById('keyframe-preview-btn');
+    const keyframeCancelBtn = document.getElementById('keyframe-cancel');
+    const keyframeSaveBtn = document.getElementById('keyframe-save');
     
     // Configuration
     const baseUrl = <?= json_encode(rtrim(BASE_URL, '/')) ?>;
     const adminUrl = <?= json_encode($router->url('')) ?>;
+    const managementUrl = <?= json_encode(rtrim(BASE_URL, '/') . '/management/') ?>;
+    const authToken = <?= json_encode($router->getToken()) ?>;
     const structureUrl = <?= json_encode($router->url('structure')) ?>;
     const multilingual = <?= json_encode(CONFIG['MULTILINGUAL_SUPPORT'] ?? false) ?>;
     const defaultLang = <?= json_encode(CONFIG['LANGUAGE_DEFAULT'] ?? 'en') ?>;
@@ -839,6 +1662,132 @@ if (is_dir($componentsDir)) {
     let currentMode = 'select';
     let currentComponent = '';
     let overlayInjected = false;
+    
+    // Theme variables state (Phase 8.3)
+    let themeVariablesLoaded = false;
+    let originalThemeVariables = {};  // Original values from CSS file
+    let currentThemeVariables = {};   // Current working values (modified)
+    let activeStyleTab = 'theme';     // 'theme' or 'selectors'
+    
+    // Selector browser state (Phase 8.4)
+    let selectorsLoaded = false;
+    let allSelectors = [];            // All selectors from CSS
+    let categorizedSelectors = { tags: [], classes: [], ids: [], attributes: [], media: {} };
+    let currentSelectedSelector = null;  // Currently selected selector
+    let hoveredSelector = null;       // Currently hovered selector (for highlight)
+    
+    // Style Editor state (Phase 8.5)
+    let styleEditorVisible = false;
+    let editingSelector = null;       // Selector being edited
+    let editingSelectorCount = 0;     // Number of matching elements
+    let originalStyles = {};          // Original property values from CSS
+    let currentStyles = {};           // Current working values (modified)
+    let newProperties = [];           // Newly added properties
+    let deletedProperties = [];       // Original properties that have been deleted
+    let stylePreviewInjected = false; // Whether live preview style is injected
+    
+    // Animations tab state (Phase 9.2)
+    let animationsLoaded = false;     // Whether animations data has been loaded
+    let keyframesData = [];           // All @keyframes from CSS
+    let animatedSelectorsData = {     // Selectors with transition/animation properties
+        transitions: [],
+        animations: [],
+        triggersWithoutTransition: []
+    };
+    let keyframePreviewActive = null; // Name of keyframe being previewed
+    
+    // Keyframe Editor state (Phase 9.3)
+    let keyframeEditorMode = 'edit';  // 'edit' or 'create'
+    let editingKeyframeName = null;   // Original name (for rename detection)
+    let keyframeFrames = {};          // Current frame data: { '0%': { opacity: '0' }, '100%': { opacity: '1' } }
+    let selectedFramePercent = null;  // Currently selected frame in timeline
+    
+    // ==================== Draggable Panels ====================
+
+    /**
+     * Make a panel draggable by its header
+     * @param {HTMLElement} panel - The panel element
+     * @param {HTMLElement} header - The header element to drag from
+     * @param {string} storageKey - localStorage key for position persistence
+     */
+    function makePanelDraggable(panel, header, storageKey) {
+        if (!panel || !header) return;
+        
+        let isDragging = false;
+        let startX, startY, startLeft, startTop;
+        
+        // Restore saved position
+        const savedPos = localStorage.getItem(storageKey);
+        if (savedPos) {
+            try {
+                const pos = JSON.parse(savedPos);
+                panel.style.left = pos.left + 'px';
+                panel.style.top = pos.top + 'px';
+                panel.classList.add(panel.classList[0] + '--dragged');
+            } catch (e) {}
+        }
+        
+        header.addEventListener('mousedown', (e) => {
+            // Don't drag if clicking on close button
+            if (e.target.closest('button')) return;
+            
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            
+            const rect = panel.getBoundingClientRect();
+            startLeft = rect.left;
+            startTop = rect.top;
+            
+            // Add dragged class to disable default positioning
+            panel.classList.add(panel.classList[0] + '--dragged');
+            
+            // Disable text selection while dragging
+            document.body.style.userSelect = 'none';
+            
+            e.preventDefault();
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
+            
+            let newLeft = startLeft + deltaX;
+            let newTop = startTop + deltaY;
+            
+            // Keep within viewport
+            const panelRect = panel.getBoundingClientRect();
+            const maxLeft = window.innerWidth - panelRect.width;
+            const maxTop = window.innerHeight - panelRect.height;
+            
+            newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+            newTop = Math.max(0, Math.min(newTop, maxTop));
+            
+            panel.style.left = newLeft + 'px';
+            panel.style.top = newTop + 'px';
+        });
+        
+        document.addEventListener('mouseup', () => {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            // Re-enable text selection
+            document.body.style.userSelect = '';
+            
+            // Save position
+            const rect = panel.getBoundingClientRect();
+            localStorage.setItem(storageKey, JSON.stringify({
+                left: rect.left,
+                top: rect.top
+            }));
+        });
+    }
+    
+    // Initialize draggable panels
+    const nodePanelHeader = nodePanel?.querySelector('.preview-node-panel__header');
+    makePanelDraggable(nodePanel, nodePanelHeader, 'qs_node_panel_pos');
     
     // ==================== URL Building ====================
     
@@ -912,7 +1861,15 @@ if (is_dir($componentsDir)) {
     
     // ==================== Editor Mode ====================
     
-    function setMode(mode) {
+    // Store preselection data for style mode (Phase 8.2)
+    let styleModePreselect = null;
+    let isSwitchingMode = false; // Debounce flag to prevent rapid mode switching
+
+    function setMode(mode, preselect = null) {
+        // Debounce rapid mode switches to prevent layout thrashing
+        if (isSwitchingMode) return;
+        isSwitchingMode = true;
+        
         currentMode = mode;
         
         modeBtns.forEach(btn => {
@@ -925,11 +1882,3393 @@ if (is_dir($componentsDir)) {
         // Send mode change to iframe
         sendToIframe('setMode', { mode });
         
+        // Store preselection for style mode (used in Phase 8.4+)
+        if (mode === 'style' && preselect) {
+            styleModePreselect = preselect;
+            console.log('[Preview] Style mode preselection:', preselect);
+            // TODO Phase 8.4: Auto-select the selector in the selector browser
+        } else if (mode !== 'style') {
+            styleModePreselect = null;
+        }
+        
+        // Update contextual area sections
+        updateContextualSection(mode);
+        
         // Hide node panel when switching away from select mode
         if (mode !== 'select') {
             hideNodePanel();
         }
+        
+        // Hide style panel when switching away from style mode
+        if (mode !== 'style') {
+            hideStylePanel();
+        }
+        
+        // Reset debounce flag after a short delay
+        requestAnimationFrame(() => {
+            isSwitchingMode = false;
+        });
     }
+    
+    // ==================== Contextual Area (Phase 8) ====================
+    
+    function updateContextualSection(mode) {
+        // Hide all sections
+        contextualSections.forEach(section => {
+            section.style.display = 'none';
+            section.classList.remove('preview-contextual-section--active');
+        });
+        
+        // Show the section matching the current mode
+        const activeSection = document.getElementById('contextual-' + mode);
+        if (activeSection) {
+            activeSection.style.display = '';
+            activeSection.classList.add('preview-contextual-section--active');
+        }
+        
+        // Reset select mode info display when switching away
+        if (mode !== 'select' && ctxSelectInfo) {
+            ctxSelectInfo.style.display = 'none';
+            ctxSelectDefault.style.display = '';
+        }
+        
+        // Phase 8.3: Show/hide style tabs and content when in style mode
+        if (mode === 'style') {
+            if (styleTabs) styleTabs.style.display = '';
+            if (styleContent) styleContent.style.display = '';
+            // Load theme variables if not already loaded
+            if (!themeVariablesLoaded) {
+                loadThemeVariables();
+            }
+        } else {
+            if (styleTabs) styleTabs.style.display = 'none';
+            if (styleContent) styleContent.style.display = 'none';
+        }
+    }
+    
+    function toggleContextualArea() {
+        contextualArea.classList.toggle('preview-contextual-area--collapsed');
+    }
+    
+    // ==================== Preview Resize ====================
+    
+    const PREVIEW_HEIGHT_KEY = 'quicksite-preview-height';
+    const MIN_PREVIEW_HEIGHT = 200;
+    const MAX_PREVIEW_HEIGHT = window.innerHeight - 150; // Leave space for toolbar
+    
+    /**
+     * Initialize preview area resize functionality
+     */
+    function initPreviewResize() {
+        if (!previewResizeHandle || !container) return;
+        
+        // Restore saved height
+        const savedHeight = localStorage.getItem(PREVIEW_HEIGHT_KEY);
+        if (savedHeight) {
+            const height = parseInt(savedHeight, 10);
+            if (height >= MIN_PREVIEW_HEIGHT && height <= MAX_PREVIEW_HEIGHT) {
+                container.style.setProperty('--preview-height', height + 'px');
+            }
+        }
+        
+        let isResizing = false;
+        let startY = 0;
+        let startHeight = 0;
+        
+        previewResizeHandle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            isResizing = true;
+            startY = e.clientY;
+            startHeight = container.offsetHeight;
+            
+            container.classList.add('preview-container--resizing');
+            previewResizeHandle.classList.add('preview-resize-handle--active');
+            
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+        
+        function onMouseMove(e) {
+            if (!isResizing) return;
+            
+            // Handle at bottom: dragging DOWN = larger, dragging UP = smaller
+            const deltaY = e.clientY - startY;
+            let newHeight = startHeight + deltaY;
+            
+            // Clamp to min/max
+            const currentMax = window.innerHeight - 150;
+            newHeight = Math.max(MIN_PREVIEW_HEIGHT, Math.min(currentMax, newHeight));
+            
+            container.style.setProperty('--preview-height', newHeight + 'px');
+        }
+        
+        function onMouseUp(e) {
+            if (!isResizing) return;
+            
+            isResizing = false;
+            container.classList.remove('preview-container--resizing');
+            previewResizeHandle.classList.remove('preview-resize-handle--active');
+            
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            
+            // Save the final height
+            const finalHeight = container.offsetHeight;
+            localStorage.setItem(PREVIEW_HEIGHT_KEY, finalHeight.toString());
+        }
+    }
+    
+    // Initialize preview resize
+    initPreviewResize();
+    
+    function showContextualInfo(data) {
+        // Format structure name for display
+        let structDisplay = data.struct || '-';
+        if (structDisplay.startsWith('page-')) {
+            structDisplay = 'Page: ' + structDisplay.substring(5);
+        } else if (structDisplay === 'menu') {
+            structDisplay = 'Menu';
+        } else if (structDisplay === 'footer') {
+            structDisplay = 'Footer';
+        }
+        
+        // Update contextual info fields
+        ctxNodeStruct.textContent = structDisplay;
+        ctxNodeId.textContent = data.isComponent ? data.componentNode : (data.node || '-');
+        ctxNodeTag.textContent = data.tag || '-';
+        ctxNodeClasses.textContent = data.classes || '-';
+        ctxNodeChildren.textContent = data.childCount !== undefined ? data.childCount : '-';
+        ctxNodeText.textContent = data.textContent || '-';
+        
+        // Show/hide component row
+        if (data.isComponent && data.component) {
+            ctxNodeComponent.textContent = data.component;
+            ctxNodeComponentRow.style.display = '';
+        } else {
+            ctxNodeComponentRow.style.display = 'none';
+        }
+        
+        // Show/hide textKey row
+        if (data.textKeys && data.textKeys.length > 0) {
+            ctxNodeTextKey.textContent = data.textKeys.join(', ');
+            ctxNodeTextKeyRow.style.display = '';
+        } else {
+            ctxNodeTextKeyRow.style.display = 'none';
+        }
+        
+        // Show info, hide default message
+        ctxSelectDefault.style.display = 'none';
+        ctxSelectInfo.style.display = '';
+        
+        // Expand contextual area if collapsed
+        contextualArea.classList.remove('preview-contextual-area--collapsed');
+    }
+    
+    function hideContextualInfo() {
+        // Show default message, hide info
+        ctxSelectDefault.style.display = '';
+        ctxSelectInfo.style.display = 'none';
+    }
+    
+    // ==================== Theme Variables (Phase 8.3) ====================
+    
+    /**
+     * Load theme variables from the API
+     */
+    async function loadThemeVariables() {
+        if (!themeLoading || !themeContent) return;
+        
+        // Show loading state
+        themeLoading.style.display = '';
+        themeContent.style.display = 'none';
+        
+        try {
+            const response = await fetch(managementUrl + 'getRootVariables', {
+                headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+            });
+            const data = await response.json();
+            
+            if (data.status === 200 && data.data?.variables) {
+                originalThemeVariables = { ...data.data.variables };
+                currentThemeVariables = { ...data.data.variables };
+                themeVariablesLoaded = true;
+                
+                // Populate the theme editor UI
+                populateThemeEditor(data.data.variables);
+                
+                // Show content, hide loading
+                themeLoading.style.display = 'none';
+                themeContent.style.display = '';
+            } else {
+                throw new Error(data.message || 'Failed to load theme variables');
+            }
+        } catch (error) {
+            console.error('Error loading theme variables:', error);
+            themeLoading.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24" style="color: #ef4444;">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <span style="color: #ef4444;">${<?= json_encode(__admin('preview.themeLoadError') ?? 'Failed to load theme variables') ?>}</span>
+            `;
+        }
+    }
+    
+    /**
+     * Categorize and populate the theme editor with variables
+     */
+    function populateThemeEditor(variables) {
+        const categories = {
+            colors: [],
+            fonts: [],
+            spacing: [],
+            other: []
+        };
+        
+        // Categorize variables by prefix
+        for (const [name, value] of Object.entries(variables)) {
+            if (name.startsWith('--color-') || name.includes('color') || isColorValue(value)) {
+                categories.colors.push({ name, value });
+            } else if (name.startsWith('--font-') || name.includes('font')) {
+                categories.fonts.push({ name, value });
+            } else if (name.startsWith('--spacing-') || name.startsWith('--gap-') || name.startsWith('--margin-') || name.startsWith('--padding-') || name.includes('size') || isSizeValue(value)) {
+                categories.spacing.push({ name, value });
+            } else {
+                categories.other.push({ name, value });
+            }
+        }
+        
+        // Render each category
+        renderColorInputs(themeColorsGrid, categories.colors);
+        renderFontInputs(themeFontsGrid, categories.fonts);
+        renderSpacingInputs(themeSpacingGrid, categories.spacing);
+        renderOtherInputs(themeOtherGrid, categories.other);
+        
+        // Show/hide "Other" section based on content
+        if (themeOtherSection) {
+            themeOtherSection.style.display = categories.other.length > 0 ? '' : 'none';
+        }
+    }
+    
+    /**
+     * Check if a value looks like a color
+     */
+    function isColorValue(value) {
+        if (!value) return false;
+        value = value.trim().toLowerCase();
+        return value.startsWith('#') || 
+               value.startsWith('rgb') || 
+               value.startsWith('hsl') ||
+               value.startsWith('var(--color');
+    }
+    
+    /**
+     * Check if a value looks like a size (px, rem, em, etc.)
+     */
+    function isSizeValue(value) {
+        if (!value) return false;
+        return /^\d+(\.\d+)?(px|rem|em|%|vh|vw|vmin|vmax)$/.test(value.trim());
+    }
+    
+    /**
+     * Format variable name for display (--color-primary -> Color Primary)
+     */
+    function formatVariableName(name) {
+        return name
+            .replace(/^--/, '')
+            .split('-')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+    }
+    
+    /**
+     * Render color inputs
+     */
+    function renderColorInputs(container, variables) {
+        if (!container) return;
+        container.innerHTML = '';
+        
+        if (variables.length === 0) {
+            container.innerHTML = `<p class="preview-theme-empty">${<?= json_encode(__admin('preview.noColorVariables') ?? 'No color variables found') ?>}</p>`;
+            return;
+        }
+        
+        variables.forEach(({ name, value }) => {
+            const item = document.createElement('div');
+            item.className = 'preview-theme-color';
+            item.innerHTML = `
+                <div class="preview-theme-color__swatch" style="background-color: ${value};" data-var="${name}"></div>
+                <div class="preview-theme-color__info">
+                    <span class="preview-theme-color__name">${formatVariableName(name)}</span>
+                    <input type="text" class="preview-theme-color__value" value="${value}" data-var="${name}" data-original="${value}">
+                </div>
+            `;
+            
+            const swatch = item.querySelector('.preview-theme-color__swatch');
+            const input = item.querySelector('.preview-theme-color__value');
+            
+            // Initialize QSColorPicker on the input if available
+            if (typeof QSColorPicker !== 'undefined') {
+                new QSColorPicker(input, {
+                    onChange: (color) => {
+                        swatch.style.backgroundColor = color;
+                        handleVariableChange(name, color);
+                        previewThemeVariable(name, color);
+                    }
+                });
+            }
+            
+            // Big swatch click → trigger input click (opens QSColorPicker)
+            swatch.addEventListener('click', () => input.click());
+            
+            // Manual input change handler (for typing hex values)
+            input.addEventListener('change', (e) => {
+                handleVariableChange(name, e.target.value);
+                swatch.style.backgroundColor = e.target.value;
+            });
+            input.addEventListener('input', (e) => {
+                // Live preview on input
+                previewThemeVariable(name, e.target.value);
+                swatch.style.backgroundColor = e.target.value;
+            });
+            
+            container.appendChild(item);
+        });
+    }
+    
+    /**
+     * Render font inputs
+     */
+    function renderFontInputs(container, variables) {
+        if (!container) return;
+        container.innerHTML = '';
+        
+        if (variables.length === 0) {
+            container.innerHTML = `<p class="preview-theme-empty">${<?= json_encode(__admin('preview.noFontVariables') ?? 'No font variables found') ?>}</p>`;
+            return;
+        }
+        
+        variables.forEach(({ name, value }) => {
+            const item = document.createElement('div');
+            item.className = 'preview-theme-input';
+            item.innerHTML = `
+                <label class="preview-theme-input__label">${formatVariableName(name)}</label>
+                <input type="text" class="preview-theme-input__field" value="${value}" data-var="${name}" data-original="${value}">
+            `;
+            
+            const input = item.querySelector('.preview-theme-input__field');
+            input.addEventListener('change', (e) => handleVariableChange(name, e.target.value));
+            input.addEventListener('input', (e) => previewThemeVariable(name, e.target.value));
+            
+            container.appendChild(item);
+        });
+    }
+    
+    /**
+     * Render spacing inputs
+     */
+    function renderSpacingInputs(container, variables) {
+        if (!container) return;
+        container.innerHTML = '';
+        
+        if (variables.length === 0) {
+            container.innerHTML = `<p class="preview-theme-empty">${<?= json_encode(__admin('preview.noSpacingVariables') ?? 'No spacing variables found') ?>}</p>`;
+            return;
+        }
+        
+        variables.forEach(({ name, value }) => {
+            const item = document.createElement('div');
+            item.className = 'preview-theme-input';
+            item.innerHTML = `
+                <label class="preview-theme-input__label">${formatVariableName(name)}</label>
+                <input type="text" class="preview-theme-input__field" value="${value}" data-var="${name}" data-original="${value}" placeholder="e.g. 1rem, 16px">
+            `;
+            
+            const input = item.querySelector('.preview-theme-input__field');
+            input.addEventListener('change', (e) => handleVariableChange(name, e.target.value));
+            input.addEventListener('input', (e) => previewThemeVariable(name, e.target.value));
+            
+            container.appendChild(item);
+        });
+    }
+    
+    /**
+     * Render other inputs
+     */
+    function renderOtherInputs(container, variables) {
+        if (!container) return;
+        container.innerHTML = '';
+        
+        if (variables.length === 0) return;
+        
+        variables.forEach(({ name, value }) => {
+            const item = document.createElement('div');
+            item.className = 'preview-theme-input';
+            item.innerHTML = `
+                <label class="preview-theme-input__label">${formatVariableName(name)}</label>
+                <input type="text" class="preview-theme-input__field" value="${value}" data-var="${name}" data-original="${value}">
+            `;
+            
+            const input = item.querySelector('.preview-theme-input__field');
+            input.addEventListener('change', (e) => handleVariableChange(name, e.target.value));
+            input.addEventListener('input', (e) => previewThemeVariable(name, e.target.value));
+            
+            container.appendChild(item);
+        });
+    }
+    
+    /**
+     * Handle variable value change
+     */
+    function handleVariableChange(name, value) {
+        currentThemeVariables[name] = value;
+    }
+    
+    /**
+     * Live preview a theme variable change in the iframe
+     */
+    function previewThemeVariable(name, value) {
+        currentThemeVariables[name] = value;
+        
+        try {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            if (!iframeDoc) return;
+            
+            // Find or create the preview style element
+            let previewStyle = iframeDoc.getElementById('quicksite-theme-preview');
+            if (!previewStyle) {
+                previewStyle = iframeDoc.createElement('style');
+                previewStyle.id = 'quicksite-theme-preview';
+                iframeDoc.head.appendChild(previewStyle);
+            }
+            
+            // Build CSS from all modified variables
+            const modifiedVars = Object.entries(currentThemeVariables)
+                .filter(([k, v]) => v !== originalThemeVariables[k])
+                .map(([k, v]) => `${k}: ${v};`)
+                .join('\n');
+            
+            previewStyle.textContent = `:root {\n${modifiedVars}\n}`;
+        } catch (e) {
+            console.warn('Could not preview theme variable:', e);
+        }
+    }
+    
+    /**
+     * Save theme variables to the server
+     */
+    async function saveThemeVariables() {
+        if (!themeSaveBtn) return;
+        
+        // Disable button and show loading
+        themeSaveBtn.disabled = true;
+        const originalText = themeSaveBtn.innerHTML;
+        themeSaveBtn.innerHTML = `
+            <svg class="preview-theme-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <circle cx="12" cy="12" r="10" opacity="0.25"/>
+                <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
+            </svg>
+            ${<?= json_encode(__admin('common.saving') ?? 'Saving...') ?>}
+        `;
+        
+        try {
+            const headers = { 'Content-Type': 'application/json' };
+            if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+            
+            const response = await fetch(managementUrl + 'setRootVariables', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({ variables: currentThemeVariables })
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 200 || data.status === 201) {
+                // Update original values to current
+                originalThemeVariables = { ...currentThemeVariables };
+                
+                // Show success toast
+                showToast(<?= json_encode(__admin('preview.themeSaved') ?? 'Theme variables saved successfully') ?>, 'success');
+                
+                // Reload iframe to get fresh styles
+                reloadPreview();
+            } else {
+                throw new Error(data.message || 'Failed to save theme variables');
+            }
+        } catch (error) {
+            console.error('Error saving theme variables:', error);
+            showToast(<?= json_encode(__admin('preview.themeSaveError') ?? 'Failed to save theme variables') ?>, 'error');
+        } finally {
+            // Restore button
+            themeSaveBtn.disabled = false;
+            themeSaveBtn.innerHTML = originalText;
+        }
+    }
+    
+    /**
+     * Reset theme variables to original values
+     */
+    function resetThemeVariables() {
+        currentThemeVariables = { ...originalThemeVariables };
+        
+        // Update all inputs
+        document.querySelectorAll('[data-var]').forEach(el => {
+            const varName = el.dataset.var;
+            const originalValue = originalThemeVariables[varName];
+            
+            if (el.classList.contains('preview-theme-color__swatch')) {
+                el.style.backgroundColor = originalValue;
+            } else if (el.classList.contains('preview-theme-color__value') || el.classList.contains('preview-theme-input__field')) {
+                el.value = originalValue;
+            }
+        });
+        
+        // Remove preview style from iframe
+        try {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            const previewStyle = iframeDoc?.getElementById('quicksite-theme-preview');
+            if (previewStyle) {
+                previewStyle.remove();
+            }
+        } catch (e) {
+            console.warn('Could not reset iframe preview:', e);
+        }
+        
+        showToast(<?= json_encode(__admin('preview.themeReset') ?? 'Theme variables reset to original') ?>, 'info');
+    }
+    
+    /**
+     * Initialize style tab switching
+     */
+    function initStyleTabs() {
+        if (!styleTabs) return;
+        
+        const tabs = styleTabs.querySelectorAll('.preview-contextual-style-tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                if (tabName === activeStyleTab) return;
+                
+                // Update active tab button
+                tabs.forEach(t => t.classList.remove('preview-contextual-style-tab--active'));
+                tab.classList.add('preview-contextual-style-tab--active');
+                
+                // Show/hide panels
+                activeStyleTab = tabName;
+                if (themePanel) themePanel.style.display = tabName === 'theme' ? '' : 'none';
+                if (selectorsPanel) selectorsPanel.style.display = tabName === 'selectors' ? '' : 'none';
+                if (animationsPanel) animationsPanel.style.display = tabName === 'animations' ? '' : 'none';
+                
+                // Load selectors when switching to selectors tab (Phase 8.4)
+                if (tabName === 'selectors' && !selectorsLoaded) {
+                    loadStyleSelectors();
+                }
+                
+                // Load animations when switching to animations tab (Phase 9.2)
+                if (tabName === 'animations' && !animationsLoaded) {
+                    loadAnimationsTab();
+                }
+            });
+        });
+        
+        // Initialize animations group collapsing
+        initAnimationsGroups();
+    }
+    
+    // ==================== Animations Tab (Phase 9.2) ====================
+    
+    // Helper function to escape HTML (alias for QuickSiteAdmin.escapeHtml)
+    const escapeHtml = (text) => {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    };
+    
+    /**
+     * Initialize animations group collapsing
+     */
+    function initAnimationsGroups() {
+        const groups = document.querySelectorAll('.preview-animations-group');
+        groups.forEach(group => {
+            const header = group.querySelector('.preview-animations-group__header');
+            const list = group.querySelector('.preview-animations-group__list');
+            
+            if (header && list) {
+                header.addEventListener('click', () => {
+                    const isExpanded = header.classList.contains('preview-animations-group__header--expanded');
+                    header.classList.toggle('preview-animations-group__header--expanded');
+                    list.classList.toggle('preview-animations-group__list--collapsed', isExpanded);
+                });
+            }
+        });
+    }
+    
+    /**
+     * Load animations data from APIs (keyframes and animated selectors)
+     */
+    async function loadAnimationsTab() {
+        if (!animationsLoading || !animationsContent) return;
+        
+        // Show loading state
+        animationsLoading.style.display = '';
+        animationsContent.style.display = 'none';
+        
+        try {
+            // Fetch both keyframes and animated selectors in parallel
+            const [keyframesResponse, selectorsResponse] = await Promise.all([
+                fetch(managementUrl + 'listKeyframes', {
+                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+                }),
+                fetch(managementUrl + 'getAnimatedSelectors', {
+                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+                })
+            ]);
+            
+            const keyframesData_response = await keyframesResponse.json();
+            const selectorsData = await selectorsResponse.json();
+            
+            // Process keyframes
+            if (keyframesData_response.status === 200 && keyframesData_response.data?.keyframes) {
+                keyframesData = keyframesData_response.data.keyframes;
+                populateKeyframesList();
+            } else {
+                keyframesData = [];
+                populateKeyframesList();
+            }
+            
+            // Process animated selectors
+            if (selectorsData.status === 200 && selectorsData.data) {
+                animatedSelectorsData = {
+                    transitions: selectorsData.data.transitions || [],
+                    animations: selectorsData.data.animations || [],
+                    triggersWithoutTransition: selectorsData.data.triggersWithoutTransition || []
+                };
+                populateAnimatedSelectorsList();
+            } else {
+                animatedSelectorsData = { transitions: [], animations: [], triggersWithoutTransition: [] };
+                populateAnimatedSelectorsList();
+            }
+            
+            animationsLoaded = true;
+            
+            // Show content, hide loading
+            animationsLoading.style.display = 'none';
+            animationsContent.style.display = '';
+            
+        } catch (error) {
+            console.error('Failed to load animations:', error);
+            animationsLoading.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <span>${<?= json_encode(__admin('preview.loadAnimationsFailed') ?? 'Failed to load animations') ?>}</span>
+            `;
+        }
+    }
+    
+    /**
+     * Populate the keyframes list UI
+     */
+    function populateKeyframesList() {
+        if (!keyframesList || !keyframesCount || !keyframesEmpty) return;
+        
+        const count = keyframesData.length;
+        keyframesCount.textContent = count;
+        
+        if (count === 0) {
+            keyframesList.innerHTML = '';
+            keyframesEmpty.style.display = '';
+            return;
+        }
+        
+        keyframesEmpty.style.display = 'none';
+        
+        keyframesList.innerHTML = keyframesData.map(kf => `
+            <div class="preview-keyframe-item" data-keyframe="${escapeHtml(kf.name)}">
+                <div class="preview-keyframe-item__info">
+                    <span class="preview-keyframe-item__name">@keyframes ${escapeHtml(kf.name)}</span>
+                    <span class="preview-keyframe-item__frames">${kf.frameCount} ${kf.frameCount === 1 ? <?= json_encode(__admin('preview.frame') ?? 'frame') ?> : <?= json_encode(__admin('preview.frames') ?? 'frames') ?>}</span>
+                </div>
+                <div class="preview-keyframe-item__actions">
+                    <button type="button" class="preview-keyframe-item__btn preview-keyframe-item__btn--preview" 
+                            data-action="preview" title="${<?= json_encode(__admin('preview.previewAnimation') ?? 'Preview animation') ?>}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                    </button>
+                    <button type="button" class="preview-keyframe-item__btn preview-keyframe-item__btn--edit" 
+                            data-action="edit" title="${<?= json_encode(__admin('common.edit') ?? 'Edit') ?>}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </button>
+                    <button type="button" class="preview-keyframe-item__btn preview-keyframe-item__btn--delete" 
+                            data-action="delete" title="${<?= json_encode(__admin('common.delete') ?? 'Delete') ?>}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+        
+        // Add event listeners
+        keyframesList.querySelectorAll('.preview-keyframe-item__btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const item = btn.closest('.preview-keyframe-item');
+                const keyframeName = item?.dataset.keyframe;
+                const action = btn.dataset.action;
+                
+                if (!keyframeName) return;
+                
+                switch (action) {
+                    case 'preview':
+                        previewKeyframe(keyframeName);
+                        break;
+                    case 'edit':
+                        editKeyframe(keyframeName);
+                        break;
+                    case 'delete':
+                        deleteKeyframe(keyframeName);
+                        break;
+                }
+            });
+        });
+    }
+    
+    /**
+     * Initialize keyframe editor event listeners (called once at page load)
+     */
+    function initKeyframeEditor() {
+        // Add click listener to keyframe-add-btn
+        if (keyframeAddBtn) {
+            keyframeAddBtn.addEventListener('click', () => createNewKeyframe());
+        }
+        
+        // Keyframe modal event listeners
+        if (keyframeModalClose) {
+            keyframeModalClose.addEventListener('click', closeKeyframeModal);
+        }
+        if (keyframeCancelBtn) {
+            keyframeCancelBtn.addEventListener('click', closeKeyframeModal);
+        }
+        if (keyframeSaveBtn) {
+            keyframeSaveBtn.addEventListener('click', saveKeyframe);
+        }
+        if (keyframePreviewBtn) {
+            keyframePreviewBtn.addEventListener('click', previewKeyframeAnimation);
+        }
+        // Close modal on backdrop click
+        if (keyframeModal) {
+            keyframeModal.addEventListener('click', (e) => {
+                if (e.target === keyframeModal || e.target.classList.contains('preview-keyframe-modal__backdrop')) {
+                    closeKeyframeModal();
+                }
+            });
+        }
+    }
+    
+    /**
+     * Populate the animated selectors list UI (grouped by base selector with pseudo-states)
+     */
+    function populateAnimatedSelectorsList() {
+        if (!transitionsList || !animationsList || !transitionsCount || !animationsCount || !animatedEmpty) return;
+        
+        const transCount = animatedSelectorsData.transitions.length;
+        const animCount = animatedSelectorsData.animations.length;
+        const triggerCount = animatedSelectorsData.triggersWithoutTransition?.length || 0;
+        
+        transitionsCount.textContent = transCount;
+        animationsCount.textContent = animCount;
+        
+        // Triggers count
+        const triggersCountEl = document.getElementById('triggers-count');
+        const triggersList = document.getElementById('triggers-list');
+        if (triggersCountEl) triggersCountEl.textContent = triggerCount;
+        
+        // Show/hide empty state (now considers triggers too)
+        const hasContent = transCount > 0 || animCount > 0 || triggerCount > 0;
+        animatedEmpty.style.display = hasContent ? 'none' : '';
+        
+        // Populate transitions (grouped by base selector)
+        if (transCount > 0) {
+            transitionsList.innerHTML = animatedSelectorsData.transitions.map(item => renderAnimatedSelectorGroup(item, 'transition')).join('');
+        } else {
+            transitionsList.innerHTML = '<div class="preview-animated-selector--empty">' + <?= json_encode(__admin('preview.noTransitions') ?? 'No selectors with transitions') ?> + '</div>';
+        }
+        
+        // Populate animations (grouped by base selector)
+        if (animCount > 0) {
+            animationsList.innerHTML = animatedSelectorsData.animations.map(item => renderAnimatedSelectorGroup(item, 'animation')).join('');
+        } else {
+            animationsList.innerHTML = '<div class="preview-animated-selector--empty">' + <?= json_encode(__admin('preview.noAnimationSelectors') ?? 'No selectors with animations') ?> + '</div>';
+        }
+        
+        // Populate triggers without transition
+        if (triggersList) {
+            if (triggerCount > 0) {
+                triggersList.innerHTML = animatedSelectorsData.triggersWithoutTransition.map(item => renderTriggerGroup(item)).join('');
+            } else {
+                triggersList.innerHTML = '<div class="preview-animated-selector--empty">' + <?= json_encode(__admin('preview.noTriggersWithoutTransition') ?? 'All triggers have transitions') ?> + '</div>';
+            }
+        }
+        
+        // Add click listeners for edit buttons
+        document.querySelectorAll('.preview-animated-selector__edit').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const item = btn.closest('[data-selector]');
+                const selector = item?.dataset.selector;
+                if (selector) {
+                    editAnimatedSelector(selector);
+                }
+            });
+        });
+        
+        // Add toggle listeners for groups with states (both toggle button and selector name)
+        document.querySelectorAll('.preview-animated-selector-group__toggle').forEach(toggle => {
+            toggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const group = toggle.closest('.preview-animated-selector-group');
+                if (group) {
+                    group.classList.toggle('preview-animated-selector-group--collapsed');
+                }
+            });
+        });
+        
+        // Allow clicking on selector name in group header to also toggle
+        document.querySelectorAll('.preview-animated-selector-group__header > .preview-animated-selector__name').forEach(name => {
+            name.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const group = name.closest('.preview-animated-selector-group');
+                if (group) {
+                    group.classList.toggle('preview-animated-selector-group--collapsed');
+                }
+            });
+        });
+    }
+    
+    /**
+     * Render a grouped animated selector with its pseudo-states
+     */
+    function renderAnimatedSelectorGroup(item, type) {
+        const hasStates = item.states && item.states.length > 0;
+        const editBtnHtml = `
+            <button type="button" class="preview-animated-selector__edit" title="${<?= json_encode(__admin('preview.editSelector') ?? 'Edit selector') ?>}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+            </button>
+        `;
+        
+        // Details for the base selector
+        let detailsHtml = '';
+        if (type === 'transition' && item.parsed) {
+            detailsHtml = formatTransitionDetails(item.parsed);
+        } else if (type === 'animation' && item.parsed) {
+            detailsHtml = formatAnimationDetails(item.parsed);
+        } else if (item.properties) {
+            const prop = type === 'transition' ? item.properties.transition : item.properties.animation;
+            detailsHtml = escapeHtml(prop || '');
+        }
+        
+        // Orphan hint HTML (for transitions without direct states but with related triggers)
+        let orphanHintHtml = '';
+        if (item.isOrphan && item.relatedTriggers && item.relatedTriggers.length > 0) {
+            const relatedList = item.relatedTriggers.map(r => `<code>${escapeHtml(r.selector)}</code>`).join(', ');
+            orphanHintHtml = `
+                <div class="preview-animated-selector__orphan-hint">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                    </svg>
+                    <span>${<?= json_encode(__admin('preview.mayBeTriggeredVia') ?? 'May be triggered via') ?>}: ${relatedList}</span>
+                </div>
+            `;
+        } else if (item.isOrphan) {
+            orphanHintHtml = `
+                <div class="preview-animated-selector__orphan-hint preview-animated-selector__orphan-hint--warning">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    <span>${<?= json_encode(__admin('preview.noDirectTrigger') ?? 'No direct trigger found - may be unused') ?>}</span>
+                </div>
+            `;
+        }
+        
+        if (!hasStates) {
+            // Simple selector without states (possibly orphan)
+            return `
+                <div class="preview-animated-selector ${item.isOrphan ? 'preview-animated-selector--orphan' : ''}" data-selector="${escapeHtml(item.selector || item.baseSelector)}">
+                    <div class="preview-animated-selector__main">
+                        <code class="preview-animated-selector__name">${escapeHtml(item.baseSelector)}</code>
+                        <span class="preview-animated-selector__details">${detailsHtml}</span>
+                        ${editBtnHtml}
+                    </div>
+                    ${orphanHintHtml}
+                </div>
+            `;
+        }
+        
+        // Group with states - render as tree
+        const statesHtml = item.states.map(state => {
+            // Get changed properties (exclude transition/animation props for cleaner display)
+            const changedProps = Object.entries(state.properties || {})
+                .filter(([prop]) => !prop.startsWith('transition') && !prop.startsWith('animation'))
+                .map(([prop, val]) => `${prop}: ${val}`)
+                .slice(0, 3); // Show max 3 properties
+            
+            const propsDisplay = changedProps.length > 0 
+                ? changedProps.join('; ') + (Object.keys(state.properties || {}).length > 3 ? '...' : '')
+                : '';
+                
+            return `
+                <div class="preview-animated-selector-state" data-selector="${escapeHtml(state.selector)}">
+                    <code class="preview-animated-selector-state__pseudo">${escapeHtml(state.pseudo)}</code>
+                    <span class="preview-animated-selector-state__props">${escapeHtml(propsDisplay)}</span>
+                    ${editBtnHtml}
+                </div>
+            `;
+        }).join('');
+        
+        return `
+            <div class="preview-animated-selector-group">
+                <div class="preview-animated-selector-group__header" data-selector="${escapeHtml(item.selector || item.baseSelector)}">
+                    <button type="button" class="preview-animated-selector-group__toggle" title="${<?= json_encode(__admin('preview.toggleStates') ?? 'Toggle states') ?>}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </button>
+                    <code class="preview-animated-selector__name">${escapeHtml(item.baseSelector)}</code>
+                    <span class="preview-animated-selector__details">${detailsHtml}</span>
+                    <span class="preview-animated-selector__state-count">${item.states.length} ${<?= json_encode(__admin('preview.states') ?? 'states') ?>}</span>
+                    ${editBtnHtml}
+                </div>
+                <div class="preview-animated-selector-group__states">
+                    ${statesHtml}
+                </div>
+            </div>
+        `;
+    }
+    
+    /**
+     * Render a trigger-only group (pseudo-states without transition/animation)
+     */
+    function renderTriggerGroup(item) {
+        const editBtnHtml = `
+            <button type="button" class="preview-animated-selector__edit" title="${<?= json_encode(__admin('preview.editSelector') ?? 'Edit selector') ?>}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+            </button>
+        `;
+        
+        const statesHtml = item.states.map(state => {
+            // Show properties that change
+            const changedProps = Object.entries(state.properties || {})
+                .map(([prop, val]) => `${prop}: ${val}`)
+                .slice(0, 3);
+            
+            const propsDisplay = changedProps.length > 0 
+                ? changedProps.join('; ') + (Object.keys(state.properties || {}).length > 3 ? '...' : '')
+                : '';
+                
+            return `
+                <div class="preview-animated-selector-state preview-animated-selector-state--trigger" data-selector="${escapeHtml(state.selector)}">
+                    <code class="preview-animated-selector-state__pseudo">${escapeHtml(state.pseudo)}</code>
+                    <span class="preview-animated-selector-state__props">${escapeHtml(propsDisplay)}</span>
+                    ${editBtnHtml}
+                </div>
+            `;
+        }).join('');
+        
+        return `
+            <div class="preview-animated-selector-group preview-animated-selector-group--trigger">
+                <div class="preview-animated-selector-group__header" data-selector="${escapeHtml(item.selector || item.baseSelector)}">
+                    <button type="button" class="preview-animated-selector-group__toggle" title="${<?= json_encode(__admin('preview.toggleStates') ?? 'Toggle states') ?>}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </button>
+                    <code class="preview-animated-selector__name preview-animated-selector__name--muted">${escapeHtml(item.baseSelector)}</code>
+                    <span class="preview-animated-selector__state-count preview-animated-selector__state-count--muted">${item.states.length} ${<?= json_encode(__admin('preview.states') ?? 'states') ?>}</span>
+                    ${editBtnHtml}
+                </div>
+                <div class="preview-animated-selector-group__states">
+                    ${statesHtml}
+                </div>
+            </div>
+        `;
+    }
+    
+    /**
+     * Format transition details for display (handles array of parsed transitions)
+     */
+    function formatTransitionDetails(parsed) {
+        // parsed is an array of transitions
+        if (!Array.isArray(parsed) || parsed.length === 0) return '';
+        
+        return parsed.map(t => {
+            const parts = [];
+            if (t.property && t.property !== 'all') parts.push(t.property);
+            if (t.duration) parts.push(t.duration);
+            if (t.timing && t.timing !== 'ease') parts.push(t.timing);
+            return parts.join(' ');
+        }).filter(Boolean).join(', ') || 'transition';
+    }
+    
+    /**
+     * Format animation details for display (handles array of parsed animations)
+     */
+    function formatAnimationDetails(parsed) {
+        // parsed is an array of animations
+        if (!Array.isArray(parsed) || parsed.length === 0) return '';
+        
+        return parsed.map(a => {
+            const parts = [];
+            if (a.name) parts.push(a.name);
+            if (a.duration) parts.push(a.duration);
+            if (a.iterationCount && a.iterationCount !== '1') parts.push(a.iterationCount + 'x');
+            return parts.join(' ');
+        }).filter(Boolean).join(', ') || 'animation';
+    }
+    
+    /**
+     * Preview a keyframe animation on selected element
+     */
+    function previewKeyframe(keyframeName) {
+        const iframe = document.getElementById('preview-frame');
+        if (!iframe?.contentWindow) return;
+        
+        // Toggle preview off if same keyframe
+        if (keyframePreviewActive === keyframeName) {
+            stopKeyframePreview();
+            return;
+        }
+        
+        // Get selected element in iframe or use body
+        const targetElement = iframe.contentDocument.querySelector('[data-visual-selected]') || 
+                              iframe.contentDocument.body;
+        
+        if (!targetElement) return;
+        
+        // Stop any current preview
+        stopKeyframePreview();
+        
+        // Apply preview animation
+        targetElement.style.animation = `${keyframeName} 1s ease infinite`;
+        keyframePreviewActive = keyframeName;
+        
+        // Update button state
+        updateKeyframePreviewButtons();
+        
+        showToast(<?= json_encode(__admin('preview.previewingAnimation') ?? 'Previewing animation') ?> + `: ${keyframeName}`, 'info');
+    }
+    
+    /**
+     * Stop keyframe preview animation
+     */
+    function stopKeyframePreview() {
+        const iframe = document.getElementById('preview-frame');
+        if (!iframe?.contentWindow) return;
+        
+        // Remove animation from any element
+        const animated = iframe.contentDocument.querySelector('[style*="animation"]');
+        if (animated) {
+            animated.style.animation = '';
+        }
+        
+        keyframePreviewActive = null;
+        updateKeyframePreviewButtons();
+    }
+    
+    /**
+     * Update keyframe preview button states
+     */
+    function updateKeyframePreviewButtons() {
+        document.querySelectorAll('.preview-keyframe-item__btn--preview').forEach(btn => {
+            const item = btn.closest('.preview-keyframe-item');
+            const name = item?.dataset.keyframe;
+            btn.classList.toggle('preview-keyframe-item__btn--active', name === keyframePreviewActive);
+        });
+    }
+    
+    /**
+     * Edit a keyframe (opens keyframe editor modal)
+     */
+    async function editKeyframe(keyframeName) {
+        try {
+            // Fetch keyframe data from API
+            const response = await fetch(managementUrl + 'getKeyframes/' + encodeURIComponent(keyframeName), {
+                method: 'GET',
+                headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+            });
+            
+            const data = await response.json();
+            
+            // API returns { status, data: { name, frames } } for single keyframe
+            if (data.status === 200 && data.data && data.data.frames) {
+                const keyframeData = data.data.frames;
+                const frames = parseKeyframeData(keyframeData);
+                openKeyframeModal(keyframeName, frames, 'edit');
+            } else {
+                throw new Error(data.message || 'Keyframe not found');
+            }
+        } catch (error) {
+            console.error('Failed to load keyframe:', error);
+            showToast(<?= json_encode(__admin('preview.loadKeyframeFailed') ?? 'Failed to load keyframe') ?>, 'error');
+        }
+    }
+    
+    /**
+     * Create a new keyframe
+     */
+    function createNewKeyframe() {
+        // Default frames for new keyframe
+        const defaultFrames = [
+            { percent: 0, properties: [{ property: 'opacity', value: '0' }] },
+            { percent: 100, properties: [{ property: 'opacity', value: '1' }] }
+        ];
+        openKeyframeModal('', defaultFrames, 'create');
+    }
+    
+    /**
+     * Parse keyframe data into structured format
+     * Handles both object format {from: 'opacity: 0', to: 'opacity: 1'} from API
+     * and CSS string format "from { opacity: 0; } to { opacity: 1; }"
+     */
+    function parseKeyframeData(keyframeData) {
+        const frames = [];
+        
+        // Check if data is an object (from API) or string (CSS)
+        if (typeof keyframeData === 'object' && keyframeData !== null) {
+            // Object format: { "from": "opacity: 0", "to": "opacity: 1", "50%": "opacity: 0.5" }
+            for (const [key, value] of Object.entries(keyframeData)) {
+                let percent = key.trim();
+                // Convert from/to to percentages
+                if (percent.toLowerCase() === 'from') percent = 0;
+                else if (percent.toLowerCase() === 'to') percent = 100;
+                else percent = parseFloat(percent);
+                
+                const properties = [];
+                // Parse CSS properties from the value string
+                const propRegex = /([a-z-]+)\s*:\s*([^;]+);?/gi;
+                let propMatch;
+                while ((propMatch = propRegex.exec(value)) !== null) {
+                    properties.push({
+                        property: propMatch[1].trim(),
+                        value: propMatch[2].trim()
+                    });
+                }
+                
+                frames.push({ percent, properties });
+            }
+        } else if (typeof keyframeData === 'string') {
+            // CSS string format: "from { opacity: 0; } to { opacity: 1; }"
+            const frameRegex = /([\d.]+%|from|to)\s*\{([^}]*)\}/gi;
+            let match;
+            
+            while ((match = frameRegex.exec(keyframeData)) !== null) {
+                let percent = match[1].trim();
+                // Convert from/to to percentages
+                if (percent.toLowerCase() === 'from') percent = 0;
+                else if (percent.toLowerCase() === 'to') percent = 100;
+                else percent = parseFloat(percent);
+                
+                const propertiesStr = match[2].trim();
+                const properties = [];
+                
+                // Parse CSS properties
+                const propRegex = /([a-z-]+)\s*:\s*([^;]+);?/gi;
+                let propMatch;
+                while ((propMatch = propRegex.exec(propertiesStr)) !== null) {
+                    properties.push({
+                        property: propMatch[1].trim(),
+                        value: propMatch[2].trim()
+                    });
+                }
+                
+                frames.push({ percent, properties });
+            }
+        }
+        
+        // Sort by percentage
+        frames.sort((a, b) => a.percent - b.percent);
+        
+        return frames;
+    }
+    
+    /**
+     * Open the keyframe editor modal
+     */
+    function openKeyframeModal(name, frames, mode) {
+        keyframeEditorMode = mode;
+        editingKeyframeName = name;
+        keyframeFrames = JSON.parse(JSON.stringify(frames)); // Deep copy
+        selectedFramePercent = frames.length > 0 ? frames[0].percent : 0;
+        
+        // Update modal title
+        keyframeModalTitle.textContent = mode === 'edit' 
+            ? (<?= json_encode(__admin('preview.editKeyframe') ?? 'Edit Keyframe') ?>)
+            : (<?= json_encode(__admin('preview.createKeyframe') ?? 'Create New Keyframe') ?>);
+        
+        // Set name input
+        keyframeNameInput.value = name;
+        keyframeNameInput.readOnly = (mode === 'edit');
+        
+        // Render timeline and frames
+        renderKeyframeTimeline();
+        renderKeyframeFrames();
+        
+        // Show modal
+        keyframeModal.classList.add('preview-keyframe-modal--visible');
+        document.body.style.overflow = 'hidden';
+    }
+    
+    /**
+     * Close the keyframe editor modal
+     */
+    function closeKeyframeModal() {
+        keyframeModal.classList.remove('preview-keyframe-modal--visible');
+        document.body.style.overflow = '';
+        keyframeEditorMode = null;
+        editingKeyframeName = null;
+        keyframeFrames = [];
+        selectedFramePercent = null;
+        
+        // Stop any preview
+        stopKeyframePreview();
+    }
+    
+    /**
+     * Render the timeline with frame markers
+     */
+    function renderKeyframeTimeline() {
+        keyframeTimeline.innerHTML = '';
+        
+        // Create timeline bar
+        const bar = document.createElement('div');
+        bar.className = 'preview-keyframe-modal__timeline-bar';
+        keyframeTimeline.appendChild(bar);
+        
+        // Add frame markers
+        keyframeFrames.forEach((frame, index) => {
+            const marker = document.createElement('div');
+            marker.className = 'preview-keyframe-modal__timeline-marker';
+            if (frame.percent === selectedFramePercent) {
+                marker.classList.add('preview-keyframe-modal__timeline-marker--selected');
+            }
+            marker.style.left = frame.percent + '%';
+            marker.title = frame.percent + '% - <?= __admin('preview.dragToMoveFrame') ?? 'Drag to move' ?>';
+            marker.dataset.percent = frame.percent;
+            marker.draggable = false; // We'll handle drag manually
+            
+            // Click to select
+            marker.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!marker.dataset.dragging) {
+                    selectFrame(frame.percent);
+                }
+            });
+            
+            // Drag to move marker
+            let isDragging = false;
+            let startX = 0;
+            
+            marker.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                isDragging = true;
+                startX = e.clientX;
+                marker.classList.add('preview-keyframe-modal__timeline-marker--dragging');
+                marker.dataset.dragging = 'true';
+                
+                const originalPercent = frame.percent;
+                const barRect = bar.getBoundingClientRect();
+                
+                const onMouseMove = (moveEvent) => {
+                    if (!isDragging) return;
+                    const newPercent = Math.round(((moveEvent.clientX - barRect.left) / barRect.width) * 100);
+                    const clampedPercent = Math.max(0, Math.min(100, newPercent));
+                    
+                    // Update marker position visually
+                    marker.style.left = clampedPercent + '%';
+                    marker.title = clampedPercent + '%';
+                };
+                
+                const onMouseUp = (upEvent) => {
+                    if (!isDragging) return;
+                    isDragging = false;
+                    marker.classList.remove('preview-keyframe-modal__timeline-marker--dragging');
+                    
+                    const newPercent = Math.round(((upEvent.clientX - barRect.left) / barRect.width) * 100);
+                    const clampedPercent = Math.max(0, Math.min(100, newPercent));
+                    
+                    // Check if we actually moved
+                    if (Math.abs(upEvent.clientX - startX) < 5) {
+                        // It was a click, not drag - select frame
+                        delete marker.dataset.dragging;
+                        selectFrame(frame.percent);
+                    } else if (clampedPercent !== originalPercent) {
+                        // Check if another frame exists at this percent
+                        const existingFrame = keyframeFrames.find(f => f.percent === clampedPercent && f !== frame);
+                        if (existingFrame) {
+                            // Revert - can't move to existing position
+                            marker.style.left = originalPercent + '%';
+                            showNotification(<?= json_encode(__admin('preview.frameExists') ?? 'A frame already exists at this percentage') ?>, 'error');
+                        } else {
+                            // Update frame percent
+                            frame.percent = clampedPercent;
+                            if (selectedFramePercent === originalPercent) {
+                                selectedFramePercent = clampedPercent;
+                            }
+                            // Re-sort frames
+                            keyframeFrames.sort((a, b) => a.percent - b.percent);
+                            renderKeyframeTimeline();
+                            renderKeyframeFrames();
+                        }
+                    }
+                    
+                    setTimeout(() => delete marker.dataset.dragging, 10);
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                };
+                
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+            
+            keyframeTimeline.appendChild(marker);
+        });
+        
+        // Click on timeline to add frame at position
+        bar.addEventListener('click', (e) => {
+            const rect = bar.getBoundingClientRect();
+            const percent = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+            // Check if frame already exists at this percent
+            if (!keyframeFrames.find(f => f.percent === percent)) {
+                addKeyframeFrame(percent);
+            } else {
+                selectFrame(percent);
+            }
+        });
+    }
+    
+    /**
+     * Select a frame for editing
+     */
+    function selectFrame(percent) {
+        selectedFramePercent = percent;
+        renderKeyframeTimeline();
+        renderKeyframeFrames();
+    }
+    
+    /**
+     * Render the frame editors
+     */
+    function renderKeyframeFrames() {
+        keyframeFramesContainer.innerHTML = '';
+        
+        // Common CSS animation properties for dropdown
+        const commonProperties = [
+            '', // Custom option
+            'opacity',
+            'transform',
+            'background-color',
+            'color',
+            'width',
+            'height',
+            'top',
+            'left',
+            'right',
+            'bottom',
+            'margin',
+            'padding',
+            'border-radius',
+            'box-shadow',
+            'filter',
+            'clip-path',
+            'scale',
+            'rotate',
+            'translate',
+            'skew',
+            'visibility',
+            'z-index',
+            'font-size',
+            'letter-spacing',
+            'line-height',
+            'text-shadow'
+        ];
+        
+        keyframeFrames.forEach((frame, frameIndex) => {
+            const frameEl = document.createElement('div');
+            frameEl.className = 'preview-keyframe-modal__frame';
+            if (frame.percent === selectedFramePercent) {
+                frameEl.classList.add('preview-keyframe-modal__frame--selected');
+            }
+            
+            // Frame header
+            const header = document.createElement('div');
+            header.className = 'preview-keyframe-modal__frame-header';
+            header.innerHTML = `
+                <div class="preview-keyframe-modal__frame-percent-group">
+                    <input type="number" class="preview-keyframe-modal__frame-percent-input" 
+                           value="${frame.percent}" min="0" max="100" step="1"
+                           title="<?= __admin('preview.enterFramePercent') ?? 'Frame percentage (0-100)' ?>">
+                    <span class="preview-keyframe-modal__frame-percent-symbol">%</span>
+                </div>
+                <div class="preview-keyframe-modal__frame-actions">
+                    ${keyframeFrames.length > 1 ? `
+                        <button type="button" class="preview-keyframe-modal__delete-frame" title="<?= __admin('preview.deleteFrame') ?? 'Delete frame' ?>">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+            
+            // Percent input change handler
+            const percentInput = header.querySelector('.preview-keyframe-modal__frame-percent-input');
+            percentInput.addEventListener('change', (e) => {
+                const newPercent = parseInt(e.target.value, 10);
+                if (isNaN(newPercent) || newPercent < 0 || newPercent > 100) {
+                    e.target.value = frame.percent;
+                    return;
+                }
+                // Check if another frame exists at this percent
+                const existingFrame = keyframeFrames.find(f => f.percent === newPercent && f !== frame);
+                if (existingFrame) {
+                    e.target.value = frame.percent;
+                    showNotification(<?= json_encode(__admin('preview.frameExists') ?? 'A frame already exists at this percentage') ?>, 'error');
+                    return;
+                }
+                // Update frame percent
+                const oldPercent = frame.percent;
+                frame.percent = newPercent;
+                if (selectedFramePercent === oldPercent) {
+                    selectedFramePercent = newPercent;
+                }
+                // Re-sort frames
+                keyframeFrames.sort((a, b) => a.percent - b.percent);
+                renderKeyframeTimeline();
+                renderKeyframeFrames();
+            });
+            
+            // Click header to select frame
+            header.addEventListener('click', (e) => {
+                if (!e.target.closest('input') && !e.target.closest('button')) {
+                    selectFrame(frame.percent);
+                }
+            });
+            
+            // Delete frame button
+            const deleteBtn = header.querySelector('.preview-keyframe-modal__delete-frame');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteKeyframeFrame(frame.percent);
+                });
+            }
+            
+            frameEl.appendChild(header);
+            
+            // Properties container
+            const propsContainer = document.createElement('div');
+            propsContainer.className = 'preview-keyframe-modal__properties';
+            
+            frame.properties.forEach((prop, propIndex) => {
+                const propEl = document.createElement('div');
+                propEl.className = 'preview-keyframe-modal__property';
+                
+                // Check if property is in common list
+                const isCommonProp = commonProperties.includes(prop.property);
+                
+                // Build select options
+                let selectOptions = commonProperties.map(p => {
+                    if (p === '') {
+                        return `<option value="" ${!isCommonProp ? 'selected' : ''}><?= __admin('preview.customProperty') ?? 'Custom...' ?></option>`;
+                    }
+                    return `<option value="${p}" ${prop.property === p ? 'selected' : ''}>${p}</option>`;
+                }).join('');
+                
+                propEl.innerHTML = `
+                    <div class="preview-keyframe-modal__property-name-group">
+                        <select class="preview-keyframe-modal__property-select" 
+                                data-frame="${frameIndex}" data-prop="${propIndex}">
+                            ${selectOptions}
+                        </select>
+                        <input type="text" class="preview-keyframe-modal__property-name ${isCommonProp ? 'preview-keyframe-modal__property-name--hidden' : ''}" 
+                               value="${escapeHTML(prop.property)}" 
+                               placeholder="<?= __admin('preview.keyframePropertyName') ?? 'property' ?>"
+                               data-frame="${frameIndex}" data-prop="${propIndex}" data-field="property">
+                    </div>
+                    <span class="preview-keyframe-modal__property-colon">:</span>
+                    <input type="text" class="preview-keyframe-modal__property-value" 
+                           value="${escapeHTML(prop.value)}" 
+                           placeholder="<?= __admin('preview.keyframePropertyValue') ?? 'value' ?>"
+                           data-frame="${frameIndex}" data-prop="${propIndex}" data-field="value">
+                    <button type="button" class="preview-keyframe-modal__delete-property" title="<?= __admin('preview.deleteKeyframeProperty') ?? 'Delete property' ?>">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                `;
+                
+                // Property select handler
+                const propSelect = propEl.querySelector('.preview-keyframe-modal__property-select');
+                const nameInput = propEl.querySelector('.preview-keyframe-modal__property-name');
+                const valueInput = propEl.querySelector('.preview-keyframe-modal__property-value');
+                const deletePropertyBtn = propEl.querySelector('.preview-keyframe-modal__delete-property');
+                
+                propSelect.addEventListener('change', (e) => {
+                    if (e.target.value === '') {
+                        // Custom - show text input
+                        nameInput.classList.remove('preview-keyframe-modal__property-name--hidden');
+                        nameInput.focus();
+                    } else {
+                        // Common property selected
+                        nameInput.classList.add('preview-keyframe-modal__property-name--hidden');
+                        nameInput.value = e.target.value;
+                        keyframeFrames[frameIndex].properties[propIndex].property = e.target.value;
+                        valueInput.focus();
+                    }
+                });
+                
+                nameInput.addEventListener('input', (e) => {
+                    keyframeFrames[frameIndex].properties[propIndex].property = e.target.value;
+                });
+                
+                valueInput.addEventListener('input', (e) => {
+                    keyframeFrames[frameIndex].properties[propIndex].value = e.target.value;
+                });
+                
+                deletePropertyBtn.addEventListener('click', () => {
+                    deleteKeyframeProperty(frameIndex, propIndex);
+                });
+                
+                propsContainer.appendChild(propEl);
+            });
+            
+            // Add property button
+            const addPropBtn = document.createElement('button');
+            addPropBtn.type = 'button';
+            addPropBtn.className = 'preview-keyframe-modal__add-property';
+            addPropBtn.innerHTML = `
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <?= __admin('preview.addKeyframeProperty') ?? 'Add Property' ?>
+            `;
+            addPropBtn.addEventListener('click', () => addKeyframeProperty(frameIndex));
+            
+            propsContainer.appendChild(addPropBtn);
+            frameEl.appendChild(propsContainer);
+            
+            keyframeFramesContainer.appendChild(frameEl);
+        });
+        
+        // Add frame button
+        const addFrameBtn = document.createElement('button');
+        addFrameBtn.type = 'button';
+        addFrameBtn.className = 'preview-keyframe-modal__add-frame';
+        addFrameBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <?= __admin('preview.addFrame') ?? 'Add Frame' ?>
+        `;
+        addFrameBtn.addEventListener('click', () => promptAddFrame());
+        keyframeFramesContainer.appendChild(addFrameBtn);
+    }
+    
+    /**
+     * Prompt user for frame percentage and add frame
+     */
+    function promptAddFrame() {
+        const percent = prompt(<?= json_encode(__admin('preview.enterFramePercent') ?? 'Enter frame percentage (0-100):') ?>, '50');
+        if (percent !== null) {
+            const percentNum = parseInt(percent, 10);
+            if (!isNaN(percentNum) && percentNum >= 0 && percentNum <= 100) {
+                if (keyframeFrames.find(f => f.percent === percentNum)) {
+                    showToast(<?= json_encode(__admin('preview.frameExists') ?? 'A frame already exists at this percentage') ?>, 'warning');
+                } else {
+                    addKeyframeFrame(percentNum);
+                }
+            } else {
+                showToast(<?= json_encode(__admin('preview.invalidPercent') ?? 'Please enter a valid percentage (0-100)') ?>, 'error');
+            }
+        }
+    }
+    
+    /**
+     * Add a new keyframe frame at specified percentage
+     */
+    function addKeyframeFrame(percent) {
+        // Find surrounding frames to interpolate properties
+        let beforeFrame = null;
+        let afterFrame = null;
+        
+        for (const frame of keyframeFrames) {
+            if (frame.percent < percent) {
+                beforeFrame = frame;
+            } else if (frame.percent > percent && !afterFrame) {
+                afterFrame = frame;
+            }
+        }
+        
+        // Create new frame with inherited properties
+        const newFrame = {
+            percent: percent,
+            properties: []
+        };
+        
+        // Copy properties from nearest frame
+        const sourceFrame = beforeFrame || afterFrame || keyframeFrames[0];
+        if (sourceFrame) {
+            newFrame.properties = sourceFrame.properties.map(p => ({ ...p }));
+        } else {
+            newFrame.properties = [{ property: 'opacity', value: '1' }];
+        }
+        
+        keyframeFrames.push(newFrame);
+        keyframeFrames.sort((a, b) => a.percent - b.percent);
+        
+        selectedFramePercent = percent;
+        renderKeyframeTimeline();
+        renderKeyframeFrames();
+    }
+    
+    /**
+     * Delete a keyframe frame
+     */
+    function deleteKeyframeFrame(percent) {
+        if (keyframeFrames.length <= 1) {
+            showToast(<?= json_encode(__admin('preview.cannotDeleteLastFrame') ?? 'Cannot delete the last frame') ?>, 'warning');
+            return;
+        }
+        
+        keyframeFrames = keyframeFrames.filter(f => f.percent !== percent);
+        
+        // Select another frame if current one was deleted
+        if (selectedFramePercent === percent) {
+            selectedFramePercent = keyframeFrames[0].percent;
+        }
+        
+        renderKeyframeTimeline();
+        renderKeyframeFrames();
+    }
+    
+    /**
+     * Add a property to a frame
+     */
+    function addKeyframeProperty(frameIndex) {
+        keyframeFrames[frameIndex].properties.push({
+            property: '',
+            value: ''
+        });
+        renderKeyframeFrames();
+        
+        // Focus the new property name input
+        setTimeout(() => {
+            const inputs = keyframeFramesContainer.querySelectorAll(`.preview-keyframe-modal__property-name[data-frame="${frameIndex}"]`);
+            const lastInput = inputs[inputs.length - 1];
+            if (lastInput) lastInput.focus();
+        }, 0);
+    }
+    
+    /**
+     * Delete a property from a frame
+     */
+    function deleteKeyframeProperty(frameIndex, propIndex) {
+        if (keyframeFrames[frameIndex].properties.length <= 1) {
+            showToast(<?= json_encode(__admin('preview.cannotDeleteLastProperty') ?? 'Cannot delete the last property') ?>, 'warning');
+            return;
+        }
+        
+        keyframeFrames[frameIndex].properties.splice(propIndex, 1);
+        renderKeyframeFrames();
+    }
+    
+    /**
+     * Generate keyframe CSS from frames data
+     */
+    function generateKeyframeCSS(name, frames) {
+        let css = `@keyframes ${name} {\n`;
+        
+        frames.forEach(frame => {
+            // Always use percentage format (0%, 100%) for consistency
+            const percent = frame.percent + '%';
+            css += `    ${percent} {\n`;
+            
+            frame.properties.forEach(prop => {
+                if (prop.property && prop.value) {
+                    css += `        ${prop.property}: ${prop.value};\n`;
+                }
+            });
+            
+            css += `    }\n`;
+        });
+        
+        css += `}`;
+        return css;
+    }
+    
+    /**
+     * Preview the keyframe animation
+     */
+    let keyframePreviewStyleElement = null;
+    
+    function previewKeyframeAnimation() {
+        const name = keyframeNameInput.value.trim() || 'preview-temp-animation';
+        
+        if (keyframeFrames.length === 0) {
+            showToast(<?= json_encode(__admin('preview.noFramesToPreview') ?? 'No frames to preview') ?>, 'warning');
+            return;
+        }
+        
+        // Generate keyframe CSS
+        const keyframeCSS = generateKeyframeCSS(name, keyframeFrames);
+        
+        try {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            
+            // Remove existing preview style
+            stopKeyframePreview();
+            
+            // Create and inject style element
+            keyframePreviewStyleElement = iframeDoc.createElement('style');
+            keyframePreviewStyleElement.id = 'preview-keyframe-animation-style';
+            keyframePreviewStyleElement.textContent = keyframeCSS;
+            iframeDoc.head.appendChild(keyframePreviewStyleElement);
+            
+            // Find an element to animate (use selected element or first animated element)
+            let targetElement = null;
+            if (selectedElement && selectedElement.element) {
+                targetElement = selectedElement.element;
+            } else {
+                // Try to find any element in the iframe
+                targetElement = iframeDoc.body;
+            }
+            
+            if (targetElement) {
+                // Store original animation
+                const originalAnimation = targetElement.style.animation;
+                
+                // Apply preview animation
+                targetElement.style.animation = `${name} 1s ease-in-out infinite`;
+                
+                // Store for cleanup
+                targetElement.dataset.previewOriginalAnimation = originalAnimation;
+                targetElement.dataset.previewAnimating = 'true';
+                
+                showToast(<?= json_encode(__admin('preview.previewingAnimation') ?? 'Previewing animation...') ?>, 'info');
+            }
+        } catch (error) {
+            console.error('Failed to preview animation:', error);
+            showToast(<?= json_encode(__admin('preview.previewFailed') ?? 'Failed to preview animation') ?>, 'error');
+        }
+    }
+    
+    /**
+     * Stop the keyframe preview animation
+     */
+    function stopKeyframePreview() {
+        try {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            
+            // Remove preview style element
+            const existingStyle = iframeDoc.getElementById('preview-keyframe-animation-style');
+            if (existingStyle) {
+                existingStyle.remove();
+            }
+            
+            // Restore original animation on elements
+            const animatingElements = iframeDoc.querySelectorAll('[data-preview-animating="true"]');
+            animatingElements.forEach(el => {
+                el.style.animation = el.dataset.previewOriginalAnimation || '';
+                delete el.dataset.previewOriginalAnimation;
+                delete el.dataset.previewAnimating;
+            });
+            
+            keyframePreviewStyleElement = null;
+        } catch (error) {
+            console.error('Failed to stop preview:', error);
+        }
+    }
+    
+    /**
+     * Save the keyframe
+     */
+    async function saveKeyframe() {
+        const name = keyframeNameInput.value.trim();
+        
+        // Validate name
+        if (!name) {
+            showToast(<?= json_encode(__admin('preview.keyframeNameRequired') ?? 'Keyframe name is required') ?>, 'error');
+            keyframeNameInput.focus();
+            return;
+        }
+        
+        // Validate name format (alphanumeric, hyphens, underscores)
+        if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(name)) {
+            showToast(<?= json_encode(__admin('preview.invalidKeyframeName') ?? 'Invalid keyframe name. Use letters, numbers, hyphens, and underscores.') ?>, 'error');
+            keyframeNameInput.focus();
+            return;
+        }
+        
+        // Determine if we're allowed to overwrite
+        // - Edit mode: always allowed (editing same keyframe)
+        // - Create mode: only if user confirms
+        let allowOverwrite = keyframeEditorMode === 'edit';
+        
+        // Check if keyframe already exists when creating new one
+        if (keyframeEditorMode === 'create') {
+            const existingKeyframe = keyframesData.find(kf => kf.name === name);
+            if (existingKeyframe) {
+                const confirmOverwrite = confirm(
+                    <?= json_encode(__admin('preview.keyframeExistsConfirm') ?? 'A keyframe with this name already exists. Do you want to replace it?') ?> +
+                    `\n\n@keyframes ${name}`
+                );
+                if (!confirmOverwrite) {
+                    keyframeNameInput.focus();
+                    keyframeNameInput.select();
+                    return;
+                }
+                allowOverwrite = true; // User confirmed overwrite
+            }
+        }
+        
+        // Validate frames have at least one property
+        const validFrames = keyframeFrames.filter(f => 
+            f.properties.some(p => p.property && p.value)
+        );
+        
+        if (validFrames.length === 0) {
+            showToast(<?= json_encode(__admin('preview.atLeastOneFrame') ?? 'At least one frame with properties is required') ?>, 'error');
+            return;
+        }
+        
+        // Convert frames to API format { "0%": "opacity: 0;", "100%": "opacity: 1;" }
+        const framesObj = {};
+        validFrames.forEach(frame => {
+            // Always use percentage format for consistency
+            const key = frame.percent + '%';
+            const propsStr = frame.properties
+                .filter(p => p.property && p.value)
+                .map(p => `${p.property}: ${p.value};`)
+                .join(' ');
+            framesObj[key] = propsStr;
+        });
+        
+        try {
+            // Stop preview before saving
+            stopKeyframePreview();
+            
+            const response = await fetch(managementUrl + 'setKeyframes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+                },
+                body: JSON.stringify({
+                    name: name,
+                    frames: framesObj,
+                    allowOverwrite: allowOverwrite
+                })
+            });
+            
+            const data = await response.json();
+            
+            // Handle 409 Conflict (keyframe exists but allowOverwrite was false)
+            // This can happen if client data was stale (keyframe created in another tab/session)
+            if (data.status === 409) {
+                const confirmOverwrite = confirm(
+                    <?= json_encode(__admin('preview.keyframeExistsConfirm') ?? 'A keyframe with this name already exists. Do you want to replace it?') ?> +
+                    `\n\n@keyframes ${name}`
+                );
+                if (confirmOverwrite) {
+                    // Retry with allowOverwrite: true
+                    const retryResponse = await fetch(managementUrl + 'setKeyframes', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+                        },
+                        body: JSON.stringify({
+                            name: name,
+                            frames: framesObj,
+                            allowOverwrite: true
+                        })
+                    });
+                    const retryData = await retryResponse.json();
+                    if (retryData.status !== 200) {
+                        throw new Error(retryData.message || 'Failed to save keyframe');
+                    }
+                    // Success on retry - continue to success handler below
+                } else {
+                    keyframeNameInput.focus();
+                    keyframeNameInput.select();
+                    return;
+                }
+            } else if (data.status !== 200) {
+                throw new Error(data.message || 'Failed to save keyframe');
+            }
+            
+            // Success (either first try or retry)
+            showToast(
+                keyframeEditorMode === 'create' 
+                    ? (<?= json_encode(__admin('preview.keyframeCreated') ?? 'Keyframe created successfully') ?>)
+                    : (<?= json_encode(__admin('preview.keyframeSaved') ?? 'Keyframe saved successfully') ?>),
+                'success'
+            );
+            
+            // Close modal
+            closeKeyframeModal();
+            
+            // Reload animations tab
+            animationsLoaded = false;
+            loadAnimationsTab();
+            
+            // Reload iframe to reflect changes
+            reloadPreview();
+            
+        } catch (error) {
+            console.error('Failed to save keyframe:', error);
+            showToast(<?= json_encode(__admin('preview.saveKeyframeFailed') ?? 'Failed to save keyframe') ?>, 'error');
+        }
+    }
+    
+    /**
+     * Escape HTML for safe rendering
+     */
+    function escapeHTML(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+    
+    /**
+     * Delete a keyframe
+     */
+    async function deleteKeyframe(keyframeName) {
+        if (!confirm(<?= json_encode(__admin('preview.confirmDeleteKeyframe') ?? 'Are you sure you want to delete this keyframe?') ?> + `\n\n@keyframes ${keyframeName}`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(managementUrl + 'deleteKeyframes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+                },
+                body: JSON.stringify({ name: keyframeName })
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 200) {
+                showToast(<?= json_encode(__admin('preview.keyframeDeleted') ?? 'Keyframe deleted successfully') ?>, 'success');
+                // Reload animations tab
+                animationsLoaded = false;
+                loadAnimationsTab();
+                // Reload iframe to reflect changes
+                reloadPreview();
+            } else {
+                throw new Error(data.message || 'Failed to delete keyframe');
+            }
+        } catch (error) {
+            console.error('Failed to delete keyframe:', error);
+            showToast(<?= json_encode(__admin('preview.deleteKeyframeFailed') ?? 'Failed to delete keyframe') ?>, 'error');
+        }
+    }
+    
+    /**
+     * Edit an animated selector (opens style editor with transition/animation focused)
+     */
+    function editAnimatedSelector(selector) {
+        // Use the existing style editor flow
+        currentSelectedSelector = selector;
+        // Count matching elements in iframe
+        const iframe = document.getElementById('preview-frame');
+        let matchCount = 0;
+        try {
+            matchCount = iframe?.contentDocument?.querySelectorAll(selector)?.length || 0;
+        } catch (e) {}
+        openStyleEditor(selector, matchCount);
+    }
+    
+    // ==================== Selector Browser (Phase 8.4) ====================
+    
+    /**
+     * Load all CSS selectors from the API
+     */
+    async function loadStyleSelectors() {
+        if (!selectorsLoading || !selectorsGroups) return;
+        
+        // Show loading state
+        selectorsLoading.style.display = '';
+        selectorsGroups.style.display = 'none';
+        
+        try {
+            const response = await fetch(managementUrl + 'listStyleRules', {
+                headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+            });
+            const data = await response.json();
+            
+            if (data.status === 200 && data.data?.selectors) {
+                allSelectors = data.data.selectors;
+                selectorsLoaded = true;
+                
+                // Categorize selectors
+                categorizeSelectors(data.data);
+                
+                // Populate the UI
+                populateSelectorBrowser();
+                
+                // Show content, hide loading
+                selectorsLoading.style.display = 'none';
+                selectorsGroups.style.display = '';
+            } else {
+                throw new Error(data.message || 'Failed to load selectors');
+            }
+        } catch (error) {
+            console.error('Error loading selectors:', error);
+            selectorsLoading.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24" style="color: #ef4444;">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <span style="color: #ef4444;">${<?= json_encode(__admin('preview.selectorsLoadError') ?? 'Failed to load selectors') ?>}</span>
+            `;
+        }
+    }
+    
+    /**
+     * Categorize selectors by type
+     */
+    function categorizeSelectors(data) {
+        categorizedSelectors = { tags: [], classes: [], ids: [], attributes: [], media: {} };
+        
+        // Process global selectors
+        const globalSelectors = data.grouped?.global || [];
+        globalSelectors.forEach(selector => {
+            categorizeSelector(selector, null);
+        });
+        
+        // Process media query selectors
+        const mediaSelectors = data.grouped?.media || {};
+        for (const [mediaQuery, selectors] of Object.entries(mediaSelectors)) {
+            categorizedSelectors.media[mediaQuery] = [];
+            selectors.forEach(selector => {
+                categorizedSelectors.media[mediaQuery].push(selector);
+            });
+        }
+    }
+    
+    /**
+     * Categorize a single selector
+     */
+    function categorizeSelector(selector, mediaQuery) {
+        // Skip :root and complex compound selectors for simplicity
+        if (selector === ':root') return;
+        
+        // Extract the primary selector part (before any combinator or pseudo)
+        const primarySelector = selector.split(/[\s>+~:]/)[0];
+        
+        if (primarySelector.startsWith('.')) {
+            categorizedSelectors.classes.push({ selector, mediaQuery });
+        } else if (primarySelector.startsWith('#')) {
+            categorizedSelectors.ids.push({ selector, mediaQuery });
+        } else if (primarySelector.startsWith('[')) {
+            categorizedSelectors.attributes.push({ selector, mediaQuery });
+        } else if (/^[a-zA-Z]/.test(primarySelector)) {
+            // Starts with a letter = tag selector
+            categorizedSelectors.tags.push({ selector, mediaQuery });
+        } else {
+            // Other (like * or complex selectors) - put in tags for now
+            categorizedSelectors.tags.push({ selector, mediaQuery });
+        }
+    }
+    
+    /**
+     * Populate the selector browser UI
+     */
+    function populateSelectorBrowser() {
+        // Clear existing items
+        if (selectorTagsList) selectorTagsList.innerHTML = '';
+        if (selectorClassesList) selectorClassesList.innerHTML = '';
+        if (selectorIdsList) selectorIdsList.innerHTML = '';
+        if (selectorAttributesList) selectorAttributesList.innerHTML = '';
+        if (selectorMediaList) selectorMediaList.innerHTML = '';
+        
+        // Populate Tags
+        categorizedSelectors.tags.forEach(item => {
+            const chip = createSelectorChip(item.selector, 'tag');
+            selectorTagsList?.appendChild(chip);
+        });
+        
+        // Populate Classes
+        categorizedSelectors.classes.forEach(item => {
+            const chip = createSelectorChip(item.selector, 'class');
+            selectorClassesList?.appendChild(chip);
+        });
+        
+        // Populate IDs
+        categorizedSelectors.ids.forEach(item => {
+            const chip = createSelectorChip(item.selector, 'id');
+            selectorIdsList?.appendChild(chip);
+        });
+        
+        // Populate Attributes
+        categorizedSelectors.attributes.forEach(item => {
+            const chip = createSelectorChip(item.selector, 'attribute');
+            selectorAttributesList?.appendChild(chip);
+        });
+        
+        // Populate Media Queries
+        for (const [mediaQuery, selectors] of Object.entries(categorizedSelectors.media)) {
+            const mediaGroup = document.createElement('div');
+            mediaGroup.className = 'preview-selectors-media-group';
+            
+            const mediaTitle = document.createElement('div');
+            mediaTitle.className = 'preview-selectors-media-group__title';
+            mediaTitle.textContent = `@media ${mediaQuery}`;
+            mediaGroup.appendChild(mediaTitle);
+            
+            const mediaChips = document.createElement('div');
+            mediaChips.className = 'preview-selectors-group__list';
+            mediaChips.style.paddingLeft = '0';
+            
+            selectors.forEach(selector => {
+                const chip = createSelectorChip(selector, 'media', mediaQuery);
+                mediaChips.appendChild(chip);
+            });
+            
+            mediaGroup.appendChild(mediaChips);
+            selectorMediaList?.appendChild(mediaGroup);
+        }
+        
+        // Update counts
+        updateSelectorCounts();
+        
+        // Update total count
+        const totalCount = categorizedSelectors.tags.length + 
+                          categorizedSelectors.classes.length + 
+                          categorizedSelectors.ids.length + 
+                          categorizedSelectors.attributes.length +
+                          Object.values(categorizedSelectors.media).flat().length;
+        if (selectorCount) selectorCount.textContent = totalCount;
+        
+        // Hide empty groups
+        hideEmptyGroups();
+    }
+    
+    /**
+     * Create a selector chip element
+     */
+    function createSelectorChip(selector, type, mediaQuery = null) {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = `preview-selector-item preview-selector-item--${type}`;
+        chip.textContent = selector;
+        chip.title = selector + (mediaQuery ? ` (${mediaQuery})` : '');
+        chip.dataset.selector = selector;
+        if (mediaQuery) chip.dataset.media = mediaQuery;
+        
+        // Hover → highlight elements in iframe
+        chip.addEventListener('mouseenter', () => {
+            hoveredSelector = selector;
+            sendToIframe('highlightBySelector', { selector });
+        });
+        
+        chip.addEventListener('mouseleave', () => {
+            if (hoveredSelector === selector) {
+                hoveredSelector = null;
+                sendToIframe('clearSelectorHighlight', {});
+            }
+        });
+        
+        // Click → select this selector
+        chip.addEventListener('click', () => {
+            selectSelector(selector, mediaQuery);
+        });
+        
+        return chip;
+    }
+    
+    /**
+     * Update selector counts in group headers
+     */
+    function updateSelectorCounts() {
+        if (selectorTagsCount) selectorTagsCount.textContent = categorizedSelectors.tags.length;
+        if (selectorClassesCount) selectorClassesCount.textContent = categorizedSelectors.classes.length;
+        if (selectorIdsCount) selectorIdsCount.textContent = categorizedSelectors.ids.length;
+        if (selectorAttributesCount) selectorAttributesCount.textContent = categorizedSelectors.attributes.length;
+        if (selectorMediaCount) {
+            const mediaCount = Object.values(categorizedSelectors.media).flat().length;
+            selectorMediaCount.textContent = mediaCount;
+        }
+    }
+    
+    /**
+     * Hide empty selector groups
+     */
+    function hideEmptyGroups() {
+        const groups = selectorsGroups?.querySelectorAll('.preview-selectors-group');
+        groups?.forEach(group => {
+            const groupName = group.dataset.group;
+            let isEmpty = false;
+            
+            if (groupName === 'tags') isEmpty = categorizedSelectors.tags.length === 0;
+            else if (groupName === 'classes') isEmpty = categorizedSelectors.classes.length === 0;
+            else if (groupName === 'ids') isEmpty = categorizedSelectors.ids.length === 0;
+            else if (groupName === 'attributes') isEmpty = categorizedSelectors.attributes.length === 0;
+            else if (groupName === 'media') isEmpty = Object.keys(categorizedSelectors.media).length === 0;
+            
+            group.style.display = isEmpty ? 'none' : '';
+        });
+    }
+    
+    /**
+     * Select a selector and show its info
+     */
+    function selectSelector(selector, mediaQuery = null) {
+        currentSelectedSelector = { selector, mediaQuery };
+        
+        // Update UI
+        if (selectorSelectedValue) selectorSelectedValue.textContent = selector;
+        if (selectorSelected) selectorSelected.style.display = '';
+        
+        // Clear previous active states
+        selectorsGroups?.querySelectorAll('.preview-selector-item--active').forEach(el => {
+            el.classList.remove('preview-selector-item--active');
+        });
+        
+        // Mark the clicked selector as active
+        const activeChip = selectorsGroups?.querySelector(`[data-selector="${CSS.escape(selector)}"]`);
+        if (activeChip) activeChip.classList.add('preview-selector-item--active');
+        
+        // Highlight and count matching elements in iframe
+        sendToIframe('selectBySelector', { selector });
+        
+        // Count matches (we'll receive this via message)
+        countSelectorMatches(selector);
+    }
+    
+    /**
+     * Clear selector selection
+     */
+    function clearSelectorSelection() {
+        currentSelectedSelector = null;
+        if (selectorSelected) selectorSelected.style.display = 'none';
+        
+        // Clear active states
+        selectorsGroups?.querySelectorAll('.preview-selector-item--active').forEach(el => {
+            el.classList.remove('preview-selector-item--active');
+        });
+        
+        // Clear highlight in iframe
+        sendToIframe('clearSelectorHighlight', {});
+    }
+    
+    /**
+     * Count how many elements match the selector in the iframe
+     */
+    function countSelectorMatches(selector) {
+        try {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            if (iframeDoc) {
+                const matches = iframeDoc.querySelectorAll(selector);
+                const count = matches.length;
+                if (selectorMatchCount) selectorMatchCount.textContent = count;
+                editingSelectorCount = count; // Store for Style Editor
+            }
+        } catch (e) {
+            console.warn('Could not count selector matches:', e);
+            if (selectorMatchCount) selectorMatchCount.textContent = '?';
+            editingSelectorCount = 0;
+        }
+    }
+    
+    /**
+     * Filter selectors based on search input
+     */
+    function filterSelectors(query) {
+        const searchLower = query.toLowerCase();
+        
+        selectorsGroups?.querySelectorAll('.preview-selector-item').forEach(chip => {
+            const selector = chip.dataset.selector || '';
+            const matches = selector.toLowerCase().includes(searchLower);
+            chip.style.display = matches ? '' : 'none';
+        });
+        
+        // Update visible counts (approximate - just show/hide based on children visibility)
+        updateVisibleSelectorCounts();
+        
+        // Show/hide clear button
+        if (selectorSearchClear) {
+            selectorSearchClear.style.display = query ? '' : 'none';
+        }
+    }
+    
+    /**
+     * Update counts based on visible selectors after filtering
+     */
+    function updateVisibleSelectorCounts() {
+        const countVisibleIn = (listEl) => {
+            return listEl?.querySelectorAll('.preview-selector-item:not([style*="display: none"])').length || 0;
+        };
+        
+        if (selectorTagsCount) selectorTagsCount.textContent = countVisibleIn(selectorTagsList);
+        if (selectorClassesCount) selectorClassesCount.textContent = countVisibleIn(selectorClassesList);
+        if (selectorIdsCount) selectorIdsCount.textContent = countVisibleIn(selectorIdsList);
+        if (selectorAttributesCount) selectorAttributesCount.textContent = countVisibleIn(selectorAttributesList);
+        
+        // Media is trickier - count all visible in media list
+        if (selectorMediaCount) {
+            selectorMediaCount.textContent = countVisibleIn(selectorMediaList);
+        }
+        
+        // Update total
+        const total = countVisibleIn(selectorTagsList) + 
+                     countVisibleIn(selectorClassesList) + 
+                     countVisibleIn(selectorIdsList) + 
+                     countVisibleIn(selectorAttributesList) +
+                     countVisibleIn(selectorMediaList);
+        if (selectorCount) selectorCount.textContent = total;
+    }
+    
+    /**
+     * Initialize selector browser event handlers
+     */
+    function initSelectorBrowser() {
+        // Search input
+        if (selectorSearchInput) {
+            selectorSearchInput.addEventListener('input', (e) => {
+                filterSelectors(e.target.value);
+            });
+        }
+        
+        // Search clear button
+        if (selectorSearchClear) {
+            selectorSearchClear.addEventListener('click', () => {
+                if (selectorSearchInput) selectorSearchInput.value = '';
+                filterSelectors('');
+            });
+        }
+        
+        // Clear selection button
+        if (selectorSelectedClear) {
+            selectorSelectedClear.addEventListener('click', clearSelectorSelection);
+        }
+        
+        // Edit styles button - opens Style Editor (Phase 8.5)
+        if (selectorEditBtn) {
+            selectorEditBtn.addEventListener('click', () => {
+                if (currentSelectedSelector) {
+                    openStyleEditor(currentSelectedSelector.selector, editingSelectorCount || 0);
+                }
+            });
+        }
+        
+        // Group header collapse/expand
+        selectorsGroups?.querySelectorAll('.preview-selectors-group__header').forEach(header => {
+            header.addEventListener('click', () => {
+                const isExpanded = header.classList.contains('preview-selectors-group__header--expanded');
+                header.classList.toggle('preview-selectors-group__header--expanded');
+                
+                const list = header.nextElementSibling;
+                if (list) {
+                    list.style.display = isExpanded ? 'none' : '';
+                }
+            });
+        });
+    }
+    
+    // ==================== Style Editor (Phase 8.5) ====================
+    
+    // Common CSS properties that should use color picker
+    const colorProperties = [
+        'color', 'background-color', 'background', 'border-color', 'border-top-color',
+        'border-right-color', 'border-bottom-color', 'border-left-color', 'outline-color',
+        'box-shadow', 'text-shadow', 'fill', 'stroke', 'caret-color', 'accent-color',
+        'text-decoration-color', 'column-rule-color'
+    ];
+    
+    /**
+     * Open the Style Editor for a selector
+     * @param {string} selector - CSS selector to edit
+     * @param {number} matchCount - Number of elements matching this selector
+     */
+    async function openStyleEditor(selector, matchCount = 0) {
+        if (!styleEditor) return;
+        
+        editingSelector = selector;
+        editingSelectorCount = matchCount;
+        originalStyles = {};
+        currentStyles = {};
+        newProperties = [];
+        deletedProperties = [];  // Reset deleted properties when opening editor
+        
+        // Update header
+        if (styleEditorSelector) styleEditorSelector.textContent = selector;
+        if (styleEditorCount) styleEditorCount.textContent = matchCount;
+        
+        // Show loading state
+        showStyleEditorState('loading');
+        
+        // Hide selector browser content, show style editor
+        if (selectorsPanel) {
+            selectorsPanel.querySelector('.preview-selectors-search')?.style.setProperty('display', 'none');
+            selectorsLoading?.style.setProperty('display', 'none');
+            selectorsGroups?.style.setProperty('display', 'none');
+            selectorSelected?.style.setProperty('display', 'none');
+        }
+        styleEditor.style.display = 'flex';
+        styleEditorVisible = true;
+        
+        // Load styles from API
+        try {
+            const response = await fetch(managementUrl + 'getStyleRule/' + encodeURIComponent(selector), {
+                headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.data) {
+                const stylesString = result.data.styles || '';
+                originalStyles = parseStylesString(stylesString);
+                currentStyles = { ...originalStyles };
+                
+                if (Object.keys(originalStyles).length === 0) {
+                    showStyleEditorState('empty');
+                } else {
+                    renderStyleProperties();
+                    showStyleEditorState('properties');
+                }
+            } else {
+                // Selector not found in CSS (might be a browser-default or doesn't exist)
+                originalStyles = {};
+                currentStyles = {};
+                showStyleEditorState('empty');
+            }
+        } catch (error) {
+            console.error('Failed to load styles:', error);
+            showToast(<?= json_encode(__admin('preview.failedToLoadStyles') ?? 'Failed to load styles') ?>, 'error');
+            closeStyleEditor();
+        }
+    }
+    
+    /**
+     * Close the Style Editor and return to selector browser
+     */
+    function closeStyleEditor() {
+        styleEditorVisible = false;
+        editingSelector = null;
+        
+        // Remove live preview styles
+        removeLivePreviewStyles();
+        
+        // Hide style editor
+        styleEditor.style.display = 'none';
+        
+        // Show selector browser content
+        if (selectorsPanel) {
+            selectorsPanel.querySelector('.preview-selectors-search')?.style.setProperty('display', '');
+            selectorsGroups?.style.setProperty('display', '');
+            if (currentSelectedSelector) {
+                selectorSelected?.style.setProperty('display', '');
+            }
+        }
+    }
+    
+    /**
+     * Show a specific state of the style editor
+     * @param {'loading'|'empty'|'properties'} state
+     */
+    function showStyleEditorState(state) {
+        if (styleEditorLoading) styleEditorLoading.style.display = state === 'loading' ? '' : 'none';
+        if (styleEditorEmpty) styleEditorEmpty.style.display = state === 'empty' ? '' : 'none';
+        if (styleEditorProperties) styleEditorProperties.style.display = state === 'properties' ? '' : 'none';
+        if (styleEditorAdd) styleEditorAdd.style.display = (state === 'properties' || state === 'empty') ? '' : 'none';
+        if (styleEditorActions) styleEditorActions.style.display = (state === 'properties' || state === 'empty') ? '' : 'none';
+    }
+    
+    /**
+     * Parse CSS styles string into object
+     * @param {string} stylesString - CSS declarations like "color: red; font-size: 16px;"
+     * @returns {Object} Property/value pairs
+     */
+    function parseStylesString(stylesString) {
+        const result = {};
+        if (!stylesString) return result;
+        
+        // Split by semicolons, handling multi-line
+        const declarations = stylesString.split(/;\s*/);
+        
+        for (const decl of declarations) {
+            const trimmed = decl.trim();
+            if (!trimmed) continue;
+            
+            const colonIndex = trimmed.indexOf(':');
+            if (colonIndex === -1) continue;
+            
+            const property = trimmed.substring(0, colonIndex).trim();
+            const value = trimmed.substring(colonIndex + 1).trim();
+            
+            if (property && value) {
+                result[property] = value;
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Extract color from a compound CSS value (like box-shadow, text-shadow, border)
+     * Returns { color, prefix, suffix } where prefix + color + suffix = original value
+     * @param {string} value - Full CSS value
+     * @returns {object|null} - { color, prefix, suffix, fullMatch } or null if no color found
+     */
+    function extractColorFromValue(value) {
+        if (!value) return null;
+        
+        const trimmed = value.trim();
+        
+        // If the value is a simple var() reference, don't treat as compound
+        // This prevents matching color names inside var(--color-orange) as "orange"
+        if (/^var\(--[\w-]+(?:\s*,\s*[^)]+)?\)$/i.test(trimmed)) {
+            return null;
+        }
+        
+        // Patterns to match colors in compound values
+        const colorPatterns = [
+            // rgba(r, g, b, a)
+            /(rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(?:,\s*[\d.]+)?\s*\))/i,
+            // hsla(h, s%, l%, a)
+            /(hsla?\(\s*\d+\s*,\s*[\d.]+%\s*,\s*[\d.]+%\s*(?:,\s*[\d.]+)?\s*\))/i,
+            // #hex colors (3, 4, 6, or 8 digits)
+            /(#[0-9a-fA-F]{3,8})\b/
+        ];
+        
+        // Named colors - checked separately to avoid matching inside var() or CSS variable names
+        const namedColors = ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 
+            'white', 'black', 'gray', 'grey', 'cyan', 'magenta', 'lime', 'navy', 
+            'teal', 'maroon', 'olive', 'silver', 'aqua', 'fuchsia', 'transparent'];
+        
+        for (const pattern of colorPatterns) {
+            const match = value.match(pattern);
+            if (match) {
+                const colorMatch = match[1];
+                const index = match.index;
+                return {
+                    color: colorMatch,
+                    prefix: value.substring(0, index),
+                    suffix: value.substring(index + colorMatch.length),
+                    fullMatch: colorMatch
+                };
+            }
+        }
+        
+        // Check for named colors, but exclude matches inside var() functions
+        // First, temporarily replace all var() with placeholders
+        const varMatches = [];
+        const tempValue = value.replace(/var\([^)]+\)/gi, (match) => {
+            varMatches.push(match);
+            return `__VAR_${varMatches.length - 1}__`;
+        });
+        
+        // Now search for named colors in the sanitized string
+        for (const colorName of namedColors) {
+            const regex = new RegExp(`\\b(${colorName})\\b`, 'i');
+            const match = tempValue.match(regex);
+            if (match) {
+                // Found a color, now find its position in the original string
+                // We need to account for any var() replacements that came before
+                const tempIndex = match.index;
+                
+                // Count how many placeholder characters came before this position
+                let offset = 0;
+                for (let i = 0; i < varMatches.length; i++) {
+                    const placeholder = `__VAR_${i}__`;
+                    const placeholderPos = tempValue.indexOf(placeholder);
+                    if (placeholderPos !== -1 && placeholderPos < tempIndex) {
+                        offset += varMatches[i].length - placeholder.length;
+                    }
+                }
+                
+                const actualIndex = tempIndex + offset;
+                return {
+                    color: match[1],
+                    prefix: value.substring(0, actualIndex),
+                    suffix: value.substring(actualIndex + match[1].length),
+                    fullMatch: match[1]
+                };
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Rebuild a compound value with a new color
+     * @param {string} prefix - Text before color
+     * @param {string} newColor - New color value
+     * @param {string} suffix - Text after color
+     * @returns {string}
+     */
+    function rebuildValueWithColor(prefix, newColor, suffix) {
+        return prefix + newColor + suffix;
+    }
+    
+    /**
+     * Render all style properties in the editor
+     */
+    function renderStyleProperties() {
+        if (!styleEditorProperties) return;
+        styleEditorProperties.innerHTML = '';
+        
+        // Render existing properties
+        for (const [property, value] of Object.entries(currentStyles)) {
+            const isModified = originalStyles[property] !== value;
+            renderPropertyRow(property, value, isModified, false);
+        }
+        
+        // Render new properties
+        for (const prop of newProperties) {
+            renderPropertyRow(prop.property, prop.value, false, true);
+        }
+    }
+    
+    /**
+     * Render a single property row
+     * @param {string} property - CSS property name
+     * @param {string} value - CSS property value
+     * @param {boolean} isModified - Whether value differs from original
+     * @param {boolean} isNew - Whether this is a newly added property
+     */
+    function renderPropertyRow(property, value, isModified, isNew) {
+        const row = document.createElement('div');
+        row.className = 'preview-style-property';
+        if (isModified) row.classList.add('preview-style-property--modified');
+        if (isNew) row.classList.add('preview-style-property--new');
+        row.dataset.property = property;
+        
+        // Track if original value used var()
+        const originalValue = isNew ? '' : (originalStyles[property] || '');
+        const originalUsedVar = /var\(([^)]+)\)/.test(originalValue);
+        
+        // Check if current value uses var()
+        const varMatch = value.match(/var\(([^)]+)\)/);
+        const usesVar = !!varMatch;
+        let resolvedValue = value;
+        
+        if (usesVar && iframe?.contentDocument) {
+            // Try to resolve the variable
+            const varName = varMatch[1].split(',')[0].trim();
+            try {
+                resolvedValue = getComputedStyle(iframe.contentDocument.documentElement)
+                    .getPropertyValue(varName).trim() || value;
+            } catch (e) {
+                resolvedValue = value;
+            }
+        }
+        
+        // Detect if this is a color property
+        const isColorProperty = colorProperties.some(p => property.includes(p)) || 
+                                 isColorValue(resolvedValue);
+        
+        // Property name (editable for new properties, static for existing)
+        if (isNew) {
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.className = 'preview-style-property__name-input';
+            nameInput.value = property;
+            nameInput.placeholder = <?= json_encode(__admin('preview.propertyName') ?? 'property-name') ?>;
+            nameInput.addEventListener('input', (e) => {
+                const newName = e.target.value.trim();
+                const currentName = row.dataset.property; // Get current name from row, not closure
+                updatePropertyName(currentName, newName, row);
+            });
+            row.appendChild(nameInput);
+        } else {
+            const nameEl = document.createElement('span');
+            nameEl.className = 'preview-style-property__name';
+            nameEl.textContent = property;
+            nameEl.title = property;
+            row.appendChild(nameEl);
+        }
+        
+        // Value container
+        const valueContainer = document.createElement('div');
+        valueContainer.className = 'preview-style-property__value';
+        
+        // Color swatch (if color property)
+        if (isColorProperty) {
+            // Extract just the color part for compound values (e.g., box-shadow)
+            const extracted = extractColorFromValue(resolvedValue);
+            const swatchColor = extracted ? extracted.color : resolvedValue;
+            
+            const colorSwatch = document.createElement('button');
+            colorSwatch.type = 'button';
+            colorSwatch.className = 'preview-style-property__color';
+            colorSwatch.style.background = swatchColor;
+            colorSwatch.title = <?= json_encode(__admin('preview.clickToPickColor') ?? 'Click to pick color') ?>;
+            colorSwatch.addEventListener('click', () => {
+                const currentProp = row.dataset.property;
+                openColorPickerForProperty(currentProp, resolvedValue, colorSwatch);
+            });
+            valueContainer.appendChild(colorSwatch);
+        }
+        
+        // Value input
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'preview-style-property__input';
+        input.value = value;
+        input.dataset.originalUsedVar = originalUsedVar ? '1' : '0';
+        input.addEventListener('input', (e) => {
+            const currentProp = row.dataset.property;
+            updatePropertyValue(currentProp, e.target.value, isNew);
+        });
+        input.addEventListener('blur', (e) => {
+            // Check if user removed var() from a value that originally had it
+            const hadVar = e.target.dataset.originalUsedVar === '1';
+            const nowHasVar = /var\(([^)]+)\)/.test(e.target.value);
+            if (hadVar && !nowHasVar && e.target.value.trim() !== '') {
+                showVarReplacementWarning(row.dataset.property, e.target.value);
+            }
+            applyLivePreview();
+        });
+        valueContainer.appendChild(input);
+        
+        // CSS Variables dropdown button
+        const varDropdownBtn = document.createElement('button');
+        varDropdownBtn.type = 'button';
+        varDropdownBtn.className = 'preview-style-property__var-btn';
+        varDropdownBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+            <polyline points="6 9 12 15 18 9"/>
+        </svg>`;
+        varDropdownBtn.title = <?= json_encode(__admin('preview.selectVariable') ?? 'Select CSS variable') ?>;
+        varDropdownBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showVarDropdown(row.dataset.property, input, varDropdownBtn);
+        });
+        valueContainer.appendChild(varDropdownBtn);
+        
+        // Variable indicator
+        if (usesVar) {
+            const varIndicator = document.createElement('span');
+            varIndicator.className = 'preview-style-property__var';
+            varIndicator.textContent = 'var';
+            varIndicator.title = varMatch[1];
+            valueContainer.appendChild(varIndicator);
+        }
+        
+        row.appendChild(valueContainer);
+        
+        // Delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'preview-style-property__delete';
+        deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>`;
+        deleteBtn.title = <?= json_encode(__admin('common.delete') ?? 'Delete') ?>;
+        deleteBtn.addEventListener('click', () => {
+            deleteProperty(row.dataset.property, isNew);
+        });
+        row.appendChild(deleteBtn);
+        
+        styleEditorProperties.appendChild(row);
+    }
+    
+    /**
+     * Update property name (for new properties)
+     * @param {string} oldName - Old property name
+     * @param {string} newName - New property name
+     * @param {HTMLElement} row - The property row element
+     */
+    function updatePropertyName(oldName, newName, row) {
+        const prop = newProperties.find(p => p.property === oldName);
+        if (prop) {
+            prop.property = newName;
+            row.dataset.property = newName;
+        }
+    }
+    
+    /**
+     * Show warning when user replaces var() with fixed value
+     * @param {string} property - Property name
+     * @param {string} newValue - New fixed value
+     */
+    function showVarReplacementWarning(property, newValue) {
+        showToast(
+            <?= json_encode(__admin('preview.varReplacementWarning') ?? 'You replaced a theme variable with a fixed value. This property will no longer follow theme changes.') ?>,
+            'warning',
+            5000
+        );
+    }
+    
+    /**
+     * Show dropdown with available CSS variables
+     * @param {string} property - Property name being edited
+     * @param {HTMLInputElement} input - The value input element
+     * @param {HTMLElement} anchorEl - Element to position dropdown near
+     */
+    function showVarDropdown(property, input, anchorEl) {
+        // Close any existing dropdown
+        closeVarDropdown();
+        
+        // Get available variables from theme
+        const allVariables = Object.keys(originalThemeVariables);
+        if (allVariables.length === 0) {
+            showToast(<?= json_encode(__admin('preview.noVariablesAvailable') ?? 'No CSS variables available. Load the Theme tab first.') ?>, 'info');
+            return;
+        }
+        
+        // Filter variables based on property type (Phase 8.6.3)
+        const isFontProperty = property.startsWith('font') || property === 'line-height' || property === 'letter-spacing';
+        const isColorProperty = colorProperties.some(p => property.includes(p));
+        const isSizeProperty = ['width', 'height', 'margin', 'padding', 'gap', 'border-radius', 'top', 'left', 'right', 'bottom'].some(p => property.includes(p));
+        
+        let variables = allVariables;
+        let filterHint = '';
+        
+        if (isFontProperty) {
+            // Show font variables first, then others
+            const fontVars = allVariables.filter(v => v.includes('font') || v.includes('text') || v.includes('line') || v.includes('letter'));
+            const otherVars = allVariables.filter(v => !fontVars.includes(v));
+            variables = [...fontVars, ...otherVars];
+            filterHint = fontVars.length > 0 ? ` (${fontVars.length} font vars)` : '';
+        } else if (isColorProperty) {
+            // Show color variables first
+            const colorVars = allVariables.filter(v => v.includes('color') || v.includes('bg') || v.includes('border') || v.includes('text'));
+            const otherVars = allVariables.filter(v => !colorVars.includes(v));
+            variables = [...colorVars, ...otherVars];
+            filterHint = colorVars.length > 0 ? ` (${colorVars.length} color vars)` : '';
+        } else if (isSizeProperty) {
+            // Show spacing/size variables first
+            const sizeVars = allVariables.filter(v => v.includes('spacing') || v.includes('gap') || v.includes('size') || v.includes('radius') || v.includes('width') || v.includes('height'));
+            const otherVars = allVariables.filter(v => !sizeVars.includes(v));
+            variables = [...sizeVars, ...otherVars];
+            filterHint = sizeVars.length > 0 ? ` (${sizeVars.length} size vars)` : '';
+        }
+        
+        // Create dropdown
+        const dropdown = document.createElement('div');
+        dropdown.className = 'preview-var-dropdown';
+        dropdown.id = 'var-dropdown';
+        
+        // Search input
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.className = 'preview-var-dropdown__search';
+        searchInput.placeholder = <?= json_encode(__admin('common.search') ?? 'Search...') ?> + filterHint;
+        dropdown.appendChild(searchInput);
+        
+        // Variables list
+        const list = document.createElement('div');
+        list.className = 'preview-var-dropdown__list';
+        
+        // Render variable items
+        const renderItems = (filter = '') => {
+            list.innerHTML = '';
+            const filterLower = filter.toLowerCase();
+            
+            for (const varName of variables) {
+                if (filterLower && !varName.toLowerCase().includes(filterLower)) continue;
+                
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'preview-var-dropdown__item';
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'preview-var-dropdown__item-name';
+                nameSpan.textContent = varName;
+                item.appendChild(nameSpan);
+                
+                const valueSpan = document.createElement('span');
+                valueSpan.className = 'preview-var-dropdown__item-value';
+                const varValue = originalThemeVariables[varName] || '';
+                valueSpan.textContent = varValue.length > 20 ? varValue.substring(0, 20) + '...' : varValue;
+                // Show color preview if it's a color
+                if (isColorValue(varValue)) {
+                    valueSpan.style.setProperty('--preview-color', varValue);
+                    valueSpan.classList.add('preview-var-dropdown__item-value--color');
+                }
+                item.appendChild(valueSpan);
+                
+                item.addEventListener('click', () => {
+                    input.value = `var(${varName})`;
+                    const currentProp = input.closest('.preview-style-property')?.dataset.property || property;
+                    const isNew = input.closest('.preview-style-property')?.classList.contains('preview-style-property--new');
+                    updatePropertyValue(currentProp, input.value, isNew);
+                    applyLivePreview();
+                    closeVarDropdown();
+                });
+                
+                list.appendChild(item);
+            }
+            
+            if (list.children.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'preview-var-dropdown__empty';
+                empty.textContent = <?= json_encode(__admin('common.noResults') ?? 'No results') ?>;
+                list.appendChild(empty);
+            }
+        };
+        
+        renderItems();
+        dropdown.appendChild(list);
+        
+        // Search filter
+        searchInput.addEventListener('input', (e) => {
+            renderItems(e.target.value);
+        });
+        
+        // Position dropdown
+        const rect = anchorEl.getBoundingClientRect();
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 4) + 'px';
+        dropdown.style.left = (rect.left - 200 + rect.width) + 'px';
+        
+        document.body.appendChild(dropdown);
+        searchInput.focus();
+        
+        // Close on outside click
+        setTimeout(() => {
+            document.addEventListener('click', closeVarDropdownOnOutsideClick);
+        }, 10);
+    }
+    
+    /**
+     * Close the var dropdown
+     */
+    function closeVarDropdown() {
+        const dropdown = document.getElementById('var-dropdown');
+        if (dropdown) dropdown.remove();
+        document.removeEventListener('click', closeVarDropdownOnOutsideClick);
+    }
+    
+    /**
+     * Close dropdown when clicking outside
+     */
+    function closeVarDropdownOnOutsideClick(e) {
+        const dropdown = document.getElementById('var-dropdown');
+        if (dropdown && !dropdown.contains(e.target)) {
+            closeVarDropdown();
+        }
+    }
+    
+    /**
+     * Check if a value looks like a color
+     * @param {string} value
+     * @returns {boolean}
+     */
+    function isColorValue(value) {
+        if (!value) return false;
+        const v = value.toLowerCase().trim();
+        return v.startsWith('#') || 
+               v.startsWith('rgb') || 
+               v.startsWith('hsl') ||
+               /^(red|blue|green|yellow|orange|purple|pink|white|black|gray|grey|transparent|inherit|currentcolor)$/i.test(v);
+    }
+    
+    /**
+     * Update a property value
+     * @param {string} property - CSS property name
+     * @param {string} value - New value
+     * @param {boolean} isNew - Whether this is a new property
+     */
+    function updatePropertyValue(property, value, isNew) {
+        if (isNew) {
+            const prop = newProperties.find(p => p.property === property);
+            if (prop) prop.value = value;
+        } else {
+            currentStyles[property] = value;
+        }
+        
+        // Update modified state
+        const row = styleEditorProperties?.querySelector(`[data-property="${property}"]`);
+        if (row && !isNew) {
+            row.classList.toggle('preview-style-property--modified', originalStyles[property] !== value);
+        }
+        
+        // Apply live preview with debounce
+        applyLivePreviewDebounced();
+    }
+    
+    /**
+     * Delete a property
+     * @param {string} property - CSS property name
+     * @param {boolean} isNew - Whether this is a new property
+     */
+    function deleteProperty(property, isNew) {
+        if (isNew) {
+            newProperties = newProperties.filter(p => p.property !== property);
+        } else {
+            delete currentStyles[property];
+            // Track deleted original properties so API can remove them
+            if (originalStyles.hasOwnProperty(property) && !deletedProperties.includes(property)) {
+                deletedProperties.push(property);
+            }
+        }
+        
+        // Remove the row
+        const row = styleEditorProperties?.querySelector(`[data-property="${property}"]`);
+        if (row) row.remove();
+        
+        // Check if empty
+        if (Object.keys(currentStyles).length === 0 && newProperties.length === 0) {
+            showStyleEditorState('empty');
+        }
+        
+        applyLivePreview();
+    }
+    
+    /**
+     * Add a new property
+     */
+    function addNewProperty() {
+        const property = '';  // Start with empty name so user must enter it
+        const uniqueProp = getUniquePropertyName(property);
+        newProperties.push({ property: uniqueProp, value: '' });
+        
+        renderPropertyRow(uniqueProp, '', false, true);
+        showStyleEditorState('properties');
+        
+        // Focus the property name input for new properties
+        const row = styleEditorProperties?.querySelector(`[data-property="${uniqueProp}"]`);
+        const nameInput = row?.querySelector('.preview-style-property__name-input');
+        if (nameInput) {
+            nameInput.focus();
+            nameInput.select();
+        }
+        
+        // Apply live preview (for consistency, even though empty value won't show)
+        applyLivePreview();
+    }
+    
+    /**
+     * Get a unique property name
+     * @param {string} baseName
+     * @returns {string}
+     */
+    function getUniquePropertyName(baseName) {
+        let name = baseName;
+        let counter = 1;
+        while (currentStyles[name] || newProperties.some(p => p.property === name)) {
+            name = `${baseName}-${counter++}`;
+        }
+        return name;
+    }
+    
+    // Track active color picker instance for cleanup
+    let activeColorPicker = null;
+    let activeColorPickerInput = null;
+    
+    /**
+     * Open color picker for a property
+     * @param {string} property - CSS property name
+     * @param {string} currentColor - Current color value (may be compound value like box-shadow)
+     * @param {HTMLElement} swatchEl - The swatch element
+     */
+    function openColorPickerForProperty(property, currentColor, swatchEl) {
+        // Use QSColorPicker if available
+        if (typeof QSColorPicker === 'undefined') return;
+        
+        // Find the input for this property
+        const row = swatchEl.closest('.preview-style-property');
+        const input = row?.querySelector('.preview-style-property__input');
+        if (!input) return;
+        
+        // Clean up previous picker if any
+        if (activeColorPicker) {
+            activeColorPicker.destroy();
+            activeColorPicker = null;
+        }
+        if (activeColorPickerInput?.parentNode) {
+            activeColorPickerInput.remove();
+        }
+        
+        // Extract color from compound value if needed
+        const fullValue = input.value;
+        const extracted = extractColorFromValue(fullValue);
+        let colorToEdit = currentColor;
+        let isCompound = false;
+        let prefix = '', suffix = '';
+        
+        if (extracted && extracted.color !== fullValue) {
+            // It's a compound value (e.g., box-shadow with rgba inside)
+            colorToEdit = extracted.color;
+            prefix = extracted.prefix;
+            suffix = extracted.suffix;
+            isCompound = true;
+        }
+        
+        // Create a temporary input for the color picker (positioned near the swatch)
+        const tempInput = document.createElement('input');
+        tempInput.type = 'text';
+        tempInput.value = colorToEdit;
+        tempInput.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;';
+        swatchEl.parentNode.appendChild(tempInput);
+        activeColorPickerInput = tempInput;
+        
+        // Get color variables from theme (originalThemeVariables is loaded on Style mode activation)
+        const colorVariables = {};
+        if (typeof originalThemeVariables === 'object' && originalThemeVariables) {
+            for (const [name, value] of Object.entries(originalThemeVariables)) {
+                // Include color-related variables
+                if (name.includes('color') || name.includes('bg') || name.includes('text')) {
+                    colorVariables[name] = value;
+                }
+            }
+        }
+        
+        // Create picker attached to temp input
+        const picker = new QSColorPicker(tempInput, {
+            position: 'auto',
+            cssVariables: Object.keys(colorVariables).length > 0 ? colorVariables : null,
+            onChange: (color) => {
+                // Extract just the color part if it's a var() (for swatch display)
+                let swatchColor = color;
+                if (color.startsWith('var(')) {
+                    const varName = color.match(/var\(([^)]+)\)/)?.[1];
+                    if (varName && colorVariables[varName]) {
+                        swatchColor = colorVariables[varName];
+                    }
+                }
+                swatchEl.style.background = swatchColor;
+                
+                // Update the actual input value
+                let newValue;
+                if (isCompound) {
+                    newValue = rebuildValueWithColor(prefix, color, suffix);
+                } else {
+                    newValue = color;
+                }
+                input.value = newValue;
+                updatePropertyValue(property, newValue, row?.classList.contains('preview-style-property--new'));
+                applyLivePreview();
+            }
+        });
+        
+        activeColorPicker = picker;
+        
+        // Position and open the picker - trigger via temp input click
+        tempInput.click();
+    }
+    
+    // Debounced live preview
+    let livePreviewTimeout = null;
+    function applyLivePreviewDebounced() {
+        clearTimeout(livePreviewTimeout);
+        livePreviewTimeout = setTimeout(applyLivePreview, 150);
+    }
+    
+    /**
+     * Apply live preview styles to the iframe
+     */
+    function applyLivePreview() {
+        if (!iframe?.contentDocument || !editingSelector) return;
+        
+        try {
+            const doc = iframe.contentDocument;
+            
+            // Build combined styles
+            const allStyles = { ...currentStyles };
+            for (const prop of newProperties) {
+                if (prop.property && prop.value) {
+                    allStyles[prop.property] = prop.value;
+                }
+            }
+            
+            // Build CSS string for active properties
+            const cssRules = Object.entries(allStyles)
+                .map(([prop, val]) => `${prop}: ${val} !important`);
+            
+            // Add unset for deleted original properties (so they visually disappear in preview)
+            for (const deletedProp of deletedProperties) {
+                cssRules.push(`${deletedProp}: unset !important`);
+            }
+            
+            const cssText = cssRules.join('; ');
+            
+            // Get or create style element in iframe
+            let styleEl = doc.getElementById('qs-live-preview-style');
+            if (!styleEl) {
+                styleEl = doc.createElement('style');
+                styleEl.id = 'qs-live-preview-style';
+                doc.head.appendChild(styleEl);
+                stylePreviewInjected = true;
+            }
+            
+            // Update style content
+            styleEl.textContent = `${editingSelector} { ${cssText} }`;
+            
+        } catch (e) {
+            console.error('Failed to apply live preview:', e);
+        }
+    }
+    
+    /**
+     * Remove live preview styles from iframe
+     */
+    function removeLivePreviewStyles() {
+        if (!iframe?.contentDocument) return;
+        
+        try {
+            const styleEl = iframe.contentDocument.getElementById('qs-live-preview-style');
+            if (styleEl) {
+                styleEl.remove();
+                stylePreviewInjected = false;
+            }
+        } catch (e) {
+            console.error('Failed to remove live preview:', e);
+        }
+    }
+    
+    /**
+     * Reset styles to original values
+     */
+    function resetStyleEditor() {
+        currentStyles = { ...originalStyles };
+        newProperties = [];
+        deletedProperties = [];  // Clear deleted properties on reset
+        
+        if (Object.keys(originalStyles).length === 0) {
+            showStyleEditorState('empty');
+        } else {
+            renderStyleProperties();
+        }
+        
+        applyLivePreview();
+        showToast(<?= json_encode(__admin('preview.stylesReset') ?? 'Styles reset to original') ?>, 'info');
+    }
+    
+    /**
+     * Save styles via API
+     */
+    async function saveStyleEditor() {
+        if (!editingSelector) return;
+        
+        // Build combined styles
+        const allStyles = { ...currentStyles };
+        for (const prop of newProperties) {
+            if (prop.property && prop.value) {
+                allStyles[prop.property] = prop.value;
+            }
+        }
+        
+        // Build styles string
+        const stylesString = Object.entries(allStyles)
+            .map(([prop, val]) => `${prop}: ${val}`)
+            .join(';\n    ');
+        
+        // Build request body with removeProperties if any were deleted
+        const requestBody = {
+            selector: editingSelector,
+            styles: stylesString
+        };
+        
+        if (deletedProperties.length > 0) {
+            requestBody.removeProperties = deletedProperties;
+        }
+        
+        try {
+            const response = await fetch(managementUrl + 'setStyleRule', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+                },
+                body: JSON.stringify(requestBody)
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                // Update original styles to current
+                originalStyles = { ...allStyles };
+                currentStyles = { ...allStyles };
+                newProperties = [];
+                deletedProperties = [];  // Clear deleted properties after successful save
+                
+                // Re-render to clear modified states
+                renderStyleProperties();
+                
+                // Remove live preview (styles are now in CSS file)
+                removeLivePreviewStyles();
+                
+                showToast(<?= json_encode(__admin('preview.stylesSaved') ?? 'Styles saved successfully') ?>, 'success');
+            } else {
+                showToast(result.message || <?= json_encode(__admin('common.saveFailed') ?? 'Failed to save') ?>, 'error');
+            }
+        } catch (error) {
+            console.error('Failed to save styles:', error);
+            showToast(<?= json_encode(__admin('common.saveFailed') ?? 'Failed to save') ?>, 'error');
+        }
+    }
+    
+    /**
+     * Initialize Style Editor event listeners
+     */
+    function initStyleEditor() {
+        // Back button
+        if (styleEditorBack) {
+            styleEditorBack.addEventListener('click', closeStyleEditor);
+        }
+        
+        // Clickable label to go back (Phase 8.6.3)
+        if (styleEditorLabel) {
+            styleEditorLabel.style.cursor = 'pointer';
+            styleEditorLabel.addEventListener('click', closeStyleEditor);
+        }
+        
+        // Add property buttons
+        if (styleEditorAddBtn) {
+            styleEditorAddBtn.addEventListener('click', addNewProperty);
+        }
+        if (styleEditorAddFirst) {
+            styleEditorAddFirst.addEventListener('click', addNewProperty);
+        }
+        
+        // Reset button
+        if (styleEditorReset) {
+            styleEditorReset.addEventListener('click', resetStyleEditor);
+        }
+        
+        // Save button
+        if (styleEditorSave) {
+            styleEditorSave.addEventListener('click', saveStyleEditor);
+        }
+        
+        // Escape key to close style editor (Phase 8.6.3)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && styleEditorVisible) {
+                // Don't close if focus is in an input (let user cancel their edit first)
+                const activeEl = document.activeElement;
+                const isInInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+                if (!isInInput) {
+                    e.preventDefault();
+                    closeStyleEditor();
+                }
+            }
+        });
+    }
+    
+    // Initialize style editor
+    initStyleEditor();
     
     // ==================== Node Panel ====================
     
@@ -937,12 +5276,16 @@ if (is_dir($componentsDir)) {
     let selectedStruct = null;
     let selectedNode = null;
     let selectedComponent = null;
-    
+    let selectedElementClasses = null;  // For style mode preselection
+    let selectedElementTag = null;      // For style mode preselection
+
     function showNodePanel(data) {
         // Store selection info for edit/copy actions
         selectedStruct = data.struct || null;
         selectedNode = data.isComponent ? data.componentNode : data.node;
         selectedComponent = data.component || null;
+        selectedElementClasses = data.classes || null;  // Store classes for style mode
+        selectedElementTag = data.tag || null;          // Store tag for style mode
         
         // Format structure name for display
         let structDisplay = data.struct || '-';
@@ -954,30 +5297,48 @@ if (is_dir($componentsDir)) {
             structDisplay = 'Footer';
         }
         
-        // Update panel fields
-        nodeStructEl.textContent = structDisplay;
-        nodeIdEl.textContent = selectedNode || '-';
-        nodeTagEl.textContent = data.tag || '-';
-        nodeClassesEl.textContent = data.classes || '-';
-        nodeChildrenEl.textContent = data.childCount !== undefined ? data.childCount : '-';
-        nodeTextEl.textContent = data.textContent || '-';
+        // Update panel fields (deprecated floating panel - kept for compatibility)
+        if (nodeStructEl) nodeStructEl.textContent = structDisplay;
+        if (nodeIdEl) nodeIdEl.textContent = selectedNode || '-';
+        if (nodeTagEl) nodeTagEl.textContent = data.tag || '-';
+        if (nodeClassesEl) nodeClassesEl.textContent = data.classes || '-';
+        if (nodeChildrenEl) nodeChildrenEl.textContent = data.childCount !== undefined ? data.childCount : '-';
+        if (nodeTextEl) nodeTextEl.textContent = data.textContent || '-';
         
         // Show/hide component row
         if (data.isComponent && data.component) {
-            nodeComponentEl.textContent = data.component;
-            nodeComponentRow.style.display = '';
+            if (nodeComponentEl) nodeComponentEl.textContent = data.component;
+            if (nodeComponentRow) nodeComponentRow.style.display = '';
         } else {
-            nodeComponentRow.style.display = 'none';
+            if (nodeComponentRow) nodeComponentRow.style.display = 'none';
         }
         
-        nodePanel.classList.add('preview-node-panel--visible');
+        // Show/hide textKey row
+        if (data.textKeys && data.textKeys.length > 0) {
+            // Show first textKey (or comma-separated if multiple)
+            if (nodeTextKeyEl) nodeTextKeyEl.textContent = data.textKeys.join(', ');
+            if (nodeTextKeyRow) nodeTextKeyRow.style.display = '';
+        } else {
+            if (nodeTextKeyRow) nodeTextKeyRow.style.display = 'none';
+        }
+        
+        // Phase 8: Update contextual area info
+        showContextualInfo(data);
+        
+        // (deprecated) nodePanel.classList.add('preview-node-panel--visible');
     }
     
     function hideNodePanel() {
-        nodePanel.classList.remove('preview-node-panel--visible');
+        // (deprecated) nodePanel.classList.remove('preview-node-panel--visible');
         selectedStruct = null;
         selectedNode = null;
         selectedComponent = null;
+        selectedElementClasses = null;
+        selectedElementTag = null;
+        
+        // Phase 8: Hide contextual info
+        hideContextualInfo();
+        
         sendToIframe('clearSelection', {});
     }
     
@@ -1095,6 +5456,53 @@ if (is_dir($componentsDir)) {
                     cursor: not-allowed !important;
                     outline: 2px dashed #ef4444 !important;
                 }
+                
+                /* ===== TEXT MODE STYLES ===== */
+                .qs-text-editable {
+                    cursor: text !important;
+                }
+                .qs-text-editable:hover {
+                    outline: 2px dashed #eab308 !important;
+                    outline-offset: 1px !important;
+                    background-color: rgba(234, 179, 8, 0.1) !important;
+                }
+                .qs-text-editing {
+                    outline: 2px solid #eab308 !important;
+                    outline-offset: 1px !important;
+                    background-color: rgba(234, 179, 8, 0.15) !important;
+                    min-width: 20px;
+                    min-height: 1em;
+                }
+                .qs-text-editing:focus {
+                    outline: 2px solid #ca8a04 !important;
+                }
+                
+                /* ===== STYLE MODE STYLES ===== */
+                .qs-styleable {
+                    cursor: pointer !important;
+                }
+                .qs-styleable:hover {
+                    outline: 2px dashed #8b5cf6 !important;
+                    outline-offset: 2px !important;
+                    background-color: rgba(139, 92, 246, 0.05) !important;
+                }
+                .qs-style-selected {
+                    outline: 2px solid #8b5cf6 !important;
+                    outline-offset: 2px !important;
+                    background-color: rgba(139, 92, 246, 0.1) !important;
+                }
+                
+                /* ===== SELECTOR BROWSER HIGHLIGHT STYLES (Phase 8.4) ===== */
+                .qs-selector-hover {
+                    outline: 2px dashed #06b6d4 !important;
+                    outline-offset: 2px !important;
+                    background-color: rgba(6, 182, 212, 0.1) !important;
+                }
+                .qs-selector-selected {
+                    outline: 2px solid #06b6d4 !important;
+                    outline-offset: 2px !important;
+                    background-color: rgba(6, 182, 212, 0.15) !important;
+                }
             `;
             iframeDoc.head.appendChild(style);
             
@@ -1115,6 +5523,11 @@ if (is_dir($componentsDir)) {
                     let dropIndicator = null;
                     let dropTarget = null;
                     let dropPosition = null; // 'before' or 'after'
+                    
+                    // Text edit state
+                    let editingElement = null;
+                    let editingTextKey = null;
+                    let originalText = null;
                     
                     // Elements to ignore
                     const ignoreTags = ['SCRIPT', 'STYLE', 'META', 'LINK', 'NOSCRIPT', 'BR', 'HR', 'HTML', 'HEAD'];
@@ -1140,6 +5553,22 @@ if (is_dir($componentsDir)) {
                             }
                             if (e.data.action === 'removeNode') {
                                 removeNodeFromDom(e.data.struct, e.data.nodeId);
+                            }
+                            if (e.data.action === 'clearStyleSelection') {
+                                clearStyleSelection();
+                            }
+                            if (e.data.action === 'applyLiveStyle') {
+                                applyLiveStyle(e.data.struct, e.data.nodeId, e.data.property, e.data.value);
+                            }
+                            // Phase 8.4: Selector-based highlighting
+                            if (e.data.action === 'highlightBySelector') {
+                                highlightBySelector(e.data.selector);
+                            }
+                            if (e.data.action === 'selectBySelector') {
+                                selectBySelector(e.data.selector);
+                            }
+                            if (e.data.action === 'clearSelectorHighlight') {
+                                clearSelectorHighlight();
                             }
                         }
                     });
@@ -1329,14 +5758,26 @@ if (is_dir($componentsDir)) {
                         if (currentMode === 'drag') {
                             disableDragMode();
                         }
+                        if (currentMode === 'text') {
+                            disableTextMode();
+                        }
+                        if (currentMode === 'style') {
+                            disableStyleMode();
+                        }
                         
                         currentMode = mode;
                         clearHover();
-                        if (mode !== 'select') clearSelection();
+                        if (mode !== 'select' && mode !== 'style') clearSelection();
                         
                         // Enable new mode
                         if (mode === 'drag') {
                             enableDragMode();
+                        }
+                        if (mode === 'text') {
+                            enableTextMode();
+                        }
+                        if (mode === 'style') {
+                            enableStyleMode();
                         }
                     }
                     
@@ -1362,6 +5803,68 @@ if (is_dir($componentsDir)) {
                             el.classList.add('qs-selected');
                             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         }
+                    }
+                    
+                    // ===== Selector Browser Functions (Phase 8.4) =====
+                    let selectorHoveredElements = [];
+                    let selectorSelectedElements = [];
+                    
+                    function highlightBySelector(selector) {
+                        // Clear previous hover highlights
+                        clearSelectorHover();
+                        
+                        try {
+                            const elements = document.querySelectorAll(selector);
+                            elements.forEach(el => {
+                                if (!ignoreTags.includes(el.tagName)) {
+                                    el.classList.add('qs-selector-hover');
+                                    selectorHoveredElements.push(el);
+                                }
+                            });
+                        } catch (e) {
+                            console.warn('[QuickSite] Invalid selector:', selector, e);
+                        }
+                    }
+                    
+                    function selectBySelector(selector) {
+                        // Clear previous selection
+                        clearSelectorSelection();
+                        
+                        try {
+                            const elements = document.querySelectorAll(selector);
+                            elements.forEach(el => {
+                                if (!ignoreTags.includes(el.tagName)) {
+                                    el.classList.add('qs-selector-selected');
+                                    selectorSelectedElements.push(el);
+                                }
+                            });
+                            
+                            // Scroll to first matched element
+                            if (selectorSelectedElements.length > 0) {
+                                selectorSelectedElements[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                        } catch (e) {
+                            console.warn('[QuickSite] Invalid selector:', selector, e);
+                        }
+                    }
+                    
+                    function clearSelectorHover() {
+                        selectorHoveredElements.forEach(el => {
+                            el.classList.remove('qs-selector-hover');
+                        });
+                        selectorHoveredElements = [];
+                    }
+                    
+                    function clearSelectorSelection() {
+                        selectorSelectedElements.forEach(el => {
+                            el.classList.remove('qs-selector-selected');
+                        });
+                        selectorSelectedElements = [];
+                    }
+                    
+                    function clearSelectorHighlight() {
+                        clearSelectorHover();
+                        clearSelectorSelection();
                     }
                     
                     // Find the selectable target (bubble up to component if inside one)
@@ -1416,7 +5919,7 @@ if (is_dir($componentsDir)) {
                         
                         const id = el.id || null;
                         const classes = el.className && typeof el.className === 'string' 
-                            ? el.className.replace(/qs-(hover|selected|draggable|dragging|drag-over)/g, '').trim() 
+                            ? el.className.replace(/qs-(hover|selected|draggable|dragging|drag-over|text-editable|text-editing)/g, '').trim() 
                             : null;
                         
                         // Get direct text content
@@ -1427,6 +5930,20 @@ if (is_dir($componentsDir)) {
                                 break;
                             }
                         }
+                        
+                        // Get textKeys from element or its children
+                        const textKeys = [];
+                        // Check if this element itself has a textKey
+                        if (el.hasAttribute('data-qs-textkey')) {
+                            textKeys.push(el.getAttribute('data-qs-textkey'));
+                        }
+                        // Also check immediate children with textKeys
+                        el.querySelectorAll('[data-qs-textkey]').forEach(function(textEl) {
+                            const key = textEl.getAttribute('data-qs-textkey');
+                            if (key && !textKeys.includes(key)) {
+                                textKeys.push(key);
+                            }
+                        });
                         
                         return {
                             // Editor info
@@ -1440,7 +5957,8 @@ if (is_dir($componentsDir)) {
                             id: id,
                             classes: classes || null,
                             childCount: el.children.length,
-                            textContent: textContent
+                            textContent: textContent,
+                            textKeys: textKeys
                         };
                     }
                     
@@ -1483,6 +6001,187 @@ if (is_dir($componentsDir)) {
                         dropPosition = null;
                         
                         console.log('[QuickSite] Drag mode disabled');
+                    }
+                    
+                    // ===== TEXT MODE FUNCTIONALITY =====
+                    
+                    function enableTextMode() {
+                        // Mark all text-editable elements
+                        document.querySelectorAll('[data-qs-textkey]').forEach(el => {
+                            el.classList.add('qs-text-editable');
+                        });
+                        console.log('[QuickSite] Text mode enabled');
+                    }
+                    
+                    function disableTextMode() {
+                        // Cancel any active editing
+                        if (editingElement) {
+                            cancelTextEdit();
+                        }
+                        
+                        // Remove editable class from all elements
+                        document.querySelectorAll('.qs-text-editable').forEach(el => {
+                            el.classList.remove('qs-text-editable', 'qs-text-editing');
+                        });
+                        console.log('[QuickSite] Text mode disabled');
+                    }
+                    
+                    function startTextEdit(el) {
+                        if (editingElement) {
+                            // Save current edit before starting new one
+                            finishTextEdit();
+                        }
+                        
+                        editingElement = el;
+                        editingTextKey = el.getAttribute('data-qs-textkey');
+                        originalText = el.textContent;
+                        
+                        el.classList.add('qs-text-editing');
+                        el.setAttribute('contenteditable', 'true');
+                        el.focus();
+                        
+                        // Select all text for easy replacement
+                        const selection = window.getSelection();
+                        const range = document.createRange();
+                        range.selectNodeContents(el);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                        
+                        console.log('[QuickSite] Started editing:', editingTextKey);
+                    }
+                    
+                    function finishTextEdit() {
+                        if (!editingElement) return;
+                        
+                        const newText = editingElement.textContent.trim();
+                        const textKey = editingTextKey;
+                        const struct = editingElement.closest('[data-qs-struct]')?.getAttribute('data-qs-struct') || '';
+                        
+                        // Clean up editing state
+                        editingElement.classList.remove('qs-text-editing');
+                        editingElement.setAttribute('contenteditable', 'false');
+                        
+                        // Only save if text actually changed
+                        if (newText !== originalText) {
+                            console.log('[QuickSite] Text changed:', textKey, originalText, '->', newText);
+                            
+                            window.parent.postMessage({ 
+                                source: 'quicksite-preview', 
+                                action: 'textEdited',
+                                textKey: textKey,
+                                newValue: newText,
+                                oldValue: originalText,
+                                structure: struct
+                            }, '*');
+                        } else {
+                            console.log('[QuickSite] Text unchanged, not saving');
+                        }
+                        
+                        editingElement = null;
+                        editingTextKey = null;
+                        originalText = null;
+                    }
+                    
+                    function cancelTextEdit() {
+                        if (!editingElement) return;
+                        
+                        // Restore original text
+                        editingElement.textContent = originalText;
+                        editingElement.classList.remove('qs-text-editing');
+                        editingElement.setAttribute('contenteditable', 'false');
+                        
+                        console.log('[QuickSite] Edit cancelled, restored:', editingTextKey);
+                        
+                        editingElement = null;
+                        editingTextKey = null;
+                        originalText = null;
+                    }
+                    
+                    // ===== STYLE MODE FUNCTIONALITY =====
+                    
+                    function enableStyleMode() {
+                        // Mark all styleable elements
+                        document.querySelectorAll('[data-qs-node]').forEach(el => {
+                            el.classList.add('qs-styleable');
+                        });
+                        console.log('[QuickSite] Style mode enabled');
+                    }
+                    
+                    function disableStyleMode() {
+                        // Remove styleable class from all elements
+                        document.querySelectorAll('.qs-styleable').forEach(el => {
+                            el.classList.remove('qs-styleable', 'qs-style-selected');
+                        });
+                        console.log('[QuickSite] Style mode disabled');
+                    }
+                    
+                    function getStyleInfo(el) {
+                        const computed = window.getComputedStyle(el);
+                        
+                        // Get class list (filter out our overlay classes)
+                        const classList = Array.from(el.classList).filter(c => 
+                            !c.startsWith('qs-')
+                        );
+                        
+                        // CSS properties we expose in the simplified panel
+                        const commonProps = [
+                            'padding', 'margin',
+                            'color', 'background-color',
+                            'font-size', 'font-weight',
+                            'width', 'max-width',
+                            'border-radius',
+                            'display', 'gap'
+                        ];
+                        
+                        const styles = {};
+                        commonProps.forEach(prop => {
+                            styles[prop] = computed.getPropertyValue(prop);
+                        });
+                        
+                        // Detect CSS variables in use (check inline style)
+                        const cssVars = [];
+                        const inlineStyle = el.getAttribute('style') || '';
+                        const varMatches = inlineStyle.matchAll(/var\((--[\w-]+)\)/g);
+                        for (const match of varMatches) {
+                            cssVars.push(match[1]);
+                        }
+                        
+                        // Build selector suggestion
+                        const tag = el.tagName.toLowerCase();
+                        let selector = tag;
+                        if (classList.length > 0) {
+                            selector = '.' + classList[0]; // Primary class
+                        } else if (el.id) {
+                            selector = '#' + el.id;
+                        }
+                        
+                        return {
+                            selector: selector,
+                            tag: tag,
+                            id: el.id || null,
+                            classList: classList,
+                            styles: styles,
+                            cssVars: cssVars
+                        };
+                    }
+                    
+                    // Clear style selection (called from parent)
+                    function clearStyleSelection() {
+                        document.querySelectorAll('.qs-style-selected').forEach(el => {
+                            el.classList.remove('qs-style-selected');
+                        });
+                    }
+                    
+                    // Apply live style preview to an element
+                    function applyLiveStyle(struct, nodeId, property, value) {
+                        const selector = '[data-qs-struct="' + struct + '"][data-qs-node="' + nodeId + '"]';
+                        const el = document.querySelector(selector);
+                        if (el) {
+                            // Convert property to camelCase for style property
+                            const camelProp = property.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+                            el.style[camelProp] = value;
+                            console.log('[QuickSite] Live style applied:', property, '=', value);
+                        }
                     }
                     
                     function canDropAt(source, target, position) {
@@ -1647,9 +6346,13 @@ if (is_dir($componentsDir)) {
                     
                     // Click handling
                     document.addEventListener('click', function(e) {
-                        if (currentMode === 'select') {
+                        // Prevent link navigation in all editor modes
+                        if (currentMode === 'select' || currentMode === 'drag' || currentMode === 'text' || currentMode === 'style') {
                             e.preventDefault();
                             e.stopPropagation();
+                        }
+                        
+                        if (currentMode === 'select') {
                             e.stopImmediatePropagation();
                             
                             const target = getSelectableTarget(e.target);
@@ -1670,6 +6373,70 @@ if (is_dir($componentsDir)) {
                                 }, '*');
                             }
                             return false;
+                        }
+                        
+                        // Text mode: click on textkey element to edit
+                        if (currentMode === 'text') {
+                            const textEl = e.target.closest('[data-qs-textkey]');
+                            if (textEl && textEl !== editingElement) {
+                                startTextEdit(textEl);
+                            }
+                        }
+                        
+                        // Style mode: click on element to get style info
+                        if (currentMode === 'style') {
+                            e.stopImmediatePropagation();
+                            
+                            const target = getSelectableTarget(e.target);
+                            if (target) {
+                                // Remove previous selection
+                                document.querySelectorAll('.qs-style-selected').forEach(el => {
+                                    el.classList.remove('qs-style-selected');
+                                });
+                                
+                                selectedElement = target;
+                                target.classList.add('qs-style-selected');
+                                
+                                const elementInfo = getElementInfo(target);
+                                const styleInfo = getStyleInfo(target);
+                                
+                                console.log('[QuickSite] Style mode - element selected:', styleInfo);
+                                
+                                window.parent.postMessage({ 
+                                    source: 'quicksite-preview', 
+                                    action: 'styleSelected',
+                                    element: elementInfo,
+                                    style: styleInfo
+                                }, '*');
+                            }
+                            return false;
+                        }
+                    }, true);
+                    
+                    // Keyboard handling for text editing
+                    document.addEventListener('keydown', function(e) {
+                        if (currentMode === 'text' && editingElement) {
+                            if (e.key === 'Escape') {
+                                e.preventDefault();
+                                cancelTextEdit();
+                            }
+                            // Enter always saves (no newlines - would break JSON translations)
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                finishTextEdit();
+                            }
+                        }
+                    }, true);
+                    
+                    // Blur handling for text editing
+                    document.addEventListener('blur', function(e) {
+                        if (currentMode === 'text' && editingElement && e.target === editingElement) {
+                            // Small delay to allow click on another textkey to work
+                            setTimeout(() => {
+                                if (editingElement === e.target) {
+                                    finishTextEdit();
+                                }
+                            }, 100);
                         }
                     }, true);
                     
@@ -1737,6 +6504,12 @@ if (is_dir($componentsDir)) {
             }
             if (e.data.action === 'elementMoved') {
                 handleElementMoved(e.data);
+            }
+            if (e.data.action === 'textEdited') {
+                handleTextEdited(e.data);
+            }
+            if (e.data.action === 'styleSelected') {
+                showStylePanel(e.data);
             }
         }
     });
@@ -1839,14 +6612,14 @@ if (is_dir($componentsDir)) {
         
         if (!source || !target || !source.struct || !source.node || !target.node) {
             console.error('[Preview] Invalid move data:', { source, target, position });
-            showToast('<?= __admin('common.error') ?>: Invalid move data', 'error');
+            showToast(<?= json_encode(__admin('common.error')) ?> + ': Invalid move data', 'error');
             return;
         }
         
         // Parse struct to get type and name
         const structInfo = parseStruct(source.struct);
         if (!structInfo || !structInfo.type) {
-            showToast('<?= __admin('common.error') ?>: Invalid structure type', 'error');
+            showToast(<?= json_encode(__admin('common.error')) ?> + ': Invalid structure type', 'error');
             return;
         }
         
@@ -1859,11 +6632,11 @@ if (is_dir($componentsDir)) {
         
         if (!sourceEl || !targetEl) {
             console.error('[Preview] DOM elements not found:', { sourceEl, targetEl });
-            showToast('<?= __admin('common.error') ?>: Elements not found', 'error');
+            showToast(<?= json_encode(__admin('common.error')) ?> + ': Elements not found', 'error');
             return;
         }
         
-        showToast('<?= __admin('common.loading') ?>...', 'info');
+        showToast(<?= json_encode(__admin('common.loading')) ?> + '...', 'info');
         
         try {
             // Use the atomic moveNode command
@@ -1900,12 +6673,83 @@ if (is_dir($componentsDir)) {
                 sourceEl.style.outlineOffset = '';
             }, 1500);
             
-            showToast('<?= __admin('preview.elementMoved') ?? 'Element moved successfully' ?>', 'success');
+            showToast(<?= json_encode(__admin('preview.elementMoved') ?? 'Element moved successfully') ?>, 'success');
             console.log('[Preview] DOM element moved successfully');
             
         } catch (error) {
             console.error('[Preview] Move error:', error);
-            showToast('<?= __admin('common.error') ?>: ' + error.message, 'error');
+            showToast(<?= json_encode(__admin('common.error')) ?> + ': ' + error.message, 'error');
+        }
+    }
+    
+    // ==================== Text Edit Handler ====================
+    
+    async function handleTextEdited(data) {
+        console.log('[Preview] Text edited:', data);
+        
+        const textKey = data.textKey;
+        const newValue = data.newValue;
+        const oldValue = data.oldValue;
+        
+        if (!textKey || newValue === undefined) {
+            console.error('[Preview] Invalid text edit data:', data);
+            showToast(<?= json_encode(__admin('common.error')) ?> + ': Invalid text data', 'error');
+            return;
+        }
+        
+        // Get current language from the selector
+        const langSelect = document.getElementById('lang-select');
+        const lang = langSelect ? langSelect.value : 'en';
+        
+        try {
+            // Call setTranslationKeys API
+            // The API expects 'language' and 'translations' (nested object, not JSON string)
+            // Format: { language: 'en', translations: { key.path: 'value' } }
+            // But the API actually expects nested structure, so we need to build it
+            
+            // Parse the textKey path into nested structure
+            // e.g., "home.hero.title" -> { home: { hero: { title: "value" } } }
+            const parts = textKey.split('.');
+            let translations = {};
+            let current = translations;
+            for (let i = 0; i < parts.length - 1; i++) {
+                current[parts[i]] = {};
+                current = current[parts[i]];
+            }
+            current[parts[parts.length - 1]] = newValue;
+            
+            const params = {
+                language: lang,
+                translations: translations
+            };
+            
+            console.log('[Preview] Saving translation:', params);
+            const result = await QuickSiteAdmin.apiRequest('setTranslationKeys', 'POST', params);
+            
+            if (!result.ok) {
+                throw new Error(result.data?.message || result.data?.data?.message || 'Failed to save text');
+            }
+            
+            showToast(<?= json_encode(__admin('preview.textSaved') ?? 'Text saved') ?>, 'success');
+            console.log('[Preview] Translation saved successfully');
+            
+            // Update the span in iframe to reflect saved state (already has the new text)
+            // No action needed - the contenteditable already shows the new text
+            
+        } catch (error) {
+            console.error('[Preview] Text save error:', error);
+            showToast(<?= json_encode(__admin('common.error')) ?> + ': ' + error.message, 'error');
+            
+            // Restore original text in iframe on error
+            try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                const textEl = iframeDoc.querySelector(`[data-qs-textkey="${textKey}"]`);
+                if (textEl) {
+                    textEl.textContent = oldValue;
+                }
+            } catch (e) {
+                console.error('[Preview] Could not restore text:', e);
+            }
         }
     }
     
@@ -1919,6 +6763,349 @@ if (is_dir($componentsDir)) {
             console.log('[Toast]', type, message);
         }
     }
+    
+    // ==================== Style Panel ====================
+    
+    const stylePanel = document.getElementById('preview-style-panel');
+    const stylePanelClose = document.getElementById('preview-style-close');
+    const styleSelectorEl = document.getElementById('style-selector');
+    const styleApplyBtn = document.getElementById('style-apply');
+    const styleResetBtn = document.getElementById('style-reset');
+    
+    // Make style panel draggable
+    const stylePanelHeader = stylePanel?.querySelector('.preview-style-panel__header');
+    makePanelDraggable(stylePanel, stylePanelHeader, 'qs_style_panel_pos');
+    
+    // Store current style context
+    let currentStyleContext = null;
+    // originalStyles already declared in Phase 8.5 state variables
+    
+    /**
+     * Show the style panel with element info
+     */
+    function showStylePanel(data) {
+        console.log('[Preview] Show style panel:', data);
+        
+        const element = data.element;
+        const style = data.style;
+        
+        if (!element || !style) {
+            console.error('[Preview] Invalid style data');
+            return;
+        }
+        
+        // Build selector for display
+        let selector = style.tag;
+        if (style.id) selector += '#' + style.id;
+        if (style.classList && style.classList.length > 0) {
+            selector += '.' + style.classList.join('.');
+        }
+        styleSelectorEl.textContent = selector;
+        
+        // Store context for later
+        currentStyleContext = {
+            struct: element.struct,
+            nodeId: element.node, // Note: getElementInfo returns 'node' not 'nodeId'
+            selector: style.selector,
+            tag: style.tag,
+            id: style.id,
+            classList: style.classList
+        };
+        
+        // Store original values for reset
+        originalStyles = { ...style.styles };
+        
+        // Populate form fields with current values
+        populateStyleFields(style.styles);
+        
+        // Show panel
+        stylePanel.classList.add('preview-style-panel--visible');
+    }
+    
+    /**
+     * Hide the style panel
+     */
+    function hideStylePanel() {
+        if (!stylePanel) return; // Guard if called before panel exists
+        stylePanel.classList.remove('preview-style-panel--visible');
+        currentStyleContext = null;
+        originalStyles = {};
+        
+        // Clear selection in iframe
+        sendToIframe('clearStyleSelection', {});
+    }
+    
+    /**
+     * Populate style input fields with values
+     */
+    function populateStyleFields(styles) {
+        const inputs = stylePanel.querySelectorAll('.preview-style-input');
+        
+        inputs.forEach(input => {
+            const prop = input.dataset.prop;
+            if (!prop) return;
+            
+            const value = styles[prop] || '';
+            
+            // Handle select elements
+            if (input.tagName === 'SELECT') {
+                // Try to match option
+                const option = input.querySelector(`option[value="${value}"]`);
+                if (option) {
+                    input.value = value;
+                } else {
+                    input.value = '';
+                }
+            } else if (input.classList.contains('preview-style-input--color')) {
+                // Color input - format nicely (preserve rgba if needed)
+                input.value = formatColorForInput(value);
+                // Trigger input event so QSColorPicker updates its UI
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            } else {
+                input.value = value;
+            }
+            
+            // Remove changed indicator
+            input.classList.remove('preview-style-input--changed');
+        });
+    }
+    
+    /**
+     * Convert any color format to hex (for color picker)
+     * Returns null if can't convert (e.g., transparent, CSS variables)
+     */
+    function rgbToHex(color) {
+        if (!color) return null;
+        
+        // Already hex
+        if (color.startsWith('#')) {
+            // Ensure 6-digit hex for color picker
+            if (color.length === 4) {
+                // #rgb -> #rrggbb
+                return '#' + color[1] + color[1] + color[2] + color[2] + color[3] + color[3];
+            }
+            return color.substring(0, 7); // Strip alpha if #rrggbbaa
+        }
+        
+        // Can't convert these
+        if (color === 'transparent' || color.includes('var(')) return null;
+        
+        // RGB/RGBA format
+        const match = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+        if (match) {
+            const r = parseInt(match[1]).toString(16).padStart(2, '0');
+            const g = parseInt(match[2]).toString(16).padStart(2, '0');
+            const b = parseInt(match[3]).toString(16).padStart(2, '0');
+            return '#' + r + g + b;
+        }
+        
+        // Named colors - use canvas to resolve
+        try {
+            const ctx = document.createElement('canvas').getContext('2d');
+            ctx.fillStyle = color;
+            const resolved = ctx.fillStyle;
+            if (resolved.startsWith('#')) {
+                return resolved;
+            }
+            // Canvas returns rgb format
+            return rgbToHex(resolved);
+        } catch (e) {
+            return null;
+        }
+    }
+    
+    /**
+     * Format color for display in text input
+     * Preserves rgba if alpha < 1, otherwise returns hex
+     */
+    function formatColorForInput(color) {
+        if (!color) return '';
+        
+        // Keep rgba format if it has alpha
+        const rgbaMatch = color.match(/rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)/);
+        if (rgbaMatch && parseFloat(rgbaMatch[4]) < 1) {
+            return color; // Keep as rgba
+        }
+        
+        // Convert to hex for simpler colors
+        const hex = rgbToHex(color);
+        return hex || color;
+    }
+    
+    /**
+     * Get changed styles from form
+     */
+    function getChangedStyles() {
+        const changed = {};
+        const inputs = stylePanel.querySelectorAll('.preview-style-input');
+        
+        inputs.forEach(input => {
+            const prop = input.dataset.prop;
+            if (!prop) return;
+            
+            // Skip color pickers (use their text input sibling)
+            if (input.type === 'color') return;
+            
+            const newValue = input.value.trim();
+            const originalValue = originalStyles[prop] || '';
+            
+            // Check if changed
+            if (newValue !== originalValue && newValue !== '') {
+                changed[prop] = newValue;
+            }
+        });
+        
+        return changed;
+    }
+    
+    /**
+     * Apply styles to the server
+     */
+    async function applyStyles() {
+        if (!currentStyleContext) {
+            console.error('[Preview] No style context');
+            return;
+        }
+        
+        const changedStyles = getChangedStyles();
+        
+        if (Object.keys(changedStyles).length === 0) {
+            showToast(<?= json_encode(__admin('preview.noChanges') ?? 'No changes to apply') ?>, 'info');
+            return;
+        }
+        
+        console.log('[Preview] Applying styles:', changedStyles);
+        
+        // Build a CSS selector for the rule
+        // Priority: use classList if available, else use struct/node path
+        let selector = '';
+        if (currentStyleContext.classList && currentStyleContext.classList.length > 0) {
+            // Use first meaningful class
+            const mainClass = currentStyleContext.classList.find(c => !c.startsWith('qs-'));
+            if (mainClass) {
+                selector = '.' + mainClass;
+            }
+        }
+        
+        // Fallback to struct-based selector (for unique node targeting)
+        if (!selector && currentStyleContext.struct && currentStyleContext.nodeId) {
+            selector = `[data-qs-struct="${currentStyleContext.struct}"][data-qs-node="${currentStyleContext.nodeId}"]`;
+        }
+        
+        // Final fallback: use tag name (affects all elements of that type)
+        if (!selector && currentStyleContext.tag) {
+            selector = currentStyleContext.tag;
+            console.log('[Preview] Using tag selector (will affect all ' + selector + ' elements)');
+        }
+        
+        if (!selector) {
+            showToast(<?= json_encode(__admin('common.error')) ?> + ': Cannot determine selector', 'error');
+            return;
+        }
+        
+        try {
+            // Call setStyleRule API
+            const result = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
+                selector: selector,
+                styles: changedStyles
+            });
+            
+            if (!result.ok) {
+                throw new Error(result.data?.message || 'Failed to save styles');
+            }
+            
+            showToast(<?= json_encode(__admin('preview.stylesSaved') ?? 'Styles saved') ?>, 'success');
+            
+            // Update original values
+            Object.assign(originalStyles, changedStyles);
+            
+            // Clear changed indicators
+            const inputs = stylePanel.querySelectorAll('.preview-style-input--changed');
+            inputs.forEach(input => input.classList.remove('preview-style-input--changed'));
+            
+            // Reload preview to see changes
+            reloadPreview();
+            
+        } catch (error) {
+            console.error('[Preview] Style save error:', error);
+            showToast(<?= json_encode(__admin('common.error')) ?> + ': ' + error.message, 'error');
+        }
+    }
+    
+    /**
+     * Reset styles to original values
+     */
+    function resetStyles() {
+        populateStyleFields(originalStyles);
+        showToast(<?= json_encode(__admin('preview.stylesReset') ?? 'Styles reset') ?>, 'info');
+    }
+    
+    // Style panel event listeners
+    if (stylePanelClose) {
+        stylePanelClose.addEventListener('click', hideStylePanel);
+    }
+    
+    if (styleApplyBtn) {
+        styleApplyBtn.addEventListener('click', applyStyles);
+    }
+    
+    if (styleResetBtn) {
+        styleResetBtn.addEventListener('click', resetStyles);
+    }
+    
+    // Initialize QSColorPicker for color inputs
+    const colorInputs = stylePanel.querySelectorAll('.preview-style-input--color');
+    const colorPickers = [];
+    colorInputs.forEach(input => {
+        const picker = new QSColorPicker(input, {
+            showAlpha: true,
+            format: 'auto',
+            onChange: (value) => {
+                input.classList.add('preview-style-input--changed');
+                // Trigger live preview
+                if (currentStyleContext) {
+                    const prop = input.dataset.prop;
+                    sendToIframe('applyLiveStyle', {
+                        struct: currentStyleContext.struct,
+                        nodeId: currentStyleContext.nodeId,
+                        property: prop,
+                        value: value
+                    });
+                }
+            }
+        });
+        colorPickers.push(picker);
+    });
+    
+    // Mark changed inputs
+    const styleInputs = stylePanel.querySelectorAll('.preview-style-input:not(.preview-style-input--color)');
+    styleInputs.forEach(input => {
+        input.addEventListener('change', () => {
+            input.classList.add('preview-style-input--changed');
+        });
+    });
+    
+    // Live preview: apply changes to iframe element in real-time
+    stylePanel.querySelectorAll('.preview-style-input:not(.preview-style-input--color)').forEach(input => {
+        const applyLivePreview = () => {
+            if (!currentStyleContext) return;
+            
+            const prop = input.dataset.prop;
+            if (!prop) return;
+            
+            const value = input.value.trim();
+            
+            // Apply to iframe element using sendToIframe
+            sendToIframe('applyLiveStyle', {
+                struct: currentStyleContext.struct,
+                nodeId: currentStyleContext.nodeId,
+                property: prop,
+                value: value
+            });
+        };
+        
+        input.addEventListener('input', applyLivePreview);
+    });
     
     // ==================== Event Handlers ====================
     
@@ -1971,9 +7158,10 @@ if (is_dir($componentsDir)) {
             return;
         }
         
-        // Escape - Clear selection and hide panel
+        // Escape - Clear selection and hide info
         if (e.key === 'Escape') {
-            if (nodePanel && nodePanel.classList.contains('show')) {
+            // Clear selection if we have one
+            if (selectedStruct && selectedNode) {
                 hideNodePanel();
                 if (iframe.contentWindow) {
                     iframe.contentWindow.postMessage({ action: 'clearSelection' }, '*');
@@ -1984,13 +7172,10 @@ if (is_dir($componentsDir)) {
         
         // Delete or Backspace - Delete selected node
         if (e.key === 'Delete' || (e.key === 'Backspace' && e.metaKey)) {
-            // Only if we have a selected node and panel is visible
-            if (selectedStruct && selectedNode && nodePanel && nodePanel.classList.contains('show')) {
+            // Only if we have a selected node
+            if (selectedStruct && selectedNode) {
                 e.preventDefault();
-                // Trigger the delete button click (reuse existing logic)
-                if (nodeDeleteBtn) {
-                    nodeDeleteBtn.click();
-                }
+                deleteSelectedNode();
             }
             return;
         }
@@ -2000,60 +7185,137 @@ if (is_dir($componentsDir)) {
         nodeClose.addEventListener('click', hideNodePanel);
     }
     
+    // Delete node function (shared between floating panel and contextual area)
+    async function deleteSelectedNode() {
+        if (!selectedStruct || !selectedNode) return;
+        
+        // Confirm deletion
+        const confirmMsg = <?= json_encode(__admin('preview.confirmDeleteNode') ?? 'Are you sure you want to delete this element?') ?>;
+        if (!confirm(confirmMsg)) return;
+        
+        // Parse struct to get type and name
+        const structInfo = parseStruct(selectedStruct);
+        if (!structInfo || !structInfo.type) {
+            showToast(<?= json_encode(__admin('common.error')) ?> + ': Invalid structure type', 'error');
+            return;
+        }
+        
+        // Save struct and node BEFORE hiding panel (which clears them)
+        const structToDelete = selectedStruct;
+        const nodeToDelete = selectedNode;
+        
+        showToast(<?= json_encode(__admin('common.loading')) ?> + '...', 'info');
+        
+        try {
+            const params = {
+                type: structInfo.type,
+                nodeId: nodeToDelete
+            };
+            if (structInfo.name) {
+                params.name = structInfo.name;
+            }
+            
+            console.log('[Preview] Deleting node:', params);
+            const result = await QuickSiteAdmin.apiRequest('deleteNode', 'DELETE', params);
+            
+            if (!result.ok) {
+                throw new Error(result.data?.message || result.data?.data?.message || 'Failed to delete node');
+            }
+            
+            // Hide the node panel
+            hideNodePanel();
+            
+            showToast(<?= json_encode(__admin('preview.nodeDeleted') ?? 'Element deleted successfully') ?>, 'success');
+            console.log('[Preview] Node deleted successfully');
+            
+            // Live DOM update - remove node and reindex siblings
+            sendToIframe('removeNode', {
+                struct: structToDelete,
+                nodeId: nodeToDelete
+            });
+            
+        } catch (error) {
+            console.error('[Preview] Delete error:', error);
+            showToast(<?= json_encode(__admin('common.error')) ?> + ': ' + error.message, 'error');
+        }
+    }
+    
     if (nodeDeleteBtn) {
-        nodeDeleteBtn.addEventListener('click', async function() {
-            if (!selectedStruct || !selectedNode) return;
-            
-            // Confirm deletion
-            const confirmMsg = '<?= __admin('preview.confirmDeleteNode') ?? 'Are you sure you want to delete this element?' ?>';
-            if (!confirm(confirmMsg)) return;
-            
-            // Parse struct to get type and name
-            const structInfo = parseStruct(selectedStruct);
-            if (!structInfo || !structInfo.type) {
-                showToast('<?= __admin('common.error') ?>: Invalid structure type', 'error');
+        nodeDeleteBtn.addEventListener('click', deleteSelectedNode);
+    }
+    
+    // ==================== Contextual Area Event Listeners (Phase 8) ====================
+    
+    // Toggle collapse/expand
+    if (contextualToggle) {
+        contextualToggle.addEventListener('click', toggleContextualArea);
+    }
+    
+    // Contextual area action buttons (wire to same handlers as floating panel)
+    if (ctxNodeAdd) {
+        ctxNodeAdd.addEventListener('click', function() {
+            if (!selectedStruct || !selectedNode) {
+                showToast(<?= json_encode(__admin('preview.selectNodeFirst') ?? 'Please select an element first') ?>, 'warning');
                 return;
             }
-            
-            // Save struct and node BEFORE hiding panel (which clears them)
-            const structToDelete = selectedStruct;
-            const nodeToDelete = selectedNode;
-            
-            showToast('<?= __admin('common.loading') ?>...', 'info');
-            
-            try {
-                const params = {
-                    type: structInfo.type,
-                    nodeId: nodeToDelete
-                };
-                if (structInfo.name) {
-                    params.name = structInfo.name;
-                }
-                
-                console.log('[Preview] Deleting node:', params);
-                const result = await QuickSiteAdmin.apiRequest('deleteNode', 'DELETE', params);
-                
-                if (!result.ok) {
-                    throw new Error(result.data?.message || result.data?.data?.message || 'Failed to delete node');
-                }
-                
-                // Hide the node panel
-                hideNodePanel();
-                
-                showToast('<?= __admin('preview.nodeDeleted') ?? 'Element deleted successfully' ?>', 'success');
-                console.log('[Preview] Node deleted successfully');
-                
-                // Live DOM update - remove node and reindex siblings
-                sendToIframe('removeNode', {
-                    struct: structToDelete,
-                    nodeId: nodeToDelete
-                });
-                
-            } catch (error) {
-                console.error('[Preview] Delete error:', error);
-                showToast('<?= __admin('common.error') ?>: ' + error.message, 'error');
-            }
+            showAddNodeModal();
         });
+    }
+    
+    if (ctxNodeEdit) {
+        ctxNodeEdit.addEventListener('click', function() {
+            // Directly call the edit modal function
+            openEditNodeModal();
+        });
+    }
+    
+    if (ctxNodeDelete) {
+        ctxNodeDelete.addEventListener('click', deleteSelectedNode);
+    }
+    
+    if (ctxNodeStyle) {
+        ctxNodeStyle.addEventListener('click', function() {
+            // Store element info for style mode preselection
+            const preselect = {
+                classes: selectedElementClasses,
+                tag: selectedElementTag,
+                selector: null
+            };
+            
+            // Determine best selector: first class or tag
+            if (selectedElementClasses && selectedElementClasses !== '-') {
+                const firstClass = selectedElementClasses.split(' ')[0].trim();
+                if (firstClass) {
+                    preselect.selector = '.' + firstClass;
+                }
+            } else if (selectedElementTag && selectedElementTag !== '-') {
+                preselect.selector = selectedElementTag.toLowerCase();
+            }
+            
+            // Switch to style mode with preselection data
+            setMode('style', preselect);
+        });
+    }
+    
+    // ==================== Theme Variables Event Listeners (Phase 8.3) ====================
+    
+    // Initialize style tabs
+    initStyleTabs();
+    
+    // Initialize selector browser (Phase 8.4)
+    initSelectorBrowser();
+    
+    // Initialize keyframe editor (Phase 9.3)
+    initKeyframeEditor();
+    
+    // Theme save button
+    if (themeSaveBtn) {
+        themeSaveBtn.addEventListener('click', saveThemeVariables);
+    }
+    
+    // Theme reset button
+    if (themeResetBtn) {
+        themeResetBtn.addEventListener('click', resetThemeVariables);
     }
     
     // ==================== Add Node Modal ====================
@@ -2536,7 +7798,7 @@ if (is_dir($componentsDir)) {
     if (nodeAddBtn) {
         nodeAddBtn.addEventListener('click', function() {
             if (!selectedStruct || !selectedNode) {
-                showToast('<?= __admin('preview.selectNodeFirst') ?? 'Please select an element first' ?>', 'warning');
+                showToast(<?= json_encode(__admin('preview.selectNodeFirst') ?? 'Please select an element first') ?>, 'warning');
                 return;
             }
             showAddNodeModal();
@@ -2563,7 +7825,7 @@ if (is_dir($componentsDir)) {
             // Parse struct to get type and name
             const structInfo = parseStruct(selectedStruct);
             if (!structInfo || !structInfo.type) {
-                showToast('<?= __admin('common.error') ?>: Invalid structure type', 'error');
+                showToast(<?= json_encode(__admin('common.error')) ?> + ': Invalid structure type', 'error');
                 return;
             }
             
@@ -2572,7 +7834,7 @@ if (is_dir($componentsDir)) {
                 // Component addition
                 const componentName = addNodeComponentSelect?.value;
                 if (!componentName) {
-                    showToast('<?= __admin('preview.selectComponent') ?? 'Please select a component' ?>', 'warning');
+                    showToast(<?= json_encode(__admin('preview.selectComponent') ?? 'Please select a component') ?>, 'warning');
                     return;
                 }
                 
@@ -2594,7 +7856,7 @@ if (is_dir($componentsDir)) {
                 }
                 
                 hideAddNodeModal();
-                showToast('<?= __admin('common.loading') ?>...', 'info');
+                showToast(<?= json_encode(__admin('common.loading')) ?> + '...', 'info');
                 
                 try {
                     console.log('[Preview] Adding component:', apiParams);
@@ -2605,7 +7867,7 @@ if (is_dir($componentsDir)) {
                     }
                     
                     const data = result.data?.data || {};
-                    let successMsg = `<?= __admin('preview.componentAdded') ?? 'Component added' ?>: ${componentName}`;
+                    let successMsg = <?= json_encode(__admin('preview.componentAdded') ?? 'Component added') ?> + `: ${componentName}`;
                     if (data.nodeId) {
                         successMsg += ` (${data.nodeId})`;
                     }
@@ -2636,7 +7898,7 @@ if (is_dir($componentsDir)) {
                     
                 } catch (error) {
                     console.error('[Preview] Add component error:', error);
-                    showToast('<?= __admin('common.error') ?>: ' + error.message, 'error');
+                    showToast(<?= json_encode(__admin('common.error')) ?> + ': ' + error.message, 'error');
                 }
                 
             } else {
@@ -2649,7 +7911,7 @@ if (is_dir($componentsDir)) {
                 
                 for (const param of requiredParams) {
                     if (!params[param]) {
-                        showToast(`<?= __admin('preview.paramRequired') ?? 'Required parameter' ?>: ${param}`, 'warning');
+                        showToast(<?= json_encode(__admin('preview.paramRequired') ?? 'Required parameter') ?> + `: ${param}`, 'warning');
                         return;
                     }
                 }
@@ -2671,7 +7933,7 @@ if (is_dir($componentsDir)) {
                 }
                 
                 hideAddNodeModal();
-                showToast('<?= __admin('common.loading') ?>...', 'info');
+                showToast(<?= json_encode(__admin('common.loading')) ?> + '...', 'info');
                 
                 try {
                     console.log('[Preview] Adding node:', apiParams);
@@ -2682,7 +7944,7 @@ if (is_dir($componentsDir)) {
                     }
                     
                     const data = result.data?.data || {};
-                    let successMsg = '<?= __admin('preview.elementAdded') ?? 'Element added successfully' ?>';
+                    let successMsg = <?= json_encode(__admin('preview.elementAdded') ?? 'Element added successfully') ?>;
                     if (data.newNodeId) {
                         successMsg += ` (${data.newNodeId})`;
                     }
@@ -2719,7 +7981,7 @@ if (is_dir($componentsDir)) {
                     
                 } catch (error) {
                     console.error('[Preview] Add node error:', error);
-                    showToast('<?= __admin('common.error') ?>: ' + error.message, 'error');
+                    showToast(<?= json_encode(__admin('common.error')) ?> + ': ' + error.message, 'error');
                 }
             }
         });
@@ -3012,7 +8274,7 @@ if (is_dir($componentsDir)) {
     // Load node data and open edit modal
     async function openEditNodeModal() {
         if (!selectedStruct || !selectedNode) {
-            showToast('<?= __admin('preview.selectNodeFirst') ?? 'Please select an element first' ?>', 'warning');
+            showToast(<?= json_encode(__admin('preview.selectNodeFirst') ?? 'Please select an element first') ?>, 'warning');
             return;
         }
         
@@ -3022,7 +8284,7 @@ if (is_dir($componentsDir)) {
         const element = iframeDoc.querySelector(selector);
         
         if (!element) {
-            showToast('<?= __admin('common.error') ?>: Element not found', 'error');
+            showToast(<?= json_encode(__admin('common.error')) ?> + ': Element not found', 'error');
             return;
         }
         
@@ -3130,7 +8392,7 @@ if (is_dir($componentsDir)) {
             // Parse struct to get type and name
             const structInfo = parseStruct(selectedStruct);
             if (!structInfo || !structInfo.type) {
-                showToast('<?= __admin('common.error') ?>: Invalid structure type', 'error');
+                showToast(<?= json_encode(__admin('common.error')) ?> + ': Invalid structure type', 'error');
                 return;
             }
             
@@ -3143,7 +8405,7 @@ if (is_dir($componentsDir)) {
             
             if (!tagChanged && !hasParamChanges) {
                 hideEditNodeModal();
-                showToast('<?= __admin('preview.noChanges') ?? 'No changes to save' ?>', 'info');
+                showToast(<?= json_encode(__admin('preview.noChanges') ?? 'No changes to save') ?>, 'info');
                 return;
             }
             
@@ -3152,7 +8414,7 @@ if (is_dir($componentsDir)) {
             for (const param of requiredParams) {
                 const paramRow = editParamsContainer.querySelector(`input[data-param="${param}"]`);
                 if (!paramRow || !paramRow.value.trim()) {
-                    showToast(`<?= __admin('preview.paramRequired') ?? 'Required parameter' ?>: ${param}`, 'warning');
+                    showToast(<?= json_encode(__admin('preview.paramRequired') ?? 'Required parameter') ?> + `: ${param}`, 'warning');
                     return;
                 }
             }
@@ -3180,7 +8442,7 @@ if (is_dir($componentsDir)) {
             }
             
             hideEditNodeModal();
-            showToast('<?= __admin('common.loading') ?>...', 'info');
+            showToast(<?= json_encode(__admin('common.loading')) ?> + '...', 'info');
             
             try {
                 console.log('[Preview] Editing node:', apiParams);
@@ -3191,7 +8453,7 @@ if (is_dir($componentsDir)) {
                 }
                 
                 const data = result.data?.data || {};
-                let successMsg = '<?= __admin('preview.elementUpdated') ?? 'Element updated successfully' ?>';
+                let successMsg = <?= json_encode(__admin('preview.elementUpdated') ?? 'Element updated successfully') ?>;
                 
                 // Show textKey generation info if applicable
                 if (data.textKeyGenerated && data.textKey) {
@@ -3206,7 +8468,7 @@ if (is_dir($componentsDir)) {
                 
             } catch (error) {
                 console.error('[Preview] Edit node error:', error);
-                showToast('<?= __admin('common.error') ?>: ' + error.message, 'error');
+                showToast(<?= json_encode(__admin('common.error')) ?> + ': ' + error.message, 'error');
             }
         });
     }
@@ -3344,11 +8606,11 @@ if (is_dir($componentsDir)) {
     // Load component info and open edit modal
     async function openEditComponentModal() {
         if (!selectedStruct || !selectedNode || !selectedComponent) {
-            showToast('<?= __admin('preview.selectComponentFirst') ?? 'Please select a component first' ?>', 'warning');
+            showToast(<?= json_encode(__admin('preview.selectComponentFirst') ?? 'Please select a component first') ?>, 'warning');
             return;
         }
         
-        showToast('<?= __admin('common.loading') ?>...', 'info');
+        showToast(<?= json_encode(__admin('common.loading')) ?> + '...', 'info');
         
         try {
             // Fetch component variables from listComponents
@@ -3394,7 +8656,7 @@ if (is_dir($componentsDir)) {
             
         } catch (error) {
             console.error('[Preview] Error loading component:', error);
-            showToast('<?= __admin('common.error') ?>: ' + error.message, 'error');
+            showToast(<?= json_encode(__admin('common.error')) ?> + ': ' + error.message, 'error');
         }
     }
     
@@ -3464,19 +8726,19 @@ if (is_dir($componentsDir)) {
             
             if (!hasChanges) {
                 hideEditComponentModal();
-                showToast('<?= __admin('preview.noChanges') ?? 'No changes to save' ?>', 'info');
+                showToast(<?= json_encode(__admin('preview.noChanges') ?? 'No changes to save') ?>, 'info');
                 return;
             }
             
             // Parse struct
             const structInfo = parseStruct(selectedStruct);
             if (!structInfo || !structInfo.type) {
-                showToast('<?= __admin('common.error') ?>: Invalid structure type', 'error');
+                showToast(<?= json_encode(__admin('common.error')) ?> + ': Invalid structure type', 'error');
                 return;
             }
             
             hideEditComponentModal();
-            showToast('<?= __admin('common.loading') ?>...', 'info');
+            showToast(<?= json_encode(__admin('common.loading')) ?> + '...', 'info');
             
             try {
                 console.log('[Preview] Editing component:', { structInfo, nodeId, newData });
@@ -3498,7 +8760,7 @@ if (is_dir($componentsDir)) {
                 }
                 
                 const data = result.data?.data || {};
-                showToast('<?= __admin('preview.componentUpdated') ?? 'Component updated successfully' ?>', 'success');
+                showToast(<?= json_encode(__admin('preview.componentUpdated') ?? 'Component updated successfully') ?>, 'success');
                 console.log('[Preview] Component edited:', data);
                 
                 // If we have HTML returned, update the DOM directly
@@ -3515,7 +8777,7 @@ if (is_dir($componentsDir)) {
                 
             } catch (error) {
                 console.error('[Preview] Edit component error:', error);
-                showToast('<?= __admin('common.error') ?>: ' + error.message, 'error');
+                showToast(<?= json_encode(__admin('common.error')) ?> + ': ' + error.message, 'error');
             }
         });
     }
@@ -3529,7 +8791,7 @@ if (is_dir($componentsDir)) {
         
         newEditBtn.addEventListener('click', function() {
             if (!selectedStruct || !selectedNode) {
-                showToast('<?= __admin('preview.selectNodeFirst') ?? 'Please select an element first' ?>', 'warning');
+                showToast(<?= json_encode(__admin('preview.selectNodeFirst') ?? 'Please select an element first') ?>, 'warning');
                 return;
             }
             
@@ -3673,9 +8935,9 @@ if (is_dir($componentsDir)) {
         
         // Show a toast message
         if (state.enabled) {
-            showToast('<?= __admin('preview.miniplayer') ?>: ON - Preview will float on other pages', 'success');
+            showToast(<?= json_encode(__admin('preview.miniplayer')) ?> + ': ON - Preview will float on other pages', 'success');
         } else {
-            showToast('<?= __admin('preview.miniplayer') ?>: OFF', 'info');
+            showToast(<?= json_encode(__admin('preview.miniplayer')) ?> + ': OFF', 'info');
         }
     }
     

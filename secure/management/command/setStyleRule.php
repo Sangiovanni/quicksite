@@ -6,7 +6,8 @@
  * Body: {
  *   "selector": ".btn-custom",
  *   "styles": "background: #007bff; color: white; padding: 10px 20px;",
- *   "mediaQuery": "(max-width: 768px)"  // optional
+ *   "mediaQuery": "(max-width: 768px)",  // optional
+ *   "removeProperties": ["border", "margin"]  // optional - properties to remove
  * }
  */
 
@@ -31,6 +32,9 @@ if (!isset($params['styles'])) {
 $selector = trim($params['selector']);
 $styles = $params['styles'];
 $mediaQuery = isset($params['mediaQuery']) ? trim($params['mediaQuery']) : null;
+$removeProperties = isset($params['removeProperties']) && is_array($params['removeProperties']) 
+    ? array_map('trim', $params['removeProperties']) 
+    : [];
 
 // Convert styles array/object to string if necessary
 if (is_array($styles)) {
@@ -114,7 +118,7 @@ try {
     
     // Parse and update
     $parser = new CssParser($content);
-    $result = $parser->setStyleRule($selector, $styles, $mediaQuery);
+    $result = $parser->setStyleRule($selector, $styles, $mediaQuery, $removeProperties);
     
     // Write updated content
     if (file_put_contents($styleFile, $parser->getContent()) === false) {

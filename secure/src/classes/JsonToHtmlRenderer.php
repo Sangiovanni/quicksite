@@ -260,8 +260,16 @@ class JsonToHtmlRenderer {
             return htmlspecialchars($rawText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
 
-        // Use Translator::translate() which already uses htmlspecialchars
-        return htmlspecialchars($this->translator->translate($textKey), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        // Get translated text
+        $translatedText = htmlspecialchars($this->translator->translate($textKey), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        
+        // In editor mode, wrap in span with data-qs-textkey for inline editing
+        if ($this->editorMode) {
+            $escapedKey = htmlspecialchars($textKey, ENT_QUOTES);
+            return '<span data-qs-textkey="' . $escapedKey . '">' . $translatedText . '</span>';
+        }
+
+        return $translatedText;
     }
 
     /**
