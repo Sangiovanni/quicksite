@@ -52,10 +52,10 @@ if (empty($selector)) {
         ->send();
 }
 
-// Validate styles
-if (empty($styles)) {
+// Validate styles - allow empty styles if removeProperties is provided
+if (empty($styles) && empty($removeProperties)) {
     ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage('Styles cannot be empty')
+        ->withMessage('Styles cannot be empty (unless removeProperties is provided)')
         ->send();
 }
 

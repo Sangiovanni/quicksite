@@ -52,6 +52,7 @@ temp/
 
 # Personal notes
 NOTES.txt
+NOTES-HISTORICAL.txt
 
 # Projects folder - ignore all except quicksite
 secure/projects/*

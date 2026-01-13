@@ -1791,7 +1791,7 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'setStyleRule' => [
-        'description' => 'Add or update a CSS rule for any selector',
+        'description' => 'Add, update, or selectively remove properties from a CSS rule',
         'method' => 'PATCH',
         'parameters' => [
             'selector' => [
@@ -1801,10 +1801,16 @@ $GLOBALS['__help_commands'] = [
                 'example' => '.my-class or #my-id'
             ],
             'styles' => [
-                'required' => true,
+                'required' => 'conditional',
                 'type' => 'string|object',
-                'description' => 'CSS declarations as string or object',
+                'description' => 'CSS declarations as string or object. Required unless removeProperties is provided.',
                 'example' => '"background: #fff; padding: 10px;" or {"background": "#fff", "padding": "10px"}'
+            ],
+            'removeProperties' => [
+                'required' => false,
+                'type' => 'array',
+                'description' => 'Array of property names to remove from the rule. If all properties are removed, the entire rule is deleted.',
+                'example' => '["margin", "padding", "border"]'
             ],
             'mediaQuery' => [
                 'required' => false,
@@ -1814,26 +1820,28 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'example_post' => 'POST /management/setStyleRule with body: {"selector": ".btn-custom", "styles": {"background": "#007bff", "color": "white"}}',
+        'example_remove' => 'PATCH /management/setStyleRule with body: {"selector": ".btn-custom", "removeProperties": ["margin", "padding"]}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
             'message' => 'Style rule added/updated successfully',
             'data' => [
-                'action' => 'added',
+                'action' => 'added|updated|deleted',
                 'selector' => '.btn-custom',
                 'mediaQuery' => null,
-                'styles' => 'background: #007bff; color: white;'
+                'styles' => 'background: #007bff; color: white;',
+                'removedProperties' => ['margin', 'padding']
             ]
         ],
         'error_responses' => [
-            '400.validation.required' => 'Missing selector or styles parameter',
+            '400.validation.required' => 'Missing selector, or neither styles nor removeProperties provided',
             '400.validation.invalid_format' => 'Invalid selector or styles format',
             '400.validation.security' => 'Dangerous CSS pattern detected (javascript:, expression(), etc.)',
             '400.validation.invalid_media_query' => 'Invalid media query format',
             '404.file.not_found' => 'Style file not found',
             '500.server.file_write_failed' => 'Failed to write style file'
         ],
-        'notes' => 'Styles can be string or object format. Object format: {"property": "value"}. Security validated. Creates media query block if specified but not exists.'
+        'notes' => 'Styles can be string or object format. Use removeProperties to selectively delete properties. If removing properties leaves the rule empty, it is automatically deleted (action: deleted). Security validated.'
     ],
     
     'deleteStyleRule' => [
@@ -1870,6 +1878,58 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'Failed to write style file'
         ],
         'notes' => 'Permanently removes the CSS rule. Use getStyleRule first to confirm selector exists. Cannot be undone.'
+    ],
+    
+    'listKeyframes' => [
+        'description' => 'Returns a lightweight list of all @keyframes animation names (without frame details)',
+        'method' => 'GET',
+        'url_structure' => '/management/listKeyframes',
+        'parameters' => [],
+        'example_get' => 'GET /management/listKeyframes',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Keyframe names retrieved successfully',
+            'data' => [
+                'animations' => ['fadeIn', 'slideInFromLeft', 'bounce', 'pulse'],
+                'count' => 4
+            ]
+        ],
+        'error_responses' => [
+            '404.file.not_found' => 'Style file not found'
+        ],
+        'notes' => 'Lightweight alternative to getKeyframes when you only need animation names. Use getKeyframes for full frame content.'
+    ],
+    
+    'getAnimatedSelectors' => [
+        'description' => 'Returns all CSS selectors using animations, grouped by animation name with orphan detection',
+        'method' => 'GET',
+        'url_structure' => '/management/getAnimatedSelectors',
+        'parameters' => [],
+        'example_get' => 'GET /management/getAnimatedSelectors',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Animated selectors retrieved successfully',
+            'data' => [
+                'animations' => [
+                    'fadeIn' => [
+                        'exists' => true,
+                        'selectors' => ['.hero-title', '.card-content']
+                    ],
+                    'unknownAnim' => [
+                        'exists' => false,
+                        'selectors' => ['.orphan-element']
+                    ]
+                ],
+                'orphanAnimations' => ['unknownAnim'],
+                'totalSelectors' => 3
+            ]
+        ],
+        'error_responses' => [
+            '404.file.not_found' => 'Style file not found'
+        ],
+        'notes' => 'Useful for finding which elements use animations and detecting orphan animations (referenced but not defined). Checks both animation and animation-name properties.'
     ],
     
     'getKeyframes' => [
@@ -1921,15 +1981,22 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'object',
                 'description' => 'Object with frame keys (0%, 50%, 100%, from, to) and CSS values',
                 'example' => '{"from": "opacity: 0;", "to": "opacity: 1;"} or {"0%, 100%": "transform: scale(1);", "50%": "transform: scale(1.1);"}'
+            ],
+            'allowOverwrite' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'If false, returns error when animation exists. If true (default), overwrites existing animation.',
+                'example' => 'false'
             ]
         ],
         'example_patch' => 'PATCH /management/setKeyframes with body: {"name": "bounce", "frames": {"0%, 100%": "transform: translateY(0);", "50%": "transform: translateY(-20px);"}}',
+        'example_no_overwrite' => 'PATCH /management/setKeyframes with body: {"name": "newAnim", "frames": {...}, "allowOverwrite": false}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
             'message' => 'Keyframe animation added/updated successfully',
             'data' => [
-                'action' => 'added',
+                'action' => 'added|updated',
                 'name' => 'bounce',
                 'frames' => ['0%, 100%', '50%']
             ]
@@ -1939,10 +2006,11 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'Invalid name format (must start with letter, alphanumeric only)',
             '400.validation.invalid_frame' => 'Invalid frame key (must be percentage or from/to)',
             '400.validation.security' => 'Dangerous CSS pattern detected',
+            '409.keyframes.exists' => 'Animation already exists (when allowOverwrite is false)',
             '404.file.not_found' => 'Style file not found',
             '500.server.file_write_failed' => 'Failed to write style file'
         ],
-        'notes' => 'Frame keys: percentages (0%, 50%, 100%), combined (0%, 100%), or keywords (from, to). Security validated against CSS injection.'
+        'notes' => 'Frame keys: percentages (0%, 50%, 100%), combined (0%, 100%), or keywords (from, to). Use allowOverwrite:false to prevent accidental overwrites. Security validated against CSS injection.'
     ],
     
     'deleteKeyframes' => [

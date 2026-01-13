@@ -4673,6 +4673,44 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
+                                                                "textKey": "__RAW__removeProperties"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.optional"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.setStyleRule.params.removeProperties"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
                                                                 "textKey": "__RAW__mediaQuery"
                                                             }
                                                         ]
@@ -4900,6 +4938,128 @@
                         "tag": "div",
                         "params": {
                             "class": "command-card",
+                            "id": "cmd-listKeyframes"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__listKeyframes"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/listKeyframes"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.listKeyframes.desc"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
+                            "id": "cmd-getAnimatedSelectors"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "command-header"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h3",
+                                        "params": {
+                                            "class": "command-name"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__getAnimatedSelectors"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "span",
+                                        "params": {
+                                            "class": "method-badge method-get"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "__RAW__GET"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "params": {
+                                    "class": "command-url"
+                                },
+                                "tag": "code",
+                                "children": [
+                                    {
+                                        "textKey": "__RAW__GET /management/getAnimatedSelectors"
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "command-desc"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "docs.cmd.getAnimatedSelectors.desc"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "command-card",
                             "id": "cmd-getKeyframes"
                         },
                         "children": [
@@ -5107,6 +5267,44 @@
                                                         "children": [
                                                             {
                                                                 "textKey": "docs.cmd.setKeyframes.params.frames"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "li",
+                                                "children": [
+                                                    {
+                                                        "params": {
+                                                            "class": "param-name"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "__RAW__allowOverwrite"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-optional"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.labels.optional"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "params": {
+                                                            "class": "param-desc"
+                                                        },
+                                                        "tag": "span",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.cmd.setKeyframes.params.allowOverwrite"
                                                             }
                                                         ]
                                                     }

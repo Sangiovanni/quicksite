@@ -1042,7 +1042,7 @@
                         "tag": "code",
                         "children": [
                             {
-                                "textKey": "__RAW__# Create a fade-in animation\ncurl -X POST http://yoursite.local/management/setKeyframes \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"name\": \"fadeInUp\",\n    \"frames\": {\n      \"from\": \"opacity: 0; transform: translateY(20px);\",\n      \"to\": \"opacity: 1; transform: translateY(0);\"\n    }\n  }'"
+                                "textKey": "__RAW__# Create a fade-in animation\ncurl -X PATCH http://yoursite.local/management/setKeyframes \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"name\": \"fadeInUp\",\n    \"frames\": {\n      \"from\": \"opacity: 0; transform: translateY(20px);\",\n      \"to\": \"opacity: 1; transform: translateY(0);\"\n    },\n    \"allowOverwrite\": true\n  }'"
                             }
                         ]
                     }

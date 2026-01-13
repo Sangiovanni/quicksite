@@ -288,11 +288,31 @@ class CssParser {
                     // Merge with existing rule
                     $existingStyles = $match[1];
                     $mergedStyles = $this->mergeStyles($existingStyles, $styles, $removeProperties);
-                    $safeStyles = str_replace(['\\', '$'], ['\\\\', '\\$'], $mergedStyles);
                     
-                    $replacePattern = '/(' . $escapedSelector . '\s*\{)[^}]*(\})/s';
-                    $newMediaContent = preg_replace($replacePattern, '${1}' . "\n" . $safeStyles . "\n" . '${2}', $mediaContent);
-                    $action = 'updated';
+                    // If merged result is empty, remove the rule from media query
+                    if (trim($mergedStyles) === '') {
+                        $replacePattern = '/\s*' . $escapedSelector . '\s*\{[^}]*\}/s';
+                        $newMediaContent = preg_replace($replacePattern, '', $mediaContent);
+                        
+                        // If media query is now empty, delete the entire media block
+                        if (trim($newMediaContent) === '') {
+                            $this->content = substr($this->content, 0, $mediaStart) . substr($this->content, $mediaStart + strlen($mediaFull));
+                            // Clean up extra newlines
+                            $this->content = preg_replace('/\n{3,}/', "\n\n", $this->content);
+                            return [
+                                'action' => 'deleted',
+                                'selector' => $selector,
+                                'mediaQuery' => $mediaQuery
+                            ];
+                        }
+                        
+                        $action = 'deleted';
+                    } else {
+                        $safeStyles = str_replace(['\\', '$'], ['\\\\', '\\$'], $mergedStyles);
+                        $replacePattern = '/(' . $escapedSelector . '\s*\{)[^}]*(\})/s';
+                        $newMediaContent = preg_replace($replacePattern, '${1}' . "\n" . $safeStyles . "\n" . '${2}', $mediaContent);
+                        $action = 'updated';
+                    }
                 } else {
                     // Add new rule to media query
                     $formattedStyles = $this->formatStyles($styles);
@@ -319,6 +339,16 @@ class CssParser {
                 // Merge with existing styles
                 $action = 'updated';
                 $mergedStyles = $this->mergeStyles($existing['styles'], $styles, $removeProperties);
+                
+                // If merged result is empty, delete the rule entirely
+                if (trim($mergedStyles) === '') {
+                    $this->deleteStyleRule($selector, null);
+                    return [
+                        'action' => 'deleted',
+                        'selector' => $selector,
+                        'mediaQuery' => $mediaQuery
+                    ];
+                }
                 
                 // Find and replace the rule outside of @media blocks
                 $this->content = $this->replaceGlobalRule($selector, $mergedStyles);

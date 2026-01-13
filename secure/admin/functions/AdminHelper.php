@@ -128,7 +128,7 @@ function getCommandCategories(): array {
         'css_animations' => [
             'label' => 'CSS Animations',
             'icon' => 'animation',
-            'commands' => ['getKeyframes', 'setKeyframes', 'deleteKeyframes']
+            'commands' => ['listKeyframes', 'getKeyframes', 'getAnimatedSelectors', 'setKeyframes', 'deleteKeyframes']
         ],
         'site_customization' => [
             'label' => 'Site Customization',

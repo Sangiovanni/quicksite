@@ -276,10 +276,11 @@
                 "desc": "Get CSS styles for a specific selector, optionally within a media query context"
             },
             "setStyleRule": {
-                "desc": "Add or update a CSS rule for any selector",
+                "desc": "Add, update, or selectively remove properties from a CSS rule",
                 "params": {
                     "selector": "CSS selector (e.g., .btn-primary)",
-                    "styles": "CSS declarations (string or object)",
+                    "styles": "CSS declarations (string or object). Required unless removeProperties is provided",
+                    "removeProperties": "Array of CSS property names to remove from the rule",
                     "mediaQuery": "Media query context (optional)"
                 }
             },
@@ -290,6 +291,12 @@
                     "mediaQuery": "Media query context (optional)"
                 }
             },
+            "listKeyframes": {
+                "desc": "Returns a lightweight list of all @keyframes animation names"
+            },
+            "getAnimatedSelectors": {
+                "desc": "Returns all CSS selectors using animations, grouped by animation name with orphan detection"
+            },
             "getKeyframes": {
                 "desc": "Retrieves all @keyframes animations defined in the stylesheet"
             },
@@ -297,7 +304,8 @@
                 "desc": "Add or update a @keyframes animation",
                 "params": {
                     "name": "Animation name (alphanumeric)",
-                    "frames": "Object with frame keys (0%, 50%, from, to)"
+                    "frames": "Object with frame keys (0%, 50%, from, to)",
+                    "allowOverwrite": "If false, returns error when animation exists (default: true)"
                 }
             },
             "deleteKeyframes": {

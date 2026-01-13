@@ -545,6 +545,12 @@ if (is_dir($componentsDir)) {
                                 </svg>
                                 <?= __admin('preview.editStyles') ?? 'Edit Styles' ?>
                             </button>
+                            <button type="button" class="admin-btn admin-btn--sm admin-btn--secondary" id="selector-animate-btn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                    <polygon points="5 3 19 12 5 21 5 3"/>
+                                </svg>
+                                <?= __admin('preview.animate') ?? 'Animate' ?>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1455,6 +1461,516 @@ if (is_dir($componentsDir)) {
     </div>
 </div>
 
+<!-- Transform Editor Modal (Phase 9.3.1 Step 5) -->
+<div class="preview-keyframe-modal transform-editor" id="transform-editor-modal">
+    <div class="preview-keyframe-modal__backdrop"></div>
+    <div class="preview-keyframe-modal__content transform-editor__content">
+        <div class="preview-keyframe-modal__header">
+            <h3><?= __admin('preview.transformEditor') ?? 'Transform Editor' ?></h3>
+            <button type="button" class="preview-keyframe-modal__close" id="transform-editor-close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="preview-keyframe-modal__body transform-editor__body">
+            <!-- Current Transform Preview -->
+            <div class="transform-editor__preview">
+                <label><?= __admin('preview.currentTransform') ?? 'Current Transform' ?>:</label>
+                <code id="transform-current-value" class="transform-editor__current">none</code>
+            </div>
+            
+            <!-- Functions List -->
+            <div class="transform-editor__functions">
+                <div class="transform-editor__functions-header">
+                    <label><?= __admin('preview.activeFunctions') ?? 'Active Functions' ?>:</label>
+                    <div class="transform-editor__add-wrapper">
+                        <button type="button" class="admin-btn admin-btn--sm admin-btn--secondary" id="transform-add-btn">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"/>
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            <?= __admin('preview.addFunction') ?? 'Add Function' ?>
+                        </button>
+                        <div class="transform-editor__dropdown" id="transform-add-dropdown">
+                            <div class="transform-editor__dropdown-category">
+                                <div class="transform-editor__dropdown-label"><?= __admin('preview.translate') ?? 'Translate' ?></div>
+                                <button type="button" data-fn="translateX">translateX</button>
+                                <button type="button" data-fn="translateY">translateY</button>
+                                <button type="button" data-fn="translateZ">translateZ</button>
+                                <button type="button" data-fn="translate">translate (X, Y)</button>
+                                <button type="button" data-fn="translate3d">translate3d</button>
+                            </div>
+                            <div class="transform-editor__dropdown-category">
+                                <div class="transform-editor__dropdown-label"><?= __admin('preview.rotate') ?? 'Rotate' ?></div>
+                                <button type="button" data-fn="rotate">rotate</button>
+                                <button type="button" data-fn="rotateX">rotateX</button>
+                                <button type="button" data-fn="rotateY">rotateY</button>
+                                <button type="button" data-fn="rotateZ">rotateZ</button>
+                                <button type="button" data-fn="rotate3d">rotate3d</button>
+                            </div>
+                            <div class="transform-editor__dropdown-category">
+                                <div class="transform-editor__dropdown-label"><?= __admin('preview.scale') ?? 'Scale' ?></div>
+                                <button type="button" data-fn="scale">scale (X, Y)</button>
+                                <button type="button" data-fn="scaleX">scaleX</button>
+                                <button type="button" data-fn="scaleY">scaleY</button>
+                                <button type="button" data-fn="scaleZ">scaleZ</button>
+                                <button type="button" data-fn="scale3d">scale3d</button>
+                            </div>
+                            <div class="transform-editor__dropdown-category">
+                                <div class="transform-editor__dropdown-label"><?= __admin('preview.skew') ?? 'Skew' ?></div>
+                                <button type="button" data-fn="skew">skew (X, Y)</button>
+                                <button type="button" data-fn="skewX">skewX</button>
+                                <button type="button" data-fn="skewY">skewY</button>
+                            </div>
+                            <div class="transform-editor__dropdown-category">
+                                <div class="transform-editor__dropdown-label"><?= __admin('preview.other') ?? 'Other' ?></div>
+                                <button type="button" data-fn="perspective">perspective</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="transform-editor__functions-list" id="transform-functions-list">
+                    <!-- Function rows will be rendered here -->
+                </div>
+            </div>
+        </div>
+        
+        <div class="preview-keyframe-modal__footer">
+            <div class="preview-keyframe-modal__footer-left">
+                <button type="button" class="admin-btn admin-btn--sm admin-btn--danger" id="transform-clear">
+                    <?= __admin('preview.clearAll') ?? 'Clear All' ?>
+                </button>
+            </div>
+            <div class="preview-keyframe-modal__footer-right">
+                <button type="button" class="admin-btn admin-btn--ghost" id="transform-cancel"><?= __admin('common.cancel') ?></button>
+                <button type="button" class="admin-btn admin-btn--primary" id="transform-apply"><?= __admin('preview.apply') ?? 'Apply' ?></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transition Editor Modal -->
+<div class="preview-keyframe-modal transition-editor" id="transition-editor-modal">
+    <div class="preview-keyframe-modal__backdrop"></div>
+    <div class="preview-keyframe-modal__content transition-editor__content">
+        <div class="preview-keyframe-modal__header">
+            <h3><?= __admin('preview.stateAnimationEditor') ?? 'State & Animation Editor' ?></h3>
+            <span class="transition-editor__selector" id="transition-editor-selector">.selector</span>
+            <button type="button" class="preview-keyframe-modal__close" id="transition-editor-close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="preview-keyframe-modal__body transition-editor__body">
+            <!-- Split View: Base State vs Trigger State -->
+            <div class="transition-editor__states">
+                <!-- Base State Panel -->
+                <div class="transition-editor__state-panel">
+                    <div class="transition-editor__state-header">
+                        <span class="transition-editor__state-label"><?= __admin('preview.baseState') ?? 'Base State' ?></span>
+                        <code class="transition-editor__state-selector" id="transition-base-selector">.selector</code>
+                    </div>
+                    <div class="transition-editor__state-properties" id="transition-base-properties">
+                        <!-- Base state properties will be rendered here -->
+                        <div class="transition-editor__empty"><?= __admin('preview.selectSelectorFirst') ?? 'Select a selector first' ?></div>
+                    </div>
+                    <!-- Inline Add Property Form for Base State -->
+                    <div class="transition-editor__add-property" id="transition-base-add-property">
+                        <button type="button" class="transition-editor__add-property-toggle" id="transition-base-add-toggle">
+                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            <?= __admin('preview.addProperty') ?? 'Add Property' ?>
+                        </button>
+                        <div class="transition-editor__add-property-form" id="transition-base-add-form" style="display: none;">
+                            <div class="transition-editor__property-selector" id="transition-base-prop-selector"></div>
+                            <div class="transition-editor__add-property-row">
+                                <div class="transition-editor__value-container" id="transition-base-value-container"></div>
+                                <button type="button" class="transition-editor__add-property-confirm" id="transition-base-add-confirm">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                    </svg>
+                                </button>
+                                <button type="button" class="transition-editor__add-property-cancel" id="transition-base-add-cancel">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Arrow -->
+                <div class="transition-editor__arrow">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                        <polyline points="12 5 19 12 12 19"/>
+                    </svg>
+                </div>
+                
+                <!-- Trigger State Panel -->
+                <div class="transition-editor__state-panel">
+                    <div class="transition-editor__state-header">
+                        <span class="transition-editor__state-label" id="transition-trigger-label"><?= __admin('preview.triggerState') ?? 'Trigger State' ?></span>
+                        <select class="transition-editor__pseudo-select" id="transition-pseudo-select">
+                            <option value=":hover">:hover</option>
+                            <option value=":focus">:focus</option>
+                            <option value=":active">:active</option>
+                            <option value=":focus-visible">:focus-visible</option>
+                            <option value=":focus-within">:focus-within</option>
+                        </select>
+                    </div>
+                    <div class="transition-editor__state-properties" id="transition-hover-properties">
+                        <!-- Trigger state properties will be rendered here -->
+                        <div class="transition-editor__empty"><?= __admin('preview.noTriggerStyles') ?? 'No trigger styles defined' ?></div>
+                    </div>
+                    <!-- Inline Add Property Form for Trigger State -->
+                    <div class="transition-editor__add-property" id="transition-trigger-add-property">
+                        <button type="button" class="transition-editor__add-property-toggle" id="transition-trigger-add-toggle">
+                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            <span id="transition-trigger-add-text"><?= __admin('preview.addProperty') ?? 'Add Property' ?></span>
+                        </button>
+                        <div class="transition-editor__add-property-form" id="transition-trigger-add-form" style="display: none;">
+                            <div class="transition-editor__property-selector" id="transition-trigger-prop-selector"></div>
+                            <div class="transition-editor__add-property-row">
+                                <div class="transition-editor__value-container" id="transition-trigger-value-container"></div>
+                                <button type="button" class="transition-editor__add-property-confirm" id="transition-trigger-add-confirm">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                    </svg>
+                                </button>
+                                <button type="button" class="transition-editor__add-property-cancel" id="transition-trigger-add-cancel">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Transition Settings -->
+            <div class="transition-editor__settings">
+                <div class="transition-editor__settings-header">
+                    <h4 class="transition-editor__settings-title"><?= __admin('preview.transitionSettings') ?? 'Transition Settings' ?></h4>
+                    <span class="transition-editor__settings-hint" title="<?= __admin('preview.transitionHint') ?? 'Transitions animate property changes between states. Defined on base, applies to all state changes.' ?>">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                        </svg>
+                    </span>
+                </div>
+                <p class="transition-editor__settings-description"><?= __admin('preview.transitionDescription') ?? 'Smoothly animates property changes when triggered (hover, focus, etc.)' ?></p>
+                
+                <div class="transition-editor__settings-grid">
+                    <!-- Properties to Transition -->
+                    <div class="transition-editor__setting">
+                        <label><?= __admin('preview.transitionProperty') ?? 'Properties' ?>:</label>
+                        <select class="transition-editor__property-select" id="transition-property-select">
+                            <option value="all"><?= __admin('preview.allProperties') ?? 'All Properties' ?></option>
+                            <option value="specific"><?= __admin('preview.specificProperties') ?? 'Specific Properties...' ?></option>
+                        </select>
+                        <div class="transition-editor__specific-props" id="transition-specific-props" style="display: none;">
+                            <!-- Checkboxes for specific properties -->
+                        </div>
+                    </div>
+                    
+                    <!-- Duration -->
+                    <div class="transition-editor__setting">
+                        <label><?= __admin('preview.transitionDuration') ?? 'Duration' ?>:</label>
+                        <div class="transition-editor__input-group">
+                            <input type="number" id="transition-duration" class="admin-input" value="0.3" min="0" max="60" step="0.1">
+                            <select class="transition-editor__unit-select" id="transition-duration-unit">
+                                <option value="s">s</option>
+                                <option value="ms">ms</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Delay -->
+                    <div class="transition-editor__setting">
+                        <label><?= __admin('preview.transitionDelay') ?? 'Delay' ?>:</label>
+                        <div class="transition-editor__input-group">
+                            <input type="number" id="transition-delay" class="admin-input" value="0" min="0" max="60" step="0.1">
+                            <select class="transition-editor__unit-select" id="transition-delay-unit">
+                                <option value="s">s</option>
+                                <option value="ms">ms</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Timing Function -->
+                    <div class="transition-editor__setting transition-editor__setting--wide">
+                        <label><?= __admin('preview.timingFunction') ?? 'Timing Function' ?>:</label>
+                        <div class="transition-editor__timing-row">
+                            <select class="transition-editor__timing-select" id="transition-timing-select">
+                                <option value="ease">ease</option>
+                                <option value="linear">linear</option>
+                                <option value="ease-in">ease-in</option>
+                                <option value="ease-out">ease-out</option>
+                                <option value="ease-in-out">ease-in-out</option>
+                                <option value="cubic-bezier"><?= __admin('preview.customCubicBezier') ?? 'Custom cubic-bezier...' ?></option>
+                            </select>
+                            <div class="transition-editor__cubic-bezier" id="transition-cubic-bezier" style="display: none;">
+                                <span>cubic-bezier(</span>
+                                <input type="number" id="transition-bezier-x1" class="admin-input admin-input--mini" value="0.4" min="0" max="1" step="0.1">
+                                <span>,</span>
+                                <input type="number" id="transition-bezier-y1" class="admin-input admin-input--mini" value="0" step="0.1">
+                                <span>,</span>
+                                <input type="number" id="transition-bezier-x2" class="admin-input admin-input--mini" value="0.2" min="0" max="1" step="0.1">
+                                <span>,</span>
+                                <input type="number" id="transition-bezier-y2" class="admin-input admin-input--mini" value="1" step="0.1">
+                                <span>)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Transition Preview String -->
+                <div class="transition-editor__preview-value">
+                    <label><?= __admin('preview.transitionValue') ?? 'Transition Value' ?>:</label>
+                    <code id="transition-preview-code">all 0.3s ease</code>
+                </div>
+            </div>
+            
+            <!-- Animation Sections (Phase 10.3) -->
+            <div class="transition-editor__animations">
+                <div class="transition-editor__animations-info">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                    </svg>
+                    <span><?= __admin('preview.animationsIndependent') ?? 'Animations are independent from transitions. You can use one, both, or neither.' ?></span>
+                </div>
+                
+                <div class="transition-editor__animations-row">
+                <!-- Base Animation (plays on load) -->
+                <div class="transition-editor__animation-section">
+                    <div class="transition-editor__animation-header">
+                        <span class="transition-editor__animation-label">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                            <?= __admin('preview.baseAnimation') ?? 'Base Animation' ?>
+                        </span>
+                        <span class="transition-editor__animation-hint"><?= __admin('preview.playsOnLoad') ?? '(plays on load)' ?></span>
+                    </div>
+                    <div class="transition-editor__animation-content" id="transition-base-animation">
+                        <div class="transition-editor__animation-empty" id="transition-base-animation-empty">
+                            <?= __admin('preview.noAnimationSet') ?? 'No animation set' ?>
+                        </div>
+                        <div class="transition-editor__animation-config" id="transition-base-animation-config" style="display: none;">
+                            <div class="transition-editor__animation-name">
+                                <span id="transition-base-animation-name">@keyframes name</span>
+                                <button type="button" class="transition-editor__animation-preview" id="transition-base-animation-preview-btn" title="<?= __admin('preview.previewAnimation') ?? 'Preview' ?>">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polygon points="5 3 19 12 5 21 5 3"/>
+                                    </svg>
+                                </button>
+                                <button type="button" class="transition-editor__animation-remove" id="transition-base-animation-remove" title="<?= __admin('common.remove') ?? 'Remove' ?>">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="transition-editor__animation-settings">
+                                <div class="transition-editor__anim-setting">
+                                    <label><?= __admin('preview.animDuration') ?? 'Duration' ?>:</label>
+                                    <input type="number" id="transition-base-anim-duration" class="admin-input admin-input--mini" value="1000" min="0" step="100">
+                                    <span>ms</span>
+                                </div>
+                                <div class="transition-editor__anim-setting">
+                                    <label><?= __admin('preview.iterations') ?? 'Iterations' ?>:</label>
+                                    <input type="number" id="transition-base-anim-iterations" class="admin-input admin-input--mini" value="1" min="1" max="100">
+                                    <label class="transition-editor__anim-checkbox">
+                                        <input type="checkbox" id="transition-base-anim-infinite">
+                                        <?= __admin('preview.infinite') ?? '∞' ?>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="transition-editor__animation-add" id="transition-base-animation-add">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        <?= __admin('preview.addAnimation') ?? 'Add Animation' ?>
+                    </button>
+                </div>
+                
+                <!-- Trigger Animation (plays on hover/focus/etc) -->
+                <div class="transition-editor__animation-section">
+                    <div class="transition-editor__animation-header">
+                        <span class="transition-editor__animation-label">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M5.52 19c.64-2.2 1.84-3 3.22-3h6.52c1.38 0 2.58.8 3.22 3"/>
+                                <circle cx="12" cy="10" r="3"/>
+                                <circle cx="12" cy="12" r="10"/>
+                            </svg>
+                            <span id="transition-trigger-animation-label"><?= __admin('preview.triggerAnimation') ?? 'Trigger Animation' ?></span>
+                        </span>
+                        <span class="transition-editor__animation-hint" id="transition-trigger-animation-hint"><?= __admin('preview.playsOnTrigger') ?? '(plays on :hover)' ?></span>
+                    </div>
+                    <div class="transition-editor__animation-content" id="transition-trigger-animation">
+                        <div class="transition-editor__animation-empty" id="transition-trigger-animation-empty">
+                            <?= __admin('preview.noAnimationSet') ?? 'No animation set' ?>
+                        </div>
+                        <div class="transition-editor__animation-config" id="transition-trigger-animation-config" style="display: none;">
+                            <div class="transition-editor__animation-name">
+                                <span id="transition-trigger-animation-name">@keyframes name</span>
+                                <button type="button" class="transition-editor__animation-preview" id="transition-trigger-animation-preview-btn" title="<?= __admin('preview.previewAnimation') ?? 'Preview' ?>">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polygon points="5 3 19 12 5 21 5 3"/>
+                                    </svg>
+                                </button>
+                                <button type="button" class="transition-editor__animation-remove" id="transition-trigger-animation-remove" title="<?= __admin('common.remove') ?? 'Remove' ?>">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="transition-editor__animation-settings">
+                                <div class="transition-editor__anim-setting">
+                                    <label><?= __admin('preview.animDuration') ?? 'Duration' ?>:</label>
+                                    <input type="number" id="transition-trigger-anim-duration" class="admin-input admin-input--mini" value="1000" min="0" step="100">
+                                    <span>ms</span>
+                                </div>
+                                <div class="transition-editor__anim-setting">
+                                    <label><?= __admin('preview.iterations') ?? 'Iterations' ?>:</label>
+                                    <input type="number" id="transition-trigger-anim-iterations" class="admin-input admin-input--mini" value="1" min="1" max="100">
+                                    <label class="transition-editor__anim-checkbox">
+                                        <input type="checkbox" id="transition-trigger-anim-infinite">
+                                        <?= __admin('preview.infinite') ?? '∞' ?>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="transition-editor__animation-add" id="transition-trigger-animation-add">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        <?= __admin('preview.addAnimation') ?? 'Add Animation' ?>
+                    </button>
+                </div>
+                </div><!-- end animations-row -->
+            </div>
+        </div>
+        
+        <div class="preview-keyframe-modal__footer">
+            <div class="preview-keyframe-modal__footer-left">
+                <button type="button" class="admin-btn admin-btn--sm admin-btn--secondary" id="transition-preview-btn">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    <?= __admin('preview.previewHover') ?? 'Preview Hover' ?>
+                </button>
+            </div>
+            <div class="preview-keyframe-modal__footer-right">
+                <button type="button" class="admin-btn admin-btn--ghost" id="transition-cancel"><?= __admin('common.cancel') ?></button>
+                <button type="button" class="admin-btn admin-btn--primary" id="transition-save"><?= __admin('common.save') ?></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Animation Preview Modal (Phase 9.5) -->
+<div class="preview-keyframe-modal animation-preview" id="animation-preview-modal">
+    <div class="preview-keyframe-modal__backdrop"></div>
+    <div class="preview-keyframe-modal__content animation-preview__content">
+        <div class="preview-keyframe-modal__header">
+            <h3><?= __admin('preview.animationPreview') ?? 'Animation Preview' ?></h3>
+            <span class="animation-preview__keyframe-name" id="animation-preview-name">@keyframes name</span>
+            <button type="button" class="preview-keyframe-modal__close" id="animation-preview-close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="preview-keyframe-modal__body animation-preview__body">
+            <!-- Preview Stage -->
+            <div class="animation-preview__stage" id="animation-preview-stage">
+                <img src="<?= $baseUrl ?>/admin/assets/images/favicon.png" alt="Preview" class="animation-preview__logo" id="animation-preview-logo">
+            </div>
+            
+            <!-- Animation Controls -->
+            <div class="animation-preview__controls">
+                <!-- Duration -->
+                <div class="animation-preview__control">
+                    <label for="animation-preview-duration"><?= __admin('preview.animDuration') ?? 'Duration' ?>:</label>
+                    <div class="animation-preview__input-group">
+                        <input type="number" id="animation-preview-duration" class="admin-input" value="1000" min="100" max="10000" step="100">
+                        <span class="animation-preview__unit">ms</span>
+                    </div>
+                </div>
+                
+                <!-- Timing Function -->
+                <div class="animation-preview__control">
+                    <label for="animation-preview-timing"><?= __admin('preview.timingFunction') ?? 'Timing Function' ?>:</label>
+                    <select id="animation-preview-timing" class="admin-select">
+                        <option value="ease" selected>ease</option>
+                        <option value="linear">linear</option>
+                        <option value="ease-in">ease-in</option>
+                        <option value="ease-out">ease-out</option>
+                        <option value="ease-in-out">ease-in-out</option>
+                    </select>
+                </div>
+                
+                <!-- Delay -->
+                <div class="animation-preview__control">
+                    <label for="animation-preview-delay"><?= __admin('preview.animDelay') ?? 'Delay' ?>:</label>
+                    <div class="animation-preview__input-group">
+                        <input type="number" id="animation-preview-delay" class="admin-input" value="0" min="0" max="5000" step="100">
+                        <span class="animation-preview__unit">ms</span>
+                    </div>
+                </div>
+                
+                <!-- Iteration Count -->
+                <div class="animation-preview__control">
+                    <label for="animation-preview-count"><?= __admin('preview.animIterations') ?? 'Iterations' ?>:</label>
+                    <div class="animation-preview__input-group">
+                        <input type="number" id="animation-preview-count" class="admin-input" value="1" min="1" max="100" step="1">
+                        <label class="animation-preview__checkbox">
+                            <input type="checkbox" id="animation-preview-infinite">
+                            <span><?= __admin('preview.infinite') ?? 'Infinite' ?></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Generated Animation CSS -->
+            <div class="animation-preview__css-preview">
+                <label><?= __admin('preview.generatedCSS') ?? 'Generated CSS' ?>:</label>
+                <code id="animation-preview-css">animation: 1000ms ease 0ms keyframeName; animation-iteration-count: 1;</code>
+            </div>
+        </div>
+        
+        <div class="preview-keyframe-modal__footer">
+            <div class="preview-keyframe-modal__footer-left">
+                <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="animation-preview-play">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    <?= __admin('preview.playAnimation') ?? 'Play Animation' ?>
+                </button>
+            </div>
+            <div class="preview-keyframe-modal__footer-right">
+                <button type="button" class="admin-btn admin-btn--ghost" id="animation-preview-done"><?= __admin('common.close') ?? 'Close' ?></button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Preview Frame Container -->
 <div class="preview-container" id="preview-container">
     <!-- Miniplayer floating controls (visible only in miniplayer mode) -->
@@ -1598,6 +2114,7 @@ if (is_dir($componentsDir)) {
     const selectorSelectedClear = document.getElementById('selector-selected-clear');
     const selectorMatchCount = document.getElementById('selector-match-count');
     const selectorEditBtn = document.getElementById('selector-edit-btn');
+    const selectorAnimateBtn = document.getElementById('selector-animate-btn');
     
     // Style Editor elements (Phase 8.5)
     const styleEditor = document.getElementById('style-editor');
@@ -1702,6 +2219,2867 @@ if (is_dir($componentsDir)) {
     let keyframeFrames = {};          // Current frame data: { '0%': { opacity: '0' }, '100%': { opacity: '1' } }
     let selectedFramePercent = null;  // Currently selected frame in timeline
     
+    // ==================== Property Type Registry (Phase 9.3.1) ====================
+    
+    /**
+     * Property type definitions for keyframe editor
+     * Maps CSS property names to input types and configurations
+     */
+    const KEYFRAME_PROPERTY_TYPES = {
+        // Opacity - range slider 0-1
+        opacity: { type: 'range', min: 0, max: 1, step: 0.01 },
+        
+        // Color properties - color picker
+        'color': { type: 'color' },
+        'background-color': { type: 'color' },
+        'border-color': { type: 'color' },
+        'border-top-color': { type: 'color' },
+        'border-right-color': { type: 'color' },
+        'border-bottom-color': { type: 'color' },
+        'border-left-color': { type: 'color' },
+        'outline-color': { type: 'color' },
+        'fill': { type: 'color' },
+        'stroke': { type: 'color' },
+        'text-decoration-color': { type: 'color' },
+        'caret-color': { type: 'color' },
+        
+        // Length properties - number + unit dropdown
+        'width': { type: 'length', units: ['px', '%', 'em', 'rem', 'vw', 'vh', 'auto'] },
+        'height': { type: 'length', units: ['px', '%', 'em', 'rem', 'vw', 'vh', 'auto'] },
+        'min-width': { type: 'length', units: ['px', '%', 'em', 'rem', 'vw', 'vh'] },
+        'min-height': { type: 'length', units: ['px', '%', 'em', 'rem', 'vw', 'vh'] },
+        'max-width': { type: 'length', units: ['px', '%', 'em', 'rem', 'vw', 'vh', 'none'] },
+        'max-height': { type: 'length', units: ['px', '%', 'em', 'rem', 'vw', 'vh', 'none'] },
+        'top': { type: 'length', units: ['px', '%', 'em', 'rem', 'auto'] },
+        'right': { type: 'length', units: ['px', '%', 'em', 'rem', 'auto'] },
+        'bottom': { type: 'length', units: ['px', '%', 'em', 'rem', 'auto'] },
+        'left': { type: 'length', units: ['px', '%', 'em', 'rem', 'auto'] },
+        'margin': { type: 'length', units: ['px', '%', 'em', 'rem', 'auto'] },
+        'margin-top': { type: 'length', units: ['px', '%', 'em', 'rem', 'auto'] },
+        'margin-right': { type: 'length', units: ['px', '%', 'em', 'rem', 'auto'] },
+        'margin-bottom': { type: 'length', units: ['px', '%', 'em', 'rem', 'auto'] },
+        'margin-left': { type: 'length', units: ['px', '%', 'em', 'rem', 'auto'] },
+        'padding': { type: 'length', units: ['px', '%', 'em', 'rem'] },
+        'padding-top': { type: 'length', units: ['px', '%', 'em', 'rem'] },
+        'padding-right': { type: 'length', units: ['px', '%', 'em', 'rem'] },
+        'padding-bottom': { type: 'length', units: ['px', '%', 'em', 'rem'] },
+        'padding-left': { type: 'length', units: ['px', '%', 'em', 'rem'] },
+        'gap': { type: 'length', units: ['px', '%', 'em', 'rem'] },
+        'row-gap': { type: 'length', units: ['px', '%', 'em', 'rem'] },
+        'column-gap': { type: 'length', units: ['px', '%', 'em', 'rem'] },
+        'border-width': { type: 'length', units: ['px', 'em'] },
+        'border-radius': { type: 'length', units: ['px', '%', 'em', 'rem'] },
+        'font-size': { type: 'length', units: ['px', 'em', 'rem', '%', 'vw'] },
+        'line-height': { type: 'length', units: ['px', 'em', 'rem', '%', ''] },  // '' = unitless
+        'letter-spacing': { type: 'length', units: ['px', 'em', 'normal'] },
+        'word-spacing': { type: 'length', units: ['px', 'em', 'normal'] },
+        'outline-width': { type: 'length', units: ['px', 'em'] },
+        'outline-offset': { type: 'length', units: ['px', 'em'] },
+        
+        // Enumerated values - dropdown
+        'visibility': { type: 'enum', values: ['visible', 'hidden', 'collapse'] },
+        'display': { type: 'enum', values: ['block', 'inline', 'inline-block', 'flex', 'inline-flex', 'grid', 'inline-grid', 'none', 'contents'] },
+        'overflow': { type: 'enum', values: ['visible', 'hidden', 'scroll', 'auto', 'clip'] },
+        'overflow-x': { type: 'enum', values: ['visible', 'hidden', 'scroll', 'auto', 'clip'] },
+        'overflow-y': { type: 'enum', values: ['visible', 'hidden', 'scroll', 'auto', 'clip'] },
+        'position': { type: 'enum', values: ['static', 'relative', 'absolute', 'fixed', 'sticky'] },
+        'pointer-events': { type: 'enum', values: ['auto', 'none'] },
+        'cursor': { type: 'enum', values: ['auto', 'default', 'pointer', 'grab', 'grabbing', 'text', 'crosshair', 'move', 'not-allowed', 'wait', 'progress', 'help', 'none'] },
+        'text-align': { type: 'enum', values: ['left', 'center', 'right', 'justify', 'start', 'end'] },
+        'text-decoration': { type: 'enum', values: ['none', 'underline', 'overline', 'line-through'] },
+        'font-weight': { type: 'enum', values: ['normal', 'bold', '100', '200', '300', '400', '500', '600', '700', '800', '900'] },
+        'font-style': { type: 'enum', values: ['normal', 'italic', 'oblique'] },
+        'white-space': { type: 'enum', values: ['normal', 'nowrap', 'pre', 'pre-wrap', 'pre-line', 'break-spaces'] },
+        'flex-direction': { type: 'enum', values: ['row', 'row-reverse', 'column', 'column-reverse'] },
+        'flex-wrap': { type: 'enum', values: ['nowrap', 'wrap', 'wrap-reverse'] },
+        'justify-content': { type: 'enum', values: ['flex-start', 'flex-end', 'center', 'space-between', 'space-around', 'space-evenly', 'start', 'end'] },
+        'align-items': { type: 'enum', values: ['flex-start', 'flex-end', 'center', 'baseline', 'stretch', 'start', 'end'] },
+        'align-content': { type: 'enum', values: ['flex-start', 'flex-end', 'center', 'space-between', 'space-around', 'stretch', 'start', 'end'] },
+        'align-self': { type: 'enum', values: ['auto', 'flex-start', 'flex-end', 'center', 'baseline', 'stretch'] },
+        
+        // Number properties (unitless)
+        'z-index': { type: 'number', step: 1 },
+        'flex-grow': { type: 'number', min: 0, step: 1 },
+        'flex-shrink': { type: 'number', min: 0, step: 1 },
+        'order': { type: 'number', step: 1 },
+        
+        // Angle properties
+        'rotate': { type: 'angle', units: ['deg', 'rad', 'turn'] },
+        
+        // Scale (unitless numbers, can be space-separated for X Y)
+        'scale': { type: 'text' },  // e.g., "1.5" or "1.2 0.8"
+        
+        // Complex properties - text input fallback (Phase 2 for specialized editors)
+        'transform': { type: 'transform' },  // Phase 9.3.1 Step 5: Transform Sub-Editor
+        'filter': { type: 'text' },
+        'box-shadow': { type: 'text' },
+        'text-shadow': { type: 'text' },
+        'clip-path': { type: 'text' },
+        'background': { type: 'text' },
+        'background-image': { type: 'text' },
+        'transition': { type: 'text' },
+        'animation': { type: 'text' },
+        'translate': { type: 'text' },
+        'skew': { type: 'text' }
+    };
+    
+    /**
+     * CSS Properties organized by category for property selector dropdowns
+     * Used by QSPropertySelector class
+     */
+    const CSS_PROPERTY_CATEGORIES = {
+        'Layout': [
+            'display', 'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
+            'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+            'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+            'box-sizing', 'overflow', 'overflow-x', 'overflow-y'
+        ],
+        'Flexbox': [
+            'flex-direction', 'flex-wrap', 'justify-content', 'align-items', 'align-content',
+            'gap', 'row-gap', 'column-gap', 'flex', 'flex-grow', 'flex-shrink', 'flex-basis',
+            'align-self', 'order'
+        ],
+        'Grid': [
+            'grid-template-columns', 'grid-template-rows', 'grid-gap', 'grid-column-gap',
+            'grid-row-gap', 'grid-auto-flow', 'grid-column', 'grid-row', 'place-items',
+            'place-content', 'place-self'
+        ],
+        'Position': [
+            'position', 'top', 'right', 'bottom', 'left', 'z-index', 'inset'
+        ],
+        'Typography': [
+            'font-family', 'font-size', 'font-weight', 'font-style', 'line-height',
+            'letter-spacing', 'word-spacing', 'text-align', 'text-decoration', 
+            'text-transform', 'white-space', 'word-break', 'text-overflow'
+        ],
+        'Colors': [
+            'color', 'background-color', 'background', 'background-image',
+            'border-color', 'outline-color', 'fill', 'stroke'
+        ],
+        'Borders': [
+            'border', 'border-width', 'border-style', 'border-color', 'border-radius',
+            'border-top', 'border-right', 'border-bottom', 'border-left',
+            'outline', 'outline-width', 'outline-style', 'outline-offset'
+        ],
+        'Effects': [
+            'opacity', 'visibility', 'box-shadow', 'text-shadow', 'filter',
+            'backdrop-filter', 'mix-blend-mode', 'clip-path'
+        ],
+        'Transform': [
+            'transform', 'transform-origin', 'perspective', 'translate', 'rotate', 'scale'
+        ],
+        'Transition': [
+            'transition', 'transition-property', 'transition-duration', 
+            'transition-timing-function', 'transition-delay'
+        ],
+        'Animation': [
+            'animation', 'animation-name', 'animation-duration', 'animation-timing-function',
+            'animation-delay', 'animation-iteration-count', 'animation-direction', 'animation-fill-mode'
+        ],
+        'Other': [
+            'cursor', 'pointer-events', 'user-select', 'content', 'list-style',
+            'object-fit', 'object-position', 'aspect-ratio'
+        ]
+    };
+    
+    /**
+     * QSPropertySelector - Reusable searchable CSS property selector dropdown
+     * Can be used anywhere a property needs to be selected from a categorized list
+     * 
+     * @example
+     * const selector = new QSPropertySelector({
+     *     container: document.getElementById('my-container'),
+     *     onSelect: (property) => console.log('Selected:', property),
+     *     excludeProperties: ['color', 'background'] // optional
+     * });
+     */
+    class QSPropertySelector {
+        constructor(options) {
+            this.container = options.container;
+            this.onSelect = options.onSelect || (() => {});
+            this.excludeProperties = new Set(options.excludeProperties || []);
+            this.placeholder = options.placeholder || <?= json_encode(__admin('preview.selectProperty') ?? 'Select property...') ?>;
+            this.searchPlaceholder = options.searchPlaceholder || <?= json_encode(__admin('preview.searchProperties') ?? 'Search properties...') ?>;
+            this.currentValue = options.currentValue || '';
+            this.showCategoryLabels = options.showCategoryLabels !== false;
+            
+            this.dropdownEl = null;
+            this.triggerEl = null;
+            this.isOpen = false;
+            this.focusedIndex = -1;
+            this.allItems = [];
+            
+            this._closeHandler = null;
+            
+            this.render();
+        }
+        
+        render() {
+            // Clear container
+            this.container.innerHTML = '';
+            this.container.className = 'qs-property-selector';
+            
+            // Create trigger button
+            this.triggerEl = document.createElement('button');
+            this.triggerEl.type = 'button';
+            this.triggerEl.className = 'qs-property-selector__trigger';
+            this.triggerEl.innerHTML = `
+                <span class="qs-property-selector__text">${this.currentValue || this.placeholder}</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            `;
+            
+            this.triggerEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (this.isOpen) {
+                    this.close();
+                } else {
+                    this.open();
+                }
+            });
+            
+            this.container.appendChild(this.triggerEl);
+        }
+        
+        open() {
+            if (this.isOpen) return;
+            this.isOpen = true;
+            this.triggerEl.classList.add('qs-property-selector__trigger--open');
+            
+            // Create dropdown
+            this.dropdownEl = document.createElement('div');
+            this.dropdownEl.className = 'qs-property-selector__dropdown';
+            
+            // Position dropdown using fixed positioning (to escape overflow containers)
+            const triggerRect = this.triggerEl.getBoundingClientRect();
+            this.dropdownEl.style.top = (triggerRect.bottom + 4) + 'px';
+            this.dropdownEl.style.left = triggerRect.left + 'px';
+            this.dropdownEl.style.minWidth = Math.max(triggerRect.width, 200) + 'px';
+            
+            // Search input
+            const searchInput = document.createElement('input');
+            searchInput.type = 'text';
+            searchInput.className = 'qs-property-selector__search';
+            searchInput.placeholder = this.searchPlaceholder;
+            searchInput.value = this.currentValue || '';
+            this.dropdownEl.appendChild(searchInput);
+            
+            // List container
+            const list = document.createElement('div');
+            list.className = 'qs-property-selector__list';
+            this.dropdownEl.appendChild(list);
+            
+            // Render initial list
+            this._renderList(list, searchInput.value);
+            
+            // Search filtering with keyboard nav
+            searchInput.addEventListener('input', (e) => {
+                this._renderList(list, e.target.value);
+            });
+            
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    this.focusedIndex = Math.min(this.focusedIndex + 1, this.allItems.length - 1);
+                    this._updateFocusedItem();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    this.focusedIndex = Math.max(this.focusedIndex - 1, 0);
+                    this._updateFocusedItem();
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (this.focusedIndex >= 0 && this.allItems[this.focusedIndex]) {
+                        this.allItems[this.focusedIndex].click();
+                    } else if (e.target.value.trim()) {
+                        // Allow custom property entry
+                        const customVal = e.target.value.trim();
+                        if (!this.excludeProperties.has(customVal)) {
+                            this.select(customVal);
+                        } else {
+                            showToast(<?= json_encode(__admin('preview.propertyAlreadyExists') ?? 'Property already exists') ?>, 'warning');
+                        }
+                    }
+                } else if (e.key === 'Escape') {
+                    this.close();
+                }
+            });
+            
+            // Append to document.body so it escapes overflow containers
+            document.body.appendChild(this.dropdownEl);
+            
+            // Focus search
+            setTimeout(() => searchInput.focus(), 0);
+            
+            // Close on outside click
+            this._closeHandler = (e) => {
+                if (!this.container.contains(e.target) && !this.dropdownEl?.contains(e.target)) {
+                    this.close();
+                }
+            };
+            setTimeout(() => document.addEventListener('click', this._closeHandler), 0);
+        }
+        
+        close() {
+            if (!this.isOpen) return;
+            this.isOpen = false;
+            
+            if (this.dropdownEl) {
+                this.dropdownEl.remove();
+                this.dropdownEl = null;
+            }
+            this.triggerEl.classList.remove('qs-property-selector__trigger--open');
+            
+            if (this._closeHandler) {
+                document.removeEventListener('click', this._closeHandler);
+                this._closeHandler = null;
+            }
+            
+            this.focusedIndex = -1;
+            this.allItems = [];
+        }
+        
+        select(property) {
+            this.currentValue = property;
+            this.triggerEl.querySelector('.qs-property-selector__text').textContent = property;
+            this.close();
+            this.onSelect(property);
+        }
+        
+        setValue(property) {
+            this.currentValue = property;
+            this.triggerEl.querySelector('.qs-property-selector__text').textContent = property || this.placeholder;
+        }
+        
+        getValue() {
+            return this.currentValue;
+        }
+        
+        setExcludeProperties(properties) {
+            this.excludeProperties = new Set(properties);
+        }
+        
+        destroy() {
+            this.close();
+            this.container.innerHTML = '';
+        }
+        
+        _renderList(listEl, filter = '') {
+            listEl.innerHTML = '';
+            this.allItems = [];
+            const filterLower = filter.toLowerCase().trim();
+            
+            // Render each category
+            for (const [category, properties] of Object.entries(CSS_PROPERTY_CATEGORIES)) {
+                // Filter by search AND exclude existing properties
+                const filtered = properties.filter(p => 
+                    (!filterLower || p.toLowerCase().includes(filterLower)) &&
+                    !this.excludeProperties.has(p)
+                );
+                
+                if (filtered.length === 0) continue;
+                
+                // Category group
+                const group = document.createElement('div');
+                group.className = 'qs-property-selector__group';
+                
+                // Category label
+                if (this.showCategoryLabels) {
+                    const label = document.createElement('div');
+                    label.className = 'qs-property-selector__group-label';
+                    label.textContent = category;
+                    group.appendChild(label);
+                }
+                
+                // Property items
+                for (const prop of filtered) {
+                    const item = document.createElement('button');
+                    item.type = 'button';
+                    item.className = 'qs-property-selector__item';
+                    item.dataset.property = prop;
+                    
+                    const propType = KEYFRAME_PROPERTY_TYPES[prop];
+                    const typeLabel = propType?.type && propType.type !== 'text' ? propType.type : '';
+                    
+                    item.innerHTML = `
+                        <span>${prop}</span>
+                        ${typeLabel ? `<span class="qs-property-selector__item-type">${typeLabel}</span>` : ''}
+                    `;
+                    
+                    item.addEventListener('click', () => this.select(prop));
+                    item.addEventListener('mouseenter', () => {
+                        this.focusedIndex = this.allItems.indexOf(item);
+                        this._updateFocusedItem();
+                    });
+                    
+                    group.appendChild(item);
+                    this.allItems.push(item);
+                }
+                
+                listEl.appendChild(group);
+            }
+            
+            // Add "Custom" option for manual entry (but warn if property exists)
+            if (filterLower && !this.allItems.some(item => item.dataset.property === filterLower)) {
+                if (this.excludeProperties.has(filterLower) || this.excludeProperties.has(filter)) {
+                    // Show warning
+                    const warningItem = document.createElement('div');
+                    warningItem.className = 'qs-property-selector__warning';
+                    warningItem.innerHTML = `
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                        <span><?= __admin('preview.propertyAlreadyExists') ?? 'Property already exists' ?></span>
+                    `;
+                    listEl.appendChild(warningItem);
+                } else {
+                    const customItem = document.createElement('button');
+                    customItem.type = 'button';
+                    customItem.className = 'qs-property-selector__item qs-property-selector__item--custom';
+                    customItem.innerHTML = `
+                        <span><?= __admin('preview.useCustomProperty') ?? 'Use custom:' ?> <strong>${filter}</strong></span>
+                    `;
+                    customItem.addEventListener('click', () => this.select(filter));
+                    listEl.appendChild(customItem);
+                    this.allItems.push(customItem);
+                }
+            }
+            
+            // Show empty state
+            if (this.allItems.length === 0 && !filterLower) {
+                listEl.innerHTML = `<div class="qs-property-selector__empty"><?= __admin('preview.noPropertiesFound') ?? 'No properties found' ?></div>`;
+            }
+            
+            this.focusedIndex = -1;
+        }
+        
+        _updateFocusedItem() {
+            this.allItems.forEach((item, i) => {
+                item.classList.toggle('qs-property-selector__item--focused', i === this.focusedIndex);
+            });
+            if (this.focusedIndex >= 0 && this.allItems[this.focusedIndex]) {
+                this.allItems[this.focusedIndex].scrollIntoView({ block: 'nearest' });
+            }
+        }
+    }
+    
+    /**
+     * QSValueInput - Reusable CSS value input component (Phase 10.3)
+     * Creates appropriate input controls based on CSS property type:
+     * - range: Slider with value display
+     * - length: Number input + unit dropdown
+     * - enum: Dropdown with predefined values
+     * - number: Number input with step
+     * - color: Text input with optional color swatch
+     * - text: Plain text input (default)
+     * 
+     * Supports two class naming conventions:
+     * - 'qs-value-input' (default): Uses BEM-style classes (qs-value-input--range, qs-value-input__range)
+     * - 'preview-style-property': Uses existing Selectors panel classes (preview-style-property__range-container)
+     */
+    class QSValueInput {
+        /**
+         * @param {object} options
+         * @param {HTMLElement} options.container - Container element
+         * @param {string} options.property - CSS property name
+         * @param {string} options.value - Initial value
+         * @param {function} options.onChange - Callback when value changes
+         * @param {function} options.onBlur - Callback on blur (for live preview)
+         * @param {string} options.className - CSS class prefix ('qs-value-input' or 'preview-style-property')
+         * @param {boolean} options.showColorSwatch - Whether to show color swatch for color properties
+         * @param {function} options.onColorPick - Callback when color swatch is clicked (receives property, value, swatchEl)
+         */
+        constructor(options) {
+            this.container = options.container;
+            this.property = options.property || '';
+            this.currentValue = options.value || '';
+            this.onChange = options.onChange || (() => {});
+            this.onBlur = options.onBlur || (() => {});
+            this.classPrefix = options.className || 'qs-value-input';
+            this.showColorSwatch = options.showColorSwatch !== false; // Default true
+            this.onColorPick = options.onColorPick || null;
+            
+            // Use legacy class names for preview-style-property prefix
+            this.useLegacyClasses = this.classPrefix === 'preview-style-property';
+            
+            this.inputEl = null;
+            this.unitSelectEl = null;
+            this.colorSwatchEl = null;
+            
+            this._render();
+        }
+        
+        /**
+         * Check if property is a color property
+         */
+        _isColorProperty() {
+            const colorProps = ['color', 'background', 'border', 'outline', 'fill', 'stroke', 'shadow', 'caret'];
+            const propType = KEYFRAME_PROPERTY_TYPES[this.property];
+            return propType?.type === 'color' || colorProps.some(cp => this.property.includes(cp));
+        }
+        
+        /**
+         * Get class name based on naming convention
+         */
+        _getClass(type) {
+            if (this.useLegacyClasses) {
+                // Legacy class names for Selectors panel
+                const legacyMap = {
+                    'container-range': 'preview-style-property__range-container',
+                    'range': 'preview-style-property__range',
+                    'range-value': 'preview-style-property__range-value',
+                    'container-length': 'preview-style-property__length-container',
+                    'number': 'preview-style-property__length-input',
+                    'unit': 'preview-style-property__unit-select',
+                    'select': 'preview-style-property__enum-select',
+                    'input': 'preview-style-property__input',
+                    'color-swatch': 'preview-style-property__color'
+                };
+                return legacyMap[type] || `${this.classPrefix}__${type}`;
+            }
+            // New BEM-style class names
+            return `${this.classPrefix}__${type}`;
+        }
+        
+        _render() {
+            this.container.innerHTML = '';
+            this.colorSwatchEl = null;
+            this.container.className = this.useLegacyClasses ? '' : this.classPrefix;
+            
+            const propType = KEYFRAME_PROPERTY_TYPES[this.property] || { type: 'text' };
+            
+            switch (propType.type) {
+                case 'range':
+                    this._renderRange(propType);
+                    break;
+                case 'length':
+                    this._renderLength(propType);
+                    break;
+                case 'enum':
+                    this._renderEnum(propType);
+                    break;
+                case 'number':
+                    this._renderNumber(propType);
+                    break;
+                case 'color':
+                    this._renderText(); // Color swatch handled externally
+                    break;
+                case 'angle':
+                    this._renderLength(propType); // Same as length but with angle units
+                    break;
+                default:
+                    this._renderText();
+            }
+        }
+        
+        _renderRange(propType) {
+            if (this.useLegacyClasses) {
+                this.container.className = this._getClass('container-range');
+            } else {
+                this.container.classList.add(`${this.classPrefix}--range`);
+            }
+            
+            const range = document.createElement('input');
+            range.type = 'range';
+            range.className = this._getClass('range');
+            range.min = propType.min ?? 0;
+            range.max = propType.max ?? 1;
+            range.step = propType.step ?? 0.01;
+            range.value = parseFloat(this.currentValue) || propType.min || 0;
+            
+            const valueDisplay = document.createElement('span');
+            valueDisplay.className = this._getClass('range-value');
+            valueDisplay.textContent = range.value;
+            
+            range.addEventListener('input', () => {
+                this.currentValue = range.value;
+                valueDisplay.textContent = range.value;
+                this.onChange(range.value);
+            });
+            
+            range.addEventListener('blur', () => this.onBlur(this.currentValue));
+            
+            this.inputEl = range;
+            this.container.appendChild(range);
+            this.container.appendChild(valueDisplay);
+        }
+        
+        _renderLength(propType) {
+            if (this.useLegacyClasses) {
+                this.container.className = this._getClass('container-length');
+            } else {
+                this.container.classList.add(`${this.classPrefix}--length`);
+            }
+            
+            // Parse current value
+            const parsed = this._parseLength(this.currentValue, propType);
+            
+            const numInput = document.createElement('input');
+            numInput.type = 'text';
+            numInput.className = this._getClass('number');
+            numInput.value = parsed.num;
+            numInput.placeholder = '0';
+            
+            const unitSelect = document.createElement('select');
+            unitSelect.className = this._getClass('unit');
+            for (const unit of (propType.units || ['px', '%', 'em', 'rem'])) {
+                const opt = document.createElement('option');
+                opt.value = unit;
+                opt.textContent = unit || '—';
+                if (unit === parsed.unit) opt.selected = true;
+                unitSelect.appendChild(opt);
+            }
+            
+            const emitChange = () => {
+                const num = numInput.value.trim();
+                const unit = unitSelect.value;
+                // Handle special values like 'auto', 'none', 'normal'
+                if (unit === 'auto' || unit === 'none' || unit === 'normal') {
+                    this.currentValue = unit;
+                } else {
+                    this.currentValue = num + unit;
+                }
+                this.onChange(this.currentValue);
+            };
+            
+            numInput.addEventListener('input', emitChange);
+            numInput.addEventListener('blur', () => this.onBlur(this.currentValue));
+            unitSelect.addEventListener('change', emitChange);
+            
+            this.inputEl = numInput;
+            this.unitSelectEl = unitSelect;
+            this.container.appendChild(numInput);
+            this.container.appendChild(unitSelect);
+        }
+        
+        _renderEnum(propType) {
+            if (!this.useLegacyClasses) {
+                this.container.classList.add(`${this.classPrefix}--enum`);
+            }
+            
+            const select = document.createElement('select');
+            select.className = this._getClass('select');
+            
+            for (const val of (propType.values || [])) {
+                const opt = document.createElement('option');
+                opt.value = val;
+                opt.textContent = val;
+                if (val === this.currentValue) opt.selected = true;
+                select.appendChild(opt);
+            }
+            
+            select.addEventListener('change', () => {
+                this.currentValue = select.value;
+                this.onChange(this.currentValue);
+                this.onBlur(this.currentValue);
+            });
+            
+            this.inputEl = select;
+            this.container.appendChild(select);
+        }
+        
+        _renderNumber(propType) {
+            if (!this.useLegacyClasses) {
+                this.container.classList.add(`${this.classPrefix}--number`);
+            }
+            
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.className = this._getClass('input');
+            input.value = parseFloat(this.currentValue) || 0;
+            input.step = propType.step ?? 1;
+            if (propType.min !== undefined) input.min = propType.min;
+            if (propType.max !== undefined) input.max = propType.max;
+            
+            input.addEventListener('input', () => {
+                this.currentValue = input.value;
+                this.onChange(this.currentValue);
+            });
+            
+            input.addEventListener('blur', () => this.onBlur(this.currentValue));
+            
+            this.inputEl = input;
+            this.container.appendChild(input);
+        }
+        
+        _renderText() {
+            if (!this.useLegacyClasses) {
+                this.container.classList.add(`${this.classPrefix}--text`);
+            }
+            
+            // Add color swatch for color properties
+            const isColor = this._isColorProperty();
+            if (isColor && this.showColorSwatch) {
+                this._renderColorSwatch();
+            }
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = this._getClass('input');
+            input.value = this.currentValue;
+            input.placeholder = isColor ? '#ffffff' : '';
+            
+            input.addEventListener('input', () => {
+                this.currentValue = input.value;
+                this.onChange(this.currentValue);
+                // Update color swatch
+                if (this.colorSwatchEl) {
+                    this.colorSwatchEl.style.background = this.currentValue || '#ffffff';
+                }
+            });
+            
+            input.addEventListener('blur', () => this.onBlur(this.currentValue));
+            
+            this.inputEl = input;
+            this.container.appendChild(input);
+        }
+        
+        /**
+         * Render color swatch button
+         */
+        _renderColorSwatch() {
+            const swatch = document.createElement('button');
+            swatch.type = 'button';
+            swatch.className = this._getClass('color-swatch');
+            swatch.style.background = this.currentValue || '#ffffff';
+            swatch.title = <?= json_encode(__admin('preview.clickToPickColor') ?? 'Click to pick color') ?>;
+            
+            swatch.addEventListener('click', () => {
+                if (this.onColorPick) {
+                    this.onColorPick(this.property, this.currentValue, swatch);
+                }
+            });
+            
+            this.colorSwatchEl = swatch;
+            this.container.appendChild(swatch);
+        }
+        
+        _parseLength(value, propType) {
+            if (!value || value === 'auto' || value === 'none' || value === 'normal') {
+                return { num: '', unit: value || (propType.units?.[0] || 'px') };
+            }
+            const match = String(value).match(/^(-?[\d.]+)(.*)$/);
+            if (match) {
+                const unit = match[2].trim() || propType.units?.[0] || 'px';
+                return { num: match[1], unit };
+            }
+            return { num: '', unit: propType.units?.[0] || 'px' };
+        }
+        
+        /**
+         * Set property and re-render input
+         * @param {string} property - CSS property name
+         */
+        setProperty(property) {
+            this.property = property;
+            this._render();
+        }
+        
+        /**
+         * Set value
+         * @param {string} value - CSS value
+         */
+        setValue(value) {
+            this.currentValue = value;
+            
+            // Update input element based on type
+            const propType = KEYFRAME_PROPERTY_TYPES[this.property] || { type: 'text' };
+            
+            if (propType.type === 'range') {
+                if (this.inputEl) this.inputEl.value = parseFloat(value) || 0;
+                const displayClass = this._getClass('range-value');
+                const display = this.container.querySelector(`.${displayClass}`);
+                if (display) display.textContent = value;
+            } else if (propType.type === 'length' || propType.type === 'angle') {
+                const parsed = this._parseLength(value, propType);
+                if (this.inputEl) this.inputEl.value = parsed.num;
+                if (this.unitSelectEl) this.unitSelectEl.value = parsed.unit;
+            } else if (this.inputEl) {
+                this.inputEl.value = value;
+            }
+            
+            // Update color swatch if present
+            if (this.colorSwatchEl) {
+                this.colorSwatchEl.style.background = value || '#ffffff';
+            }
+        }
+        
+        /**
+         * Get current value
+         * @returns {string}
+         */
+        getValue() {
+            return this.currentValue;
+        }
+        
+        /**
+         * Focus the input
+         */
+        focus() {
+            if (this.inputEl) this.inputEl.focus();
+        }
+        
+        /**
+         * Destroy and cleanup
+         */
+        destroy() {
+            this.container.innerHTML = '';
+        }
+    }
+    
+    /**
+     * Get the input type configuration for a CSS property
+     * @param {string} propertyName - CSS property name
+     * @returns {object} Configuration object with type and settings
+     */
+    function getPropertyInputType(propertyName) {
+        const prop = propertyName.toLowerCase().trim();
+        return KEYFRAME_PROPERTY_TYPES[prop] || { type: 'text' };
+    }
+    
+    /**
+     * Parse a CSS length value into number and unit parts
+     * @param {string} value - CSS value like "100px", "50%", "1.5em"
+     * @returns {object} { num: number, unit: string }
+     */
+    function parseLength(value) {
+        if (!value || value === 'auto' || value === 'none' || value === 'normal') {
+            return { num: '', unit: value || '' };
+        }
+        const match = String(value).match(/^(-?[\d.]+)(.*)$/);
+        if (match) {
+            return { num: parseFloat(match[1]), unit: match[2].trim() || 'px' };
+        }
+        return { num: '', unit: value };
+    }
+    
+    /**
+     * Parse a CSS angle value into number and unit parts
+     * @param {string} value - CSS value like "45deg", "1.5rad"
+     * @returns {object} { num: number, unit: string }
+     */
+    function parseAngle(value) {
+        if (!value) return { num: 0, unit: 'deg' };
+        const match = String(value).match(/^(-?[\d.]+)(.*)$/);
+        if (match) {
+            return { num: parseFloat(match[1]), unit: match[2].trim() || 'deg' };
+        }
+        return { num: 0, unit: 'deg' };
+    }
+    
+    /**
+     * Render a property-specific input based on the property type
+     * @param {string} property - CSS property name
+     * @param {string} value - Current value
+     * @param {number} frameIndex - Frame index
+     * @param {number} propIndex - Property index
+     * @returns {string} HTML string for the input
+     */
+    function renderPropertyValueInput(property, value, frameIndex, propIndex) {
+        const config = getPropertyInputType(property);
+        const dataAttrs = `data-frame="${frameIndex}" data-prop="${propIndex}" data-field="value"`;
+        
+        switch (config.type) {
+            case 'range':
+                const rangeVal = parseFloat(value) || config.min || 0;
+                return `
+                    <div class="preview-keyframe-modal__property-input-group preview-keyframe-modal__property-input-group--range">
+                        <input type="range" class="preview-keyframe-modal__property-range" 
+                               min="${config.min}" max="${config.max}" step="${config.step}"
+                               value="${rangeVal}" ${dataAttrs}>
+                        <span class="preview-keyframe-modal__property-range-value">${rangeVal}</span>
+                    </div>`;
+            
+            case 'color':
+                const colorVal = escapeHTML(value || '#000000');
+                return `
+                    <div class="preview-keyframe-modal__property-input-group preview-keyframe-modal__property-input-group--color">
+                        <button type="button" class="preview-keyframe-modal__color-picker-btn" 
+                                style="background: ${colorVal};"
+                                title="<?= __admin('preview.clickToPickColor') ?? 'Click to pick color' ?>"></button>
+                        <input type="text" class="preview-keyframe-modal__property-value preview-keyframe-modal__property-value--color" 
+                               value="${colorVal}" ${dataAttrs}
+                               placeholder="<?= __admin('preview.colorValue') ?? '#000000 or rgba(...)' ?>">
+                    </div>`;
+            
+            case 'length':
+                const lengthParsed = parseLength(value);
+                const unitOptions = config.units.map(u => 
+                    `<option value="${u}" ${lengthParsed.unit === u ? 'selected' : ''}>${u || '(none)'}</option>`
+                ).join('');
+                return `
+                    <div class="preview-keyframe-modal__property-input-group preview-keyframe-modal__property-input-group--length">
+                        <input type="number" class="preview-keyframe-modal__property-number" 
+                               value="${lengthParsed.num}" step="any" ${dataAttrs}>
+                        <select class="preview-keyframe-modal__property-unit" 
+                                data-frame="${frameIndex}" data-prop="${propIndex}" data-field="unit">
+                            ${unitOptions}
+                        </select>
+                    </div>`;
+            
+            case 'angle':
+                const angleParsed = parseAngle(value);
+                const angleUnitOptions = config.units.map(u => 
+                    `<option value="${u}" ${angleParsed.unit === u ? 'selected' : ''}>${u}</option>`
+                ).join('');
+                return `
+                    <div class="preview-keyframe-modal__property-input-group preview-keyframe-modal__property-input-group--angle">
+                        <input type="number" class="preview-keyframe-modal__property-number" 
+                               value="${angleParsed.num}" step="any" ${dataAttrs}>
+                        <select class="preview-keyframe-modal__property-unit" 
+                                data-frame="${frameIndex}" data-prop="${propIndex}" data-field="unit">
+                            ${angleUnitOptions}
+                        </select>
+                    </div>`;
+            
+            case 'enum':
+                const enumOptions = config.values.map(v => 
+                    `<option value="${v}" ${value === v ? 'selected' : ''}>${v}</option>`
+                ).join('');
+                return `
+                    <select class="preview-keyframe-modal__property-enum" ${dataAttrs}>
+                        ${enumOptions}
+                    </select>`;
+            
+            case 'number':
+                const numVal = value !== '' ? parseFloat(value) : '';
+                return `
+                    <input type="number" class="preview-keyframe-modal__property-value preview-keyframe-modal__property-value--number" 
+                           value="${numVal}" step="${config.step || 1}" 
+                           ${config.min !== undefined ? `min="${config.min}"` : ''} ${dataAttrs}>`;
+            
+            case 'transform':
+                // Transform editor - text input + Edit button
+                return `
+                    <div class="preview-keyframe-modal__property-input-group preview-keyframe-modal__property-input-group--transform">
+                        <input type="text" class="preview-keyframe-modal__property-value preview-keyframe-modal__property-value--transform" 
+                               value="${escapeHTML(value || 'none')}" 
+                               placeholder="<?= __admin('preview.transformValue') ?? 'translateX(10px) rotate(5deg)' ?>" ${dataAttrs}>
+                        <button type="button" class="preview-keyframe-modal__transform-edit-btn admin-btn admin-btn--xs admin-btn--secondary"
+                                data-frame="${frameIndex}" data-prop="${propIndex}"
+                                title="<?= __admin('preview.openTransformEditor') ?? 'Open Transform Editor' ?>">
+                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                            <?= __admin('preview.edit') ?? 'Edit' ?>
+                        </button>
+                    </div>`;
+            
+            default: // text fallback
+                return `
+                    <input type="text" class="preview-keyframe-modal__property-value" 
+                           value="${escapeHTML(value)}" 
+                           placeholder="<?= __admin('preview.keyframePropertyValue') ?? 'value' ?>" ${dataAttrs}>`;
+        }
+    }
+    
+    /**
+     * Attach event handlers for property value inputs based on their type
+     * @param {HTMLElement} propEl - The property row element
+     * @param {number} frameIndex - Frame index
+     * @param {number} propIndex - Property index
+     * @param {string} property - CSS property name
+     */
+    function attachPropertyValueHandlers(propEl, frameIndex, propIndex, property) {
+        const config = getPropertyInputType(property);
+        
+        switch (config.type) {
+            case 'range':
+                // Range slider with live value display
+                const rangeInput = propEl.querySelector('.preview-keyframe-modal__property-range');
+                const rangeValue = propEl.querySelector('.preview-keyframe-modal__property-range-value');
+                if (rangeInput) {
+                    rangeInput.addEventListener('input', (e) => {
+                        const val = e.target.value;
+                        rangeValue.textContent = val;
+                        keyframeFrames[frameIndex].properties[propIndex].value = val;
+                    });
+                }
+                break;
+            
+            case 'color':
+                // Color picker button + text input
+                const colorInput = propEl.querySelector('.preview-keyframe-modal__property-value--color');
+                const colorBtn = propEl.querySelector('.preview-keyframe-modal__color-picker-btn');
+                if (colorInput) {
+                    // Manual input change
+                    colorInput.addEventListener('input', (e) => {
+                        const val = e.target.value;
+                        keyframeFrames[frameIndex].properties[propIndex].value = val;
+                        if (colorBtn) {
+                            colorBtn.style.background = val;
+                        }
+                    });
+                    
+                    // Initialize QSColorPicker attached to the input
+                    if (typeof QSColorPicker !== 'undefined') {
+                        const picker = new QSColorPicker(colorInput, {
+                            showAlpha: true,
+                            onChange: (color) => {
+                                keyframeFrames[frameIndex].properties[propIndex].value = color;
+                                if (colorBtn) {
+                                    colorBtn.style.background = color;
+                                }
+                            }
+                        });
+                        
+                        // Also open picker when button is clicked
+                        if (colorBtn) {
+                            colorBtn.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                picker.open();
+                            });
+                        }
+                    } else if (colorBtn) {
+                        // Fallback: focus the text input when button clicked
+                        colorBtn.addEventListener('click', () => {
+                            colorInput.focus();
+                            colorInput.select();
+                        });
+                    }
+                }
+                break;
+            
+            case 'length':
+            case 'angle':
+                // Number input + unit dropdown
+                const numInput = propEl.querySelector('.preview-keyframe-modal__property-number');
+                const unitSelect = propEl.querySelector('.preview-keyframe-modal__property-unit');
+                if (numInput && unitSelect) {
+                    const updateValue = () => {
+                        const num = numInput.value;
+                        const unit = unitSelect.value;
+                        // Handle special units like 'auto', 'none', 'normal'
+                        let combinedValue;
+                        if (unit === 'auto' || unit === 'none' || unit === 'normal') {
+                            combinedValue = unit;
+                        } else if (num === '' || num === null) {
+                            combinedValue = '';
+                        } else {
+                            combinedValue = num + unit;
+                        }
+                        keyframeFrames[frameIndex].properties[propIndex].value = combinedValue;
+                    };
+                    
+                    numInput.addEventListener('input', updateValue);
+                    unitSelect.addEventListener('change', () => {
+                        // If selecting 'auto', 'none', or 'normal', clear the number
+                        const unit = unitSelect.value;
+                        if (unit === 'auto' || unit === 'none' || unit === 'normal') {
+                            numInput.value = '';
+                            numInput.disabled = true;
+                        } else {
+                            numInput.disabled = false;
+                        }
+                        updateValue();
+                    });
+                    
+                    // Initial state check for special units
+                    if (['auto', 'none', 'normal'].includes(unitSelect.value)) {
+                        numInput.disabled = true;
+                    }
+                }
+                break;
+            
+            case 'enum':
+                // Enum dropdown
+                const enumSelect = propEl.querySelector('.preview-keyframe-modal__property-enum');
+                if (enumSelect) {
+                    enumSelect.addEventListener('change', (e) => {
+                        keyframeFrames[frameIndex].properties[propIndex].value = e.target.value;
+                    });
+                }
+                break;
+            
+            case 'number':
+                // Unitless number input
+                const plainNumInput = propEl.querySelector('.preview-keyframe-modal__property-value--number');
+                if (plainNumInput) {
+                    plainNumInput.addEventListener('input', (e) => {
+                        keyframeFrames[frameIndex].properties[propIndex].value = e.target.value;
+                    });
+                }
+                break;
+            
+            case 'transform':
+                // Transform editor - text input + Edit button
+                const transformTextInput = propEl.querySelector('.preview-keyframe-modal__property-value--transform');
+                const transformEditBtn = propEl.querySelector('.preview-keyframe-modal__transform-edit-btn');
+                
+                // Text input for manual editing
+                if (transformTextInput) {
+                    transformTextInput.addEventListener('input', (e) => {
+                        keyframeFrames[frameIndex].properties[propIndex].value = e.target.value;
+                    });
+                }
+                
+                // Edit button to open Transform Editor modal
+                if (transformEditBtn) {
+                    transformEditBtn.addEventListener('click', () => {
+                        const currentValue = keyframeFrames[frameIndex].properties[propIndex].value || '';
+                        
+                        // Live preview target is optional - we don't have direct access
+                        // to the selected element from the keyframe modal context
+                        openTransformEditor(currentValue, (newValue) => {
+                            // Update the stored value
+                            keyframeFrames[frameIndex].properties[propIndex].value = newValue;
+                            // Update the text input
+                            if (transformTextInput) {
+                                transformTextInput.value = newValue;
+                            }
+                        }, null);
+                    });
+                }
+                break;
+            
+            default:
+                // Text input (fallback)
+                const textInput = propEl.querySelector('.preview-keyframe-modal__property-value');
+                if (textInput) {
+                    textInput.addEventListener('input', (e) => {
+                        keyframeFrames[frameIndex].properties[propIndex].value = e.target.value;
+                    });
+                }
+                break;
+        }
+    }
+    
+    // ==================== Transform Sub-Editor (Phase 9.3.1 Step 5) ====================
+    
+    /**
+     * Transform function definitions
+     * Maps function names to their parameter configs
+     */
+    const TRANSFORM_FUNCTIONS = {
+        // Translation functions
+        translateX: { params: ['x'], units: ['px', '%', 'em', 'rem', 'vw', 'vh'], category: 'translate' },
+        translateY: { params: ['y'], units: ['px', '%', 'em', 'rem', 'vw', 'vh'], category: 'translate' },
+        translateZ: { params: ['z'], units: ['px', 'em', 'rem'], category: 'translate' },
+        translate: { params: ['x', 'y'], units: ['px', '%', 'em', 'rem', 'vw', 'vh'], category: 'translate' },
+        translate3d: { params: ['x', 'y', 'z'], units: ['px', '%', 'em', 'rem', 'vw', 'vh'], category: 'translate' },
+        
+        // Rotation functions
+        rotate: { params: ['angle'], units: ['deg', 'rad', 'turn'], category: 'rotate' },
+        rotateX: { params: ['angle'], units: ['deg', 'rad', 'turn'], category: 'rotate' },
+        rotateY: { params: ['angle'], units: ['deg', 'rad', 'turn'], category: 'rotate' },
+        rotateZ: { params: ['angle'], units: ['deg', 'rad', 'turn'], category: 'rotate' },
+        rotate3d: { params: ['x', 'y', 'z', 'angle'], units: ['deg'], category: 'rotate', special: true },
+        
+        // Scale functions
+        scale: { params: ['x', 'y'], units: [], category: 'scale', unitless: true },
+        scaleX: { params: ['x'], units: [], category: 'scale', unitless: true },
+        scaleY: { params: ['y'], units: [], category: 'scale', unitless: true },
+        scaleZ: { params: ['z'], units: [], category: 'scale', unitless: true },
+        scale3d: { params: ['x', 'y', 'z'], units: [], category: 'scale', unitless: true },
+        
+        // Skew functions
+        skew: { params: ['x', 'y'], units: ['deg', 'rad', 'turn'], category: 'skew' },
+        skewX: { params: ['x'], units: ['deg', 'rad', 'turn'], category: 'skew' },
+        skewY: { params: ['y'], units: ['deg', 'rad', 'turn'], category: 'skew' },
+        
+        // Other
+        perspective: { params: ['d'], units: ['px'], category: 'other' }
+    };
+    
+    /**
+     * Parse a CSS transform string into an array of function objects
+     * @param {string} transformStr - e.g., "translateY(-10px) rotate(5deg) scale(1.1)"
+     * @returns {Array} Array of { fn: 'translateY', args: [{ num: -10, unit: 'px' }] }
+     */
+    function parseTransformString(transformStr) {
+        if (!transformStr || transformStr === 'none') return [];
+        
+        const functions = [];
+        // Match function calls: name(args)
+        const regex = /(\w+)\(([^)]+)\)/g;
+        let match;
+        
+        while ((match = regex.exec(transformStr)) !== null) {
+            const fnName = match[1];
+            const argsStr = match[2];
+            const config = TRANSFORM_FUNCTIONS[fnName];
+            
+            if (!config) continue; // Unknown function, skip
+            
+            // Parse arguments (comma or space separated)
+            const argParts = argsStr.split(/[,\s]+/).filter(a => a.trim());
+            const args = [];
+            
+            for (let i = 0; i < argParts.length; i++) {
+                const argStr = argParts[i].trim();
+                
+                if (config.unitless) {
+                    // Unitless number (scale)
+                    args.push({ num: parseFloat(argStr) || 0, unit: '' });
+                } else if (config.special && fnName === 'rotate3d' && i < 3) {
+                    // rotate3d first 3 params are unitless vector
+                    args.push({ num: parseFloat(argStr) || 0, unit: '' });
+                } else {
+                    // Parse number + unit
+                    const numMatch = argStr.match(/^(-?[\d.]+)(.*)$/);
+                    if (numMatch) {
+                        args.push({ 
+                            num: parseFloat(numMatch[1]) || 0, 
+                            unit: numMatch[2].trim() || config.units[0] || ''
+                        });
+                    } else {
+                        args.push({ num: 0, unit: config.units[0] || '' });
+                    }
+                }
+            }
+            
+            // Fill missing args with defaults
+            while (args.length < config.params.length) {
+                const defaultUnit = config.unitless ? '' : (config.units[0] || '');
+                args.push({ num: 0, unit: defaultUnit });
+            }
+            
+            functions.push({ fn: fnName, args });
+        }
+        
+        return functions;
+    }
+    
+    /**
+     * Serialize transform functions array back to CSS string
+     * @param {Array} functions - Array of { fn, args }
+     * @returns {string} CSS transform string
+     */
+    function serializeTransform(functions) {
+        if (!functions || functions.length === 0) return 'none';
+        
+        return functions.map(({ fn, args }) => {
+            const config = TRANSFORM_FUNCTIONS[fn];
+            const argStrs = args.map((arg, i) => {
+                if (config.unitless || (config.special && fn === 'rotate3d' && i < 3)) {
+                    return String(arg.num);
+                }
+                return `${arg.num}${arg.unit}`;
+            });
+            return `${fn}(${argStrs.join(', ')})`;
+        }).join(' ');
+    }
+    
+    // Transform Editor state
+    let transformEditorOpen = false;
+    let transformEditorCallback = null;  // Called with final value when Apply clicked
+    let transformFunctions = [];          // Current transform functions being edited
+    let transformEditorTarget = null;     // Element to preview on
+    
+    /**
+     * Open the Transform Editor modal
+     * @param {string} initialValue - Current transform CSS value
+     * @param {function} onApply - Callback with new transform value
+     * @param {HTMLElement} previewTarget - Element in iframe to preview on
+     */
+    function openTransformEditor(initialValue, onApply, previewTarget) {
+        transformEditorCallback = onApply;
+        transformEditorTarget = previewTarget;
+        transformFunctions = parseTransformString(initialValue);
+        transformEditorOpen = true;
+        
+        renderTransformEditor();
+        document.getElementById('transform-editor-modal').classList.add('preview-keyframe-modal--visible');
+    }
+    
+    /**
+     * Close the Transform Editor modal
+     * @param {boolean} apply - If true, call callback with current value
+     */
+    function closeTransformEditor(apply = false) {
+        if (apply && transformEditorCallback) {
+            const value = serializeTransform(transformFunctions);
+            transformEditorCallback(value);
+        }
+        
+        // Remove preview
+        if (transformEditorTarget) {
+            transformEditorTarget.style.transform = '';
+        }
+        
+        transformEditorOpen = false;
+        transformEditorCallback = null;
+        transformEditorTarget = null;
+        transformFunctions = [];
+        
+        document.getElementById('transform-editor-modal').classList.remove('preview-keyframe-modal--visible');
+    }
+    
+    /**
+     * Render the Transform Editor UI
+     */
+    function renderTransformEditor() {
+        const currentValue = serializeTransform(transformFunctions);
+        const currentDisplay = document.getElementById('transform-current-value');
+        const functionsContainer = document.getElementById('transform-functions-list');
+        
+        if (currentDisplay) {
+            currentDisplay.textContent = currentValue || 'none';
+        }
+        
+        if (!functionsContainer) return;
+        functionsContainer.innerHTML = '';
+        
+        if (transformFunctions.length === 0) {
+            functionsContainer.innerHTML = `
+                <div class="transform-editor__empty">
+                    <?= __admin('preview.transformEmpty') ?? 'No transform functions. Click "Add Function" to start.' ?>
+                </div>`;
+            return;
+        }
+        
+        transformFunctions.forEach((func, index) => {
+            const config = TRANSFORM_FUNCTIONS[func.fn];
+            if (!config) return;
+            
+            const row = document.createElement('div');
+            row.className = 'transform-editor__function-row';
+            row.dataset.index = index;
+            
+            // Build input fields based on params
+            let inputsHTML = '';
+            func.args.forEach((arg, argIndex) => {
+                const paramName = config.params[argIndex] || '';
+                
+                if (config.unitless || (config.special && func.fn === 'rotate3d' && argIndex < 3)) {
+                    // Unitless number input
+                    inputsHTML += `
+                        <div class="transform-editor__param">
+                            <label>${paramName}</label>
+                            <input type="number" step="any" value="${arg.num}" 
+                                   data-func="${index}" data-arg="${argIndex}" class="transform-editor__input">
+                        </div>`;
+                } else {
+                    // Number + unit dropdown
+                    const unitOptions = config.units.map(u => 
+                        `<option value="${u}" ${arg.unit === u ? 'selected' : ''}>${u}</option>`
+                    ).join('');
+                    
+                    inputsHTML += `
+                        <div class="transform-editor__param">
+                            <label>${paramName}</label>
+                            <div class="transform-editor__input-group">
+                                <input type="number" step="any" value="${arg.num}" 
+                                       data-func="${index}" data-arg="${argIndex}" class="transform-editor__input">
+                                <select data-func="${index}" data-arg="${argIndex}" class="transform-editor__unit">
+                                    ${unitOptions}
+                                </select>
+                            </div>
+                        </div>`;
+                }
+            });
+            
+            row.innerHTML = `
+                <div class="transform-editor__drag-handle" title="<?= __admin('preview.dragToReorder') ?? 'Drag to reorder' ?>">⋮⋮</div>
+                <div class="transform-editor__function-name">${func.fn}</div>
+                <div class="transform-editor__params">${inputsHTML}</div>
+                <button type="button" class="transform-editor__delete" title="<?= __admin('preview.removeFunction') ?? 'Remove function' ?>">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            `;
+            
+            // Event: Input change
+            row.querySelectorAll('.transform-editor__input').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    const funcIdx = parseInt(e.target.dataset.func);
+                    const argIdx = parseInt(e.target.dataset.arg);
+                    transformFunctions[funcIdx].args[argIdx].num = parseFloat(e.target.value) || 0;
+                    updateTransformPreview();
+                    updateTransformCurrentDisplay();
+                });
+            });
+            
+            // Event: Unit change
+            row.querySelectorAll('.transform-editor__unit').forEach(select => {
+                select.addEventListener('change', (e) => {
+                    const funcIdx = parseInt(e.target.dataset.func);
+                    const argIdx = parseInt(e.target.dataset.arg);
+                    transformFunctions[funcIdx].args[argIdx].unit = e.target.value;
+                    updateTransformPreview();
+                    updateTransformCurrentDisplay();
+                });
+            });
+            
+            // Event: Delete function
+            row.querySelector('.transform-editor__delete').addEventListener('click', () => {
+                transformFunctions.splice(index, 1);
+                renderTransformEditor();
+                updateTransformPreview();
+            });
+            
+            functionsContainer.appendChild(row);
+        });
+        
+        // Make rows draggable for reordering
+        setupTransformDragReorder(functionsContainer);
+    }
+    
+    /**
+     * Update the current value display
+     */
+    function updateTransformCurrentDisplay() {
+        const display = document.getElementById('transform-current-value');
+        if (display) {
+            display.textContent = serializeTransform(transformFunctions) || 'none';
+        }
+    }
+    
+    /**
+     * Apply live preview to target element
+     */
+    function updateTransformPreview() {
+        if (transformEditorTarget) {
+            transformEditorTarget.style.transform = serializeTransform(transformFunctions);
+        }
+    }
+    
+    /**
+     * Setup drag-and-drop reordering for function rows
+     */
+    function setupTransformDragReorder(container) {
+        let draggedEl = null;
+        let draggedIndex = -1;
+        
+        container.querySelectorAll('.transform-editor__function-row').forEach(row => {
+            const handle = row.querySelector('.transform-editor__drag-handle');
+            
+            handle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                draggedEl = row;
+                draggedIndex = parseInt(row.dataset.index);
+                row.classList.add('transform-editor__function-row--dragging');
+                
+                const onMouseMove = (e) => {
+                    const rows = Array.from(container.querySelectorAll('.transform-editor__function-row'));
+                    const y = e.clientY;
+                    
+                    rows.forEach((r, idx) => {
+                        if (r === draggedEl) return;
+                        const rect = r.getBoundingClientRect();
+                        const midY = rect.top + rect.height / 2;
+                        
+                        if (y < midY && idx < draggedIndex) {
+                            container.insertBefore(draggedEl, r);
+                            draggedIndex = idx;
+                        } else if (y > midY && idx > draggedIndex) {
+                            container.insertBefore(draggedEl, r.nextSibling);
+                            draggedIndex = idx;
+                        }
+                    });
+                };
+                
+                const onMouseUp = () => {
+                    row.classList.remove('transform-editor__function-row--dragging');
+                    
+                    // Reorder transformFunctions array based on DOM order
+                    const newOrder = [];
+                    container.querySelectorAll('.transform-editor__function-row').forEach(r => {
+                        const oldIdx = parseInt(r.dataset.index);
+                        newOrder.push(transformFunctions[oldIdx]);
+                    });
+                    transformFunctions = newOrder;
+                    
+                    // Re-render to update indices
+                    renderTransformEditor();
+                    updateTransformPreview();
+                    updateTransformCurrentDisplay();
+                    
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                };
+                
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+        });
+    }
+    
+    /**
+     * Add a new transform function
+     * @param {string} fnName - Function name (e.g., 'translateX', 'rotate')
+     */
+    function addTransformFunction(fnName) {
+        const config = TRANSFORM_FUNCTIONS[fnName];
+        if (!config) return;
+        
+        // Create default args
+        const args = config.params.map((param, i) => {
+            if (config.unitless || (config.special && fnName === 'rotate3d' && i < 3)) {
+                return { num: fnName.startsWith('scale') ? 1 : 0, unit: '' };
+            }
+            return { num: 0, unit: config.units[0] || '' };
+        });
+        
+        transformFunctions.push({ fn: fnName, args });
+        renderTransformEditor();
+        updateTransformPreview();
+        
+        // Close dropdown
+        document.getElementById('transform-add-dropdown').classList.remove('transform-editor__dropdown--open');
+    }
+    
+    /**
+     * Toggle add function dropdown
+     */
+    function toggleTransformDropdown() {
+        const dropdown = document.getElementById('transform-add-dropdown');
+        dropdown.classList.toggle('transform-editor__dropdown--open');
+    }
+    
+    // ==================== Transition Editor ====================
+    
+    // Transition Editor state
+    let transitionEditorSelector = null;
+    let transitionEditorBaseProperties = {};
+    let transitionEditorHoverProperties = {};
+    let transitionEditorCurrentPseudo = ':hover';
+    let transitionEditorCallback = null;
+    let transitionEditorBaseAnimation = null;    // { name, duration, iterations, infinite }
+    let transitionEditorTriggerAnimation = null; // { name, duration, iterations, infinite }
+    
+    // Transition Editor DOM references
+    const transitionEditorModal = document.getElementById('transition-editor-modal');
+    const transitionEditorSelectorEl = document.getElementById('transition-editor-selector');
+    const transitionBaseSelectorEl = document.getElementById('transition-base-selector');
+    const transitionBasePropsEl = document.getElementById('transition-base-properties');
+    const transitionHoverPropsEl = document.getElementById('transition-hover-properties');
+    const transitionPseudoSelect = document.getElementById('transition-pseudo-select');
+    const transitionPropertySelect = document.getElementById('transition-property-select');
+    const transitionSpecificProps = document.getElementById('transition-specific-props');
+    const transitionDuration = document.getElementById('transition-duration');
+    const transitionDurationUnit = document.getElementById('transition-duration-unit');
+    const transitionDelay = document.getElementById('transition-delay');
+    const transitionDelayUnit = document.getElementById('transition-delay-unit');
+    const transitionTimingSelect = document.getElementById('transition-timing-select');
+    const transitionCubicBezier = document.getElementById('transition-cubic-bezier');
+    const transitionPreviewCode = document.getElementById('transition-preview-code');
+    const transitionTriggerLabel = document.getElementById('transition-trigger-label');
+    const transitionAddHoverText = document.getElementById('transition-add-hover-text');
+    
+    // Inline property editor DOM references (Phase 10.2)
+    const transitionBaseAddToggle = document.getElementById('transition-base-add-toggle');
+    const transitionBaseAddForm = document.getElementById('transition-base-add-form');
+    const transitionBasePropSelectorContainer = document.getElementById('transition-base-prop-selector');
+    const transitionBaseValueContainer = document.getElementById('transition-base-value-container');
+    const transitionBaseAddConfirm = document.getElementById('transition-base-add-confirm');
+    const transitionBaseAddCancel = document.getElementById('transition-base-add-cancel');
+    const transitionTriggerAddToggle = document.getElementById('transition-trigger-add-toggle');
+    const transitionTriggerAddForm = document.getElementById('transition-trigger-add-form');
+    const transitionTriggerPropSelectorContainer = document.getElementById('transition-trigger-prop-selector');
+    const transitionTriggerValueContainer = document.getElementById('transition-trigger-value-container');
+    const transitionTriggerAddConfirm = document.getElementById('transition-trigger-add-confirm');
+    const transitionTriggerAddCancel = document.getElementById('transition-trigger-add-cancel');
+    
+    // QSPropertySelector and QSValueInput instances (Phase 10.3 - unified components)
+    let transitionBasePropSelector = null;
+    let transitionTriggerPropSelector = null;
+    let transitionBaseValueInput = null;
+    let transitionTriggerValueInput = null;
+    
+    // Animation section DOM references (Phase 10.3)
+    const transitionBaseAnimEmpty = document.getElementById('transition-base-animation-empty');
+    const transitionBaseAnimConfig = document.getElementById('transition-base-animation-config');
+    const transitionBaseAnimName = document.getElementById('transition-base-animation-name');
+    const transitionBaseAnimDuration = document.getElementById('transition-base-anim-duration');
+    const transitionBaseAnimIterations = document.getElementById('transition-base-anim-iterations');
+    const transitionBaseAnimInfinite = document.getElementById('transition-base-anim-infinite');
+    const transitionBaseAnimAddBtn = document.getElementById('transition-base-animation-add');
+    const transitionBaseAnimPreviewBtn = document.getElementById('transition-base-animation-preview-btn');
+    const transitionBaseAnimRemoveBtn = document.getElementById('transition-base-animation-remove');
+    const transitionTriggerAnimEmpty = document.getElementById('transition-trigger-animation-empty');
+    const transitionTriggerAnimConfig = document.getElementById('transition-trigger-animation-config');
+    const transitionTriggerAnimName = document.getElementById('transition-trigger-animation-name');
+    const transitionTriggerAnimDuration = document.getElementById('transition-trigger-anim-duration');
+    const transitionTriggerAnimIterations = document.getElementById('transition-trigger-anim-iterations');
+    const transitionTriggerAnimInfinite = document.getElementById('transition-trigger-anim-infinite');
+    const transitionTriggerAnimAddBtn = document.getElementById('transition-trigger-animation-add');
+    const transitionTriggerAnimPreviewBtn = document.getElementById('transition-trigger-animation-preview-btn');
+    const transitionTriggerAnimRemoveBtn = document.getElementById('transition-trigger-animation-remove');
+    const transitionTriggerAnimHint = document.getElementById('transition-trigger-animation-hint');
+    
+    // Animation Preview Modal DOM references (Phase 9.5)
+    const animationPreviewModal = document.getElementById('animation-preview-modal');
+    const animationPreviewName = document.getElementById('animation-preview-name');
+    const animationPreviewStage = document.getElementById('animation-preview-stage');
+    const animationPreviewLogo = document.getElementById('animation-preview-logo');
+    const animationPreviewDuration = document.getElementById('animation-preview-duration');
+    const animationPreviewTiming = document.getElementById('animation-preview-timing');
+    const animationPreviewDelay = document.getElementById('animation-preview-delay');
+    const animationPreviewCount = document.getElementById('animation-preview-count');
+    const animationPreviewInfinite = document.getElementById('animation-preview-infinite');
+    const animationPreviewCss = document.getElementById('animation-preview-css');
+    const animationPreviewPlayBtn = document.getElementById('animation-preview-play');
+    const animationPreviewCloseBtn = document.getElementById('animation-preview-close');
+    const animationPreviewDoneBtn = document.getElementById('animation-preview-done');
+    let currentPreviewKeyframe = null;
+    
+    /**
+     * Open the Transition Editor for a selector
+     * @param {string} selector - Base CSS selector (without pseudo-class)
+     * @param {function} onSave - Callback when transition is saved
+     */
+    async function openTransitionEditor(selector, onSave = null) {
+        transitionEditorSelector = selector;
+        transitionEditorCallback = onSave;
+        
+        // Update header
+        if (transitionEditorSelectorEl) transitionEditorSelectorEl.textContent = selector;
+        if (transitionBaseSelectorEl) transitionBaseSelectorEl.textContent = selector;
+        
+        // Reset state
+        transitionEditorBaseProperties = {};
+        transitionEditorHoverProperties = {};
+        transitionEditorCurrentPseudo = transitionPseudoSelect?.value || ':hover';
+        
+        // Reset controls to defaults
+        if (transitionDuration) transitionDuration.value = 0.3;
+        if (transitionDelay) transitionDelay.value = 0;
+        if (transitionTimingSelect) transitionTimingSelect.value = 'ease';
+        if (transitionPropertySelect) transitionPropertySelect.value = 'all';
+        if (transitionCubicBezier) transitionCubicBezier.style.display = 'none';
+        if (transitionSpecificProps) transitionSpecificProps.style.display = 'none';
+        
+        // Update labels to match current pseudo-class
+        updateTriggerStateLabels();
+        
+        // Show modal
+        transitionEditorModal?.classList.add('preview-keyframe-modal--visible');
+        
+        // Load selector states
+        await loadTransitionSelectorStates(selector);
+        
+        // Update preview
+        updateTransitionPreviewCode();
+    }
+    
+    /**
+     * Load base and pseudo-state styles for the selector
+     */
+    async function loadTransitionSelectorStates(selector) {
+        const pseudoClass = transitionEditorCurrentPseudo;
+        const hoverSelector = selector + pseudoClass;
+        
+        try {
+            // Fetch base and hover styles in parallel
+            // Note: selector is passed as route parameter, not query string
+            const [baseResponse, hoverResponse] = await Promise.all([
+                fetch(managementUrl + 'getStyleRule/' + encodeURIComponent(selector), {
+                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+                }),
+                fetch(managementUrl + 'getStyleRule/' + encodeURIComponent(hoverSelector), {
+                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+                })
+            ]);
+            
+            const baseData = await baseResponse.json();
+            const hoverData = await hoverResponse.json();
+            
+            // Extract properties - API returns styles as a string, need to parse it
+            transitionEditorBaseProperties = {};
+            transitionEditorHoverProperties = {};
+            transitionEditorBaseAnimation = null;
+            transitionEditorTriggerAnimation = null;
+            
+            if (baseData.status === 200 && baseData.data?.styles) {
+                transitionEditorBaseProperties = parseStylesString(baseData.data.styles);
+                
+                // Check if there's already a transition defined
+                if (transitionEditorBaseProperties.transition) {
+                    parseExistingTransition(transitionEditorBaseProperties.transition);
+                }
+                
+                // Check if there's already an animation defined
+                if (transitionEditorBaseProperties.animation) {
+                    transitionEditorBaseAnimation = parseAnimationValue(transitionEditorBaseProperties.animation);
+                }
+            }
+            
+            if (hoverData.status === 200 && hoverData.data?.styles) {
+                transitionEditorHoverProperties = parseStylesString(hoverData.data.styles);
+                
+                // Check if there's an animation on the trigger state
+                if (transitionEditorHoverProperties.animation) {
+                    transitionEditorTriggerAnimation = parseAnimationValue(transitionEditorHoverProperties.animation);
+                }
+            }
+            
+            // Render property panels
+            renderTransitionBaseProperties();
+            renderTransitionHoverProperties();
+            
+            // Render animation sections
+            renderAnimationSection('base');
+            renderAnimationSection('trigger');
+            
+            // Re-initialize property selectors with updated exclusion lists
+            initTransitionPropertySelectors();
+            
+        } catch (error) {
+            console.error('Failed to load selector states:', error);
+            showToast(<?= json_encode(__admin('preview.loadTransitionFailed') ?? 'Failed to load transition data') ?>, 'error');
+        }
+    }
+    
+    /**
+     * Parse animation CSS value into structured object
+     * @param {string} animationValue - CSS animation value like "1000ms ease 0s fadeIn" or "fadeIn 1s infinite"
+     * @returns {object|null} - { name, duration, timing, delay, iterations, infinite }
+     */
+    function parseAnimationValue(animationValue) {
+        if (!animationValue || animationValue === 'none') return null;
+        
+        // Animation shorthand: name duration timing-function delay iteration-count direction fill-mode play-state
+        // Or: duration timing-function delay name (alternative order)
+        const parts = animationValue.trim().split(/\s+/);
+        
+        let name = null;
+        let duration = 1000;
+        let iterations = 1;
+        let infinite = false;
+        
+        for (const part of parts) {
+            if (part === 'infinite') {
+                infinite = true;
+            } else if (/^\d+$/.test(part)) {
+                // Plain number - could be iterations
+                iterations = parseInt(part);
+            } else if (/^\d+(\.\d+)?(ms|s)$/.test(part)) {
+                // Duration
+                duration = part.endsWith('ms') ? parseFloat(part) : parseFloat(part) * 1000;
+            } else if (!['ease', 'linear', 'ease-in', 'ease-out', 'ease-in-out', 'forwards', 'backwards', 'both', 'none', 'normal', 'reverse', 'alternate', 'alternate-reverse', 'running', 'paused'].includes(part) && !/^cubic-bezier/.test(part)) {
+                // Probably the animation name
+                name = part;
+            }
+        }
+        
+        // Also check for animation-name and animation-iteration-count properties
+        if (!name && transitionEditorBaseProperties['animation-name']) {
+            name = transitionEditorBaseProperties['animation-name'];
+        }
+        
+        return name ? { name, duration, iterations, infinite } : null;
+    }
+    
+    /**
+     * Render animation section (base or trigger)
+     * @param {string} target - 'base' or 'trigger'
+     */
+    function renderAnimationSection(target) {
+        const animation = target === 'base' ? transitionEditorBaseAnimation : transitionEditorTriggerAnimation;
+        const emptyEl = target === 'base' ? transitionBaseAnimEmpty : transitionTriggerAnimEmpty;
+        const configEl = target === 'base' ? transitionBaseAnimConfig : transitionTriggerAnimConfig;
+        const nameEl = target === 'base' ? transitionBaseAnimName : transitionTriggerAnimName;
+        const durationEl = target === 'base' ? transitionBaseAnimDuration : transitionTriggerAnimDuration;
+        const iterationsEl = target === 'base' ? transitionBaseAnimIterations : transitionTriggerAnimIterations;
+        const infiniteEl = target === 'base' ? transitionBaseAnimInfinite : transitionTriggerAnimInfinite;
+        const addBtn = target === 'base' ? transitionBaseAnimAddBtn : transitionTriggerAnimAddBtn;
+        
+        if (!animation) {
+            // No animation set
+            if (emptyEl) emptyEl.style.display = '';
+            if (configEl) configEl.style.display = 'none';
+            if (addBtn) addBtn.style.display = '';
+        } else {
+            // Animation is set
+            if (emptyEl) emptyEl.style.display = 'none';
+            if (configEl) configEl.style.display = '';
+            if (addBtn) addBtn.style.display = 'none';
+            
+            if (nameEl) nameEl.textContent = `@keyframes ${animation.name}`;
+            if (durationEl) durationEl.value = animation.duration;
+            if (iterationsEl) iterationsEl.value = animation.iterations;
+            if (infiniteEl) infiniteEl.checked = animation.infinite;
+        }
+        
+        // Update trigger animation hint
+        if (target === 'trigger' && transitionTriggerAnimHint) {
+            const pseudo = transitionEditorCurrentPseudo || ':hover';
+            transitionTriggerAnimHint.textContent = `(${<?= json_encode(__admin('preview.playsOn') ?? 'plays on') ?>} ${pseudo})`;
+        }
+    }
+    
+    /**
+     * Parse existing transition value and populate controls
+     */
+    function parseExistingTransition(transitionValue) {
+        // Simple parse: "all 0.3s ease" or "background-color 0.5s ease-in-out 0.1s"
+        const parts = transitionValue.trim().split(/\s+/);
+        
+        if (parts.length >= 1) {
+            // Property
+            const prop = parts[0];
+            if (transitionPropertySelect) {
+                if (prop === 'all') {
+                    transitionPropertySelect.value = 'all';
+                } else {
+                    // For now, treat as 'all' - specific properties need more complex parsing
+                    transitionPropertySelect.value = 'all';
+                }
+            }
+        }
+        
+        if (parts.length >= 2) {
+            // Duration
+            const dur = parseFloat(parts[1]);
+            if (!isNaN(dur) && transitionDuration) {
+                transitionDuration.value = dur;
+            }
+        }
+        
+        if (parts.length >= 3) {
+            // Timing function
+            const timing = parts[2];
+            if (transitionTimingSelect) {
+                const validTimings = ['ease', 'linear', 'ease-in', 'ease-out', 'ease-in-out'];
+                if (validTimings.includes(timing)) {
+                    transitionTimingSelect.value = timing;
+                } else if (timing.startsWith('cubic-bezier')) {
+                    transitionTimingSelect.value = 'cubic-bezier';
+                    // Parse cubic-bezier values
+                    const match = timing.match(/cubic-bezier\(([^)]+)\)/);
+                    if (match) {
+                        const vals = match[1].split(',').map(v => parseFloat(v.trim()));
+                        if (vals.length === 4) {
+                            document.getElementById('transition-bezier-x1').value = vals[0];
+                            document.getElementById('transition-bezier-y1').value = vals[1];
+                            document.getElementById('transition-bezier-x2').value = vals[2];
+                            document.getElementById('transition-bezier-y2').value = vals[3];
+                        }
+                    }
+                    if (transitionCubicBezier) transitionCubicBezier.style.display = '';
+                }
+            }
+        }
+        
+        if (parts.length >= 4) {
+            // Delay
+            const delay = parseFloat(parts[3]);
+            if (!isNaN(delay) && transitionDelay) {
+                transitionDelay.value = delay;
+            }
+        }
+    }
+    
+    /**
+     * Render base state properties panel
+     */
+    function renderTransitionBaseProperties() {
+        if (!transitionBasePropsEl) return;
+        
+        const props = Object.entries(transitionEditorBaseProperties)
+            .filter(([key]) => key !== 'transition' && key !== 'animation'); // Don't show transition/animation in the list
+        
+        if (props.length === 0) {
+            transitionBasePropsEl.innerHTML = `
+                <div class="transition-editor__empty"><?= __admin('preview.noBaseStyles') ?? 'No base styles defined' ?></div>
+            `;
+            return;
+        }
+        
+        transitionBasePropsEl.innerHTML = props.map(([prop, value]) => `
+            <div class="transition-editor__property" data-property="${escapeHtml(prop)}" data-target="base">
+                <div class="transition-editor__property-info">
+                    <span class="transition-editor__property-name">${escapeHtml(prop)}</span>
+                    <span class="transition-editor__property-value" title="${escapeHtml(value)}">${escapeHtml(value)}</span>
+                </div>
+                <div class="transition-editor__property-actions">
+                    <button type="button" class="transition-editor__property-btn transition-editor__property-btn--delete" 
+                            data-action="delete" title="<?= __admin('common.delete') ?? 'Delete' ?>">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+        
+        // Add event listeners for delete buttons
+        transitionBasePropsEl.querySelectorAll('[data-action="delete"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const propEl = e.target.closest('.transition-editor__property');
+                const prop = propEl?.dataset.property;
+                if (prop) deleteTransitionProperty('base', prop);
+            });
+        });
+    }
+    
+    /**
+     * Render trigger state properties panel
+     */
+    function renderTransitionHoverProperties() {
+        if (!transitionHoverPropsEl) return;
+        
+        const props = Object.entries(transitionEditorHoverProperties);
+        
+        if (props.length === 0) {
+            transitionHoverPropsEl.innerHTML = `
+                <div class="transition-editor__empty"><?= __admin('preview.noTriggerStyles') ?? 'No trigger styles defined' ?></div>
+            `;
+            return;
+        }
+        
+        transitionHoverPropsEl.innerHTML = props.map(([prop, value]) => `
+            <div class="transition-editor__property" data-property="${escapeHtml(prop)}" data-target="trigger">
+                <div class="transition-editor__property-info">
+                    <span class="transition-editor__property-name">${escapeHtml(prop)}</span>
+                    <span class="transition-editor__property-value" title="${escapeHtml(value)}">${escapeHtml(value)}</span>
+                </div>
+                <div class="transition-editor__property-actions">
+                    <button type="button" class="transition-editor__property-btn transition-editor__property-btn--delete" 
+                            data-action="delete" title="<?= __admin('common.delete') ?? 'Delete' ?>">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+        
+        // Add event listeners for delete buttons
+        transitionHoverPropsEl.querySelectorAll('[data-action="delete"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const propEl = e.target.closest('.transition-editor__property');
+                const prop = propEl?.dataset.property;
+                if (prop) deleteTransitionProperty('trigger', prop);
+            });
+        });
+        
+        // Update specific properties checkboxes if needed
+        updateSpecificPropertiesCheckboxes();
+    }
+    
+    /**
+     * Delete a property from base or trigger state
+     * @param {string} target - 'base' or 'trigger'
+     * @param {string} property - Property name to delete
+     */
+    async function deleteTransitionProperty(target, property) {
+        const selector = target === 'base' 
+            ? transitionEditorSelector 
+            : transitionEditorSelector + transitionEditorCurrentPseudo;
+        
+        try {
+            const response = await fetch(managementUrl + 'setStyleRule', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+                },
+                body: JSON.stringify({
+                    selector: selector,
+                    styles: '',  // Empty styles for merge
+                    removeProperties: [property]  // Delete this property
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.status === 200) {
+                showToast(<?= json_encode(__admin('preview.propertyDeleted') ?? 'Property deleted') ?>, 'success');
+                // Reload the properties
+                await loadTransitionSelectorStates(transitionEditorSelector);
+            } else {
+                throw new Error(result.message || 'Failed to delete property');
+            }
+        } catch (error) {
+            console.error('Failed to delete property:', error);
+            showToast(<?= json_encode(__admin('preview.deletePropertyFailed') ?? 'Failed to delete property') ?>, 'error');
+        }
+    }
+    
+    /**
+     * Add a property to base or trigger state
+     * @param {string} target - 'base' or 'trigger'
+     * @param {string} property - Property name
+     * @param {string} value - Property value
+     */
+    async function addTransitionProperty(target, property, value) {
+        if (!property || !value) return;
+        
+        const selector = target === 'base' 
+            ? transitionEditorSelector 
+            : transitionEditorSelector + transitionEditorCurrentPseudo;
+        
+        try {
+            const response = await fetch(managementUrl + 'setStyleRule', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+                },
+                body: JSON.stringify({
+                    selector: selector,
+                    styles: `${property}: ${value};`  // Style string format
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.status === 200) {
+                showToast(<?= json_encode(__admin('preview.propertyAdded') ?? 'Property added') ?>, 'success');
+                // Reload the properties
+                await loadTransitionSelectorStates(transitionEditorSelector);
+                // Refresh iframe
+                const iframe = document.getElementById('preview-frame');
+                if (iframe?.contentWindow) {
+                    iframe.contentWindow.location.reload();
+                }
+            } else {
+                throw new Error(result.message || 'Failed to add property');
+            }
+        } catch (error) {
+            console.error('Failed to add property:', error);
+            showToast(<?= json_encode(__admin('preview.addPropertyFailed') ?? 'Failed to add property') ?>, 'error');
+        }
+    }
+    
+    /**
+     * Initialize property selector dropdowns using QSPropertySelector class
+     * and value input using QSValueInput class
+     * This creates searchable, categorized property dropdowns with smart value inputs
+     */
+    function initTransitionPropertySelectors() {
+        // Get existing properties to exclude
+        const baseExclude = Object.keys(transitionEditorBaseProperties);
+        const triggerExclude = Object.keys(transitionEditorHoverProperties);
+        
+        // Shared color picker callback
+        const handleColorPick = (property, value, swatchEl) => {
+            openColorPickerForTransition(property, value, swatchEl);
+        };
+        
+        // Initialize base property selector
+        if (transitionBasePropSelectorContainer) {
+            if (transitionBasePropSelector) {
+                transitionBasePropSelector.destroy();
+            }
+            transitionBasePropSelector = new QSPropertySelector({
+                container: transitionBasePropSelectorContainer,
+                excludeProperties: baseExclude,
+                onSelect: (property) => {
+                    // Update value input to match property type
+                    if (transitionBaseValueContainer) {
+                        if (transitionBaseValueInput) {
+                            transitionBaseValueInput.destroy();
+                        }
+                        transitionBaseValueInput = new QSValueInput({
+                            container: transitionBaseValueContainer,
+                            property: property,
+                            value: '',
+                            onChange: () => {},
+                            onBlur: () => {},
+                            onColorPick: handleColorPick
+                        });
+                        transitionBaseValueInput.focus();
+                    }
+                }
+            });
+        }
+        
+        // Initialize base value input (default text type)
+        if (transitionBaseValueContainer) {
+            if (transitionBaseValueInput) {
+                transitionBaseValueInput.destroy();
+            }
+            transitionBaseValueInput = new QSValueInput({
+                container: transitionBaseValueContainer,
+                property: '',
+                value: '',
+                onChange: () => {},
+                onBlur: () => {},
+                onColorPick: handleColorPick
+            });
+        }
+        
+        // Initialize trigger property selector
+        if (transitionTriggerPropSelectorContainer) {
+            if (transitionTriggerPropSelector) {
+                transitionTriggerPropSelector.destroy();
+            }
+            transitionTriggerPropSelector = new QSPropertySelector({
+                container: transitionTriggerPropSelectorContainer,
+                excludeProperties: triggerExclude,
+                onSelect: (property) => {
+                    // Update value input to match property type
+                    if (transitionTriggerValueContainer) {
+                        if (transitionTriggerValueInput) {
+                            transitionTriggerValueInput.destroy();
+                        }
+                        transitionTriggerValueInput = new QSValueInput({
+                            container: transitionTriggerValueContainer,
+                            property: property,
+                            value: '',
+                            onChange: () => {},
+                            onBlur: () => {},
+                            onColorPick: handleColorPick
+                        });
+                        transitionTriggerValueInput.focus();
+                    }
+                }
+            });
+        }
+        
+        // Initialize trigger value input (default text type)
+        if (transitionTriggerValueContainer) {
+            if (transitionTriggerValueInput) {
+                transitionTriggerValueInput.destroy();
+            }
+            transitionTriggerValueInput = new QSValueInput({
+                container: transitionTriggerValueContainer,
+                property: '',
+                value: '',
+                onChange: () => {},
+                onBlur: () => {},
+                onColorPick: handleColorPick
+            });
+        }
+    }
+    
+    // Track active transition color picker for cleanup
+    let activeTransitionColorPicker = null;
+    let activeTransitionColorPickerInput = null;
+    
+    /**
+     * Open color picker for State & Animation Editor
+     * Uses the same QSColorPicker as the Selectors panel for consistency
+     * @param {string} property - CSS property name
+     * @param {string} currentColor - Current color value
+     * @param {HTMLElement} swatchEl - The color swatch element
+     */
+    function openColorPickerForTransition(property, currentColor, swatchEl) {
+        // Use QSColorPicker if available (same as Selectors panel)
+        if (typeof QSColorPicker === 'undefined') {
+            console.warn('QSColorPicker not available');
+            return;
+        }
+        
+        // Clean up previous picker if any
+        if (activeTransitionColorPicker) {
+            activeTransitionColorPicker.destroy();
+            activeTransitionColorPicker = null;
+        }
+        if (activeTransitionColorPickerInput?.parentNode) {
+            activeTransitionColorPickerInput.remove();
+        }
+        
+        // Create a temporary input for the color picker (positioned near the swatch)
+        const tempInput = document.createElement('input');
+        tempInput.type = 'text';
+        tempInput.value = currentColor || '';
+        tempInput.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;';
+        swatchEl.parentNode.appendChild(tempInput);
+        activeTransitionColorPickerInput = tempInput;
+        
+        // Get color variables from theme (same as Selectors panel)
+        const colorVariables = {};
+        if (typeof originalThemeVariables === 'object' && originalThemeVariables) {
+            for (const [name, value] of Object.entries(originalThemeVariables)) {
+                // Include color-related variables
+                if (name.includes('color') || name.includes('bg') || name.includes('text')) {
+                    colorVariables[name] = value;
+                }
+            }
+        }
+        
+        // Create picker attached to temp input (same as Selectors panel)
+        const picker = new QSColorPicker(tempInput, {
+            position: 'auto',
+            cssVariables: Object.keys(colorVariables).length > 0 ? colorVariables : null,
+            onChange: (color) => {
+                // Extract just the color part if it's a var() (for swatch display)
+                let swatchColor = color;
+                if (color.startsWith('var(')) {
+                    const varName = color.match(/var\(([^)]+)\)/)?.[1];
+                    if (varName && colorVariables[varName]) {
+                        swatchColor = colorVariables[varName];
+                    }
+                }
+                
+                // Update the swatch
+                if (swatchEl) swatchEl.style.background = swatchColor;
+                
+                // Update the value input based on which form is visible
+                if (transitionBaseAddForm?.style.display !== 'none' && transitionBaseValueInput) {
+                    transitionBaseValueInput.setValue(color);
+                } else if (transitionTriggerAddForm?.style.display !== 'none' && transitionTriggerValueInput) {
+                    transitionTriggerValueInput.setValue(color);
+                }
+            }
+        });
+        
+        activeTransitionColorPicker = picker;
+        
+        // Open the picker via temp input click
+        tempInput.click();
+    }
+    
+    /**
+     * Toggle inline add property form
+     * @param {string} target - 'base' or 'trigger'
+     * @param {boolean} show - Whether to show or hide
+     */
+    function toggleAddPropertyForm(target, show) {
+        const toggle = target === 'base' ? transitionBaseAddToggle : transitionTriggerAddToggle;
+        const form = target === 'base' ? transitionBaseAddForm : transitionTriggerAddForm;
+        const propSelector = target === 'base' ? transitionBasePropSelector : transitionTriggerPropSelector;
+        const valueInput = target === 'base' ? transitionBaseValueInput : transitionTriggerValueInput;
+        const valueContainer = target === 'base' ? transitionBaseValueContainer : transitionTriggerValueContainer;
+        
+        if (toggle) toggle.style.display = show ? 'none' : '';
+        if (form) form.style.display = show ? '' : 'none';
+        
+        if (show) {
+            if (propSelector) propSelector.setValue('');
+            // Reset value input to default text type
+            if (valueInput && valueContainer) {
+                valueInput.destroy();
+                const newInput = new QSValueInput({
+                    container: valueContainer,
+                    property: '',
+                    value: '',
+                    onChange: () => {},
+                    onBlur: () => {},
+                    onColorPick: (property, value, swatchEl) => openColorPickerForTransition(property, value, swatchEl)
+                });
+                if (target === 'base') {
+                    transitionBaseValueInput = newInput;
+                } else {
+                    transitionTriggerValueInput = newInput;
+                }
+            }
+        }
+    }
+    
+    /**
+     * Open animation picker dropdown (Phase 10.3)
+     * @param {string} target - 'base' or 'trigger'
+     */
+    function openAnimationPicker(target) {
+        // Use keyframesData from Animations tab (should already be loaded)
+        if (!keyframesData || keyframesData.length === 0) {
+            // Try to fetch keyframes
+            fetch(managementUrl + 'getKeyframes', {
+                headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 200 && data.data) {
+                    keyframesData = data.data;
+                    showAnimationPickerDropdown(target);
+                } else {
+                    showToast(<?= json_encode(__admin('preview.noKeyframesFound') ?? 'No @keyframes found. Create one in the Animations tab first.') ?>, 'warning');
+                }
+            })
+            .catch(() => {
+                showToast(<?= json_encode(__admin('preview.errorLoadingKeyframes') ?? 'Error loading keyframes') ?>, 'error');
+            });
+        } else {
+            showAnimationPickerDropdown(target);
+        }
+    }
+    
+    /**
+     * Show animation picker dropdown
+     * @param {string} target - 'base' or 'trigger'
+     */
+    function showAnimationPickerDropdown(target) {
+        if (!keyframesData || keyframesData.length === 0) {
+            showToast(<?= json_encode(__admin('preview.noKeyframesFound') ?? 'No @keyframes found. Create one in the Animations tab first.') ?>, 'warning');
+            return;
+        }
+        
+        // Create dropdown
+        const existingDropdown = document.querySelector('.animation-picker-dropdown');
+        if (existingDropdown) existingDropdown.remove();
+        
+        const addBtn = target === 'base' ? transitionBaseAnimAddBtn : transitionTriggerAnimAddBtn;
+        if (!addBtn) return;
+        
+        const rect = addBtn.getBoundingClientRect();
+        
+        const dropdown = document.createElement('div');
+        dropdown.className = 'animation-picker-dropdown';
+        dropdown.style.cssText = `
+            position: fixed;
+            left: ${rect.left}px;
+            top: ${rect.bottom + 4}px;
+            background: var(--qsb-bg-secondary, #2d2d2d);
+            border: 1px solid var(--qsb-border, #404040);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 100002;
+            max-height: 200px;
+            overflow-y: auto;
+            min-width: 180px;
+        `;
+        
+        dropdown.innerHTML = keyframesData.map(kf => `
+            <div class="animation-picker-dropdown__item" data-name="${escapeHtml(kf.name)}" style="
+                padding: 8px 12px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                border-bottom: 1px solid var(--qsb-border, #404040);
+            ">
+                <span style="color: var(--qsb-accent, #4fc3f7);">@keyframes</span>
+                <span style="color: var(--qsb-text, #fff);">${escapeHtml(kf.name)}</span>
+            </div>
+        `).join('');
+        
+        // Add click handlers
+        dropdown.querySelectorAll('.animation-picker-dropdown__item').forEach(item => {
+            item.addEventListener('click', () => {
+                const name = item.dataset.name;
+                addAnimationToSelector(target, name);
+                dropdown.remove();
+            });
+            item.addEventListener('mouseenter', () => {
+                item.style.background = 'var(--qsb-bg-hover, #3a3a3a)';
+            });
+            item.addEventListener('mouseleave', () => {
+                item.style.background = '';
+            });
+        });
+        
+        // Close on click outside
+        const closeDropdown = (e) => {
+            if (!dropdown.contains(e.target) && e.target !== addBtn) {
+                dropdown.remove();
+                document.removeEventListener('click', closeDropdown);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeDropdown), 10);
+        
+        document.body.appendChild(dropdown);
+    }
+    
+    /**
+     * Add animation to selector
+     * @param {string} target - 'base' or 'trigger'
+     * @param {string} keyframeName - Name of the @keyframes
+     */
+    async function addAnimationToSelector(target, keyframeName) {
+        const selector = target === 'base' ? transitionEditorSelector : 
+            `${transitionEditorSelector}${transitionEditorCurrentPseudo || ':hover'}`;
+        
+        // Default animation value
+        const animationValue = `${keyframeName} 1000ms ease forwards`;
+        
+        try {
+            const response = await fetch(managementUrl + 'setStyleRule', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+                },
+                body: JSON.stringify({
+                    selector: selector,
+                    styles: `animation: ${animationValue};`
+                })
+            });
+            
+            const result = await response.json();
+            if (result.status === 200) {
+                showToast(<?= json_encode(__admin('preview.animationAdded') ?? 'Animation added') ?>, 'success');
+                
+                // Update local state
+                if (target === 'base') {
+                    transitionEditorBaseAnimation = { name: keyframeName, duration: 1000, iterations: 1, infinite: false };
+                    transitionEditorBaseProperties.animation = animationValue;
+                } else {
+                    transitionEditorTriggerAnimation = { name: keyframeName, duration: 1000, iterations: 1, infinite: false };
+                    transitionEditorHoverProperties.animation = animationValue;
+                }
+                
+                renderAnimationSection(target);
+                refreshPreviewFrame();
+            } else {
+                showToast(result.message || <?= json_encode(__admin('preview.errorAddingAnimation') ?? 'Error adding animation') ?>, 'error');
+            }
+        } catch (error) {
+            console.error('Failed to add animation:', error);
+            showToast(<?= json_encode(__admin('preview.errorAddingAnimation') ?? 'Error adding animation') ?>, 'error');
+        }
+    }
+    
+    /**
+     * Remove animation from selector
+     * @param {string} target - 'base' or 'trigger'
+     */
+    async function removeAnimation(target) {
+        const selector = target === 'base' ? transitionEditorSelector : 
+            `${transitionEditorSelector}${transitionEditorCurrentPseudo || ':hover'}`;
+        
+        try {
+            const response = await fetch(managementUrl + 'setStyleRule', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+                },
+                body: JSON.stringify({
+                    selector: selector,
+                    styles: '',
+                    removeProperties: ['animation']
+                })
+            });
+            
+            const result = await response.json();
+            if (result.status === 200) {
+                showToast(<?= json_encode(__admin('preview.animationRemoved') ?? 'Animation removed') ?>, 'success');
+                
+                // Update local state
+                if (target === 'base') {
+                    transitionEditorBaseAnimation = null;
+                    delete transitionEditorBaseProperties.animation;
+                } else {
+                    transitionEditorTriggerAnimation = null;
+                    delete transitionEditorHoverProperties.animation;
+                }
+                
+                renderAnimationSection(target);
+                refreshPreviewFrame();
+            } else {
+                showToast(result.message || <?= json_encode(__admin('preview.errorRemovingAnimation') ?? 'Error removing animation') ?>, 'error');
+            }
+        } catch (error) {
+            console.error('Failed to remove animation:', error);
+            showToast(<?= json_encode(__admin('preview.errorRemovingAnimation') ?? 'Error removing animation') ?>, 'error');
+        }
+    }
+    
+    /**
+     * Preview animation using the Animation Preview Modal
+     * @param {string} target - 'base' or 'trigger'
+     */
+    function previewAnimation(target) {
+        const animation = target === 'base' ? transitionEditorBaseAnimation : transitionEditorTriggerAnimation;
+        if (!animation || !animation.name) {
+            showToast(<?= json_encode(__admin('preview.noAnimationToPreview') ?? 'No animation to preview') ?>, 'warning');
+            return;
+        }
+        
+        // Find the keyframe data
+        const keyframe = keyframesData?.find(kf => kf.name === animation.name);
+        if (!keyframe) {
+            showToast(<?= json_encode(__admin('preview.keyframeNotFound') ?? 'Keyframe not found') ?>, 'error');
+            return;
+        }
+        
+        // Use existing animation preview modal
+        if (typeof openAnimationPreviewModal === 'function') {
+            openAnimationPreviewModal(keyframe);
+        } else {
+            showToast(<?= json_encode(__admin('preview.previewNotAvailable') ?? 'Preview not available') ?>, 'warning');
+        }
+    }
+    
+    /**
+     * Update animation setting (duration, iterations, infinite)
+     * @param {string} target - 'base' or 'trigger'
+     * @param {string} setting - 'duration', 'iterations', or 'infinite'
+     */
+    async function updateAnimationSetting(target, setting) {
+        const animation = target === 'base' ? transitionEditorBaseAnimation : transitionEditorTriggerAnimation;
+        if (!animation || !animation.name) return;
+        
+        const selector = target === 'base' ? transitionEditorSelector : 
+            `${transitionEditorSelector}${transitionEditorCurrentPseudo || ':hover'}`;
+        
+        // Get updated values from inputs
+        const durationEl = target === 'base' ? transitionBaseAnimDuration : transitionTriggerAnimDuration;
+        const iterationsEl = target === 'base' ? transitionBaseAnimIterations : transitionTriggerAnimIterations;
+        const infiniteEl = target === 'base' ? transitionBaseAnimInfinite : transitionTriggerAnimInfinite;
+        
+        const duration = durationEl?.value || animation.duration;
+        const iterations = infiniteEl?.checked ? 'infinite' : (iterationsEl?.value || animation.iterations);
+        const infinite = infiniteEl?.checked || false;
+        
+        // Build animation value
+        const animationValue = `${animation.name} ${duration}ms ease ${iterations === 'infinite' ? 'infinite' : ''} forwards`.replace(/\s+/g, ' ').trim();
+        
+        try {
+            const response = await fetch(managementUrl + 'setStyleRule', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+                },
+                body: JSON.stringify({
+                    selector: selector,
+                    styles: `animation: ${animationValue};`
+                })
+            });
+            
+            const result = await response.json();
+            if (result.status === 200) {
+                // Update local state
+                if (target === 'base') {
+                    transitionEditorBaseAnimation = { ...animation, duration: parseInt(duration), iterations: infinite ? 'infinite' : parseInt(iterationsEl?.value || 1), infinite };
+                    transitionEditorBaseProperties.animation = animationValue;
+                } else {
+                    transitionEditorTriggerAnimation = { ...animation, duration: parseInt(duration), iterations: infinite ? 'infinite' : parseInt(iterationsEl?.value || 1), infinite };
+                    transitionEditorHoverProperties.animation = animationValue;
+                }
+                
+                refreshPreviewFrame();
+            }
+        } catch (error) {
+            console.error('Failed to update animation:', error);
+        }
+    }
+    
+    /**
+     * Update specific properties checkboxes based on hover properties
+     */
+    function updateSpecificPropertiesCheckboxes() {
+        if (!transitionSpecificProps) return;
+        
+        // Get all unique properties from both base and hover
+        const allProps = new Set([
+            ...Object.keys(transitionEditorBaseProperties),
+            ...Object.keys(transitionEditorHoverProperties)
+        ]);
+        
+        // Filter out transition/animation
+        const propsToShow = [...allProps].filter(p => 
+            p !== 'transition' && p !== 'animation'
+        );
+        
+        if (propsToShow.length === 0) {
+            transitionSpecificProps.innerHTML = `
+                <div class="transition-editor__empty"><?= __admin('preview.noPropertiesToTransition') ?? 'No properties to transition' ?></div>
+            `;
+            return;
+        }
+        
+        transitionSpecificProps.innerHTML = propsToShow.map(prop => `
+            <label class="transition-editor__checkbox-label">
+                <input type="checkbox" class="transition-editor__prop-checkbox" value="${escapeHtml(prop)}" checked>
+                ${escapeHtml(prop)}
+            </label>
+        `).join('');
+        
+        // Add change listeners
+        transitionSpecificProps.querySelectorAll('.transition-editor__prop-checkbox').forEach(cb => {
+            cb.addEventListener('change', updateTransitionPreviewCode);
+        });
+    }
+    
+    /**
+     * Build transition value string from controls
+     */
+    function buildTransitionValue() {
+        const property = transitionPropertySelect?.value || 'all';
+        const durationVal = transitionDuration?.value || 0.3;
+        const durationUnit = transitionDurationUnit?.value || 's';
+        const duration = durationVal + durationUnit;
+        const delayVal = parseFloat(transitionDelay?.value || 0);
+        const delayUnit = transitionDelayUnit?.value || 's';
+        const delay = delayVal > 0 ? delayVal + delayUnit : null;
+        const timing = transitionTimingSelect?.value || 'ease';
+        
+        let timingValue = timing;
+        if (timing === 'cubic-bezier') {
+            const x1 = document.getElementById('transition-bezier-x1')?.value || 0.4;
+            const y1 = document.getElementById('transition-bezier-y1')?.value || 0;
+            const x2 = document.getElementById('transition-bezier-x2')?.value || 0.2;
+            const y2 = document.getElementById('transition-bezier-y2')?.value || 1;
+            timingValue = `cubic-bezier(${x1}, ${y1}, ${x2}, ${y2})`;
+        }
+        
+        if (property === 'specific') {
+            // Get selected properties
+            const selectedProps = [];
+            transitionSpecificProps?.querySelectorAll('.transition-editor__prop-checkbox:checked').forEach(cb => {
+                selectedProps.push(cb.value);
+            });
+            
+            if (selectedProps.length === 0) {
+                return 'none';
+            }
+            
+            // Build multiple transitions
+            return selectedProps.map(prop => 
+                `${prop} ${duration} ${timingValue}${delay ? ' ' + delay : ''}`
+            ).join(', ');
+        }
+        
+        // Single transition for all
+        let value = `all ${duration} ${timingValue}`;
+        if (delay) {
+            value += ` ${delay}`;
+        }
+        return value;
+    }
+    
+    /**
+     * Update the transition preview code display
+     */
+    function updateTransitionPreviewCode() {
+        if (!transitionPreviewCode) return;
+        transitionPreviewCode.textContent = buildTransitionValue();
+    }
+    
+    /**
+     * Update trigger state labels based on selected pseudo-class
+     */
+    function updateTriggerStateLabels() {
+        const pseudo = transitionEditorCurrentPseudo || ':hover';
+        const pseudoName = pseudo.replace(':', '');
+        const pseudoCapitalized = pseudoName.charAt(0).toUpperCase() + pseudoName.slice(1);
+        
+        // Update the trigger state panel label
+        if (transitionTriggerLabel) {
+            transitionTriggerLabel.textContent = `${pseudo} ${<?= json_encode(__admin('preview.state') ?? 'State') ?>}`;
+        }
+        
+        // Update the "Add State Style" button text
+        if (transitionAddHoverText) {
+            transitionAddHoverText.textContent = `${<?= json_encode(__admin('preview.addStyle') ?? 'Add') ?>} ${pseudo} ${<?= json_encode(__admin('preview.style') ?? 'Style') ?>}`;
+        }
+    }
+    
+    /**
+     * Close the Transition Editor
+     */
+    function closeTransitionEditor() {
+        transitionEditorModal?.classList.remove('preview-keyframe-modal--visible');
+        transitionEditorSelector = null;
+        transitionEditorCallback = null;
+    }
+    
+    /**
+     * Save the transition
+     */
+    async function saveTransition() {
+        if (!transitionEditorSelector) return;
+        
+        const transitionValue = buildTransitionValue();
+        
+        try {
+            // Save transition to the base selector
+            const response = await fetch(managementUrl + 'setStyleRule', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+                },
+                body: JSON.stringify({
+                    selector: transitionEditorSelector,
+                    styles: `transition: ${transitionValue};`
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.status === 200) {
+                showToast(<?= json_encode(__admin('preview.transitionSaved') ?? 'Transition saved successfully') ?>, 'success');
+                
+                // Refresh iframe to show changes
+                const iframe = document.getElementById('preview-frame');
+                if (iframe?.contentWindow) {
+                    iframe.contentWindow.location.reload();
+                }
+                
+                // Call callback if provided
+                if (typeof transitionEditorCallback === 'function') {
+                    transitionEditorCallback(transitionValue);
+                }
+                
+                // Reload animations tab data
+                if (animationsLoaded) {
+                    animationsLoaded = false;
+                    loadAnimationsTab();
+                }
+                
+                closeTransitionEditor();
+            } else {
+                throw new Error(result.message || 'Failed to save');
+            }
+            
+        } catch (error) {
+            console.error('Failed to save transition:', error);
+            showToast(<?= json_encode(__admin('preview.saveTransitionFailed') ?? 'Failed to save transition') ?>, 'error');
+        }
+    }
+    
+    /**
+     * Preview hover effect in iframe
+     */
+    function previewTransitionHover() {
+        const iframe = document.getElementById('preview-frame');
+        if (!iframe?.contentDocument || !transitionEditorSelector) return;
+        
+        try {
+            const elements = iframe.contentDocument.querySelectorAll(transitionEditorSelector);
+            if (elements.length === 0) {
+                showToast(<?= json_encode(__admin('preview.noElementsFound') ?? 'No elements found for selector') ?>, 'warning');
+                return;
+            }
+            
+            // Apply hover styles temporarily
+            elements.forEach(el => {
+                // Store original inline styles
+                el.dataset.originalStyle = el.getAttribute('style') || '';
+                
+                // Apply hover properties
+                Object.entries(transitionEditorHoverProperties).forEach(([prop, value]) => {
+                    el.style.setProperty(prop, value);
+                });
+            });
+            
+            // Revert after delay
+            setTimeout(() => {
+                elements.forEach(el => {
+                    // Restore original inline styles
+                    const original = el.dataset.originalStyle;
+                    if (original) {
+                        el.setAttribute('style', original);
+                    } else {
+                        el.removeAttribute('style');
+                    }
+                    delete el.dataset.originalStyle;
+                });
+            }, 1500);
+            
+            showToast(<?= json_encode(__admin('preview.previewingHover') ?? 'Previewing hover effect') ?>, 'info');
+            
+        } catch (error) {
+            console.error('Failed to preview hover:', error);
+        }
+    }
+    
+    // Transition Editor Event Listeners
+    if (transitionEditorModal) {
+        // Close button
+        document.getElementById('transition-editor-close')?.addEventListener('click', closeTransitionEditor);
+        document.getElementById('transition-cancel')?.addEventListener('click', closeTransitionEditor);
+        
+        // Save button
+        document.getElementById('transition-save')?.addEventListener('click', saveTransition);
+        
+        // Preview button
+        document.getElementById('transition-preview-btn')?.addEventListener('click', previewTransitionHover);
+        
+        // Backdrop click to close
+        transitionEditorModal.querySelector('.preview-keyframe-modal__backdrop')?.addEventListener('click', closeTransitionEditor);
+        
+        // Pseudo-class select change
+        transitionPseudoSelect?.addEventListener('change', async (e) => {
+            transitionEditorCurrentPseudo = e.target.value;
+            updateTriggerStateLabels();
+            await loadTransitionSelectorStates(transitionEditorSelector);
+        });
+        
+        // Property select change (all vs specific)
+        transitionPropertySelect?.addEventListener('change', (e) => {
+            if (e.target.value === 'specific') {
+                transitionSpecificProps.style.display = '';
+            } else {
+                transitionSpecificProps.style.display = 'none';
+            }
+            updateTransitionPreviewCode();
+        });
+        
+        // Timing function change
+        transitionTimingSelect?.addEventListener('change', (e) => {
+            if (e.target.value === 'cubic-bezier') {
+                transitionCubicBezier.style.display = '';
+            } else {
+                transitionCubicBezier.style.display = 'none';
+            }
+            updateTransitionPreviewCode();
+        });
+        
+        // Duration/delay changes
+        transitionDuration?.addEventListener('input', updateTransitionPreviewCode);
+        transitionDelay?.addEventListener('input', updateTransitionPreviewCode);
+        transitionDurationUnit?.addEventListener('change', updateTransitionPreviewCode);
+        transitionDelayUnit?.addEventListener('change', updateTransitionPreviewCode);
+        
+        // Cubic bezier changes
+        ['transition-bezier-x1', 'transition-bezier-y1', 'transition-bezier-x2', 'transition-bezier-y2'].forEach(id => {
+            document.getElementById(id)?.addEventListener('input', updateTransitionPreviewCode);
+        });
+        
+        // Initialize property selectors (uses QSPropertySelector class)
+        initTransitionPropertySelectors();
+        
+        // Base state inline add property form
+        transitionBaseAddToggle?.addEventListener('click', () => toggleAddPropertyForm('base', true));
+        transitionBaseAddCancel?.addEventListener('click', () => toggleAddPropertyForm('base', false));
+        transitionBaseAddConfirm?.addEventListener('click', async () => {
+            const prop = transitionBasePropSelector?.getValue();
+            const value = transitionBaseValueInput?.getValue();
+            if (prop && value) {
+                await addTransitionProperty('base', prop, value);
+                toggleAddPropertyForm('base', false);
+            }
+        });
+        
+        // Keyboard events for base value input container
+        transitionBaseValueContainer?.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                const prop = transitionBasePropSelector?.getValue();
+                const value = transitionBaseValueInput?.getValue();
+                if (prop && value) {
+                    await addTransitionProperty('base', prop, value);
+                    toggleAddPropertyForm('base', false);
+                }
+            } else if (e.key === 'Escape') {
+                toggleAddPropertyForm('base', false);
+            }
+        });
+        
+        // Trigger state inline add property form
+        transitionTriggerAddToggle?.addEventListener('click', () => toggleAddPropertyForm('trigger', true));
+        transitionTriggerAddCancel?.addEventListener('click', () => toggleAddPropertyForm('trigger', false));
+        transitionTriggerAddConfirm?.addEventListener('click', async () => {
+            const prop = transitionTriggerPropSelector?.getValue();
+            const value = transitionTriggerValueInput?.getValue();
+            if (prop && value) {
+                await addTransitionProperty('trigger', prop, value);
+                toggleAddPropertyForm('trigger', false);
+            }
+        });
+        
+        // Keyboard events for trigger value input container
+        transitionTriggerValueContainer?.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                const prop = transitionTriggerPropSelector?.getValue();
+                const value = transitionTriggerValueInput?.getValue();
+                if (prop && value) {
+                    await addTransitionProperty('trigger', prop, value);
+                    toggleAddPropertyForm('trigger', false);
+                }
+            } else if (e.key === 'Escape') {
+                toggleAddPropertyForm('trigger', false);
+            }
+        });
+        
+        // Animation section event listeners (Phase 10.3)
+        transitionBaseAnimAddBtn?.addEventListener('click', () => openAnimationPicker('base'));
+        transitionTriggerAnimAddBtn?.addEventListener('click', () => openAnimationPicker('trigger'));
+        transitionBaseAnimRemoveBtn?.addEventListener('click', () => removeAnimation('base'));
+        transitionTriggerAnimRemoveBtn?.addEventListener('click', () => removeAnimation('trigger'));
+        transitionBaseAnimPreviewBtn?.addEventListener('click', () => previewAnimation('base'));
+        transitionTriggerAnimPreviewBtn?.addEventListener('click', () => previewAnimation('trigger'));
+        
+        // Animation duration change listeners
+        transitionBaseAnimDuration?.addEventListener('change', () => updateAnimationSetting('base', 'duration'));
+        transitionTriggerAnimDuration?.addEventListener('change', () => updateAnimationSetting('trigger', 'duration'));
+        transitionBaseAnimIterations?.addEventListener('change', () => updateAnimationSetting('base', 'iterations'));
+        transitionTriggerAnimIterations?.addEventListener('change', () => updateAnimationSetting('trigger', 'iterations'));
+        transitionBaseAnimInfinite?.addEventListener('change', () => updateAnimationSetting('base', 'infinite'));
+        transitionTriggerAnimInfinite?.addEventListener('change', () => updateAnimationSetting('trigger', 'infinite'));
+    }
+
     // ==================== Draggable Panels ====================
 
     /**
@@ -2671,6 +6049,77 @@ if (is_dir($componentsDir)) {
     }
     
     /**
+     * Initialize Transform Editor event handlers
+     */
+    function initTransformEditorHandlers() {
+        const transformModal = document.getElementById('transform-editor-modal');
+        const transformClose = document.getElementById('transform-editor-close');
+        const transformCancel = document.getElementById('transform-cancel');
+        const transformApply = document.getElementById('transform-apply');
+        const transformClear = document.getElementById('transform-clear');
+        const transformAddBtn = document.getElementById('transform-add-btn');
+        const transformDropdown = document.getElementById('transform-add-dropdown');
+        
+        // Close button
+        if (transformClose) {
+            transformClose.addEventListener('click', () => closeTransformEditor(false));
+        }
+        
+        // Cancel button
+        if (transformCancel) {
+            transformCancel.addEventListener('click', () => closeTransformEditor(false));
+        }
+        
+        // Apply button
+        if (transformApply) {
+            transformApply.addEventListener('click', () => closeTransformEditor(true));
+        }
+        
+        // Clear All button
+        if (transformClear) {
+            transformClear.addEventListener('click', () => {
+                transformFunctions = [];
+                renderTransformEditor();
+                updateTransformPreview();
+            });
+        }
+        
+        // Add Function button
+        if (transformAddBtn) {
+            transformAddBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleTransformDropdown();
+            });
+        }
+        
+        // Dropdown function buttons
+        if (transformDropdown) {
+            transformDropdown.querySelectorAll('[data-fn]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    addTransformFunction(e.target.dataset.fn);
+                });
+            });
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!transformDropdown.contains(e.target) && e.target !== transformAddBtn) {
+                    transformDropdown.classList.remove('transform-editor__dropdown--open');
+                }
+            });
+        }
+        
+        // Close modal on backdrop click
+        if (transformModal) {
+            transformModal.addEventListener('click', (e) => {
+                if (e.target === transformModal || e.target.classList.contains('preview-keyframe-modal__backdrop')) {
+                    closeTransformEditor(false);
+                }
+            });
+        }
+    }
+    
+    /**
      * Populate the animated selectors list UI (grouped by base selector with pseudo-states)
      */
     function populateAnimatedSelectorsList() {
@@ -2715,34 +6164,45 @@ if (is_dir($componentsDir)) {
             }
         }
         
-        // Add click listeners for edit buttons
-        document.querySelectorAll('.preview-animated-selector__edit').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const item = btn.closest('[data-selector]');
-                const selector = item?.dataset.selector;
+        // Add click listeners for clickable selectors (opens State & Animation Editor)
+        document.querySelectorAll('.preview-animated-selector--clickable').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const selector = item.dataset.selector;
                 if (selector) {
-                    editAnimatedSelector(selector);
+                    openTransitionEditor(selector);
                 }
             });
         });
         
-        // Add toggle listeners for groups with states (both toggle button and selector name)
+        // Add click listeners for clickable group headers (opens State & Animation Editor)
+        document.querySelectorAll('.preview-animated-selector-group__header--clickable').forEach(header => {
+            header.addEventListener('click', (e) => {
+                // Don't trigger if clicking the toggle button
+                if (e.target.closest('.preview-animated-selector-group__toggle')) return;
+                const selector = header.dataset.selector;
+                if (selector) {
+                    openTransitionEditor(selector);
+                }
+            });
+        });
+        
+        // Add click listeners for clickable state items (opens State & Animation Editor)
+        document.querySelectorAll('.preview-animated-selector-state--clickable').forEach(state => {
+            state.addEventListener('click', (e) => {
+                const selector = state.dataset.selector;
+                if (selector) {
+                    // Extract base selector (remove pseudo-class)
+                    const baseSelector = selector.replace(/:(hover|focus|active|visited|focus-within|focus-visible)$/i, '');
+                    openTransitionEditor(baseSelector);
+                }
+            });
+        });
+        
+        // Add toggle listeners for groups with states
         document.querySelectorAll('.preview-animated-selector-group__toggle').forEach(toggle => {
             toggle.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const group = toggle.closest('.preview-animated-selector-group');
-                if (group) {
-                    group.classList.toggle('preview-animated-selector-group--collapsed');
-                }
-            });
-        });
-        
-        // Allow clicking on selector name in group header to also toggle
-        document.querySelectorAll('.preview-animated-selector-group__header > .preview-animated-selector__name').forEach(name => {
-            name.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const group = name.closest('.preview-animated-selector-group');
                 if (group) {
                     group.classList.toggle('preview-animated-selector-group--collapsed');
                 }
@@ -2755,14 +6215,6 @@ if (is_dir($componentsDir)) {
      */
     function renderAnimatedSelectorGroup(item, type) {
         const hasStates = item.states && item.states.length > 0;
-        const editBtnHtml = `
-            <button type="button" class="preview-animated-selector__edit" title="${<?= json_encode(__admin('preview.editSelector') ?? 'Edit selector') ?>}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                </svg>
-            </button>
-        `;
         
         // Details for the base selector
         let detailsHtml = '';
@@ -2800,13 +6252,15 @@ if (is_dir($componentsDir)) {
         }
         
         if (!hasStates) {
-            // Simple selector without states (possibly orphan)
+            // Simple selector without states (possibly orphan) - clickable to open State & Animation Editor
             return `
-                <div class="preview-animated-selector ${item.isOrphan ? 'preview-animated-selector--orphan' : ''}" data-selector="${escapeHtml(item.selector || item.baseSelector)}">
+                <div class="preview-animated-selector preview-animated-selector--clickable ${item.isOrphan ? 'preview-animated-selector--orphan' : ''}" data-selector="${escapeHtml(item.selector || item.baseSelector)}" data-type="${type}">
                     <div class="preview-animated-selector__main">
                         <code class="preview-animated-selector__name">${escapeHtml(item.baseSelector)}</code>
                         <span class="preview-animated-selector__details">${detailsHtml}</span>
-                        ${editBtnHtml}
+                        <svg class="preview-animated-selector__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                            <path d="M5 12h14"/><path d="M12 5l7 7-7 7"/>
+                        </svg>
                     </div>
                     ${orphanHintHtml}
                 </div>
@@ -2826,17 +6280,16 @@ if (is_dir($componentsDir)) {
                 : '';
                 
             return `
-                <div class="preview-animated-selector-state" data-selector="${escapeHtml(state.selector)}">
+                <div class="preview-animated-selector-state preview-animated-selector-state--clickable" data-selector="${escapeHtml(state.selector)}">
                     <code class="preview-animated-selector-state__pseudo">${escapeHtml(state.pseudo)}</code>
                     <span class="preview-animated-selector-state__props">${escapeHtml(propsDisplay)}</span>
-                    ${editBtnHtml}
                 </div>
             `;
         }).join('');
         
         return `
-            <div class="preview-animated-selector-group">
-                <div class="preview-animated-selector-group__header" data-selector="${escapeHtml(item.selector || item.baseSelector)}">
+            <div class="preview-animated-selector-group" data-type="${type}">
+                <div class="preview-animated-selector-group__header preview-animated-selector-group__header--clickable" data-selector="${escapeHtml(item.selector || item.baseSelector)}">
                     <button type="button" class="preview-animated-selector-group__toggle" title="${<?= json_encode(__admin('preview.toggleStates') ?? 'Toggle states') ?>}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
                             <polyline points="6 9 12 15 18 9"/>
@@ -2845,7 +6298,9 @@ if (is_dir($componentsDir)) {
                     <code class="preview-animated-selector__name">${escapeHtml(item.baseSelector)}</code>
                     <span class="preview-animated-selector__details">${detailsHtml}</span>
                     <span class="preview-animated-selector__state-count">${item.states.length} ${<?= json_encode(__admin('preview.states') ?? 'states') ?>}</span>
-                    ${editBtnHtml}
+                    <svg class="preview-animated-selector__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                        <path d="M5 12h14"/><path d="M12 5l7 7-7 7"/>
+                    </svg>
                 </div>
                 <div class="preview-animated-selector-group__states">
                     ${statesHtml}
@@ -2858,15 +6313,6 @@ if (is_dir($componentsDir)) {
      * Render a trigger-only group (pseudo-states without transition/animation)
      */
     function renderTriggerGroup(item) {
-        const editBtnHtml = `
-            <button type="button" class="preview-animated-selector__edit" title="${<?= json_encode(__admin('preview.editSelector') ?? 'Edit selector') ?>}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                </svg>
-            </button>
-        `;
-        
         const statesHtml = item.states.map(state => {
             // Show properties that change
             const changedProps = Object.entries(state.properties || {})
@@ -2878,17 +6324,16 @@ if (is_dir($componentsDir)) {
                 : '';
                 
             return `
-                <div class="preview-animated-selector-state preview-animated-selector-state--trigger" data-selector="${escapeHtml(state.selector)}">
+                <div class="preview-animated-selector-state preview-animated-selector-state--trigger preview-animated-selector-state--clickable" data-selector="${escapeHtml(state.selector)}">
                     <code class="preview-animated-selector-state__pseudo">${escapeHtml(state.pseudo)}</code>
                     <span class="preview-animated-selector-state__props">${escapeHtml(propsDisplay)}</span>
-                    ${editBtnHtml}
                 </div>
             `;
         }).join('');
         
         return `
             <div class="preview-animated-selector-group preview-animated-selector-group--trigger">
-                <div class="preview-animated-selector-group__header" data-selector="${escapeHtml(item.selector || item.baseSelector)}">
+                <div class="preview-animated-selector-group__header preview-animated-selector-group__header--clickable" data-selector="${escapeHtml(item.selector || item.baseSelector)}">
                     <button type="button" class="preview-animated-selector-group__toggle" title="${<?= json_encode(__admin('preview.toggleStates') ?? 'Toggle states') ?>}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
                             <polyline points="6 9 12 15 18 9"/>
@@ -2896,7 +6341,9 @@ if (is_dir($componentsDir)) {
                     </button>
                     <code class="preview-animated-selector__name preview-animated-selector__name--muted">${escapeHtml(item.baseSelector)}</code>
                     <span class="preview-animated-selector__state-count preview-animated-selector__state-count--muted">${item.states.length} ${<?= json_encode(__admin('preview.states') ?? 'states') ?>}</span>
-                    ${editBtnHtml}
+                    <svg class="preview-animated-selector__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                        <path d="M5 12h14"/><path d="M12 5l7 7-7 7"/>
+                    </svg>
                 </div>
                 <div class="preview-animated-selector-group__states">
                     ${statesHtml}
@@ -2938,36 +6385,197 @@ if (is_dir($componentsDir)) {
     }
     
     /**
-     * Preview a keyframe animation on selected element
+     * Preview a keyframe animation - opens Animation Preview Modal
      */
-    function previewKeyframe(keyframeName) {
-        const iframe = document.getElementById('preview-frame');
-        if (!iframe?.contentWindow) return;
+    async function previewKeyframe(keyframeName) {
+        if (!animationPreviewModal) return;
         
-        // Toggle preview off if same keyframe
-        if (keyframePreviewActive === keyframeName) {
-            stopKeyframePreview();
-            return;
+        currentPreviewKeyframe = keyframeName;
+        
+        // Update modal header
+        if (animationPreviewName) {
+            animationPreviewName.textContent = `@keyframes ${keyframeName}`;
         }
         
-        // Get selected element in iframe or use body
-        const targetElement = iframe.contentDocument.querySelector('[data-visual-selected]') || 
-                              iframe.contentDocument.body;
+        // Reset controls to defaults
+        if (animationPreviewDuration) animationPreviewDuration.value = 1000;
+        if (animationPreviewTiming) animationPreviewTiming.value = 'ease';
+        if (animationPreviewDelay) animationPreviewDelay.value = 0;
+        if (animationPreviewCount) animationPreviewCount.value = 1;
+        if (animationPreviewInfinite) animationPreviewInfinite.checked = false;
         
-        if (!targetElement) return;
+        // Inject the keyframe CSS into the admin page so the animation can play
+        await injectKeyframeForPreview(keyframeName);
         
-        // Stop any current preview
-        stopKeyframePreview();
+        // Update CSS preview
+        updateAnimationPreviewCss();
         
-        // Apply preview animation
-        targetElement.style.animation = `${keyframeName} 1s ease infinite`;
-        keyframePreviewActive = keyframeName;
+        // Show modal
+        animationPreviewModal.classList.add('preview-keyframe-modal--visible');
         
-        // Update button state
-        updateKeyframePreviewButtons();
-        
-        showToast(<?= json_encode(__admin('preview.previewingAnimation') ?? 'Previewing animation') ?> + `: ${keyframeName}`, 'info');
+        // Auto-play the animation
+        setTimeout(() => playAnimationPreview(), 100);
     }
+    
+    /**
+     * Inject keyframe CSS into admin page for preview
+     * @param {string} keyframeName - Name of the keyframe to inject
+     */
+    async function injectKeyframeForPreview(keyframeName) {
+        // Remove any previous preview keyframe style
+        const existingStyle = document.getElementById('animation-preview-keyframe-style');
+        if (existingStyle) existingStyle.remove();
+        
+        // Find the keyframe data
+        const keyframeData = keyframesData.find(kf => kf.name === keyframeName);
+        if (!keyframeData) return;
+        
+        // Fetch the full keyframe definition from API
+        try {
+            const response = await fetch(managementUrl + 'getKeyframes/' + encodeURIComponent(keyframeName), {
+                headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 200 && data.data?.frames) {
+                    // Reconstruct CSS from frames data
+                    let css = `@keyframes ${keyframeName} {\n`;
+                    for (const [key, value] of Object.entries(data.data.frames)) {
+                        css += `  ${key} { ${value} }\n`;
+                    }
+                    css += '}';
+                    
+                    // Create style element with the keyframe
+                    const style = document.createElement('style');
+                    style.id = 'animation-preview-keyframe-style';
+                    style.textContent = css;
+                    document.head.appendChild(style);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to fetch keyframe for preview:', e);
+        }
+    }
+    
+    /**
+     * Update the animation CSS preview text
+     */
+    function updateAnimationPreviewCss() {
+        if (!animationPreviewCss || !currentPreviewKeyframe) return;
+        
+        const duration = animationPreviewDuration?.value || 1000;
+        const timing = animationPreviewTiming?.value || 'ease';
+        const delay = animationPreviewDelay?.value || 0;
+        const isInfinite = animationPreviewInfinite?.checked;
+        const count = isInfinite ? 'infinite' : (animationPreviewCount?.value || 1);
+        
+        animationPreviewCss.textContent = `animation: ${duration}ms ${timing} ${delay}ms ${currentPreviewKeyframe};\nanimation-iteration-count: ${count};`;
+    }
+    
+    /**
+     * Play/replay the animation preview
+     */
+    function playAnimationPreview() {
+        if (!animationPreviewStage || !currentPreviewKeyframe) return;
+        
+        const duration = animationPreviewDuration?.value || 1000;
+        const timing = animationPreviewTiming?.value || 'ease';
+        const delay = animationPreviewDelay?.value || 0;
+        const isInfinite = animationPreviewInfinite?.checked;
+        const count = isInfinite ? 'infinite' : (animationPreviewCount?.value || 1);
+        
+        // Get current logo or find it
+        let logo = document.getElementById('animation-preview-logo');
+        
+        if (logo) {
+            // Store src before removing
+            const logoSrc = logo.src;
+            const logoAlt = logo.alt;
+            
+            // Remove the logo completely
+            logo.remove();
+            
+            // Small delay to ensure DOM updates
+            requestAnimationFrame(() => {
+                // Create fresh logo element
+                const newLogo = document.createElement('img');
+                newLogo.id = 'animation-preview-logo';
+                newLogo.className = 'animation-preview__logo';
+                newLogo.src = logoSrc;
+                newLogo.alt = logoAlt;
+                
+                // Apply animation
+                newLogo.style.animation = `${currentPreviewKeyframe} ${duration}ms ${timing} ${delay}ms`;
+                newLogo.style.animationIterationCount = count;
+                newLogo.style.animationFillMode = 'forwards';
+                
+                animationPreviewStage.appendChild(newLogo);
+            });
+        }
+    }
+    
+    /**
+     * Close the Animation Preview Modal
+     */
+    function closeAnimationPreview() {
+        if (animationPreviewModal) {
+            animationPreviewModal.classList.remove('preview-keyframe-modal--visible');
+        }
+        
+        // Stop any running animation
+        const logo = document.getElementById('animation-preview-logo');
+        if (logo) {
+            logo.style.animation = '';
+        }
+        
+        currentPreviewKeyframe = null;
+    }
+    
+    /**
+     * Initialize Animation Preview Modal event listeners
+     */
+    function initAnimationPreviewModal() {
+        // Close button
+        if (animationPreviewCloseBtn) {
+            animationPreviewCloseBtn.addEventListener('click', closeAnimationPreview);
+        }
+        if (animationPreviewDoneBtn) {
+            animationPreviewDoneBtn.addEventListener('click', closeAnimationPreview);
+        }
+        
+        // Backdrop click to close
+        const backdrop = animationPreviewModal?.querySelector('.preview-keyframe-modal__backdrop');
+        if (backdrop) {
+            backdrop.addEventListener('click', closeAnimationPreview);
+        }
+        
+        // Play button
+        if (animationPreviewPlayBtn) {
+            animationPreviewPlayBtn.addEventListener('click', playAnimationPreview);
+        }
+        
+        // Update CSS preview when controls change
+        const controls = [animationPreviewDuration, animationPreviewTiming, animationPreviewDelay, animationPreviewCount, animationPreviewInfinite];
+        controls.forEach(ctrl => {
+            if (ctrl) {
+                ctrl.addEventListener('change', updateAnimationPreviewCss);
+                ctrl.addEventListener('input', updateAnimationPreviewCss);
+            }
+        });
+        
+        // Infinite checkbox disables count input
+        if (animationPreviewInfinite) {
+            animationPreviewInfinite.addEventListener('change', () => {
+                if (animationPreviewCount) {
+                    animationPreviewCount.disabled = animationPreviewInfinite.checked;
+                }
+            });
+        }
+    }
+    
+    // Initialize on DOM ready
+    initAnimationPreviewModal();
     
     /**
      * Stop keyframe preview animation
@@ -3409,10 +7017,7 @@ if (is_dir($componentsDir)) {
                                data-frame="${frameIndex}" data-prop="${propIndex}" data-field="property">
                     </div>
                     <span class="preview-keyframe-modal__property-colon">:</span>
-                    <input type="text" class="preview-keyframe-modal__property-value" 
-                           value="${escapeHTML(prop.value)}" 
-                           placeholder="<?= __admin('preview.keyframePropertyValue') ?? 'value' ?>"
-                           data-frame="${frameIndex}" data-prop="${propIndex}" data-field="value">
+                    ${renderPropertyValueInput(prop.property, prop.value, frameIndex, propIndex)}
                     <button type="button" class="preview-keyframe-modal__delete-property" title="<?= __admin('preview.deleteKeyframeProperty') ?? 'Delete property' ?>">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -3424,7 +7029,6 @@ if (is_dir($componentsDir)) {
                 // Property select handler
                 const propSelect = propEl.querySelector('.preview-keyframe-modal__property-select');
                 const nameInput = propEl.querySelector('.preview-keyframe-modal__property-name');
-                const valueInput = propEl.querySelector('.preview-keyframe-modal__property-value');
                 const deletePropertyBtn = propEl.querySelector('.preview-keyframe-modal__delete-property');
                 
                 propSelect.addEventListener('change', (e) => {
@@ -3437,7 +7041,8 @@ if (is_dir($componentsDir)) {
                         nameInput.classList.add('preview-keyframe-modal__property-name--hidden');
                         nameInput.value = e.target.value;
                         keyframeFrames[frameIndex].properties[propIndex].property = e.target.value;
-                        valueInput.focus();
+                        // Re-render frames to update input type for new property
+                        renderKeyframeFrames();
                     }
                 });
                 
@@ -3445,9 +7050,8 @@ if (is_dir($componentsDir)) {
                     keyframeFrames[frameIndex].properties[propIndex].property = e.target.value;
                 });
                 
-                valueInput.addEventListener('input', (e) => {
-                    keyframeFrames[frameIndex].properties[propIndex].value = e.target.value;
-                });
+                // Attach event handlers based on input type
+                attachPropertyValueHandlers(propEl, frameIndex, propIndex, prop.property);
                 
                 deletePropertyBtn.addEventListener('click', () => {
                     deleteKeyframeProperty(frameIndex, propIndex);
@@ -3892,21 +7496,6 @@ if (is_dir($componentsDir)) {
         }
     }
     
-    /**
-     * Edit an animated selector (opens style editor with transition/animation focused)
-     */
-    function editAnimatedSelector(selector) {
-        // Use the existing style editor flow
-        currentSelectedSelector = selector;
-        // Count matching elements in iframe
-        const iframe = document.getElementById('preview-frame');
-        let matchCount = 0;
-        try {
-            matchCount = iframe?.contentDocument?.querySelectorAll(selector)?.length || 0;
-        } catch (e) {}
-        openStyleEditor(selector, matchCount);
-    }
-    
     // ==================== Selector Browser (Phase 8.4) ====================
     
     /**
@@ -4280,6 +7869,15 @@ if (is_dir($componentsDir)) {
             });
         }
         
+        // Animate button - opens State & Animation Editor (Phase 11)
+        if (selectorAnimateBtn) {
+            selectorAnimateBtn.addEventListener('click', () => {
+                if (currentSelectedSelector) {
+                    openTransitionEditor(currentSelectedSelector.selector);
+                }
+            });
+        }
+        
         // Group header collapse/expand
         selectorsGroups?.querySelectorAll('.preview-selectors-group__header').forEach(header => {
             header.addEventListener('click', () => {
@@ -4531,6 +8129,73 @@ if (is_dir($componentsDir)) {
     }
     
     /**
+     * CSS Properties organized by category for the property selector dropdown (Phase 8.7)
+     */
+    const CSS_PROPERTIES_BY_CATEGORY = {
+        'Layout': [
+            'display', 'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
+            'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+            'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+            'box-sizing', 'overflow', 'overflow-x', 'overflow-y'
+        ],
+        'Flexbox': [
+            'flex-direction', 'flex-wrap', 'justify-content', 'align-items', 'align-content',
+            'gap', 'row-gap', 'column-gap', 'flex', 'flex-grow', 'flex-shrink', 'flex-basis',
+            'align-self', 'order'
+        ],
+        'Grid': [
+            'grid-template-columns', 'grid-template-rows', 'grid-gap', 'grid-column-gap',
+            'grid-row-gap', 'grid-auto-flow', 'grid-column', 'grid-row', 'place-items',
+            'place-content', 'place-self'
+        ],
+        'Position': [
+            'position', 'top', 'right', 'bottom', 'left', 'z-index', 'inset'
+        ],
+        'Typography': [
+            'font-family', 'font-size', 'font-weight', 'font-style', 'line-height',
+            'letter-spacing', 'word-spacing', 'text-align', 'text-decoration', 
+            'text-transform', 'white-space', 'word-break', 'text-overflow'
+        ],
+        'Colors': [
+            'color', 'background-color', 'background', 'background-image',
+            'border-color', 'outline-color', 'fill', 'stroke'
+        ],
+        'Borders': [
+            'border', 'border-width', 'border-style', 'border-color', 'border-radius',
+            'border-top', 'border-right', 'border-bottom', 'border-left',
+            'outline', 'outline-width', 'outline-style', 'outline-offset'
+        ],
+        'Effects': [
+            'opacity', 'visibility', 'box-shadow', 'text-shadow', 'filter',
+            'backdrop-filter', 'mix-blend-mode', 'clip-path'
+        ],
+        'Transform': [
+            'transform', 'transform-origin', 'perspective', 'translate', 'rotate', 'scale'
+        ],
+        'Transition': [
+            'transition', 'transition-property', 'transition-duration', 
+            'transition-timing-function', 'transition-delay'
+        ],
+        'Animation': [
+            'animation', 'animation-name', 'animation-duration', 'animation-timing-function',
+            'animation-delay', 'animation-iteration-count', 'animation-direction', 'animation-fill-mode'
+        ],
+        'Other': [
+            'cursor', 'pointer-events', 'user-select', 'content', 'list-style',
+            'object-fit', 'object-position', 'aspect-ratio'
+        ]
+    };
+    
+    /**
+     * Get property type info (reuses KEYFRAME_PROPERTY_TYPES)
+     * @param {string} property - CSS property name
+     * @returns {object} - Type info { type, values/units/min/max/step }
+     */
+    function getStylePropertyType(property) {
+        return KEYFRAME_PROPERTY_TYPES[property] || { type: 'text' };
+    }
+    
+    /**
      * Render all style properties in the editor
      */
     function renderStyleProperties() {
@@ -4589,17 +8254,15 @@ if (is_dir($componentsDir)) {
         
         // Property name (editable for new properties, static for existing)
         if (isNew) {
-            const nameInput = document.createElement('input');
-            nameInput.type = 'text';
-            nameInput.className = 'preview-style-property__name-input';
-            nameInput.value = property;
-            nameInput.placeholder = <?= json_encode(__admin('preview.propertyName') ?? 'property-name') ?>;
-            nameInput.addEventListener('input', (e) => {
-                const newName = e.target.value.trim();
-                const currentName = row.dataset.property; // Get current name from row, not closure
+            // Use searchable property selector dropdown (Phase 8.7)
+            const selectorContainer = createPropertySelector(property, (newName) => {
+                const currentName = row.dataset.property;
                 updatePropertyName(currentName, newName, row);
+                
+                // Re-render value input based on property type
+                updateValueInputForProperty(row, newName, value);
             });
-            row.appendChild(nameInput);
+            row.appendChild(selectorContainer);
         } else {
             const nameEl = document.createElement('span');
             nameEl.className = 'preview-style-property__name';
@@ -4704,6 +8367,127 @@ if (is_dir($componentsDir)) {
             prop.property = newName;
             row.dataset.property = newName;
         }
+    }
+    
+    /**
+     * Create a searchable property selector dropdown (Phase 8.7)
+     * @param {string} currentValue - Current property name
+     * @param {function} onSelect - Callback when property is selected
+     * @returns {HTMLElement} - The selector container
+     */
+    /**
+     * Create a property selector using QSPropertySelector class
+     * This is a wrapper for backward compatibility with existing code
+     * @param {string} currentValue - Current property name
+     * @param {function} onSelect - Callback when property is selected
+     * @returns {HTMLElement} - The selector container
+     */
+    function createPropertySelector(currentValue, onSelect) {
+        const container = document.createElement('div');
+        container.className = 'preview-property-selector';
+        
+        // Get list of properties already in use (existing + new)
+        const existingPropertyNames = [
+            ...Object.keys(currentStyles),
+            ...newProperties.map(p => p.property)
+        ];
+        
+        // Create QSPropertySelector instance
+        const selector = new QSPropertySelector({
+            container: container,
+            currentValue: currentValue,
+            excludeProperties: existingPropertyNames,
+            onSelect: onSelect
+        });
+        
+        // Store reference to selector for potential later use
+        container._selector = selector;
+        
+        return container;
+    }
+    
+    /**
+     * Update value input based on selected property type (Phase 8.7)
+     * @param {HTMLElement} row - Property row element
+     * @param {string} property - CSS property name
+     * @param {string} currentValue - Current value
+     */
+    function updateValueInputForProperty(row, property, currentValue) {
+        const valueContainer = row.querySelector('.preview-style-property__value');
+        if (!valueContainer) return;
+        
+        // Get property type
+        const propType = getStylePropertyType(property);
+        const isNew = row.classList.contains('preview-style-property--new');
+        
+        // Preserve var dropdown button
+        const varBtn = valueContainer.querySelector('.preview-style-property__var-btn');
+        
+        // Clear value container except var button
+        while (valueContainer.firstChild) {
+            if (valueContainer.firstChild === varBtn) break;
+            valueContainer.removeChild(valueContainer.firstChild);
+        }
+        
+        // Check if this is a color property (for color swatch)
+        const isColorProperty = colorProperties.some(p => property.includes(p)) || propType.type === 'color';
+        
+        // Add color swatch if needed
+        if (isColorProperty) {
+            const colorSwatch = document.createElement('button');
+            colorSwatch.type = 'button';
+            colorSwatch.className = 'preview-style-property__color';
+            colorSwatch.style.background = currentValue || '#ffffff';
+            colorSwatch.title = <?= json_encode(__admin('preview.clickToPickColor') ?? 'Click to pick color') ?>;
+            colorSwatch.addEventListener('click', () => {
+                openColorPickerForProperty(row.dataset.property, currentValue, colorSwatch);
+            });
+            valueContainer.insertBefore(colorSwatch, varBtn);
+        }
+        
+        // Create specialized input based on type
+        let inputEl = createSpecializedInput(propType, property, currentValue, (newValue) => {
+            updatePropertyValue(row.dataset.property, newValue, isNew);
+            
+            // Update color swatch if present
+            if (isColorProperty) {
+                const swatch = valueContainer.querySelector('.preview-style-property__color');
+                if (swatch) swatch.style.background = newValue;
+            }
+        });
+        
+        valueContainer.insertBefore(inputEl, varBtn);
+        
+        // Apply live preview
+        applyLivePreview();
+    }
+    
+    /**
+     * Create a specialized input control based on property type (Phase 8.7)
+     * This is a wrapper around QSValueInput for backward compatibility
+     * @param {object} propType - Property type configuration
+     * @param {string} property - CSS property name
+     * @param {string} value - Current value
+     * @param {function} onChange - Callback when value changes
+     * @returns {HTMLElement}
+     */
+    function createSpecializedInput(propType, property, value, onChange) {
+        const container = document.createElement('div');
+        
+        // Create QSValueInput instance with Selectors panel styling
+        const valueInput = new QSValueInput({
+            container: container,
+            property: property,
+            value: value,
+            className: 'preview-style-property',  // Use existing Selectors panel class names
+            onChange: onChange,
+            onBlur: () => applyLivePreview()
+        });
+        
+        // Store reference for potential later use
+        container._valueInput = valueInput;
+        
+        return container;
     }
     
     /**
@@ -5209,6 +8993,12 @@ if (is_dir($componentsDir)) {
                 
                 // Remove live preview (styles are now in CSS file)
                 removeLivePreviewStyles();
+                
+                // Refresh iframe to load updated CSS from server
+                const iframe = document.getElementById('preview-frame');
+                if (iframe?.contentWindow) {
+                    iframe.contentWindow.location.reload();
+                }
                 
                 showToast(<?= json_encode(__admin('preview.stylesSaved') ?? 'Styles saved successfully') ?>, 'success');
             } else {
@@ -7307,6 +11097,9 @@ if (is_dir($componentsDir)) {
     
     // Initialize keyframe editor (Phase 9.3)
     initKeyframeEditor();
+    
+    // Initialize transform editor (Phase 9.3.1 Step 5)
+    initTransformEditorHandlers();
     
     // Theme save button
     if (themeSaveBtn) {
