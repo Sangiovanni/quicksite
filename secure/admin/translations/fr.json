@@ -317,7 +317,92 @@
         "preview": "Aperçu",
         "logout": "Déconnexion",
         "build": "Construire",
-        "inspect": "Inspecter"
+        "inspect": "Inspecter",
+        "interactions": "Interactions"
+    },
+    "interactions": {
+        "title": "Interactions",
+        "subtitle": "Gérer les schémas d'interaction et les interactions du projet",
+        "refresh": "Actualiser",
+        "build": "Compiler",
+        "building": "Compilation...",
+        "buildSuccess": "Interactions compilées avec succès",
+        "refreshed": "Données actualisées",
+        "deleted": "Supprimé avec succès",
+        "instancesLabel": "interactions",
+        "status": {
+            "loading": "Chargement...",
+            "noInteractions": "Aucune interaction définie",
+            "ready": "Prêt à compiler"
+        },
+        "schemas": {
+            "title": "Schémas d'interaction",
+            "core": "Base",
+            "custom": "Personnalisé",
+            "create": "Nouveau schéma",
+            "searchPlaceholder": "Rechercher des schémas...",
+            "noCoreSchemas": "Aucun schéma de base trouvé",
+            "noCustomSchemas": "Aucun schéma personnalisé",
+            "noCustomSchemasHint": "Créez des schémas personnalisés pour étendre le système d'interaction",
+            "params": "paramètres",
+            "noParams": "Aucun paramètre",
+            "noDescription": "Aucune description fournie",
+            "description": "Description",
+            "parameters": "Paramètres",
+            "paramName": "Nom",
+            "paramType": "Type",
+            "paramRequired": "Requis",
+            "paramDesc": "Description",
+            "handler": "Code du gestionnaire",
+            "viewTitle": "Détails du schéma",
+            "createTitle": "Créer un schéma",
+            "editTitle": "Modifier le schéma",
+            "created": "Schéma créé avec succès",
+            "updated": "Schéma mis à jour avec succès",
+            "form": {
+                "id": "ID du schéma",
+                "idHint": "Identifiant unique (camelCase, commence par une lettre)",
+                "description": "Description",
+                "descPlaceholder": "Décrivez ce que fait ce schéma...",
+                "params": "Paramètres",
+                "addParam": "Ajouter un paramètre",
+                "paramName": "Nom",
+                "paramDescPlaceholder": "Description",
+                "handler": "Fonction gestionnaire",
+                "handlerHint": "Code JavaScript à exécuter. L'objet 'params' contient les valeurs des paramètres."
+            }
+        },
+        "instances": {
+            "title": "Interactions du projet",
+            "create": "Nouvelle interaction",
+            "searchPlaceholder": "Rechercher des interactions...",
+            "noInteractions": "Aucune interaction définie",
+            "noInteractionsHint": "Créez des interactions pour ajouter du comportement à votre site",
+            "createTitle": "Créer une interaction",
+            "editTitle": "Modifier l'interaction",
+            "created": "Interaction créée avec succès",
+            "updated": "Interaction mise à jour avec succès",
+            "form": {
+                "id": "ID de l'interaction",
+                "idHint": "Identifiant unique pour cette interaction",
+                "schema": "Schéma",
+                "selectSchema": "Sélectionner un schéma...",
+                "trigger": "Déclencheur",
+                "triggerHint": "Sélecteur CSS et événement (ex: #monBtn click, .carte hover)",
+                "params": "Paramètres",
+                "onSuccess": "En cas de succès",
+                "onSuccessHint": "Enchaîner une autre interaction en cas de succès",
+                "onFailed": "En cas d'échec",
+                "onFailedHint": "Enchaîner une autre interaction en cas d'échec",
+                "noChain": "Aucun"
+            }
+        },
+        "deleteConfirm": {
+            "title": "Confirmer la suppression",
+            "message": "Êtes-vous sûr de vouloir supprimer cet élément ?",
+            "schemaMessage": "Êtes-vous sûr de vouloir supprimer le schéma '{id}' ? Cette action est irréversible.",
+            "interactionMessage": "Êtes-vous sûr de vouloir supprimer l'interaction '{id}' ? Cette action est irréversible."
+        }
     },
     "settings": {
         "title": "Paramètres",

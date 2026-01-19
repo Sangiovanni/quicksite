@@ -4,6 +4,39 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
+// SECURITY: Blocked tags that could execute scripts or inject styles
+const BLOCKED_TAGS = ['script', 'noscript', 'style', 'template', 'slot'];
+
+/**
+ * Recursively validate structure for blocked tags
+ * @param mixed $node Node to validate
+ * @return string|null Error message if blocked tag found, null if valid
+ */
+function validateStructureTags($node): ?string {
+    if (!is_array($node)) {
+        return null;
+    }
+    
+    // Check if this node has a blocked tag
+    if (isset($node['tag']) && is_string($node['tag'])) {
+        if (in_array(strtolower($node['tag']), BLOCKED_TAGS, true)) {
+            return "Blocked tag '{$node['tag']}' not allowed (security restriction)";
+        }
+    }
+    
+    // Recursively check children
+    if (isset($node['children']) && is_array($node['children'])) {
+        foreach ($node['children'] as $child) {
+            $error = validateStructureTags($child);
+            if ($error !== null) {
+                return $error;
+            }
+        }
+    }
+    
+    return null;
+}
+
 $params = $trimParametersManagement->params();
 
 // Check for nodeId-based edit mode
@@ -108,6 +141,31 @@ if ($structure !== null && is_array($structure)) {
             ApiResponse::create(400, 'validation.invalid_format')
                 ->withMessage("Structure too deeply nested (max 50 levels)")
                 ->withErrors([['field' => 'structure', 'reason' => 'exceeds max depth of 50']])
+                ->send();
+        }
+    }
+}
+
+// SECURITY: Validate no blocked tags (script, style, etc.) - skip for delete
+if ($structure !== null && is_array($structure)) {
+    // For pages/menu/footer (arrays of nodes)
+    if (isset($structure[0]) || empty($structure)) {
+        foreach ($structure as $node) {
+            $tagError = validateStructureTags($node);
+            if ($tagError !== null) {
+                ApiResponse::create(400, 'validation.blocked_tag')
+                    ->withMessage($tagError)
+                    ->withErrors([['field' => 'structure', 'reason' => 'blocked_tag']])
+                    ->send();
+            }
+        }
+    } else {
+        // For components (single object node)
+        $tagError = validateStructureTags($structure);
+        if ($tagError !== null) {
+            ApiResponse::create(400, 'validation.blocked_tag')
+                ->withMessage($tagError)
+                ->withErrors([['field' => 'structure', 'reason' => 'blocked_tag']])
                 ->send();
         }
     }

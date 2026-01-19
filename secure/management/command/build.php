@@ -24,6 +24,20 @@ require_once SECURE_FOLDER_PATH . '/src/functions/LockManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/ZipUtilities.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
+/**
+ * Get active project name from target.php
+ */
+if (!function_exists('getActiveProjectName')) {
+    function getActiveProjectName(): ?string {
+        $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
+        if (file_exists($targetFile)) {
+            $target = include $targetFile;
+            return is_array($target) ? ($target['project'] ?? null) : $target;
+        }
+        return null;
+    }
+}
+
 // Get optional parameters for renaming folders in build
 $params = $trimParametersManagement->params();
 $buildPublicName = $params['public'] ?? PUBLIC_FOLDER_NAME;
@@ -670,6 +684,13 @@ $compressionRatio = round((1 - ($zipSize / $originalSize)) * 100, 1);
 // Release lock before sending response
 release_build_lock();
 
+// Determine interactions count from build result
+$interactionsCount = 0;
+if ($interactionsBuildResult && $interactionsBuildResult->getStatus() === 200) {
+    $interactionData = $interactionsBuildResult->getData();
+    $interactionsCount = $interactionData['interactions_count'] ?? 0;
+}
+
 // Step 8: Success response
 ApiResponse::create(201, 'operation.success')
     ->withMessage('Production build completed successfully')
@@ -688,6 +709,8 @@ ApiResponse::create(201, 'operation.success')
         'config_sanitized' => true,
         'menu_compiled' => file_exists($buildFullPath . '/' . $buildSecureName . '/templates/menu.php'),
         'footer_compiled' => file_exists($buildFullPath . '/' . $buildSecureName . '/templates/footer.php'),
+        'interactions_compiled' => $interactionsCount > 0,
+        'interactions_count' => $interactionsCount,
         'build_date' => date('Y-m-d H:i:s'),
         'readme_created' => true,
         'download_url' => BASE_URL . '/build/' . $zipFilename

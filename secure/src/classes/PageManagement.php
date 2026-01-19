@@ -73,7 +73,15 @@ class PageManagement {
         $body .= $this->content;
         $body .= $renderer->renderFooter();
 
-        // Include scripts
+        // Always include QuickSite core library for {{call:...}} interactions
+        $body .= '<script src="' . BASE_URL . '/scripts/qs.js"></script>';
+        // Include custom functions if file exists and is not empty
+        $customJsPath = PUBLIC_FOLDER_ROOT . '/scripts/qs-custom.js';
+        if (file_exists($customJsPath) && filesize($customJsPath) > 500) {
+            $body .= '<script src="' . BASE_URL . '/scripts/qs-custom.js"></script>';
+        }
+
+        // Include additional scripts
         if (!empty($this->scripts)) {
             foreach ($this->scripts as $script) {
                 $body .= '<script src="' . htmlspecialchars($script) . '"></script>'; 

@@ -35,6 +35,13 @@ class Page {
     <footer>
         <?php require_once PROJECT_PATH . '/templates/footer.php'; ?>
     </footer>
+    <script src="/<?= PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '' ?>scripts/qs.js"></script>
+    <?php 
+    // Include custom functions if file exists and has content
+    $customJsPath = PUBLIC_FOLDER_ROOT . '/scripts/qs-custom.js';
+    if (file_exists($customJsPath) && filesize($customJsPath) > 500): ?>
+    <script src="/<?= PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '' ?>scripts/qs-custom.js"></script>
+    <?php endif; ?>
 </body>
 </html>
         <?php

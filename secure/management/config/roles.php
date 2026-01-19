@@ -37,6 +37,7 @@ return array (
       22 => 'listRoles',
       23 => 'getMyPermissions',
       24 => 'listAiProviders',
+      25 => 'listJsFunctions',
     ),
   ),
   'editor' => 
@@ -236,6 +237,7 @@ return array (
       62 => 'editNode',
       63 => 'addComponentToNode',
       64 => 'editComponentToNode',
+      65 => 'listJsFunctions',
     ),
   ),
   'admin' => 
@@ -327,6 +329,10 @@ return array (
       80 => 'editNode',
       81 => 'addComponentToNode',
       82 => 'editComponentToNode',
+      83 => 'listJsFunctions',
+      84 => 'addJsFunction',
+      85 => 'editJsFunction',
+      86 => 'deleteJsFunction',
     ),
   ),
 );

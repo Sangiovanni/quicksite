@@ -292,6 +292,13 @@ class JsonToHtmlRenderer {
             error_log("Invalid tag name: {$tag}");
             return "<!-- Invalid tag name -->";
         }
+        
+        // SECURITY: Block dangerous tags that could execute scripts or inject styles
+        $blockedTags = ['script', 'noscript', 'style', 'template', 'slot'];
+        if (in_array(strtolower($tag), $blockedTags, true)) {
+            error_log("Blocked dangerous tag: {$tag}");
+            return "<!-- Blocked tag -->";
+        }
 
         $params = $node['params'] ?? [];
         $children = $node['children'] ?? null;
@@ -377,9 +384,20 @@ class JsonToHtmlRenderer {
             return '';
         }
     
-        // Block event handler attributes (XSS vector)
+        // Handle event handler attributes (on*)
+        // Block raw JS, but allow {{call:...}} syntax which gets transformed to safe QS.* calls
         if (preg_match('/^on[a-z]+$/i', $name)) {
-            error_log("Event handler attributes not allowed: {$name}");
+            if (is_string($value) && strpos($value, '{{call:') !== false) {
+                // Transform {{call:...}} to QS.* function calls
+                $transformedValue = $this->transformCallSyntax($value);
+                // Double-check the result doesn't contain suspicious patterns
+                if ($this->isValidTransformedHandler($transformedValue)) {
+                    $escapedValue = htmlspecialchars($transformedValue, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    return ' ' . htmlspecialchars($name, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '="' . $escapedValue . '"';
+                }
+            }
+            // Block if not using {{call:...}} syntax or transformation failed
+            error_log("Event handler blocked (use {{call:...}} syntax): {$name}");
             return '';
         }
 
@@ -434,6 +452,117 @@ class JsonToHtmlRenderer {
         $escapedValue = htmlspecialchars((string)$value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         
         return ' ' . htmlspecialchars($name, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '="' . $escapedValue . '"';
+    }
+
+    /**
+     * Transform {{call:functionName:arg1,arg2}} syntax to QS.functionName('arg1', 'arg2')
+     * 
+     * Supports:
+     * - {{call:hide:#modal}} → QS.hide('#modal')
+     * - {{call:toggleClass:#menu,open}} → QS.toggleClass('#menu', 'open')
+     * - {{call:filter:event,.card,data-title}} → QS.filter(event, '.card', 'data-title')
+     * - Multiple calls: {{call:hide:#a}};{{call:show:#b}} → QS.hide('#a'); QS.show('#b')
+     * 
+     * Special keywords (not quoted): event, this
+     * 
+     * @param string $value The attribute value containing {{call:...}} placeholders
+     * @return string Transformed JavaScript code
+     */
+    private function transformCallSyntax(string $value): string {
+        // Match all {{call:functionName:args}} or {{call:functionName}} patterns
+        return preg_replace_callback(
+            '/\{\{call:([a-zA-Z][a-zA-Z0-9]*)(:[^}]*)?\}\}/',
+            function ($matches) {
+                $functionName = $matches[1];
+                $argsString = isset($matches[2]) ? substr($matches[2], 1) : ''; // Remove leading ':'
+                
+                // Get allowed function names dynamically (core + custom)
+                $allowedFunctions = $this->getAllowedJsFunctions();
+                
+                if (!in_array($functionName, $allowedFunctions, true)) {
+                    error_log("Unknown QS function: {$functionName}");
+                    return '/* invalid function */';
+                }
+                
+                // Parse arguments (comma-separated)
+                if (empty($argsString)) {
+                    return "QS.{$functionName}()";
+                }
+                
+                // Special keywords that should not be quoted (JS variables)
+                $jsKeywords = ['event', 'this'];
+                
+                // Split by comma, but be careful with selectors that might contain commas
+                // For simplicity, treat each segment as a string argument
+                $args = array_map('trim', explode(',', $argsString));
+                $quotedArgs = array_map(function($arg) use ($jsKeywords) {
+                    // Don't quote JS keywords
+                    if (in_array($arg, $jsKeywords, true)) {
+                        return $arg;
+                    }
+                    // Escape single quotes in the argument
+                    $escaped = str_replace("'", "\\'", $arg);
+                    return "'{$escaped}'";
+                }, $args);
+                
+                return "QS.{$functionName}(" . implode(', ', $quotedArgs) . ")";
+            },
+            $value
+        );
+    }
+
+    /**
+     * Get all allowed JS function names (core + custom)
+     * Cached for performance within single render
+     * 
+     * @return array
+     */
+    private function getAllowedJsFunctions(): array {
+        static $allowedFunctions = null;
+        
+        if ($allowedFunctions === null) {
+            // Core functions (always available)
+            $allowedFunctions = [
+                'show', 'hide', 'toggle', 'toggleHide', 'addClass', 'removeClass',
+                'setValue', 'redirect', 'filter', 'scrollTo', 'focus', 'blur'
+            ];
+            
+            // Add custom functions if JsFunctionManager is available
+            $managerPath = SECURE_FOLDER_PATH . '/src/classes/JsFunctionManager.php';
+            if (file_exists($managerPath)) {
+                require_once $managerPath;
+                $manager = new \JsFunctionManager();
+                $customFuncs = $manager->getCustomFunctions();
+                foreach ($customFuncs as $func) {
+                    $allowedFunctions[] = $func['name'];
+                }
+            }
+        }
+        
+        return $allowedFunctions;
+    }
+
+    /**
+     * Validate that a transformed event handler only contains safe QS.* calls
+     * 
+     * @param string $handler The transformed handler string
+     * @return bool True if safe, false if suspicious
+     */
+    private function isValidTransformedHandler(string $handler): bool {
+        // Remove all valid QS.functionName(...) calls and see what's left
+        $stripped = preg_replace('/QS\.[a-zA-Z]+\([^)]*\)/', '', $handler);
+        
+        // After removing QS calls, only semicolons, spaces, and comments should remain
+        $stripped = preg_replace('/[;\s]/', '', $stripped);
+        $stripped = preg_replace('/\/\*[^*]*\*\//', '', $stripped); // Remove /* comments */
+        
+        // If anything else remains, it's suspicious
+        if (!empty($stripped)) {
+            error_log("Suspicious content in transformed handler: {$stripped}");
+            return false;
+        }
+        
+        return true;
     }
 
     /**

@@ -151,9 +151,9 @@ if ($file['size'] > $sizeLimits[$category]) {
 }
 
 // Validate MIME type based on category (detect actual content, not just extension)
+// SECURITY: 'scripts' category removed - JS uploads could enable XSS attacks
 $allowedMimes = [
     'images' => ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
-    'scripts' => ['application/javascript', 'text/javascript', 'application/x-javascript', 'text/plain'], // text/plain for .js sometimes
     'font' => ['font/ttf', 'font/otf', 'font/woff', 'font/woff2', 'application/x-font-ttf', 'application/x-font-otf', 'application/font-woff', 'application/font-woff2', 'application/octet-stream'], // fonts often detected as octet-stream
     'audio' => ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/x-wav'],
     'videos' => ['video/mp4', 'video/webm', 'video/ogg']
@@ -233,9 +233,9 @@ if (empty($extension)) {
 
 // Validate extension matches category BEFORE checking MIME
 // This prevents uploading .php files even if they somehow pass MIME checks
+// SECURITY: 'scripts' category removed - JS uploads disabled
 $validExtensions = [
     'images' => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'],
-    'scripts' => ['js'],
     'font' => ['ttf', 'otf', 'woff', 'woff2'],
     'audio' => ['mp3', 'wav', 'ogg'],
     'videos' => ['mp4', 'webm', 'ogv']

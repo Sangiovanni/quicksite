@@ -309,7 +309,92 @@
         "preview": "Preview",
         "logout": "Logout",
         "build": "Build",
-        "inspect": "Inspect"
+        "inspect": "Inspect",
+        "interactions": "Interactions"
+    },
+    "interactions": {
+        "title": "Interactions",
+        "subtitle": "Manage interaction schemas and project interactions",
+        "refresh": "Refresh",
+        "build": "Build",
+        "building": "Building...",
+        "buildSuccess": "Interactions compiled successfully",
+        "refreshed": "Data refreshed",
+        "deleted": "Deleted successfully",
+        "instancesLabel": "interactions",
+        "status": {
+            "loading": "Loading...",
+            "noInteractions": "No interactions defined",
+            "ready": "Ready to build"
+        },
+        "schemas": {
+            "title": "Interaction Schemas",
+            "core": "Core",
+            "custom": "Custom",
+            "create": "New Schema",
+            "searchPlaceholder": "Search schemas...",
+            "noCoreSchemas": "No core schemas found",
+            "noCustomSchemas": "No custom schemas yet",
+            "noCustomSchemasHint": "Create custom schemas to extend the interaction system",
+            "params": "params",
+            "noParams": "No parameters",
+            "noDescription": "No description provided",
+            "description": "Description",
+            "parameters": "Parameters",
+            "paramName": "Name",
+            "paramType": "Type",
+            "paramRequired": "Required",
+            "paramDesc": "Description",
+            "handler": "Handler Code",
+            "viewTitle": "Schema Details",
+            "createTitle": "Create Schema",
+            "editTitle": "Edit Schema",
+            "created": "Schema created successfully",
+            "updated": "Schema updated successfully",
+            "form": {
+                "id": "Schema ID",
+                "idHint": "Unique identifier (camelCase, starts with letter)",
+                "description": "Description",
+                "descPlaceholder": "Describe what this schema does...",
+                "params": "Parameters",
+                "addParam": "Add Parameter",
+                "paramName": "Name",
+                "paramDescPlaceholder": "Description",
+                "handler": "Handler Function",
+                "handlerHint": "JavaScript code to execute. 'params' object contains the parameter values."
+            }
+        },
+        "instances": {
+            "title": "Project Interactions",
+            "create": "New Interaction",
+            "searchPlaceholder": "Search interactions...",
+            "noInteractions": "No interactions defined",
+            "noInteractionsHint": "Create interactions to add behavior to your site",
+            "createTitle": "Create Interaction",
+            "editTitle": "Edit Interaction",
+            "created": "Interaction created successfully",
+            "updated": "Interaction updated successfully",
+            "form": {
+                "id": "Interaction ID",
+                "idHint": "Unique identifier for this interaction",
+                "schema": "Schema",
+                "selectSchema": "Select a schema...",
+                "trigger": "Trigger",
+                "triggerHint": "CSS selector and event (e.g., #myBtn click, .card hover)",
+                "params": "Parameters",
+                "onSuccess": "On Success",
+                "onSuccessHint": "Chain another interaction on success",
+                "onFailed": "On Failed",
+                "onFailedHint": "Chain another interaction on failure",
+                "noChain": "None"
+            }
+        },
+        "deleteConfirm": {
+            "title": "Confirm Delete",
+            "message": "Are you sure you want to delete this item?",
+            "schemaMessage": "Are you sure you want to delete schema '{id}'? This cannot be undone.",
+            "interactionMessage": "Are you sure you want to delete interaction '{id}'? This cannot be undone."
+        }
     },
     "settings": {
         "title": "Settings",

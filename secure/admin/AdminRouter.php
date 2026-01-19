@@ -14,19 +14,19 @@ class AdminRouter {
     private array $params = [];
     private ?string $specId = null;  // For AI spec routing
     private array $validPages = [
-        'login',      // Authentication page
-        'dashboard',  // Main admin panel after login
-        'command',    // Individual command pages
-        'history',    // Command history viewer
-        'settings',   // Settings and configuration
-        'favorites',  // Favorite/bookmarked commands
-        'structure',  // Structure tree viewer
-        'batch',      // Batch command execution
-        'docs',       // API documentation
-        'ai',         // AI Integration / Communication spec
+        'login',       // Authentication page
+        'dashboard',   // Main admin panel after login
+        'command',     // Individual command pages
+        'history',     // Command history viewer
+        'settings',    // Settings and configuration
+        'favorites',   // Favorite/bookmarked commands
+        'structure',   // Structure tree viewer
+        'batch',       // Batch command execution
+        'docs',        // API documentation
+        'ai',          // AI Integration / Communication spec
         'ai-settings', // AI Provider Settings (BYOK)
-        'preview',    // Live website preview
-        'logout'      // Logout action
+        'preview',     // Live website preview
+        'logout'       // Logout action
     ];
 
     public function __construct() {
