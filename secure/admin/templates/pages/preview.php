@@ -10910,10 +10910,8 @@ if (is_dir($componentsDir)) {
     
     // Simple toast helper
     function showToast(message, type) {
-        if (window.Admin && Admin.toast) {
-            Admin.toast(message, type);
-        } else if (window.QuickSiteAdmin && QuickSiteAdmin.toast) {
-            QuickSiteAdmin.toast(message, type);
+        if (window.QuickSiteAdmin && QuickSiteAdmin.showToast) {
+            QuickSiteAdmin.showToast(message, type);
         } else {
             console.log('[Toast]', type, message);
         }
