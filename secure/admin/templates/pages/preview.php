@@ -104,6 +104,11 @@ if (is_dir($componentsDir)) {
                     <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
                 </svg>
             </button>
+            <button type="button" class="preview-mode-btn" data-mode="js" title="<?= __admin('preview.modeJs') ?? 'JS Mode: Manage Interactions' ?>">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+            </button>
         </div>
     </div>
 
@@ -738,6 +743,87 @@ if (is_dir($componentsDir)) {
                             <?= __admin('common.save') ?? 'Save' ?>
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- JS MODE Content -->
+        <div class="preview-contextual-section preview-contextual-section--js" id="contextual-js" data-mode="js" style="display: none;">
+            <div class="preview-contextual-default" id="contextual-js-default">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+                <span><?= __admin('preview.jsModeHint') ?? 'Click an element to manage its JavaScript interactions' ?></span>
+            </div>
+            
+            <!-- JS Info (shown when element selected) -->
+            <div class="preview-contextual-js-info" id="contextual-js-info" style="display: none;">
+                <div class="preview-contextual-js-element">
+                    <span class="preview-contextual-js-label"><?= __admin('preview.element') ?? 'Element' ?>:</span>
+                    <code class="preview-contextual-js-value" id="js-element-info">-</code>
+                </div>
+            </div>
+            
+            <!-- Interactions List -->
+            <div class="preview-contextual-js-content" id="contextual-js-content" style="display: none;">
+                <div class="preview-contextual-js-list" id="js-interactions-list">
+                    <p class="preview-contextual-js-empty"><?= __admin('preview.noInteractions') ?? 'No interactions yet.' ?></p>
+                </div>
+                
+                <!-- Add Interaction Form (hidden by default) -->
+                <div class="preview-contextual-js-form" id="js-add-form" style="display: none;">
+                    <div class="preview-contextual-js-form-header">
+                        <strong><?= __admin('preview.newInteraction') ?? 'New Interaction' ?></strong>
+                        <button type="button" class="preview-contextual-js-form-close" id="js-form-close" title="<?= __admin('common.cancel') ?>">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <div class="preview-contextual-js-form-row">
+                        <label class="preview-contextual-js-form-label"><?= __admin('preview.event') ?? 'Event' ?></label>
+                        <select class="preview-contextual-js-form-select" id="js-form-event">
+                            <option value=""><?= __admin('preview.selectEvent') ?? '-- Select event --' ?></option>
+                        </select>
+                    </div>
+                    
+                    <div class="preview-contextual-js-form-row">
+                        <label class="preview-contextual-js-form-label"><?= __admin('preview.function') ?? 'Function' ?></label>
+                        <select class="preview-contextual-js-form-select" id="js-form-function">
+                            <option value=""><?= __admin('preview.selectFunction') ?? '-- Select function --' ?></option>
+                        </select>
+                    </div>
+                    
+                    <div class="preview-contextual-js-form-params" id="js-form-params">
+                        <!-- Dynamic params will be populated based on selected function -->
+                    </div>
+                    
+                    <div class="preview-contextual-js-form-preview">
+                        <span class="preview-contextual-js-form-label"><?= __admin('preview.previewCode') ?? 'Preview' ?>:</span>
+                        <code class="preview-contextual-js-form-code" id="js-preview-code">-</code>
+                    </div>
+                    
+                    <div class="preview-contextual-js-form-actions">
+                        <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="js-form-cancel">
+                            <?= __admin('common.cancel') ?? 'Cancel' ?>
+                        </button>
+                        <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="js-form-save" disabled>
+                            <?= __admin('preview.addInteraction') ?? 'Add' ?>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Add button -->
+                <div class="preview-contextual-js-actions" id="js-panel-actions">
+                    <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="js-add-interaction">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        <?= __admin('preview.addInteraction') ?? 'Add Interaction' ?>
+                    </button>
                 </div>
             </div>
         </div>
@@ -2192,6 +2278,9 @@ if (is_dir($componentsDir)) {
     let categorizedSelectors = { tags: [], classes: [], ids: [], attributes: [], media: {} };
     let currentSelectedSelector = null;  // Currently selected selector
     let hoveredSelector = null;       // Currently hovered selector (for highlight)
+    
+    // Page structure classes (for JS mode picker)
+    let pageStructureClasses = [];    // Classes from actual DOM (not just CSS)
     
     // Style Editor state (Phase 8.5)
     let styleEditorVisible = false;
@@ -5282,6 +5371,11 @@ if (is_dir($componentsDir)) {
             hideStylePanel();
         }
         
+        // Hide JS panel when switching away from js mode
+        if (mode !== 'js') {
+            hideJsPanel();
+        }
+        
         // Reset debounce flag after a short delay
         requestAnimationFrame(() => {
             isSwitchingMode = false;
@@ -7499,14 +7593,11 @@ if (is_dir($componentsDir)) {
     // ==================== Selector Browser (Phase 8.4) ====================
     
     /**
-     * Load all CSS selectors from the API
+     * Load CSS selectors data from API (data only, no UI)
+     * Used by both Style mode and JS mode picker
      */
-    async function loadStyleSelectors() {
-        if (!selectorsLoading || !selectorsGroups) return;
-        
-        // Show loading state
-        selectorsLoading.style.display = '';
-        selectorsGroups.style.display = 'none';
+    async function loadSelectorsData() {
+        if (selectorsLoaded) return true;
         
         try {
             const response = await fetch(managementUrl + 'listStyleRules', {
@@ -7520,18 +7611,38 @@ if (is_dir($componentsDir)) {
                 
                 // Categorize selectors
                 categorizeSelectors(data.data);
-                
-                // Populate the UI
-                populateSelectorBrowser();
-                
-                // Show content, hide loading
-                selectorsLoading.style.display = 'none';
-                selectorsGroups.style.display = '';
-            } else {
-                throw new Error(data.message || 'Failed to load selectors');
+                return true;
             }
         } catch (error) {
-            console.error('Error loading selectors:', error);
+            console.error('Error loading selectors data:', error);
+        }
+        return false;
+    }
+    
+    /**
+     * Load all CSS selectors from the API (with UI updates for Style panel)
+     */
+    async function loadStyleSelectors() {
+        if (!selectorsLoading || !selectorsGroups) {
+            // No UI elements - just load data
+            await loadSelectorsData();
+            return;
+        }
+        
+        // Show loading state
+        selectorsLoading.style.display = '';
+        selectorsGroups.style.display = 'none';
+        
+        const success = await loadSelectorsData();
+        
+        if (success) {
+            // Populate the UI
+            populateSelectorBrowser();
+            
+            // Show content, hide loading
+            selectorsLoading.style.display = 'none';
+            selectorsGroups.style.display = '';
+        } else {
             selectorsLoading.innerHTML = `
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24" style="color: #ef4444;">
                     <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -9282,6 +9393,61 @@ if (is_dir($componentsDir)) {
                     background-color: rgba(139, 92, 246, 0.1) !important;
                 }
                 
+                /* ===== JS MODE STYLES ===== */
+                .qs-interactable {
+                    cursor: pointer !important;
+                }
+                .qs-interactable:hover {
+                    outline: 2px dashed #f59e0b !important;
+                    outline-offset: 2px !important;
+                    background-color: rgba(245, 158, 11, 0.05) !important;
+                }
+                .qs-js-selected {
+                    outline: 2px solid #f59e0b !important;
+                    outline-offset: 2px !important;
+                    background-color: rgba(245, 158, 11, 0.1) !important;
+                }
+                
+                /* Interaction badge for elements with defined interactions */
+                .qs-has-interaction {
+                    position: relative !important;
+                }
+                .qs-has-interaction::after {
+                    content: '⚡';
+                    position: absolute;
+                    top: -6px;
+                    right: -6px;
+                    font-size: 10px;
+                    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+                    color: white;
+                    border-radius: 50%;
+                    width: 16px;
+                    height: 16px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 9999;
+                    pointer-events: none;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                    line-height: 1;
+                }
+                
+                /* Interaction tooltip on hover */
+                .qs-interaction-tooltip {
+                    position: fixed;
+                    background: #1f2937;
+                    color: #f3f4f6;
+                    padding: 6px 10px;
+                    border-radius: 4px;
+                    font-size: 11px;
+                    font-family: monospace;
+                    z-index: 10001;
+                    pointer-events: none;
+                    max-width: 300px;
+                    white-space: pre-wrap;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                }
+                
                 /* ===== SELECTOR BROWSER HIGHLIGHT STYLES (Phase 8.4) ===== */
                 .qs-selector-hover {
                     outline: 2px dashed #06b6d4 !important;
@@ -9360,8 +9526,39 @@ if (is_dir($componentsDir)) {
                             if (e.data.action === 'clearSelectorHighlight') {
                                 clearSelectorHighlight();
                             }
+                            // JS Mode: Get all classes from DOM
+                            if (e.data.action === 'getPageClasses') {
+                                getPageClasses();
+                            }
                         }
                     });
+                    
+                    // Get all unique CSS classes from the current page DOM
+                    function getPageClasses() {
+                        const classSet = new Set();
+                        
+                        // Get all elements with class attribute
+                        document.querySelectorAll('[class]').forEach(el => {
+                            // Skip QuickSite internal classes
+                            el.classList.forEach(cls => {
+                                if (!cls.startsWith('qs-')) {
+                                    classSet.add(cls);
+                                }
+                            });
+                        });
+                        
+                        // Convert to sorted array
+                        const classes = Array.from(classSet).sort();
+                        
+                        // Send back to parent
+                        window.parent.postMessage({
+                            source: 'quicksite-preview',
+                            action: 'pageClassesResult',
+                            classes: classes
+                        }, '*');
+                        
+                        console.log('[QuickSite] Sent page classes:', classes.length, 'unique classes');
+                    }
                     
                     // Insert a new node into the DOM without full page reload
                     function insertNodeIntoDom(struct, targetNode, position, html, newNodeId) {
@@ -9554,10 +9751,13 @@ if (is_dir($componentsDir)) {
                         if (currentMode === 'style') {
                             disableStyleMode();
                         }
+                        if (currentMode === 'js') {
+                            disableJsMode();
+                        }
                         
                         currentMode = mode;
                         clearHover();
-                        if (mode !== 'select' && mode !== 'style') clearSelection();
+                        if (mode !== 'select' && mode !== 'style' && mode !== 'js') clearSelection();
                         
                         // Enable new mode
                         if (mode === 'drag') {
@@ -9568,6 +9768,9 @@ if (is_dir($componentsDir)) {
                         }
                         if (mode === 'style') {
                             enableStyleMode();
+                        }
+                        if (mode === 'js') {
+                            enableJsMode();
                         }
                     }
                     
@@ -9974,6 +10177,124 @@ if (is_dir($componentsDir)) {
                         }
                     }
                     
+                    // ===== JS MODE FUNCTIONALITY =====
+                    
+                    // Event attributes to check for interactions
+                    const interactionEvents = ['onclick', 'ondblclick', 'onmouseover', 'onmouseout', 
+                        'onmouseenter', 'onmouseleave', 'onfocus', 'onblur', 'oninput', 'onchange',
+                        'onsubmit', 'onreset', 'ontoggle', 'onplay', 'onpause', 'onended'];
+                    
+                    let jsTooltip = null;
+                    
+                    function hasInteractions(el) {
+                        // Check if element has any event attributes with QS.* calls
+                        // ({{call:...}} gets transformed to QS.functionName(...) at render time)
+                        for (const event of interactionEvents) {
+                            const attr = el.getAttribute(event);
+                            if (attr && (attr.includes('QS.') || attr.includes('{{call:'))) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
+                    
+                    function getInteractionSummary(el) {
+                        // Get summary of all interactions on element
+                        const summary = [];
+                        for (const event of interactionEvents) {
+                            const attr = el.getAttribute(event);
+                            if (attr && (attr.includes('QS.') || attr.includes('{{call:'))) {
+                                // Extract QS.* function calls
+                                const qsMatches = attr.match(/QS\.(\w+)\([^)]*\)/g) || [];
+                                const callMatches = attr.match(/\{\{call:([^}]+)\}\}/g) || [];
+                                
+                                const funcs = [];
+                                // Parse QS.func() format
+                                qsMatches.forEach(m => {
+                                    funcs.push(m.replace('QS.', ''));
+                                });
+                                // Parse {{call:...}} format (fallback)
+                                callMatches.forEach(m => {
+                                    const inner = m.replace('{{call:', '').replace('}}', '');
+                                    const parts = inner.split(':');
+                                    funcs.push(parts[0] + '(' + (parts.slice(1).join(',') || '') + ')');
+                                });
+                                
+                                if (funcs.length > 0) {
+                                    summary.push(event + ': ' + funcs.join(', '));
+                                }
+                            }
+                        }
+                        return summary.join('\\n');
+                    }
+                    
+                    function showJsTooltip(el, e) {
+                        if (!hasInteractions(el)) return;
+                        
+                        if (!jsTooltip) {
+                            jsTooltip = document.createElement('div');
+                            jsTooltip.className = 'qs-interaction-tooltip';
+                            document.body.appendChild(jsTooltip);
+                        }
+                        
+                        const summary = getInteractionSummary(el);
+                        if (!summary) return;
+                        
+                        jsTooltip.textContent = summary;
+                        jsTooltip.style.display = 'block';
+                        jsTooltip.style.left = (e.clientX + 15) + 'px';
+                        jsTooltip.style.top = (e.clientY + 15) + 'px';
+                    }
+                    
+                    function hideJsTooltip() {
+                        if (jsTooltip) {
+                            jsTooltip.style.display = 'none';
+                        }
+                    }
+                    
+                    function enableJsMode() {
+                        // Mark all interactable elements (elements with data-qs-node)
+                        document.querySelectorAll('[data-qs-node]').forEach(el => {
+                            el.classList.add('qs-interactable');
+                            
+                            // Mark elements that have interactions with badge
+                            if (hasInteractions(el)) {
+                                el.classList.add('qs-has-interaction');
+                            }
+                            
+                            // Add hover listener for tooltip
+                            el._jsHoverHandler = (e) => showJsTooltip(el, e);
+                            el._jsLeaveHandler = () => hideJsTooltip();
+                            el.addEventListener('mouseenter', el._jsHoverHandler);
+                            el.addEventListener('mouseleave', el._jsLeaveHandler);
+                        });
+                        console.log('[QuickSite] JS mode enabled');
+                    }
+                    
+                    function disableJsMode() {
+                        // Remove interactable class and badges from all elements
+                        document.querySelectorAll('.qs-interactable').forEach(el => {
+                            el.classList.remove('qs-interactable', 'qs-js-selected', 'qs-has-interaction');
+                            
+                            // Remove hover listeners
+                            if (el._jsHoverHandler) {
+                                el.removeEventListener('mouseenter', el._jsHoverHandler);
+                                el.removeEventListener('mouseleave', el._jsLeaveHandler);
+                                delete el._jsHoverHandler;
+                                delete el._jsLeaveHandler;
+                            }
+                        });
+                        hideJsTooltip();
+                        console.log('[QuickSite] JS mode disabled');
+                    }
+                    
+                    // Clear JS selection (called from parent)
+                    function clearJsSelection() {
+                        document.querySelectorAll('.qs-js-selected').forEach(el => {
+                            el.classList.remove('qs-js-selected');
+                        });
+                    }
+                    
                     function canDropAt(source, target, position) {
                         if (!source || !target) return false;
                         if (source === target) return false;
@@ -10137,7 +10458,7 @@ if (is_dir($componentsDir)) {
                     // Click handling
                     document.addEventListener('click', function(e) {
                         // Prevent link navigation in all editor modes
-                        if (currentMode === 'select' || currentMode === 'drag' || currentMode === 'text' || currentMode === 'style') {
+                        if (currentMode === 'select' || currentMode === 'drag' || currentMode === 'text' || currentMode === 'style' || currentMode === 'js') {
                             e.preventDefault();
                             e.stopPropagation();
                         }
@@ -10197,6 +10518,33 @@ if (is_dir($componentsDir)) {
                                     action: 'styleSelected',
                                     element: elementInfo,
                                     style: styleInfo
+                                }, '*');
+                            }
+                            return false;
+                        }
+                        
+                        // JS mode: click on element to manage interactions
+                        if (currentMode === 'js') {
+                            e.stopImmediatePropagation();
+                            
+                            const target = getSelectableTarget(e.target);
+                            if (target) {
+                                // Remove previous selection
+                                document.querySelectorAll('.qs-js-selected').forEach(el => {
+                                    el.classList.remove('qs-js-selected');
+                                });
+                                
+                                selectedElement = target;
+                                target.classList.add('qs-js-selected');
+                                
+                                const elementInfo = getElementInfo(target);
+                                
+                                console.log('[QuickSite] JS mode - element selected:', elementInfo);
+                                
+                                window.parent.postMessage({ 
+                                    source: 'quicksite-preview', 
+                                    action: 'interactionSelected',
+                                    element: elementInfo
                                 }, '*');
                             }
                             return false;
@@ -10285,12 +10633,22 @@ if (is_dir($componentsDir)) {
             if (e.data.action === 'overlayReady') {
                 console.log('[Preview] Iframe overlay is ready, restoring mode:', currentMode);
                 // Re-send current mode to iframe (preserves drag mode after reload)
-                if (iframe.contentWindow) {
-                    iframe.contentWindow.postMessage({ action: 'setMode', mode: currentMode }, '*');
+                // Use setTimeout to ensure iframe's message listener is fully ready
+                setTimeout(() => {
+                    console.log('[Preview] Sending setMode to iframe:', currentMode);
+                    // Use sendToIframe to ensure source is included (required by iframe handler)
+                    sendToIframe('setMode', { mode: currentMode });
                     if (currentMode !== 'select') {
-                        iframe.contentWindow.postMessage({ action: 'clearSelection' }, '*');
+                        sendToIframe('clearSelection', {});
                     }
-                }
+                    
+                    // If in JS mode, refresh page classes for the new page
+                    if (currentMode === 'js') {
+                        pageStructureClasses = []; // Clear old page data
+                        sendToIframe('getPageClasses', {}); // Request fresh data
+                        hideJsPanel(); // Reset panel since element selection was cleared
+                    }
+                }, 50); // Small delay to ensure iframe is ready to receive messages
             }
             if (e.data.action === 'elementMoved') {
                 handleElementMoved(e.data);
@@ -10300,6 +10658,13 @@ if (is_dir($componentsDir)) {
             }
             if (e.data.action === 'styleSelected') {
                 showStylePanel(e.data);
+            }
+            if (e.data.action === 'interactionSelected') {
+                showJsPanel(e.data);
+            }
+            if (e.data.action === 'pageClassesResult') {
+                pageStructureClasses = e.data.classes || [];
+                console.log('[Preview] Received page classes:', pageStructureClasses.length);
             }
         }
     });
@@ -10625,6 +10990,357 @@ if (is_dir($componentsDir)) {
         sendToIframe('clearStyleSelection', {});
     }
     
+    // ==================== JS Interactions Panel ====================
+    
+    let currentJsContext = null;
+    let availableFunctions = []; // Cached from listJsFunctions
+    let currentAvailableEvents = []; // From listInteractions response
+    let editingInteraction = null; // { event, index, interaction } when editing, null when adding
+    let currentInteractionsData = null; // Cached interactions data for edit lookup
+    
+    const jsDefault = document.getElementById('contextual-js-default');
+    const jsInfo = document.getElementById('contextual-js-info');
+    const jsContent = document.getElementById('contextual-js-content');
+    
+    /**
+     * Show JS interactions for the selected element (in contextual area)
+     */
+    async function showJsPanel(data) {
+        console.log('[Preview] Show JS panel:', data);
+        
+        const element = data.element;
+        
+        if (!element) {
+            console.error('[Preview] Invalid element data');
+            return;
+        }
+        
+        // Store context
+        currentJsContext = {
+            struct: element.struct,
+            nodeId: element.node,
+            tag: element.tag || 'unknown'
+        };
+        
+        // Build element display
+        let elementDisplay = currentJsContext.tag + ' [' + currentJsContext.nodeId + ']';
+        
+        // Force fresh element lookups to avoid stale references
+        const jsElementInfo = document.getElementById('js-element-info');
+        const jsDefaultEl = document.getElementById('contextual-js-default');
+        const jsInfoEl = document.getElementById('contextual-js-info');
+        const jsContentEl = document.getElementById('contextual-js-content');
+        const jsPanelActionsEl = document.getElementById('js-panel-actions');
+        
+        if (jsElementInfo) jsElementInfo.textContent = elementDisplay;
+        
+        // Show info and content, hide default
+        if (jsDefaultEl) jsDefaultEl.style.display = 'none';
+        if (jsInfoEl) jsInfoEl.style.display = '';
+        if (jsContentEl) jsContentEl.style.display = '';
+        if (jsPanelActionsEl) jsPanelActionsEl.style.display = 'flex';
+        
+        console.log('[Preview] JS panel visibility set:', { 
+            default: jsDefaultEl?.style.display, 
+            info: jsInfoEl?.style.display, 
+            content: jsContentEl?.style.display,
+            actions: jsPanelActionsEl?.style.display
+        });
+        
+        // Expand contextual area if collapsed
+        contextualArea.classList.remove('preview-contextual-area--collapsed');
+        
+        // Load selectors data if needed (for searchable picker in add form)
+        if (!selectorsLoaded) {
+            await loadSelectorsData();
+        }
+        
+        // Request page structure classes from iframe (for picker)
+        sendToIframe('getPageClasses', {});
+        
+        // Fetch interactions from API
+        await loadInteractions();
+    }
+    
+    /**
+     * Reset JS panel to default state (hide info/content, show default hint)
+     */
+    function hideJsPanel() {
+        currentJsContext = null;
+        
+        // Reset to default state
+        if (jsDefault) jsDefault.style.display = '';
+        if (jsInfo) jsInfo.style.display = 'none';
+        if (jsContent) jsContent.style.display = 'none';
+        
+        // Hide the add form if open
+        const addForm = document.getElementById('js-add-form');
+        const actions = document.getElementById('js-panel-actions');
+        if (addForm) addForm.style.display = 'none';
+        if (actions) actions.style.display = '';
+        
+        // Clear selection in iframe
+        sendToIframe('clearJsSelection', {});
+    }
+    
+    /**
+     * Load interactions from API for current context
+     */
+    async function loadInteractions() {
+        if (!currentJsContext) return;
+        
+        const { struct, nodeId } = currentJsContext;
+        
+        // Determine structType from struct string
+        let structType = struct;
+        if (struct.startsWith('page-')) {
+            structType = 'page';
+        } else if (struct === 'menu') {
+            structType = 'menu';
+        } else if (struct === 'footer') {
+            structType = 'footer';
+        }
+        
+        // Extract pageName if struct is a page
+        let pageName = null;
+        if (struct.startsWith('page-')) {
+            pageName = struct.substring(5);
+        }
+        
+        try {
+            const url = pageName 
+                ? `/management/listInteractions/${structType}/${pageName}/${nodeId}`
+                : `/management/listInteractions/${structType}/${nodeId}`;
+            
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer <?= $token ?>'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch interactions');
+            }
+            
+            const result = await response.json();
+            console.log('[Preview] Interactions loaded:', result);
+            
+            // Store available events for the add form
+            currentAvailableEvents = result.data?.availableEvents || [];
+            
+            // Cache interactions data for edit lookups
+            currentInteractionsData = result.data;
+            
+            // Display interactions
+            displayInteractions(result.data);
+            
+        } catch (error) {
+            console.error('[Preview] Failed to load interactions:', error);
+            const listEl = document.getElementById('js-interactions-list');
+            listEl.innerHTML = '<p class="preview-contextual-js-empty" style="color: var(--danger);">Failed to load interactions</p>';
+        }
+    }
+    
+    /**
+     * Display interactions in the panel
+     */
+    function displayInteractions(data) {
+        const listEl = document.getElementById('js-interactions-list');
+        
+        if (!data.interactions || data.interactions.length === 0) {
+            listEl.innerHTML = '<p class="preview-contextual-js-empty"><?= __admin('preview.noInteractions') ?? 'No interactions yet.' ?></p>';
+            return;
+        }
+        
+        // Group interactions by event
+        const byEvent = {};
+        data.interactions.forEach((interaction) => {
+            const event = interaction.event;
+            if (!byEvent[event]) byEvent[event] = [];
+            byEvent[event].push(interaction);
+        });
+        
+        // Build interactions list HTML grouped by event
+        let html = '<div class="preview-js-interactions">';
+        
+        Object.entries(byEvent).forEach(([event, interactions]) => {
+            html += `<div class="preview-js-event-group">
+                <div class="preview-js-event-header">${event}</div>`;
+            
+            interactions.forEach((interaction, indexInEvent) => {
+                html += `
+                    <div class="preview-js-interaction" data-event="${event}" data-index="${indexInEvent}">
+                        <div class="preview-js-interaction__body">
+                            <div class="preview-js-interaction__function">${interaction.function}(${interaction.params?.join(', ') || ''})</div>
+                        </div>
+                        <div class="preview-js-interaction__actions">
+                            <button type="button" class="admin-btn admin-btn--xs admin-btn--secondary" onclick="editInteraction('${event}', ${indexInEvent})">
+                                Edit
+                            </button>
+                            <button type="button" class="admin-btn admin-btn--xs admin-btn--danger" onclick="deleteInteraction('${event}', ${indexInEvent})">
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+        });
+        
+        html += '</div>';
+        listEl.innerHTML = html;
+    }
+    
+    /**
+     * Delete an interaction
+     */
+    async function deleteInteraction(eventName, index) {
+        if (!currentJsContext) return;
+        
+        if (!confirm('<?= __admin('preview.confirmDeleteInteraction') ?? 'Delete this interaction?' ?>')) {
+            return;
+        }
+        
+        const { struct, nodeId } = currentJsContext;
+        
+        // Determine structType from struct string
+        let structType = struct;
+        let pageName = null;
+        if (struct.startsWith('page-')) {
+            structType = 'page';
+            pageName = struct.substring(5);
+        }
+        
+        const body = {
+            structType,
+            nodeId,
+            event: eventName,
+            index
+        };
+        
+        if (pageName) {
+            body.pageName = pageName;
+        }
+        
+        try {
+            const response = await fetch('/management/deleteInteraction', {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': 'Bearer <?= $token ?>',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+            
+            const result = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(result.message || 'Failed to delete interaction');
+            }
+            
+            showToast('<?= __admin('preview.interactionDeleted') ?? 'Interaction deleted' ?>', 'success');
+            
+            // Refresh list
+            await loadInteractions();
+            
+            // Reload preview
+            reloadPreview();
+            
+        } catch (error) {
+            console.error('[Preview] Delete interaction error:', error);
+            showToast('Error: ' + error.message, 'error');
+        }
+    }
+    
+    // Make deleteInteraction global for onclick handlers
+    window.deleteInteraction = deleteInteraction;
+    
+    /**
+     * Edit an interaction (opens form with pre-filled values)
+     */
+    async function editInteraction(eventName, index) {
+        console.log('[Preview] Edit interaction:', eventName, index);
+        
+        if (!currentInteractionsData || !currentJsContext) {
+            showToast('No interaction data available', 'error');
+            return;
+        }
+        
+        // Find the interaction to edit
+        const interactions = currentInteractionsData.interactions || [];
+        const interactionsForEvent = interactions.filter(i => i.event === eventName);
+        
+        if (index >= interactionsForEvent.length) {
+            showToast('Interaction not found', 'error');
+            return;
+        }
+        
+        const interaction = interactionsForEvent[index];
+        console.log('[Preview] Found interaction to edit:', interaction);
+        
+        // Store edit state
+        editingInteraction = {
+            event: eventName,
+            index: index,
+            interaction: interaction
+        };
+        
+        // Show form
+        const jsAddForm = document.getElementById('js-add-form');
+        const jsPanelActions = document.getElementById('js-panel-actions');
+        const jsFormEvent = document.getElementById('js-form-event');
+        const jsFormFunction = document.getElementById('js-form-function');
+        const jsFormSave = document.getElementById('js-form-save');
+        const jsFormParams = document.getElementById('js-form-params');
+        const jsPreviewCode = document.getElementById('js-preview-code');
+        const formHeader = jsAddForm.querySelector('.preview-contextual-js-form-header strong');
+        
+        jsAddForm.style.display = 'block';
+        jsPanelActions.style.display = 'none';
+        
+        // Change header and button text to "Edit"
+        if (formHeader) formHeader.textContent = '<?= __admin('preview.editInteraction') ?? 'Edit Interaction' ?>';
+        jsFormSave.textContent = '<?= __admin('common.save') ?? 'Save' ?>';
+        
+        // Populate dropdowns
+        populateEventDropdown();
+        if (availableFunctions.length === 0) {
+            await fetchJsFunctions();
+        }
+        populateFunctionDropdown();
+        
+        // Pre-fill event dropdown
+        jsFormEvent.value = interaction.event;
+        
+        // Pre-fill function dropdown
+        jsFormFunction.value = interaction.function;
+        
+        // Trigger function change to populate params
+        jsFormFunction.dispatchEvent(new Event('change'));
+        
+        // Pre-fill params after a short delay (params are created async)
+        setTimeout(() => {
+            const paramInputs = jsFormParams.querySelectorAll('.preview-contextual-js-form-input');
+            const params = interaction.params || [];
+            paramInputs.forEach((input, i) => {
+                if (params[i] !== undefined) {
+                    input.value = params[i];
+                    // Trigger input event to update preview
+                    input.dispatchEvent(new Event('input'));
+                }
+            });
+            
+            // Update preview code
+            updateJsPreview();
+            jsFormSave.disabled = false;
+        }, 100);
+    }
+    
+    // Make editInteraction global for onclick handlers
+    window.editInteraction = editInteraction;
+    
     /**
      * Populate style input fields with values
      */
@@ -10843,6 +11559,530 @@ if (is_dir($componentsDir)) {
         styleResetBtn.addEventListener('click', resetStyles);
     }
     
+    // ===== JS PANEL SETUP =====
+    
+    const jsAddBtn = document.getElementById('js-add-interaction');
+    
+    // ===== JS PANEL ADD INTERACTION FORM =====
+    
+    const jsAddForm = document.getElementById('js-add-form');
+    const jsFormEvent = document.getElementById('js-form-event');
+    const jsFormFunction = document.getElementById('js-form-function');
+    const jsFormParams = document.getElementById('js-form-params');
+    const jsPreviewCode = document.getElementById('js-preview-code');
+    const jsFormSave = document.getElementById('js-form-save');
+    const jsFormCancel = document.getElementById('js-form-cancel');
+    const jsFormClose = document.getElementById('js-form-close');
+    const jsPanelActions = document.getElementById('js-panel-actions');
+    
+    // Show add form
+    if (jsAddBtn) {
+        jsAddBtn.addEventListener('click', async () => {
+            console.log('[Preview] Add interaction clicked');
+            
+            // Clear edit state (this is a new add)
+            editingInteraction = null;
+            
+            // Show form, hide add button
+            jsAddForm.style.display = 'block';
+            jsPanelActions.style.display = 'none';
+            
+            // Reset header and button text to "Add"
+            const formHeader = jsAddForm.querySelector('.preview-contextual-js-form-header strong');
+            if (formHeader) formHeader.textContent = '<?= __admin('preview.newInteraction') ?? 'New Interaction' ?>';
+            jsFormSave.textContent = '<?= __admin('preview.addInteraction') ?? 'Add' ?>';
+            
+            // Populate event dropdown from currentAvailableEvents
+            populateEventDropdown();
+            
+            // Fetch functions if not cached
+            if (availableFunctions.length === 0) {
+                await fetchJsFunctions();
+            }
+            populateFunctionDropdown();
+            
+            // Reset form
+            jsFormEvent.value = '';
+            jsFormFunction.value = '';
+            jsFormParams.innerHTML = '';
+            jsPreviewCode.textContent = '-';
+            jsFormSave.disabled = true;
+        });
+    }
+    
+    // Cancel/close form
+    function hideAddForm() {
+        jsAddForm.style.display = 'none';
+        jsPanelActions.style.display = 'flex';
+        // Clear edit state
+        editingInteraction = null;
+    }
+    
+    if (jsFormCancel) {
+        jsFormCancel.addEventListener('click', hideAddForm);
+    }
+    if (jsFormClose) {
+        jsFormClose.addEventListener('click', hideAddForm);
+    }
+    
+    // Fetch JS functions from API
+    async function fetchJsFunctions() {
+        try {
+            const response = await fetch('/management/listJsFunctions', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer <?= $token ?>'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch functions');
+            }
+            
+            const result = await response.json();
+            availableFunctions = result.data?.functions || [];
+            console.log('[Preview] JS functions loaded:', availableFunctions.length);
+            
+        } catch (error) {
+            console.error('[Preview] Failed to load JS functions:', error);
+            availableFunctions = [];
+        }
+    }
+    
+    // Populate event dropdown
+    function populateEventDropdown() {
+        jsFormEvent.innerHTML = '<option value=""><?= __admin('preview.selectEvent') ?? '-- Select event --' ?></option>';
+        
+        currentAvailableEvents.forEach(event => {
+            const option = document.createElement('option');
+            option.value = event;
+            option.textContent = event;
+            jsFormEvent.appendChild(option);
+        });
+    }
+    
+    // Populate function dropdown (grouped by type)
+    function populateFunctionDropdown() {
+        jsFormFunction.innerHTML = '<option value=""><?= __admin('preview.selectFunction') ?? '-- Select function --' ?></option>';
+        
+        // Group functions by type (core, custom)
+        const grouped = {};
+        availableFunctions.forEach(fn => {
+            const type = fn.type || 'other';
+            if (!grouped[type]) grouped[type] = [];
+            grouped[type].push(fn);
+        });
+        
+        // Add optgroups (core first, then custom)
+        const typeOrder = ['core', 'custom', 'other'];
+        const typeLabels = {
+            'core': 'Core Functions',
+            'custom': 'Custom Functions',
+            'other': 'Other'
+        };
+        
+        typeOrder.forEach(type => {
+            if (!grouped[type] || grouped[type].length === 0) return;
+            
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = typeLabels[type] || type;
+            
+            grouped[type].forEach(fn => {
+                const option = document.createElement('option');
+                option.value = fn.name;
+                option.textContent = fn.name + ' - ' + (fn.description || '').substring(0, 40);
+                option.dataset.args = JSON.stringify(fn.args || []);
+                option.dataset.description = fn.description || '';
+                optgroup.appendChild(option);
+            });
+            
+            jsFormFunction.appendChild(optgroup);
+        });
+    }
+    
+    /**
+     * Create a searchable picker input with dropdown suggestions
+     * @param {string} inputType - 'selector' or 'class'
+     * @param {object} arg - The argument definition
+     * @param {number} index - Parameter index
+     * @returns {HTMLElement} The wrapper element containing input and dropdown
+     */
+    function createSearchablePicker(inputType, arg, index) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'preview-js-picker-wrapper';
+        
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'preview-contextual-js-form-input preview-js-picker-input';
+        input.dataset.paramIndex = index;
+        input.dataset.paramName = arg.name || '';
+        input.dataset.inputType = inputType;
+        input.placeholder = arg.description || arg.name || '';
+        input.autocomplete = 'off';
+        
+        if (arg.default !== undefined && arg.default !== null) {
+            input.value = arg.default;
+        }
+        
+        // Special placeholder for selector inputs
+        if (inputType === 'selector') {
+            input.placeholder = '<?= __admin('preview.selectorOrThis') ?? 'Search selector or type "this"' ?>';
+        } else if (inputType === 'class') {
+            input.placeholder = '<?= __admin('preview.searchClass') ?? 'Search CSS class...' ?>';
+        }
+        
+        const dropdown = document.createElement('div');
+        dropdown.className = 'preview-js-picker-dropdown';
+        dropdown.style.display = 'none';
+        
+        // Function to get available items (rebuilt each time to get latest data)
+        function getItems() {
+            const items = [];
+            
+            if (inputType === 'selector') {
+                const seenValues = new Set();
+                
+                // Start with "this" special option
+                items.push({ value: 'this', label: '<?= __admin('preview.thisElement') ?? 'this (current element)' ?>', type: 'special' });
+                seenValues.add('this');
+                
+                // Add IDs from CSS (high priority - specific targets)
+                categorizedSelectors.ids.forEach(s => {
+                    if (!seenValues.has(s.selector)) {
+                        items.push({ value: s.selector, label: s.selector, type: 'id' });
+                        seenValues.add(s.selector);
+                    }
+                });
+                
+                // Add classes from page DOM FIRST (most relevant - actually on this page)
+                pageStructureClasses.forEach(cls => {
+                    const selector = '.' + cls;
+                    if (!seenValues.has(selector)) {
+                        items.push({ value: selector, label: selector, type: 'dom' });
+                        seenValues.add(selector);
+                    }
+                });
+                
+                // Add classes from CSS (may include unused selectors)
+                categorizedSelectors.classes.forEach(s => {
+                    if (!seenValues.has(s.selector)) {
+                        items.push({ value: s.selector, label: s.selector + ' (CSS)', type: 'class' });
+                        seenValues.add(s.selector);
+                    }
+                });
+                
+                // Add tags from CSS
+                categorizedSelectors.tags.forEach(s => {
+                    if (!seenValues.has(s.selector)) {
+                        items.push({ value: s.selector, label: s.selector, type: 'tag' });
+                        seenValues.add(s.selector);
+                    }
+                });
+            } else if (inputType === 'class') {
+                const seenClasses = new Set();
+                
+                // Add common utility classes first
+                const commonClasses = ['hidden', 'active', 'open', 'visible', 'disabled', 'selected'];
+                commonClasses.forEach(cls => {
+                    items.push({ value: cls, label: cls + ' (common)', type: 'common' });
+                    seenClasses.add(cls);
+                });
+                
+                // Add classes from page DOM FIRST (most relevant)
+                pageStructureClasses.forEach(cls => {
+                    if (!seenClasses.has(cls)) {
+                        items.push({ value: cls, label: cls, type: 'dom' });
+                        seenClasses.add(cls);
+                    }
+                });
+                
+                // Add classes from CSS
+                categorizedSelectors.classes.forEach(s => {
+                    const className = s.selector.replace(/^\./, ''); // Remove leading dot
+                    if (!seenClasses.has(className)) {
+                        items.push({ value: className, label: className + ' (CSS)', type: 'class' });
+                        seenClasses.add(className);
+                    }
+                });
+            }
+            
+            return items;
+        }
+        
+        // Filter and render dropdown items
+        function renderDropdown(filter = '') {
+            dropdown.innerHTML = '';
+            const items = getItems(); // Get fresh items each time
+            const filterLower = filter.toLowerCase();
+            const filtered = items.filter(item => 
+                item.value.toLowerCase().includes(filterLower) || 
+                item.label.toLowerCase().includes(filterLower)
+            );
+            
+            if (filtered.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            
+            filtered.forEach(item => {
+                const option = document.createElement('div');
+                option.className = 'preview-js-picker-option';
+                option.dataset.value = item.value;
+                option.dataset.type = item.type;
+                
+                const typeIcon = item.type === 'special' ? '⚡' : 
+                                 item.type === 'id' ? '#' : 
+                                 item.type === 'class' ? '.' : 
+                                 item.type === 'dom' ? '◇' :
+                                 item.type === 'common' ? '★' : 
+                                 item.type === 'tag' ? '&lt;&gt;' : '';
+                option.innerHTML = `<span class="preview-js-picker-type">${typeIcon}</span><span>${item.label}</span>`;
+                
+                option.addEventListener('click', () => {
+                    input.value = item.value;
+                    dropdown.style.display = 'none';
+                    updatePreview();
+                });
+                
+                dropdown.appendChild(option);
+            });
+            
+            dropdown.style.display = '';
+        }
+        
+        // Input events
+        input.addEventListener('focus', () => {
+            renderDropdown(input.value);
+        });
+        
+        input.addEventListener('input', () => {
+            renderDropdown(input.value);
+            updatePreview();
+        });
+        
+        input.addEventListener('blur', () => {
+            // Delay to allow click on dropdown item
+            setTimeout(() => {
+                dropdown.style.display = 'none';
+            }, 200);
+        });
+        
+        // Keyboard navigation
+        input.addEventListener('keydown', (e) => {
+            const options = dropdown.querySelectorAll('.preview-js-picker-option');
+            const current = dropdown.querySelector('.preview-js-picker-option--active');
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (!current && options.length > 0) {
+                    options[0].classList.add('preview-js-picker-option--active');
+                } else if (current && current.nextElementSibling) {
+                    current.classList.remove('preview-js-picker-option--active');
+                    current.nextElementSibling.classList.add('preview-js-picker-option--active');
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (current && current.previousElementSibling) {
+                    current.classList.remove('preview-js-picker-option--active');
+                    current.previousElementSibling.classList.add('preview-js-picker-option--active');
+                }
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (current) {
+                    input.value = current.dataset.value;
+                    dropdown.style.display = 'none';
+                    updatePreview();
+                }
+            } else if (e.key === 'Escape') {
+                dropdown.style.display = 'none';
+            }
+        });
+        
+        wrapper.appendChild(input);
+        wrapper.appendChild(dropdown);
+        
+        return wrapper;
+    }
+    
+    // When function changes, populate param inputs
+    if (jsFormFunction) {
+        jsFormFunction.addEventListener('change', () => {
+            const selectedOption = jsFormFunction.options[jsFormFunction.selectedIndex];
+            const args = selectedOption?.dataset?.args ? JSON.parse(selectedOption.dataset.args) : [];
+            
+            jsFormParams.innerHTML = '';
+            
+            if (args.length === 0) {
+                jsFormParams.innerHTML = '<p class="preview-contextual-js-form-hint"><?= __admin('preview.noParams') ?? 'This function has no parameters.' ?></p>';
+            } else {
+                args.forEach((arg, index) => {
+                    const row = document.createElement('div');
+                    row.className = 'preview-contextual-js-form-row';
+                    
+                    const label = document.createElement('label');
+                    label.className = 'preview-contextual-js-form-label';
+                    label.textContent = arg.name || `Param ${index + 1}`;
+                    if (arg.required) label.innerHTML += ' <span class="required">*</span>';
+                    
+                    row.appendChild(label);
+                    
+                    // Use searchable picker for selector and class inputTypes
+                    const inputType = arg.inputType || 'text';
+                    if (inputType === 'selector' || inputType === 'class') {
+                        const picker = createSearchablePicker(inputType, arg, index);
+                        row.appendChild(picker);
+                    } else {
+                        // Regular text input
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.className = 'preview-contextual-js-form-input';
+                        input.dataset.paramIndex = index;
+                        input.dataset.paramName = arg.name || '';
+                        input.placeholder = arg.description || arg.name || '';
+                        if (arg.default !== undefined && arg.default !== null) {
+                            input.value = arg.default;
+                        }
+                        input.addEventListener('input', updatePreview);
+                        row.appendChild(input);
+                    }
+                    
+                    jsFormParams.appendChild(row);
+                });
+            }
+            
+            updatePreview();
+        });
+    }
+    
+    // Update preview as user types
+    function updatePreview() {
+        const fnName = jsFormFunction.value;
+        const eventName = jsFormEvent.value;
+        
+        if (!fnName) {
+            jsPreviewCode.textContent = '-';
+            jsFormSave.disabled = true;
+            return;
+        }
+        
+        // Collect params
+        const paramInputs = jsFormParams.querySelectorAll('.preview-contextual-js-form-input');
+        const params = [];
+        paramInputs.forEach(input => {
+            if (input.value.trim()) {
+                params.push(input.value.trim());
+            }
+        });
+        
+        // Build preview
+        let preview = '{{call:' + fnName;
+        if (params.length > 0) {
+            preview += ':' + params.join(',');
+        }
+        preview += '}}';
+        
+        jsPreviewCode.textContent = preview;
+        
+        // Enable save if event and function selected
+        jsFormSave.disabled = !eventName || !fnName;
+    }
+    
+    // Event change also triggers preview update
+    if (jsFormEvent) {
+        jsFormEvent.addEventListener('change', updatePreview);
+    }
+    
+    // Save interaction (add or edit based on editingInteraction state)
+    if (jsFormSave) {
+        jsFormSave.addEventListener('click', async () => {
+            const eventName = jsFormEvent.value;
+            const fnName = jsFormFunction.value;
+            
+            if (!eventName || !fnName || !currentJsContext) {
+                showToast('Please select an event and function', 'error');
+                return;
+            }
+            
+            // Collect params
+            const paramInputs = jsFormParams.querySelectorAll('.preview-contextual-js-form-input');
+            const params = [];
+            paramInputs.forEach(input => {
+                if (input.value.trim()) {
+                    params.push(input.value.trim());
+                }
+            });
+            
+            // Determine if this is an edit or add operation
+            const isEdit = editingInteraction !== null;
+            
+            // Build request body
+            const body = {
+                structType: currentJsContext.struct.startsWith('page-') ? 'page' : currentJsContext.struct,
+                nodeId: currentJsContext.nodeId,
+                event: eventName,
+                function: fnName,
+                params: params
+            };
+            
+            // Add pageName if it's a page
+            if (currentJsContext.struct.startsWith('page-')) {
+                body.pageName = currentJsContext.struct.substring(5);
+            }
+            
+            // For edit, add index and use original event if changed
+            if (isEdit) {
+                body.index = editingInteraction.index;
+                // If event changed, we need to delete old and add new (API limitation)
+                // For simplicity, we'll use the original event for the edit
+                body.event = editingInteraction.event;
+            }
+            
+            try {
+                jsFormSave.disabled = true;
+                jsFormSave.textContent = '<?= __admin('common.saving') ?? 'Saving...' ?>';
+                
+                const endpoint = isEdit ? '/management/editInteraction' : '/management/addInteraction';
+                const method = isEdit ? 'PUT' : 'POST';
+                
+                const response = await fetch(endpoint, {
+                    method: method,
+                    headers: {
+                        'Authorization': 'Bearer <?= $token ?>',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(body)
+                });
+                
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.message || (isEdit ? 'Failed to edit interaction' : 'Failed to add interaction'));
+                }
+                
+                showToast(isEdit 
+                    ? '<?= __admin('preview.interactionUpdated') ?? 'Interaction updated successfully' ?>' 
+                    : '<?= __admin('preview.interactionAdded') ?? 'Interaction added successfully' ?>', 
+                    'success');
+                
+                // Hide form and refresh list
+                hideAddForm();
+                await loadInteractions();
+                
+                // Reload preview to see changes
+                reloadPreview();
+                
+            } catch (error) {
+                console.error('[Preview] Save interaction error:', error);
+                showToast('Error: ' + error.message, 'error');
+            } finally {
+                jsFormSave.disabled = false;
+                jsFormSave.textContent = isEdit
+                    ? '<?= __admin('common.save') ?? 'Save' ?>'
+                    : '<?= __admin('preview.addInteraction') ?? 'Add Interaction' ?>';
+            }
+        });
+    }
+
     // Initialize QSColorPicker for color inputs
     const colorInputs = stylePanel.querySelectorAll('.preview-style-input--color');
     const colorPickers = [];

@@ -38,6 +38,7 @@ return array (
       23 => 'getMyPermissions',
       24 => 'listAiProviders',
       25 => 'listJsFunctions',
+      26 => 'listInteractions',
     ),
   ),
   'editor' => 
@@ -97,6 +98,10 @@ return array (
       48 => 'editNode',
       49 => 'addComponentToNode',
       50 => 'editComponentToNode',
+      51 => 'listInteractions',
+      52 => 'addInteraction',
+      53 => 'editInteraction',
+      54 => 'deleteInteraction',
     ),
   ),
   'designer' => 
@@ -164,6 +169,10 @@ return array (
       56 => 'editNode',
       57 => 'addComponentToNode',
       58 => 'editComponentToNode',
+      59 => 'listInteractions',
+      60 => 'addInteraction',
+      61 => 'editInteraction',
+      62 => 'deleteInteraction',
     ),
   ),
   'developer' => 
@@ -238,6 +247,10 @@ return array (
       63 => 'addComponentToNode',
       64 => 'editComponentToNode',
       65 => 'listJsFunctions',
+      66 => 'listInteractions',
+      67 => 'addInteraction',
+      68 => 'editInteraction',
+      69 => 'deleteInteraction',
     ),
   ),
   'admin' => 
@@ -333,6 +346,10 @@ return array (
       84 => 'addJsFunction',
       85 => 'editJsFunction',
       86 => 'deleteJsFunction',
+      87 => 'listInteractions',
+      88 => 'addInteraction',
+      89 => 'editInteraction',
+      90 => 'deleteInteraction',
     ),
   ),
 );

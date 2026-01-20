@@ -205,6 +205,11 @@ class ApiResponse {
             call_user_func(self::$beforeSendCallback, $this->status, $this->code);
         }
         
+        // Clear any output buffering
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
         http_response_code($this->status);
         header('Content-Type: application/json');
         

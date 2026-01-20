@@ -6,8 +6,8 @@
  * Handles reading/writing function definitions to JSON config,
  * regenerating qs-custom.js, and updating the whitelist.
  * 
- * Storage: secure/config/custom-js-functions.json
- * Output: public/scripts/qs-custom.js
+ * Storage: secure/projects/{project}/config/custom-js-functions.json (per-project)
+ * Output: public/scripts/qs-custom.js (regenerated on project switch)
  */
 
 class JsFunctionManager {
@@ -26,10 +26,113 @@ class JsFunctionManager {
     
     /**
      * Constructor
+     * @param string|null $projectPath Optional project path override (for switchProject)
      */
-    public function __construct() {
-        $this->configPath = SECURE_FOLDER_PATH . '/config/custom-js-functions.json';
+    public function __construct(?string $projectPath = null) {
+        // Use provided project path or current PROJECT_PATH
+        if ($projectPath !== null) {
+            $basePath = $projectPath;
+        } elseif (defined('PROJECT_PATH')) {
+            $basePath = PROJECT_PATH;
+        } else {
+            // Fallback to old global location for backwards compatibility
+            $basePath = SECURE_FOLDER_PATH;
+        }
+        
+        // Project-specific config path
+        $this->configPath = $basePath . '/config/custom-js-functions.json';
+        
+        // Output always goes to live public folder
         $this->outputPath = PUBLIC_FOLDER_ROOT . '/scripts/qs-custom.js';
+        
+        // Ensure config directory exists
+        $configDir = dirname($this->configPath);
+        if (!is_dir($configDir)) {
+            mkdir($configDir, 0755, true);
+        }
+        
+        // Initialize empty config if it doesn't exist
+        if (!file_exists($this->configPath)) {
+            $this->initializeConfig();
+        }
+    }
+    
+    /**
+     * Initialize an empty config file
+     * @return bool
+     */
+    private function initializeConfig(): bool {
+        $data = [
+            'version' => '1.0',
+            'generated' => date('Y-m-d H:i:s'),
+            'functions' => []
+        ];
+        
+        return file_put_contents(
+            $this->configPath,
+            json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+            LOCK_EX
+        ) !== false;
+    }
+    
+    /**
+     * Get the config path (useful for debugging/migration)
+     * @return string
+     */
+    public function getConfigPath(): string {
+        return $this->configPath;
+    }
+    
+    /**
+     * Migrate functions from old global config to current project
+     * Call this manually if needed: JsFunctionManager::migrateFromGlobal()
+     * @return array Migration result
+     */
+    public static function migrateFromGlobal(): array {
+        $globalPath = SECURE_FOLDER_PATH . '/config/custom-js-functions.json';
+        
+        if (!file_exists($globalPath)) {
+            return ['success' => false, 'reason' => 'No global config found'];
+        }
+        
+        $globalContent = file_get_contents($globalPath);
+        $globalData = json_decode($globalContent, true);
+        $globalFunctions = $globalData['functions'] ?? [];
+        
+        if (empty($globalFunctions)) {
+            return ['success' => true, 'reason' => 'No functions to migrate', 'migrated' => 0];
+        }
+        
+        // Instantiate for current project
+        $manager = new self();
+        $existingFunctions = $manager->getCustomFunctions();
+        
+        // Merge (don't overwrite existing)
+        $migrated = 0;
+        foreach ($globalFunctions as $func) {
+            $exists = false;
+            foreach ($existingFunctions as $ef) {
+                if ($ef['name'] === $func['name']) {
+                    $exists = true;
+                    break;
+                }
+            }
+            if (!$exists) {
+                $manager->addFunction(
+                    $func['name'],
+                    $func['code'],
+                    $func['description'] ?? ''
+                );
+                $migrated++;
+            }
+        }
+        
+        return [
+            'success' => true,
+            'migrated' => $migrated,
+            'skipped' => count($globalFunctions) - $migrated,
+            'config_path' => $manager->getConfigPath()
+        ];
     }
     
     /**

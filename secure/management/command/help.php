@@ -2082,12 +2082,12 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Role to assign to the token',
                 'valid_values' => [
-                    '*' => 'Superadmin - full access to all commands including token/role management',
-                    'viewer' => 'Read-only access (26 commands)',
-                    'editor' => 'Content editing - structure, translations, assets (45 commands)',
-                    'designer' => 'Style editing - CSS, animations, visual elements (54 commands)',
-                    'developer' => 'Build and deploy access (59 commands)',
-                    'admin' => 'Full access except token/role management (72 commands)',
+                    '*' => 'Superadmin - full access to all 97 commands including token/role management',
+                    'viewer' => 'Read-only access (27 commands)',
+                    'editor' => 'Content editing - structure, translations, assets (55 commands)',
+                    'designer' => 'Style editing - CSS, animations, visual elements (63 commands)',
+                    'developer' => 'Build and deploy access (70 commands)',
+                    'admin' => 'Full access except token/role management (91 commands)',
                     '<custom>' => 'Any custom role name created via createRole'
                 ],
                 'example' => 'editor or designer or admin'
@@ -2779,7 +2779,7 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'switchProject' => [
-        'description' => 'Switches the active project. Optionally copies project public files to live public folder.',
+        'description' => 'Switches the active project. Syncs live edits back to previous project before switching, then copies new project files to live folder.',
         'method' => 'PATCH',
         'parameters' => [
             'project' => [
@@ -2801,18 +2801,22 @@ $GLOBALS['__help_commands'] = [
             'code' => 'operation.success',
             'message' => "Switched to project 'mysite'",
             'data' => [
+                'project' => 'mysite',
                 'previous_project' => 'quicksite',
-                'new_project' => 'mysite',
-                'project_path' => 'secure/projects/mysite',
-                'public_deployed' => true
+                'previous_project_synced' => true,
+                'target_updated' => true,
+                'public_files_copied' => true,
+                'custom_js_regenerated' => true,
+                'custom_functions_count' => 0
             ]
         ],
         'error_responses' => [
-            '400.validation.missing_field' => 'Missing name parameter',
-            '400.validation.same_project' => 'Already on this project',
+            '400.validation.missing_field' => 'Missing project parameter',
+            '400.validation.incomplete_project' => 'Project missing required files',
+            '200.operation.no_change' => 'Already on this project (returns success with was_already_active=true)',
             '404.resource.not_found' => 'Project not found'
         ],
-        'notes' => 'The website will immediately start serving the new project. Use deploy_public=true to update public assets.'
+        'notes' => 'IMPORTANT: Before switching, live CSS/assets are synced BACK to the previous project to prevent data loss. The website will immediately start serving the new project. Custom JS functions are regenerated for the new project.'
     ],
     
     'createProject' => [
@@ -3300,7 +3304,7 @@ $GLOBALS['__help_commands'] = [
                 'is_superadmin' => false
             ]
         ],
-        'notes' => 'Use this to determine what commands the current token can execute. Useful for building permission-aware UIs. Superadmin (*) users have is_superadmin=true and access to all 77 commands.'
+        'notes' => 'Use this to determine what commands the current token can execute. Useful for building permission-aware UIs. Superadmin (*) users have is_superadmin=true and access to all 93 commands.'
     ],
     
     'createRole' => [
@@ -3620,6 +3624,439 @@ $GLOBALS['__help_commands'] = [
             '503.ai.overloaded' => 'AI provider is overloaded'
         ],
         'notes' => 'SECURITY: API key is passed per-request, used for a single API call, and immediately garbage collected. Keys are NEVER stored on disk. Server acts as proxy to bypass CORS restrictions. User controls their own AI costs and usage.'
+    ],
+
+    // JAVASCRIPT FUNCTIONS / INTERACTIONS
+    // ==========================================
+    
+    'listJsFunctions' => [
+        'description' => 'Lists all available QS.* JavaScript functions that can be used in {{call:...}} syntax for page interactions. Returns both core built-in functions and custom project-specific functions.',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/listJsFunctions',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'js_functions.list',
+            'message' => 'JavaScript functions retrieved successfully',
+            'data' => [
+                'functions' => [
+                    [
+                        'name' => 'show',
+                        'type' => 'core',
+                        'args' => [
+                            ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for target element(s)'],
+                            ['name' => 'hideClass', 'type' => 'string', 'required' => false, 'default' => 'hidden', 'description' => 'CSS class to remove']
+                        ],
+                        'description' => 'Shows element(s) by removing the hide class',
+                        'example' => '{{call:show:#modal}} or {{call:show:.cards,invisible}}'
+                    ],
+                    [
+                        'name' => 'customFunc',
+                        'type' => 'custom',
+                        'args' => [['name' => 'param1', 'type' => 'string', 'required' => true]],
+                        'description' => 'A custom function added via addJsFunction',
+                        'example' => '{{call:customFunc:value}}'
+                    ]
+                ],
+                'total' => 14,
+                'core_count' => 12,
+                'custom_count' => 2
+            ]
+        ],
+        'error_responses' => [
+            '500.server.error' => 'Failed to load JavaScript functions'
+        ],
+        'notes' => 'Core functions (12) are built into QS namespace and cannot be modified. Custom functions are project-specific and stored in secure/projects/{project}/config/custom-js-functions.json. Use {{call:functionName:arg1,arg2}} syntax in structure params like onclick, oninput.'
+    ],
+    
+    'addJsFunction' => [
+        'description' => 'Adds a custom JavaScript function to the QS namespace. Function becomes available in {{call:...}} syntax. Auto-regenerates qs-custom.js.',
+        'method' => 'POST',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Function name (alphanumeric + underscore, cannot start with number, cannot match core function names)',
+                'example' => 'myCustomToggle'
+            ],
+            'args' => [
+                'required' => false,
+                'type' => 'array',
+                'description' => 'Function arguments array with name, type, required, default, description',
+                'example' => '[{"name": "target", "type": "string", "required": true}, {"name": "duration", "type": "number", "default": 300}]'
+            ],
+            'body' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'JavaScript function body (without function wrapper). Must be valid JS.',
+                'example' => 'const el = document.querySelector(target); el.style.transition = `opacity ${duration}ms`; el.style.opacity = el.style.opacity === "0" ? "1" : "0";'
+            ],
+            'description' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Human-readable description of what the function does',
+                'example' => 'Toggles element opacity with custom duration'
+            ]
+        ],
+        'example_post' => 'POST /management/addJsFunction with body: {"name": "fadeToggle", "args": [{"name": "target", "type": "string", "required": true}], "body": "const el = document.querySelector(target); el.classList.toggle(\"faded\");", "description": "Toggles faded class"}',
+        'success_response' => [
+            'status' => 201,
+            'code' => 'js_function.created',
+            'message' => 'JavaScript function "fadeToggle" created successfully',
+            'data' => [
+                'name' => 'fadeToggle',
+                'type' => 'custom',
+                'args' => [['name' => 'target', 'type' => 'string', 'required' => true]],
+                'description' => 'Toggles faded class',
+                'usage' => '{{call:fadeToggle:#myElement}}'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'name and body parameters are required',
+            '400.validation.invalid_name' => 'Invalid function name format',
+            '400.validation.reserved_name' => 'Cannot use reserved core function name',
+            '400.validation.duplicate_name' => 'Function with this name already exists',
+            '400.validation.invalid_body' => 'JavaScript body contains syntax errors or dangerous patterns',
+            '403.forbidden' => 'Insufficient permissions (admin required)'
+        ],
+        'notes' => 'Custom functions are stored per-project. The body is validated for balanced brackets and dangerous patterns (eval, Function constructor, etc.). Functions are immediately available after creation via qs-custom.js regeneration.'
+    ],
+    
+    'editJsFunction' => [
+        'description' => 'Edits an existing custom JavaScript function. Can update name, args, body, and description. Core functions cannot be edited.',
+        'method' => 'POST',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Current name of the function to edit',
+                'example' => 'fadeToggle'
+            ],
+            'newName' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'New name for the function (if renaming)',
+                'example' => 'opacityToggle'
+            ],
+            'args' => [
+                'required' => false,
+                'type' => 'array',
+                'description' => 'Updated function arguments',
+                'example' => '[{"name": "target", "type": "string", "required": true}, {"name": "speed", "type": "number", "default": 500}]'
+            ],
+            'body' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Updated JavaScript function body',
+                'example' => 'document.querySelector(target).classList.toggle("visible");'
+            ],
+            'description' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Updated description',
+                'example' => 'Toggles visible class with optional speed'
+            ]
+        ],
+        'example_post' => 'POST /management/editJsFunction with body: {"name": "fadeToggle", "newName": "opacityToggle", "description": "Improved toggle function"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'js_function.updated',
+            'message' => 'JavaScript function "opacityToggle" updated successfully',
+            'data' => [
+                'name' => 'opacityToggle',
+                'previous_name' => 'fadeToggle',
+                'type' => 'custom',
+                'updated_fields' => ['name', 'description']
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'name parameter is required',
+            '400.validation.no_changes' => 'No fields provided to update',
+            '400.validation.invalid_name' => 'Invalid new function name format',
+            '400.validation.duplicate_name' => 'A function with the new name already exists',
+            '400.validation.invalid_body' => 'JavaScript body contains syntax errors',
+            '403.forbidden' => 'Cannot edit core functions',
+            '404.not_found' => 'Function not found'
+        ],
+        'notes' => 'Only custom functions can be edited. Core functions (show, hide, toggle, etc.) are protected. Provide only the fields you want to update. Regenerates qs-custom.js on success.'
+    ],
+    
+    'deleteJsFunction' => [
+        'description' => 'Deletes a custom JavaScript function. Core functions cannot be deleted. Removes from qs-custom.js.',
+        'method' => 'POST',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Name of the custom function to delete',
+                'example' => 'fadeToggle'
+            ]
+        ],
+        'example_post' => 'POST /management/deleteJsFunction with body: {"name": "fadeToggle"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'js_function.deleted',
+            'message' => 'JavaScript function "fadeToggle" deleted successfully',
+            'data' => [
+                'deleted_function' => 'fadeToggle',
+                'remaining_custom_functions' => 3
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'name parameter is required',
+            '403.forbidden' => 'Cannot delete core functions',
+            '404.not_found' => 'Custom function not found'
+        ],
+        'notes' => 'WARNING: Deleting a function that is used in page structures will cause JavaScript errors at runtime. Check usage before deleting. Core functions (12) are protected and cannot be deleted.'
+    ],
+    
+    // ==========================================
+    // INTERACTION MANAGEMENT COMMANDS
+    // ==========================================
+    
+    'listInteractions' => [
+        'description' => 'Lists all interactions ({{call:...}} bindings) on a specific element. Returns parsed interactions grouped by event, available events for the element type, and element info.',
+        'method' => 'GET',
+        'parameters' => [
+            'structType' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Structure type: page, menu, footer, or component',
+                'example' => 'page'
+            ],
+            'pageName' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Page name (required when structType is "page")',
+                'example' => 'home'
+            ],
+            'nodeId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Node ID from data-qs-node attribute',
+                'example' => 'hero/cta-button'
+            ]
+        ],
+        'example_get' => 'GET /management/listInteractions/page/home/hero%2Fcta-button',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'interactions.list',
+            'message' => 'Interactions retrieved successfully',
+            'data' => [
+                'interactions' => [
+                    [
+                        'event' => 'onclick',
+                        'function' => 'toggleHide',
+                        'params' => ['#menu'],
+                        'raw' => '{{call:toggleHide:#menu}}'
+                    ],
+                    [
+                        'event' => 'onmouseover',
+                        'function' => 'addClass',
+                        'params' => ['.tooltip', 'visible'],
+                        'raw' => '{{call:addClass:.tooltip,visible}}'
+                    ]
+                ],
+                'availableEvents' => ['onclick', 'ondblclick', 'onmouseover', 'onmouseout', 'onmouseenter', 'onmouseleave', 'onfocus', 'onblur'],
+                'element' => [
+                    'tag' => 'button',
+                    'nodeId' => 'hero/cta-button'
+                ]
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'structType and nodeId are required',
+            '400.validation.invalid_struct_type' => 'Invalid structure type',
+            '404.node.not_found' => 'Node not found in structure'
+        ],
+        'notes' => 'Available events are filtered by element tag type. Forms get onsubmit/onreset, inputs get oninput/onchange, media elements get onplay/onpause/onended. Interactions are parsed from {{call:...}} syntax in event params.'
+    ],
+    
+    'addInteraction' => [
+        'description' => 'Adds an interaction ({{call:...}}) to an element\'s event attribute. Generates the call syntax automatically from function name and params.',
+        'method' => 'POST',
+        'parameters' => [
+            'structType' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Structure type: page, menu, footer, or component',
+                'example' => 'page'
+            ],
+            'pageName' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Page name (required when structType is "page")',
+                'example' => 'home'
+            ],
+            'nodeId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Node ID from data-qs-node attribute',
+                'example' => 'hero/cta-button'
+            ],
+            'event' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Event name (onclick, onmouseover, oninput, etc.)',
+                'example' => 'onclick'
+            ],
+            'function' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Function name from listJsFunctions (core or custom)',
+                'example' => 'toggleHide'
+            ],
+            'params' => [
+                'required' => false,
+                'type' => 'array',
+                'description' => 'Function parameters as array of strings',
+                'example' => '["#contact-modal"]'
+            ]
+        ],
+        'example_post' => 'POST /management/addInteraction with body: {"structType": "page", "pageName": "home", "nodeId": "hero/cta-button", "event": "onclick", "function": "show", "params": ["#contact-modal"]}',
+        'success_response' => [
+            'status' => 201,
+            'code' => 'interaction.added',
+            'message' => 'Interaction added successfully',
+            'data' => [
+                'event' => 'onclick',
+                'function' => 'show',
+                'params' => ['#contact-modal'],
+                'raw' => '{{call:show:#contact-modal}}',
+                'total_on_event' => 2
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'structType, nodeId, event, and function are required',
+            '400.validation.invalid_event' => 'Invalid event name',
+            '400.validation.invalid_function' => 'Function not found in available functions',
+            '404.node.not_found' => 'Node not found in structure'
+        ],
+        'notes' => 'If the event already has interactions, the new one is appended (space-separated). Use listJsFunctions to get available function names. Params array order must match function argument order.'
+    ],
+    
+    'editInteraction' => [
+        'description' => 'Edits an existing interaction on an element. Replaces the interaction at the specified index within the event.',
+        'method' => 'PUT',
+        'parameters' => [
+            'structType' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Structure type: page, menu, footer, or component',
+                'example' => 'page'
+            ],
+            'pageName' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Page name (required when structType is "page")',
+                'example' => 'home'
+            ],
+            'nodeId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Node ID from data-qs-node attribute',
+                'example' => 'hero/cta-button'
+            ],
+            'event' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Event name containing the interaction to edit',
+                'example' => 'onclick'
+            ],
+            'index' => [
+                'required' => true,
+                'type' => 'integer',
+                'description' => 'Index of the interaction within the event (0-based)',
+                'example' => 0
+            ],
+            'function' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'New function name',
+                'example' => 'toggleHide'
+            ],
+            'params' => [
+                'required' => false,
+                'type' => 'array',
+                'description' => 'New function parameters',
+                'example' => '["#modal", "invisible"]'
+            ]
+        ],
+        'example_put' => 'PUT /management/editInteraction with body: {"structType": "page", "pageName": "home", "nodeId": "hero/cta-button", "event": "onclick", "index": 0, "function": "toggleHide", "params": ["#modal"]}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'interaction.updated',
+            'message' => 'Interaction updated successfully',
+            'data' => [
+                'event' => 'onclick',
+                'index' => 0,
+                'function' => 'toggleHide',
+                'params' => ['#modal'],
+                'raw' => '{{call:toggleHide:#modal}}'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'structType, nodeId, event, index, and function are required',
+            '400.validation.invalid_index' => 'Index out of bounds for this event',
+            '404.node.not_found' => 'Node not found in structure',
+            '404.interaction.not_found' => 'No interaction found at specified index'
+        ],
+        'notes' => 'Index is 0-based within the specific event. Use listInteractions to find the correct index. Only replaces the interaction at that index, other interactions on the same event are preserved.'
+    ],
+    
+    'deleteInteraction' => [
+        'description' => 'Deletes an interaction from an element. Can delete a specific interaction by index or all interactions on an event.',
+        'method' => 'DELETE',
+        'parameters' => [
+            'structType' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Structure type: page, menu, footer, or component',
+                'example' => 'page'
+            ],
+            'pageName' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Page name (required when structType is "page")',
+                'example' => 'home'
+            ],
+            'nodeId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Node ID from data-qs-node attribute',
+                'example' => 'hero/cta-button'
+            ],
+            'event' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Event name containing the interaction(s) to delete',
+                'example' => 'onclick'
+            ],
+            'index' => [
+                'required' => false,
+                'type' => 'integer',
+                'description' => 'Index of specific interaction to delete (omit to delete all on event)',
+                'example' => 0
+            ]
+        ],
+        'example_delete' => 'DELETE /management/deleteInteraction with body: {"structType": "page", "pageName": "home", "nodeId": "hero/cta-button", "event": "onclick", "index": 0}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'interaction.deleted',
+            'message' => 'Interaction deleted successfully',
+            'data' => [
+                'event' => 'onclick',
+                'deleted_index' => 0,
+                'remaining_on_event' => 1
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'structType, nodeId, and event are required',
+            '400.validation.invalid_index' => 'Index out of bounds for this event',
+            '404.node.not_found' => 'Node not found in structure',
+            '404.interaction.not_found' => 'No interaction found on this event'
+        ],
+        'notes' => 'If index is omitted, ALL interactions on that event are removed (the event param is deleted entirely). If index is provided, only that specific interaction is removed and others are preserved.'
     ]
 ];
 
@@ -3689,12 +4126,12 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'token_format' => 'tvt_<48 hex characters>',
                 'default_token' => 'tvt_dev_default_change_me_in_production (CHANGE IN PRODUCTION!)',
                 'role_system' => [
-                    '*' => 'Superadmin - full access to all 81 commands including token/role management',
-                    'viewer' => 'Read-only access (28 commands) - get*, list*, validate*, help, listAiProviders',
-                    'editor' => 'Content editing (47 commands) - viewer + structure, translations, assets',
-                    'designer' => 'Style editing (56 commands) - editor + CSS, animations, visual elements',
-                    'developer' => 'Build access (63 commands) - designer + build, deploy, projects, AI generation',
-                    'admin' => 'Full except tokens (76 commands) - developer + all except token/role management'
+                    '*' => 'Superadmin - full access to all 97 commands including token/role management',
+                    'viewer' => 'Read-only access (27 commands) - get*, list*, validate*, help, listAiProviders, listJsFunctions, listInteractions',
+                    'editor' => 'Content editing (55 commands) - viewer + structure, translations, assets, interactions',
+                    'designer' => 'Style editing (63 commands) - editor + CSS, animations, visual elements',
+                    'developer' => 'Build access (70 commands) - designer + build, deploy, projects, AI, listJsFunctions',
+                    'admin' => 'Full except tokens (91 commands) - developer + all except token/role management + JS functions'
                 ],
                 'endpoints' => [
                     'listRoles' => 'View available roles (* sees commands, others see names only)',

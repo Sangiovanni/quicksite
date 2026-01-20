@@ -170,6 +170,11 @@ function getCommandCategories(): array {
             'icon' => 'bot',
             'commands' => ['listAiProviders', 'detectProvider', 'testAiKey', 'callAi']
         ],
+        'js_functions' => [
+            'label' => 'JavaScript Functions / Interactions',
+            'icon' => 'zap',
+            'commands' => ['listJsFunctions', 'addJsFunction', 'editJsFunction', 'deleteJsFunction', 'listInteractions', 'addInteraction', 'editInteraction', 'deleteInteraction']
+        ],
         'documentation' => [
             'label' => 'Documentation',
             'icon' => 'book',

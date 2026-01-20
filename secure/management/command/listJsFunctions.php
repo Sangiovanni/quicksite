@@ -26,13 +26,14 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
     
     // Define core QS.* functions (from public/scripts/qs.js)
     // These are read-only and cannot be modified
+    // inputType hints: 'selector' = CSS selector picker, 'class' = CSS class picker, 'text' = plain text (default)
     $coreFunctions = [
         [
             'name' => 'show',
             'signature' => 'QS.show(target, hideClass?)',
             'args' => [
-                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s) to show'],
-                ['name' => 'hideClass', 'type' => 'string', 'required' => false, 'default' => 'hidden', 'description' => 'Class to remove']
+                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s) to show', 'inputType' => 'selector'],
+                ['name' => 'hideClass', 'type' => 'string', 'required' => false, 'default' => 'hidden', 'description' => 'Class to remove', 'inputType' => 'class']
             ],
             'description' => 'Show element(s) by removing the hidden class',
             'example' => '{{call:show:#modal}}',
@@ -42,8 +43,8 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
             'name' => 'hide',
             'signature' => 'QS.hide(target, hideClass?)',
             'args' => [
-                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s) to hide'],
-                ['name' => 'hideClass', 'type' => 'string', 'required' => false, 'default' => 'hidden', 'description' => 'Class to add']
+                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s) to hide', 'inputType' => 'selector'],
+                ['name' => 'hideClass', 'type' => 'string', 'required' => false, 'default' => 'hidden', 'description' => 'Class to add', 'inputType' => 'class']
             ],
             'description' => 'Hide element(s) by adding the hidden class',
             'example' => '{{call:hide:#modal}}',
@@ -53,8 +54,8 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
             'name' => 'toggle',
             'signature' => 'QS.toggle(target, className)',
             'args' => [
-                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s)'],
-                ['name' => 'className', 'type' => 'string', 'required' => true, 'description' => 'CSS class to toggle']
+                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s)', 'inputType' => 'selector'],
+                ['name' => 'className', 'type' => 'string', 'required' => true, 'description' => 'CSS class to toggle', 'inputType' => 'class']
             ],
             'description' => 'Toggle a CSS class on element(s)',
             'example' => '{{call:toggle:#menu,open}}',
@@ -64,8 +65,8 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
             'name' => 'toggleHide',
             'signature' => 'QS.toggleHide(target, hideClass?)',
             'args' => [
-                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s) to toggle visibility'],
-                ['name' => 'hideClass', 'type' => 'string', 'required' => false, 'default' => 'hidden', 'description' => 'Class to toggle (default: hidden)']
+                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s) to toggle visibility', 'inputType' => 'selector'],
+                ['name' => 'hideClass', 'type' => 'string', 'required' => false, 'default' => 'hidden', 'description' => 'Class to toggle (default: hidden)', 'inputType' => 'class']
             ],
             'description' => 'Toggle element(s) visibility - if hidden, show it; if visible, hide it',
             'example' => '{{call:toggleHide:#dropdown}}',
@@ -75,8 +76,8 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
             'name' => 'addClass',
             'signature' => 'QS.addClass(target, className)',
             'args' => [
-                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s)'],
-                ['name' => 'className', 'type' => 'string', 'required' => true, 'description' => 'CSS class to add']
+                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s)', 'inputType' => 'selector'],
+                ['name' => 'className', 'type' => 'string', 'required' => true, 'description' => 'CSS class to add', 'inputType' => 'class']
             ],
             'description' => 'Add a CSS class to element(s)',
             'example' => '{{call:addClass:#card,highlight}}',
@@ -86,8 +87,8 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
             'name' => 'removeClass',
             'signature' => 'QS.removeClass(target, className)',
             'args' => [
-                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s)'],
-                ['name' => 'className', 'type' => 'string', 'required' => true, 'description' => 'CSS class to remove']
+                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s)', 'inputType' => 'selector'],
+                ['name' => 'className', 'type' => 'string', 'required' => true, 'description' => 'CSS class to remove', 'inputType' => 'class']
             ],
             'description' => 'Remove a CSS class from element(s)',
             'example' => '{{call:removeClass:#card,highlight}}',
@@ -97,7 +98,7 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
             'name' => 'setValue',
             'signature' => 'QS.setValue(target, value)',
             'args' => [
-                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s)'],
+                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s)', 'inputType' => 'selector'],
                 ['name' => 'value', 'type' => 'string|boolean', 'required' => true, 'description' => 'Value to set (for checkbox/radio: true, "true", or "1" to check)']
             ],
             'description' => 'Set the value of element(s). Handles inputs, textareas, selects, checkboxes, and radios.',
@@ -119,9 +120,9 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
             'signature' => 'QS.filter(event, itemsSelector, matchAttr?, hideClass?)',
             'args' => [
                 ['name' => 'event', 'type' => 'Event', 'required' => true, 'description' => 'Pass "event" keyword to get input value'],
-                ['name' => 'itemsSelector', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for items to filter'],
+                ['name' => 'itemsSelector', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for items to filter', 'inputType' => 'selector'],
                 ['name' => 'matchAttr', 'type' => 'string', 'required' => false, 'default' => 'textContent', 'description' => 'Attribute to match against (e.g., data-title)'],
-                ['name' => 'hideClass', 'type' => 'string', 'required' => false, 'default' => 'hidden', 'description' => 'Class for hidden items']
+                ['name' => 'hideClass', 'type' => 'string', 'required' => false, 'default' => 'hidden', 'description' => 'Class for hidden items', 'inputType' => 'class']
             ],
             'description' => 'Filter elements based on input value. Use on input fields.',
             'example' => '{{call:filter:event,.card,data-title}}',
@@ -131,7 +132,7 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
             'name' => 'scrollTo',
             'signature' => 'QS.scrollTo(target, behavior?)',
             'args' => [
-                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element to scroll to'],
+                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element to scroll to', 'inputType' => 'selector'],
                 ['name' => 'behavior', 'type' => 'string', 'required' => false, 'default' => 'smooth', 'description' => '"smooth" or "instant"']
             ],
             'description' => 'Smoothly scroll to an element',
@@ -142,7 +143,7 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
             'name' => 'focus',
             'signature' => 'QS.focus(target)',
             'args' => [
-                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element to focus']
+                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element to focus', 'inputType' => 'selector']
             ],
             'description' => 'Focus an element',
             'example' => '{{call:focus:#searchInput}}',
@@ -152,7 +153,7 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
             'name' => 'blur',
             'signature' => 'QS.blur(target)',
             'args' => [
-                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element to blur']
+                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element to blur', 'inputType' => 'selector']
             ],
             'description' => 'Remove focus from an element',
             'example' => '{{call:blur:#searchInput}}',

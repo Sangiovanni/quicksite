@@ -97,6 +97,16 @@ function __command_switchProject(array $params = [], array $urlParams = []): Api
             ]);
     }
     
+    // CRITICAL: Sync live public files BACK to previous project before switching
+    // This preserves any CSS/asset edits made while that project was active
+    $previousProjectSynced = false;
+    if ($previousProject !== null) {
+        $previousProjectPath = SECURE_FOLDER_PATH . '/projects/' . $previousProject;
+        if (is_dir($previousProjectPath)) {
+            $previousProjectSynced = syncLiveToProject($previousProjectPath);
+        }
+    }
+    
     // Write new target.php with explicit sync to ensure file is fully written before response
     $targetContent = "<?php\n/**\n * Active Project Target Configuration\n * \n * Updated: " . date('Y-m-d H:i:s') . "\n * Previous: " . ($previousProject ?? 'none') . "\n */\n\nreturn [\n    'project' => '" . addslashes($projectName) . "'\n];\n";
     
@@ -133,8 +143,10 @@ function __command_switchProject(array $params = [], array $urlParams = []): Api
     $result = [
         'project' => $projectName,
         'previous_project' => $previousProject,
+        'previous_project_synced' => $previousProjectSynced,
         'target_updated' => true,
-        'public_files_copied' => false
+        'public_files_copied' => false,
+        'custom_js_regenerated' => false
     ];
     
     // Copy public files if requested
@@ -153,6 +165,13 @@ function __command_switchProject(array $params = [], array $urlParams = []): Api
             ];
         }
     }
+    
+    // Regenerate qs-custom.js with new project's custom functions
+    require_once SECURE_FOLDER_PATH . '/src/classes/JsFunctionManager.php';
+    $jsManager = new JsFunctionManager($projectPath);
+    $regenerateResult = $jsManager->regenerateJsFile();
+    $result['custom_js_regenerated'] = $regenerateResult['success'];
+    $result['custom_functions_count'] = count($jsManager->getCustomFunctions());
     
     return ApiResponse::create(200, 'operation.success')
         ->withMessage("Switched to project '$projectName'")
@@ -239,6 +258,71 @@ function copyDirectoryContents(string $source, string $destination): bool {
     }
     
     return true;
+}
+
+/**
+ * Sync live public files back to project folder
+ * Preserves CSS/asset edits made while project was active
+ * 
+ * @param string $projectPath Project folder path
+ * @return bool Success status
+ */
+function syncLiveToProject(string $projectPath): bool {
+    $livePublicPath = PUBLIC_FOLDER_ROOT;
+    $projectPublicPath = $projectPath . '/public';
+    
+    // Ensure project public folder exists
+    if (!is_dir($projectPublicPath)) {
+        mkdir($projectPublicPath, 0755, true);
+    }
+    
+    // Folders to sync from live → project
+    $foldersToSync = ['assets', 'style'];
+    $success = true;
+    
+    foreach ($foldersToSync as $folder) {
+        $src = $livePublicPath . '/' . $folder;
+        $dst = $projectPublicPath . '/' . $folder;
+        
+        if (!is_dir($src)) {
+            continue;
+        }
+        
+        // Delete existing destination and copy fresh from live
+        if (is_dir($dst)) {
+            deleteDirectoryRecursive($dst);
+        }
+        
+        if (!copyDirectoryContents($src, $dst)) {
+            $success = false;
+        }
+    }
+    
+    return $success;
+}
+
+/**
+ * Recursively delete a directory and its contents
+ */
+function deleteDirectoryRecursive(string $dir): bool {
+    if (!is_dir($dir)) {
+        return true;
+    }
+    
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+    );
+    
+    foreach ($iterator as $file) {
+        if ($file->isDir()) {
+            rmdir($file->getRealPath());
+        } else {
+            unlink($file->getRealPath());
+        }
+    }
+    
+    return rmdir($dir);
 }
 
 // Execute command if called directly via API (not internal call)

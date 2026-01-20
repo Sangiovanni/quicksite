@@ -739,94 +739,150 @@ The CSS system supports the Visual Editor with:
 
 ## Interactions System
 
+> **Note:** This documents Interactions System v2, a complete rewrite from v1.
+> v1 used schemas, instances, and a build step. v2 uses inline syntax - simpler and more intuitive.
+
 ### Concept
 
-Instead of injecting arbitrary JavaScript, users define **declarative interactions** in JSON. QuickSite compiles these to optimized JS at build time.
+Instead of injecting arbitrary JavaScript, users declare **behavior inline** in structure JSON using the `{{call:...}}` syntax. QuickSite renders this to safe, namespaced function calls.
 
-### Two-Layer Architecture
+### Architecture (v2)
 
 ```
 ┌────────────────────────────────┐
-│     INTERACTION SCHEMAS        │  "What CAN exist" (blueprints)
-│  secure/interaction-schemas/   │  Shared across all projects
-│  ├── core/                     │
-│  │   ├── show.json             │
-│  │   ├── hide.json             │
-│  │   ├── filter.json           │
-│  │   └── api.json              │
-│  └── custom/                   │  User-defined types
+│      CORE JS LIBRARY           │  QuickSite built-in functions
+│  public/scripts/qs.js          │  QS.show(), QS.hide(), QS.filter(), etc.
+│  (always included, shared)     │  12 core functions
 └────────────────────────────────┘
-                │
-                │ referenced by
-                ▼
+         │
+         │ + (optional)
+         ▼
 ┌────────────────────────────────┐
-│    PROJECT INTERACTIONS        │  "What IS configured" (instances)
-│  project/interactions/         │  Per-project configurations
-│  ├── search-cards.json         │
-│  └── contact-form.json         │
+│    CUSTOM JS FUNCTIONS         │  Per-project custom functions
+│  public/scripts/qs-custom.js   │  Regenerated on project switch
+│  Config: project/config/       │
+│    custom-js-functions.json    │
 └────────────────────────────────┘
-                │
-                │ buildInteractions
-                ▼
+         │
+         │ called via {{call:...}} syntax
+         ▼
 ┌────────────────────────────────┐
-│     COMPILED RUNTIME           │
-│  public/assets/scripts/        │
-│  └── interactions.js           │
+│      STRUCTURE JSON            │  Behavior declared inline
+│  "params": {                   │
+│    "onclick": "{{call:hide:#modal}}"
+│  }                             │
+└────────────────────────────────┘
+         │
+         │ JsonToHtmlRenderer / JsonToPhpCompiler
+         ▼
+┌────────────────────────────────┐
+│      RENDERED HTML             │
+│  <button onclick="QS.hide('#modal')">
 └────────────────────────────────┘
 ```
 
-### Schema Definition
+### Call Syntax
+
+**Format:** `{{call:functionName:arg1,arg2,arg3}}`
+
+| Example | Renders To |
+|---------|------------|
+| `{{call:hide:#modal}}` | `QS.hide('#modal')` |
+| `{{call:toggle:#menu,open}}` | `QS.toggle('#menu', 'open')` |
+| `{{call:filter:event,.card}}` | `QS.filter(event, '.card')` |
+| `{{call:redirect:/thanks}}` | `QS.redirect('/thanks')` |
+
+**Chaining:** Use semicolons to chain multiple calls:
+```json
+"onclick": "{{call:hide:#modal}};{{call:show:#success}}"
+```
+→ `onclick="QS.hide('#modal'); QS.show('#success')"`
+
+**Special keyword `event`:** Passes through unquoted for event handlers:
+```json
+"oninput": "{{call:filter:event,.card}}"
+```
+→ `oninput="QS.filter(event, '.card')"`
+
+### Core Functions (qs.js)
+
+| Function | Arguments | Description |
+|----------|-----------|-------------|
+| `QS.show(target, hideClass?)` | selector, class | Remove hidden class |
+| `QS.hide(target, hideClass?)` | selector, class | Add hidden class |
+| `QS.toggleHide(target, hideClass?)` | selector, class | Toggle visibility |
+| `QS.toggle(target, class)` | selector, className | Toggle any CSS class |
+| `QS.addClass(target, class)` | selector, className | Add CSS class |
+| `QS.removeClass(target, class)` | selector, className | Remove CSS class |
+| `QS.setValue(target, value)` | selector, value | Set input/textContent |
+| `QS.redirect(url)` | url | Navigate to URL |
+| `QS.filter(event, items, attr?, hideClass?)` | event, selector, matchAttr, class | Filter elements |
+| `QS.scrollTo(target, behavior?)` | selector, smooth/instant | Scroll to element |
+| `QS.focus(target)` | selector | Focus element |
+| `QS.blur(target)` | selector | Remove focus |
+
+### Custom Functions
+
+Projects can define custom functions via the API:
+
+```
+POST /management/addJsFunction
+{
+  "name": "myFunction",
+  "args": ["target", "value"],
+  "body": "document.querySelector(target).style.color = value;",
+  "description": "Set element color"
+}
+```
+
+Custom functions are stored in `project/config/custom-js-functions.json` and 
+compiled to `public/scripts/qs-custom.js`. On project switch, this file is 
+regenerated with the new project's functions.
+
+### Security
+
+- **Raw JS blocked:** `onclick="alert('xss')"` is rejected
+- **Only {{call:...}} allowed:** All on* attributes must use the call syntax
+- **Whitelist enforced:** Only registered QS.* functions can be called
+- **Custom functions validated:** Syntax checked, dangerous patterns blocked
+
+### API Commands
+
+| Command | Method | Description |
+|---------|--------|-------------|
+| `listJsFunctions` | GET | List all available functions (core + custom) |
+| `addJsFunction` | POST | Add custom function (admin only) |
+| `editJsFunction` | POST | Edit custom function (admin only) |
+| `deleteJsFunction` | POST | Remove custom function (admin only) |
+
+### Usage Example
 
 ```json
 {
-  "name": "filter",
-  "description": "Filter elements based on text input",
-  "category": "dom",
-  "parameters": {
-    "required": {
-      "target": { "type": "selector", "description": "Elements to filter" }
-    },
-    "optional": {
-      "hideClass": { "type": "string", "default": "hidden" },
-      "debounce": { "type": "number", "default": 150 }
+  "tag": "div",
+  "params": { "class": "modal", "id": "contact-modal" },
+  "children": [
+    {
+      "tag": "button",
+      "params": { 
+        "class": "close-btn",
+        "onclick": "{{call:hide:#contact-modal}}"
+      },
+      "children": [{ "text": "×" }]
     }
-  },
-  "supports": {
-    "onSuccess": false,
-    "onFailed": false
-  }
+  ]
 }
 ```
 
-### Interaction Instance
+### CSS Requirement
 
-```json
-{
-  "name": "search-products",
-  "schema": "filter",
-  "trigger": {
-    "selector": "#search-input",
-    "event": "input"
-  },
-  "params": {
-    "target": ".product-card",
-    "hideClass": "hidden",
-    "debounce": 200
-  }
-}
+Visibility functions use a CSS class (default: `hidden`). Define it in your stylesheet:
+
+```css
+.hidden { display: none; }
 ```
 
-### Core Schemas
-
-| Schema | Purpose |
-|--------|---------|
-| `show` | Reveal hidden elements |
-| `hide` | Hide elements |
-| `toggleClass` | Add/remove CSS classes |
-| `filter` | Client-side search/filter |
-| `setValue` | Update element content |
-| `redirect` | Navigate to URL |
-| `api` | External API calls (with proxy option) |
+Or specify a custom class: `{{call:hide:#modal,invisible}}`
 
 ---
 
