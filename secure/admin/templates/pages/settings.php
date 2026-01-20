@@ -226,37 +226,6 @@
     </div>
 </div>
 
-<!-- Tutorial Settings -->
-<div class="admin-card" style="margin-top: var(--space-lg);">
-    <div class="admin-card__header">
-        <h2 class="admin-card__title">
-            <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-            </svg>
-            <?= __admin('tutorial.tutorialSettings') ?>
-        </h2>
-    </div>
-    <div class="admin-card__body">
-        <p class="admin-hint" style="margin-bottom: var(--space-md);"><?= __admin('tutorial.tutorialDescription') ?></p>
-        
-        <div id="tutorial-status" class="admin-loading">
-            <span class="admin-spinner"></span>
-            <?= __admin('common.loading') ?>
-        </div>
-        
-        <div id="tutorial-actions" style="display: none; margin-top: var(--space-md);">
-            <button type="button" class="admin-btn admin-btn--primary" onclick="restartTutorial()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                    <path d="M1 4v6h6"/>
-                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-                </svg>
-                <?= __admin('tutorial.restartTutorial') ?>
-            </button>
-        </div>
-    </div>
-</div>
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     loadSystemInfo();
@@ -264,7 +233,6 @@ document.addEventListener('DOMContentLoaded', function() {
     loadRoutes();
     loadLanguages();
     loadPreferences();
-    loadTutorialStatus();
     loadPermissionsInfo();
     loadAiConfigStatus();
 });
@@ -600,100 +568,6 @@ function savePreferences() {
     QuickSiteAdmin.prefs = prefs;
     
     QuickSiteAdmin.showToast('Preferences saved', 'success');
-}
-
-async function loadTutorialStatus() {
-    const container = document.getElementById('tutorial-status');
-    const actions = document.getElementById('tutorial-actions');
-    
-    try {
-        // Use admin-specific tutorial API
-        const response = await fetch('<?= $router->getBaseUrl() ?>/tutorial-api.php?action=get', {
-            method: 'GET',
-            credentials: 'same-origin'
-        });
-        const result = await response.json();
-        
-        if (result.success && result.data) {
-            const data = result.data;
-            const statusLabels = {
-                'pending': { text: '<?= __adminJs('tutorial.step1Preview') ?>', badge: 'info' },
-                'skipped': { text: 'Skipped', badge: 'warning' },
-                'completed': { text: '<?= __adminJs('tutorial.tutorialComplete') ?>', badge: 'success' }
-            };
-            
-            const status = statusLabels[data.status] || statusLabels['pending'];
-            const totalSteps = 11;
-            let stepText;
-            if (data.status === 'completed') {
-                stepText = 'Completed';
-            } else if (data.step) {
-                stepText = `Step ${data.step}/${totalSteps}`;
-            } else {
-                stepText = 'Not started';
-            }
-            
-            container.innerHTML = `
-                <dl class="admin-definition-list">
-                    <dt>Status</dt>
-                    <dd>
-                        <span class="admin-badge admin-badge--${status.badge}">
-                            ${data.status === 'completed' ? 'Completed ✓' : (data.status === 'skipped' ? 'Skipped' : 'In Progress')}
-                        </span>
-                    </dd>
-                    
-                    <dt>Progress</dt>
-                    <dd>${stepText}</dd>
-                </dl>
-            `;
-            
-            actions.style.display = 'block';
-        } else {
-            container.innerHTML = '<p class="admin-text-muted">Tutorial status not available</p>';
-            actions.style.display = 'block';
-        }
-    } catch (error) {
-        container.innerHTML = `<p class="admin-text-error">Error: ${error.message}</p>`;
-        actions.style.display = 'block';
-    }
-}
-
-async function restartTutorial() {
-    if (!confirm('<?= __adminJs('tutorial.freshStartWarning') ?>')) {
-        return;
-    }
-    
-    try {
-        // Use admin-specific tutorial API
-        const response = await fetch('<?= $router->getBaseUrl() ?>/tutorial-api.php?action=update', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            credentials: 'same-origin',
-            body: JSON.stringify({
-                step: 1,
-                substep: 1,
-                status: 'pending'
-            })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            // Clear all tutorial localStorage data
-            localStorage.removeItem('quicksite_tutorial_started');
-            localStorage.removeItem('quicksite_tutorial_progress');
-            QuickSiteAdmin.showToast('Tutorial reset! Redirecting...', 'success');
-            setTimeout(() => {
-                window.location.href = '<?= $router->url('dashboard') ?>';
-            }, 1000);
-        } else {
-            QuickSiteAdmin.showToast('Failed to reset tutorial: ' + (result.error || 'Unknown error'), 'error');
-        }
-    } catch (error) {
-        QuickSiteAdmin.showToast('Error: ' + error.message, 'error');
-    }
 }
 </script>
 

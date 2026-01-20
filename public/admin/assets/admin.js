@@ -250,7 +250,7 @@ const QuickSiteAdmin = {
     },
     
     /**
-     * Expand a nav group (used by tutorial)
+     * Expand a nav group programmatically
      * @param {string} groupName - 'build' or 'inspect'
      */
     expandNavGroup(groupName) {

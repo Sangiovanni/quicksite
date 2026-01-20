@@ -278,17 +278,9 @@ class AdminRouter {
         // Load admin functions
         require_once SECURE_FOLDER_PATH . '/admin/functions/AdminHelper.php';
         require_once SECURE_FOLDER_PATH . '/admin/functions/AdminTranslation.php';
-        require_once SECURE_FOLDER_PATH . '/admin/functions/AdminTutorial.php';
         
         // Initialize translation helper
         $lang = AdminTranslation::getInstance();
-        
-        // Initialize tutorial system with current token
-        $tutorial = AdminTutorial::getInstance();
-        $token = $this->getToken();
-        if ($token) {
-            $tutorial->setCurrentToken($token);
-        }
         
         // Pass router to templates
         $router = $this;

@@ -4418,11 +4418,6 @@ function validateImportJson() {
         
         statusEl.innerHTML = statusHtml;
         
-        // Dispatch event for tutorial system
-        document.dispatchEvent(new CustomEvent('quicksite:import-json-valid', {
-            detail: { commandCount: validCommands.length }
-        }));
-        
     } catch (e) {
         // Parse error
         statusEl.className = 'admin-ai-import-status admin-ai-import-status--invalid';
