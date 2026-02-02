@@ -222,8 +222,6 @@
             "changesUrls": "Modifie les URLs",
             "serverConfigRequired": "Config serveur requise"
         },
-        "addToFavorites": "Ajouter aux favoris",
-        "removeFromFavorites": "Retirer des favoris",
         "saveToQueue": "Ajouter à la file",
         "backToBatch": "Retour au batch",
         "errors": {
@@ -468,38 +466,6 @@
             "routesFailed": "Impossible de charger les routes",
             "languagesFailed": "Impossible de charger les langues",
             "defaultLangFailed": "Échec de la mise à jour de la langue par défaut"
-        }
-    },
-    "favorites": {
-        "title": "Favoris",
-        "subtitle": "Accès rapide à vos commandes favorites",
-        "quickActions": "Actions rapides",
-        "yourFavorites": "Vos commandes favorites",
-        "addFavorites": "Ajouter aux favoris",
-        "loading": "Chargement des favoris...",
-        "searchPlaceholder": "Rechercher des commandes à ajouter aux favoris...",
-        "noMatches": "Aucune commande correspondante trouvée",
-        "quickAction": {
-            "buildSite": "Construire le site",
-            "viewRoutes": "Voir les routes",
-            "listAssets": "Liste des assets",
-            "translations": "Traductions",
-            "viewStyles": "Voir les styles",
-            "structure": "Structure"
-        },
-        "empty": {
-            "title": "Aucun favori",
-            "message": "Recherchez des commandes ci-dessous pour les ajouter à vos favoris."
-        },
-        "modal": {
-            "clearTitle": "Effacer les favoris",
-            "clearMessage": "Êtes-vous sûr de vouloir effacer tous les favoris ?",
-            "clearConfirm": "Tout effacer"
-        },
-        "toast": {
-            "added": "\":command\" ajouté aux favoris",
-            "removed": "\":command\" retiré des favoris",
-            "cleared": "Tous les favoris effacés"
         }
     },
     "structure": {

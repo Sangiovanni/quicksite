@@ -2,24 +2,36 @@
  * QuickSite Admin Panel JavaScript
  * 
  * Handles client-side functionality for the admin interface.
+ * Delegates to core modules (QuickSiteAPI, QuickSiteUtils) for shared functionality.
  * 
  * @version 1.6.0
+ * @requires js/core/api.js
+ * @requires js/core/utils.js
  */
 
 const QuickSiteAdmin = {
-    // Configuration - uses injected values from PHP or defaults
+    // Configuration - delegates to QuickSiteAPI.config with additional admin-specific values
     config: {
         get apiBase() {
-            return window.QUICKSITE_CONFIG?.apiBase || '/management';
+            return window.QuickSiteAPI?.config.apiBase || window.QUICKSITE_CONFIG?.apiBase || '/management';
         },
         get adminBase() {
-            return window.QUICKSITE_CONFIG?.adminBase || '/admin';
+            return window.QuickSiteAPI?.config.adminBase || window.QUICKSITE_CONFIG?.adminBase || '/admin';
         },
         get baseUrl() {
-            return window.QUICKSITE_CONFIG?.baseUrl || '';
+            return window.QuickSiteAPI?.config.baseUrl || window.QUICKSITE_CONFIG?.baseUrl || '';
         },
         get publicSpace() {
-            return window.QUICKSITE_CONFIG?.publicSpace || '';
+            return window.QuickSiteAPI?.config.publicSpace || window.QUICKSITE_CONFIG?.publicSpace || '';
+        },
+        get token() {
+            // Try QUICKSITE_CONFIG first, then cookie
+            if (window.QUICKSITE_CONFIG?.token) {
+                return window.QUICKSITE_CONFIG.token;
+            }
+            // Read from cookie
+            const match = document.cookie.match(/(?:^|; )admin_token=([^;]*)/);
+            return match ? decodeURIComponent(match[1]) : '';
         },
         get defaultLang() {
             return window.QUICKSITE_CONFIG?.defaultLang || 'en';
@@ -261,9 +273,14 @@ const QuickSiteAdmin = {
     },
 
     /**
-     * Check for pending message from redirect (e.g., after setPublicSpace)
+     * Check for pending message from redirect - delegates to QuickSiteUtils
      */
     checkPendingMessage() {
+        if (window.QuickSiteUtils) {
+            return window.QuickSiteUtils.checkPendingMessage();
+        }
+        
+        // Fallback
         const pending = sessionStorage.getItem('quicksite_pending_message');
         if (pending) {
             sessionStorage.removeItem('quicksite_pending_message');
@@ -280,9 +297,13 @@ const QuickSiteAdmin = {
     },
 
     /**
-     * Store a message to show after redirect
+     * Store a message to show after redirect - delegates to QuickSiteUtils
      */
     setPendingMessage(message, type = 'success', duration = 6000) {
+        if (window.QuickSiteUtils) {
+            return window.QuickSiteUtils.setPendingMessage(message, type, duration);
+        }
+        // Fallback
         sessionStorage.setItem('quicksite_pending_message', JSON.stringify({
             message,
             type,
@@ -301,22 +322,33 @@ const QuickSiteAdmin = {
      * Get a preference value with default
      */
     getPref(key, defaultValue) {
+        // Delegate to core utils if available, otherwise use local prefs
+        if (window.QuickSiteUtils) {
+            return window.QuickSiteUtils.getPref(key, defaultValue);
+        }
         return this.prefs[key] !== undefined ? this.prefs[key] : defaultValue;
     },
 
     /**
-     * Get stored token
+     * Get stored token - delegates to QuickSiteAPI
      */
     getToken() {
-        // Try localStorage first (remembered), then sessionStorage
+        if (window.QuickSiteAPI) {
+            return window.QuickSiteAPI.getToken();
+        }
+        // Fallback for when core module isn't loaded
         return localStorage.getItem(this.config.tokenStorageKey) || 
                sessionStorage.getItem(this.config.tokenStorageKey);
     },
 
     /**
-     * Store token
+     * Store token - delegates to QuickSiteAPI
      */
     setToken(token, remember = false) {
+        if (window.QuickSiteAPI) {
+            return window.QuickSiteAPI.setToken(token, remember);
+        }
+        // Fallback
         if (remember) {
             localStorage.setItem(this.config.tokenStorageKey, token);
             localStorage.setItem(this.config.rememberStorageKey, 'true');
@@ -328,18 +360,27 @@ const QuickSiteAdmin = {
     },
 
     /**
-     * Clear stored token
+     * Clear stored token - delegates to QuickSiteAPI
      */
     clearToken() {
+        if (window.QuickSiteAPI) {
+            return window.QuickSiteAPI.clearToken();
+        }
+        // Fallback
         localStorage.removeItem(this.config.tokenStorageKey);
         sessionStorage.removeItem(this.config.tokenStorageKey);
         localStorage.removeItem(this.config.rememberStorageKey);
     },
 
     /**
-     * Make an API request
+     * Make an API request - delegates to QuickSiteAPI
      */
     async apiRequest(command, method = 'GET', data = null, urlParams = [], queryParams = {}) {
+        if (window.QuickSiteAPI) {
+            return window.QuickSiteAPI.request(command, method, data, urlParams, queryParams);
+        }
+        
+        // Fallback implementation
         const token = this.getToken();
         if (!token) {
             throw new Error('No authentication token');
@@ -412,9 +453,14 @@ const QuickSiteAdmin = {
     },
 
     /**
-     * Make an API request with file upload
+     * Make an API request with file upload - delegates to QuickSiteAPI
      */
     async apiUpload(command, formData, urlParams = []) {
+        if (window.QuickSiteAPI) {
+            return window.QuickSiteAPI.upload(command, formData, urlParams);
+        }
+        
+        // Fallback implementation
         const token = this.getToken();
         if (!token) {
             throw new Error('No authentication token');
@@ -691,17 +737,37 @@ const QuickSiteAdmin = {
         
         const statusClass = result.ok ? 'admin-alert--success' : 'admin-alert--error';
         const statusText = result.ok ? 'Success' : 'Error';
+        const responseJson = JSON.stringify(result.data, null, 2);
         
         container.innerHTML = `
             <div class="admin-alert ${statusClass}">
                 <strong>${statusText}</strong> (Status: ${result.status})
             </div>
             <div class="admin-code admin-code--response">
-                <pre>${this.escapeHtml(JSON.stringify(result.data, null, 2))}</pre>
+                <div class="admin-code__header">
+                    <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" onclick="QuickSiteAdmin.copyResponse(this)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                        Copy
+                    </button>
+                </div>
+                <pre>${this.escapeHtml(responseJson)}</pre>
             </div>
         `;
         
         container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    },
+
+    /**
+     * Copy command response to clipboard
+     */
+    copyResponse(button) {
+        const pre = button.closest('.admin-code').querySelector('pre');
+        if (pre) {
+            this.utils.copyToClipboard(pre.textContent, 'Response copied to clipboard!');
+        }
     },
 
     /**
@@ -807,18 +873,25 @@ const QuickSiteAdmin = {
     },
 
     /**
-     * Escape HTML to prevent XSS
+     * Escape HTML to prevent XSS - delegates to QuickSiteUtils
      */
     escapeHtml(text) {
+        if (window.QuickSiteUtils) {
+            return window.QuickSiteUtils.escapeHtml(text);
+        }
+        // Fallback
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     },
 
     /**
-     * Format JSON for display
+     * Format JSON for display - delegates to QuickSiteUtils
      */
     formatJson(data) {
+        if (window.QuickSiteUtils) {
+            return window.QuickSiteUtils.formatJson(data);
+        }
         return JSON.stringify(data, null, 2);
     },
 
@@ -827,9 +900,14 @@ const QuickSiteAdmin = {
     // ============================================
 
     /**
-     * Fetch data from admin helper API
+     * Fetch data from admin helper API - delegates to QuickSiteAPI
      */
     async fetchHelperData(action, params = []) {
+        if (window.QuickSiteAPI) {
+            return window.QuickSiteAPI.fetchHelper(action, params);
+        }
+        
+        // Fallback
         const token = this.getToken();
         if (!token) {
             throw new Error('No authentication token');
@@ -994,9 +1072,14 @@ const QuickSiteAdmin = {
     // ============================================
 
     /**
-     * Show a toast notification
+     * Show a toast notification - delegates to QuickSiteUtils
      */
     showToast(message, type = 'info', duration = null) {
+        if (window.QuickSiteUtils) {
+            return window.QuickSiteUtils.showToast(message, type, duration);
+        }
+        
+        // Fallback implementation
         // Use preference duration if not explicitly provided
         if (duration === null) {
             duration = parseInt(this.getPref('toastDuration', 4000));
@@ -1048,9 +1131,14 @@ const QuickSiteAdmin = {
     // ============================================
 
     /**
-     * Show a confirmation dialog
+     * Show a confirmation dialog - delegates to QuickSiteUtils
      */
     async confirm(message, options = {}) {
+        if (window.QuickSiteUtils) {
+            return window.QuickSiteUtils.confirm(message, options);
+        }
+        
+        // Fallback implementation
         return new Promise((resolve) => {
             const overlay = document.createElement('div');
             overlay.className = 'admin-modal-overlay';
@@ -1100,9 +1188,13 @@ const QuickSiteAdmin = {
     },
 
     /**
-     * Confirm destructive action
+     * Confirm destructive action - delegates to QuickSiteUtils
      */
     async confirmDelete(itemName) {
+        if (window.QuickSiteUtils) {
+            return window.QuickSiteUtils.confirmDelete(itemName);
+        }
+        // Fallback
         return this.confirm(`Are you sure you want to delete "${itemName}"? This action cannot be undone.`, {
             title: 'Confirm Deletion',
             type: 'danger',
@@ -1234,9 +1326,6 @@ const QuickSiteAdmin = {
                     case 'h': // go to history
                         window.location.href = this.config.adminBase + '/history';
                         break;
-                    case 'f': // go to favorites
-                        window.location.href = this.config.adminBase + '/favorites';
-                        break;
                     case 's': // go to structure
                         window.location.href = this.config.adminBase + '/structure';
                         break;
@@ -1289,7 +1378,6 @@ const QuickSiteAdmin = {
                         <div class="admin-shortcut"><kbd>g</kbd> <kbd>d</kbd> <span>Dashboard</span></div>
                         <div class="admin-shortcut"><kbd>g</kbd> <kbd>c</kbd> <span>Commands</span></div>
                         <div class="admin-shortcut"><kbd>g</kbd> <kbd>h</kbd> <span>History</span></div>
-                        <div class="admin-shortcut"><kbd>g</kbd> <kbd>f</kbd> <span>Favorites</span></div>
                         <div class="admin-shortcut"><kbd>g</kbd> <kbd>s</kbd> <span>Structure</span></div>
                         <div class="admin-shortcut"><kbd>g</kbd> <kbd>t</kbd> <span>Settings</span></div>
                     </div>
@@ -1356,37 +1444,6 @@ const QuickSiteAdmin = {
         } catch (error) {
             this.showToast('Failed to export history', 'error');
         }
-    },
-
-    // ============================================
-    // Favorites Management
-    // ============================================
-
-    /**
-     * Check if a command is favorited
-     */
-    isFavorite(command) {
-        const favorites = JSON.parse(localStorage.getItem('quicksite_admin_favorites') || '[]');
-        return favorites.includes(command);
-    },
-
-    /**
-     * Toggle favorite status for a command
-     */
-    toggleFavorite(command) {
-        const favorites = JSON.parse(localStorage.getItem('quicksite_admin_favorites') || '[]');
-        const index = favorites.indexOf(command);
-        
-        if (index > -1) {
-            favorites.splice(index, 1);
-            this.showToast(`Removed "${command}" from favorites`, 'info');
-        } else {
-            favorites.push(command);
-            this.showToast(`Added "${command}" to favorites`, 'success');
-        }
-        
-        localStorage.setItem('quicksite_admin_favorites', JSON.stringify(favorites));
-        return !index > -1;
     }
 };
 

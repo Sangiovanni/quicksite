@@ -214,8 +214,6 @@
             "changesUrls": "Changes URLs",
             "serverConfigRequired": "Server Config Required"
         },
-        "addToFavorites": "Add to favorites",
-        "removeFromFavorites": "Remove from favorites",
         "saveToQueue": "Save to Queue",
         "backToBatch": "Back to Batch",
         "errors": {
@@ -460,38 +458,6 @@
             "routesFailed": "Could not load routes",
             "languagesFailed": "Could not load languages",
             "defaultLangFailed": "Failed to update default language"
-        }
-    },
-    "favorites": {
-        "title": "Favorites",
-        "subtitle": "Quick access to your bookmarked commands",
-        "quickActions": "Quick Actions",
-        "yourFavorites": "Your Favorite Commands",
-        "addFavorites": "Add to Favorites",
-        "loading": "Loading favorites...",
-        "searchPlaceholder": "Search commands to add to favorites...",
-        "noMatches": "No matching commands found",
-        "quickAction": {
-            "buildSite": "Build Site",
-            "viewRoutes": "View Routes",
-            "listAssets": "List Assets",
-            "translations": "Translations",
-            "viewStyles": "View Styles",
-            "structure": "Structure"
-        },
-        "empty": {
-            "title": "No favorites yet",
-            "message": "Search for commands below to add them to your favorites."
-        },
-        "modal": {
-            "clearTitle": "Clear Favorites",
-            "clearMessage": "Are you sure you want to clear all favorites?",
-            "clearConfirm": "Clear All"
-        },
-        "toast": {
-            "added": "Added \":command\" to favorites",
-            "removed": "Removed \":command\" from favorites",
-            "cleared": "All favorites cleared"
         }
     },
     "structure": {

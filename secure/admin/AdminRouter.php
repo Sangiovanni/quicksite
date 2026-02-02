@@ -19,7 +19,6 @@ class AdminRouter {
         'command',     // Individual command pages
         'history',     // Command history viewer
         'settings',    // Settings and configuration
-        'favorites',   // Favorite/bookmarked commands
         'structure',   // Structure tree viewer
         'batch',       // Batch command execution
         'docs',        // API documentation

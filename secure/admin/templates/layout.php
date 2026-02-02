@@ -5,8 +5,26 @@
  * Main template wrapper for all admin pages.
  * Uses the site's CSS variables but with darker admin theme.
  * 
- * @version 1.6.0
+ * @version 1.7.0
  */
+
+// Base URL (needed early for asset helper)
+$baseUrl = rtrim(BASE_URL, '/');
+
+// Asset version for cache-busting (bump on release or use filemtime for dev)
+$assetVersion = '1.0.0';
+
+// Helper to get versioned asset URL
+$versionedAsset = function($path) use ($baseUrl, $assetVersion) {
+    // In development, use filemtime for instant cache invalidation
+    $fullPath = PUBLIC_FOLDER_ROOT . '/admin/assets' . $path;
+    if (file_exists($fullPath)) {
+        $version = filemtime($fullPath);
+    } else {
+        $version = $assetVersion;
+    }
+    return $baseUrl . '/admin/assets' . $path . '?v=' . $version;
+};
 
 $isLoginPage = $router->getPage() === 'login';
 $currentPage = $router->getPage();
@@ -15,8 +33,6 @@ $currentPage = $router->getPage();
 $pageTitle = $lang->has('nav.' . $currentPage) 
     ? __admin('nav.' . $currentPage) 
     : ucfirst($currentPage);
-
-$baseUrl = rtrim(BASE_URL, '/');
 
 // Get available admin languages and current language
 $adminLang = AdminTranslation::getInstance();
@@ -63,7 +79,7 @@ $langNames = [
     </script>
     
     <!-- Admin-specific styles -->
-    <link rel="stylesheet" href="<?= $baseUrl ?>/admin/assets/admin.css">
+    <link rel="stylesheet" href="<?= $versionedAsset('/admin.css') ?>">
 </head>
 <body class="admin-body<?= $isLoginPage ? ' admin-body--login' : '' ?>" data-page="<?= adminEscape($currentPage) ?>">
     
@@ -337,16 +353,7 @@ $langNames = [
                         jsonCopied: '<?= __adminJs('structure.toast.jsonCopied') ?>'
                     }
                 },
-                favorites: {
-                    toast: {
-                        added: '<?= __adminJs('favorites.toast.added') ?>',
-                        removed: '<?= __adminJs('favorites.toast.removed') ?>',
-                        cleared: '<?= __adminJs('favorites.toast.cleared') ?>'
-                    }
-                },
                 commandForm: {
-                    addToFavorites: '<?= __adminJs('commandForm.addToFavorites') ?>',
-                    removeFromFavorites: '<?= __adminJs('commandForm.removeFromFavorites') ?>',
                     errors: {
                         docNotFound: '<?= __adminJs('commandForm.errors.docNotFound') ?>',
                         docLoadFailed: '<?= __adminJs('commandForm.errors.docLoadFailed') ?>',
@@ -401,8 +408,12 @@ $langNames = [
         })();
     </script>
     
+    <!-- Core JavaScript Modules -->
+    <script src="<?= $versionedAsset('/js/core/api.js') ?>"></script>
+    <script src="<?= $versionedAsset('/js/core/utils.js') ?>"></script>
+    
     <!-- Admin JavaScript -->
-    <script src="<?= $baseUrl ?>/admin/assets/admin.js"></script>
+    <script src="<?= $versionedAsset('/admin.js') ?>"></script>
     
     <?php if (!$isLoginPage): ?>
     <script>
