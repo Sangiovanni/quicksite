@@ -1,40 +1,40 @@
 <?php
 /**
- * AI Spec Editor Page
+ * Workflow Editor Page
  * 
- * Create and edit custom AI specifications.
+ * Create and edit custom workflow specifications.
  * 
  * Features:
  * - JSON definition editor with validation
- * - Markdown prompt template editor
+ * - Markdown prompt template editor (AI workflows)
  * - Live preview of rendered prompts
- * - Save/Update custom specs
+ * - Save/Update custom workflows
  * 
- * @version 1.1.0
+ * @version 1.2.0
  */
 
-require_once SECURE_FOLDER_PATH . '/src/classes/AiSpecManager.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
 
-$specManager = new AiSpecManager();
-$specId = $router->getSpecId();
-$isNew = ($specId === 'new');
-$isEdit = str_starts_with($specId ?? '', 'edit/');
+$workflowManager = new WorkflowManager();
+$workflowId = $router->getWorkflowId();
+$isNew = ($workflowId === 'new');
+$isEdit = str_starts_with($workflowId ?? '', 'edit/');
 $baseUrl = rtrim(BASE_URL, '/');
 
-// For edit mode, extract the actual spec ID
+// For edit mode, extract the actual workflow ID
 if ($isEdit) {
-    $editSpecId = substr($specId, 5); // Remove 'edit/' prefix
-    $spec = $specManager->loadSpec($editSpecId);
+    $editWorkflowId = substr($workflowId, 5); // Remove 'edit/' prefix
+    $spec = $workflowManager->loadWorkflow($editWorkflowId);
     
     if (!$spec) {
         http_response_code(404);
         ?>
         <div class="ai-editor-error">
             <div class="ai-editor-error__icon">❓</div>
-            <h2><?= __admin('ai.editor.notFound.title', 'Spec Not Found') ?></h2>
-            <p><?= __admin('ai.editor.notFound.message', 'The requested AI specification could not be found.') ?></p>
-            <a href="<?= $router->url('ai') ?>" class="admin-btn admin-btn--primary">
-                <?= __admin('ai.spec.backToList', 'Back to Specs') ?>
+            <h2><?= __admin('workflows.editor.notFound.title', 'Workflow Not Found') ?></h2>
+            <p><?= __admin('workflows.editor.notFound.message', 'The requested workflow could not be found.') ?></p>
+            <a href="<?= $router->url('workflows') ?>" class="admin-btn admin-btn--primary">
+                <?= __admin('workflows.spec.backToList', 'Back to Workflows') ?>
             </a>
         </div>
         <?php
@@ -42,7 +42,7 @@ if ($isEdit) {
     }
     
     // Load the markdown template
-    $templatePath = SECURE_FOLDER_PATH . '/admin/ai_specs/' . ($spec['_source'] ?? 'core') . '/' . $editSpecId . '.md';
+    $templatePath = SECURE_FOLDER_PATH . '/admin/workflows/' . ($spec['_source'] ?? 'core') . '/' . $editWorkflowId . '.md';
     $templateContent = file_exists($templatePath) ? file_get_contents($templatePath) : '';
     
     // Remove internal fields for editing
@@ -131,7 +131,7 @@ TEMPLATE;
 }
 
 // Load the JSON schema for reference
-$schemaPath = SECURE_FOLDER_PATH . '/admin/ai_specs/schema.json';
+$schemaPath = SECURE_FOLDER_PATH . '/admin/workflows/schema.json';
 $schema = file_exists($schemaPath) ? file_get_contents($schemaPath) : '{}';
 ?>
 
@@ -141,17 +141,17 @@ window.QUICKSITE_CONFIG = window.QUICKSITE_CONFIG || {};
 window.QUICKSITE_CONFIG.apiBaseUrl = '<?= $router->getBaseUrl() ?>';
 window.QUICKSITE_CONFIG.token = '<?= $router->getToken() ?>';
 window.QUICKSITE_CONFIG.isNew = <?= json_encode($isNew) ?>;
-window.QUICKSITE_CONFIG.originalSpecId = <?= json_encode($editSpecId) ?>;
-window.QUICKSITE_CONFIG.aiUrl = '<?= $router->url('ai') ?>';
+window.QUICKSITE_CONFIG.originalSpecId = <?= json_encode($editWorkflowId ?? '') ?>;
+window.QUICKSITE_CONFIG.workflowsUrl = '<?= $router->url('workflows') ?>';
 window.QUICKSITE_CONFIG.translations = {
-    validationErrors: '<?= __admin('ai.editor.validationErrors', 'Validation Errors') ?>',
-    validJson: '<?= __admin('ai.editor.validJson', 'Valid JSON - All required fields present') ?>',
-    invalidJson: '<?= __admin('ai.editor.invalidJson', 'Invalid JSON') ?>',
-    fixErrors: '<?= __admin('ai.editor.fixErrors', 'Please fix JSON errors before previewing') ?>',
-    templateRequired: '<?= __admin('ai.editor.templateRequired', 'Prompt template is required') ?>',
-    loading: '<?= __admin('ai.editor.loading', 'Loading...') ?>',
-    saving: '<?= __admin('ai.editor.saving', 'Saving...') ?>',
-    saved: '<?= __admin('ai.editor.saved', 'Spec saved successfully!') ?>'
+    validationErrors: '<?= __admin('workflows.editor.validationErrors', 'Validation Errors') ?>',
+    validJson: '<?= __admin('workflows.editor.validJson', 'Valid JSON - All required fields present') ?>',
+    invalidJson: '<?= __admin('workflows.editor.invalidJson', 'Invalid JSON') ?>',
+    fixErrors: '<?= __admin('workflows.editor.fixErrors', 'Please fix JSON errors before previewing') ?>',
+    templateRequired: '<?= __admin('workflows.editor.templateRequired', 'Prompt template is required') ?>',
+    loading: '<?= __admin('workflows.editor.loading', 'Loading...') ?>',
+    saving: '<?= __admin('workflows.editor.saving', 'Saving...') ?>',
+    saved: '<?= __admin('workflows.editor.saved', 'Workflow saved successfully!') ?>'
 };
 </script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/ai-editor.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/ai-editor.js') ?>"></script>
@@ -159,17 +159,17 @@ window.QUICKSITE_CONFIG.translations = {
 <div class="ai-editor">
     <!-- Breadcrumb -->
     <nav class="ai-editor__breadcrumb">
-        <a href="<?= $router->url('ai') ?>"><?= __admin('ai.browser.title', 'AI Specs') ?></a>
+        <a href="<?= $router->url('workflows') ?>"><?= __admin('workflows.browser.title', 'Workflows') ?></a>
         <span>›</span>
-        <span><?= $isNew ? __admin('ai.editor.new', 'New Spec') : __admin('ai.editor.edit', 'Edit Spec') ?></span>
+        <span><?= $isNew ? __admin('workflows.editor.new', 'New Workflow') : __admin('workflows.editor.edit', 'Edit Workflow') ?></span>
     </nav>
     
-    <!-- Info for new specs -->
+    <!-- Info for new workflows -->
     <?php if ($isNew): ?>
     <div class="ai-editor-info">
-        <div class="ai-editor-info__title">💡 <?= __admin('ai.editor.info.title', 'Creating a Custom Spec') ?></div>
+        <div class="ai-editor-info__title">💡 <?= __admin('workflows.editor.info.title', 'Creating a Custom Workflow') ?></div>
         <div class="ai-editor-info__text">
-            <?= __admin('ai.editor.info.text', 'Custom specs are saved to the secure/admin/ai_specs/custom/ folder. They will appear alongside core specs in the browser. Make sure to add translation keys to your locale files for labels and descriptions.') ?>
+            <?= __admin('workflows.editor.info.text', 'Custom workflows are saved to the secure/admin/workflows/custom/ folder. They will appear alongside core workflows in the browser. Make sure to add translation keys to your locale files for labels and descriptions.') ?>
         </div>
     </div>
     <?php endif; ?>
@@ -178,8 +178,8 @@ window.QUICKSITE_CONFIG.translations = {
     <header class="ai-editor__header">
         <h1 class="ai-editor__title">
             <?= $isNew 
-                ? __admin('ai.editor.title.new', 'Create Custom Spec') 
-                : __admin('ai.editor.title.edit', 'Edit: ' . htmlspecialchars($editSpecId)) 
+                ? __admin('workflows.editor.title.new', 'Create Custom Workflow') 
+                : __admin('workflows.editor.title.edit', 'Edit: ' . htmlspecialchars($editWorkflowId)) 
             ?>
         </h1>
         <div class="ai-editor__actions">
@@ -188,7 +188,7 @@ window.QUICKSITE_CONFIG.translations = {
                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                     <circle cx="12" cy="12" r="3"/>
                 </svg>
-                <?= __admin('ai.editor.preview', 'Preview') ?>
+                <?= __admin('workflows.editor.preview', 'Preview') ?>
             </button>
             <button type="button" id="save-btn" class="admin-btn admin-btn--primary">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -196,7 +196,7 @@ window.QUICKSITE_CONFIG.translations = {
                     <polyline points="17 21 17 13 7 13 7 21"/>
                     <polyline points="7 3 7 8 15 8"/>
                 </svg>
-                <?= __admin('ai.editor.save', 'Save Spec') ?>
+                <?= __admin('workflows.editor.save', 'Save Workflow') ?>
             </button>
         </div>
     </header>

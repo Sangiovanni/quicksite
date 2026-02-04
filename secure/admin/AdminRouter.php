@@ -12,7 +12,7 @@ class AdminRouter {
     private string $page = 'login';
     private string $command = '';
     private array $params = [];
-    private ?string $specId = null;  // For AI spec routing
+    private ?string $workflowId = null;  // For workflow routing
     private array $validPages = [
         'login',       // Authentication page
         'dashboard',   // Main admin panel after login
@@ -22,7 +22,7 @@ class AdminRouter {
         'structure',   // Structure tree viewer
         'batch',       // Batch command execution
         'docs',        // API documentation
-        'ai',          // AI Integration / Communication spec
+        'workflows',   // Workflows (AI and manual)
         'ai-settings', // AI Provider Settings (BYOK)
         'preview',     // Visual Editor (route kept as 'preview' for URL compatibility)
         'logout'       // Logout action
@@ -61,16 +61,16 @@ class AdminRouter {
             $this->command = array_shift($parts);
         }
         
-        // For AI pages, second segment is the spec ID (if present)
-        // Can be: {specId}, 'new', or 'edit/{specId}'
-        if ($this->page === 'ai' && !empty($parts)) {
-            $specPart = array_shift($parts);
+        // For workflow pages, second segment is the workflow ID (if present)
+        // Can be: {workflowId}, 'new', or 'edit/{workflowId}'
+        if ($this->page === 'workflows' && !empty($parts)) {
+            $workflowPart = array_shift($parts);
             
-            // Handle edit/{specId} pattern
-            if ($specPart === 'edit' && !empty($parts)) {
-                $this->specId = 'edit/' . array_shift($parts);
+            // Handle edit/{workflowId} pattern
+            if ($workflowPart === 'edit' && !empty($parts)) {
+                $this->workflowId = 'edit/' . array_shift($parts);
             } else {
-                $this->specId = $specPart;
+                $this->workflowId = $workflowPart;
             }
         }
         
@@ -93,10 +93,15 @@ class AdminRouter {
     }
 
     /**
-     * Get AI spec ID (for /admin/ai/{specId} routes)
+     * Get workflow ID (for /admin/workflows/{workflowId} routes)
      */
+    public function getWorkflowId(): ?string {
+        return $this->workflowId;
+    }
+    
+    // Legacy alias for backward compatibility
     public function getSpecId(): ?string {
-        return $this->specId;
+        return $this->workflowId;
     }
 
     /**
@@ -287,24 +292,24 @@ class AdminRouter {
         // Determine which template to load
         $templatePath = SECURE_FOLDER_PATH . '/admin/templates/pages/' . $this->page . '.php';
         
-        // Special handling for AI specs with specId
-        if ($this->page === 'ai' && $this->specId !== null) {
+        // Special handling for workflows with workflowId
+        if ($this->page === 'workflows' && $this->workflowId !== null) {
             // Check for editor routes (new or edit/*)
-            if ($this->specId === 'new' || str_starts_with($this->specId, 'edit/')) {
-                $editorPath = SECURE_FOLDER_PATH . '/admin/templates/pages/ai/editor.php';
+            if ($this->workflowId === 'new' || str_starts_with($this->workflowId, 'edit/')) {
+                $editorPath = SECURE_FOLDER_PATH . '/admin/templates/pages/workflows/editor.php';
                 if (file_exists($editorPath)) {
                     $templatePath = $editorPath;
                 }
             } else {
-                // Load spec-specific template for viewing
-                $specTemplatePath = SECURE_FOLDER_PATH . '/admin/templates/pages/ai/spec.php';
-                if (file_exists($specTemplatePath)) {
-                    $templatePath = $specTemplatePath;
+                // Load workflow-specific template for viewing
+                $workflowTemplatePath = SECURE_FOLDER_PATH . '/admin/templates/pages/workflows/spec.php';
+                if (file_exists($workflowTemplatePath)) {
+                    $templatePath = $workflowTemplatePath;
                 }
             }
-        } elseif ($this->page === 'ai' && $this->specId === null) {
-            // Load AI index (spec browser) if it exists, otherwise fall back to legacy ai.php
-            $indexPath = SECURE_FOLDER_PATH . '/admin/templates/pages/ai/index.php';
+        } elseif ($this->page === 'workflows' && $this->workflowId === null) {
+            // Load workflows index (browser) if it exists
+            $indexPath = SECURE_FOLDER_PATH . '/admin/templates/pages/workflows/index.php';
             if (file_exists($indexPath)) {
                 $templatePath = $indexPath;
             }

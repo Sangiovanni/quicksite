@@ -21,8 +21,24 @@ if ($selectedCommand) {
 ?>
 
 <div class="admin-page-header">
-    <h1 class="admin-page-header__title"><?= __admin('commands.title') ?></h1>
-    <p class="admin-page-header__subtitle"><?= __admin('commands.subtitle') ?></p>
+    <div class="admin-page-header__main">
+        <h1 class="admin-page-header__title"><?= __admin('commands.title') ?></h1>
+        <p class="admin-page-header__subtitle"><?= __admin('commands.subtitle') ?></p>
+    </div>
+    <div class="admin-page-header__actions">
+        <a href="<?= $router->url('batch') ?>" class="admin-btn admin-btn--primary" id="command-queue-btn">
+            <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <line x1="8" y1="6" x2="21" y2="6"/>
+                <line x1="8" y1="12" x2="21" y2="12"/>
+                <line x1="8" y1="18" x2="21" y2="18"/>
+                <line x1="3" y1="6" x2="3.01" y2="6"/>
+                <line x1="3" y1="12" x2="3.01" y2="12"/>
+                <line x1="3" y1="18" x2="3.01" y2="18"/>
+            </svg>
+            <?= __admin('commands.openQueue') ?>
+            <span class="admin-btn__badge" id="queue-count-badge" style="display: none;">0</span>
+        </a>
+    </div>
 </div>
 
 <!-- Search -->

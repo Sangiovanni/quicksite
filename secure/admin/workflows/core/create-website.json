@@ -111,15 +111,15 @@
                     "tag": "div",
                     "params": { "class": "lang-switch" },
                     "children": {
-                        "$each": "{{config.LANGUAGES_NAME}}",
+                        "$each": "{{param.languages}}",
                         "$item": {
                             "tag": "a",
                             "params": {
-                                "href": "{{__current_page;lang={{$key}}}}",
+                                "href": "{{__current_page;lang={{$value}}}}",
                                 "class": "lang-btn",
-                                "data-lang": "{{$key}}"
+                                "data-lang": "{{$value}}"
                             },
-                            "children": [{ "textKey": "__RAW__{{$value}}" }]
+                            "children": [{ "text": "{{$value | langname}}" }]
                         }
                     }
                 }

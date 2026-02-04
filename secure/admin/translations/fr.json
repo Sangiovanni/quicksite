@@ -178,6 +178,7 @@
         "title": "Commandes",
         "subtitle": "Parcourir et exécuter les commandes API",
         "searchPlaceholder": "Rechercher des commandes...",
+        "openQueue": "Ouvrir la file",
         "allCategories": "Toutes les catégories",
         "method": "Méthode",
         "parameters": "Paramètres",
@@ -309,9 +310,9 @@
         "history": "Historique",
         "settings": "Paramètres",
         "structure": "Structure",
-        "batch": "Batch",
+        "batch": "File de commandes",
         "docs": "Documentation",
-        "ai": "Intégration IA",
+        "workflows": "Workflows",
         "visualEditor": "Éditeur visuel",
         "preview": "Aperçu",
         "logout": "Déconnexion",
@@ -571,35 +572,6 @@
             "hint": "Collez un tableau JSON de commandes pour les ajouter à la file. Parfait pour les séquences générées par IA.",
             "label": "Tableau JSON de commandes",
             "addToQueue": "Ajouter à la file"
-        },
-        "templates": {
-            "title": "Modèles de commandes",
-            "hint": "Séquences de commandes prédéfinies pour les tâches courantes. Cliquez pour prévisualiser, puis chargez dans la file.",
-            "dynamic": "Dynamique",
-            "analyzePreview": "Analyser et prévisualiser",
-            "generateLoad": "Générer et charger",
-            "loadIntoQueue": "Charger dans la file",
-            "previewTitle": "Aperçu du modèle",
-            "freshStart": {
-                "title": "Nouveau départ",
-                "desc": "Remettre à zéro tout le contenu : supprimer les routes, vider les assets, effacer les traductions, réinitialiser le CSS. Conserve les langues et la page 404."
-            },
-            "starterBusiness": {
-                "title": "Site entreprise",
-                "desc": "Site web d'entreprise avec menu, pied de page, 4 pages (accueil, à propos, services, contact) et thème turquoise. Langue unique."
-            },
-            "starterBusinessMultilingual": {
-                "title": "Site entreprise (Multilingue)",
-                "desc": "Identique au site entreprise avec traductions EN + FR et sélecteur de langue dans le pied de page."
-            },
-            "landingPage": {
-                "title": "Page d'atterrissage",
-                "desc": "Créer une structure de page unique avec sections héros, fonctionnalités et appel à l'action."
-            },
-            "landingPageMultilingual": {
-                "title": "Page d'atterrissage (Multilingue)",
-                "desc": "Identique à la page d'atterrissage avec traductions EN + FR et sélecteur de langue."
-            }
         }
     },
     "docs": {
@@ -631,11 +603,11 @@
             "copyFailed": "Impossible de copier l'URL"
         }
     },
-    "ai": {
-        "title": "Intégration IA",
-        "subtitle": "Générer des commandes avec des assistants IA",
+    "workflows": {
+        "title": "Workflows",
+        "subtitle": "Séquences de tâches automatisées - manuelles ou assistées par IA",
         "howItWorks": "Comment ça marche",
-        "specification": "Spécification IA",
+        "specification": "Workflow",
         "quickPrompts": "Exemples de prompts",
         "intro": {
             "description": "Utilisez des assistants IA (ChatGPT, Claude, Gemini...) pour créer des sites web complets via les commandes QuickSite."
@@ -710,15 +682,15 @@
         "executionComplete": "Exécution terminée",
         "clear": "Effacer",
         "browser": {
-            "title": "Spécifications IA",
+            "title": "Workflows",
             "subtitle": "Générez des prompts prêts pour l'IA pour les tâches QuickSite courantes",
             "howItWorks": "Comment ça marche",
-            "step1": "Sélectionnez une spécification ci-dessous",
+            "step1": "Sélectionnez un workflow ci-dessous",
             "step2": "Décrivez votre objectif en détail",
             "step3": "Copiez le prompt généré vers votre assistant IA",
-            "step4": "Exécutez la réponse IA dans le panneau Batch",
-            "noSpecs": "Aucune spécification IA disponible pour le moment.",
-            "searchPlaceholder": "Rechercher des spécifications...",
+            "step4": "Exécutez la réponse IA dans la File de commandes",
+            "noSpecs": "Aucun workflow disponible pour le moment.",
+            "searchPlaceholder": "Rechercher des workflows...",
             "allTags": "Tous",
             "noResults": "Aucune spécification ne correspond à votre recherche.",
             "createSpec": "Créer une Spec Perso",
@@ -726,6 +698,19 @@
             "importSuccess": "Spec importée avec succès !",
             "importError": "Échec de l'import :",
             "invalidImport": "Fichier d'import invalide : doit contenir spec et template"
+        },
+        "spec": {
+            "manual": "Manuel",
+            "ai": "IA",
+            "manualHint": "Ce workflow exécute des commandes prédéfinies sans IA",
+            "aiHint": "Ce workflow génère des prompts IA",
+            "previewSteps": "Aperçu des étapes",
+            "actions": "Actions",
+            "noParamsHint": "Ce workflow n'a pas de paramètres configurables.",
+            "stepsPreview": "Étapes du workflow",
+            "stepsHint": "Ce workflow exécutera les commandes suivantes :",
+            "loadingSteps": "Chargement des étapes...",
+            "executeWorkflow": "Exécuter le workflow"
         },
         "editor": {
             "new": "Nouvelle Spec",
@@ -736,7 +721,7 @@
             },
             "info": {
                 "title": "Création d'une Spec Personnalisée",
-                "text": "Les specs personnalisées sont enregistrées dans le dossier secure/admin/ai_specs/custom/. Elles apparaîtront aux côtés des specs principales dans le navigateur. N'oubliez pas d'ajouter les clés de traduction dans vos fichiers de langue pour les libellés et descriptions."
+                "text": "Les workflows personnalisés sont enregistrés dans le dossier secure/admin/workflows/custom/. Ils apparaîtront aux côtés des workflows principaux dans le navigateur. N'oubliez pas d'ajouter les clés de traduction dans vos fichiers de langue pour les libellés et descriptions."
             },
             "notFound": {
                 "title": "Spec Introuvable",
@@ -766,6 +751,10 @@
             "creation": {
                 "title": "Création",
                 "desc": "Créer de nouveaux sites et pages à partir de zéro"
+            },
+            "template": {
+                "title": "Templates",
+                "desc": "Modèles de sites prêts à l'emploi - sans IA"
             },
             "modification": {
                 "title": "Modification",
@@ -952,6 +941,36 @@
                     "minimalist": { "title": "Minimaliste", "prompt": "Restyler avec esthétique minimaliste : espaces blancs, typographie épurée, ombres subtiles" },
                     "boldColorful": { "title": "Audacieux & Coloré", "prompt": "Rendre audacieux et vibrant avec couleurs vives, grande typographie, éléments dynamiques" },
                     "glassmorphism": { "title": "Glassmorphism", "prompt": "Appliquer le glassmorphism avec effets verre dépoli, arrière-plans flous, dégradés" }
+                }
+            },
+            "starterBusiness": {
+                "title": "Starter Business",
+                "description": "Site web business avec menu, pied de page, 4 pages et thème turquoise. Langue unique."
+            },
+            "starterBusinessMultilingual": {
+                "title": "Starter Business (Multilingue)",
+                "description": "Site web business avec traductions EN + FR et thème sombre ambre."
+            },
+            "landingPage": {
+                "title": "Page d'Atterrissage",
+                "description": "Landing page avec hero, fonctionnalités et sections CTA. Thème violet dégradé."
+            },
+            "landingPageMultilingual": {
+                "title": "Page d'Atterrissage (Multilingue)",
+                "description": "Landing page avec traductions EN + FR et sélecteur de langue."
+            },
+            "freshStart": {
+                "title": "Nouveau Départ",
+                "description": "Réinitialiser le projet à un état propre. Supprime toutes les routes (sauf home), les assets et les langues supplémentaires.",
+                "params": {
+                    "keepAssets": {
+                        "label": "Conserver les assets",
+                        "help": "Si coché, les images et fichiers téléchargés ne seront PAS supprimés"
+                    },
+                    "keepLanguages": {
+                        "label": "Conserver les langues",
+                        "help": "Si coché, les langues supplémentaires ne seront PAS supprimées"
+                    }
                 }
             }
         }

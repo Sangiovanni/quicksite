@@ -22,10 +22,18 @@
         
         const specId = container.dataset.specId || '';
         const isCreateSpec = container.dataset.isCreateSpec === 'true';
+        const isManualWorkflow = container.dataset.isManual === 'true';
         const baseUrl = QuickSiteAdmin.config.baseUrl || '';
         const adminBase = QuickSiteAdmin.config.adminBase || '';
         const managementUrl = QuickSiteAdmin.config.managementBase || (baseUrl + '/management/');
         const token = QuickSiteAdmin.config.token || '';
+    
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
     
     const form = document.getElementById('spec-params-form');
     const promptOutput = document.getElementById('prompt-output');
@@ -664,8 +672,235 @@
             formData.forEach((value, key) => {
                 if (value) params[key] = value;
             });
-            generatePrompt(params);
+            
+            if (isManualWorkflow) {
+                // For manual workflows, generate steps preview
+                generateManualSteps(params);
+            } else {
+                // For AI workflows, generate prompt
+                generatePrompt(params);
+            }
         });
+    }
+    
+    // Manual workflow: Preview steps button (for workflows without params)
+    const previewManualStepsBtn = document.getElementById('preview-manual-steps');
+    if (previewManualStepsBtn) {
+        previewManualStepsBtn.addEventListener('click', function() {
+            generateManualSteps({});
+        });
+    }
+    
+    // Generate steps for manual workflow
+    async function generateManualSteps(params) {
+        const loadingEl = document.getElementById('manual-steps-loading');
+        const commandList = document.getElementById('manual-command-list');
+        const stepCount = document.getElementById('manual-step-count');
+        const executeBtn = document.getElementById('execute-manual-workflow');
+        
+        if (loadingEl) loadingEl.style.display = 'flex';
+        if (commandList) commandList.innerHTML = '';
+        
+        try {
+            // Call API to generate steps
+            const response = await fetch(adminBase + '/api/workflow-generate-steps', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify({
+                    workflowId: specId,
+                    params: params
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.message || 'Failed to generate steps');
+            }
+            
+            const steps = result.data.steps || [];
+            
+            if (stepCount) {
+                stepCount.textContent = steps.length + ' command' + (steps.length !== 1 ? 's' : '');
+            }
+            
+            // Render steps
+            if (commandList) {
+                steps.forEach((step, index) => {
+                    const itemEl = document.createElement('div');
+                    itemEl.className = 'command-item';
+                    itemEl.innerHTML = `
+                        <div class="command-item__header">
+                            <span class="command-item__index">${index + 1}</span>
+                            <span class="command-item__name">${escapeHtml(step.command)}</span>
+                        </div>
+                        <div class="command-item__params">
+                            ${Object.entries(step.params || {}).map(([key, value]) => 
+                                `<div class="command-item__param">
+                                    <span class="command-item__param-key">${escapeHtml(key)}:</span>
+                                    <span class="command-item__param-value">${escapeHtml(typeof value === 'object' ? JSON.stringify(value) : String(value))}</span>
+                                </div>`
+                            ).join('')}
+                        </div>
+                    `;
+                    commandList.appendChild(itemEl);
+                });
+            }
+            
+            // Store steps for execution
+            window._manualWorkflowSteps = steps;
+            
+            if (executeBtn) executeBtn.disabled = false;
+            
+        } catch (error) {
+            console.error('Error generating steps:', error);
+            if (commandList) {
+                commandList.innerHTML = `<div class="command-error">Error: ${escapeHtml(error.message)}</div>`;
+            }
+        }
+        
+        if (loadingEl) loadingEl.style.display = 'none';
+    }
+    
+    // Execute manual workflow
+    const executeManualBtn = document.getElementById('execute-manual-workflow');
+    if (executeManualBtn) {
+        executeManualBtn.addEventListener('click', function() {
+            const steps = window._manualWorkflowSteps || [];
+            if (steps.length === 0) {
+                alert('No steps to execute');
+                return;
+            }
+            
+            // Convert to commands format
+            const commands = steps.map(step => ({
+                command: step.command,
+                ...step.params
+            }));
+            
+            // Execute using dedicated manual workflow executor
+            executeManualWorkflowCommands(commands);
+        });
+    }
+    
+    /**
+     * Execute manual workflow commands (no fresh start logic)
+     * This is separate from executeCommands() which is for AI workflows
+     */
+    async function executeManualWorkflowCommands(commands) {
+        if (commandPreviewSection) commandPreviewSection.style.display = 'none';
+        if (executionResultsSection) executionResultsSection.style.display = 'block';
+        if (executionProgress) executionProgress.style.display = 'flex';
+        if (executionResults) executionResults.innerHTML = '';
+        
+        // Create result items for all commands
+        commands.forEach((cmd, index) => {
+            const item = document.createElement('div');
+            item.className = 'result-item result-item--pending';
+            item.id = 'result-' + index;
+            item.innerHTML = `
+                <span class="result-item__icon">⏳</span>
+                <div class="result-item__content">
+                    <div class="result-item__command">🧹 ${escapeHtml(cmd.command)}</div>
+                    <div class="result-item__message">Pending...</div>
+                </div>
+            `;
+            if (executionResults) executionResults.appendChild(item);
+        });
+        
+        // Execute each command
+        let successCount = 0;
+        let failCount = 0;
+        
+        for (let i = 0; i < commands.length; i++) {
+            const cmd = commands[i];
+            
+            if (progressText) {
+                progressText.textContent = `Executing command ${i + 1} of ${commands.length}: ${cmd.command}`;
+            }
+            
+            const resultItem = document.getElementById('result-' + i);
+            
+            try {
+                // Build params (everything except 'command' and 'method')
+                const params = {};
+                for (const [key, value] of Object.entries(cmd)) {
+                    if (key !== 'command' && key !== 'method') {
+                        params[key] = value;
+                    }
+                }
+                
+                // Use method from step (default POST for workflow commands)
+                const method = cmd.method || 'POST';
+                const url = managementUrl + cmd.command;
+                
+                const options = {
+                    method: method,
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
+                };
+                
+                // Send body for POST/PUT/PATCH methods if we have params
+                if (method !== 'GET' && method !== 'DELETE' && Object.keys(params).length > 0) {
+                    options.body = JSON.stringify(params);
+                }
+                
+                const response = await fetch(url, options);
+                const text = await response.text();
+                let result;
+                try {
+                    result = text ? JSON.parse(text) : { status: response.status };
+                } catch (e) {
+                    result = { status: response.status, message: text || 'No response' };
+                }
+                
+                const isSuccess = response.ok || result.status === 200 || result.success;
+                
+                if (resultItem) {
+                    resultItem.className = 'result-item ' + (isSuccess ? 'result-item--success' : 'result-item--error');
+                    resultItem.querySelector('.result-item__icon').textContent = isSuccess ? '✅' : '❌';
+                    resultItem.querySelector('.result-item__message').textContent = 
+                        result.message || result.data?.message || (isSuccess ? 'Success' : 'Failed');
+                }
+                
+                if (isSuccess) {
+                    successCount++;
+                } else {
+                    failCount++;
+                }
+                
+            } catch (error) {
+                failCount++;
+                if (resultItem) {
+                    resultItem.className = 'result-item result-item--error';
+                    resultItem.querySelector('.result-item__icon').textContent = '❌';
+                    resultItem.querySelector('.result-item__message').textContent = error.message;
+                }
+            }
+            
+            // Small delay between commands
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        // Done
+        if (executionProgress) executionProgress.style.display = 'none';
+        
+        // Show summary
+        const summary = document.createElement('div');
+        summary.style.cssText = 'text-align: center; padding: 12px; margin-top: 8px; border-top: 1px solid var(--admin-border); font-weight: 500;';
+        summary.innerHTML = `✅ ${successCount} succeeded` + (failCount > 0 ? ` &nbsp;|&nbsp; ❌ ${failCount} failed` : '');
+        if (executionResults) executionResults.appendChild(summary);
+    }
+    
+    // Auto-load steps for manual workflows without parameters
+    if (isManualWorkflow && container.dataset.hasNoParams === 'true') {
+        // Load steps immediately
+        setTimeout(() => generateManualSteps({}), 100);
     }
     
     // Example click - fill user prompt textarea

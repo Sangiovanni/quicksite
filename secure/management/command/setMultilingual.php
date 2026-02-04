@@ -144,19 +144,9 @@ $syncDirection = '';
 
 if ($enabled) {
     // Switching TO multilingual
-    // Ensure at least 2 languages exist (using fresh config)
-    $languages = $freshConfig['LANGUAGES_SUPPORTED'] ?? [];
-    if (count($languages) < 2) {
-        flock($lockHandle, LOCK_UN);
-        fclose($lockHandle);
-        @unlink($lockFile);
-        ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('Multilingual mode requires at least 2 configured languages. Use addLang to add more languages first.')
-            ->withErrors([
-                ['field' => 'languages', 'count' => count($languages), 'minimum' => 2]
-            ])
-            ->send();
-    }
+    // Note: We allow enabling multilingual with just 1 language
+    // This supports workflows where setMultilingual comes before addLang
+    // The sync logic still works correctly with any number of languages
     
     // Sync: default.json -> LANGUAGE_DEFAULT file
     // Add missing keys from default.json to the default language file

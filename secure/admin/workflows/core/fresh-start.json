@@ -1,0 +1,234 @@
+{
+    "$schema": "../schema.json",
+    "id": "fresh-start",
+    "version": "1.1.0",
+    "meta": {
+        "icon": "🧹",
+        "titleKey": "workflows.specs.freshStart.title",
+        "descriptionKey": "workflows.specs.freshStart.description",
+        "category": "advanced",
+        "tags": ["reset", "cleanup", "fresh"],
+        "difficulty": "beginner"
+    },
+    "parameters": [
+        {
+            "id": "keepAssets",
+            "type": "checkbox",
+            "labelKey": "workflows.specs.freshStart.params.keepAssets.label",
+            "helpKey": "workflows.specs.freshStart.params.keepAssets.help",
+            "default": false
+        },
+        {
+            "id": "keepLanguages",
+            "type": "checkbox",
+            "labelKey": "workflows.specs.freshStart.params.keepLanguages.label",
+            "helpKey": "workflows.specs.freshStart.params.keepLanguages.help",
+            "default": false
+        }
+    ],
+    "dataRequirements": [
+        {
+            "id": "routes",
+            "command": "getRoutes",
+            "extract": "data.flat_routes"
+        },
+        {
+            "id": "assetsData",
+            "command": "listAssets",
+            "extract": "data"
+        },
+        {
+            "id": "langData",
+            "command": "getLangList",
+            "extract": "data"
+        },
+        {
+            "id": "structureData",
+            "command": "getStructure",
+            "extract": "data"
+        }
+    ],
+    "steps": [
+        {
+            "comment": "=== PHASE 1: DELETE ROUTES (except home) ===",
+            "forEach": "routes",
+            "filter": "{{$value}} !== 'home'",
+            "command": "deleteRoute",
+            "params": {
+                "route": "{{$value}}"
+            }
+        },
+        {
+            "comment": "=== PHASE 2: DELETE ASSETS ===",
+            "condition": "param.keepAssets !== true",
+            "forEach": "assetsData.images",
+            "command": "deleteAsset",
+            "params": {
+                "category": "images",
+                "filename": "{{$value.filename}}"
+            }
+        },
+        {
+            "condition": "param.keepAssets !== true",
+            "forEach": "assetsData.documents",
+            "command": "deleteAsset",
+            "params": {
+                "category": "documents",
+                "filename": "{{$value.filename}}"
+            }
+        },
+        {
+            "condition": "param.keepAssets !== true",
+            "forEach": "assetsData.videos",
+            "command": "deleteAsset",
+            "params": {
+                "category": "videos",
+                "filename": "{{$value.filename}}"
+            }
+        },
+        {
+            "condition": "param.keepAssets !== true",
+            "forEach": "assetsData.audio",
+            "command": "deleteAsset",
+            "params": {
+                "category": "audio",
+                "filename": "{{$value.filename}}"
+            }
+        },
+        {
+            "condition": "param.keepAssets !== true",
+            "forEach": "assetsData.fonts",
+            "command": "deleteAsset",
+            "params": {
+                "category": "fonts",
+                "filename": "{{$value.filename}}"
+            }
+        },
+        {
+            "condition": "param.keepAssets !== true",
+            "forEach": "assetsData.other",
+            "command": "deleteAsset",
+            "params": {
+                "category": "other",
+                "filename": "{{$value.filename}}"
+            }
+        },
+        {
+            "comment": "=== PHASE 3: DELETE ALL COMPONENTS (force) ===",
+            "forEach": "structureData.components",
+            "command": "editStructure",
+            "params": {
+                "type": "component",
+                "name": "{{$key}}",
+                "action": "delete",
+                "force": true
+            }
+        },
+        {
+            "comment": "=== PHASE 4: DELETE NON-DEFAULT LANGUAGES ===",
+            "condition": "param.keepLanguages !== true",
+            "forEach": "langData.languages",
+            "filter": "{{$value}} !== {{langData.default_language}}",
+            "command": "deleteLang",
+            "params": {
+                "code": "{{$value}}"
+            }
+        },
+        {
+            "comment": "=== PHASE 5: RESET STRUCTURES ===",
+            "command": "editStructure",
+            "params": {
+                "type": "page",
+                "name": "home",
+                "structure": {
+                    "tag": "main",
+                    "params": { "class": "container" },
+                    "children": []
+                }
+            }
+        },
+        {
+            "command": "editStructure",
+            "params": {
+                "type": "menu",
+                "structure": {
+                    "tag": "nav",
+                    "params": { "class": "main-nav" },
+                    "children": []
+                }
+            }
+        },
+        {
+            "command": "editStructure",
+            "params": {
+                "type": "footer",
+                "structure": {
+                    "tag": "footer",
+                    "params": { "class": "main-footer" },
+                    "children": []
+                }
+            }
+        },
+        {
+            "comment": "=== PHASE 6: SET MINIMAL TRANSLATIONS (default language - REPLACE) ===",
+            "command": "setTranslationKeys",
+            "params": {
+                "language": "{{langData.default_language}}",
+                "replace": true,
+                "translations": {
+                    "site": {
+                        "name": "My Website"
+                    },
+                    "page": {
+                        "titles": {
+                            "home": "Home"
+                        }
+                    },
+                    "404": {
+                        "title": "Page Not Found",
+                        "message": "The page you are looking for does not exist.",
+                        "backHome": "Back to Home"
+                    }
+                }
+            }
+        },
+        {
+            "comment": "=== PHASE 6b: SET MINIMAL TRANSLATIONS (default.json - REPLACE) ===",
+            "command": "setTranslationKeys",
+            "params": {
+                "language": "default",
+                "replace": true,
+                "translations": {
+                    "site": {
+                        "name": "My Website"
+                    },
+                    "page": {
+                        "titles": {
+                            "home": "Home"
+                        }
+                    },
+                    "404": {
+                        "title": "Page Not Found",
+                        "message": "The page you are looking for does not exist.",
+                        "backHome": "Back to Home"
+                    }
+                }
+            }
+        },
+        {
+            "comment": "=== PHASE 7: DISABLE MULTILINGUAL (only if currently multilingual) ===",
+            "condition": "param.keepLanguages !== true && langData.multilingual === true",
+            "command": "setMultilingual",
+            "params": {
+                "enabled": false
+            }
+        },
+        {
+            "comment": "=== PHASE 8: RESET CSS ===",
+            "command": "editStyles",
+            "params": {
+                "css": "/* Fresh start - add your styles here */\n\n:root {\n    --color-primary: #3b82f6;\n    --color-text: #1f2937;\n    --color-bg: #ffffff;\n}\n\nbody {\n    font-family: system-ui, -apple-system, sans-serif;\n    color: var(--color-text);\n    background: var(--color-bg);\n    margin: 0;\n    padding: 0;\n}\n\n.container {\n    max-width: 1200px;\n    margin: 0 auto;\n    padding: 2rem;\n}"
+            }
+        }
+    ]
+}

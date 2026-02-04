@@ -19,7 +19,8 @@
 11. [Build & Deploy System](#build--deploy-system)
 12. [Security Architecture](#security-architecture)
 13. [Admin Panel](#admin-panel)
-14. [Design Decisions](#design-decisions)
+14. [Workflow System](#workflow-system)
+15. [Design Decisions](#design-decisions)
 
 ---
 
@@ -1176,6 +1177,247 @@ or "footer editor" views.
 4. Admin panel shows properties for selected node
 5. User edits → API call to `editNode`, `editStructure`, etc.
 6. Preview refreshes (or updates inline for text changes)
+
+---
+
+## Workflow System
+
+QuickSite includes a powerful Workflow System that allows both AI-assisted and manual automation of complex multi-step operations.
+
+### Overview
+
+Workflows are JSON definitions that describe:
+- **AI Workflows**: Generate API commands via LLM prompts (e.g., "Create Website")
+- **Manual Workflows**: Execute predefined command sequences (e.g., "Fresh Start", "Landing Page")
+- **Composed Workflows**: Combine workflows using `preWorkflows`/`postWorkflows`
+
+```
+secure/admin/workflows/
+├── schema.json          # JSON Schema for validation
+├── core/                # Built-in workflows
+│   ├── create-website.json       # AI: Full site generation
+│   ├── fresh-start.json          # Manual: Reset project
+│   ├── landing-page.json         # Manual: Landing page template
+│   └── starter-business.json     # Manual: Business site template
+└── custom/              # User-created workflows
+```
+
+### Workflow Types
+
+#### AI Workflows (promptTemplate)
+
+AI workflows use a prompt template that gets rendered with context data, sent to an LLM, and the response is parsed as API commands.
+
+```json
+{
+  "id": "create-website",
+  "promptTemplate": "create-website.md",
+  "dataRequirements": [...],
+  "parameters": [...],
+  "outputFormat": "json-commands"
+}
+```
+
+#### Manual Workflows (steps)
+
+Manual workflows define a fixed sequence of commands to execute directly without AI:
+
+```json
+{
+  "id": "landing-page",
+  "steps": [
+    { "command": "addRoute", "params": {...} },
+    { "command": "addNode", "params": {...} }
+  ]
+}
+```
+
+### Key Concepts
+
+#### Parameters
+
+User-configurable inputs shown in the admin UI:
+
+```json
+{
+  "parameters": [
+    {
+      "id": "siteName",
+      "type": "text",
+      "labelKey": "workflow.params.siteName",
+      "required": true
+    },
+    {
+      "id": "languages",
+      "type": "multiselect",
+      "options": "dynamic:getLangList.data.languages",
+      "condition": "multilingual === true"
+    }
+  ]
+}
+```
+
+**Types**: `text`, `textarea`, `select`, `multiselect`, `checkbox`, `number`, `nodeSelector`
+**Conditions**: Parameters can be shown/hidden based on other parameter values
+
+#### Data Requirements
+
+Fetch live data from the system before execution:
+
+```json
+{
+  "dataRequirements": [
+    {
+      "id": "routes",
+      "command": "getRoutes",
+      "extract": "data.routes"
+    },
+    {
+      "id": "langData",
+      "command": "getLangList",
+      "condition": "multilingual"
+    }
+  ]
+}
+```
+
+- **id**: Reference name for use in templates/steps
+- **command**: API command to call
+- **extract**: Dot-notation path to extract specific data
+- **condition**: Only fetch when expression is truthy
+
+#### Steps with forEach
+
+Generate multiple commands from a data source:
+
+```json
+{
+  "steps": [
+    {
+      "comment": "Delete all non-404 routes",
+      "forEach": "routes",
+      "filter": "{{$value.path}} !== '/404'",
+      "command": "deleteRoute",
+      "params": {
+        "path": "{{$value.path}}"
+      }
+    }
+  ]
+}
+```
+
+**Variables in forEach:**
+- `{{$key}}` - Array index or object key
+- `{{$value}}` - The current item
+- `{{$value.field}}` - Access nested properties
+
+#### Conditional Steps
+
+Skip steps based on runtime conditions:
+
+```json
+{
+  "command": "deleteLang",
+  "condition": "langData.languages.length > 1",
+  "params": {
+    "lang": "{{$value}}"
+  }
+}
+```
+
+**Condition operators**: `===`, `!==`, `>`, `<`, `>=`, `<=`, `&&`, `||`
+**Context references**: `param.X`, `config.X`, `dataRequirementId.path`
+
+#### Workflow Composition (preWorkflows/postWorkflows)
+
+Include other workflows to run before or after:
+
+```json
+{
+  "id": "landing-page-multilingual",
+  "preWorkflows": [
+    { "id": "fresh-start", "params": { "keepLanguages": true } }
+  ],
+  "steps": [...]
+}
+```
+
+Or with simple string syntax for default params:
+```json
+{
+  "preWorkflows": ["fresh-start"]
+}
+```
+
+**Execution order**: preWorkflows → main steps → postWorkflows
+
+#### Template Variables
+
+Use in params or prompt templates:
+
+| Syntax | Description |
+|--------|-------------|
+| `{{param.siteName}}` | User-provided parameter |
+| `{{config.DEFAULT_LANG}}` | Project config value |
+| `{{routes}}` | Full dataRequirement result |
+| `{{routes[0].path}}` | Specific data access |
+| `{{$key}}`, `{{$value}}` | forEach iteration |
+
+#### Value Filters
+
+Apply transformations to template values using pipe syntax:
+
+```json
+{
+  "text": "{{$value | langname}}",
+  "title": "{{param.name | uppercase}}"
+}
+```
+
+**Available Filters:**
+
+| Filter | Aliases | Description | Example |
+|--------|---------|-------------|---------|
+| `langname` | `language` | ISO 639-1 code → native name | `fr` → `Français` |
+| `uppercase` | `upper` | Convert to uppercase | `hello` → `HELLO` |
+| `lowercase` | `lower` | Convert to lowercase | `HELLO` → `hello` |
+| `ucfirst` | `capitalize` | Capitalize first letter | `hello` → `Hello` |
+| `ucwords` | `title` | Capitalize each word | `hello world` → `Hello World` |
+| `trim` | - | Remove whitespace | ` hi ` → `hi` |
+
+**Nested Placeholders:**
+
+Placeholders inside QuickSite template syntax are resolved first:
+
+```json
+"href": "{{__current_page;lang={{$value}}}}"
+```
+→ Resolves to: `{{__current_page;lang=fr}}` (QuickSite renders final URL at runtime)
+
+### WorkflowManager
+
+The `WorkflowManager` class (`secure/src/classes/WorkflowManager.php`) handles:
+
+1. **Loading**: Read workflow JSON from core/ or custom/
+2. **Validation**: Check against schema.json
+3. **Data Fetching**: Execute dataRequirements via CommandRunner
+4. **Expansion**: Resolve forEach, conditions, preWorkflows/postWorkflows
+5. **Rendering**: Generate final command list or prompt
+
+```php
+$manager = new WorkflowManager($projectId);
+$workflow = $manager->loadWorkflow('landing-page');
+$steps = $manager->generateSteps($workflow, $userParams);
+// $steps = [{ command, params }, { command, params }, ...]
+```
+
+### Best Practices
+
+1. **Use preWorkflows for cleanup**: Template workflows should include `fresh-start` as a preWorkflow
+2. **Keep workflows focused**: One workflow = one outcome
+3. **Use conditions sparingly**: Complex conditions make workflows hard to debug
+4. **Document with comments**: The `comment` field in steps is ignored at runtime but helpful for maintenance
+5. **Test with small datasets**: Use filter conditions to test subset of operations
 
 ---
 

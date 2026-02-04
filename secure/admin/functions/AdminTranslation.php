@@ -150,9 +150,38 @@ class AdminTranslation {
     }
 
     /**
+     * Key aliases for backward compatibility
+     * Maps old keys to new keys during transition
+     */
+    private static array $keyAliases = [
+        'ai' => 'workflows',
+        'ai.spec' => 'workflows.spec',
+        'ai.specs' => 'workflows.specs',
+    ];
+
+    /**
+     * Apply key aliases for backward compatibility
+     */
+    private function applyKeyAlias(string $key): string {
+        // Sort aliases by length descending to match longest first
+        $sortedAliases = self::$keyAliases;
+        uksort($sortedAliases, fn($a, $b) => strlen($b) - strlen($a));
+        
+        foreach ($sortedAliases as $oldPrefix => $newPrefix) {
+            if (str_starts_with($key, $oldPrefix . '.') || $key === $oldPrefix) {
+                return $newPrefix . substr($key, strlen($oldPrefix));
+            }
+        }
+        return $key;
+    }
+
+    /**
      * Get nested value from array using dot notation
      */
     private function getNestedValue(array $array, string $key): ?string {
+        // Apply key alias if exists
+        $key = $this->applyKeyAlias($key);
+        
         $keys = explode('.', $key);
         $value = $array;
         

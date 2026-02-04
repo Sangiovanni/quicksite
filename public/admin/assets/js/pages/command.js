@@ -113,11 +113,38 @@
         }, 500);
     }
 
+    /**
+     * Update queue count badge from localStorage
+     */
+    function updateQueueBadge() {
+        const badge = document.getElementById('queue-count-badge');
+        if (!badge) return;
+        
+        try {
+            const saved = localStorage.getItem('admin_batch_queue');
+            const queue = saved ? JSON.parse(saved) : [];
+            const count = queue.length;
+            
+            if (count > 0) {
+                badge.textContent = count;
+                badge.style.display = '';
+            } else {
+                badge.style.display = 'none';
+            }
+        } catch (e) {
+            badge.style.display = 'none';
+        }
+    }
+
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initCommandSearch);
+        document.addEventListener('DOMContentLoaded', () => {
+            initCommandSearch();
+            updateQueueBadge();
+        });
     } else {
         initCommandSearch();
+        updateQueueBadge();
     }
 
 })();

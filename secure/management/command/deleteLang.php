@@ -2,13 +2,8 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
-// Check if multilingual mode is enabled
-if (!MULTILINGUAL_SUPPORT) {
-    ApiResponse::create(403, 'mode.requires_multilingual')
-        ->withMessage('The deleteLang command requires multilingual mode. Use setMultilingual to enable it first.')
-        ->withData(['current_mode' => 'mono-language'])
-        ->send();
-}
+// Note: Removed multilingual mode requirement to allow cleanup of orphaned languages
+// This supports fresh-start workflows that need to delete extra languages regardless of mode
 
 $params = $trimParametersManagement->params();
 

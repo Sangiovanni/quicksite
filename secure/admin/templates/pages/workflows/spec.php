@@ -1,36 +1,37 @@
 ﻿<?php
 /**
- * AI Spec Detail Page
+ * Workflow Detail Page
  * 
- * Shows a specific AI spec with:
- * - Parameter form (if spec has parameters)
- * - Generated prompt preview
+ * Shows a specific workflow with:
+ * - Parameter form (if workflow has parameters)
+ * - Generated prompt preview (AI workflows)
+ * - Step preview (manual workflows)
  * - Copy/export options
  * - Related commands reference
  * 
- * @version 2.0.0
+ * @version 2.1.0
  * JavaScript: /admin/assets/js/pages/ai-spec.js
  * CSS: Moved to admin.css (AI SPEC PAGE section)
  */
 
-require_once SECURE_FOLDER_PATH . '/src/classes/AiSpecManager.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
 
 $baseUrl = rtrim(BASE_URL, '/');
-$specManager = new AiSpecManager();
-$specId = $router->getSpecId();
+$workflowManager = new WorkflowManager();
+$specId = $router->getWorkflowId();
 
-// Load the spec
-$spec = $specManager->loadSpec($specId);
+// Load the workflow (using legacy method name for compatibility)
+$spec = $workflowManager->loadWorkflow($specId);
 
 if (!$spec) {
     http_response_code(404);
     ?>
     <div class="ai-spec-error">
         <div class="ai-spec-error__icon">â“</div>
-        <h2><?= __admin('ai.spec.notFound.title', 'Spec Not Found') ?></h2>
-        <p><?= __admin('ai.spec.notFound.message', 'The requested AI specification could not be found.') ?></p>
-        <a href="<?= $router->url('ai') ?>" class="admin-btn admin-btn--primary">
-            <?= __admin('ai.spec.backToList', 'Back to Specs') ?>
+        <h2><?= __admin('workflows.spec.notFound.title', 'Workflow Not Found') ?></h2>
+        <p><?= __admin('workflows.spec.notFound.message', 'The requested workflow could not be found.') ?></p>
+        <a href="<?= $router->url('workflows') ?>" class="admin-btn admin-btn--primary">
+            <?= __admin('workflows.spec.backToList', 'Back to Workflows') ?>
         </a>
     </div>
     <?php
@@ -38,25 +39,29 @@ if (!$spec) {
 }
 
 // Validate spec
-$validation = $specManager->validateSpec($spec);
+$validation = $workflowManager->validateWorkflow($spec);
 
 $meta = $spec['meta'] ?? [];
 $parameters = $spec['parameters'] ?? [];
 $examples = $spec['examples'] ?? [];
 $relatedCommands = $spec['relatedCommands'] ?? [];
 
+// Check workflow type
+$isManualWorkflow = $workflowManager->isManualWorkflow($spec);
+$isAiWorkflow = $workflowManager->isAiWorkflow($spec);
+
 // Get initial data for display
-$specData = $specManager->fetchDataRequirements($spec);
+$specData = $workflowManager->fetchDataRequirements($spec);
 
 // Check if spec has 'create' tag (requires fresh start)
 $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
 ?>
 
 
-<div class="ai-spec" data-spec-id="<?= htmlspecialchars($specId) ?>" data-is-create-spec="<?= $hasCreateTag ? 'true' : 'false' ?>" data-has-no-params="<?= empty($parameters) ? 'true' : 'false' ?>">
+<div class="ai-spec" data-spec-id="<?= htmlspecialchars($specId) ?>" data-is-create-spec="<?= $hasCreateTag ? 'true' : 'false' ?>" data-has-no-params="<?= empty($parameters) ? 'true' : 'false' ?>" data-is-manual="<?= $isManualWorkflow ? 'true' : 'false' ?>">
     <!-- Breadcrumb -->
     <nav class="ai-spec__breadcrumb">
-        <a href="<?= $router->url('ai') ?>"><?= __admin('ai.browser.title', 'AI Specs') ?></a>
+        <a href="<?= $router->url('workflows') ?>"><?= __admin('workflows.browser.title', 'Workflows') ?></a>
         <span>›</span>
         <span><?= __admin($meta['titleKey'] ?? '', $specId) ?></span>
     </nav>
@@ -84,24 +89,30 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                     <span class="ai-spec__tag"><?= htmlspecialchars($tag) ?></span>
                     <?php endforeach; ?>
                 <?php endif; ?>
+                <?php if ($isManualWorkflow): ?>
+                <span class="ai-spec__tag ai-spec__tag--manual" title="<?= __admin('workflows.spec.manualHint', 'This workflow executes predefined commands without AI') ?>">📦 <?= __admin('workflows.spec.manual', 'Manual') ?></span>
+                <?php elseif ($isAiWorkflow): ?>
+                <span class="ai-spec__tag ai-spec__tag--ai" title="<?= __admin('workflows.spec.aiHint', 'This workflow generates AI prompts') ?>">🤖 <?= __admin('workflows.spec.ai', 'AI') ?></span>
+                <?php endif; ?>
                 <span class="ai-spec__version">v<?= htmlspecialchars($spec['version'] ?? '1.0.0') ?></span>
                 <?php if (($spec['_source'] ?? 'core') === 'custom'): ?>
-                <span class="ai-spec__tag ai-spec__tag--custom"><?= __admin('ai.spec.custom', 'Custom') ?></span>
+                <span class="ai-spec__tag ai-spec__tag--custom"><?= __admin('workflows.spec.custom', 'Custom') ?></span>
                 <?php endif; ?>
             </div>
         </div>
         <?php if (($spec['_source'] ?? 'core') === 'custom'): ?>
-        <a href="<?= $router->url('ai', 'edit/' . $specId) ?>" class="admin-btn admin-btn--secondary">
+        <a href="<?= $router->url('workflows', 'edit/' . $specId) ?>" class="admin-btn admin-btn--secondary">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
-            <?= __admin('ai.spec.edit', 'Edit Spec') ?>
+            <?= __admin('workflows.spec.edit', 'Edit Workflow') ?>
         </a>
         <?php endif; ?>
     </header>
     
-    <!-- Examples + User Prompt Section -->
+    <?php if ($isAiWorkflow): ?>
+    <!-- Examples + User Prompt Section (AI workflows only) -->
     <div class="ai-spec-user-prompt<?= empty($examples) ? ' ai-spec-user-prompt--single' : '' ?>">
         <?php if (!empty($examples)): ?>
         <!-- Examples -->
@@ -150,6 +161,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
             </div>
         </div>
     </div>
+    <?php endif; ?>
     
     <div class="ai-spec__layout">
         <!-- Sidebar -->
@@ -361,10 +373,42 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                         <?php endif; ?>
                         <?php endforeach; ?>
                         
+                        <?php if ($isManualWorkflow): ?>
+                        <button type="submit" class="admin-btn admin-btn--primary" style="margin-top: var(--space-sm);">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            <?= __admin('workflows.spec.previewSteps', 'Preview Steps') ?>
+                        </button>
+                        <?php else: ?>
                         <button type="submit" class="admin-btn admin-btn--primary" style="margin-top: var(--space-sm);">
                             <?= __admin('ai.spec.generatePrompt', 'Generate Prompt') ?>
                         </button>
+                        <?php endif; ?>
                     </form>
+                </div>
+            </div>
+            <?php elseif ($isManualWorkflow): ?>
+            <!-- Execute button for manual workflows without parameters -->
+            <div class="ai-spec-card">
+                <div class="ai-spec-card__header">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    <?= __admin('workflows.spec.actions', 'Actions') ?>
+                </div>
+                <div class="ai-spec-card__body">
+                    <p class="ai-spec-form__help" style="margin-bottom: var(--space-sm);">
+                        <?= __admin('workflows.spec.noParamsHint', 'This workflow has no configurable parameters.') ?>
+                    </p>
+                    <button type="button" id="preview-manual-steps" class="admin-btn admin-btn--primary" style="width: 100%;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                        <?= __admin('workflows.spec.previewSteps', 'Preview Steps') ?>
+                    </button>
                 </div>
             </div>
             <?php endif; ?>
@@ -399,7 +443,8 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
         
         <!-- Main Content -->
         <main class="ai-spec__main">
-            <!-- Prompt Output -->
+            <?php if ($isAiWorkflow): ?>
+            <!-- Prompt Output (AI workflows only) -->
             <div class="ai-spec-card">
                 <div class="ai-spec-card__header">
                     <span style="display: flex; align-items: center; gap: var(--space-sm);">
@@ -502,8 +547,43 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                     </div>
                 </div>
             </div>
+            <?php endif; ?>
             
-            <!-- Command Preview Section -->
+            <?php if ($isManualWorkflow): ?>
+            <!-- Manual Workflow Steps Preview -->
+            <div class="ai-spec-card manual-steps-section">
+                <div class="ai-spec-card__header">
+                    <span style="display: flex; align-items: center; gap: var(--space-sm);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="4 17 10 11 4 5"/>
+                            <line x1="12" y1="19" x2="20" y2="19"/>
+                        </svg>
+                        <?= __admin('workflows.spec.stepsPreview', 'Workflow Steps') ?>
+                    </span>
+                    <span id="manual-step-count" class="command-count"></span>
+                </div>
+                <div class="ai-spec-card__body">
+                    <p class="ai-spec-form__help" style="margin-bottom: var(--space-md);">
+                        <?= __admin('workflows.spec.stepsHint', 'This workflow will execute the following commands:') ?>
+                    </p>
+                    <div id="manual-steps-loading" class="ai-spec-loading" style="display: none;">
+                        <div class="ai-spec-loading__spinner"></div>
+                        <span><?= __admin('workflows.spec.loadingSteps', 'Loading steps...') ?></span>
+                    </div>
+                    <div id="manual-command-list" class="command-list"></div>
+                    <div class="ai-spec-prompt__actions" style="margin-top: var(--space-md);">
+                        <button type="button" id="execute-manual-workflow" class="admin-btn admin-btn--primary">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                            <?= __admin('workflows.spec.executeWorkflow', 'Execute Workflow') ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+            
+            <!-- Command Preview Section (shared for both AI and manual) -->
             <div class="ai-spec-card command-preview-section" style="display: none;">
                 <div class="ai-spec-card__header">
                     <span style="display: flex; align-items: center; gap: var(--space-sm);">

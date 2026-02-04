@@ -1,10 +1,10 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "quicksite-ai-spec-schema",
-  "title": "QuickSite AI Spec",
-  "description": "Schema for AI specification files used in QuickSite admin panel",
+  "$id": "quicksite-workflow-schema",
+  "title": "QuickSite Workflow",
+  "description": "Schema for workflow files used in QuickSite admin panel (AI-assisted or manual)",
   "type": "object",
-  "required": ["id", "version", "meta", "dataRequirements", "relatedCommands"],
+  "required": ["id", "version", "meta"],
   "properties": {
     "$schema": {
       "type": "string",
@@ -13,12 +13,12 @@
     "id": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$",
-      "description": "Unique identifier for the spec (kebab-case)"
+      "description": "Unique identifier for the workflow (kebab-case)"
     },
     "version": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "description": "Semantic version of this spec"
+      "description": "Semantic version of this workflow"
     },
     "meta": {
       "type": "object",
@@ -30,16 +30,16 @@
         },
         "titleKey": {
           "type": "string",
-          "description": "Translation key for the spec title"
+          "description": "Translation key for the workflow title"
         },
         "descriptionKey": {
           "type": "string",
-          "description": "Translation key for the spec description"
+          "description": "Translation key for the workflow description"
         },
         "category": {
           "type": "string",
-          "enum": ["creation", "modification", "content", "style", "advanced", "wip"],
-          "description": "Category for organizing specs"
+          "enum": ["creation", "modification", "content", "style", "advanced", "wip", "template"],
+          "description": "Category for organizing workflows"
         },
         "tags": {
           "type": "array",
@@ -51,6 +51,60 @@
           "enum": ["beginner", "intermediate", "advanced"],
           "description": "Complexity level for user guidance"
         }
+      }
+    },
+    "preWorkflows": {
+      "type": "array",
+      "description": "Workflows to run BEFORE this workflow's steps. Each can optionally specify params to pass.",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "Workflow ID to run with default params"
+          },
+          {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Workflow ID to run"
+              },
+              "params": {
+                "type": "object",
+                "description": "Parameters to pass to the sub-workflow. Can use {{param.x}} to forward values.",
+                "additionalProperties": true
+              }
+            }
+          }
+        ]
+      }
+    },
+    "postWorkflows": {
+      "type": "array",
+      "description": "Workflows to run AFTER this workflow's steps complete. Same format as preWorkflows.",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "Workflow ID to run with default params"
+          },
+          {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Workflow ID to run"
+              },
+              "params": {
+                "type": "object",
+                "description": "Parameters to pass to the sub-workflow. Can use {{param.x}} to forward values.",
+                "additionalProperties": true
+              }
+            }
+          }
+        ]
       }
     },
     "parameters": {
@@ -260,6 +314,13 @@
       "items": {
         "$ref": "#/definitions/specCommand"
       }
+    },
+    "steps": {
+      "type": "array",
+      "description": "For manual workflows: commands to execute directly (no AI). Presence of steps without promptTemplate makes this a manual workflow.",
+      "items": {
+        "$ref": "#/definitions/specCommand"
+      }
     }
   },
   "definitions": {
@@ -267,9 +328,21 @@
       "type": "object",
       "description": "A command or template to execute automatically",
       "properties": {
+        "comment": {
+          "type": "string",
+          "description": "Optional comment for documentation/debugging purposes. Ignored during execution."
+        },
         "condition": {
           "type": "string",
-          "description": "Condition expression. Supports: param.X === value, config.MULTILINGUAL_SUPPORT === true"
+          "description": "Condition expression. Supports: param.X === value, config.MULTILINGUAL_SUPPORT === true, data.X for dataRequirements. Also supports && and || operators."
+        },
+        "forEach": {
+          "type": "string",
+          "description": "Data path to iterate over (e.g., 'routes', 'assets', 'langData.languages'). Generates one command per item. Use {{$key}} and {{$value}} in params."
+        },
+        "filter": {
+          "type": "string",
+          "description": "Filter expression for forEach items. Supports {{$key}}, {{$value}}, {{$value.prop}}, and {{dataPath}} references. Items where filter evaluates to false are skipped."
         },
         "template": {
           "type": "string",
@@ -279,10 +352,21 @@
           "type": "string",
           "description": "API command name to execute (mutually exclusive with template)"
         },
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+          "description": "HTTP method to use for the command. Default: POST for workflow steps.",
+          "default": "POST"
+        },
         "params": {
           "type": "object",
-          "description": "Parameters for the command. Supports {{config.X}} and $each loops",
+          "description": "Parameters for the command. Supports {{config.X}}, {{param.X}}, {{dataRequirementId.path}}, and in forEach: {{$key}}, {{$value}}, {{$value.field}}",
           "additionalProperties": true
+        },
+        "abortOnFail": {
+          "type": "boolean",
+          "description": "If true, abort the entire workflow if this command fails",
+          "default": false
         }
       },
       "oneOf": [

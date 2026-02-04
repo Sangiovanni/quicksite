@@ -226,12 +226,12 @@
             const data = await response.json();
             
             if (data.success) {
-                showMessage('success', t('saved', 'Spec saved successfully!'));
+                showMessage('success', t('saved', 'Workflow saved successfully!'));
                 
-                // Redirect to the spec page after a short delay
-                const aiUrl = config.aiUrl || (apiBaseUrl + '/admin/ai');
+                // Redirect to the workflow page after a short delay
+                const workflowsUrl = config.workflowsUrl || (apiBaseUrl + '/admin/workflows');
                 setTimeout(() => {
-                    window.location.href = `${aiUrl}/${validation.spec.id}`;
+                    window.location.href = `${workflowsUrl}/${validation.spec.id}`;
                 }, 1500);
             } else {
                 showMessage('error', data.error || 'Save failed');

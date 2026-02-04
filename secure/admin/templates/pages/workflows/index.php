@@ -1,17 +1,17 @@
 <?php
 /**
- * AI Specs Browser
+ * Workflows Browser
  * 
- * Lists all available AI specs organized by category.
- * Users can select a spec to view details and generate prompts.
+ * Lists all available workflows organized by category.
+ * Users can select a workflow to view details and generate prompts (AI) or execute steps (manual).
  * 
- * @version 2.1.0
+ * @version 2.2.0
  */
 
-require_once SECURE_FOLDER_PATH . '/src/classes/AiSpecManager.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
 
-$specManager = new AiSpecManager();
-$specsByCategory = $specManager->getSpecsByCategory();
+$workflowManager = new WorkflowManager();
+$specsByCategory = $workflowManager->getSpecsByCategory();
 $baseUrl = rtrim(BASE_URL, '/');
 
 // Category display configuration
@@ -27,6 +27,12 @@ $categoryConfig = [
         'titleKey' => 'ai.categories.modification.title',
         'descKey' => 'ai.categories.modification.desc',
         'color' => '#3b82f6'
+    ],
+    'template' => [
+        'icon' => '📦',
+        'titleKey' => 'ai.categories.template.title',
+        'descKey' => 'ai.categories.template.desc',
+        'color' => '#0ea5e9'
     ],
     'content' => [
         'icon' => '📝',
@@ -55,7 +61,7 @@ $categoryConfig = [
 ];
 
 // Category order
-$categoryOrder = ['creation', 'modification', 'content', 'style', 'advanced', 'wip'];
+$categoryOrder = ['creation', 'template', 'modification', 'content', 'style', 'advanced', 'wip'];
 ?>
 
 <script>
@@ -84,14 +90,14 @@ window.QUICKSITE_CONFIG.translations = {
                     <polyline points="17 8 12 3 7 8"/>
                     <line x1="12" y1="3" x2="12" y2="15"/>
                 </svg>
-                <?= __admin('ai.browser.importSpec', 'Import Spec') ?>
+                <?= __admin('workflows.browser.importSpec', 'Import Workflow') ?>
             </button>
-            <a href="<?= $router->url('ai', 'new') ?>" class="admin-btn admin-btn--primary">
+            <a href="<?= $router->url('workflows', 'new') ?>" class="admin-btn admin-btn--primary">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="12" y1="5" x2="12" y2="19"/>
                     <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
-                <?= __admin('ai.browser.createSpec', 'Create Custom Spec') ?>
+                <?= __admin('workflows.browser.createSpec', 'Create Custom Workflow') ?>
             </a>
         </div>
     </div>
@@ -193,9 +199,10 @@ window.QUICKSITE_CONFIG.translations = {
                 $specTags = implode(',', $meta['tags'] ?? []);
                 $specTitle = __admin($meta['titleKey'] ?? '', $spec['id']);
                 $specDesc = __admin($meta['descriptionKey'] ?? '', '');
+                $isManual = isset($spec['steps']) && !isset($spec['promptTemplate']);
             ?>
-            <a href="<?= $router->url('ai', $spec['id']) ?>" 
-               class="ai-spec-card" 
+            <a href="<?= $router->url('workflows', $spec['id']) ?>" 
+               class="ai-spec-card<?= $isManual ? ' ai-spec-card--manual' : '' ?>" 
                data-tags="<?= htmlspecialchars($specTags) ?>"
                data-title="<?= htmlspecialchars(strtolower($specTitle)) ?>"
                data-desc="<?= htmlspecialchars(strtolower($specDesc)) ?>"
@@ -203,6 +210,15 @@ window.QUICKSITE_CONFIG.translations = {
                 <div class="ai-spec-card__header">
                     <span class="ai-spec-card__icon"><?= htmlspecialchars($meta['icon'] ?? '📋') ?></span>
                     <span class="ai-spec-card__title"><?= __admin($meta['titleKey'] ?? '', $spec['id']) ?></span>
+                    <?php if ($isManual): ?>
+                    <span class="ai-spec-card__badge ai-spec-card__badge--manual" title="<?= __admin('workflows.spec.manualHint', 'Executes predefined commands without AI') ?>">
+                        📦
+                    </span>
+                    <?php else: ?>
+                    <span class="ai-spec-card__badge ai-spec-card__badge--ai" title="<?= __admin('workflows.spec.aiHint', 'Generates AI prompts') ?>">
+                        🤖
+                    </span>
+                    <?php endif; ?>
                 </div>
                 <p class="ai-spec-card__desc">
                     <?= __admin($meta['descriptionKey'] ?? '', 'No description available') ?>

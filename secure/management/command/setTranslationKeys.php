@@ -5,8 +5,9 @@
  * Adds new keys, updates existing keys, keeps other keys untouched.
  * This is the safe way to update translations without losing existing content.
  * 
- * @param string language - Language code (e.g., 'en', 'fr')
+ * @param string language - Language code (e.g., 'en', 'fr') or 'default'
  * @param object translations - Keys to set/update (nested structure supported)
+ * @param bool replace - Optional. If true, replaces entire file instead of merging (default: false)
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
@@ -105,11 +106,15 @@ if ($translationSize > $maxSize) {
         ->send();
 }
 
+// Optional: replace mode (replaces entire file instead of merging)
+$replaceMode = isset($params['replace']) && $params['replace'] === true;
+
 $translations_file = PROJECT_PATH . '/translate/' . $language . '.json';
 
 // Load existing translations (or empty array if file doesn't exist)
+// Skip loading if in replace mode - we'll just use the new translations
 $existingTranslations = [];
-if (file_exists($translations_file)) {
+if (!$replaceMode && file_exists($translations_file)) {
     $existingJson = @file_get_contents($translations_file);
     if ($existingJson !== false) {
         $decoded = json_decode($existingJson, true);

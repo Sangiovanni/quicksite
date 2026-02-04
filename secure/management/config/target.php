@@ -2,10 +2,10 @@
 /**
  * Active Project Target Configuration
  * 
- * Updated: 2026-02-04 10:25:08
- * Previous: test-bin
+ * Updated: 2026-02-04 17:09:43
+ * Previous: quicksite
  */
 
 return [
-    'project' => 'quicksite'
+    'project' => 'test-bin'
 ];

@@ -99,7 +99,7 @@ $langNames = [
         
         <?php
             // Determine which nav group should be highlighted
-            $buildPages = ['ai', 'batch', 'command', 'preview'];
+            $buildPages = ['workflows', 'batch', 'command', 'preview'];
             $inspectPages = ['structure', 'history', 'docs'];
             $settingsPages = ['settings', 'ai-settings'];
             $isBuildActive = in_array($currentPage, $buildPages);
@@ -130,14 +130,14 @@ $langNames = [
                     </svg>
                 </button>
                 <div class="admin-nav__group-dropdown">
-                    <a href="<?= $router->url('ai') ?>" 
-                       class="admin-nav__link<?= $currentPage === 'ai' ? ' admin-nav__link--active' : '' ?>">
+                    <a href="<?= $router->url('workflows') ?>" 
+                       class="admin-nav__link<?= $currentPage === 'workflows' ? ' admin-nav__link--active' : '' ?>">
                         <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
                             <circle cx="7.5" cy="14.5" r="1.5"/>
                             <circle cx="16.5" cy="14.5" r="1.5"/>
                         </svg>
-                        <span><?= __admin('nav.ai') ?></span>
+                        <span><?= __admin('nav.workflows') ?></span>
                     </a>
                     <a href="<?= $router->url('preview') ?>" 
                        class="admin-nav__link<?= $currentPage === 'preview' ? ' admin-nav__link--active' : '' ?>">
@@ -147,18 +147,6 @@ $langNames = [
                             <line x1="12" y1="17" x2="12" y2="21"/>
                         </svg>
                         <span><?= __admin('nav.visualEditor') ?></span>
-                    </a>
-                    <a href="<?= $router->url('batch') ?>" 
-                       class="admin-nav__link<?= $currentPage === 'batch' ? ' admin-nav__link--active' : '' ?>">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="8" y1="6" x2="21" y2="6"/>
-                            <line x1="8" y1="12" x2="21" y2="12"/>
-                            <line x1="8" y1="18" x2="21" y2="18"/>
-                            <line x1="3" y1="6" x2="3.01" y2="6"/>
-                            <line x1="3" y1="12" x2="3.01" y2="12"/>
-                            <line x1="3" y1="18" x2="3.01" y2="18"/>
-                        </svg>
-                        <span><?= __admin('nav.batch') ?></span>
                     </a>
                     <a href="<?= $router->url('command') ?>" 
                        class="admin-nav__link<?= $currentPage === 'command' ? ' admin-nav__link--active' : '' ?>">

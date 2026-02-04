@@ -312,7 +312,7 @@ quicksite/                    # Root installation
 │
 ├── secure/                  # Backend (core system + projects)
 │   ├── admin/               # Admin panel backend
-│   │   ├── ai_specs/        # AI specification files for commands
+│   │   ├── workflows/       # Workflow specifications (AI + manual)
 │   │   ├── functions/       # Admin helper functions
 │   │   └── templates/       # Admin panel templates
 │   │

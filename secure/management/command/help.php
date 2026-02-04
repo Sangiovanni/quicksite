@@ -945,7 +945,7 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'setTranslationKeys' => [
-        'description' => 'Sets/updates specific translation keys (merge, not replace)',
+        'description' => 'Sets/updates specific translation keys (merge by default, or replace entire file)',
         'method' => 'PATCH',
         'parameters' => [
             'language' => [
@@ -958,12 +958,21 @@ $GLOBALS['__help_commands'] = [
             'translations' => [
                 'required' => true,
                 'type' => 'object',
-                'description' => 'Translation keys to add or update (existing keys preserved)',
+                'description' => 'Translation keys to add or update (existing keys preserved unless replace=true)',
                 'example' => '{"menu": {"home": "Home"}, "footer": {"new_key": "value"}}',
                 'validation' => 'Must be valid JSON object'
+            ],
+            'replace' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'If true, replaces entire file instead of merging (useful for fresh start)',
+                'example' => 'true',
+                'default' => false,
+                'validation' => 'Boolean value'
             ]
         ],
         'example_patch' => 'PATCH /management/setTranslationKeys with body: {"language": "en", "translations": {"home": {"title": "New Title"}}}',
+        'example_replace' => 'PATCH /management/setTranslationKeys with body: {"language": "en", "replace": true, "translations": {"site": {"name": "My Site"}}}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -981,7 +990,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'Invalid translation format',
             '500.server.file_write_failed' => 'Failed to write translation file'
         ],
-        'notes' => 'SAFE: Merges with existing translations. Use language="default" in mono-language mode to edit default.json. New keys are added, existing keys are updated, other keys are preserved.'
+        'notes' => 'SAFE by default: Merges with existing translations. Use language="default" in mono-language mode to edit default.json. New keys are added, existing keys are updated, other keys are preserved. Set replace=true to completely replace the file (used by fresh-start workflow).'
     ],
     
     'deleteTranslationKeys' => [

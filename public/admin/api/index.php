@@ -529,8 +529,8 @@ switch ($action) {
     
     case 'ai-specs':
         // List all available AI specs
-        require_once SECURE_FOLDER_PATH . '/src/classes/AiSpecManager.php';
-        $manager = new AiSpecManager();
+        require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
+        $manager = new WorkflowManager();
         $specs = $manager->listSpecs();
         
         // Return just the metadata for listing
@@ -554,8 +554,8 @@ switch ($action) {
             break;
         }
         
-        require_once SECURE_FOLDER_PATH . '/src/classes/AiSpecManager.php';
-        $manager = new AiSpecManager();
+        require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
+        $manager = new WorkflowManager();
         $specId = $params[0];
         
         // Load the spec
@@ -588,8 +588,8 @@ switch ($action) {
         // Fetch data requirements (pass userParams for condition evaluation)
         $data = $manager->fetchDataRequirements($spec, $userParams);
         
-        // Render the prompt
-        $prompt = $manager->renderPrompt($spec, $data, $userParams);
+        // Render the prompt (signature: workflow, userParams, fetchedData)
+        $prompt = $manager->renderPrompt($spec, $userParams, $data);
         
         // Generate pre/post commands
         $preCommands = $manager->generateSpecCommands($spec, $userParams, 'preCommands');
@@ -626,8 +626,8 @@ switch ($action) {
             break;
         }
         
-        require_once SECURE_FOLDER_PATH . '/src/classes/AiSpecManager.php';
-        $manager = new AiSpecManager();
+        require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
+        $manager = new WorkflowManager();
         
         // Create a mock spec with just the postCommands to reuse generateSpecCommands
         $mockSpec = ['postCommands' => $rawPostCommands];
@@ -647,8 +647,8 @@ switch ($action) {
             break;
         }
         
-        require_once SECURE_FOLDER_PATH . '/src/classes/AiSpecManager.php';
-        $manager = new AiSpecManager();
+        require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
+        $manager = new WorkflowManager();
         $spec = $manager->loadSpec($params[0]);
         
         if (!$spec) {
@@ -687,8 +687,8 @@ switch ($action) {
             break;
         }
         
-        require_once SECURE_FOLDER_PATH . '/src/classes/AiSpecManager.php';
-        $manager = new AiSpecManager();
+        require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
+        $manager = new WorkflowManager();
         
         $spec = $input['spec'];
         $template = $input['template'];
@@ -741,8 +741,8 @@ switch ($action) {
             break;
         }
         
-        require_once SECURE_FOLDER_PATH . '/src/classes/AiSpecManager.php';
-        $manager = new AiSpecManager();
+        require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
+        $manager = new WorkflowManager();
         
         $spec = $input['spec'];
         $template = $input['template'];
@@ -761,7 +761,7 @@ switch ($action) {
         }
         
         $specId = $spec['id'];
-        $customFolder = SECURE_FOLDER_PATH . '/admin/ai_specs/custom';
+        $customFolder = SECURE_FOLDER_PATH . '/admin/workflows/custom';
         
         // Ensure custom folder exists
         if (!is_dir($customFolder)) {
@@ -769,7 +769,7 @@ switch ($action) {
         }
         
         // Check if trying to overwrite a core spec
-        $coreFolder = SECURE_FOLDER_PATH . '/admin/ai_specs/core';
+        $coreFolder = SECURE_FOLDER_PATH . '/admin/workflows/core';
         if (file_exists($coreFolder . '/' . $specId . '.json')) {
             http_response_code(400);
             echo json_encode(['error' => 'Cannot overwrite core spec: ' . $specId]);
@@ -812,6 +812,54 @@ switch ($action) {
                 'id' => $specId,
                 'jsonPath' => $jsonPath,
                 'mdPath' => $mdPath
+            ]
+        ]);
+        break;
+    
+    case 'workflow-generate-steps':
+        // Generate steps for a manual workflow
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+            break;
+        }
+        
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input || !isset($input['workflowId'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Missing workflowId']);
+            break;
+        }
+        
+        require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
+        $manager = new WorkflowManager();
+        
+        $workflow = $manager->loadWorkflow($input['workflowId']);
+        if (!$workflow) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Workflow not found']);
+            break;
+        }
+        
+        // Get user params
+        $userParams = $input['params'] ?? [];
+        
+        // Fetch data requirements
+        $data = [];
+        try {
+            $data = $manager->fetchDataRequirements($workflow, $userParams);
+        } catch (Exception $e) {
+            $data = ['_error' => $e->getMessage()];
+        }
+        
+        // Generate expanded steps
+        $steps = $manager->generateSteps($workflow, $userParams, $data, []);
+        
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'steps' => $steps,
+                'count' => count($steps)
             ]
         ]);
         break;
