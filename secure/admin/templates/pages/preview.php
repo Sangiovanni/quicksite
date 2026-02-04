@@ -153,28 +153,24 @@ if (is_dir($componentsDir)) {
     </div>
     <?php endif; ?>
     
-    <!-- Page Navigation -->
+    <!-- Unified Edit Target (Pages + Components) -->
     <div class="preview-toolbar__group preview-toolbar__group--grow">
-        <label class="preview-toolbar__label" for="preview-route"><?= __admin('preview.page') ?>:</label>
-        <select id="preview-route" class="preview-toolbar__select">
-            <?php foreach ($routes as $route): ?>
-                <option value="<?= adminEscape($route) ?>"><?= adminEscape($route) ?></option>
-            <?php endforeach; ?>
+        <label class="preview-toolbar__label" for="preview-target"><?= __admin('preview.editTarget') ?? 'Edit' ?>:</label>
+        <select id="preview-target" class="preview-toolbar__select">
+            <optgroup label="📄 <?= __admin('preview.pages') ?? 'Pages' ?>">
+                <?php foreach ($routes as $route): ?>
+                    <option value="page:<?= adminEscape($route) ?>"><?= adminEscape($route) ?></option>
+                <?php endforeach; ?>
+            </optgroup>
+            <?php if (!empty($components)): ?>
+            <optgroup label="🧩 <?= __admin('preview.components') ?? 'Components' ?>">
+                <?php foreach ($components as $component): ?>
+                    <option value="component:<?= adminEscape($component) ?>"><?= adminEscape($component) ?></option>
+                <?php endforeach; ?>
+            </optgroup>
+            <?php endif; ?>
         </select>
     </div>
-    
-    <!-- Component Selector (Future: component isolation view) -->
-    <?php if (!empty($components)): ?>
-    <div class="preview-toolbar__group">
-        <label class="preview-toolbar__label" for="preview-component"><?= __admin('preview.component') ?>:</label>
-        <select id="preview-component" class="preview-toolbar__select preview-toolbar__select--sm" disabled title="<?= __admin('preview.componentSoon') ?>">
-            <option value=""><?= __admin('preview.fullPage') ?></option>
-            <?php foreach ($components as $component): ?>
-                <option value="<?= adminEscape($component) ?>"><?= adminEscape($component) ?></option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-    <?php endif; ?>
     
     <!-- Actions -->
     <div class="preview-toolbar__group">
@@ -209,6 +205,16 @@ if (is_dir($componentsDir)) {
             <span class="preview-miniplayer-text--expand" style="display: none;"><?= __admin('preview.expand') ?></span>
         </button>
     </div>
+</div>
+
+<!-- Component Warning Banner (shown when editing a component) -->
+<div class="preview-component-warning" id="preview-component-warning" style="display: none;">
+    <svg class="preview-component-warning__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+    <span class="preview-component-warning__text" id="preview-component-warning-text"></span>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
@@ -1178,6 +1184,27 @@ if (is_dir($componentsDir)) {
                 <input type="text" id="add-node-class" class="admin-input" placeholder="my-class another-class">
             </div>
             
+            <!-- Text Content Section (for component editing) -->
+            <div class="preview-add-node-modal__section" id="add-node-text-content-section" style="display: none;">
+                <label class="preview-add-node-modal__section-label">
+                    <?= __admin('preview.textContent') ?? 'Text Content' ?>:
+                </label>
+                <div class="preview-add-node-modal__text-content">
+                    <select id="add-node-text-mode" class="admin-input">
+                        <option value="none"><?= __admin('preview.textModeNone') ?? 'None (container only)' ?></option>
+                        <option value="translation"><?= __admin('preview.textModeTranslation') ?? 'Translation Key' ?></option>
+                        <option value="variable"><?= __admin('preview.textModeVariable') ?? 'Variable {{...}}' ?></option>
+                        <option value="raw"><?= __admin('preview.textModeRaw') ?? 'Raw Text (__RAW__)' ?></option>
+                    </select>
+                    <div id="add-node-text-input-container" style="display: none; margin-top: 8px;">
+                        <input type="text" id="add-node-text-value" class="admin-input" placeholder="">
+                        <small id="add-node-text-hint" class="preview-add-node-modal__hint" style="margin-top: 4px; display: block;"></small>
+                        <!-- Duplicate variable warning -->
+                        <div id="add-node-text-duplicate-warning" class="preview-add-node-modal__warning preview-add-node-modal__warning--collision" style="display: none; margin-top: 8px;"></div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Custom Parameters Section (expandable) -->
             <div class="preview-add-node-modal__section">
                 <button type="button" class="preview-add-node-modal__expand-btn" id="add-node-expand-params">
@@ -1406,7 +1433,28 @@ if (is_dir($componentsDir)) {
                     </button>
                 </div>
                 
-                <!-- TextKey info (read-only) -->
+                <!-- Text Content Section (editable, for component editing) -->
+                <div class="preview-add-node-modal__section" id="edit-node-text-content-section" style="display: none;">
+                    <label class="preview-add-node-modal__section-label">
+                        <?= __admin('preview.textContent') ?? 'Text Content' ?>:
+                    </label>
+                    <div class="preview-add-node-modal__text-content">
+                        <select id="edit-node-text-mode" class="admin-input">
+                            <option value="none"><?= __admin('preview.textModeNone') ?? 'None (container only)' ?></option>
+                            <option value="translation"><?= __admin('preview.textModeTranslation') ?? 'Translation Key' ?></option>
+                            <option value="variable"><?= __admin('preview.textModeVariable') ?? 'Variable {{...}}' ?></option>
+                            <option value="raw"><?= __admin('preview.textModeRaw') ?? 'Raw Text (__RAW__)' ?></option>
+                        </select>
+                        <div id="edit-node-text-input-container" style="display: none; margin-top: 8px;">
+                            <input type="text" id="edit-node-text-value" class="admin-input" placeholder="">
+                            <small id="edit-node-text-hint" class="preview-add-node-modal__hint" style="margin-top: 4px; display: block;"></small>
+                        </div>
+                        <!-- Collision warning placeholder -->
+                        <div id="edit-node-text-collision-warning" class="preview-add-node-modal__warning preview-add-node-modal__warning--collision" style="display: none; margin-top: 8px;"></div>
+                    </div>
+                </div>
+                
+                <!-- TextKey info (read-only, for page editing) -->
                 <div class="preview-add-node-modal__info" id="edit-node-textkey-info" style="display: none;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; flex-shrink: 0;">
                         <polyline points="4 7 4 4 20 4 20 7"/>

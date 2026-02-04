@@ -111,6 +111,96 @@ class JsonToHtmlRenderer {
     }
 
     /**
+     * Render a component in isolation (for component editor preview)
+     * 
+     * @param string $componentName Name of the component to render
+     * @param array $sampleData Optional sample data for component variables
+     * @return string Rendered HTML
+     */
+    public function renderComponent(string $componentName, array $sampleData = []): string {
+        // Set structure context for editor mode - component editing
+        $this->currentStructure = 'component-' . $componentName;
+        $this->currentNodePath = [];
+        $this->inComponent = false; // Start as NOT in component (we're editing the component itself)
+        
+        // Load component template
+        $componentTemplate = $this->loadComponent($componentName);
+        if ($componentTemplate === null) {
+            return "<!-- Component not found: {$componentName} -->";
+        }
+        
+        // If no sample data provided, generate placeholder data from template
+        if (empty($sampleData)) {
+            $sampleData = $this->generatePlaceholderData($componentTemplate);
+        }
+        
+        // Process placeholders with sample data
+        $processedTemplate = $this->processComponentTemplate($componentTemplate, $sampleData);
+        
+        // Render the processed template
+        return $this->renderNode($processedTemplate, false);
+    }
+
+    /**
+     * Generate placeholder data from a component template
+     * Finds all placeholders like {{varName}} and creates sample values
+     * 
+     * @param array $template Component template structure
+     * @return array Sample data with placeholder names as keys
+     */
+    private function generatePlaceholderData(array $template): array {
+        $placeholders = [];
+        $this->extractPlaceholders($template, $placeholders);
+        
+        $sampleData = [];
+        foreach ($placeholders as $key) {
+            // Show placeholder name as-is for component preview
+            $sampleData[$key] = "{{" . $key . "}}";
+        }
+        
+        return $sampleData;
+    }
+
+    /**
+     * Recursively extract placeholder names from a template
+     * 
+     * @param array $node Current node to scan
+     * @param array &$placeholders Array to collect placeholder names
+     */
+    private function extractPlaceholders(array $node, array &$placeholders): void {
+        // Check textKey for placeholders
+        if (isset($node['textKey']) && preg_match_all('/\{\{(\w+)\}\}/', $node['textKey'], $matches)) {
+            foreach ($matches[1] as $key) {
+                if (!in_array($key, $placeholders)) {
+                    $placeholders[] = $key;
+                }
+            }
+        }
+        
+        // Check params for placeholders
+        if (isset($node['params']) && is_array($node['params'])) {
+            array_walk_recursive($node['params'], function($value) use (&$placeholders) {
+                if (is_string($value) && preg_match_all('/\{\{(\w+)\}\}/', $value, $matches)) {
+                    foreach ($matches[1] as $key) {
+                        if (!in_array($key, $placeholders)) {
+                            $placeholders[] = $key;
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Check children
+        if (isset($node['children']) && is_array($node['children'])) {
+            foreach ($node['children'] as $child) {
+                if (is_array($child)) {
+                    $this->extractPlaceholders($child, $placeholders);
+                }
+            }
+        }
+    }
+
+    /**
      * Render JSON file
      * 
      * @param string $relativePath Path relative to PROJECT_PATH
@@ -258,6 +348,17 @@ class JsonToHtmlRenderer {
         if (strpos($textKey, '__RAW__') === 0) {
             $rawText = substr($textKey, 7); // Remove __RAW__ prefix
             return htmlspecialchars($rawText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        // Check if it's a variable placeholder (e.g., {{varName}}) - display as-is
+        if (preg_match('/^\{\{\w+\}\}$/', $textKey)) {
+            $displayText = htmlspecialchars($textKey, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            // In editor mode, wrap with data attribute for visibility
+            if ($this->editorMode) {
+                $escapedKey = htmlspecialchars($textKey, ENT_QUOTES);
+                return '<span data-qs-textkey="' . $escapedKey . '" data-qs-variable="true">' . $displayText . '</span>';
+            }
+            return $displayText;
         }
 
         // Get translated text

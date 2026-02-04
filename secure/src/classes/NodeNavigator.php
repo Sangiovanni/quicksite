@@ -231,11 +231,15 @@ class NodeNavigator {
         // Navigate to parent and get target index
         $targetIndex = (int)array_pop($path);
         
+        // Determine if root is an array of nodes (pages) or single object (components)
+        $isRootArray = is_array($structure) && !self::isAssociativeArray($structure);
+        
         if (empty($path)) {
             // Target is at root level
-            if (is_array($structure) && !self::isAssociativeArray($structure)) {
+            if ($isRootArray) {
+                // Root is an array of nodes (page structure)
                 if (!isset($structure[$targetIndex])) {
-                    return ['success' => false, 'error' => 'Node not found'];
+                    return ['success' => false, 'error' => 'Node not found at index ' . $targetIndex];
                 }
                 if ($isDelete) {
                     array_splice($structure, $targetIndex, 1);
@@ -243,12 +247,23 @@ class NodeNavigator {
                     $structure[$targetIndex] = $newNode;
                 }
                 return ['success' => true, 'structure' => $structure];
+            } else {
+                // Root is a single object (component structure) - target is in children
+                if (!isset($structure['children'][$targetIndex])) {
+                    return ['success' => false, 'error' => 'Node not found at index ' . $targetIndex];
+                }
+                if ($isDelete) {
+                    array_splice($structure['children'], $targetIndex, 1);
+                    $structure['children'] = array_values($structure['children']);
+                } else {
+                    $structure['children'][$targetIndex] = $newNode;
+                }
+                return ['success' => true, 'structure' => $structure];
             }
         }
         
         // Navigate to parent
         $parent = &$structure;
-        $isRootArray = is_array($structure) && !self::isAssociativeArray($structure);
         
         foreach ($path as $i => $segment) {
             if ($segment === 'slots') {
@@ -304,20 +319,30 @@ class NodeNavigator {
         $targetIndex = (int)array_pop($path);
         $insertIndex = $position === 'after' ? $targetIndex + 1 : $targetIndex;
         
+        // Determine if root is an array of nodes (pages) or single object (components)
+        $isRootArray = is_array($structure) && !self::isAssociativeArray($structure);
+        
         if (empty($path)) {
             // Insert at root level
-            if (is_array($structure) && !self::isAssociativeArray($structure)) {
+            if ($isRootArray) {
+                // Root is an array of nodes (page structure)
                 if ($targetIndex < 0 || $targetIndex >= count($structure)) {
                     return ['success' => false, 'error' => 'Invalid target index'];
                 }
                 array_splice($structure, $insertIndex, 0, [$newNode]);
+                return ['success' => true, 'structure' => $structure, 'insertedAt' => $insertIndex];
+            } else {
+                // Root is a single object (component structure) - target is in children
+                if (!isset($structure['children']) || $targetIndex < 0 || $targetIndex >= count($structure['children'])) {
+                    return ['success' => false, 'error' => 'Invalid target index'];
+                }
+                array_splice($structure['children'], $insertIndex, 0, [$newNode]);
                 return ['success' => true, 'structure' => $structure, 'insertedAt' => $insertIndex];
             }
         }
         
         // Navigate to parent
         $parent = &$structure;
-        $isRootArray = is_array($structure) && !self::isAssociativeArray($structure);
         
         foreach ($path as $i => $segment) {
             if ($segment === 'slots') {

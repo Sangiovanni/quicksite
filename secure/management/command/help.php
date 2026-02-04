@@ -818,7 +818,7 @@ $GLOBALS['__help_commands'] = [
             '404.node.not_found' => 'Node not found at specified identifier',
             '500.server.file_write_failed' => 'Failed to read structure file'
         ],
-        'notes' => 'Node identifiers use 0-indexed dot notation: "0.2.1" = root\'s 1st child → 3rd child → 2nd child. Use /summary to see structure overview with nodeIds. Use specific nodeId to retrieve just that node.'
+        'notes' => 'Node identifiers use 0-indexed dot notation: "0.2.1" = root\'s 1st child → 3rd child → 2nd child. Use /summary to see structure overview with nodeIds. Use specific nodeId to retrieve just that node. **Component vs Page structure**: Pages/menu/footer have an ARRAY root where "0", "1", "2" are root elements. Components have a single OBJECT root where the root itself is accessed via empty string "" and its children are "0", "1", "2". This affects all node operations (addNode, editNode, deleteNode, moveNode).'
     ],
 
     'editStructure' => [
@@ -884,7 +884,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'Failed to write structure file',
             '500.server.internal_error' => 'Failed to encode structure to JSON'
         ],
-        'notes' => 'Two modes: (1) Full replacement - sends complete structure. (2) Targeted edit - use nodeId to modify single node. Use getStructure/page/name/showIds to see node identifiers first. Actions: update (replace), delete (remove), insertBefore/insertAfter (add sibling). Security: max 10,000 nodes, max 50 levels deep.'
+        'notes' => 'Two modes: (1) Full replacement - sends complete structure. (2) Targeted edit - use nodeId to modify single node. Use getStructure/page/name/showIds to see node identifiers first. Actions: update (replace), delete (remove), insertBefore/insertAfter (add sibling). Security: max 10,000 nodes, max 50 levels deep. **Component node paths**: For type=component, the root object is "" (empty) and children are "0", "1", etc. This differs from pages where root elements are "0", "1".'
     ],
     
     'getTranslation' => [
@@ -2082,12 +2082,12 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Role to assign to the token',
                 'valid_values' => [
-                    '*' => 'Superadmin - full access to all 97 commands including token/role management',
-                    'viewer' => 'Read-only access (27 commands)',
-                    'editor' => 'Content editing - structure, translations, assets (55 commands)',
-                    'designer' => 'Style editing - CSS, animations, visual elements (63 commands)',
-                    'developer' => 'Build and deploy access (70 commands)',
-                    'admin' => 'Full access except token/role management (91 commands)',
+                    '*' => 'Superadmin - full access to all 100 commands including token/role management',
+                    'viewer' => 'Read-only access (28 commands)',
+                    'editor' => 'Content editing - structure, translations, assets (58 commands)',
+                    'designer' => 'Style editing - CSS, animations, visual elements (66 commands)',
+                    'developer' => 'Build and deploy access (73 commands)',
+                    'admin' => 'Full access except token/role management (94 commands)',
                     '<custom>' => 'Any custom role name created via createRole'
                 ],
                 'example' => 'editor or designer or admin'
@@ -2218,6 +2218,127 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Slots are {{placeholder}} names (backwards compatibility). Variables array includes type detection: textKey for translatable content, param for URL/attribute values. System placeholders (__ prefix) are filtered out. Use editStructure with type="component" to create/update/delete components.'
     ],
     
+    'findComponentUsages' => [
+        'description' => 'Finds all pages, menu, footer, and other components that use a specific component. Essential for safe delete/rename operations.',
+        'method' => 'GET',
+        'parameters' => [
+            '{component}' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Component name to search for (URL segment)',
+                'example' => 'menu-card'
+            ]
+        ],
+        'example_get' => 'GET /management/findComponentUsages/menu-card',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => "Component 'menu-card' is used in 5 location(s)",
+            'data' => [
+                'component' => 'menu-card',
+                'is_used' => true,
+                'can_delete' => true,
+                'delete_warning' => 'Warning: component is used in pages/menu/footer',
+                'total_usages' => 5,
+                'used_in' => ['page:home', 'page:about', 'menu'],
+                'usages' => [
+                    'pages' => [
+                        ['name' => 'home', 'type' => 'page', 'locations' => ['0.2', '0.3'], 'count' => 2],
+                        ['name' => 'about', 'type' => 'page', 'locations' => ['0.1'], 'count' => 1]
+                    ],
+                    'menu' => ['type' => 'menu', 'locations' => ['0.0', '0.1'], 'count' => 2],
+                    'footer' => null,
+                    'components' => []
+                ]
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.missing_parameter' => 'Component name not provided',
+            '404.file.not_found' => 'Component does not exist'
+        ],
+        'notes' => 'can_delete is false only if other components use this component (would break them). Pages/menu/footer usage shows warning but allows delete. Use before deleteComponent to understand impact. Locations array contains node IDs where component is referenced.'
+    ],
+    
+    'renameComponent' => [
+        'description' => 'Renames a component and updates all references in pages, menu, footer, and other components.',
+        'method' => 'POST',
+        'parameters' => [
+            'oldName' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Current component name',
+                'example' => 'menu-card'
+            ],
+            'newName' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'New component name (letters, numbers, hyphens)',
+                'example' => 'nav-card'
+            ]
+        ],
+        'example_post' => 'POST /management/renameComponent with body: {"oldName": "menu-card", "newName": "nav-card"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => "Component renamed from 'menu-card' to 'nav-card' (5 references updated)",
+            'data' => [
+                'oldName' => 'menu-card',
+                'newName' => 'nav-card',
+                'references_updated' => 5,
+                'files_updated' => [
+                    ['file' => 'pages/home.json', 'references' => 3],
+                    ['file' => 'menu.json', 'references' => 2]
+                ],
+                'errors' => null
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.missing_parameter' => 'oldName or newName not provided',
+            '400.validation.invalid_format' => 'Invalid component name format',
+            '404.file.not_found' => 'Source component does not exist',
+            '409.file.already_exists' => 'Target component name already exists'
+        ],
+        'notes' => 'Renames file and updates all references atomically. Name must start with letter and contain only letters, numbers, hyphens. Use findComponentUsages first to preview impact.'
+    ],
+    
+    'duplicateComponent' => [
+        'description' => 'Creates a copy of an existing component with a new name. References are NOT updated - creates independent copy.',
+        'method' => 'POST',
+        'parameters' => [
+            'source' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Source component name to copy',
+                'example' => 'menu-card'
+            ],
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Name for the new component',
+                'example' => 'menu-card-v2'
+            ]
+        ],
+        'example_post' => 'POST /management/duplicateComponent with body: {"source": "menu-card", "name": "menu-card-v2"}',
+        'success_response' => [
+            'status' => 201,
+            'code' => 'operation.created',
+            'message' => "Component 'menu-card-v2' created as copy of 'menu-card'",
+            'data' => [
+                'source' => 'menu-card',
+                'name' => 'menu-card-v2',
+                'file' => 'components/menu-card-v2.json',
+                'size' => 512
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.missing_parameter' => 'source or name not provided',
+            '400.validation.invalid_format' => 'Invalid component name format',
+            '404.file.not_found' => 'Source component does not exist',
+            '409.file.already_exists' => 'Target component name already exists'
+        ],
+        'notes' => 'Creates independent copy. Existing pages using original component are NOT modified. Use to create variations of components.'
+    ],
+    
     'listPages' => [
         'description' => 'Lists all JSON page structures with metadata. Shows route status, components used, and translation keys.',
         'method' => 'GET',
@@ -2311,7 +2432,7 @@ $GLOBALS['__help_commands'] = [
             '400.operation.denied' => 'Cannot move to same position or inside self',
             '404.resource.not_found' => 'Source or target node not found'
         ],
-        'notes' => 'Atomic move operation with proper index adjustment. Use in Visual Editor drag & drop. Components are moved as single units.'
+        'notes' => 'Atomic move operation with proper index adjustment. Use in Visual Editor drag & drop. Components are moved as single units. **Component node paths**: For type=component, children are "0", "1", etc. (root is "", not movable).'
     ],
     
     'deleteNode' => [
@@ -2353,7 +2474,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_value' => 'Invalid type value',
             '404.resource.not_found' => 'Node not found'
         ],
-        'notes' => 'Recursively deletes all children. Does not delete associated translation keys. Use in Visual Editor with Del key.'
+        'notes' => 'Recursively deletes all children. Does not delete associated translation keys. Use in Visual Editor with Del key. **Component node paths**: For type=component, children are "0", "1", etc. (root itself is "", but cannot be deleted).'
     ],
     
     'addNode' => [
@@ -2423,7 +2544,7 @@ $GLOBALS['__help_commands'] = [
             '400.operation.denied' => 'Cannot insert inside component node',
             '404.resource.not_found' => 'Target node not found'
         ],
-        'notes' => 'Auto-generates textKey as {struct}.item{N}. Creates empty translation in default.json. Position "inside" moves existing text children into new node. For components, use addComponentToNode.'
+        'notes' => 'Auto-generates textKey based on structure type: for pages uses {pageName}.item{N}, for components uses component.{componentName}.item{N}, for menu/footer uses {type}.item{N}. Creates empty translation in default.json. Position "inside" moves existing text children into new node. For components, use addComponentToNode. **Component node paths**: For type=component, root is "" (empty) and children are "0", "1", etc. (differs from pages where root elements start at "0").'
     ],
     
     'editNode' => [
@@ -2493,7 +2614,7 @@ $GLOBALS['__help_commands'] = [
             '400.operation.denied' => 'Cannot edit component node (use editComponentToNode)',
             '404.resource.not_found' => 'Node not found'
         ],
-        'notes' => 'Does NOT edit translation values (use setTranslationKeys). Cannot edit component nodes or pure text nodes. After tag change, validates mandatory params are present.'
+        'notes' => 'Does NOT edit translation values (use setTranslationKeys). Cannot edit component nodes or pure text nodes. After tag change, validates mandatory params are present. **Component node paths**: For type=component, root is "" and children are "0", "1", etc.'
     ],
     
     'addComponentToNode' => [
@@ -4099,7 +4220,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
             'command_categories' => [
                 'folder_management' => ['setPublicSpace', 'renameSecureFolder', 'renamePublicFolder'],
                 'route_management' => ['addRoute', 'deleteRoute', 'getRoutes', 'getSiteMap'],
-                'structure_management' => ['getStructure', 'editStructure', 'listComponents', 'listPages'],
+                'structure_management' => ['getStructure', 'editStructure', 'listComponents', 'findComponentUsages', 'renameComponent', 'duplicateComponent', 'listPages'],
                 'node_management' => ['moveNode', 'deleteNode', 'addNode', 'editNode', 'addComponentToNode', 'editComponentToNode'],
                 'alias_management' => ['createAlias', 'deleteAlias', 'listAliases'],
                 'translation_management' => ['getTranslation', 'getTranslations', 'setTranslationKeys', 'deleteTranslationKeys', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations'],
@@ -4126,12 +4247,12 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'token_format' => 'tvt_<48 hex characters>',
                 'default_token' => 'tvt_dev_default_change_me_in_production (CHANGE IN PRODUCTION!)',
                 'role_system' => [
-                    '*' => 'Superadmin - full access to all 97 commands including token/role management',
-                    'viewer' => 'Read-only access (27 commands) - get*, list*, validate*, help, listAiProviders, listJsFunctions, listInteractions',
-                    'editor' => 'Content editing (55 commands) - viewer + structure, translations, assets, interactions',
-                    'designer' => 'Style editing (63 commands) - editor + CSS, animations, visual elements',
-                    'developer' => 'Build access (70 commands) - designer + build, deploy, projects, AI, listJsFunctions',
-                    'admin' => 'Full except tokens (91 commands) - developer + all except token/role management + JS functions'
+                    '*' => 'Superadmin - full access to all 100 commands including token/role management',
+                    'viewer' => 'Read-only access (28 commands) - get*, list*, validate*, help, listAiProviders, listJsFunctions, listInteractions',
+                    'editor' => 'Content editing (58 commands) - viewer + structure, translations, assets, interactions',
+                    'designer' => 'Style editing (66 commands) - editor + CSS, animations, visual elements',
+                    'developer' => 'Build access (73 commands) - designer + build, deploy, projects, AI, listJsFunctions',
+                    'admin' => 'Full except tokens (94 commands) - developer + all except token/role management + JS functions'
                 ],
                 'endpoints' => [
                     'listRoles' => 'View available roles (* sees commands, others see names only)',

@@ -8,6 +8,99 @@ require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 const BLOCKED_TAGS = ['script', 'noscript', 'style', 'template', 'slot'];
 
 /**
+ * Internal function to find component usages (for delete safety check)
+ * Simplified version of findComponentUsages command
+ */
+function findComponentUsagesInternal(string $componentName): array {
+    $usages = [
+        'pages' => [],
+        'menu' => null,
+        'footer' => null,
+        'components' => []
+    ];
+    
+    $jsonDir = PROJECT_PATH . '/templates/model/json';
+    $componentsDir = $jsonDir . '/components';
+    
+    // Helper to find component in structure
+    $findInStructure = function($node, string $target, array &$found, string $path = '') use (&$findInStructure): void {
+        if (!is_array($node)) return;
+        if (isset($node['component']) && $node['component'] === $target) {
+            $found[] = $path ?: 'root';
+        }
+        if (isset($node['children']) && is_array($node['children'])) {
+            foreach ($node['children'] as $i => $child) {
+                $findInStructure($child, $target, $found, $path ? "{$path}.{$i}" : (string)$i);
+            }
+        }
+    };
+    
+    // Helper to scan file
+    $scanFile = function(string $file, string $target) use ($findInStructure): array {
+        if (!file_exists($file)) return [];
+        $content = @file_get_contents($file);
+        if ($content === false) return [];
+        $structure = json_decode($content, true);
+        if (json_last_error() !== JSON_ERROR_NONE) return [];
+        
+        $found = [];
+        if (isset($structure['tag']) || isset($structure['component']) || isset($structure['textKey'])) {
+            $findInStructure($structure, $target, $found, '0');
+        } else if (is_array($structure)) {
+            foreach ($structure as $i => $node) {
+                $findInStructure($node, $target, $found, (string)$i);
+            }
+        }
+        return $found;
+    };
+    
+    // Scan menu
+    $locations = $scanFile($jsonDir . '/menu.json', $componentName);
+    if (!empty($locations)) {
+        $usages['menu'] = ['type' => 'menu', 'locations' => $locations, 'count' => count($locations)];
+    }
+    
+    // Scan footer
+    $locations = $scanFile($jsonDir . '/footer.json', $componentName);
+    if (!empty($locations)) {
+        $usages['footer'] = ['type' => 'footer', 'locations' => $locations, 'count' => count($locations)];
+    }
+    
+    // Scan pages recursively
+    $scanPagesDir = function(string $dir, string $prefix = '') use (&$scanPagesDir, $scanFile, $componentName, &$usages): void {
+        if (!is_dir($dir)) return;
+        foreach (scandir($dir) as $item) {
+            if ($item === '.' || $item === '..') continue;
+            $path = $dir . '/' . $item;
+            if (is_dir($path)) {
+                $scanPagesDir($path, $prefix ? $prefix . '/' . $item : $item);
+            } else if (pathinfo($item, PATHINFO_EXTENSION) === 'json') {
+                $pageName = $prefix ? $prefix . '/' . pathinfo($item, PATHINFO_FILENAME) : pathinfo($item, PATHINFO_FILENAME);
+                $locations = $scanFile($path, $componentName);
+                if (!empty($locations)) {
+                    $usages['pages'][] = ['name' => $pageName, 'type' => 'page', 'locations' => $locations, 'count' => count($locations)];
+                }
+            }
+        }
+    };
+    $scanPagesDir($jsonDir . '/pages');
+    
+    // Scan other components
+    if (is_dir($componentsDir)) {
+        foreach (glob($componentsDir . '/*.json') as $file) {
+            $otherName = basename($file, '.json');
+            if ($otherName === $componentName) continue;
+            $locations = $scanFile($file, $componentName);
+            if (!empty($locations)) {
+                $usages['components'][] = ['name' => $otherName, 'type' => 'component', 'locations' => $locations, 'count' => count($locations)];
+            }
+        }
+    }
+    
+    return $usages;
+}
+
+/**
  * Recursively validate structure for blocked tags
  * @param mixed $node Node to validate
  * @return string|null Error message if blocked tag found, null if valid
@@ -305,6 +398,33 @@ if (!file_exists($json_file) && $type !== 'component') {
 // For components with empty structure, delete the component file
 if ($type === 'component' && is_array($structure) && empty($structure)) {
     if (file_exists($json_file)) {
+        // Check if component is used by other components (block delete)
+        $usages = findComponentUsagesInternal($name);
+        
+        if (!empty($usages['components'])) {
+            $usingComponents = array_map(fn($c) => $c['name'], $usages['components']);
+            ApiResponse::create(400, 'operation.denied')
+                ->withMessage("Cannot delete component '{$name}': used by other components")
+                ->withData([
+                    'component' => $name,
+                    'used_by_components' => $usingComponents,
+                    'hint' => 'Remove references from these components first, or use force=true to delete anyway'
+                ])
+                ->send();
+        }
+        
+        // Warn about page/menu/footer usage but allow delete
+        $warnings = [];
+        if (!empty($usages['pages'])) {
+            $warnings[] = 'Used in ' . count($usages['pages']) . ' page(s): ' . implode(', ', array_map(fn($p) => $p['name'], $usages['pages']));
+        }
+        if ($usages['menu']) {
+            $warnings[] = 'Used in menu';
+        }
+        if ($usages['footer']) {
+            $warnings[] = 'Used in footer';
+        }
+        
         if (!unlink($json_file)) {
             ApiResponse::create(500, 'server.file_delete_failed')
                 ->withMessage("Failed to delete component file")
@@ -314,11 +434,12 @@ if ($type === 'component' && is_array($structure) && empty($structure)) {
         
         // Success - component deleted
         ApiResponse::create(200, 'operation.success')
-            ->withMessage('Component deleted successfully')
+            ->withMessage('Component deleted successfully' . (!empty($warnings) ? ' (with warnings)' : ''))
             ->withData([
                 'type' => $type,
                 'name' => $name,
-                'deleted' => true
+                'deleted' => true,
+                'warnings' => $warnings ?: null
             ])
             ->send();
     } else {

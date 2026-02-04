@@ -1,6 +1,81 @@
 <?php
 require_once 'init.php';
 
+// --- Component Preview Mode (for Visual Editor) ---
+// If ?_component={name}&_editor=1 is present, render just the component in isolation
+if (isset($_GET['_component']) && isset($_GET['_editor']) && $_GET['_editor'] === '1') {
+    $componentName = preg_replace('/[^a-zA-Z0-9_-]/', '', $_GET['_component']); // Sanitize
+    
+    require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';
+    $trimParameters = new TrimParameters();
+    $lang = $trimParameters->lang() ?: (CONFIG['LANGUAGE_DEFAULT'] ?? 'en');
+    
+    require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
+    $translator = new Translator($lang);
+    
+    require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
+    $renderer = new JsonToHtmlRenderer($translator, [
+        'editorMode' => true,
+        'baseUrl' => BASE_URL,
+        'lang' => $lang,
+    ]);
+    
+    // Render component in isolation
+    $componentHtml = $renderer->renderComponent($componentName);
+    
+    // Output minimal HTML wrapper with component
+    ?><!DOCTYPE html>
+<html lang="<?= htmlspecialchars($lang) ?>">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Component: <?= htmlspecialchars($componentName) ?></title>
+    <link rel="stylesheet" href="<?= BASE_URL ?>/style/style.css">
+    <style>
+        /* Component preview container */
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        .component-preview-wrapper {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .component-preview-label {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed #ddd;
+        }
+        .component-preview-label code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="component-preview-wrapper">
+        <div class="component-preview-label">
+            Component: <code><?= htmlspecialchars($componentName) ?></code>
+        </div>
+        <?= $componentHtml ?>
+    </div>
+    <script src="<?= BASE_URL ?>/scripts/qs.js"></script>
+</body>
+</html><?php
+    exit;
+}
+
 // --- Check for URL aliases BEFORE TrimParameters processes routes ---
 $aliasesFile = PROJECT_PATH . '/data/aliases.json';
 $aliasRewrite = null;

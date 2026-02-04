@@ -102,6 +102,42 @@ switch ($action) {
             echo json_encode(['success' => false, 'error' => $result['error']]);
         }
         break;
+    
+    case 'component-variables':
+        // Return variables for a specific component
+        $componentName = $params[0] ?? '';
+        if (!$componentName) {
+            echo json_encode(['success' => false, 'error' => 'Component name required']);
+            break;
+        }
+        
+        $result = makeInternalApiCall('listComponents', $token);
+        if ($result['success']) {
+            $component = null;
+            foreach ($result['data']['components'] ?? [] as $comp) {
+                if ($comp['name'] === $componentName) {
+                    $component = $comp;
+                    break;
+                }
+            }
+            
+            if ($component) {
+                // Return variables with their types
+                echo json_encode([
+                    'success' => true, 
+                    'data' => [
+                        'name' => $component['name'],
+                        'variables' => $component['variables'] ?? [],
+                        'slots' => $component['slots'] ?? []
+                    ]
+                ]);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Component not found']);
+            }
+        } else {
+            echo json_encode(['success' => false, 'error' => $result['error']]);
+        }
+        break;
         
     case 'routes':
         // Return list of routes

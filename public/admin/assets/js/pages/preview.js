@@ -19,9 +19,8 @@
     const wrapper = document.getElementById('preview-frame-wrapper');
     const previewResizeHandle = document.getElementById('preview-resize-handle');
     const loading = document.getElementById('preview-loading');
-    const routeSelect = document.getElementById('preview-route');
+    const targetSelect = document.getElementById('preview-target');  // Unified page/component dropdown
     const langSelect = document.getElementById('preview-lang');
-    const componentSelect = document.getElementById('preview-component');
     const reloadBtn = document.getElementById('preview-reload');
     const deviceBtns = document.querySelectorAll('.preview-device-btn');
     const modeBtns = document.querySelectorAll('.preview-mode-btn');
@@ -142,6 +141,10 @@
     const keyframeCancelBtn = document.getElementById('keyframe-cancel');
     const keyframeSaveBtn = document.getElementById('keyframe-save');
     
+    // Component Warning Banner (Phase 2E)
+    const componentWarning = document.getElementById('preview-component-warning');
+    const componentWarningText = document.getElementById('preview-component-warning-text');
+    
     // Configuration
     const baseUrl = PreviewConfig.baseUrl;
     const adminUrl = PreviewConfig.adminUrl;
@@ -161,7 +164,8 @@
     // State
     let currentDevice = 'desktop';
     let currentMode = 'select';
-    let currentComponent = '';
+    let currentEditType = 'page';     // 'page' or 'component'
+    let currentEditName = '';         // route name for pages, component name for components
     let overlayInjected = false;
     
     // Theme variables state (Phase 8.3)
@@ -3160,19 +3164,22 @@
         return langSelect ? langSelect.value : defaultLang;
     }
     
-    function buildUrl(route, component = '') {
+    function buildUrl(editType, editName) {
         let url = baseUrl + '/';
-        if (multilingual) {
-            url += getCurrentLang() + '/';
-        }
-        if (route) {
-            url += route;
-        }
-        // Always add _editor=1 for editor mode
-        url += (url.includes('?') ? '&' : '?') + '_editor=1';
-        // Add component isolation parameter if set
-        if (component) {
-            url += '&_component=' + encodeURIComponent(component);
+        
+        if (editType === 'component') {
+            // Component preview - standalone component render
+            url += '?_component=' + encodeURIComponent(editName) + '&_editor=1';
+        } else {
+            // Page preview - normal route
+            if (multilingual) {
+                url += getCurrentLang() + '/';
+            }
+            if (editName) {
+                url += editName;
+            }
+            // Always add _editor=1 for editor mode
+            url += (url.includes('?') ? '&' : '?') + '_editor=1';
         }
         return url;
     }
@@ -3202,11 +3209,74 @@
         iframe.src = iframe.src;
     }
     
-    function navigateTo(route, component = '') {
+    function navigateTo(editType, editName) {
         showLoading();
         startLoadingTimeout();
         overlayInjected = false;
-        iframe.src = buildUrl(route, component);
+        currentEditType = editType;
+        currentEditName = editName;
+        iframe.src = buildUrl(editType, editName);
+        
+        // Invalidate structure caches on navigation
+        invalidateAllStructureCaches();
+        
+        // Update component warning banner
+        updateComponentWarning(editType, editName);
+    }
+    
+    // ==================== Component Warning Banner ====================
+    
+    /**
+     * Show/hide component warning banner and fetch usage count
+     */
+    async function updateComponentWarning(editType, editName) {
+        if (!componentWarning || !componentWarningText) return;
+        
+        // Update Text mode button visibility - hide when editing components
+        updateTextModeVisibility(editType);
+        
+        if (editType !== 'component') {
+            componentWarning.style.display = 'none';
+            return;
+        }
+        
+        // Show banner immediately with loading state
+        componentWarning.style.display = 'flex';
+        componentWarningText.textContent = PreviewConfig.i18n.componentWarning?.replace(':count', '...') || 'Editing component template...';
+        
+        try {
+            // Fetch usage count via findComponentUsages API
+            const result = await QuickSiteAdmin.apiRequest('findComponentUsages', 'POST', {
+                componentName: editName
+            });
+            
+            if (result.ok && result.data?.data) {
+                const totalUsages = result.data.data.totalUsages || 0;
+                const warningText = PreviewConfig.i18n.componentWarning?.replace(':count', totalUsages.toString()) 
+                    || `Editing component template - changes affect all ${totalUsages} usage(s)`;
+                componentWarningText.textContent = warningText;
+            }
+        } catch (error) {
+            console.warn('[Preview] Failed to fetch component usages:', error);
+            // Keep showing generic warning
+        }
+    }
+    
+    /**
+     * Show/hide Text mode button based on edit type
+     * Text mode is hidden when editing components (use Add Tag modal for text content)
+     */
+    function updateTextModeVisibility(editType) {
+        const textModeBtn = document.querySelector('.preview-mode-btn[data-mode="text"]');
+        if (!textModeBtn) return;
+        
+        const isComponent = editType === 'component';
+        textModeBtn.style.display = isComponent ? 'none' : '';
+        
+        // If currently in text mode and switching to component, reset to select mode
+        if (isComponent && currentMode === 'text') {
+            setMode('select');
+        }
     }
     
     // ==================== Device ====================
@@ -10045,20 +10115,24 @@
         setTimeout(injectOverlay, 200);
     });
     
-    routeSelect.addEventListener('change', function() {
-        navigateTo(this.value, currentComponent);
+    targetSelect.addEventListener('change', function() {
+        // Parse unified dropdown value: "type:name" (e.g., "page:home" or "component:feature-item")
+        const value = this.value;
+        const colonIdx = value.indexOf(':');
+        if (colonIdx === -1) {
+            // Fallback for legacy format - treat as page
+            navigateTo('page', value);
+            return;
+        }
+        const type = value.substring(0, colonIdx);
+        const name = value.substring(colonIdx + 1);
+        navigateTo(type, name);
     });
     
     if (langSelect) {
         langSelect.addEventListener('change', function() {
-            navigateTo(routeSelect.value, currentComponent);
-        });
-    }
-    
-    if (componentSelect) {
-        componentSelect.addEventListener('change', function() {
-            currentComponent = this.value;
-            navigateTo(routeSelect.value, currentComponent);
+            // Reload with current edit target
+            navigateTo(currentEditType, currentEditName);
         });
     }
     
@@ -10340,6 +10414,14 @@
     const componentVarsContainer = document.getElementById('component-vars-container');
     const componentNoVarsInfo = document.getElementById('component-no-vars');
     
+    // Text content section (for component editing)
+    const textContentSection = document.getElementById('add-node-text-content-section');
+    const textModeSelect = document.getElementById('add-node-text-mode');
+    const textInputContainer = document.getElementById('add-node-text-input-container');
+    const textValueInput = document.getElementById('add-node-text-value');
+    const textHint = document.getElementById('add-node-text-hint');
+    const textDuplicateWarning = document.getElementById('add-node-text-duplicate-warning');
+    
     // Input elements
     const tagSelect = document.getElementById('add-node-tag');
     const addNodeComponentSelect = document.getElementById('add-node-component');
@@ -10354,6 +10436,12 @@
     // Generate a preview of what the textKey will be
     function updateTextKeyPreview() {
         if (!textKeyInfoSection || !generatedTextKeyPreview) return;
+        
+        // Don't show auto-textKey info when editing components (user picks manually)
+        if (currentEditType === 'component') {
+            textKeyInfoSection.style.display = 'none';
+            return;
+        }
         
         const tag = tagSelect?.value || 'div';
         const hasClass = (classInput?.value?.trim() || '').length > 0;
@@ -10386,6 +10474,119 @@
             altKeyInfoSection.style.display = 'none';
         }
     }
+    
+    // Show/hide text content section based on edit type and node type
+    function updateTextContentSection() {
+        if (!textContentSection) return;
+        
+        // Only show when editing components AND adding HTML tags
+        const shouldShow = currentEditType === 'component' && currentNodeType === 'tag';
+        textContentSection.style.display = shouldShow ? 'block' : 'none';
+        
+        // Reset on show
+        if (shouldShow && textModeSelect) {
+            textModeSelect.value = 'none';
+            updateTextInputVisibility();
+        }
+    }
+    
+    // Update text input visibility and placeholder based on selected mode
+    function updateTextInputVisibility() {
+        if (!textInputContainer || !textModeSelect || !textValueInput || !textHint) return;
+        
+        const mode = textModeSelect.value;
+        
+        // Hide duplicate warning when mode changes
+        if (textDuplicateWarning) textDuplicateWarning.style.display = 'none';
+        
+        if (mode === 'none') {
+            textInputContainer.style.display = 'none';
+            textValueInput.value = '';
+        } else {
+            textInputContainer.style.display = 'block';
+            
+            // Set placeholder and hint based on mode
+            switch (mode) {
+                case 'translation':
+                    textValueInput.placeholder = PreviewConfig.i18n?.textPlaceholderTranslation || 'e.g. component.myButton.label';
+                    textHint.textContent = PreviewConfig.i18n?.textHintTranslation || 'Enter a translation key. Value will be looked up in translations.';
+                    break;
+                case 'variable':
+                    textValueInput.placeholder = PreviewConfig.i18n?.textPlaceholderVariable || 'e.g. buttonText';
+                    textHint.textContent = PreviewConfig.i18n?.textHintVariable || 'Enter variable name (without {{ }}). Value will be passed from parent.';
+                    break;
+                case 'raw':
+                    textValueInput.placeholder = PreviewConfig.i18n?.textPlaceholderRaw || 'e.g. Hello World';
+                    textHint.textContent = PreviewConfig.i18n?.textHintRaw || 'Enter raw text. This will be displayed as-is.';
+                    break;
+            }
+        }
+    }
+    
+    // Check if variable already exists in current component's structure (async)
+    async function checkDuplicateVariable(varName, warningElement) {
+        if (!varName || !warningElement || currentEditType !== 'component') {
+            if (warningElement) warningElement.style.display = 'none';
+            return false;
+        }
+        
+        // Get variables actually used in the structure
+        const usedVars = await getStructureUsedVariables();
+        const isDuplicate = usedVars.has(varName);
+        
+        if (isDuplicate) {
+            warningElement.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; flex-shrink: 0;">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <div>
+                    <strong>${PreviewConfig.i18n?.variableDuplicate || 'Duplicate variable!'}</strong>
+                    <div style="margin-top: 4px; font-size: 0.85em;">
+                        <code>{{${varName}}}</code> ${PreviewConfig.i18n?.variableDuplicateHint || 'already exists in this component.'}
+                    </div>
+                </div>
+            `;
+            warningElement.style.display = 'flex';
+            return true;
+        } else {
+            warningElement.style.display = 'none';
+            return false;
+        }
+    }
+    
+    // Get the constructed textKey value based on selection
+    function getTextKeyFromSelection() {
+        if (!textModeSelect || !textValueInput) return null;
+        
+        const mode = textModeSelect.value;
+        const value = textValueInput.value.trim();
+        
+        if (mode === 'none' || !value) return null;
+        
+        switch (mode) {
+            case 'translation':
+                return value; // Just the key
+            case 'variable':
+                // Wrap in {{ }} if not already wrapped
+                return value.startsWith('{{') ? value : `{{${value}}}`;
+            case 'raw':
+                return `__RAW__${value}`;
+            default:
+                return null;
+        }
+    }
+    
+    // Text mode dropdown change handler
+    textModeSelect?.addEventListener('change', updateTextInputVisibility);
+    
+    // Variable input handler - check for duplicates on input (async, fire-and-forget)
+    textValueInput?.addEventListener('input', async function() {
+        if (textModeSelect?.value === 'variable' && textDuplicateWarning) {
+            await checkDuplicateVariable(this.value.trim(), textDuplicateWarning);
+        }
+    });
     
     // Build mandatory params fields for selected tag
     function updateMandatoryParams() {
@@ -10496,11 +10697,16 @@
             // Reset component state
             if (addNodeComponentSelect) addNodeComponentSelect.value = '';
             hideComponentVariables();
+            // Reset text content section
+            if (textModeSelect) textModeSelect.value = 'none';
+            if (textValueInput) textValueInput.value = '';
+            if (textInputContainer) textInputContainer.style.display = 'none';
             // Update UI
             updateNodeTypeUI();
             updateMandatoryParams();
             updateTextKeyPreview();
             updateAltKeyPreview();
+            updateTextContentSection();
         }
     }
     
@@ -10531,6 +10737,9 @@
         if (isTag) {
             hideComponentVariables();
         }
+        
+        // Update text content section for component editing
+        updateTextContentSection();
     }
     
     // Type radio change
@@ -10645,12 +10854,197 @@
         showComponentVariables(comp);
     }
     
+    // Get current (parent) component's variables for collision detection
+    function getParentComponentVariables() {
+        if (currentEditType !== 'component' || !currentEditName || !componentsCache) {
+            return [];
+        }
+        const parentComp = componentsCache.find(c => c.name === currentEditName);
+        return parentComp?.variables || [];
+    }
+    
+    // Cache for current component structure's used variables
+    let structureVariablesCache = null;
+    let structureVariablesCacheFor = null;
+    
+    // Scan a structure node recursively for all {{varName}} textKeys
+    function findTextKeyVariables(node, found = new Set()) {
+        if (!node) return found;
+        
+        // Check if this node has a textKey with {{varName}} pattern
+        if (node.textKey) {
+            const match = node.textKey.match(/^\{\{(\w+)\}\}$/);
+            if (match) {
+                found.add(match[1]);
+            }
+        }
+        
+        // Recurse into children
+        if (Array.isArray(node.children)) {
+            node.children.forEach(child => findTextKeyVariables(child, found));
+        }
+        
+        return found;
+    }
+    
+    // Get all variable names used in the current component's structure
+    async function getStructureUsedVariables(excludeNodePath = null) {
+        if (currentEditType !== 'component' || !currentEditName) {
+            return new Set();
+        }
+        
+        // Check cache
+        const cacheKey = `${currentEditType}:${currentEditName}`;
+        if (structureVariablesCache && structureVariablesCacheFor === cacheKey) {
+            return structureVariablesCache;
+        }
+        
+        try {
+            const result = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, ['component', currentEditName]);
+            if (result.ok && result.data?.data?.structure) {
+                const usedVars = findTextKeyVariables(result.data.data.structure);
+                structureVariablesCache = usedVars;
+                structureVariablesCacheFor = cacheKey;
+                return usedVars;
+            }
+        } catch (error) {
+            console.error('Failed to fetch structure for variable check:', error);
+        }
+        
+        return new Set();
+    }
+    
+    // Invalidate structure variables cache (call after navigation or save)
+    function invalidateStructureVariablesCache() {
+        structureVariablesCache = null;
+        structureVariablesCacheFor = null;
+    }
+    
+    // Check for variable collisions between parent and child components
+    function checkVariableCollisions(childVariables) {
+        const parentVars = getParentComponentVariables();
+        if (parentVars.length === 0) return [];
+        
+        const parentVarNames = new Set(parentVars.map(v => v.name));
+        return childVariables.filter(v => parentVarNames.has(v.name));
+    }
+    
+    // Cache for nested component names in current component
+    let nestedComponentsCache = null;
+    let nestedComponentsCacheFor = null;
+    
+    // Find all nested component names in a structure recursively
+    function findNestedComponents(node, found = new Set()) {
+        if (!node) return found;
+        
+        // Check if this node is a component
+        if (node.component) {
+            found.add(node.component);
+        }
+        
+        // Recurse into children
+        if (Array.isArray(node.children)) {
+            node.children.forEach(child => findNestedComponents(child, found));
+        }
+        
+        return found;
+    }
+    
+    // Get variables from all nested child components (async)
+    async function getNestedComponentVariables() {
+        if (currentEditType !== 'component' || !currentEditName) {
+            return [];
+        }
+        
+        // Use cache if valid
+        if (nestedComponentsCacheFor === currentEditName && nestedComponentsCache !== null) {
+            return nestedComponentsCache;
+        }
+        
+        try {
+            // Fetch the current component's structure
+            const result = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, ['component', currentEditName]);
+            if (!result.ok || !result.data?.data?.structure) {
+                return [];
+            }
+            
+            const structure = result.data.data.structure;
+            const nestedNames = findNestedComponents(structure);
+            
+            // Collect variables from all nested components
+            const allVars = [];
+            if (componentsCache) {
+                nestedNames.forEach(compName => {
+                    const comp = componentsCache.find(c => c.name === compName);
+                    if (comp?.variables) {
+                        comp.variables.forEach(v => {
+                            allVars.push({ ...v, fromComponent: compName });
+                        });
+                    }
+                });
+            }
+            
+            // Cache result
+            nestedComponentsCache = allVars;
+            nestedComponentsCacheFor = currentEditName;
+            
+            return allVars;
+        } catch (e) {
+            console.error('[Preview] Error fetching nested components:', e);
+            return [];
+        }
+    }
+    
+    // Check if a variable name collides with nested child component variables
+    async function checkReverseCollision(varName) {
+        if (!varName || currentEditType !== 'component') return [];
+        
+        const nestedVars = await getNestedComponentVariables();
+        return nestedVars.filter(v => v.name === varName);
+    }
+    
+    // Invalidate nested components cache when navigating
+    function invalidateNestedCache() {
+        nestedComponentsCache = null;
+        nestedComponentsCacheFor = null;
+    }
+    
+    // Invalidate all caches when navigating or saving
+    function invalidateAllStructureCaches() {
+        invalidateNestedCache();
+        invalidateStructureVariablesCache();
+    }
+    
     // Show component variables section
     function showComponentVariables(comp) {
         if (!componentVarsSection || !componentVarsContainer) return;
         
         const variables = comp.variables || [];
         componentVarsContainer.innerHTML = '';
+        
+        // Check for variable collisions if editing a component
+        const collisions = checkVariableCollisions(variables);
+        
+        // Show collision warning if needed
+        if (collisions.length > 0 && currentEditType === 'component') {
+            const warningDiv = document.createElement('div');
+            warningDiv.className = 'preview-add-node-modal__warning preview-add-node-modal__warning--collision';
+            warningDiv.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; flex-shrink: 0;">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <div>
+                    <strong>${PreviewConfig.i18n?.variableCollision || 'Variable name collision!'}</strong>
+                    <div style="margin-top: 4px; font-size: 0.85em;">
+                        ${PreviewConfig.i18n?.variableCollisionHint || 'These variables exist in both parent and child:'} 
+                        <code>${collisions.map(v => v.name).join(', ')}</code>
+                    </div>
+                </div>
+            `;
+            componentVarsContainer.appendChild(warningDiv);
+        }
         
         if (variables.length === 0) {
             componentVarsSection.style.display = 'block';
@@ -10861,6 +11255,14 @@
                     apiParams.params = params;
                 }
                 
+                // If editing a component and user specified text content, add textKey
+                if (currentEditType === 'component') {
+                    const textKey = getTextKeyFromSelection();
+                    if (textKey) {
+                        apiParams.textKey = textKey;
+                    }
+                }
+                
                 hideAddNodeModal();
                 showToast(PreviewConfig.i18n.loading + '...', 'info');
                 
@@ -10883,6 +11285,9 @@
                     
                     showToast(successMsg, 'success');
                     console.log('[Preview] Node added:', data);
+                    
+                    // Invalidate structure caches since structure changed
+                    invalidateAllStructureCaches();
                     
                     // Save target info BEFORE hiding the panel (which clears selectedNode)
                     const targetNodeId = selectedNode;
@@ -10937,6 +11342,14 @@
     const editNodeTextKeyValue = document.getElementById('edit-node-textkey-value');
     const editNodeAltKeyInfo = document.getElementById('edit-node-altkey-info');
     const editNodeAltKeyValue = document.getElementById('edit-node-altkey-value');
+    
+    // Edit modal - text content section (for component editing)
+    const editNodeTextContentSection = document.getElementById('edit-node-text-content-section');
+    const editNodeTextModeSelect = document.getElementById('edit-node-text-mode');
+    const editNodeTextInputContainer = document.getElementById('edit-node-text-input-container');
+    const editNodeTextValueInput = document.getElementById('edit-node-text-value');
+    const editNodeTextHint = document.getElementById('edit-node-text-hint');
+    const editNodeTextCollisionWarning = document.getElementById('edit-node-text-collision-warning');
     
     // Store original node data for comparison
     let editNodeOriginalData = null;
@@ -11020,6 +11433,13 @@
         editNodeTextOnlyWarning.style.display = 'none';
         editNodeConfirm.disabled = false;
         
+        // Reset text content section
+        if (editNodeTextContentSection) editNodeTextContentSection.style.display = 'none';
+        if (editNodeTextModeSelect) editNodeTextModeSelect.value = 'none';
+        if (editNodeTextInputContainer) editNodeTextInputContainer.style.display = 'none';
+        if (editNodeTextValueInput) editNodeTextValueInput.value = '';
+        if (editNodeTextCollisionWarning) editNodeTextCollisionWarning.style.display = 'none';
+        
         // Update node ID display
         editNodeIdDisplay.textContent = nodeData.nodeId || '-';
         
@@ -11029,6 +11449,7 @@
             editNodeComponentWarning.style.display = 'flex';
             editNodeTextKeyInfo.style.display = 'none';
             editNodeAltKeyInfo.style.display = 'none';
+            if (editNodeTextContentSection) editNodeTextContentSection.style.display = 'none';
             editNodeConfirm.disabled = true;
             return;
         }
@@ -11039,6 +11460,7 @@
             editNodeTextOnlyWarning.style.display = 'flex';
             editNodeTextKeyInfo.style.display = 'none';
             editNodeAltKeyInfo.style.display = 'none';
+            if (editNodeTextContentSection) editNodeTextContentSection.style.display = 'none';
             editNodeConfirm.disabled = true;
             return;
         }
@@ -11070,12 +11492,29 @@
             }
         });
         
-        // Show textKey if present
-        if (nodeData.textKey) {
-            editNodeTextKeyInfo.style.display = 'flex';
-            editNodeTextKeyValue.textContent = nodeData.textKey;
-        } else {
+        // Handle text content based on edit mode (page vs component)
+        if (currentEditType === 'component') {
+            // Component editing: show editable text content section
+            if (editNodeTextContentSection) editNodeTextContentSection.style.display = 'block';
             editNodeTextKeyInfo.style.display = 'none';
+            
+            // Parse existing textKey to determine mode and value
+            if (nodeData.textKey) {
+                const parsed = parseTextKeyMode(nodeData.textKey);
+                if (editNodeTextModeSelect) editNodeTextModeSelect.value = parsed.mode;
+                if (editNodeTextValueInput) editNodeTextValueInput.value = parsed.value;
+                updateEditTextInputVisibility();
+            }
+        } else {
+            // Page editing: show read-only textKey info
+            if (editNodeTextContentSection) editNodeTextContentSection.style.display = 'none';
+            
+            if (nodeData.textKey) {
+                editNodeTextKeyInfo.style.display = 'flex';
+                editNodeTextKeyValue.textContent = nodeData.textKey;
+            } else {
+                editNodeTextKeyInfo.style.display = 'none';
+            }
         }
         
         // Show altKey info for img/area tags
@@ -11095,6 +11534,152 @@
             editNodeAltKeyInfo.style.display = 'none';
         }
     }
+    
+    // Parse a textKey to determine its mode and value
+    function parseTextKeyMode(textKey) {
+        if (!textKey) return { mode: 'none', value: '' };
+        
+        // Check for variable pattern {{varName}}
+        const varMatch = textKey.match(/^\{\{(\w+)\}\}$/);
+        if (varMatch) {
+            return { mode: 'variable', value: varMatch[1] };
+        }
+        
+        // Check for raw text pattern __RAW__text
+        if (textKey.startsWith('__RAW__')) {
+            return { mode: 'raw', value: textKey.substring(7) };
+        }
+        
+        // Default: translation key
+        return { mode: 'translation', value: textKey };
+    }
+    
+    // Update edit text input visibility based on mode
+    function updateEditTextInputVisibility() {
+        if (!editNodeTextInputContainer || !editNodeTextModeSelect || !editNodeTextValueInput || !editNodeTextHint) return;
+        
+        const mode = editNodeTextModeSelect.value;
+        
+        if (mode === 'none') {
+            editNodeTextInputContainer.style.display = 'none';
+            editNodeTextValueInput.value = '';
+            if (editNodeTextCollisionWarning) editNodeTextCollisionWarning.style.display = 'none';
+        } else {
+            editNodeTextInputContainer.style.display = 'block';
+            
+            // Set placeholder and hint based on mode
+            switch (mode) {
+                case 'translation':
+                    editNodeTextValueInput.placeholder = PreviewConfig.i18n?.textPlaceholderTranslation || 'e.g. component.myButton.label';
+                    editNodeTextHint.textContent = PreviewConfig.i18n?.textHintTranslation || 'Enter a translation key.';
+                    if (editNodeTextCollisionWarning) editNodeTextCollisionWarning.style.display = 'none';
+                    break;
+                case 'variable':
+                    editNodeTextValueInput.placeholder = PreviewConfig.i18n?.textPlaceholderVariable || 'e.g. buttonText';
+                    editNodeTextHint.textContent = PreviewConfig.i18n?.textHintVariable || 'Enter variable name (without {{ }}).';
+                    // Check for reverse collision when in variable mode
+                    checkAndShowReverseCollision();
+                    break;
+                case 'raw':
+                    editNodeTextValueInput.placeholder = PreviewConfig.i18n?.textPlaceholderRaw || 'e.g. Hello World';
+                    editNodeTextHint.textContent = PreviewConfig.i18n?.textHintRaw || 'Enter raw text.';
+                    if (editNodeTextCollisionWarning) editNodeTextCollisionWarning.style.display = 'none';
+                    break;
+            }
+        }
+    }
+    
+    // Check and show collision/duplicate warnings for edit modal variable
+    async function checkAndShowReverseCollision() {
+        if (!editNodeTextCollisionWarning || !editNodeTextValueInput) return;
+        
+        const varName = editNodeTextValueInput.value.trim();
+        if (!varName) {
+            editNodeTextCollisionWarning.style.display = 'none';
+            return;
+        }
+        
+        // First check for duplicate (same var already exists in this component's structure)
+        const usedVars = await getStructureUsedVariables();
+        const originalTextKey = editNodeOriginalData?.textKey || '';
+        const originalVarName = originalTextKey.match(/^\{\{(\w+)\}\}$/)?.[1] || '';
+        
+        // Only flag as duplicate if it's not the same var we're editing
+        const isDuplicate = usedVars.has(varName) && varName !== originalVarName;
+        
+        if (isDuplicate) {
+            editNodeTextCollisionWarning.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; flex-shrink: 0;">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <div>
+                    <strong>${PreviewConfig.i18n?.variableDuplicate || 'Duplicate variable!'}</strong>
+                    <div style="margin-top: 4px; font-size: 0.85em;">
+                        <code>{{${varName}}}</code> ${PreviewConfig.i18n?.variableDuplicateHint || 'already exists in this component.'}
+                    </div>
+                </div>
+            `;
+            editNodeTextCollisionWarning.style.display = 'flex';
+            return;
+        }
+        
+        // Then check for reverse collision (child components use this var)
+        const collisions = await checkReverseCollision(varName);
+        
+        if (collisions.length > 0) {
+            const componentNames = [...new Set(collisions.map(c => c.fromComponent))];
+            editNodeTextCollisionWarning.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; flex-shrink: 0;">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <div>
+                    <strong>${PreviewConfig.i18n?.variableCollisionChild || 'Variable used by child component!'}</strong>
+                    <div style="margin-top: 4px; font-size: 0.85em;">
+                        <code>${varName}</code> ${PreviewConfig.i18n?.variableCollisionChildHint || 'is used by:'} ${componentNames.join(', ')}
+                    </div>
+                </div>
+            `;
+            editNodeTextCollisionWarning.style.display = 'flex';
+        } else {
+            editNodeTextCollisionWarning.style.display = 'none';
+        }
+    }
+    
+    // Get the constructed textKey value from edit form
+    function getEditTextKeyFromSelection() {
+        if (!editNodeTextModeSelect || !editNodeTextValueInput) return null;
+        
+        const mode = editNodeTextModeSelect.value;
+        const value = editNodeTextValueInput.value.trim();
+        
+        if (mode === 'none') return null;
+        if (!value) return null;
+        
+        switch (mode) {
+            case 'translation':
+                return value;
+            case 'variable':
+                return value.startsWith('{{') ? value : `{{${value}}}`;
+            case 'raw':
+                return `__RAW__${value}`;
+            default:
+                return null;
+        }
+    }
+    
+    // Text mode dropdown change handler for edit modal
+    editNodeTextModeSelect?.addEventListener('change', updateEditTextInputVisibility);
+    
+    // Variable input change handler - check reverse collision on blur
+    editNodeTextValueInput?.addEventListener('blur', function() {
+        if (editNodeTextModeSelect?.value === 'variable') {
+            checkAndShowReverseCollision();
+        }
+    });
     
     // Update params when tag changes
     function updateEditParamsForTag() {
@@ -11328,11 +11913,20 @@
             const newTag = editNodeTagSelect?.value || editNodeOriginalData.tag;
             const { addParams, removeParams } = collectEditParams();
             
+            // Check for textKey changes (when editing components)
+            let newTextKey = null;
+            let textKeyChanged = false;
+            if (currentEditType === 'component' && editNodeTextContentSection?.style.display !== 'none') {
+                newTextKey = getEditTextKeyFromSelection();
+                const originalTextKey = editNodeOriginalData.textKey || null;
+                textKeyChanged = newTextKey !== originalTextKey;
+            }
+            
             // Check if anything changed
             const tagChanged = newTag !== editNodeOriginalData.tag;
             const hasParamChanges = Object.keys(addParams).length > 0 || removeParams.length > 0;
             
-            if (!tagChanged && !hasParamChanges) {
+            if (!tagChanged && !hasParamChanges && !textKeyChanged) {
                 hideEditNodeModal();
                 showToast(PreviewConfig.i18n.noChanges, 'info');
                 return;
@@ -11370,6 +11964,16 @@
                 apiParams.removeParams = removeParams;
             }
             
+            // Include textKey if changed (for component editing)
+            if (textKeyChanged) {
+                if (newTextKey === null) {
+                    // Remove textKey - set to empty or special marker
+                    apiParams.removeTextKey = true;
+                } else {
+                    apiParams.textKey = newTextKey;
+                }
+            }
+            
             hideEditNodeModal();
             showToast(PreviewConfig.i18n.loading + '...', 'info');
             
@@ -11391,6 +11995,9 @@
                 
                 showToast(successMsg, 'success');
                 console.log('[Preview] Node edited:', data);
+                
+                // Invalidate structure caches since structure changed
+                invalidateAllStructureCaches();
                 
                 // Reload preview to show the changes
                 reloadPreview();
@@ -11798,7 +12405,7 @@
         }
         
         // Sync route and lang from current preview
-        state.route = routeSelect ? routeSelect.value : '';
+        state.editTarget = targetSelect ? targetSelect.value : '';
         state.lang = langSelect ? langSelect.value : '';
         
         localStorage.setItem(MINIPLAYER_STORAGE_KEY, JSON.stringify(state));
@@ -11856,7 +12463,7 @@
         state.enabled = !state.enabled;
         
         // Sync route and lang
-        state.route = routeSelect ? routeSelect.value : '';
+        state.editTarget = targetSelect ? targetSelect.value : '';
         state.lang = langSelect ? langSelect.value : '';
         
         localStorage.setItem(MINIPLAYER_STORAGE_KEY, JSON.stringify(state));
@@ -11981,6 +12588,23 @@
     // Initial state
     startLoadingTimeout();
     loadMiniplayerState();
+    
+    // Initialize edit target state from dropdown
+    if (targetSelect && targetSelect.value) {
+        const value = targetSelect.value;
+        const colonIdx = value.indexOf(':');
+        if (colonIdx !== -1) {
+            currentEditType = value.substring(0, colonIdx);
+            currentEditName = value.substring(colonIdx + 1);
+        } else {
+            // Legacy format fallback
+            currentEditType = 'page';
+            currentEditName = value;
+        }
+        
+        // Update component warning on initial load
+        updateComponentWarning(currentEditType, currentEditName);
+    }
     
     // Ensure mode is reset to 'select' on page load (browser may cache button states)
     setMode('select');

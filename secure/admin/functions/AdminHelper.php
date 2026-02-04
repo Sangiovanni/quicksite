@@ -88,7 +88,7 @@ function getCommandCategories(): array {
         'structure_management' => [
             'label' => 'Structure Management',
             'icon' => 'structure',
-            'commands' => ['getStructure', 'editStructure', 'listComponents', 'listPages']
+            'commands' => ['getStructure', 'editStructure', 'listComponents', 'listPages', 'findComponentUsages', 'renameComponent', 'duplicateComponent']
         ],
         'node_management' => [
             'label' => 'Node Management',

@@ -20,7 +20,7 @@ That question turned a template into a CMS. The file-based architecture wasn't a
 - **JSON-Driven Templates**: Define page structures, menus, and components in JSON, compiled to optimized PHP
 - **Multilingual Support**: Built-in translation system with language switching and validation
 - **Production Builds**: One-command deployment with compilation, optimization, and ZIP packaging
-- **RESTful Management API**: 97 endpoints for complete site management
+- **RESTful Management API**: 100 endpoints for complete site management
 - **File-Based Storage**: No database required - all configuration in JSON/PHP files
 - **Flexible Architecture**: Separate public and secure folders for clean deployment
 - **🔐 API Authentication**: Bearer token authentication with role-based permissions
@@ -156,12 +156,12 @@ curl -H "Authorization: Bearer your_token_here" \
 **Role-Based Permissions:**
 | Role | Access |
 |------|--------|
-| `viewer` | Read-only (27 commands): get*, list*, help |
-| `editor` | Content editing (55 commands): edit*, add*, delete content, interactions |
-| `designer` | Styling (63 commands): CSS, styles, visual design |
-| `developer` | Build & deploy (70 commands): build, deploy, downloads, AI |
-| `admin` | Full admin (91 commands): everything except token/role management |
-| `*` (superadmin) | Full access (97 commands) including token and role management |
+| `viewer` | Read-only (28 commands): get*, list*, help |
+| `editor` | Content editing (58 commands): edit*, add*, delete content, interactions, components |
+| `designer` | Styling (65 commands): CSS, styles, visual design |
+| `developer` | Build & deploy (72 commands): build, deploy, downloads, AI |
+| `admin` | Full admin (93 commands): everything except token/role management |
+| `*` (superadmin) | Full access (100 commands) including token and role management |
 
 Tokens are assigned a role via `generateToken`. Use `getMyPermissions` to check current access.
 

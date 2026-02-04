@@ -420,24 +420,47 @@ function editNodeInStructure(array $structure, array $nodeIndices, string $tag, 
     
     $ref = &$structure;
     
+    // Detect if root is an array of nodes (page) or single object (component)
+    // For components, the root is an object with 'tag' key, so we navigate through children
+    $isRootObject = isset($structure['tag']);
+    
     // Navigate to the node
     for ($i = 0; $i < count($nodeIndices); $i++) {
         $index = $nodeIndices[$i];
         
-        if (!isset($ref[$index])) {
-            return ['success' => false, 'error' => "Node not found at index {$index}"];
-        }
-        
-        if ($i < count($nodeIndices) - 1) {
-            // Not at the target yet, go to children
-            $ref = &$ref[$index];
-            if (!isset($ref['children'])) {
-                return ['success' => false, 'error' => 'Path interrupted: no children array'];
+        // For root object (component), first index accesses children directly
+        if ($isRootObject && $i === 0) {
+            if (!isset($ref['children'][$index])) {
+                return ['success' => false, 'error' => "Node not found at index {$index}"];
             }
-            $ref = &$ref['children'];
+            if ($i < count($nodeIndices) - 1) {
+                // Not at the target yet, go to children of this node
+                $ref = &$ref['children'][$index];
+                if (!isset($ref['children'])) {
+                    return ['success' => false, 'error' => 'Path interrupted: no children array'];
+                }
+                $ref = &$ref['children'];
+            } else {
+                // At the target node
+                $ref = &$ref['children'][$index];
+            }
         } else {
-            // At the target node
-            $ref = &$ref[$index];
+            // Standard array navigation
+            if (!isset($ref[$index])) {
+                return ['success' => false, 'error' => "Node not found at index {$index}"];
+            }
+            
+            if ($i < count($nodeIndices) - 1) {
+                // Not at the target yet, go to children
+                $ref = &$ref[$index];
+                if (!isset($ref['children'])) {
+                    return ['success' => false, 'error' => 'Path interrupted: no children array'];
+                }
+                $ref = &$ref['children'];
+            } else {
+                // At the target node
+                $ref = &$ref[$index];
+            }
         }
     }
     

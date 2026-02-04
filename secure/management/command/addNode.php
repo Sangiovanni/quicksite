@@ -138,7 +138,15 @@ function tagRequiresTextKey(string $tag, array $params): bool {
 }
 
 function generateAutoTextKey(string $structureType, ?string $structureName): string {
-    $prefix = ($structureType === 'page' && $structureName) ? $structureName : $structureType;
+    // For pages and components with name, use name-based prefix
+    // For menu/footer, use type as prefix
+    if (($structureType === 'page' || $structureType === 'component') && $structureName) {
+        $prefix = $structureType === 'component' 
+            ? 'component.' . $structureName  // component.feature-card.item1
+            : $structureName;                 // home.item1
+    } else {
+        $prefix = $structureType;             // menu.item1, footer.item1
+    }
     
     $translationFile = PROJECT_PATH . '/translate/default.json';
     $existingKeys = [];
@@ -485,19 +493,37 @@ function insertNodeIntoStructure_addNode(array $structure, array $targetIndices,
         return ['success' => false, 'error' => 'Empty target indices'];
     }
     
+    // Detect if root is a single object (component) or array of nodes (page)
+    $isRootObject = isset($structure['tag']);
+    
     if ($position === 'inside') {
         $ref = &$structure;
         for ($i = 0; $i < count($targetIndices); $i++) {
             $index = $targetIndices[$i];
-            if (!isset($ref[$index])) {
-                return ['success' => false, 'error' => "Node not found at index {$index}"];
-            }
-            $ref = &$ref[$index];
-            if ($i < count($targetIndices) - 1) {
-                if (!isset($ref['children'])) {
-                    return ['success' => false, 'error' => 'Parent node has no children array'];
+            
+            // For root object (component), first index accesses children directly
+            if ($isRootObject && $i === 0) {
+                if (!isset($ref['children'][$index])) {
+                    return ['success' => false, 'error' => "Node not found at index {$index}"];
                 }
-                $ref = &$ref['children'];
+                $ref = &$ref['children'][$index];
+                if ($i < count($targetIndices) - 1) {
+                    if (!isset($ref['children'])) {
+                        return ['success' => false, 'error' => 'Parent node has no children array'];
+                    }
+                    $ref = &$ref['children'];
+                }
+            } else {
+                if (!isset($ref[$index])) {
+                    return ['success' => false, 'error' => "Node not found at index {$index}"];
+                }
+                $ref = &$ref[$index];
+                if ($i < count($targetIndices) - 1) {
+                    if (!isset($ref['children'])) {
+                        return ['success' => false, 'error' => 'Parent node has no children array'];
+                    }
+                    $ref = &$ref['children'];
+                }
             }
         }
         
@@ -528,12 +554,36 @@ function insertNodeIntoStructure_addNode(array $structure, array $targetIndices,
     $targetIndex = end($targetIndices);
     
     $ref = &$structure;
+    
+    // For root object with empty parent path, we insert into children array
+    if ($isRootObject && empty($parentPath)) {
+        if (!isset($ref['children'][$targetIndex])) {
+            return ['success' => false, 'error' => "Target node not found at index {$targetIndex}"];
+        }
+        
+        $insertIndex = ($position === 'before') ? $targetIndex : $targetIndex + 1;
+        array_splice($ref['children'], $insertIndex, 0, [$newNode]);
+        
+        $newNodeId = (string)$insertIndex;
+        return ['success' => true, 'structure' => $structure, 'newNodeId' => $newNodeId];
+    }
+    
     for ($i = 0; $i < count($parentPath); $i++) {
         $index = $parentPath[$i];
-        if (!isset($ref[$index])) {
-            return ['success' => false, 'error' => "Parent node not found at index {$index}"];
+        
+        // For root object (component), first index accesses children directly
+        if ($isRootObject && $i === 0) {
+            if (!isset($ref['children'][$index])) {
+                return ['success' => false, 'error' => "Parent node not found at index {$index}"];
+            }
+            $ref = &$ref['children'][$index];
+        } else {
+            if (!isset($ref[$index])) {
+                return ['success' => false, 'error' => "Parent node not found at index {$index}"];
+            }
+            $ref = &$ref[$index];
         }
-        $ref = &$ref[$index];
+        
         if (!isset($ref['children'])) {
             return ['success' => false, 'error' => 'Parent node has no children array'];
         }

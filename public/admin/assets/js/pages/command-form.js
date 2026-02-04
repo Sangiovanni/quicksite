@@ -630,6 +630,21 @@ async function initEnhancedFeatures() {
         case 'generateToken':
             initGenerateTokenForm();
             break;
+        case 'findComponentUsages':
+            await initFindComponentUsagesForm();
+            break;
+        case 'renameComponent':
+            await initRenameComponentForm();
+            break;
+        case 'duplicateComponent':
+            await initDuplicateComponentForm();
+            break;
+        case 'addComponentToNode':
+            await initAddComponentToNodeForm();
+            break;
+        case 'editComponentToNode':
+            await initEditComponentToNodeForm();
+            break;
     }
 }
 
@@ -2201,6 +2216,729 @@ async function initRouteSelectForm() {
         routeInput.replaceWith(routeSelect);
         
         await QuickSiteAdmin.populateSelect(routeSelect, 'routes', [], 'Select route...');
+    }
+}
+
+/**
+ * Initialize findComponentUsages form with component select
+ */
+async function initFindComponentUsagesForm() {
+    const form = document.getElementById('command-form');
+    const componentInput = form.querySelector('[name="component"]');
+    
+    if (componentInput && componentInput.tagName !== 'SELECT') {
+        const componentSelect = document.createElement('select');
+        componentSelect.name = 'component';
+        componentSelect.className = 'admin-select';
+        componentSelect.required = componentInput.required;
+        
+        if (componentInput.dataset.urlParam !== undefined) {
+            componentSelect.dataset.urlParam = '';
+        }
+        
+        componentInput.replaceWith(componentSelect);
+        await QuickSiteAdmin.populateSelect(componentSelect, 'components', [], 'Select component...');
+    }
+}
+
+/**
+ * Initialize renameComponent form with oldName component select
+ */
+async function initRenameComponentForm() {
+    const form = document.getElementById('command-form');
+    const oldNameInput = form.querySelector('[name="oldName"]');
+    
+    if (oldNameInput && oldNameInput.tagName !== 'SELECT') {
+        const oldNameSelect = document.createElement('select');
+        oldNameSelect.name = 'oldName';
+        oldNameSelect.className = 'admin-select';
+        oldNameSelect.required = oldNameInput.required;
+        oldNameInput.replaceWith(oldNameSelect);
+        await QuickSiteAdmin.populateSelect(oldNameSelect, 'components', [], 'Select component to rename...');
+    }
+}
+
+/**
+ * Initialize duplicateComponent form with source component select
+ */
+async function initDuplicateComponentForm() {
+    const form = document.getElementById('command-form');
+    const sourceInput = form.querySelector('[name="source"]');
+    
+    if (sourceInput && sourceInput.tagName !== 'SELECT') {
+        const sourceSelect = document.createElement('select');
+        sourceSelect.name = 'source';
+        sourceSelect.className = 'admin-select';
+        sourceSelect.required = sourceInput.required;
+        sourceInput.replaceWith(sourceSelect);
+        await QuickSiteAdmin.populateSelect(sourceSelect, 'components', [], 'Select component to duplicate...');
+    }
+}
+
+/**
+ * Initialize addComponentToNode form with cascading selects and dynamic data fields
+ */
+async function initAddComponentToNodeForm() {
+    const form = document.getElementById('command-form');
+    
+    // Convert type input to select
+    const typeInput = form.querySelector('[name="type"]');
+    if (typeInput && typeInput.tagName !== 'SELECT') {
+        const typeSelect = document.createElement('select');
+        typeSelect.name = 'type';
+        typeSelect.className = 'admin-select';
+        typeSelect.required = typeInput.required;
+        typeInput.replaceWith(typeSelect);
+        await QuickSiteAdmin.populateSelect(typeSelect, 'structure-types', [], 'Select structure type...');
+    }
+    
+    // Convert name input to select
+    const nameInput = form.querySelector('[name="name"]');
+    if (nameInput && nameInput.tagName !== 'SELECT') {
+        const nameSelect = document.createElement('select');
+        nameSelect.name = 'name';
+        nameSelect.className = 'admin-select';
+        nameSelect.innerHTML = '<option value="">Select type first...</option>';
+        nameSelect.disabled = true;
+        nameInput.replaceWith(nameSelect);
+    }
+    
+    // Convert targetNodeId input to select
+    const targetNodeIdInput = form.querySelector('[name="targetNodeId"]');
+    if (targetNodeIdInput && targetNodeIdInput.tagName !== 'SELECT') {
+        const targetNodeIdSelect = document.createElement('select');
+        targetNodeIdSelect.name = 'targetNodeId';
+        targetNodeIdSelect.className = 'admin-select';
+        targetNodeIdSelect.required = targetNodeIdInput.required;
+        targetNodeIdSelect.innerHTML = '<option value="">Select structure first...</option>';
+        targetNodeIdSelect.disabled = true;
+        targetNodeIdInput.replaceWith(targetNodeIdSelect);
+    }
+    
+    // Convert position input to select
+    const positionInput = form.querySelector('[name="position"]');
+    if (positionInput && positionInput.tagName !== 'SELECT') {
+        const positionSelect = document.createElement('select');
+        positionSelect.name = 'position';
+        positionSelect.className = 'admin-select';
+        positionSelect.innerHTML = `
+            <option value="">Select position...</option>
+            <option value="inside">Inside (as child)</option>
+            <option value="before">Before</option>
+            <option value="after">After</option>
+        `;
+        positionInput.replaceWith(positionSelect);
+    }
+    
+    // Convert component input to select
+    const componentInput = form.querySelector('[name="component"]');
+    if (componentInput && componentInput.tagName !== 'SELECT') {
+        const componentSelect = document.createElement('select');
+        componentSelect.name = 'component';
+        componentSelect.className = 'admin-select';
+        componentSelect.required = componentInput.required;
+        componentInput.replaceWith(componentSelect);
+        await QuickSiteAdmin.populateSelect(componentSelect, 'components', [], 'Select component to add...');
+    }
+    
+    // Find or create data field container
+    const dataInput = form.querySelector('[name="data"]');
+    let dataContainer = null;
+    if (dataInput) {
+        // Create a container for the dynamic variable fields
+        dataContainer = document.createElement('div');
+        dataContainer.className = 'admin-component-data-builder';
+        dataContainer.innerHTML = `
+            <div class="admin-component-data-header">
+                <span class="admin-label">Component Data (Variables)</span>
+                <span class="admin-hint">Select a component to see its variables</span>
+            </div>
+            <div class="admin-component-data-fields" id="component-data-fields">
+                <p class="admin-hint" style="text-align: center; padding: var(--space-md);">
+                    Select a component to configure its variables
+                </p>
+            </div>
+        `;
+        dataInput.parentNode.insertBefore(dataContainer, dataInput);
+        dataInput.style.display = 'none'; // Hide the original JSON textarea
+    }
+    
+    // Set up cascading behavior
+    const typeSelect = form.querySelector('[name="type"]');
+    const nameSelect = form.querySelector('[name="name"]');
+    const targetNodeIdSelect = form.querySelector('[name="targetNodeId"]');
+    const componentSelect = form.querySelector('[name="component"]');
+    
+    // Function to load node options
+    async function loadNodeOptions() {
+        if (!targetNodeIdSelect) return;
+        
+        const type = typeSelect?.value;
+        const name = nameSelect?.value;
+        
+        if (!type) {
+            targetNodeIdSelect.innerHTML = '<option value="">Select type first...</option>';
+            targetNodeIdSelect.disabled = true;
+            return;
+        }
+        
+        if ((type === 'page' || type === 'component') && !name) {
+            targetNodeIdSelect.innerHTML = '<option value="">Select name first...</option>';
+            targetNodeIdSelect.disabled = true;
+            return;
+        }
+        
+        targetNodeIdSelect.disabled = false;
+        
+        const params = (type === 'page' || type === 'component') ? [type, name] : [type];
+        
+        try {
+            const nodes = await QuickSiteAdmin.fetchHelperData('structure-nodes', params);
+            targetNodeIdSelect.innerHTML = '<option value="">Select target node...</option>';
+            QuickSiteAdmin.appendOptionsToSelect(targetNodeIdSelect, nodes);
+        } catch (error) {
+            targetNodeIdSelect.innerHTML = '<option value="">Error loading nodes</option>';
+        }
+    }
+    
+    // Function to build dynamic data fields based on component variables
+    async function buildDataFields(componentName) {
+        const fieldsContainer = document.getElementById('component-data-fields');
+        if (!fieldsContainer || !componentName) {
+            if (fieldsContainer) {
+                fieldsContainer.innerHTML = `
+                    <p class="admin-hint" style="text-align: center; padding: var(--space-md);">
+                        Select a component to configure its variables
+                    </p>
+                `;
+            }
+            return;
+        }
+        
+        try {
+            const componentData = await QuickSiteAdmin.fetchHelperData('component-variables', [componentName]);
+            const variables = componentData.variables || [];
+            
+            if (variables.length === 0) {
+                fieldsContainer.innerHTML = `
+                    <p class="admin-hint" style="text-align: center; padding: var(--space-md);">
+                        This component has no variables
+                    </p>
+                `;
+                return;
+            }
+            
+            // Build the variable fields table
+            let html = '<div class="admin-data-table">';
+            
+            for (const variable of variables) {
+                const varName = variable.name;
+                const varType = variable.type || 'string';
+                const inputId = `data-var-${varName}`;
+                
+                html += `
+                    <div class="admin-data-row" data-var-name="${varName}" data-var-type="${varType}">
+                        <div class="admin-data-label">
+                            <label for="${inputId}" class="admin-label">${varName}</label>
+                            <span class="admin-badge admin-badge--small">${varType}</span>
+                        </div>
+                        <div class="admin-data-input">
+                `;
+                
+                if (varType === 'textKey') {
+                    // Translation key selector
+                    html += `
+                        <div class="admin-textkey-selector">
+                            <select id="${inputId}-select" class="admin-select admin-select--textkey" data-target="${inputId}">
+                                <option value="">Loading translation keys...</option>
+                            </select>
+                            <span class="admin-hint">or enter manually:</span>
+                            <input type="text" id="${inputId}" class="admin-input" data-var-input="${varName}" placeholder="e.g., page.home.title">
+                        </div>
+                    `;
+                } else {
+                    // Regular text input
+                    html += `
+                        <input type="text" id="${inputId}" class="admin-input" data-var-input="${varName}" placeholder="Enter ${varName}...">
+                    `;
+                }
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            fieldsContainer.innerHTML = html;
+            
+            // Initialize textKey selectors with translation keys
+            const textKeySelects = fieldsContainer.querySelectorAll('.admin-select--textkey');
+            if (textKeySelects.length > 0) {
+                await initTextKeySelectors(textKeySelects);
+            }
+            
+            // Set up event listeners to sync to hidden data field
+            setupDataFieldSync();
+            
+        } catch (error) {
+            console.error('Failed to load component variables:', error);
+            fieldsContainer.innerHTML = `
+                <p class="admin-hint admin-hint--error" style="text-align: center; padding: var(--space-md);">
+                    Error loading component variables
+                </p>
+            `;
+        }
+    }
+    
+    // Initialize textKey selectors with translation keys
+    async function initTextKeySelectors(selects) {
+        try {
+            // Get available languages first
+            const languages = await QuickSiteAdmin.fetchHelperData('languages', []);
+            const defaultLang = languages[0]?.value || 'en';
+            
+            // Fetch translation keys
+            const keys = await QuickSiteAdmin.fetchHelperData('translation-keys', [defaultLang]);
+            
+            selects.forEach(select => {
+                const targetId = select.dataset.target;
+                select.innerHTML = '<option value="">Select a translation key...</option>';
+                
+                keys.forEach(key => {
+                    const option = document.createElement('option');
+                    option.value = key.value;
+                    option.textContent = key.label;
+                    select.appendChild(option);
+                });
+                
+                // When select changes, update the input field
+                select.addEventListener('change', () => {
+                    const input = document.getElementById(targetId);
+                    if (input && select.value) {
+                        input.value = select.value;
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                });
+            });
+        } catch (error) {
+            console.error('Failed to load translation keys:', error);
+            selects.forEach(select => {
+                select.innerHTML = '<option value="">Error loading keys</option>';
+            });
+        }
+    }
+    
+    // Sync all variable inputs to the hidden data JSON field
+    function setupDataFieldSync() {
+        const dataField = form.querySelector('[name="data"]');
+        if (!dataField) return;
+        
+        const varInputs = document.querySelectorAll('[data-var-input]');
+        varInputs.forEach(input => {
+            input.addEventListener('input', () => {
+                const data = {};
+                varInputs.forEach(inp => {
+                    const varName = inp.dataset.varInput;
+                    const value = inp.value.trim();
+                    if (value) {
+                        data[varName] = value;
+                    }
+                });
+                dataField.value = Object.keys(data).length > 0 ? JSON.stringify(data, null, 2) : '';
+            });
+        });
+    }
+    
+    if (typeSelect && nameSelect) {
+        typeSelect.addEventListener('change', async () => {
+            const type = typeSelect.value;
+            nameSelect.disabled = false;
+            
+            if (type === 'page') {
+                await QuickSiteAdmin.populateSelect(nameSelect, 'pages', [], 'Select page...');
+            } else if (type === 'component') {
+                await QuickSiteAdmin.populateSelect(nameSelect, 'components', [], 'Select component...');
+            } else {
+                nameSelect.innerHTML = '<option value="">Not required for this type</option>';
+                nameSelect.disabled = true;
+                await loadNodeOptions();
+            }
+            
+            if (targetNodeIdSelect && (type === 'page' || type === 'component')) {
+                targetNodeIdSelect.innerHTML = '<option value="">Select name first...</option>';
+                targetNodeIdSelect.disabled = true;
+            }
+        });
+        
+        nameSelect.addEventListener('change', loadNodeOptions);
+    }
+    
+    // When component is selected, build the data fields
+    if (componentSelect) {
+        componentSelect.addEventListener('change', () => {
+            buildDataFields(componentSelect.value);
+        });
+    }
+}
+
+/**
+ * Initialize editComponentToNode form with cascading selects and dynamic data fields
+ */
+async function initEditComponentToNodeForm() {
+    const form = document.getElementById('command-form');
+    
+    // Convert type input to select
+    const typeInput = form.querySelector('[name="type"]');
+    if (typeInput && typeInput.tagName !== 'SELECT') {
+        const typeSelect = document.createElement('select');
+        typeSelect.name = 'type';
+        typeSelect.className = 'admin-select';
+        typeSelect.required = typeInput.required;
+        typeInput.replaceWith(typeSelect);
+        await QuickSiteAdmin.populateSelect(typeSelect, 'structure-types', [], 'Select structure type...');
+    }
+    
+    // Convert name input to select
+    const nameInput = form.querySelector('[name="name"]');
+    if (nameInput && nameInput.tagName !== 'SELECT') {
+        const nameSelect = document.createElement('select');
+        nameSelect.name = 'name';
+        nameSelect.className = 'admin-select';
+        nameSelect.innerHTML = '<option value="">Select type first...</option>';
+        nameSelect.disabled = true;
+        nameInput.replaceWith(nameSelect);
+    }
+    
+    // Convert targetNodeId input to select
+    const targetNodeIdInput = form.querySelector('[name="targetNodeId"]');
+    if (targetNodeIdInput && targetNodeIdInput.tagName !== 'SELECT') {
+        const targetNodeIdSelect = document.createElement('select');
+        targetNodeIdSelect.name = 'targetNodeId';
+        targetNodeIdSelect.className = 'admin-select';
+        targetNodeIdSelect.required = targetNodeIdInput.required;
+        targetNodeIdSelect.innerHTML = '<option value="">Select structure first...</option>';
+        targetNodeIdSelect.disabled = true;
+        targetNodeIdInput.replaceWith(targetNodeIdSelect);
+    }
+    
+    // Find or create data field container
+    const dataInput = form.querySelector('[name="data"]');
+    let dataContainer = null;
+    if (dataInput) {
+        dataContainer = document.createElement('div');
+        dataContainer.className = 'admin-component-data-builder';
+        dataContainer.innerHTML = `
+            <div class="admin-component-data-header">
+                <span class="admin-label">Component Data (Variables)</span>
+                <span class="admin-hint">Select a component node to see and edit its data</span>
+            </div>
+            <div class="admin-component-data-fields" id="edit-component-data-fields">
+                <p class="admin-hint" style="text-align: center; padding: var(--space-md);">
+                    Select a component node to edit its data
+                </p>
+            </div>
+        `;
+        dataInput.parentNode.insertBefore(dataContainer, dataInput);
+        dataInput.style.display = 'none';
+    }
+    
+    // Set up cascading behavior
+    const typeSelect = form.querySelector('[name="type"]');
+    const nameSelect = form.querySelector('[name="name"]');
+    const targetNodeIdSelect = form.querySelector('[name="targetNodeId"]');
+    
+    // Store component nodes data for extracting component names
+    let componentNodesData = [];
+    
+    // Function to load node options - only show component nodes
+    async function loadComponentNodes() {
+        if (!targetNodeIdSelect) return;
+        
+        const type = typeSelect?.value;
+        const name = nameSelect?.value;
+        
+        if (!type) {
+            targetNodeIdSelect.innerHTML = '<option value="">Select type first...</option>';
+            targetNodeIdSelect.disabled = true;
+            componentNodesData = [];
+            return;
+        }
+        
+        if ((type === 'page' || type === 'component') && !name) {
+            targetNodeIdSelect.innerHTML = '<option value="">Select name first...</option>';
+            targetNodeIdSelect.disabled = true;
+            componentNodesData = [];
+            return;
+        }
+        
+        targetNodeIdSelect.disabled = false;
+        
+        const params = (type === 'page' || type === 'component') ? [type, name] : [type];
+        
+        try {
+            const nodes = await QuickSiteAdmin.fetchHelperData('structure-nodes', params);
+            componentNodesData = nodes.filter(n => n.label && n.label.includes('[component:'));
+            
+            if (componentNodesData.length === 0) {
+                targetNodeIdSelect.innerHTML = '<option value="">No component nodes found</option>';
+            } else {
+                targetNodeIdSelect.innerHTML = '<option value="">Select component node...</option>';
+                QuickSiteAdmin.appendOptionsToSelect(targetNodeIdSelect, componentNodesData);
+            }
+        } catch (error) {
+            targetNodeIdSelect.innerHTML = '<option value="">Error loading nodes</option>';
+            componentNodesData = [];
+        }
+        
+        // Clear data fields
+        const fieldsContainer = document.getElementById('edit-component-data-fields');
+        if (fieldsContainer) {
+            fieldsContainer.innerHTML = `
+                <p class="admin-hint" style="text-align: center; padding: var(--space-md);">
+                    Select a component node to edit its data
+                </p>
+            `;
+        }
+    }
+    
+    // Extract component name from node label (e.g., "div [component:hero]" -> "hero")
+    function getComponentNameFromNode(nodeValue) {
+        const node = componentNodesData.find(n => n.value === nodeValue);
+        if (!node || !node.label) return null;
+        
+        const match = node.label.match(/\[component:([^\]]+)\]/);
+        return match ? match[1] : null;
+    }
+    
+    // Build dynamic data fields for the component
+    async function buildDataFields(componentName, currentData = {}) {
+        const fieldsContainer = document.getElementById('edit-component-data-fields');
+        if (!fieldsContainer || !componentName) {
+            if (fieldsContainer) {
+                fieldsContainer.innerHTML = `
+                    <p class="admin-hint" style="text-align: center; padding: var(--space-md);">
+                        Select a component node to edit its data
+                    </p>
+                `;
+            }
+            return;
+        }
+        
+        try {
+            const componentData = await QuickSiteAdmin.fetchHelperData('component-variables', [componentName]);
+            const variables = componentData.variables || [];
+            
+            if (variables.length === 0) {
+                fieldsContainer.innerHTML = `
+                    <p class="admin-hint" style="text-align: center; padding: var(--space-md);">
+                        This component has no variables
+                    </p>
+                `;
+                return;
+            }
+            
+            let html = '<div class="admin-data-table">';
+            
+            for (const variable of variables) {
+                const varName = variable.name;
+                const varType = variable.type || 'string';
+                const inputId = `edit-data-var-${varName}`;
+                const currentValue = currentData[varName] || '';
+                
+                html += `
+                    <div class="admin-data-row" data-var-name="${varName}" data-var-type="${varType}">
+                        <div class="admin-data-label">
+                            <label for="${inputId}" class="admin-label">${varName}</label>
+                            <span class="admin-badge admin-badge--small">${varType}</span>
+                        </div>
+                        <div class="admin-data-input">
+                `;
+                
+                if (varType === 'textKey') {
+                    html += `
+                        <div class="admin-textkey-selector">
+                            <select id="${inputId}-select" class="admin-select admin-select--textkey" data-target="${inputId}">
+                                <option value="">Loading translation keys...</option>
+                            </select>
+                            <span class="admin-hint">or enter manually:</span>
+                            <input type="text" id="${inputId}" class="admin-input" data-var-input="${varName}" 
+                                placeholder="e.g., page.home.title" value="${escapeHtml(currentValue)}">
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <input type="text" id="${inputId}" class="admin-input" data-var-input="${varName}" 
+                            placeholder="Enter ${varName}..." value="${escapeHtml(currentValue)}">
+                    `;
+                }
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            fieldsContainer.innerHTML = html;
+            
+            // Initialize textKey selectors
+            const textKeySelects = fieldsContainer.querySelectorAll('.admin-select--textkey');
+            if (textKeySelects.length > 0) {
+                await initTextKeySelectors(textKeySelects, currentData);
+            }
+            
+            setupDataFieldSync();
+            
+        } catch (error) {
+            console.error('Failed to load component variables:', error);
+            fieldsContainer.innerHTML = `
+                <p class="admin-hint admin-hint--error" style="text-align: center; padding: var(--space-md);">
+                    Error loading component variables
+                </p>
+            `;
+        }
+    }
+    
+    // Helper to escape HTML in values
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    
+    // Initialize textKey selectors
+    async function initTextKeySelectors(selects, currentData = {}) {
+        try {
+            const languages = await QuickSiteAdmin.fetchHelperData('languages', []);
+            const defaultLang = languages[0]?.value || 'en';
+            const keys = await QuickSiteAdmin.fetchHelperData('translation-keys', [defaultLang]);
+            
+            selects.forEach(select => {
+                const targetId = select.dataset.target;
+                const input = document.getElementById(targetId);
+                const currentValue = input?.value || '';
+                
+                select.innerHTML = '<option value="">Select a translation key...</option>';
+                
+                keys.forEach(key => {
+                    const option = document.createElement('option');
+                    option.value = key.value;
+                    option.textContent = key.label;
+                    if (key.value === currentValue) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+                
+                select.addEventListener('change', () => {
+                    if (input && select.value) {
+                        input.value = select.value;
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                });
+            });
+        } catch (error) {
+            console.error('Failed to load translation keys:', error);
+            selects.forEach(select => {
+                select.innerHTML = '<option value="">Error loading keys</option>';
+            });
+        }
+    }
+    
+    // Sync variable inputs to hidden data field
+    function setupDataFieldSync() {
+        const dataField = form.querySelector('[name="data"]');
+        if (!dataField) return;
+        
+        const varInputs = document.querySelectorAll('[data-var-input]');
+        
+        // Initial sync
+        const data = {};
+        varInputs.forEach(inp => {
+            const varName = inp.dataset.varInput;
+            const value = inp.value.trim();
+            if (value) {
+                data[varName] = value;
+            }
+        });
+        dataField.value = Object.keys(data).length > 0 ? JSON.stringify(data, null, 2) : '';
+        
+        // Listen for changes
+        varInputs.forEach(input => {
+            input.addEventListener('input', () => {
+                const data = {};
+                varInputs.forEach(inp => {
+                    const varName = inp.dataset.varInput;
+                    const value = inp.value.trim();
+                    if (value) {
+                        data[varName] = value;
+                    }
+                });
+                dataField.value = Object.keys(data).length > 0 ? JSON.stringify(data, null, 2) : '';
+            });
+        });
+    }
+    
+    // Fetch current node data when a component node is selected
+    async function loadCurrentNodeData(nodeId) {
+        const type = typeSelect?.value;
+        const name = nameSelect?.value;
+        
+        const componentName = getComponentNameFromNode(nodeId);
+        if (!componentName) {
+            return;
+        }
+        
+        try {
+            // Fetch the node to get current data
+            const params = [type];
+            if (type === 'page' || type === 'component') {
+                params.push(name);
+            }
+            params.push(nodeId);
+            
+            const result = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, params);
+            const currentData = result.data?.data?.node?.data || {};
+            
+            await buildDataFields(componentName, currentData);
+        } catch (error) {
+            console.error('Failed to load node data:', error);
+            await buildDataFields(componentName, {});
+        }
+    }
+    
+    if (typeSelect && nameSelect) {
+        typeSelect.addEventListener('change', async () => {
+            const type = typeSelect.value;
+            nameSelect.disabled = false;
+            
+            if (type === 'page') {
+                await QuickSiteAdmin.populateSelect(nameSelect, 'pages', [], 'Select page...');
+            } else if (type === 'component') {
+                await QuickSiteAdmin.populateSelect(nameSelect, 'components', [], 'Select component...');
+            } else {
+                nameSelect.innerHTML = '<option value="">Not required for this type</option>';
+                nameSelect.disabled = true;
+                await loadComponentNodes();
+            }
+            
+            if (targetNodeIdSelect && (type === 'page' || type === 'component')) {
+                targetNodeIdSelect.innerHTML = '<option value="">Select name first...</option>';
+                targetNodeIdSelect.disabled = true;
+            }
+        });
+        
+        nameSelect.addEventListener('change', loadComponentNodes);
+    }
+    
+    // When a component node is selected, load its current data and build fields
+    if (targetNodeIdSelect) {
+        targetNodeIdSelect.addEventListener('change', async () => {
+            const nodeId = targetNodeIdSelect.value;
+            if (nodeId) {
+                await loadCurrentNodeData(nodeId);
+            }
+        });
     }
 }
 

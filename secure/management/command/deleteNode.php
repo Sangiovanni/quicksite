@@ -144,6 +144,9 @@ function removeNodeFromStructure(array $structure, array $indices): array {
         return ['success' => false, 'error' => 'Empty indices'];
     }
     
+    // Detect if root is a single object (component) or array of nodes (page)
+    $isRootObject = isset($structure['tag']);
+    
     // Navigate to the parent and remove the node
     $ref = &$structure;
     
@@ -151,11 +154,20 @@ function removeNodeFromStructure(array $structure, array $indices): array {
         $idx = $indices[$i];
         
         if ($i === 0) {
-            // First level - direct array access
-            if (!isset($ref[$idx])) {
-                return ['success' => false, 'error' => "Node not found at index {$idx}"];
+            // First level access
+            if ($isRootObject) {
+                // Component: first index accesses children directly
+                if (!isset($ref['children'][$idx])) {
+                    return ['success' => false, 'error' => "Node not found at index {$idx}"];
+                }
+                $ref = &$ref['children'][$idx];
+            } else {
+                // Page: direct array access
+                if (!isset($ref[$idx])) {
+                    return ['success' => false, 'error' => "Node not found at index {$idx}"];
+                }
+                $ref = &$ref[$idx];
             }
-            $ref = &$ref[$idx];
         } else {
             // Deeper levels - access children
             if (!isset($ref['children']) || !isset($ref['children'][$idx])) {
@@ -169,11 +181,20 @@ function removeNodeFromStructure(array $structure, array $indices): array {
     $finalIndex = end($indices);
     
     if (count($indices) === 1) {
-        // Root level
-        if (!isset($structure[$finalIndex])) {
-            return ['success' => false, 'error' => "Root node not found at index {$finalIndex}"];
+        // Root level deletion
+        if ($isRootObject) {
+            // Component: delete from children array
+            if (!isset($structure['children']) || !isset($structure['children'][$finalIndex])) {
+                return ['success' => false, 'error' => "Root child node not found at index {$finalIndex}"];
+            }
+            array_splice($structure['children'], $finalIndex, 1);
+        } else {
+            // Page: delete from root array
+            if (!isset($structure[$finalIndex])) {
+                return ['success' => false, 'error' => "Root node not found at index {$finalIndex}"];
+            }
+            array_splice($structure, $finalIndex, 1);
         }
-        array_splice($structure, $finalIndex, 1);
     } else {
         // Nested level
         if (!isset($ref['children']) || !isset($ref['children'][$finalIndex])) {
