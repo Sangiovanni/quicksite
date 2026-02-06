@@ -21,7 +21,7 @@ class JsFunctionManager {
     /** @var array Core function names (cannot be overwritten) */
     private array $coreFunctions = [
         'show', 'hide', 'toggle', 'toggleHide', 'addClass', 'removeClass',
-        'setValue', 'redirect', 'filter', 'scrollTo', 'focus', 'blur'
+        'setValue', 'redirect', 'filter', 'scrollTo', 'focus', 'blur', 'fetch'
     ];
     
     /**

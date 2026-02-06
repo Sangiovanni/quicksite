@@ -25,6 +25,7 @@ class AdminRouter {
         'workflows',   // Workflows (AI and manual)
         'ai-settings', // AI Provider Settings (BYOK)
         'preview',     // Visual Editor (route kept as 'preview' for URL compatibility)
+        'apis',        // External API Registry
         'logout'       // Logout action
     ];
 

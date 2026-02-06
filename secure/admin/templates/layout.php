@@ -118,6 +118,15 @@ $langNames = [
                 <span><?= __admin('nav.dashboard') ?></span>
             </a>
             
+            <a href="<?= $router->url('apis') ?>" 
+               class="admin-nav__link<?= $currentPage === 'apis' ? ' admin-nav__link--active' : '' ?>">
+                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22 6 12 13 2 6"/>
+                </svg>
+                <span><?= __admin('nav.apis') ?></span>
+            </a>
+            
             <!-- Build Tools Group -->
             <div class="admin-nav__group<?= $isBuildActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="build">
                 <button type="button" class="admin-nav__group-toggle">

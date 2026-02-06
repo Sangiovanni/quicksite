@@ -7,6 +7,7 @@
         "success": "Succès",
         "warning": "Attention",
         "confirm": "Confirmer",
+        "confirmDelete": "Confirmer la suppression",
         "cancel": "Annuler",
         "save": "Enregistrer",
         "delete": "Supprimer",
@@ -16,6 +17,7 @@
         "next": "Suivant",
         "previous": "Précédent",
         "close": "Fermer",
+        "refresh": "Actualiser",
         "yes": "Oui",
         "no": "Non",
         "search": "Rechercher...",
@@ -34,6 +36,7 @@
         "load": "Charger",
         "add": "Ajouter",
         "remove": "Retirer",
+        "format": "Formater",
         "enabled": "Activé",
         "default": "Par défaut",
         "status": {
@@ -305,6 +308,7 @@
     "nav": {
         "login": "Connexion",
         "dashboard": "Tableau de bord",
+        "apis": "APIs",
         "commands": "Commandes",
         "command": "Commande",
         "history": "Historique",
@@ -710,7 +714,30 @@
             "stepsPreview": "Étapes du workflow",
             "stepsHint": "Ce workflow exécutera les commandes suivantes :",
             "loadingSteps": "Chargement des étapes...",
-            "executeWorkflow": "Exécuter le workflow"
+            "executeWorkflow": "Exécuter le workflow",
+            "notFound": {
+                "title": "Spec non trouvée",
+                "message": "La spécification IA demandée n'a pas été trouvée."
+            },
+            "backToList": "Retour aux specs",
+            "validationError": "Erreurs de validation de la spec",
+            "parameters": "Paramètres",
+            "examples": "Exemples",
+            "yourPrompt": "Votre demande",
+            "yourPromptPlaceholder": "Décrivez ce que vous voulez créer... Cliquez sur un exemple pour remplir automatiquement.",
+            "relatedCommands": "Commandes associées",
+            "generatedPrompt": "Prompt généré",
+            "generating": "Génération du prompt...",
+            "promptPlaceholder": "Remplissez les paramètres et cliquez sur Générer pour créer un prompt...",
+            "custom": "Personnalisée",
+            "edit": "Modifier la Spec",
+            "export": "Exporter",
+            "generatePrompt": "Générer le prompt",
+            "copyPrompt": "Copier",
+            "copied": "Copié !",
+            "goToBatch": "Aller au panneau Batch",
+            "chars": "caractères",
+            "words": "mots"
         },
         "editor": {
             "new": "Nouvelle Spec",
@@ -781,33 +808,7 @@
             "beginner": "Débutant",
             "intermediate": "Intermédiaire",
             "advanced": "Avancé"
-        },
-        "spec": {
-            "notFound": {
-                "title": "Spec non trouvée",
-                "message": "La spécification IA demandée n'a pas été trouvée."
-            },
-            "backToList": "Retour aux specs",
-            "validationError": "Erreurs de validation de la spec",
-            "parameters": "Paramètres",
-            "examples": "Exemples",
-            "yourPrompt": "Votre demande",
-            "yourPromptPlaceholder": "Décrivez ce que vous voulez créer... Cliquez sur un exemple pour remplir automatiquement.",
-            "relatedCommands": "Commandes associées",
-            "generatedPrompt": "Prompt généré",
-            "generating": "Génération du prompt...",
-            "promptPlaceholder": "Remplissez les paramètres et cliquez sur Générer pour créer un prompt...",
-            "custom": "Personnalisée",
-            "edit": "Modifier la Spec",
-            "export": "Exporter",
-            "generatePrompt": "Générer le prompt",
-            "copyPrompt": "Copier",
-            "copied": "Copié !",
-            "goToBatch": "Aller au panneau Batch",
-            "chars": "caractères",
-            "words": "mots"
-        },
-        "specs": {
+        },\n        "specs": {
             "addLanguage": {
                 "title": "Ajouter une langue",
                 "description": "Ajouter une nouvelle langue à votre site multilingue avec les traductions et la mise à jour du sélecteur de langue.",
@@ -1315,5 +1316,88 @@
         "previewNotAvailable": "Prévisualisation non disponible",
         "noKeyframesFound": "Aucun @keyframes trouvé. Créez-en un dans l'onglet Animations d'abord.",
         "errorLoadingKeyframes": "Erreur lors du chargement des keyframes"
+    },
+    "apis": {
+        "title": "Registre d'APIs",
+        "subtitle": "Gérer les endpoints API externes pour les interactions",
+        "addApi": "Ajouter une API",
+        "editApi": "Modifier l'API",
+        "addEndpoint": "Ajouter un endpoint",
+        "editEndpoint": "Modifier l'endpoint",
+        "addFirstApi": "Ajouter une première API",
+        "testEndpoint": "Tester l'endpoint",
+        "import": "Importer",
+        "export": "Exporter",
+        "importJson": "Importer JSON",
+        "exportJson": "Exporter JSON",
+        "noEndpoints": "Aucun endpoint défini",
+        "stats": {
+            "apis": "APIs",
+            "endpoints": "Endpoints"
+        },
+        "empty": {
+            "title": "Aucune API définie",
+            "description": "Créez votre première définition d'API pour commencer à connecter des services externes."
+        },
+        "form": {
+            "apiId": "ID de l'API",
+            "apiIdHint": "Identifiant unique (lettres, chiffres, tirets, underscores)",
+            "name": "Nom d'affichage",
+            "baseUrl": "URL de base",
+            "baseUrlHint": "L'URL racine pour tous les endpoints (ex: https://api.exemple.com)",
+            "description": "Description",
+            "authentication": "Authentification",
+            "authType": "Type d'auth",
+            "tokenSource": "Source du token",
+            "tokenSourceHint": "Où récupérer le token d'authentification au runtime",
+            "storageLocation": "Emplacement de stockage",
+            "storageKeyName": "Nom de la clé de stockage",
+            "storageKeyHint": "Au runtime, le token sera lu depuis cet emplacement (ex: authToken)",
+            "storageLocalStorage": "localStorage (persistant)",
+            "storageSessionStorage": "sessionStorage (session seulement)",
+            "storageConfig": "Variables de config (visible dans le JS public !)",
+            "configWarning": "Attention : Les variables de config sont visibles dans le JavaScript public. Utilisez uniquement pour les clés publiques (comme Stripe publishable key).",
+            "endpointId": "ID de l'endpoint",
+            "endpointName": "Nom de l'endpoint",
+            "method": "Méthode",
+            "path": "Chemin",
+            "pathHint": "Chemin relatif à l'URL de base (ex: /users ou /contact)",
+            "requestSchema": "Schéma de requête (optionnel)",
+            "responseSchema": "Schéma de réponse (optionnel)",
+            "schemaHint": "Utilise le format JSON Schema standard. Cliquez sur Modèle pour commencer.",
+            "template": "Modèle",
+            "requestSchemaPlaceholder": "{\n  \"type\": \"object\",\n  \"required\": [\"name\"],\n  \"properties\": {\n    \"name\": { \"type\": \"string\" }\n  }\n}",
+            "responseSchemaPlaceholder": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"success\": { \"type\": \"boolean\" },\n    \"data\": { \"type\": \"object\" }\n  }\n}",
+            "endpointAuth": "Authentification",
+            "authInherit": "Hériter de l'API (par défaut)",
+            "authNone": "Aucune (endpoint public)",
+            "authRequired": "Requise (remplace si l'API n'en a pas)",
+            "endpointAuthHint": "Remplacer l'auth de l'API pour cet endpoint"
+        },
+        "auth": {
+            "none": "Aucune",
+            "bearer": "Token Bearer",
+            "apiKey": "Clé API",
+            "basic": "Auth Basic"
+        },
+        "test": {
+            "request": "Requête",
+            "response": "Réponse",
+            "run": "Lancer le test",
+            "authToken": "Token d'auth",
+            "authTokenPlaceholder": "Entrez le token ou laissez vide",
+            "authTokenHint": "Cliquez sauvegarder pour mémoriser pour cette API",
+            "saveToken": "Sauvegarder le token pour cette API",
+            "showHide": "Afficher/Masquer le token",
+            "rawJson": "Avancé : JSON brut",
+            "requestBody": "Corps de requête (JSON)",
+            "queryParams": "Paramètres de requête (JSON)",
+            "noResponse": "Lancez le test pour voir la réponse"
+        },
+        "importModal": {
+            "warning": "L'import fusionnera avec les APIs existantes. Les APIs avec le même ID seront écrasées.",
+            "pasteJson": "Coller le JSON",
+            "button": "Importer"
+        }
     }
 }

@@ -1144,23 +1144,23 @@ const QuickSiteAdmin = {
             overlay.className = 'admin-modal-overlay';
             
             const modal = document.createElement('div');
-            modal.className = 'admin-modal admin-modal--confirm';
+            modal.className = 'admin-modal-dialog admin-modal-dialog--confirm';
             modal.innerHTML = `
-                <div class="admin-modal__content">
-                    <div class="admin-modal__icon admin-modal__icon--${options.type || 'warning'}">
+                <div class="admin-modal-dialog__content">
+                    <div class="admin-modal-dialog__icon admin-modal-dialog__icon--${options.type || 'warning'}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                             <line x1="12" y1="9" x2="12" y2="13"/>
                             <line x1="12" y1="17" x2="12.01" y2="17"/>
                         </svg>
                     </div>
-                    <h3 class="admin-modal__title">${options.title || 'Confirm Action'}</h3>
-                    <p class="admin-modal__message">${this.escapeHtml(message)}</p>
-                    <div class="admin-modal__actions">
-                        <button class="admin-btn admin-btn--secondary admin-modal__cancel">
+                    <h3 class="admin-modal-dialog__title">${options.title || 'Confirm Action'}</h3>
+                    <p class="admin-modal-dialog__message">${this.escapeHtml(message)}</p>
+                    <div class="admin-modal-dialog__actions">
+                        <button class="admin-btn admin-btn--secondary admin-modal-dialog__cancel">
                             ${options.cancelText || 'Cancel'}
                         </button>
-                        <button class="admin-btn admin-btn--${options.confirmClass || 'primary'} admin-modal__confirm">
+                        <button class="admin-btn admin-btn--${options.confirmClass || 'primary'} admin-modal-dialog__confirm">
                             ${options.confirmText || 'Confirm'}
                         </button>
                     </div>
@@ -1179,8 +1179,8 @@ const QuickSiteAdmin = {
                 resolve(result);
             };
 
-            modal.querySelector('.admin-modal__cancel').addEventListener('click', () => cleanup(false));
-            modal.querySelector('.admin-modal__confirm').addEventListener('click', () => cleanup(true));
+            modal.querySelector('.admin-modal-dialog__cancel').addEventListener('click', () => cleanup(false));
+            modal.querySelector('.admin-modal-dialog__confirm').addEventListener('click', () => cleanup(true));
             overlay.addEventListener('click', (e) => {
                 if (e.target === overlay) cleanup(false);
             });
@@ -1350,7 +1350,7 @@ const QuickSiteAdmin = {
             if (e.key === 'Escape') {
                 const modal = document.querySelector('.admin-modal-overlay--visible');
                 if (modal) {
-                    modal.querySelector('.admin-modal__cancel')?.click();
+                    modal.querySelector('.admin-modal-dialog__cancel')?.click();
                 }
                 const nodeDetails = document.getElementById('node-details');
                 if (nodeDetails && nodeDetails.style.display !== 'none') {
@@ -1368,10 +1368,10 @@ const QuickSiteAdmin = {
         overlay.className = 'admin-modal-overlay admin-modal-overlay--visible';
         
         const modal = document.createElement('div');
-        modal.className = 'admin-modal admin-modal--shortcuts';
+        modal.className = 'admin-modal-dialog admin-modal-dialog--shortcuts';
         modal.innerHTML = `
-            <div class="admin-modal__content">
-                <h3 class="admin-modal__title">Keyboard Shortcuts</h3>
+            <div class="admin-modal-dialog__content">
+                <h3 class="admin-modal-dialog__title">Keyboard Shortcuts</h3>
                 <div class="admin-shortcuts-grid">
                     <div class="admin-shortcut-group">
                         <h4>Navigation (g + key)</h4>
@@ -1388,8 +1388,8 @@ const QuickSiteAdmin = {
                         <div class="admin-shortcut"><kbd>Esc</kbd> <span>Close modal / blur input</span></div>
                     </div>
                 </div>
-                <div class="admin-modal__actions">
-                    <button class="admin-btn admin-btn--primary admin-modal__close">Close</button>
+                <div class="admin-modal-dialog__actions">
+                    <button class="admin-btn admin-btn--primary admin-modal-dialog__close">Close</button>
                 </div>
             </div>
         `;
@@ -1402,7 +1402,7 @@ const QuickSiteAdmin = {
             setTimeout(() => overlay.remove(), 300);
         };
 
-        modal.querySelector('.admin-modal__close').addEventListener('click', close);
+        modal.querySelector('.admin-modal-dialog__close').addEventListener('click', close);
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) close();
         });

@@ -487,7 +487,7 @@ class JsonToPhpCompiler {
             // Core functions (always available)
             $allowedFunctions = [
                 'show', 'hide', 'toggle', 'toggleHide', 'addClass', 'removeClass',
-                'setValue', 'redirect', 'filter', 'scrollTo', 'focus', 'blur'
+                'setValue', 'redirect', 'filter', 'scrollTo', 'focus', 'blur', 'fetch'
             ];
             
             // Add custom functions if JsFunctionManager is available

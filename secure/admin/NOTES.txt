@@ -1,0 +1,124 @@
+=============================================================================
+                        NODE MANAGEMENT SYSTEM - NOTES
+=============================================================================
+
+## Translatable Attributes System
+---------------------------------
+
+The system supports translatable attributes for accessibility and UX.
+These attributes are auto-generated as translation keys and rendered via
+JsonToHtmlRenderer.php which detects if a value looks like a translation key
+and auto-translates it.
+
+### Translatable Attributes:
+- alt        (for img, area tags)
+- placeholder (for input, textarea)
+- title      (for any element)
+- aria-label
+- aria-placeholder  
+- aria-description
+
+### Auto-generation Format:
+- textKey:  {structureName}.item{N}
+- alt:      {structureName}.item{N}.alt
+
+Example: For an img in home.json, might generate:
+  - textKey for any text content (rare for img)
+  - alt key: home.item27.alt
+
+### Detection in listComponents.php:
+The extractVariables() function now returns type: 'textKey' for translatable
+params (alt, placeholder, title, aria-*) to help the UI understand these are
+translation keys, not raw values.
+
+
+## Future Work
+--------------
+
+1. **Translation Key Editor UI**
+   - Currently, translatable keys are auto-generated but there's no UI to
+     easily edit their values in the translation files
+   - Planned: Integration with translateKey command for inline editing
+
+2. **Placeholder Handling in Components**
+   - Components may have placeholder params that should be translatable
+   - Need to extend the component variable system to support this
+
+3. **Import System for Components**
+   - Components using translatable params need their translation keys
+     imported when the component is added to a page
+
+
+## Node Management Workflow
+---------------------------
+
+### Step 0: analyzeTranslations fix
+- Fixed position handling in translation operations
+
+### Step 1: Translation system
+- Added textKey auto-generation for container tags without class
+- Format: {structureName}.item{N}
+
+### Step 2: listComponents upgrade
+- Enhanced to detect variables, textKeys, and translatable params
+- Returns type info for each variable (param vs textKey)
+
+### Step 3: addNode revision
+- Params persist between tag changes
+- Self-closing tags handled properly
+- textKey auto-generated for containers without class
+
+### Step 4: addNode UI
+- Radio buttons for tag vs component
+- Mandatory params based on tag type
+- textKey info display for applicable tags
+- alt key info display for img/area tags
+- Custom params expandable section
+
+### Step 5: editNode command
+- Full attribute editing support
+- Tag type conversion (self-closing ↔ container)
+- Auto-generates textKey when converting self-closing to container
+- Auto-generates alt key when changing tag to img/area
+
+### Step 6: editNode UI (in preview.php)
+- Modal for editing existing nodes
+- Pre-fills with current values
+- Shows generated keys info
+
+### Step 7: addComponentToNode (COMPLETED)
+- Created addComponentToNode.php command
+- Route added to routes.php
+- UI: Enabled Component radio button in Add Element modal
+- Component selection dropdown (loads from listComponents)
+- Variables display:
+  - textKey variables: read-only, shows auto-generated key format
+  - param variables: editable input fields
+- Auto-generates translation keys: {structureName}.{componentName}{N}.{variableName}
+- Creates empty translation entries in default.json
+- Prevents "inside" position for component targets (atomic)
+
+### Steps 8-11: Pending
+- Step 8: Drag and drop
+- Step 9: editComponentToNode
+- Step 10: Undo/redo system
+- Step 11: Performance optimizations
+
+
+## Bug Fixes Applied
+--------------------
+
+1. **qs-selected class in edit form**
+   - Issue: When editing a node, qs-selected appeared in class field
+   - Fix: Filter out qs-selected when reading class attribute
+
+2. **Empty children on img→div conversion**
+   - Issue: Converting img to div created "children": []
+   - Fix: Auto-generate textKey when converting self-closing to container
+
+3. **Alt as raw text**
+   - Issue: alt attribute was stored as raw text instead of translation key
+   - Fix: alt is now auto-generated as {prefix}.item{N}.alt, hidden from UI
+
+
+=============================================================================

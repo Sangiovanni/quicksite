@@ -488,6 +488,25 @@ if (file_exists($footerJsonPath)) {
     }
 }
 
+// Step 4.5: Compile API endpoints config to JavaScript
+require_once SECURE_FOLDER_PATH . '/src/classes/ApiEndpointManager.php';
+$apiManager = new ApiEndpointManager(PROJECT_PATH);
+$apiConfigPath = $buildFullPath . '/' . $buildPublicName . '/' . ($buildPublicSpace !== '' ? $buildPublicSpace . '/' : '') . 'scripts/qs-api-config.js';
+
+// Ensure scripts directory exists in build
+$scriptsDir = dirname($apiConfigPath);
+if (!is_dir($scriptsDir)) {
+    mkdir($scriptsDir, 0755, true);
+}
+
+// Write compiled API config
+if (!$apiManager->writeCompiledJs($apiConfigPath)) {
+    release_build_lock();
+    ApiResponse::create(500, 'server.file_write_failed')
+        ->withMessage("Failed to write qs-api-config.js")
+        ->send();
+}
+
 // Step 5: Compile all pages based on ROUTES
 $compiledPages = [];
 

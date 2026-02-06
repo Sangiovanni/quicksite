@@ -173,6 +173,13 @@ function __command_switchProject(array $params = [], array $urlParams = []): Api
     $result['custom_js_regenerated'] = $regenerateResult['success'];
     $result['custom_functions_count'] = count($jsManager->getCustomFunctions());
     
+    // Regenerate qs-api-config.js with project's API configurations
+    require_once SECURE_FOLDER_PATH . '/src/classes/ApiEndpointManager.php';
+    $apiManager = new ApiEndpointManager($projectPath);
+    $apiConfigPath = PUBLIC_FOLDER_ROOT . '/scripts/qs-api-config.js';
+    $apiConfigWritten = $apiManager->writeCompiledJs($apiConfigPath);
+    $result['api_config_regenerated'] = $apiConfigWritten;
+    
     return ApiResponse::create(200, 'operation.success')
         ->withMessage("Switched to project '$projectName'")
         ->withData($result);

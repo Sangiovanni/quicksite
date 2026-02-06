@@ -7,6 +7,7 @@
         "success": "Success",
         "warning": "Warning",
         "confirm": "Confirm",
+        "confirmDelete": "Confirm Delete",
         "cancel": "Cancel",
         "save": "Save",
         "delete": "Delete",
@@ -16,6 +17,7 @@
         "next": "Next",
         "previous": "Previous",
         "close": "Close",
+        "refresh": "Refresh",
         "yes": "Yes",
         "no": "No",
         "search": "Search...",
@@ -34,6 +36,7 @@
         "load": "Load",
         "add": "Add",
         "remove": "Remove",
+        "format": "Format",
         "enabled": "Enabled",
         "default": "Default",
         "status": {
@@ -297,6 +300,7 @@
     "nav": {
         "login": "Login",
         "dashboard": "Dashboard",
+        "apis": "APIs",
         "commands": "Commands",
         "command": "Command",
         "history": "History",
@@ -702,7 +706,30 @@
             "stepsPreview": "Workflow Steps",
             "stepsHint": "This workflow will execute the following commands:",
             "loadingSteps": "Loading steps...",
-            "executeWorkflow": "Execute Workflow"
+            "executeWorkflow": "Execute Workflow",
+            "notFound": {
+                "title": "Workflow Not Found",
+                "message": "The requested workflow could not be found."
+            },
+            "backToList": "Back to Workflows",
+            "validationError": "Spec Validation Errors",
+            "parameters": "Parameters",
+            "examples": "Examples",
+            "yourPrompt": "Your Prompt",
+            "yourPromptPlaceholder": "Describe what you want to create... Click an example to fill this automatically.",
+            "relatedCommands": "Related Commands",
+            "generatedPrompt": "Generated Prompt",
+            "generating": "Generating prompt...",
+            "promptPlaceholder": "Fill in the parameters and click Generate to create a prompt...",
+            "custom": "Custom",
+            "edit": "Edit Spec",
+            "export": "Export",
+            "generatePrompt": "Generate Prompt",
+            "copyPrompt": "Copy",
+            "copied": "Copied!",
+            "goToBatch": "Go to Batch Panel",
+            "chars": "chars",
+            "words": "words"
         },
         "editor": {
             "new": "New Spec",
@@ -773,31 +800,6 @@
             "beginner": "Beginner",
             "intermediate": "Intermediate",
             "advanced": "Advanced"
-        },
-        "spec": {
-            "notFound": {
-                "title": "Workflow Not Found",
-                "message": "The requested workflow could not be found."
-            },
-            "backToList": "Back to Workflows",
-            "validationError": "Spec Validation Errors",
-            "parameters": "Parameters",
-            "examples": "Examples",
-            "yourPrompt": "Your Prompt",
-            "yourPromptPlaceholder": "Describe what you want to create... Click an example to fill this automatically.",
-            "relatedCommands": "Related Commands",
-            "generatedPrompt": "Generated Prompt",
-            "generating": "Generating prompt...",
-            "promptPlaceholder": "Fill in the parameters and click Generate to create a prompt...",
-            "custom": "Custom",
-            "edit": "Edit Spec",
-            "export": "Export",
-            "generatePrompt": "Generate Prompt",
-            "copyPrompt": "Copy",
-            "copied": "Copied!",
-            "goToBatch": "Go to Batch Panel",
-            "chars": "chars",
-            "words": "words"
         },
         "specs": {
             "addLanguage": {
@@ -1307,5 +1309,86 @@
         "previewNotAvailable": "Preview not available",
         "noKeyframesFound": "No @keyframes found. Create one in the Animations tab first.",
         "errorLoadingKeyframes": "Error loading keyframes"
+    },
+    "apis": {
+        "title": "API Registry",
+        "subtitle": "Manage external API endpoints for use in interactions",
+        "addApi": "Add API",
+        "editApi": "Edit API",
+        "addEndpoint": "Add Endpoint",
+        "editEndpoint": "Edit Endpoint",
+        "addFirstApi": "Add First API",
+        "testEndpoint": "Test Endpoint",
+        "import": "Import",
+        "export": "Export",
+        "importJson": "Import JSON",
+        "exportJson": "Export JSON",
+        "noEndpoints": "No endpoints defined",
+        "stats": {
+            "apis": "APIs",
+            "endpoints": "Endpoints"
+        },
+        "empty": {
+            "title": "No APIs Defined",
+            "description": "Create your first API definition to start connecting external services."
+        },
+        "form": {
+            "apiId": "API ID",
+            "apiIdHint": "Unique identifier (letters, numbers, dashes, underscores)",
+            "name": "Display Name",
+            "baseUrl": "Base URL",
+            "baseUrlHint": "The root URL for all endpoints (e.g., https://api.example.com)",
+            "description": "Description",
+            "authentication": "Authentication",
+            "authType": "Auth Type",
+            "storageLocation": "Token Storage Location",
+            "storageKeyName": "Storage Key Name",
+            "storageKeyHint": "Name of the variable in storage (e.g., 'authToken'). At runtime, the token will be read from this location.",
+            "storageLocalStorage": "localStorage (browser, persists)",
+            "storageSessionStorage": "sessionStorage (browser, cleared on close)",
+            "storageConfig": "config (public key in JS - USE WITH CAUTION)",
+            "configWarning": "Warning: Tokens stored in 'config' are compiled into JavaScript and visible to all site visitors. Only use this for publishable/public API keys (like Stripe publishable keys or Google Maps API keys) that are designed to be client-side.",
+            "endpointId": "Endpoint ID",
+            "endpointName": "Endpoint Name",
+            "method": "Method",
+            "path": "Path",
+            "pathHint": "Path relative to base URL (e.g., /users or /contact)",
+            "requestSchema": "Request Schema (optional)",
+            "responseSchema": "Response Schema (optional)",
+            "schemaHint": "Uses standard JSON Schema format. Click Template to get started.",
+            "template": "Template",
+            "requestSchemaPlaceholder": "{\n  \"type\": \"object\",\n  \"required\": [\"name\"],\n  \"properties\": {\n    \"name\": { \"type\": \"string\" }\n  }\n}",
+            "responseSchemaPlaceholder": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"success\": { \"type\": \"boolean\" },\n    \"data\": { \"type\": \"object\" }\n  }\n}",
+            "endpointAuth": "Authentication",
+            "authInherit": "Inherit from API (default)",
+            "authNone": "None (public endpoint)",
+            "authRequired": "Required (override if API has none)",
+            "endpointAuthHint": "Override API-level auth for this endpoint"
+        },
+        "auth": {
+            "none": "None",
+            "bearer": "Bearer Token",
+            "apiKey": "API Key",
+            "basic": "Basic Auth"
+        },
+        "test": {
+            "request": "Request",
+            "response": "Response",
+            "run": "Run Test",
+            "authToken": "Auth Token",
+            "authTokenPlaceholder": "Enter token or leave empty",
+            "authTokenHint": "Click save to remember for this API",
+            "saveToken": "Save token for this API",
+            "showHide": "Show/Hide token",
+            "rawJson": "Advanced: Raw JSON",
+            "requestBody": "Request Body (JSON)",
+            "queryParams": "Query Parameters (JSON)",
+            "noResponse": "Run test to see response"
+        },
+        "importModal": {
+            "warning": "Importing will merge with existing APIs. APIs with the same ID will be overwritten.",
+            "pasteJson": "Paste JSON",
+            "button": "Import"
+        }
     }
 }

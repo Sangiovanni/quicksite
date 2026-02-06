@@ -80,6 +80,11 @@ class PageManagement {
         if (file_exists($customJsPath) && filesize($customJsPath) > 500) {
             $body .= '<script src="' . BASE_URL . '/scripts/qs-custom.js"></script>';
         }
+        // Include API endpoint config if file exists and has real content
+        $apiConfigPath = PUBLIC_FOLDER_ROOT . '/scripts/qs-api-config.js';
+        if (file_exists($apiConfigPath) && filesize($apiConfigPath) > 100) {
+            $body .= '<script src="' . BASE_URL . '/scripts/qs-api-config.js"></script>';
+        }
 
         // Include additional scripts
         if (!empty($this->scripts)) {

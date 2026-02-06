@@ -260,6 +260,12 @@ code{
     font-size: var(--font-size-base);
 }
 
+.admin-btn--xs {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--font-size-xs);
+    gap: var(--space-xs);
+}
+
 .admin-btn--block {
     width: 100%;
     justify-content: center;
@@ -2052,6 +2058,23 @@ kbd {
     overflow: auto;
 }
 
+/* API Page Modals - Unified sizing */
+.admin-modal--apis .admin-modal__content {
+    width: 65%;
+    max-width: none;
+}
+
+.admin-modal--apis.admin-modal--small .admin-modal__content {
+    width: 450px;
+    max-width: 90%;
+}
+
+@media (max-width: 1024px) {
+    .admin-modal--apis .admin-modal__content {
+        width: 90%;
+    }
+}
+
 .admin-modal__header {
     display: flex;
     align-items: center;
@@ -2086,6 +2109,48 @@ kbd {
     gap: var(--space-sm);
     padding: var(--space-md);
     border-top: 1px solid var(--admin-border);
+}
+
+/* Schema Editor (JSON textarea with toolbar) */
+.admin-schema-editor {
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.admin-schema-editor__toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--admin-bg-tertiary);
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-schema-editor__status {
+    margin-left: auto;
+    font-size: var(--font-size-xs);
+}
+
+.admin-schema-editor__status--valid {
+    color: var(--admin-success);
+}
+
+.admin-schema-editor__status--invalid {
+    color: var(--admin-error);
+}
+
+.admin-schema-editor .admin-input--code {
+    border: none;
+    border-radius: 0;
+}
+
+.admin-schema-editor .admin-input--code:focus {
+    box-shadow: none;
+}
+
+.admin-schema-editor--invalid .admin-input--code {
+    background: var(--admin-error-bg);
 }
 
 .no-providers {
@@ -3972,7 +4037,6 @@ kbd {
 .admin-ai-page-selector__hint.valid {
     color: #22c55e;
 }
-</style>
 
 /* =============================================================================
    AI SPEC PAGE
@@ -4932,6 +4996,199 @@ kbd {
     width: auto;
 }
 
+/* Compact form group for API test params */
+.admin-form-group--compact {
+    margin-bottom: var(--space-sm);
+}
+
+.admin-form-group--compact .admin-label {
+    font-size: 0.85rem;
+    margin-bottom: var(--space-xs);
+}
+
+/* Small input variant */
+.admin-input--sm {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 0.9rem;
+}
+
+/* Test params grid layout */
+.admin-test-params {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: var(--space-sm) var(--space-md);
+    padding: var(--space-sm);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-sm);
+}
+
+.admin-test-params .admin-form-group--compact {
+    margin-bottom: 0;
+}
+
+/* Details/Summary for collapsible sections */
+.admin-details {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+
+.admin-details__summary {
+    padding: var(--space-sm) var(--space-md);
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    list-style: none;
+}
+
+.admin-details__summary::-webkit-details-marker {
+    display: none;
+}
+
+.admin-details__summary::before {
+    content: '▶';
+    display: inline-block;
+    margin-right: var(--space-sm);
+    transition: transform 0.2s;
+    font-size: 0.75rem;
+}
+
+.admin-details[open] .admin-details__summary::before {
+    transform: rotate(90deg);
+}
+
+.admin-details[open] .admin-details__summary {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.admin-details > div {
+    padding: var(--space-sm);
+}
+
+/* Checkbox styling for test params */
+.admin-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    cursor: pointer;
+}
+
+.admin-checkbox input[type="checkbox"] {
+    width: auto;
+    cursor: pointer;
+}
+
+/* API Card styles */
+.api-card {
+    margin-bottom: var(--space-md);
+}
+
+.api-card__header {
+    padding: var(--space-md) var(--space-lg);
+}
+
+.api-card__body {
+    padding: var(--space-md) var(--space-lg);
+}
+
+/* APIs Page specific styles */
+.apis-toolbar {
+    margin-bottom: var(--space-lg);
+}
+
+.apis-stats {
+    margin-bottom: var(--space-lg);
+}
+
+.apis-loading,
+.apis-empty {
+    text-align: center;
+    padding: var(--space-xl);
+}
+
+.apis-empty__icon {
+    opacity: 0.3;
+    margin-bottom: var(--space-md);
+}
+
+.apis-empty__title {
+    margin-bottom: var(--space-sm);
+}
+
+.apis-empty__desc {
+    margin-bottom: var(--space-lg);
+}
+
+.apis-test-grid {
+    gap: var(--space-lg);
+}
+
+.apis-test-section-title {
+    margin-bottom: var(--space-sm);
+}
+
+.apis-test-info {
+    margin-bottom: var(--space-md);
+}
+
+.apis-test-params-form {
+    margin-bottom: var(--space-md);
+}
+
+.apis-test-details {
+    margin-bottom: var(--space-md);
+}
+
+.apis-test-details-content {
+    padding-top: var(--space-sm);
+}
+
+.apis-test-run-btn {
+    width: 100%;
+}
+
+.apis-test-response-status {
+    margin-bottom: var(--space-sm);
+}
+
+.apis-test-response-time {
+    margin-bottom: var(--space-sm);
+}
+
+.apis-test-response-body {
+    max-height: 400px;
+    overflow: auto;
+}
+
+.apis-import-warning {
+    margin-bottom: var(--space-md);
+}
+
+.apis-auth-token-label {
+    margin-top: var(--space-sm);
+}
+
+.apis-auth-token-input {
+    margin-top: var(--space-xs);
+}
+
+.apis-auth-config-warning {
+    margin-top: var(--space-sm);
+}
+
+.apis-schema-hint {
+    margin-bottom: var(--space-sm);
+}
+
+.apis-import-warning {
+    margin-bottom: var(--space-md);
+}
+
 @media (max-width: 768px) {
     .admin-grid--cols-2 {
         grid-template-columns: 1fr;
@@ -5323,7 +5580,7 @@ kbd {
     visibility: visible;
 }
 
-.admin-modal {
+.admin-modal-dialog {
     background: var(--admin-bg-secondary);
     border: 1px solid var(--admin-border);
     border-radius: var(--radius-lg);
@@ -5333,16 +5590,16 @@ kbd {
     transition: transform 0.3s ease;
 }
 
-.admin-modal-overlay--visible .admin-modal {
+.admin-modal-overlay--visible .admin-modal-dialog {
     transform: scale(1);
 }
 
-.admin-modal__content {
+.admin-modal-dialog__content {
     padding: var(--space-xl);
     text-align: center;
 }
 
-.admin-modal__icon {
+.admin-modal-dialog__icon {
     width: 64px;
     height: 64px;
     margin: 0 auto var(--space-lg);
@@ -5350,38 +5607,38 @@ kbd {
     border-radius: 50%;
 }
 
-.admin-modal__icon--warning {
+.admin-modal-dialog__icon--warning {
     background: var(--admin-warning-bg);
     color: var(--admin-warning);
 }
 
-.admin-modal__icon--danger {
+.admin-modal-dialog__icon--danger {
     background: var(--admin-error-bg);
     color: var(--admin-error);
 }
 
-.admin-modal__icon--info {
+.admin-modal-dialog__icon--info {
     background: var(--admin-info-bg);
     color: var(--admin-info);
 }
 
-.admin-modal__icon svg {
+.admin-modal-dialog__icon svg {
     width: 100%;
     height: 100%;
 }
 
-.admin-modal__title {
+.admin-modal-dialog__title {
     margin: 0 0 var(--space-sm);
     font-size: var(--font-size-lg);
     color: var(--admin-text);
 }
 
-.admin-modal__message {
+.admin-modal-dialog__message {
     margin: 0 0 var(--space-xl);
     color: var(--admin-text-muted);
 }
 
-.admin-modal__actions {
+.admin-modal-dialog__actions {
     display: flex;
     gap: var(--space-md);
     justify-content: center;
@@ -5622,7 +5879,7 @@ kbd {
 /* =============================================================================
    KEYBOARD SHORTCUTS MODAL
    ============================================================================= */
-.admin-modal--shortcuts .admin-modal__content {
+.admin-modal-dialog--shortcuts .admin-modal-dialog__content {
     max-width: 500px;
     text-align: left;
 }
@@ -7938,7 +8195,6 @@ code.preview-contextual-info__value {
 .preview-style-property__range {
     flex: 1;
     height: 4px;
-    -webkit-appearance: none;
     background: var(--admin-border);
     border-radius: 2px;
     outline: none;
@@ -10500,7 +10756,6 @@ code.preview-contextual-info__value {
     overflow: hidden;
     text-overflow: ellipsis;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
 }
 
@@ -11931,9 +12186,6 @@ select.preview-style-input {
 }
 
 /* Body class when miniplayer is active - can be used to adjust layout */
-body.has-miniplayer {
-    /* Can add padding-bottom if needed to avoid content overlap */
-}
 
 /* Hide global miniplayer on preview page (preview page has its own) */
 body[data-page="preview"] .global-miniplayer {
