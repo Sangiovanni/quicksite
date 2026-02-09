@@ -10,8 +10,14 @@ class JsonToPhpCompiler {
     
     /**
      * Compile a full page JSON structure to PHP code
+     * 
+     * @param array $structure The page JSON structure
+     * @param string $pageTitle The page title key for translation
+     * @param bool $showMenu Whether to show the menu (default: true)
+     * @param bool $showFooter Whether to show the footer (default: true)
+     * @return string The compiled PHP code
      */
-    public function compilePage(array $structure, string $pageTitle): string {
+    public function compilePage(array $structure, string $pageTitle, bool $showMenu = true, bool $showFooter = true): string {
         $output = "<?php\n\n";
         $output .= "require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';\n";
         $output .= "\$trimParameters = new TrimParameters();\n";
@@ -28,8 +34,12 @@ class JsonToPhpCompiler {
         $output .= "\$content = '';\n";
         $output .= $this->compileNodes($structure);
         
+        // Pass layout settings to Page constructor
+        $showMenuStr = $showMenu ? 'true' : 'false';
+        $showFooterStr = $showFooter ? 'true' : 'false';
+        
         $output .= "\nrequire_once SECURE_FOLDER_PATH . '/src/classes/Page.php';\n";
-        $output .= "\$page = new Page(\$pageTitle, \$content, \$lang);\n";
+        $output .= "\$page = new Page(\$pageTitle, \$content, \$lang, {$showMenuStr}, {$showFooterStr});\n";
         $output .= "\$page->render();\n";
         
         return $output;

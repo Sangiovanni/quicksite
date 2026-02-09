@@ -229,6 +229,23 @@ if (file_exists($aliasesFile)) {
 }
 
 // ============================================================================
+// CLEAN UP ROUTE LAYOUT SETTINGS
+// ============================================================================
+
+require_once SECURE_FOLDER_PATH . '/src/classes/RouteLayoutManager.php';
+$layoutManager = new RouteLayoutManager();
+
+// Remove layout entries for all deleted routes
+$deletedLayoutRoutes = [];
+foreach ($routesToDelete as $routeSegments) {
+    $routeToRemove = implode('/', $routeSegments);
+    if ($layoutManager->hasExplicitLayout($routeToRemove)) {
+        $layoutManager->removeLayout($routeToRemove);
+        $deletedLayoutRoutes[] = $routeToRemove;
+    }
+}
+
+// ============================================================================
 // SUCCESS RESPONSE
 // ============================================================================
 

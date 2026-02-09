@@ -510,7 +510,12 @@ if (!$apiManager->writeCompiledJs($apiConfigPath)) {
 // Step 5: Compile all pages based on ROUTES
 $compiledPages = [];
 
+// Load RouteLayoutManager for menu/footer visibility settings
+require_once SECURE_FOLDER_PATH . '/src/classes/RouteLayoutManager.php';
+$layoutManager = new RouteLayoutManager();
+
 // First compile 404 page (special case) - supports folder structure
+// 404 pages inherit layout from root (default: menu=true, footer=true)
 $page404JsonPath = resolvePageJsonPath('404');
 if ($page404JsonPath !== null && file_exists($page404JsonPath)) {
     $page404Json = json_decode(file_get_contents($page404JsonPath), true);
@@ -521,7 +526,9 @@ if ($page404JsonPath !== null && file_exists($page404JsonPath)) {
             ->send();
     }
     
-    $page404Php = $compiler->compilePage($page404Json, '404');
+    // Get layout for 404 page (inherits from root)
+    $layout404 = $layoutManager->getEffectiveLayout('404');
+    $page404Php = $compiler->compilePage($page404Json, '404', $layout404['menu'], $layout404['footer']);
     // Create folder structure in build
     @mkdir($buildFullPath . '/' . $buildSecureName . '/templates/pages/404', 0755, true);
     $page404FilePath = $buildFullPath . '/' . $buildSecureName . '/templates/pages/404/404.php';
@@ -558,7 +565,9 @@ foreach ($allRoutes as $route) {
     $routeName = basename($route);
     $pageTitle = ucfirst(str_replace('-', ' ', $routeName));
     
-    $pagePhp = $compiler->compilePage($pageJson, $route);
+    // Get layout settings (with inheritance)
+    $pageLayout = $layoutManager->getEffectiveLayout($route);
+    $pagePhp = $compiler->compilePage($pageJson, $route, $pageLayout['menu'], $pageLayout['footer']);
     
     // Create folder structure in build: route/route.php
     $buildPageDir = $buildFullPath . '/' . $buildSecureName . '/templates/pages/' . $route;

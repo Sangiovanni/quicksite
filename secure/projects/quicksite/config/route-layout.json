@@ -1,0 +1,5 @@
+{
+    "version": "1.0",
+    "description": "Per-route layout settings (menu/footer visibility). Routes without entries inherit from nearest ancestor or default (both true).",
+    "routes": {}
+}

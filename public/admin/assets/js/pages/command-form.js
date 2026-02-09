@@ -569,6 +569,7 @@ async function initEnhancedFeatures() {
             await initGetStructureForm();
             break;
         case 'deleteRoute':
+        case 'setRouteLayout':
             await initRouteSelectForm();
             break;
         case 'removeLang':

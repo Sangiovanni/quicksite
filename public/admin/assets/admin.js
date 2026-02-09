@@ -765,8 +765,8 @@ const QuickSiteAdmin = {
      */
     copyResponse(button) {
         const pre = button.closest('.admin-code').querySelector('pre');
-        if (pre) {
-            this.utils.copyToClipboard(pre.textContent, 'Response copied to clipboard!');
+        if (pre && window.QuickSiteUtils) {
+            window.QuickSiteUtils.copyToClipboard(pre.textContent, 'Response copied to clipboard!');
         }
     },
 

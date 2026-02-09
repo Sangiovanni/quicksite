@@ -83,7 +83,7 @@ function getCommandCategories(): array {
         'route_management' => [
             'label' => 'Route Management',
             'icon' => 'route',
-            'commands' => ['addRoute', 'deleteRoute', 'getRoutes', 'getSiteMap']
+            'commands' => ['addRoute', 'deleteRoute', 'setRouteLayout', 'getRoutes', 'getSiteMap']
         ],
         'structure_management' => [
             'label' => 'Structure Management',
@@ -174,6 +174,11 @@ function getCommandCategories(): array {
             'label' => 'JavaScript Functions / Interactions',
             'icon' => 'zap',
             'commands' => ['listJsFunctions', 'addJsFunction', 'editJsFunction', 'deleteJsFunction', 'listInteractions', 'addInteraction', 'editInteraction', 'deleteInteraction']
+        ],
+        'api_registry' => [
+            'label' => 'API Registry',
+            'icon' => 'globe',
+            'commands' => ['listApiEndpoints', 'getApiEndpoint', 'addApi', 'editApi', 'deleteApi', 'testApiEndpoint']
         ],
         'documentation' => [
             'label' => 'Documentation',

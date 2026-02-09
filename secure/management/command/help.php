@@ -200,6 +200,58 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Deletes both PHP template and JSON page structure. Updates routes.php automatically. Also automatically removes any URL aliases that were pointing to this route to prevent ghost redirects.'
     ],
     
+    'setRouteLayout' => [
+        'description' => 'Configures visibility of menu (header) and footer for a specific route. Supports inheritance from parent routes and propagation to descendants.',
+        'method' => 'POST',
+        'parameters' => [
+            'route' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Route path to configure',
+                'example' => 'landing or app/dashboard',
+                'validation' => 'Must be an existing route'
+            ],
+            'menu' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Whether to show menu (header). At least one of menu/footer required.',
+                'example' => 'false',
+                'validation' => 'Boolean (true/false)'
+            ],
+            'footer' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Whether to show footer. At least one of menu/footer required.',
+                'example' => 'false',
+                'validation' => 'Boolean (true/false)'
+            ],
+            'propagate' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Apply settings to all descendant routes',
+                'example' => 'true',
+                'default' => false
+            ]
+        ],
+        'example_post' => 'POST /management/setRouteLayout with body: {"route": "landing", "menu": false, "footer": false}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'route.layout_updated',
+            'message' => 'Layout settings updated for route',
+            'data' => [
+                'route' => 'landing',
+                'layout' => ['menu' => false, 'footer' => false],
+                'explicit' => true
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing route or both menu/footer parameters',
+            '400.validation.invalid_type' => 'Invalid parameter type',
+            '404.route.not_found' => 'Route does not exist'
+        ],
+        'notes' => 'Layout settings use inheritance: child routes inherit from nearest ancestor with explicit settings. Default is menu=true, footer=true. Use propagate=true to apply settings to all descendants at once.'
+    ],
+    
     'build' => [
         'description' => 'Creates a production-ready build with compiled PHP files, optional folder renaming, config sanitization, and ZIP archive creation',
         'method' => 'POST',
@@ -2091,12 +2143,12 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Role to assign to the token',
                 'valid_values' => [
-                    '*' => 'Superadmin - full access to all 100 commands including token/role management',
-                    'viewer' => 'Read-only access (28 commands)',
-                    'editor' => 'Content editing - structure, translations, assets (58 commands)',
-                    'designer' => 'Style editing - CSS, animations, visual elements (66 commands)',
-                    'developer' => 'Build and deploy access (73 commands)',
-                    'admin' => 'Full access except token/role management (94 commands)',
+                    '*' => 'Superadmin - full access to all 106 commands including token/role management',
+                    'viewer' => 'Read-only access (30 commands)',
+                    'editor' => 'Content editing - structure, translations, assets, APIs (64 commands)',
+                    'designer' => 'Style editing - CSS, animations, visual elements, APIs (71 commands)',
+                    'developer' => 'Build and deploy access (78 commands)',
+                    'admin' => 'Full access except token/role management (99 commands)',
                     '<custom>' => 'Any custom role name created via createRole'
                 ],
                 'example' => 'editor or designer or admin'
@@ -3434,7 +3486,7 @@ $GLOBALS['__help_commands'] = [
                 'is_superadmin' => false
             ]
         ],
-        'notes' => 'Use this to determine what commands the current token can execute. Useful for building permission-aware UIs. Superadmin (*) users have is_superadmin=true and access to all 93 commands.'
+        'notes' => 'Use this to determine what commands the current token can execute. Useful for building permission-aware UIs. Superadmin (*) users have is_superadmin=true and access to all 106 commands.'
     ],
     
     'createRole' => [
@@ -4187,6 +4239,352 @@ $GLOBALS['__help_commands'] = [
             '404.interaction.not_found' => 'No interaction found on this event'
         ],
         'notes' => 'If index is omitted, ALL interactions on that event are removed (the event param is deleted entirely). If index is provided, only that specific interaction is removed and others are preserved.'
+    ],
+
+    // =========================================================================
+    // API REGISTRY COMMANDS
+    // =========================================================================
+    
+    'listApiEndpoints' => [
+        'description' => 'Lists all registered external API endpoints, grouped by API. Can filter by specific API ID.',
+        'method' => 'GET',
+        'parameters' => [
+            'apiId' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Filter to show endpoints from only this API (URL segment or query param)',
+                'example' => 'main-backend'
+            ]
+        ],
+        'example_get' => 'GET /management/listApiEndpoints or GET /management/listApiEndpoints/main-backend',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'All API endpoints listed successfully',
+            'data' => [
+                'apis' => [
+                    [
+                        'apiId' => 'main-backend',
+                        'name' => 'Main Backend API',
+                        'description' => 'Our primary REST API',
+                        'baseUrl' => 'https://api.example.com',
+                        'auth' => ['type' => 'bearer', 'tokenSource' => 'localStorage:apiToken'],
+                        'endpointCount' => 2,
+                        'endpoints' => [
+                            [
+                                'id' => 'contact-submit',
+                                'name' => 'Submit Contact Form',
+                                'path' => '/contact',
+                                'method' => 'POST',
+                                'fullUrl' => 'https://api.example.com/contact'
+                            ]
+                        ]
+                    ]
+                ],
+                'apiCount' => 1,
+                'totalEndpoints' => 2
+            ]
+        ],
+        'error_responses' => [
+            '404.api.error.not_found' => 'Specified API not found'
+        ],
+        'notes' => 'APIs and endpoints are defined per-project in data/api-endpoints.json. Use {{call:fetch:@apiId/endpointId,...}} in interactions to call these endpoints.'
+    ],
+    
+    'getApiEndpoint' => [
+        'description' => 'Gets a single endpoint by ID, including the parent API\'s auth configuration.',
+        'method' => 'GET',
+        'parameters' => [
+            'endpointId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'The endpoint ID to retrieve (URL segment)',
+                'example' => 'contact-submit'
+            ],
+            'apiId' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'API filter for faster lookup or when duplicate IDs exist (URL segment)',
+                'example' => 'main-backend'
+            ]
+        ],
+        'example_get' => 'GET /management/getApiEndpoint/contact-submit or GET /management/getApiEndpoint/main-backend/contact-submit',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Endpoint retrieved successfully',
+            'data' => [
+                'endpoint' => [
+                    'id' => 'contact-submit',
+                    'name' => 'Submit Contact Form',
+                    'path' => '/contact',
+                    'method' => 'POST',
+                    'fullUrl' => 'https://api.example.com/contact',
+                    'apiId' => 'main-backend',
+                    'apiAuth' => ['type' => 'bearer', 'tokenSource' => 'localStorage:apiToken'],
+                    'requestSchema' => [
+                        'type' => 'object',
+                        'required' => ['name', 'email'],
+                        'properties' => [
+                            'name' => ['type' => 'string'],
+                            'email' => ['type' => 'string', 'format' => 'email']
+                        ]
+                    ]
+                ],
+                'hasDuplicates' => false,
+                'duplicateCount' => 1
+            ]
+        ],
+        'error_responses' => [
+            '400.api.error.missing_parameter' => 'Missing endpoint ID',
+            '404.api.error.not_found' => 'Endpoint not found'
+        ],
+        'notes' => 'If the same endpoint ID exists in multiple APIs and apiId is not specified, returns the first match. Check hasDuplicates in response to handle ambiguity.'
+    ],
+    
+    'addApi' => [
+        'description' => 'Creates a new API group for organizing external endpoints. Endpoints are added via editApi.',
+        'method' => 'POST',
+        'parameters' => [
+            'apiId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Unique identifier for the API (alphanumeric, dashes, underscores)',
+                'example' => 'main-backend'
+            ],
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Human-readable display name',
+                'example' => 'Main Backend API'
+            ],
+            'baseUrl' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Base URL for all endpoints in this API',
+                'example' => 'https://api.example.com'
+            ],
+            'description' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Optional description of the API',
+                'example' => 'Our primary REST API'
+            ],
+            'auth' => [
+                'required' => false,
+                'type' => 'object',
+                'description' => 'Authentication configuration: {type: "none"|"bearer"|"apiKey"|"basic", tokenSource: "localStorage:key"|"sessionStorage:key"|"config:key"}',
+                'example' => '{"type": "bearer", "tokenSource": "localStorage:apiToken"}'
+            ]
+        ],
+        'example_post' => 'POST /management/addApi with body: {"apiId": "main-backend", "name": "Main Backend", "baseUrl": "https://api.example.com", "auth": {"type": "bearer", "tokenSource": "localStorage:apiToken"}}',
+        'success_response' => [
+            'status' => 201,
+            'code' => 'operation.success',
+            'message' => "API 'main-backend' created successfully",
+            'data' => [
+                'apiId' => 'main-backend',
+                'api' => [
+                    'name' => 'Main Backend',
+                    'baseUrl' => 'https://api.example.com',
+                    'auth' => ['type' => 'bearer', 'tokenSource' => 'localStorage:apiToken'],
+                    'endpoints' => []
+                ]
+            ]
+        ],
+        'error_responses' => [
+            '400.api.error.missing_parameter' => 'Missing required parameter (apiId, name, or baseUrl)',
+            '400.api.error.invalid_parameter' => 'API with this ID already exists'
+        ],
+        'notes' => 'After creating an API, add endpoints using editApi with addEndpoint parameter. The API config is stored in data/api-endpoints.json and compiled to qs-api-config.js for client-side use.'
+    ],
+    
+    'editApi' => [
+        'description' => 'Modifies an existing API group or manages its endpoints. Can update API properties, add/edit/delete individual endpoints, or replace all endpoints.',
+        'method' => 'POST',
+        'parameters' => [
+            'apiId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'API to edit',
+                'example' => 'main-backend'
+            ],
+            'name' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'New display name',
+                'example' => 'Updated API Name'
+            ],
+            'baseUrl' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'New base URL',
+                'example' => 'https://new-api.example.com'
+            ],
+            'description' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'New description',
+                'example' => 'Updated description'
+            ],
+            'auth' => [
+                'required' => false,
+                'type' => 'object',
+                'description' => 'New authentication config',
+                'example' => '{"type": "apiKey", "tokenSource": "header:X-API-Key"}'
+            ],
+            'endpoints' => [
+                'required' => false,
+                'type' => 'array',
+                'description' => 'Full replacement of all endpoints (use with caution)',
+                'example' => '[{"id": "ep1", "name": "Endpoint 1", "path": "/ep1", "method": "GET"}]'
+            ],
+            'addEndpoint' => [
+                'required' => false,
+                'type' => 'object',
+                'description' => 'Add a single endpoint: {id, name, path, method, description?, requestSchema?, responseSchema?, headers?, queryParams?, responseBindings?}',
+                'example' => '{"id": "contact", "name": "Contact Form", "path": "/contact", "method": "POST"}'
+            ],
+            'editEndpoint' => [
+                'required' => false,
+                'type' => 'object',
+                'description' => 'Edit existing endpoint: {id: "endpoint-to-edit", updates: {...}}',
+                'example' => '{"id": "contact", "updates": {"name": "New Name", "path": "/new-path"}}'
+            ],
+            'deleteEndpoint' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Delete endpoint by ID',
+                'example' => 'old-endpoint'
+            ]
+        ],
+        'example_post' => 'POST /management/editApi with body: {"apiId": "main-backend", "addEndpoint": {"id": "users-list", "name": "List Users", "path": "/users", "method": "GET"}}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => "API 'main-backend' updated successfully",
+            'data' => [
+                'apiId' => 'main-backend',
+                'api' => ['...updated API object...'],
+                'endpointCount' => 3
+            ]
+        ],
+        'error_responses' => [
+            '400.api.error.missing_parameter' => 'Missing apiId or no updates provided',
+            '400.api.error.invalid_parameter' => 'Endpoint already exists (when adding) or invalid update operation',
+            '404.api.error.not_found' => 'API or endpoint not found'
+        ],
+        'notes' => 'Use ONE endpoint operation per request: endpoints (full replace), addEndpoint, editEndpoint, or deleteEndpoint. Regenerates qs-api-config.js automatically.'
+    ],
+    
+    'deleteApi' => [
+        'description' => 'Deletes an API group and all its endpoints. This action cannot be undone.',
+        'method' => 'DELETE',
+        'parameters' => [
+            'apiId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'API to delete (URL segment or body param)',
+                'example' => 'old-api'
+            ]
+        ],
+        'example_delete' => 'DELETE /management/deleteApi/old-api',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => "API 'old-api' deleted successfully",
+            'data' => [
+                'apiId' => 'old-api',
+                'deletedEndpoints' => 5
+            ]
+        ],
+        'error_responses' => [
+            '400.api.error.missing_parameter' => 'Missing API ID',
+            '404.api.error.not_found' => 'API not found'
+        ],
+        'notes' => 'Removes the API and all its endpoints from api-endpoints.json. Regenerates qs-api-config.js automatically. Cannot be undone - use backupProject first if needed.'
+    ],
+    
+    'testApiEndpoint' => [
+        'description' => 'Makes a real HTTP request to a registered external API endpoint for testing. Only registered endpoints can be tested - no arbitrary URLs allowed.',
+        'method' => 'POST',
+        'parameters' => [
+            'endpointId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Endpoint to test',
+                'example' => 'contact-submit'
+            ],
+            'apiId' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'API filter (required if duplicate endpoint IDs exist)',
+                'example' => 'main-backend'
+            ],
+            'testData' => [
+                'required' => false,
+                'type' => 'object',
+                'description' => 'Request body for POST/PUT/PATCH endpoints',
+                'example' => '{"name": "Test User", "email": "test@example.com"}'
+            ],
+            'queryParams' => [
+                'required' => false,
+                'type' => 'object',
+                'description' => 'Query parameters for GET requests',
+                'example' => '{"page": 1, "limit": 10}'
+            ],
+            'headers' => [
+                'required' => false,
+                'type' => 'object',
+                'description' => 'Additional headers to include',
+                'example' => '{"X-Custom-Header": "value"}'
+            ],
+            'authToken' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Override auth token for testing',
+                'example' => 'test-token-123'
+            ],
+            'timeout' => [
+                'required' => false,
+                'type' => 'integer',
+                'description' => 'Request timeout in seconds (default: 30)',
+                'example' => 10
+            ]
+        ],
+        'example_post' => 'POST /management/testApiEndpoint with body: {"endpointId": "contact-submit", "testData": {"name": "Test", "email": "test@test.com"}}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'API endpoint test completed',
+            'data' => [
+                'endpoint' => ['id' => 'contact-submit', 'method' => 'POST', 'fullUrl' => 'https://api.example.com/contact'],
+                'request' => [
+                    'method' => 'POST',
+                    'url' => 'https://api.example.com/contact',
+                    'headers' => ['Content-Type' => 'application/json', 'Authorization' => 'Bearer ***'],
+                    'body' => ['name' => 'Test', 'email' => 'test@test.com']
+                ],
+                'response' => [
+                    'statusCode' => 200,
+                    'statusText' => 'OK',
+                    'headers' => ['Content-Type' => 'application/json'],
+                    'body' => ['success' => true, 'id' => 123],
+                    'isJson' => true
+                ],
+                'timing' => [
+                    'duration_ms' => 245.3,
+                    'duration_formatted' => '245ms'
+                ]
+            ]
+        ],
+        'error_responses' => [
+            '400.api.error.missing_parameter' => 'Missing endpointId',
+            '400.api.error.invalid_parameter' => 'Duplicate endpoint IDs - specify apiId',
+            '404.api.error.not_found' => 'Endpoint not found',
+            '500.api.error.request_failed' => 'HTTP request failed (timeout, connection error)'
+        ],
+        'notes' => 'This makes a server-side (PHP) request to the external API. Useful for testing auth configuration and endpoint availability without client-side CORS issues. Auth tokens are masked in response for security.'
     ]
 ];
 
@@ -4228,7 +4626,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
             'base_url' => rtrim(BASE_URL, '/') . '/management',
             'command_categories' => [
                 'folder_management' => ['setPublicSpace', 'renameSecureFolder', 'renamePublicFolder'],
-                'route_management' => ['addRoute', 'deleteRoute', 'getRoutes', 'getSiteMap'],
+                'route_management' => ['addRoute', 'deleteRoute', 'setRouteLayout', 'getRoutes', 'getSiteMap'],
                 'structure_management' => ['getStructure', 'editStructure', 'listComponents', 'findComponentUsages', 'renameComponent', 'duplicateComponent', 'listPages'],
                 'node_management' => ['moveNode', 'deleteNode', 'addNode', 'editNode', 'addComponentToNode', 'editComponentToNode'],
                 'alias_management' => ['createAlias', 'deleteAlias', 'listAliases'],
@@ -4256,12 +4654,12 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'token_format' => 'tvt_<48 hex characters>',
                 'default_token' => 'tvt_dev_default_change_me_in_production (CHANGE IN PRODUCTION!)',
                 'role_system' => [
-                    '*' => 'Superadmin - full access to all 100 commands including token/role management',
-                    'viewer' => 'Read-only access (28 commands) - get*, list*, validate*, help, listAiProviders, listJsFunctions, listInteractions',
-                    'editor' => 'Content editing (58 commands) - viewer + structure, translations, assets, interactions',
-                    'designer' => 'Style editing (66 commands) - editor + CSS, animations, visual elements',
-                    'developer' => 'Build access (73 commands) - designer + build, deploy, projects, AI, listJsFunctions',
-                    'admin' => 'Full except tokens (94 commands) - developer + all except token/role management + JS functions'
+                    '*' => 'Superadmin - full access to all 106 commands including token/role management',
+                    'viewer' => 'Read-only access (30 commands) - get*, list*, validate*, help, listAiProviders, listJsFunctions, listInteractions, listApiEndpoints',
+                    'editor' => 'Content editing (64 commands) - viewer + structure, translations, assets, interactions, APIs',
+                    'designer' => 'Style editing (71 commands) - editor + CSS, animations, visual elements',
+                    'developer' => 'Build access (78 commands) - designer + build, deploy, projects, AI, listJsFunctions',
+                    'admin' => 'Full except tokens (99 commands) - developer + all except token/role management + JS functions'
                 ],
                 'endpoints' => [
                     'listRoles' => 'View available roles (* sees commands, others see names only)',

@@ -4,17 +4,23 @@ class Page {
     private $title;
     private $content;
     private $lang;
+    private $showMenu;
+    private $showFooter;
 
-    public function __construct($title, $content, $lang) {
+    public function __construct($title, $content, $lang, $showMenu = true, $showFooter = true) {
         $this->title = $title;
         $this->content = $content;
         $this->lang = $lang;
+        $this->showMenu = $showMenu;
+        $this->showFooter = $showFooter;
     }
 
     public function render() {
         $title = $this->title;
         $content = $this->content;
         $lang = $this->lang;
+        $showMenu = $this->showMenu;
+        $showFooter = $this->showFooter;
         ?>
 <!DOCTYPE html>
 <html lang="<?= htmlspecialchars($lang, ENT_QUOTES | ENT_HTML5, 'UTF-8') ?>">
@@ -26,15 +32,19 @@ class Page {
     <link rel="stylesheet" href="/<?= PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '' ?>style/style.css">
 </head>
 <body>
+    <?php if ($showMenu): ?>
     <header>
         <?php require_once PROJECT_PATH . '/templates/menu.php'; ?>
     </header>
+    <?php endif; ?>
     <main>
         <?= $content ?>
     </main>
+    <?php if ($showFooter): ?>
     <footer>
         <?php require_once PROJECT_PATH . '/templates/footer.php'; ?>
     </footer>
+    <?php endif; ?>
     <script src="/<?= PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '' ?>scripts/qs.js"></script>
     <?php 
     // Include custom functions if file exists and has content

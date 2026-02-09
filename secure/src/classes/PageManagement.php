@@ -68,10 +68,19 @@ class PageManagement {
 
         $renderer = new JsonToHtmlRenderer($translator, $context);
 
-        // Render the main content
-        $body .= $renderer->renderMenu();
+        // Load route layout settings (menu/footer visibility)
+        require_once SECURE_FOLDER_PATH . '/src/classes/RouteLayoutManager.php';
+        $layoutManager = new RouteLayoutManager();
+        $layout = $layoutManager->getEffectiveLayout($trimParameters->routePath());
+
+        // Render the main content with conditional menu/footer
+        if ($layout['menu']) {
+            $body .= $renderer->renderMenu();
+        }
         $body .= $this->content;
-        $body .= $renderer->renderFooter();
+        if ($layout['footer']) {
+            $body .= $renderer->renderFooter();
+        }
 
         // Always include QuickSite core library for {{call:...}} interactions
         $body .= '<script src="' . BASE_URL . '/scripts/qs.js"></script>';
