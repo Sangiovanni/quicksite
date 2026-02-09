@@ -8960,6 +8960,7 @@
     
     let currentJsContext = null;
     let availableFunctions = []; // Cached from listJsFunctions
+    let availableApiEndpoints = []; // Cached from listApiEndpoints
     let currentAvailableEvents = []; // From listInteractions response
     let editingInteraction = null; // { event, index, interaction } when editing, null when adding
     let currentInteractionsData = null; // Cached interactions data for edit lookup
@@ -9081,7 +9082,7 @@
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {
-                    'Authorization': 'Bearer ${PreviewConfig.authToken}'
+                    'Authorization': `Bearer ${PreviewConfig.authToken}`
                 }
             });
             
@@ -9165,7 +9166,7 @@
     async function deleteInteraction(eventName, index) {
         if (!currentJsContext) return;
         
-        if (!confirm('${PreviewConfig.i18n.confirmDeleteInteraction}')) {
+        if (!confirm(`${PreviewConfig.i18n.confirmDeleteInteraction}`)) {
             return;
         }
         
@@ -9194,7 +9195,7 @@
             const response = await fetch('/management/deleteInteraction', {
                 method: 'DELETE',
                 headers: {
-                    'Authorization': 'Bearer ${PreviewConfig.authToken}',
+                    'Authorization': `Bearer ${PreviewConfig.authToken}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(body)
@@ -9206,7 +9207,7 @@
                 throw new Error(result.message || 'Failed to delete interaction');
             }
             
-            showToast('${PreviewConfig.i18n.interactionDeleted}', 'success');
+            showToast(`${PreviewConfig.i18n.interactionDeleted}`, 'success');
             
             // Refresh list
             await loadInteractions();
@@ -9230,7 +9231,7 @@
         console.log('[Preview] Edit interaction:', eventName, index);
         
         if (!currentInteractionsData || !currentJsContext) {
-            showToast('No interaction data available', 'error');
+            showToast(PreviewConfig.i18n.noInteractionData || 'No interaction data available', 'error');
             return;
         }
         
@@ -9239,7 +9240,7 @@
         const interactionsForEvent = interactions.filter(i => i.event === eventName);
         
         if (index >= interactionsForEvent.length) {
-            showToast('Interaction not found', 'error');
+            showToast(PreviewConfig.i18n.interactionNotFound || 'Interaction not found', 'error');
             return;
         }
         
@@ -9267,8 +9268,8 @@
         jsPanelActions.style.display = 'none';
         
         // Change header and button text to "Edit"
-        if (formHeader) formHeader.textContent = '${PreviewConfig.i18n.editInteraction}';
-        jsFormSave.textContent = '${PreviewConfig.i18n.save}';
+        if (formHeader) formHeader.textContent = `${PreviewConfig.i18n.editInteraction}`;
+        jsFormSave.textContent = `${PreviewConfig.i18n.save}`;
         
         // Populate dropdowns
         populateEventDropdown();
@@ -9533,7 +9534,13 @@
     
     const jsAddForm = document.getElementById('js-add-form');
     const jsFormEvent = document.getElementById('js-form-event');
+    const jsFormActionType = document.getElementById('js-form-action-type');
+    const jsFormFunctionSection = document.getElementById('js-form-function-section');
+    const jsFormApiSection = document.getElementById('js-form-api-section');
     const jsFormFunction = document.getElementById('js-form-function');
+    const jsFormApi = document.getElementById('js-form-api');
+    const jsFormEndpoint = document.getElementById('js-form-endpoint');
+    const jsFormApiBody = document.getElementById('js-form-api-body');
     const jsFormParams = document.getElementById('js-form-params');
     const jsPreviewCode = document.getElementById('js-preview-code');
     const jsFormSave = document.getElementById('js-form-save');
@@ -9555,8 +9562,8 @@
             
             // Reset header and button text to "Add"
             const formHeader = jsAddForm.querySelector('.preview-contextual-js-form-header strong');
-            if (formHeader) formHeader.textContent = '${PreviewConfig.i18n.newInteraction}';
-            jsFormSave.textContent = '${PreviewConfig.i18n.addInteraction}';
+            if (formHeader) formHeader.textContent = `${PreviewConfig.i18n.newInteraction}`;
+            jsFormSave.textContent = `${PreviewConfig.i18n.addInteraction}`;
             
             // Populate event dropdown from currentAvailableEvents
             populateEventDropdown();
@@ -9567,9 +9574,22 @@
             }
             populateFunctionDropdown();
             
+            // Fetch API endpoints if not cached
+            if (availableApiEndpoints.length === 0) {
+                await fetchApiEndpoints();
+            }
+            populateApiDropdown();
+            
             // Reset form
             jsFormEvent.value = '';
+            jsFormActionType.value = 'function';
+            jsFormFunctionSection.style.display = '';
+            jsFormApiSection.classList.remove('visible');
             jsFormFunction.value = '';
+            jsFormApi.value = '';
+            jsFormEndpoint.value = '';
+            jsFormEndpoint.disabled = true;
+            jsFormApiBody.value = '#form';
             jsFormParams.innerHTML = '';
             jsPreviewCode.textContent = '-';
             jsFormSave.disabled = true;
@@ -9597,7 +9617,7 @@
             const response = await fetch('/management/listJsFunctions', {
                 method: 'GET',
                 headers: {
-                    'Authorization': 'Bearer ${PreviewConfig.authToken}'
+                    'Authorization': `Bearer ${PreviewConfig.authToken}`
                 }
             });
             
@@ -9615,9 +9635,52 @@
         }
     }
     
+    // Fetch API endpoints from API Registry
+    async function fetchApiEndpoints() {
+        try {
+            const response = await fetch('/management/listApiEndpoints', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${PreviewConfig.authToken}`
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch API endpoints');
+            }
+            
+            const result = await response.json();
+            
+            // Flatten the APIs structure into a simple list of endpoints
+            // API returns: { data: { apis: [{ apiId, endpoints: [...] }] } }
+            // We need: [{ api: apiId, endpoint: endpointId, method, requestSchema, ... }]
+            const apis = result.data?.apis || [];
+            availableApiEndpoints = [];
+            
+            for (const api of apis) {
+                for (const ep of (api.endpoints || [])) {
+                    availableApiEndpoints.push({
+                        api: api.apiId,
+                        endpoint: ep.id || ep.name,
+                        method: ep.method || 'POST',
+                        path: ep.path,
+                        description: ep.description,
+                        requestSchema: ep.requestSchema || {}
+                    });
+                }
+            }
+            
+            console.log('[Preview] API endpoints loaded:', availableApiEndpoints.length);
+            
+        } catch (error) {
+            console.error('[Preview] Failed to load API endpoints:', error);
+            availableApiEndpoints = [];
+        }
+    }
+    
     // Populate event dropdown
     function populateEventDropdown() {
-        jsFormEvent.innerHTML = '<option value="">${PreviewConfig.i18n.selectEvent}</option>';
+        jsFormEvent.innerHTML = `<option value="">${PreviewConfig.i18n.selectEvent}</option>`;
         
         currentAvailableEvents.forEach(event => {
             const option = document.createElement('option');
@@ -9629,7 +9692,7 @@
     
     // Populate function dropdown (grouped by type)
     function populateFunctionDropdown() {
-        jsFormFunction.innerHTML = '<option value="">${PreviewConfig.i18n.selectFunction}</option>';
+        jsFormFunction.innerHTML = `<option value="">${PreviewConfig.i18n.selectFunction}</option>`;
         
         // Group functions by type (core, custom)
         const grouped = {};
@@ -9642,9 +9705,9 @@
         // Add optgroups (core first, then custom)
         const typeOrder = ['core', 'custom', 'other'];
         const typeLabels = {
-            'core': 'Core Functions',
-            'custom': 'Custom Functions',
-            'other': 'Other'
+            'core': PreviewConfig.i18n.functionGroupCore || 'Core Functions',
+            'custom': PreviewConfig.i18n.functionGroupCustom || 'Custom Functions',
+            'other': PreviewConfig.i18n.functionGroupOther || 'Other'
         };
         
         typeOrder.forEach(type => {
@@ -9664,6 +9727,47 @@
             
             jsFormFunction.appendChild(optgroup);
         });
+    }
+    
+    // Populate API dropdown (list of unique APIs)
+    function populateApiDropdown() {
+        jsFormApi.innerHTML = `<option value="">${PreviewConfig.i18n.selectApi}</option>`;
+        jsFormEndpoint.innerHTML = `<option value="">${PreviewConfig.i18n.selectEndpoint}</option>`;
+        jsFormEndpoint.disabled = true;
+        
+        // Extract unique API names
+        const uniqueApis = [...new Set(availableApiEndpoints.map(ep => ep.api))];
+        
+        uniqueApis.forEach(apiName => {
+            const option = document.createElement('option');
+            option.value = apiName;
+            option.textContent = apiName;
+            jsFormApi.appendChild(option);
+        });
+    }
+    
+    // Populate endpoint dropdown based on selected API
+    function populateEndpointDropdown(apiName) {
+        jsFormEndpoint.innerHTML = `<option value="">${PreviewConfig.i18n.selectEndpoint}</option>`;
+        
+        if (!apiName) {
+            jsFormEndpoint.disabled = true;
+            return;
+        }
+        
+        // Filter endpoints for this API
+        const endpoints = availableApiEndpoints.filter(ep => ep.api === apiName);
+        
+        endpoints.forEach(ep => {
+            const option = document.createElement('option');
+            option.value = ep.endpoint;
+            option.textContent = ep.endpoint + ' (' + ep.method + ')';
+            option.dataset.method = ep.method || 'POST';
+            option.dataset.requestSchema = JSON.stringify(ep.requestSchema || {});
+            jsFormEndpoint.appendChild(option);
+        });
+        
+        jsFormEndpoint.disabled = endpoints.length === 0;
     }
     
     /**
@@ -9692,9 +9796,9 @@
         
         // Special placeholder for selector inputs
         if (inputType === 'selector') {
-            input.placeholder = '${PreviewConfig.i18n.selectorOrThis}';
+            input.placeholder = `${PreviewConfig.i18n.selectorOrThis}`;
         } else if (inputType === 'class') {
-            input.placeholder = '${PreviewConfig.i18n.searchClass}';
+            input.placeholder = `${PreviewConfig.i18n.searchClass}`;
         }
         
         const dropdown = document.createElement('div');
@@ -9709,7 +9813,7 @@
                 const seenValues = new Set();
                 
                 // Start with "this" special option
-                items.push({ value: 'this', label: '${PreviewConfig.i18n.thisElement}', type: 'special' });
+                items.push({ value: 'this', label: `${PreviewConfig.i18n.thisElement}`, type: 'special' });
                 seenValues.add('this');
                 
                 // Add IDs from CSS (high priority - specific targets)
@@ -9870,6 +9974,51 @@
         return wrapper;
     }
     
+    // Action type toggle - switch between function and API sections
+    if (jsFormActionType) {
+        jsFormActionType.addEventListener('change', () => {
+            const actionType = jsFormActionType.value;
+            
+            if (actionType === 'api') {
+                // Show API section, hide function section
+                jsFormFunctionSection.style.display = 'none';
+                jsFormApiSection.classList.add('visible');
+                // Clear function params
+                jsFormFunction.value = '';
+                jsFormParams.innerHTML = '';
+            } else {
+                // Show function section, hide API section
+                jsFormFunctionSection.style.display = '';
+                jsFormApiSection.classList.remove('visible');
+                // Clear API fields
+                jsFormApi.value = '';
+                jsFormEndpoint.value = '';
+                jsFormEndpoint.disabled = true;
+            }
+            
+            updatePreview();
+        });
+    }
+    
+    // API dropdown change - populate endpoints
+    if (jsFormApi) {
+        jsFormApi.addEventListener('change', () => {
+            const apiName = jsFormApi.value;
+            populateEndpointDropdown(apiName);
+            updatePreview();
+        });
+    }
+    
+    // Endpoint dropdown change - update preview
+    if (jsFormEndpoint) {
+        jsFormEndpoint.addEventListener('change', updatePreview);
+    }
+    
+    // Body input change - update preview
+    if (jsFormApiBody) {
+        jsFormApiBody.addEventListener('input', updatePreview);
+    }
+    
     // When function changes, populate param inputs
     if (jsFormFunction) {
         jsFormFunction.addEventListener('change', () => {
@@ -9922,50 +10071,37 @@
     
     // Update preview as user types
     function updatePreview() {
-        const fnName = jsFormFunction.value;
+        const actionType = jsFormActionType?.value || 'function';
         const eventName = jsFormEvent.value;
         
-        if (!fnName) {
-            jsPreviewCode.textContent = '-';
-            jsFormSave.disabled = true;
-            return;
-        }
-        
-        // Collect params
-        const paramInputs = jsFormParams.querySelectorAll('.preview-contextual-js-form-input');
-        const params = [];
-        paramInputs.forEach(input => {
-            if (input.value.trim()) {
-                params.push(input.value.trim());
+        if (actionType === 'api') {
+            // API mode: {{call:fetch:@api/endpoint,body=#form}}
+            const apiName = jsFormApi?.value || '';
+            const endpointName = jsFormEndpoint?.value || '';
+            const bodySelector = jsFormApiBody?.value || '#form';
+            
+            if (!apiName || !endpointName) {
+                jsPreviewCode.textContent = '-';
+                jsFormSave.disabled = true;
+                return;
             }
-        });
-        
-        // Build preview
-        let preview = '{{call:' + fnName;
-        if (params.length > 0) {
-            preview += ':' + params.join(',');
-        }
-        preview += '}}';
-        
-        jsPreviewCode.textContent = preview;
-        
-        // Enable save if event and function selected
-        jsFormSave.disabled = !eventName || !fnName;
-    }
-    
-    // Event change also triggers preview update
-    if (jsFormEvent) {
-        jsFormEvent.addEventListener('change', updatePreview);
-    }
-    
-    // Save interaction (add or edit based on editingInteraction state)
-    if (jsFormSave) {
-        jsFormSave.addEventListener('click', async () => {
-            const eventName = jsFormEvent.value;
+            
+            // Build API call preview
+            let preview = '{{call:fetch:@' + apiName + '/' + endpointName;
+            if (bodySelector.trim()) {
+                preview += ',body=' + bodySelector.trim();
+            }
+            preview += '}}';
+            
+            jsPreviewCode.textContent = preview;
+            jsFormSave.disabled = !eventName;
+        } else {
+            // Function mode: {{call:functionName:param1,param2}}
             const fnName = jsFormFunction.value;
             
-            if (!eventName || !fnName || !currentJsContext) {
-                showToast('Please select an event and function', 'error');
+            if (!fnName) {
+                jsPreviewCode.textContent = '-';
+                jsFormSave.disabled = true;
                 return;
             }
             
@@ -9977,6 +10113,74 @@
                     params.push(input.value.trim());
                 }
             });
+            
+            // Build preview
+            let preview = '{{call:' + fnName;
+            if (params.length > 0) {
+                preview += ':' + params.join(',');
+            }
+            preview += '}}';
+            
+            jsPreviewCode.textContent = preview;
+            
+            // Enable save if event and function selected
+            jsFormSave.disabled = !eventName || !fnName;
+        }
+    }
+    
+    // Event change also triggers preview update
+    if (jsFormEvent) {
+        jsFormEvent.addEventListener('change', updatePreview);
+    }
+    
+    // Save interaction (add or edit based on editingInteraction state)
+    if (jsFormSave) {
+        jsFormSave.addEventListener('click', async () => {
+            const eventName = jsFormEvent.value;
+            const actionType = jsFormActionType?.value || 'function';
+            
+            // Determine function name and params based on action type
+            let fnName, params;
+            
+            if (actionType === 'api') {
+                // API Call mode
+                const apiName = jsFormApi?.value || '';
+                const endpointName = jsFormEndpoint?.value || '';
+                const bodySelector = jsFormApiBody?.value || '';
+                
+                if (!eventName || !apiName || !endpointName) {
+                    showToast(PreviewConfig.i18n.selectEventApiEndpoint || 'Please select an event, API, and endpoint', 'error');
+                    return;
+                }
+                
+                fnName = 'fetch';
+                params = ['@' + apiName + '/' + endpointName];
+                if (bodySelector.trim()) {
+                    params.push('body=' + bodySelector.trim());
+                }
+            } else {
+                // Function mode
+                fnName = jsFormFunction.value;
+                
+                if (!eventName || !fnName || !currentJsContext) {
+                    showToast(PreviewConfig.i18n.selectEventAndFunction || 'Please select an event and function', 'error');
+                    return;
+                }
+                
+                // Collect params
+                const paramInputs = jsFormParams.querySelectorAll('.preview-contextual-js-form-input');
+                params = [];
+                paramInputs.forEach(input => {
+                    if (input.value.trim()) {
+                        params.push(input.value.trim());
+                    }
+                });
+            }
+            
+            if (!currentJsContext) {
+                showToast(PreviewConfig.i18n.noElementSelected || 'No element selected', 'error');
+                return;
+            }
             
             // Determine if this is an edit or add operation
             const isEdit = editingInteraction !== null;
@@ -10005,7 +10209,7 @@
             
             try {
                 jsFormSave.disabled = true;
-                jsFormSave.textContent = '${PreviewConfig.i18n.saving}';
+                jsFormSave.textContent = `${PreviewConfig.i18n.saving}`;
                 
                 const endpoint = isEdit ? '/management/editInteraction' : '/management/addInteraction';
                 const method = isEdit ? 'PUT' : 'POST';
@@ -10013,7 +10217,7 @@
                 const response = await fetch(endpoint, {
                     method: method,
                     headers: {
-                        'Authorization': 'Bearer ${PreviewConfig.authToken}',
+                        'Authorization': `Bearer ${PreviewConfig.authToken}`,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(body)
@@ -10026,8 +10230,8 @@
                 }
                 
                 showToast(isEdit 
-                    ? '${PreviewConfig.i18n.interactionUpdated}' 
-                    : '${PreviewConfig.i18n.interactionAdded}', 
+                    ? `${PreviewConfig.i18n.interactionUpdated}` 
+                    : `${PreviewConfig.i18n.interactionAdded}`, 
                     'success');
                 
                 // Hide form and refresh list
@@ -10043,8 +10247,8 @@
             } finally {
                 jsFormSave.disabled = false;
                 jsFormSave.textContent = isEdit
-                    ? '${PreviewConfig.i18n.save}'
-                    : '${PreviewConfig.i18n.addInteraction}';
+                    ? `${PreviewConfig.i18n.save}`
+                    : `${PreviewConfig.i18n.addInteraction}`;
             }
         });
     }

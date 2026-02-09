@@ -799,10 +799,42 @@ if (is_dir($componentsDir)) {
                     </div>
                     
                     <div class="preview-contextual-js-form-row">
-                        <label class="preview-contextual-js-form-label"><?= __admin('preview.function') ?? 'Function' ?></label>
-                        <select class="preview-contextual-js-form-select" id="js-form-function">
-                            <option value=""><?= __admin('preview.selectFunction') ?? '-- Select function --' ?></option>
+                        <label class="preview-contextual-js-form-label"><?= __admin('preview.actionType') ?? 'Action Type' ?></label>
+                        <select class="preview-contextual-js-form-select" id="js-form-action-type">
+                            <option value="function"><?= __admin('preview.actionTypeFunction') ?? 'Function' ?></option>
+                            <option value="api"><?= __admin('preview.actionTypeApi') ?? 'API Call' ?></option>
                         </select>
+                    </div>
+                    
+                    <!-- Function section (shown when action type = function) -->
+                    <div id="js-form-function-section">
+                        <div class="preview-contextual-js-form-row">
+                            <label class="preview-contextual-js-form-label"><?= __admin('preview.function') ?? 'Function' ?></label>
+                            <select class="preview-contextual-js-form-select" id="js-form-function">
+                                <option value=""><?= __admin('preview.selectFunction') ?? '-- Select function --' ?></option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- API section (shown when action type = api, hidden by default) -->
+                    <div id="js-form-api-section" class="preview-contextual-js-form-api-section">
+                        <div class="preview-contextual-js-form-row">
+                            <label class="preview-contextual-js-form-label"><?= __admin('preview.selectApi') ?? 'API' ?></label>
+                            <select class="preview-contextual-js-form-select" id="js-form-api">
+                                <option value=""><?= __admin('preview.selectApiPlaceholder') ?? '-- Select API --' ?></option>
+                            </select>
+                        </div>
+                        <div class="preview-contextual-js-form-row">
+                            <label class="preview-contextual-js-form-label"><?= __admin('preview.selectEndpoint') ?? 'Endpoint' ?></label>
+                            <select class="preview-contextual-js-form-select" id="js-form-endpoint" disabled>
+                                <option value=""><?= __admin('preview.selectEndpointPlaceholder') ?? '-- Select endpoint --' ?></option>
+                            </select>
+                        </div>
+                        <div class="preview-contextual-js-form-row" id="js-form-api-body-row">
+                            <label class="preview-contextual-js-form-label"><?= __admin('preview.requestBody') ?? 'Body source' ?></label>
+                            <input type="text" class="preview-contextual-js-form-input" id="js-form-api-body" placeholder="<?= __admin('preview.bodySourcePlaceholder') ?? '#form or CSS selector' ?>">
+                            <small class="preview-contextual-js-form-hint"><?= __admin('preview.bodySourceHint') ?? 'Use #form to collect from a form, or a CSS selector' ?></small>
+                        </div>
                     </div>
                     
                     <div class="preview-contextual-js-form-params" id="js-form-params">

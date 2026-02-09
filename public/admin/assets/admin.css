@@ -11283,6 +11283,15 @@ select.preview-style-input {
     margin: var(--space-sm) 0;
 }
 
+/* API Call section - hidden by default, shown when action type is "api" */
+.preview-contextual-js-form-api-section {
+    display: none;
+}
+
+.preview-contextual-js-form-api-section.visible {
+    display: contents;
+}
+
 .preview-contextual-js-form-hint {
     font-size: 0.7rem;
     color: var(--admin-text-muted);
