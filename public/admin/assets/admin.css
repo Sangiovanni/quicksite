@@ -1125,73 +1125,6 @@ code{
     font-weight: 500;
 }
 
-/* Node Details Panel */
-.admin-node-details {
-    position: fixed;
-    top: calc(var(--admin-header-height) + var(--space-lg));
-    right: var(--space-lg);
-    width: 360px;
-    max-height: calc(100vh - var(--admin-header-height) - var(--space-2xl));
-    background: var(--admin-bg-secondary);
-    border: 1px solid var(--admin-border);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    z-index: 50;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-.admin-node-details__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-md) var(--space-lg);
-    border-bottom: 1px solid var(--admin-border);
-}
-
-.admin-node-details__header h3 {
-    margin: 0;
-    font-size: var(--font-size-base);
-    color: var(--admin-text);
-}
-
-.admin-node-details__close {
-    background: none;
-    border: none;
-    color: var(--admin-text-muted);
-    font-size: var(--font-size-xl);
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
-}
-
-.admin-node-details__close:hover {
-    color: var(--admin-text);
-}
-
-.admin-node-details__body {
-    padding: var(--space-lg);
-    overflow-y: auto;
-    flex: 1;
-}
-
-.admin-node-details__json {
-    margin: 0;
-    padding: var(--space-sm);
-    background: var(--admin-bg);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-xs);
-    white-space: pre-wrap;
-    word-break: break-all;
-}
-
-.admin-node-details__actions {
-    margin-top: var(--space-lg);
-    padding-top: var(--space-lg);
-    border-top: 1px solid var(--admin-border);
-}
-
 .admin-definition-list dt {
     font-size: var(--font-size-xs);
     color: var(--admin-text-muted);
@@ -5950,6 +5883,7 @@ kbd {
     transition: all var(--transition-fast);
     font-size: var(--font-size-sm);
     font-family: inherit;
+    text-decoration: none;
 }
 
 .admin-nav__group-toggle:hover {
@@ -6115,11 +6049,6 @@ kbd {
     max-width: 500px;
 }
 
-/* Structure selector - keep it reasonable */
-.admin-structure-selector {
-    max-width: 800px;
-}
-
 /* Quick actions grid - constrain width */
 .admin-quick-actions {
     max-width: 700px;
@@ -6196,7 +6125,7 @@ kbd {
 .admin-user-badge__name {
     color: var(--admin-text);
     font-weight: var(--font-weight-medium);
-    max-width: 150px;
+    max-width: 100px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -12481,4 +12410,160 @@ body[data-page="preview"] .global-miniplayer {
 
 .admin-component-empty__text {
     font-size: var(--font-size-sm);
+}
+
+/* =============================================================================
+   TABS COMPONENT
+   ============================================================================= */
+.admin-tabs {
+    display: flex;
+    gap: var(--space-xs);
+    padding: var(--space-sm);
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-lg);
+}
+
+.admin-tabs__tab {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    text-decoration: none;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.admin-tabs__tab:hover {
+    background: var(--admin-bg);
+    color: var(--admin-text);
+}
+
+.admin-tabs__tab--active {
+    background: var(--admin-primary);
+    color: #fff;
+}
+
+.admin-tabs__tab--active:hover {
+    background: var(--admin-primary-hover);
+    color: #fff;
+}
+
+.admin-tabs__icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+/* Responsive tabs */
+@media (max-width: 640px) {
+    .admin-tabs {
+        flex-wrap: wrap;
+    }
+    
+    .admin-tabs__tab {
+        flex: 1;
+        justify-content: center;
+        min-width: 100px;
+    }
+}
+
+/* =============================================================================
+   STRUCTURE OVERVIEW (Dashboard Panel)
+   ============================================================================= */
+.structure-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--space-lg);
+}
+
+.structure-overview__section {
+    background: var(--admin-bg);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+}
+
+.structure-overview__heading {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--admin-text);
+    margin: 0 0 var(--space-sm) 0;
+}
+
+.structure-overview__heading svg {
+    color: var(--admin-text-muted);
+}
+
+.structure-overview__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.structure-overview__item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-xs) 0;
+    border-bottom: 1px solid var(--admin-border);
+    font-size: var(--font-size-sm);
+}
+
+.structure-overview__item:last-child {
+    border-bottom: none;
+}
+
+.structure-overview__name {
+    color: var(--admin-text);
+    font-weight: var(--font-weight-medium);
+}
+
+.structure-overview__path {
+    color: var(--admin-text-muted);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+}
+
+.structure-overview__more {
+    padding: var(--space-xs) 0;
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-xs);
+    font-style: italic;
+}
+
+.structure-overview__langs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.structure-overview__lang {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+}
+
+.structure-overview__lang-flag {
+    font-size: 1rem;
+}
+
+.structure-overview__lang-code {
+    color: var(--admin-text-muted);
+    font-weight: var(--font-weight-medium);
+    font-size: var(--font-size-xs);
 }

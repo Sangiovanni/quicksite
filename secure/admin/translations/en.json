@@ -157,6 +157,12 @@
             "admin": "Admin",
             "other": "Other"
         },
+        "structure": {
+            "title": "Structure Overview",
+            "viewFull": "View Full Structure",
+            "routes": "Routes",
+            "languages": "Languages"
+        },
         "categories": {
             "title": "Commands by Category"
         },
@@ -172,6 +178,11 @@
     "commands": {
         "title": "Commands",
         "subtitle": "Browse and execute API commands",
+        "tabs": {
+            "commands": "Commands",
+            "history": "History",
+            "docs": "Docs"
+        },
         "searchPlaceholder": "Search commands...",
         "openQueue": "Open Queue",
         "allCategories": "All Categories",
@@ -305,6 +316,9 @@
         "command": "Command",
         "history": "History",
         "settings": "Settings",
+        "projectSettings": "Project Settings",
+        "apiEndpoints": "API Endpoints",
+        "aiApiKeys": "AI API Keys",
         "structure": "Structure",
         "batch": "Command Queue",
         "docs": "Docs",

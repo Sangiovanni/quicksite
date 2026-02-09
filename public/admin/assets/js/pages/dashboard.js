@@ -937,6 +937,225 @@
     }
 
     // ========================================================================
+    // Structure Panel
+    // ========================================================================
+
+    let dashStructureLoaded = null; // Stores { type, name, structure }
+
+    /**
+     * Toggle the structure panel open/closed
+     */
+    function toggleStructurePanel() {
+        const body = document.getElementById('structure-panel-body');
+        const toggle = document.getElementById('structure-panel-toggle');
+        
+        if (!body || !toggle) return;
+        
+        const isOpen = body.style.display !== 'none';
+        
+        if (isOpen) {
+            body.style.display = 'none';
+            toggle.classList.remove('admin-card__toggle--open');
+        } else {
+            body.style.display = 'block';
+            toggle.classList.add('admin-card__toggle--open');
+        }
+    }
+
+    /**
+     * Initialize structure viewer selectors in dashboard
+     */
+    function initDashboardStructureViewer() {
+        const typeSelect = document.getElementById('dash-structure-type');
+        const nameSelect = document.getElementById('dash-structure-name');
+        const loadBtn = document.getElementById('dash-load-structure');
+        
+        if (!typeSelect || !nameSelect || !loadBtn) return;
+        
+        const trans = window.QUICKSITE_CONFIG?.translations?.structure?.select || {};
+        
+        typeSelect.addEventListener('change', async function() {
+            const type = this.value;
+            
+            if (!type) {
+                nameSelect.innerHTML = `<option value="">${trans.typeFirst || 'Select type first...'}</option>`;
+                nameSelect.disabled = true;
+                loadBtn.disabled = true;
+                return;
+            }
+            
+            if (type === 'menu' || type === 'footer') {
+                nameSelect.innerHTML = `<option value="">${(trans.notRequired || 'Not required for :type').replace(':type', type)}</option>`;
+                nameSelect.disabled = true;
+                loadBtn.disabled = false;
+            } else {
+                nameSelect.disabled = true;
+                nameSelect.innerHTML = '<option value="">Loading...</option>';
+                
+                try {
+                    const endpoint = type === 'page' ? 'pages' : 'components';
+                    const options = await QuickSiteAdmin.fetchHelperData(endpoint);
+                    
+                    nameSelect.innerHTML = `<option value="">${(trans.selectType || 'Select :type...').replace(':type', type)}</option>`;
+                    options.forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt.value;
+                        option.textContent = opt.label;
+                        nameSelect.appendChild(option);
+                    });
+                    nameSelect.disabled = false;
+                } catch (error) {
+                    nameSelect.innerHTML = '<option value="">Error loading options</option>';
+                }
+                
+                loadBtn.disabled = true;
+            }
+        });
+        
+        nameSelect.addEventListener('change', function() {
+            loadBtn.disabled = !this.value && !['menu', 'footer'].includes(typeSelect.value);
+        });
+        
+        loadBtn.addEventListener('click', loadDashboardStructure);
+    }
+
+    /**
+     * Load structure in dashboard
+     */
+    async function loadDashboardStructure() {
+        const typeSelect = document.getElementById('dash-structure-type');
+        const nameSelect = document.getElementById('dash-structure-name');
+        const treeContainer = document.getElementById('dash-structure-tree');
+        
+        const type = typeSelect?.value;
+        const name = nameSelect?.value;
+        
+        if (!type || !treeContainer) return;
+        
+        const trans = window.QUICKSITE_CONFIG?.translations?.structure?.tree || {};
+        
+        treeContainer.innerHTML = `<div class="admin-loading"><span class="admin-spinner"></span> ${trans.loading || 'Loading structure...'}</div>`;
+        
+        try {
+            let urlParams = [type];
+            if (name && (type === 'page' || type === 'component')) {
+                urlParams.push(name);
+            }
+            urlParams.push('showIds');
+            
+            const result = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, urlParams);
+            
+            if (result.ok && result.data?.data?.structure) {
+                dashStructureLoaded = {
+                    type,
+                    name,
+                    structure: result.data.data.structure
+                };
+                renderDashboardStructureTree(result.data.data.structure, treeContainer);
+            } else {
+                treeContainer.innerHTML = `
+                    <div class="admin-alert admin-alert--error">
+                        ${result.data?.message || trans.loadFailed || 'Failed to load structure'}
+                    </div>
+                `;
+            }
+        } catch (error) {
+            treeContainer.innerHTML = `
+                <div class="admin-alert admin-alert--error">
+                    Error: ${error.message}
+                </div>
+            `;
+        }
+    }
+
+    /**
+     * Render structure tree in dashboard
+     */
+    function renderDashboardStructureTree(structure, container) {
+        if (!structure || (Array.isArray(structure) && structure.length === 0)) {
+            const trans = window.QUICKSITE_CONFIG?.translations?.structure?.tree || {};
+            container.innerHTML = `<div class="admin-empty"><p>${trans.isEmpty || 'Structure is empty'}</p></div>`;
+            return;
+        }
+        
+        const tree = Array.isArray(structure) ? structure : [structure];
+        container.innerHTML = renderDashboardNodes(tree, 0, '');
+    }
+
+    /**
+     * Render tree nodes recursively for dashboard
+     */
+    function renderDashboardNodes(nodes, depth, parentPath) {
+        let html = '<ul class="admin-tree">';
+        
+        nodes.forEach((node, index) => {
+            const nodePath = parentPath ? `${parentPath}.${index}` : `${index}`;
+            const nodeId = node._nodeId ?? nodePath;
+            
+            const element = node.tag || node.component || (node.textKey ? 'text' : (node.text ? 'raw' : 'node'));
+            const hasChildren = node.children && node.children.length > 0;
+            const attributes = node.params || {};
+            
+            // Build label
+            let label = '';
+            if (node.component) {
+                label = `<span class="admin-tree__component">&lt;${QuickSiteAdmin.escapeHtml(node.component)}/&gt;</span>`;
+            } else if (node.tag) {
+                label = `<span class="admin-tree__element">&lt;${element}</span>`;
+                
+                if (attributes.id) {
+                    label += `<span class="admin-tree__attr-id">#${QuickSiteAdmin.escapeHtml(attributes.id)}</span>`;
+                }
+                if (attributes.class) {
+                    const classes = Array.isArray(attributes.class) ? attributes.class.join(' ') : attributes.class;
+                    label += `<span class="admin-tree__attr-class">.${QuickSiteAdmin.escapeHtml(classes.replace(/\s+/g, '.'))}</span>`;
+                }
+                
+                label += `<span class="admin-tree__element">&gt;</span>`;
+            } else if (node.textKey) {
+                label = `<span class="admin-tree__trans">{{${QuickSiteAdmin.escapeHtml(node.textKey)}}}</span>`;
+            } else if (node.text) {
+                const preview = node.text.length > 30 ? node.text.substring(0, 30) + '...' : node.text;
+                label = `<span class="admin-tree__text">"${QuickSiteAdmin.escapeHtml(preview)}"</span>`;
+            } else {
+                label = `<span class="admin-tree__element">&lt;unknown&gt;</span>`;
+            }
+            
+            label += `<span class="admin-tree__node-id">[${nodeId}]</span>`;
+            
+            html += `
+                <li class="admin-tree__item ${hasChildren ? 'admin-tree__item--has-children' : ''}" data-node-id="${nodeId}">
+                    <div class="admin-tree__row">
+                        ${hasChildren ? '<span class="admin-tree__toggle" onclick="event.stopPropagation(); this.closest(\'.admin-tree__item\').classList.toggle(\'admin-tree__item--expanded\'); this.textContent = this.closest(\'.admin-tree__item\').classList.contains(\'admin-tree__item--expanded\') ? \'▼\' : \'▶\';">▶</span>' : '<span class="admin-tree__spacer"></span>'}
+                        ${label}
+                    </div>
+            `;
+            
+            if (hasChildren) {
+                html += renderDashboardNodes(node.children, depth + 1, nodePath);
+            }
+            
+            html += '</li>';
+        });
+        
+        html += '</ul>';
+        return html;
+    }
+
+    /**
+     * Setup structure panel event listeners
+     */
+    function setupStructurePanel() {
+        const header = document.getElementById('structure-panel-header');
+        if (header) {
+            header.addEventListener('click', toggleStructurePanel);
+        }
+        
+        // Initialize the structure viewer selectors
+        initDashboardStructureViewer();
+    }
+
+    // ========================================================================
     // Initialization
     // ========================================================================
 
@@ -992,6 +1211,9 @@
         
         // Setup project manager event listeners
         setupProjectManagerEvents();
+        
+        // Setup structure panel (collapsible)
+        setupStructurePanel();
     });
 
 })();

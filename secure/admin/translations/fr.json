@@ -101,6 +101,12 @@
             "admin": "Admin",
             "other": "Autre"
         },
+        "structure": {
+            "title": "Aperçu de la Structure",
+            "viewFull": "Voir la Structure Complète",
+            "routes": "Routes",
+            "languages": "Langues"
+        },
         "history": {
             "columns": {
                 "command": "Commande",
@@ -180,6 +186,11 @@
     "commands": {
         "title": "Commandes",
         "subtitle": "Parcourir et exécuter les commandes API",
+        "tabs": {
+            "commands": "Commandes",
+            "history": "Historique",
+            "docs": "Docs"
+        },
         "searchPlaceholder": "Rechercher des commandes...",
         "openQueue": "Ouvrir la file",
         "allCategories": "Toutes les catégories",
@@ -313,6 +324,9 @@
         "command": "Commande",
         "history": "Historique",
         "settings": "Paramètres",
+        "projectSettings": "Paramètres du projet",
+        "apiEndpoints": "Points d'accès API",
+        "aiApiKeys": "Clés API IA",
         "structure": "Structure",
         "batch": "File de commandes",
         "docs": "Documentation",

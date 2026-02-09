@@ -19,7 +19,6 @@ class AdminRouter {
         'command',     // Individual command pages
         'history',     // Command history viewer
         'settings',    // Settings and configuration
-        'structure',   // Structure tree viewer
         'batch',       // Batch command execution
         'docs',        // API documentation
         'workflows',   // Workflows (AI and manual)

@@ -319,11 +319,64 @@ $baseUrl = rtrim(BASE_URL, '/');
     </div>
 </section>
 
+<!-- Structure Viewer (Collapsible) -->
+<section class="admin-section">
+    <div class="admin-card">
+        <div class="admin-card__header admin-card__header--collapsible" id="structure-panel-header">
+            <h2 class="admin-card__title">
+                <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                    <line x1="12" y1="22.08" x2="12" y2="12"/>
+                </svg>
+                <?= __admin('dashboard.structure.title') ?>
+            </h2>
+            <svg class="admin-card__toggle" id="structure-panel-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <polyline points="6 9 12 15 18 9"/>
+            </svg>
+        </div>
+        <div class="admin-card__body" id="structure-panel-body" style="display: none;">
+            <!-- Structure Selector -->
+            <div class="admin-grid admin-grid--cols-3" style="margin-bottom: var(--space-md);">
+                <div class="admin-form-group">
+                    <label class="admin-label"><?= __admin('structure.label.type') ?></label>
+                    <select id="dash-structure-type" class="admin-select">
+                        <option value=""><?= __admin('structure.select.type') ?></option>
+                        <option value="page"><?= __admin('structure.type.page') ?></option>
+                        <option value="menu"><?= __admin('structure.type.menu') ?></option>
+                        <option value="footer"><?= __admin('structure.type.footer') ?></option>
+                        <option value="component"><?= __admin('structure.type.component') ?></option>
+                    </select>
+                </div>
+                <div class="admin-form-group">
+                    <label class="admin-label"><?= __admin('structure.label.name') ?></label>
+                    <select id="dash-structure-name" class="admin-select" disabled>
+                        <option value=""><?= __admin('structure.select.typeFirst') ?></option>
+                    </select>
+                </div>
+                <div class="admin-form-group">
+                    <label class="admin-label">&nbsp;</label>
+                    <button type="button" id="dash-load-structure" class="admin-btn admin-btn--primary" disabled>
+                        <?= __admin('structure.loadStructure') ?>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Structure Tree -->
+            <div id="dash-structure-tree" class="admin-structure-tree">
+                <div class="admin-empty">
+                    <p><?= __admin('structure.tree.empty') ?></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
 <!-- Recent Command History -->
 <section class="admin-section">
     <div class="admin-section__header">
         <h2 class="admin-section__title"><?= __admin('dashboard.recentCommands') ?></h2>
-        <a href="<?= $router->url('history') ?>" class="admin-btn admin-btn--ghost">
+        <a href="<?= $router->url('command') ?>?tab=history" class="admin-btn admin-btn--ghost">
             <?= __admin('dashboard.viewAllHistory') ?>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <polyline points="9 18 15 12 9 6"/>

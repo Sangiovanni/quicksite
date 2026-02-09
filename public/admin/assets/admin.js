@@ -243,11 +243,15 @@ const QuickSiteAdmin = {
                 }, 150); // Small delay to prevent accidental close
             });
             
-            // Also support click for accessibility/mobile
+            // For anchor toggles, allow click to navigate (don't prevent default)
+            // For button toggles (mobile), toggle the dropdown
             toggle.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                group.classList.toggle('admin-nav__group--open');
+                if (toggle.tagName === 'BUTTON') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    group.classList.toggle('admin-nav__group--open');
+                }
+                // Anchor clicks will navigate naturally
             });
         });
         
@@ -1324,12 +1328,9 @@ const QuickSiteAdmin = {
                         window.location.href = this.config.adminBase + '/command';
                         break;
                     case 'h': // go to history
-                        window.location.href = this.config.adminBase + '/history';
+                        window.location.href = this.config.adminBase + '/command?tab=history';
                         break;
-                    case 's': // go to structure
-                        window.location.href = this.config.adminBase + '/structure';
-                        break;
-                    case 't': // go to settings
+                    case 's': // go to settings
                         window.location.href = this.config.adminBase + '/settings';
                         break;
                 }
