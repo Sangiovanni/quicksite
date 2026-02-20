@@ -90,7 +90,7 @@ function createLogEntry(
     string $method,
     array $body,
     array $tokenInfo,
-    string $status,
+    int $httpStatus,
     string $responseCode,
     float $startTime
 ): array {
@@ -113,7 +113,7 @@ function createLogEntry(
             'token_name' => $tokenInfo['name'] ?? 'Unknown'
         ],
         'result' => [
-            'status' => $status,
+            'http_status' => $httpStatus,
             'code' => $responseCode
         ],
         'duration_ms' => $duration
@@ -122,6 +122,7 @@ function createLogEntry(
 
 /**
  * Write a log entry to the daily log file
+ * Uses file locking to prevent concurrent access issues on Windows
  */
 function writeLogEntry(array $entry): bool {
     if (!ensureLogsDirectory()) {
@@ -129,24 +130,56 @@ function writeLogEntry(array $entry): bool {
     }
     
     $logFile = getLogFilePath();
+    $lockFile = $logFile . '.lock';
     
-    // Read existing logs or start fresh
-    $logs = [];
-    if (file_exists($logFile)) {
-        $content = file_get_contents($logFile);
-        $logs = json_decode($content, true) ?? [];
+    // Acquire exclusive lock using a separate lock file
+    $lockHandle = fopen($lockFile, 'c');
+    if (!$lockHandle) {
+        return false;
     }
     
-    // Append new entry
-    $logs[] = $entry;
-    
-    // Write back atomically
-    $tempFile = $logFile . '.tmp';
-    if (file_put_contents($tempFile, json_encode($logs, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) !== false) {
-        return rename($tempFile, $logFile);
+    // Try to get exclusive lock (blocking with timeout)
+    $lockAcquired = false;
+    $maxRetries = 10;
+    for ($i = 0; $i < $maxRetries; $i++) {
+        if (flock($lockHandle, LOCK_EX | LOCK_NB)) {
+            $lockAcquired = true;
+            break;
+        }
+        usleep(50000); // Wait 50ms before retry
     }
     
-    return false;
+    if (!$lockAcquired) {
+        fclose($lockHandle);
+        return false; // Could not acquire lock, skip logging this entry
+    }
+    
+    try {
+        // Read existing logs or start fresh
+        $logs = [];
+        if (file_exists($logFile)) {
+            $content = @file_get_contents($logFile);
+            if ($content !== false) {
+                $logs = json_decode($content, true) ?? [];
+            }
+        }
+        
+        // Append new entry
+        $logs[] = $entry;
+        
+        // Write directly to file (we have exclusive lock)
+        $success = @file_put_contents(
+            $logFile, 
+            json_encode($logs, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+            LOCK_EX
+        ) !== false;
+        
+        return $success;
+    } finally {
+        // Always release lock and close handle
+        flock($lockHandle, LOCK_UN);
+        fclose($lockHandle);
+    }
 }
 
 /**
@@ -157,7 +190,7 @@ function logCommand(
     string $method,
     array $body,
     array $tokenInfo,
-    string $status,
+    int $httpStatus,
     string $responseCode,
     float $startTime
 ): bool {
@@ -169,15 +202,18 @@ function logCommand(
         return true;
     }
     
+    // Determine if this is a success response (2xx status codes)
+    $isSuccess = $httpStatus >= 200 && $httpStatus < 300;
+    
     // Only log successful commands and auth failures
-    $shouldLog = ($status === 'success') || 
+    $shouldLog = $isSuccess || 
                  (in_array($responseCode, ['auth.invalid_token', 'auth.missing_token', 'auth.permission_denied']));
     
     if (!$shouldLog) {
         return true; // Not an error, just nothing to log
     }
     
-    $entry = createLogEntry($command, $method, $body, $tokenInfo, $status, $responseCode, $startTime);
+    $entry = createLogEntry($command, $method, $body, $tokenInfo, $httpStatus, $responseCode, $startTime);
     return writeLogEntry($entry);
 }
 
@@ -208,11 +244,26 @@ function getCommandHistory(array $filters = []): array {
     
     // Apply filters
     if (!empty($filters['command'])) {
-        $logs = array_filter($logs, fn($l) => $l['command'] === $filters['command']);
+        $commandFilter = strtolower($filters['command']);
+        $logs = array_filter($logs, fn($l) => 
+            stripos($l['command'], $commandFilter) !== false
+        );
     }
     
     if (!empty($filters['status'])) {
-        $logs = array_filter($logs, fn($l) => $l['result']['status'] === $filters['status']);
+        $statusFilter = strtolower($filters['status']);
+        $logs = array_filter($logs, function($l) use ($statusFilter) {
+            // Handle both old format (status: "success") and new format (http_status: 200)
+            $httpStatus = $l['result']['http_status'] ?? $l['result']['status'] ?? null;
+            
+            if (is_numeric($httpStatus)) {
+                $isSuccess = $httpStatus >= 200 && $httpStatus < 300;
+            } else {
+                $isSuccess = $httpStatus === 'success';
+            }
+            
+            return $statusFilter === 'success' ? $isSuccess : !$isSuccess;
+        });
     }
     
     if (!empty($filters['token_name'])) {

@@ -3,14 +3,16 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 
 $params = $trimParametersManagement->params();
 
+// Support both 'content' (full form) and 'css' (shorthand alias)
+$newContent = $params['content'] ?? $params['css'] ?? null;
+
 // Validate required parameter
-if (!isset($params['content'])) {
+if ($newContent === null) {
     ApiResponse::create(400, 'validation.required')
-        ->withErrors([['field' => 'content', 'reason' => 'missing']])
+        ->withMessage('CSS content is required')
+        ->withErrors([['field' => 'content', 'reason' => 'missing', 'hint' => 'Use "content" or "css" parameter']])
         ->send();
 }
-
-$newContent = $params['content'];
 
 // Type validation - content must be string
 if (!is_string($newContent)) {

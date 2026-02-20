@@ -1,0 +1,120 @@
+{
+  "$schema": "../schema.json",
+  "id": "add-language",
+  "version": "1.0.0",
+  "meta": {
+    "icon": "🌍",
+    "titleKey": "ai.specs.addLanguage.title",
+    "descriptionKey": "ai.specs.addLanguage.description",
+    "category": "modification",
+    "tags": ["multilang", "translation", "internationalization"],
+    "difficulty": "intermediate"
+  },
+  "parameters": [
+    {
+      "id": "targetLanguage",
+      "type": "text",
+      "labelKey": "ai.specs.addLanguage.params.targetLanguage.label",
+      "placeholderKey": "ai.specs.addLanguage.params.targetLanguage.placeholder",
+      "helpKey": "ai.specs.addLanguage.params.targetLanguage.help",
+      "required": true,
+      "validation": {
+        "minLength": 2,
+        "maxLength": 10,
+        "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$"
+      }
+    },
+    {
+      "id": "languageName",
+      "type": "text",
+      "labelKey": "ai.specs.addLanguage.params.languageName.label",
+      "placeholderKey": "ai.specs.addLanguage.params.languageName.placeholder",
+      "helpKey": "ai.specs.addLanguage.params.languageName.help",
+      "required": true
+    }
+  ],
+  "examples": [
+    {
+      "id": "add-spanish",
+      "titleKey": "ai.specs.addLanguage.examples.spanish.title",
+      "promptKey": "ai.specs.addLanguage.examples.spanish.prompt",
+      "params": {
+        "targetLanguage": "es",
+        "languageName": "Español"
+      }
+    },
+    {
+      "id": "add-german",
+      "titleKey": "ai.specs.addLanguage.examples.german.title",
+      "promptKey": "ai.specs.addLanguage.examples.german.prompt",
+      "params": {
+        "targetLanguage": "de",
+        "languageName": "Deutsch"
+      }
+    },
+    {
+      "id": "add-japanese",
+      "titleKey": "ai.specs.addLanguage.examples.japanese.title",
+      "promptKey": "ai.specs.addLanguage.examples.japanese.prompt",
+      "params": {
+        "targetLanguage": "ja",
+        "languageName": "日本語"
+      }
+    }
+  ],
+  "dataRequirements": [
+    {
+      "id": "languages",
+      "command": "getLangList",
+      "extract": "data.languages"
+    },
+    {
+      "id": "defaultLang",
+      "command": "getLangList",
+      "extract": "data.default_language"
+    },
+    {
+      "id": "translations",
+      "command": "getTranslations",
+      "extract": "data.translations"
+    },
+    {
+      "id": "langSwitchComponent",
+      "command": "getStructure",
+      "urlParams": ["component", "lang-switch"],
+      "extract": "data"
+    },
+    {
+      "id": "footerStructure",
+      "command": "getStructure",
+      "urlParams": ["footer"],
+      "extract": "data.structure"
+    },
+    {
+      "id": "components",
+      "command": "listComponents",
+      "extract": "data.components"
+    },
+    {
+      "id": "helpAddLang",
+      "command": "help",
+      "urlParams": ["addLang"],
+      "extract": "data"
+    },
+    {
+      "id": "helpEditStructure",
+      "command": "help",
+      "urlParams": ["editStructure"],
+      "extract": "data"
+    },
+    {
+      "id": "helpSetTranslationKeys",
+      "command": "help",
+      "urlParams": ["setTranslationKeys"],
+      "extract": "data"
+    }
+  ],
+  "relatedCommands": ["addLang", "editStructure", "setTranslationKeys"],
+  "promptTemplate": "add-language.md",
+  "outputFormat": "json-commands"
+}

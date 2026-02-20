@@ -20,6 +20,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/LockManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 $params = $trimParametersManagement->params();
 $buildName = $params['name'] ?? null;
@@ -37,12 +38,10 @@ if (empty($buildName)) {
         ->send();
 }
 
-if (!is_string($buildName) || !preg_match('/^build_\d{8}_\d{6}$/', $buildName)) {
+if (!is_string($buildName) || !RegexPatterns::match('build_name', $buildName)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage('Invalid build name format')
-        ->withErrors([
-            ['field' => 'name', 'value' => $buildName, 'expected_format' => 'build_YYYYMMDD_HHMMSS']
-        ])
+        ->withErrors([RegexPatterns::validationError('build_name', 'name', $buildName ?? '')])
         ->send();
 }
 

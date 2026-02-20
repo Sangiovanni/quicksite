@@ -1,0 +1,61 @@
+{
+    "$schema": "../schema.json",
+    "id": "translate-language",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "🌍",
+        "titleKey": "ai.specs.translateLanguage.title",
+        "descriptionKey": "ai.specs.translateLanguage.description",
+        "category": "modification",
+        "tags": ["translate", "language", "content", "i18n"],
+        "difficulty": "beginner"
+    },
+    "parameters": [
+        {
+            "id": "targetLanguage",
+            "type": "select",
+            "labelKey": "ai.specs.translateLanguage.params.targetLanguage.label",
+            "helpKey": "ai.specs.translateLanguage.params.targetLanguage.help",
+            "dataSource": "languages",
+            "required": true
+        }
+    ],
+    "examples": [
+        {
+            "id": "french",
+            "titleKey": "ai.specs.translateLanguage.examples.french.title",
+            "promptKey": "ai.specs.translateLanguage.examples.french.prompt"
+        },
+        {
+            "id": "spanish",
+            "titleKey": "ai.specs.translateLanguage.examples.spanish.title",
+            "promptKey": "ai.specs.translateLanguage.examples.spanish.prompt"
+        },
+        {
+            "id": "improve",
+            "titleKey": "ai.specs.translateLanguage.examples.improve.title",
+            "promptKey": "ai.specs.translateLanguage.examples.improve.prompt"
+        }
+    ],
+    "dataRequirements": [
+        {
+            "id": "languages",
+            "command": "getLangList",
+            "extract": "data"
+        },
+        {
+            "id": "translations",
+            "command": "getTranslations",
+            "extract": "data"
+        },
+        {
+            "id": "helpSetTranslationKeys",
+            "command": "help",
+            "urlParams": ["setTranslationKeys"],
+            "extract": "data"
+        }
+    ],
+    "relatedCommands": ["setTranslationKeys"],
+    "promptTemplate": "translate-language.md",
+    "outputFormat": "json-commands"
+}

@@ -1,0 +1,768 @@
+{
+    "home": {
+        "hero": {
+            "title": "QuickSite",
+            "subtitle": "Build and manage websites entirely through a REST API. No frontend framework needed.",
+            "cta_start": "Get Started",
+            "cta_docs": "View Docs"
+        },
+        "features": {
+            "title": "Features",
+            "api": {
+                "title": "Full API Control",
+                "desc": "114+ commands to manage every aspect of your site - routes, pages, styles, translations, assets, builds, and more."
+            },
+            "i18n": {
+                "title": "Multi-Language",
+                "desc": "Built-in internationalization with automatic language detection and easy translation management."
+            },
+            "css": {
+                "title": "Dynamic Styling",
+                "desc": "Modify CSS variables, rules, and animations on the fly. No build step required."
+            },
+            "build": {
+                "title": "One-Click Deploy",
+                "desc": "Generate production-ready builds with compiled PHP, sanitized configs, and ZIP packaging."
+            }
+        },
+        "stats": {
+            "commands": "API Commands",
+            "api": "API-Driven",
+            "dependencies": "Dependencies"
+        }
+    },
+    "page": {
+        "titles": {
+            "home": "QuickSite - Build Websites via API",
+            "docs": "Documentation - QuickSite",
+            "get-started": "Get Started - QuickSite",
+            "privacy": "Privacy Policy - QuickSite",
+            "terms": "Terms of Use - QuickSite",
+            "guides": "Guides - QuickSite",
+            "test": "test title",
+            "404": "Page Not Found - QuickSite"
+        }
+    },
+    "footer": {
+        "language": "Language:",
+        "copyright": "© 2025 QuickSite. Built with ❤️ and APIs.",
+        "terms": "Terms of Service",
+        "privacy": "Privacy policy"
+    },
+    "404": {
+        "message": "Sorry, the page you're looking for doesn't exist or has been moved.",
+        "backHome": "Back to Home",
+        "pageNotFound": "Page Not Found"
+    },
+    "menu": {
+        "home": "Home",
+        "docs": "Documentation",
+        "getstarted": "Get Started",
+        "github": "GitHub",
+        "guides": "Guides"
+    },
+    "privacy": {
+        "title": "Privacy Policy",
+        "content": "This is the privacy policy of our website. We respect your privacy and are committed to protecting your personal information."
+    },
+    "termOfUse": {
+        "title": "Terms of Use",
+        "content": "These are the terms of use for our website. By using our site, you agree to these terms."
+    },
+    "docs": {
+        "title": "API Documentation",
+        "intro": "Complete reference for all QuickSite management commands. All endpoints require authentication.",
+        "auth": {
+            "title": "Authentication",
+            "desc": "Include your API token in the Authorization header for all requests:"
+        },
+        "cat": {
+            "folder": "Folder Management",
+            "route": "Route Management",
+            "structure": "Structure Management",
+            "alias": "URL Aliases",
+            "translation": "Translation Management",
+            "language": "Language Management",
+            "asset": "Asset Management",
+            "style": "Style Management",
+            "css_vars": "CSS Variables & Rules",
+            "animations": "CSS Animations",
+            "customize": "Site Customization",
+            "build": "Build & Deploy",
+            "auth": "Token Management",
+            "docs": "Documentation",
+            "project": "Project Management",
+            "ai": "AI Integration",
+            "roles": "Roles & Permissions",
+            "storage": "Storage Monitoring",
+            "snippets": "Snippets"
+        },
+        "cmd": {
+            "setPublicSpace": {
+                "desc": "Sets the URL space/prefix for the public site. Creates a subdirectory inside the public folder and moves all content there. Use empty destination to restore to root. Note: Site URL changes (e.g., http://domain/web/ when set to \"web\")",
+                "params": {
+                    "destination": "URL prefix/space for public site (empty string to remove)"
+                }
+            },
+            "renameSecureFolder": {
+                "desc": "Renames the secure/backend folder at server root level. Updates SECURE_FOLDER_NAME constant. Management URL stays the same.",
+                "params": {
+                    "destination": "New folder name (single name, no paths)"
+                }
+            },
+            "renamePublicFolder": {
+                "desc": "Renames the public folder at server root level. Updates all references. Requires Apache/web server config update after rename.",
+                "params": {
+                    "destination": "New folder name (single name, no paths)"
+                }
+            },
+            "addRoute": {
+                "desc": "Creates a new route with PHP page template and empty JSON structure",
+                "params": {
+                    "route": "Route name for URL (lowercase, numbers, hyphens)"
+                }
+            },
+            "deleteRoute": {
+                "desc": "Deletes an existing route and its associated files (PHP and JSON). Also removes any URL aliases pointing to this route.",
+                "params": {
+                    "route": "Route name to delete"
+                }
+            },
+            "getRoutes": {
+                "desc": "Returns list of all available routes in the system"
+            },
+            "getStructure": {
+                "desc": "Retrieves the JSON structure for a page, menu, footer, or component. Options: showIds (adds node identifiers), summary (tree overview), or nodeId (get specific node by 0-indexed path like 0.2.1)"
+            },
+            "editStructure": {
+                "desc": "Updates the JSON structure. Two modes: full replacement (send complete structure) or targeted edit (use nodeId + action: update, delete, insertBefore, insertAfter)",
+                "params": {
+                    "type": "Structure type: page, menu, footer, component",
+                    "name": "Name (required for page/component)",
+                    "structure": "JSON structure to save",
+                    "nodeId": "Target node for surgical edit (e.g., 0.2.1)",
+                    "action": "update, delete, insertBefore, insertAfter"
+                }
+            },
+            "listComponents": {
+                "desc": "Lists all reusable JSON components with metadata. Shows available slots (placeholders) and component dependencies."
+            },
+            "listPages": {
+                "desc": "Lists all JSON page structures with metadata. Shows route status, components used, and translation keys."
+            },
+            "createAlias": {
+                "desc": "Creates a URL redirect alias that points to an existing route. Supports 301 redirects or internal (transparent) routing.",
+                "params": {
+                    "alias": "URL path for the alias",
+                    "target": "Target route to redirect to",
+                    "type": "redirect (301) or internal (transparent)"
+                }
+            },
+            "deleteAlias": {
+                "desc": "Deletes an existing URL redirect alias.",
+                "params": {
+                    "alias": "Alias URL path to delete"
+                }
+            },
+            "listAliases": {
+                "desc": "Lists all URL redirect aliases with their targets and types."
+            },
+            "getTranslation": {
+                "desc": "Retrieves translations for a single language"
+            },
+            "getTranslations": {
+                "desc": "Retrieves translations for all languages"
+            },
+            "setTranslationKeys": {
+                "desc": "Sets/updates specific translation keys (merge, not replace)",
+                "params": {
+                    "language": "Language code (e.g., en, fr)",
+                    "translations": "Object of keys to add/update (safe merge)"
+                }
+            },
+            "deleteTranslationKeys": {
+                "desc": "Deletes specific translation keys from a language file",
+                "params": {
+                    "language": "Language code (e.g., en, fr)",
+                    "keys": "Array of dot-notation keys to delete"
+                }
+            },
+            "getTranslationKeys": {
+                "desc": "Scans all JSON structures and extracts required translation keys"
+            },
+            "validateTranslations": {
+                "desc": "Validates translation completeness by comparing required keys with existing translations"
+            },
+            "getUnusedTranslationKeys": {
+                "desc": "Finds translation keys that exist in translation files but are not used in any structure"
+            },
+            "analyzeTranslations": {
+                "desc": "Complete translation health check - finds both missing AND unused keys"
+            },
+            "getLangList": {
+                "desc": "Returns list of configured languages and multilingual settings"
+            },
+            "setMultilingual": {
+                "desc": "Enable or disable multilingual support. Syncs translations between default.json and default language file.",
+                "params": {
+                    "enabled": "Boolean: true for multilingual, false for mono-language"
+                }
+            },
+            "checkStructureMulti": {
+                "desc": "Scans all structures for lang-specific content. Use before switching to mono-language mode."
+            },
+            "addLang": {
+                "desc": "Adds a new language to the system",
+                "params": {
+                    "code": "ISO language code (e.g., es, de)",
+                    "name": "Display name (e.g., Espanol)"
+                }
+            },
+            "deleteLang": {
+                "desc": "Deletes a language from the system",
+                "params": {
+                    "code": "Language code to delete (not default/last)"
+                }
+            },
+            "setDefaultLang": {
+                "desc": "Sets the default language for the site",
+                "params": {
+                    "lang": "Language code to set as default (must exist)"
+                }
+            },
+            "uploadAsset": {
+                "desc": "Uploads a file to the assets folder with validation and automatic naming",
+                "params": {
+                    "category": "images, scripts, font, audio, or videos",
+                    "file": "File upload (multipart/form-data)"
+                }
+            },
+            "deleteAsset": {
+                "desc": "Deletes a file from the assets folder"
+            },
+            "listAssets": {
+                "desc": "Lists all files in assets folder with metadata, optionally filtered by category"
+            },
+            "updateAssetMeta": {
+                "desc": "Updates metadata (description, alt text) for an existing asset. Useful for AI context and accessibility.",
+                "params": {
+                    "category": "Asset category (images, scripts, font, audio, videos)",
+                    "filename": "Name of the file to update metadata for",
+                    "description": "Description for AI context (max 500 chars)",
+                    "alt": "Alt text for images/accessibility (max 200 chars)"
+                }
+            },
+            "getStyles": {
+                "desc": "Retrieves the content of the main SCSS/CSS file"
+            },
+            "editStyles": {
+                "desc": "Updates the content of the main SCSS/CSS file",
+                "params": {
+                    "content": "Complete CSS content (replaces file)"
+                }
+            },
+            "getRootVariables": {
+                "desc": "Retrieves all CSS custom properties (variables) defined in the :root selector"
+            },
+            "setRootVariables": {
+                "desc": "Add or update CSS custom properties (variables) in the :root selector",
+                "params": {
+                    "variables": "Object of CSS variables to set/update"
+                }
+            },
+            "listStyleRules": {
+                "desc": "Lists all CSS selectors in the stylesheet, organized by global and media query scopes"
+            },
+            "getStyleRule": {
+                "desc": "Get CSS styles for a specific selector, optionally within a media query context"
+            },
+            "setStyleRule": {
+                "desc": "Add, update, or selectively remove properties from a CSS rule",
+                "params": {
+                    "selector": "CSS selector (e.g., .btn-primary)",
+                    "styles": "CSS declarations (string or object). Required unless removeProperties is provided",
+                    "removeProperties": "Array of CSS property names to remove from the rule",
+                    "mediaQuery": "Media query context (optional)"
+                }
+            },
+            "deleteStyleRule": {
+                "desc": "Remove a CSS rule from the stylesheet",
+                "params": {
+                    "selector": "CSS selector to delete",
+                    "mediaQuery": "Media query context (optional)"
+                }
+            },
+            "listKeyframes": {
+                "desc": "Returns a lightweight list of all @keyframes animation names"
+            },
+            "getAnimatedSelectors": {
+                "desc": "Returns all CSS selectors using animations, grouped by animation name with orphan detection"
+            },
+            "getKeyframes": {
+                "desc": "Retrieves all @keyframes animations defined in the stylesheet"
+            },
+            "setKeyframes": {
+                "desc": "Add or update a @keyframes animation",
+                "params": {
+                    "name": "Animation name (alphanumeric)",
+                    "frames": "Object with frame keys (0%, 50%, from, to)",
+                    "allowOverwrite": "If false, returns error when animation exists (default: true)"
+                }
+            },
+            "deleteKeyframes": {
+                "desc": "Remove a @keyframes animation from the stylesheet",
+                "params": {
+                    "name": "Animation name to delete"
+                }
+            },
+            "editFavicon": {
+                "desc": "Updates the site favicon with a new image from assets/images folder (PNG only)",
+                "params": {
+                    "imageName": "PNG filename from assets/images/"
+                }
+            },
+            "editTitle": {
+                "desc": "Updates page title for a specific route and language in the translation file (page.titles.{route} structure)",
+                "params": {
+                    "route": "Route name to update title for",
+                    "lang": "Language code",
+                    "title": "New page title text"
+                }
+            },
+            "build": {
+                "desc": "Creates a production-ready build with compiled PHP files, optional folder renaming, config sanitization, and ZIP archive creation",
+                "params": {
+                    "public": "Custom public folder name/path",
+                    "secure": "Custom secure folder name (single level)",
+                    "space": "PUBLIC_FOLDER_SPACE subdirectory"
+                }
+            },
+            "listBuilds": {
+                "desc": "Lists all available builds with metadata including creation date, sizes, languages, and page counts"
+            },
+            "getBuild": {
+                "desc": "Get detailed info for a specific build including manifest data, file count, and directory contents",
+                "params": {
+                    "name": "Build name (e.g., build_20250101_120000)"
+                }
+            },
+            "deleteBuild": {
+                "desc": "Delete a specific build including both folder and ZIP archive",
+                "params": {
+                    "name": "Build name to delete"
+                }
+            },
+            "cleanBuilds": {
+                "desc": "Bulk delete builds older than a specified timestamp with optional dry-run mode",
+                "params": {
+                    "before": "Unix timestamp or date string",
+                    "dry_run": "Preview without deleting (default: false)"
+                }
+            },
+            "deployBuild": {
+                "desc": "Deploy a build to production paths with file locking and integrity checks",
+                "params": {
+                    "name": "Build name to deploy",
+                    "publicPath": "Absolute path for public folder",
+                    "securePath": "Absolute path for secure folder",
+                    "overwrite": "Overwrite existing files (default: false)"
+                }
+            },
+            "downloadBuild": {
+                "desc": "Get download URL for a build ZIP file with size and manifest info",
+                "params": {
+                    "name": "Build name to download"
+                }
+            },
+            "getCommandHistory": {
+                "desc": "Retrieves command execution history with filtering and pagination. Supports filtering by date, command, status, and token."
+            },
+            "clearCommandHistory": {
+                "desc": "Deletes command log files older than a specified date. Shows preview without confirm=true.",
+                "params": {
+                    "before": "Date in YYYY-MM-DD format",
+                    "confirm": "Set to true to execute deletion"
+                }
+            },
+            "generateToken": {
+                "desc": "Creates a new API authentication token with specified permissions. Requires admin permission.",
+                "params": {
+                    "name": "Descriptive name for the token",
+                    "permissions": "Array: *, read, write, admin, command:name"
+                }
+            },
+            "listTokens": {
+                "desc": "Lists all API tokens with masked values. Requires admin permission."
+            },
+            "revokeToken": {
+                "desc": "Revokes (permanently deletes) an API token. Requires admin permission.",
+                "params": {
+                    "token_preview": "Token preview from listTokens or full token"
+                }
+            },
+            "help": {
+                "desc": "Returns documentation for all available commands"
+            },
+            "listProjects": {
+                "desc": "Lists all available projects in the multi-project environment"
+            },
+            "getActiveProject": {
+                "desc": "Returns the currently active project name"
+            },
+            "switchProject": {
+                "desc": "Switches to a different project context",
+                "params": {
+                    "project": "Name of the project to switch to"
+                }
+            },
+            "createProject": {
+                "desc": "Creates a new project from the template",
+                "params": {
+                    "name": "Name for the new project (lowercase, alphanumeric, hyphens allowed)",
+                    "activate": "Whether to switch to the new project after creation (default: false)"
+                }
+            },
+            "deleteProject": {
+                "desc": "Permanently deletes a project and all its files",
+                "params": {
+                    "project": "Name of the project to delete",
+                    "confirm": "Must be 'DELETE' to confirm deletion"
+                }
+            },
+            "exportProject": {
+                "desc": "Creates a ZIP archive of a project for backup or transfer",
+                "params": {
+                    "project": "Project to export (default: active project)"
+                }
+            },
+            "importProject": {
+                "desc": "Imports a project from a ZIP archive",
+                "params": {
+                    "file": "Base64-encoded ZIP file content",
+                    "activate": "Whether to switch to the imported project (default: false)"
+                }
+            },
+            "downloadExport": {
+                "desc": "Downloads a previously exported project archive",
+                "params": {
+                    "filename": "Name of the export file to download"
+                }
+            },
+            "clearExports": {
+                "desc": "Clears all exported ZIP files to free disk space"
+            },
+            "backupProject": {
+                "desc": "Creates a timestamped backup of a project for internal recovery",
+                "params": {
+                    "name": "Project name (defaults to active project)",
+                    "max_backups": "Maximum backups to keep (default: 5)"
+                }
+            },
+            "listBackups": {
+                "desc": "Lists all available backups for a project with size and date info",
+                "params": {
+                    "name": "Project name (defaults to active project)"
+                }
+            },
+            "restoreBackup": {
+                "desc": "Restores a project from a backup (auto-creates pre-restore backup first)",
+                "params": {
+                    "backup": "Backup timestamp name to restore",
+                    "name": "Project name (defaults to active project)"
+                }
+            },
+            "deleteBackup": {
+                "desc": "Deletes a specific backup to free disk space",
+                "params": {
+                    "backup": "Backup timestamp name to delete",
+                    "name": "Project name (defaults to active project)"
+                }
+            },
+            "getSiteMap": {
+                "desc": "Generates a complete sitemap of all routes × all languages for SEO",
+                "params": {
+                    "format": "Output format: json (default) or text"
+                }
+            },
+            "getSizeInfo": {
+                "desc": "Returns detailed storage information for all project folders"
+            },
+            "listAiProviders": {
+                "desc": "Lists all supported AI providers (OpenAI, Anthropic, Google, Mistral) for BYOK integration"
+            },
+            "detectProvider": {
+                "desc": "Detects the AI provider from an API key prefix (sk- = OpenAI, sk-ant- = Anthropic)",
+                "params": {
+                    "key": "API key to analyze"
+                }
+            },
+            "testAiKey": {
+                "desc": "Tests if an API key is valid by making a minimal API call",
+                "params": {
+                    "key": "API key to test",
+                    "provider": "Provider name (required if key has no detectable prefix)"
+                }
+            },
+            "callAi": {
+                "desc": "Makes an AI completion request via the specified provider (BYOK proxy)",
+                "params": {
+                    "key": "API key for the provider",
+                    "provider": "Provider to use (openai, anthropic, google, mistral)",
+                    "model": "Model name (from testAiKey models list)",
+                    "messages": "Chat messages array with role and content"
+                }
+            },
+            "listRoles": {
+                "desc": "Lists all available roles in the system with their command counts"
+            },
+            "getMyPermissions": {
+                "desc": "Returns the current token's role and accessible commands"
+            },
+            "createRole": {
+                "desc": "Creates a new custom role with specified commands (superadmin only)",
+                "params": {
+                    "name": "Role name (lowercase alphanumeric with underscores)",
+                    "description": "Human-readable description",
+                    "commands": "Array of command names this role can execute"
+                }
+            },
+            "editRole": {
+                "desc": "Edits an existing role. Builtin roles can only have description changed.",
+                "params": {
+                    "name": "Name of the role to edit",
+                    "description": "New description (optional)",
+                    "commands": "New command list (custom roles only)"
+                }
+            },
+            "deleteRole": {
+                "desc": "Deletes a custom role (builtin roles cannot be deleted)",
+                "params": {
+                    "name": "Name of the role to delete",
+                    "force": "Reassign tokens to viewer role if in use"
+                }
+            },
+            "listSnippets": {
+                "desc": "Lists all available snippets (core + project) organized by category",
+                "params": {}
+            },
+            "getSnippet": {
+                "desc": "Gets a single snippet with full structure, translations, and CSS",
+                "params": {
+                    "id": "Snippet ID to retrieve"
+                }
+            },
+            "createSnippet": {
+                "desc": "Creates a new user snippet in the project snippets folder",
+                "params": {
+                    "id": "Unique snippet ID",
+                    "name": "Display name",
+                    "category": "Category folder (nav, forms, cards, layouts)",
+                    "structure": "The snippet structure",
+                    "description": "Optional description",
+                    "translations": "Optional translation keys"
+                }
+            },
+            "deleteSnippet": {
+                "desc": "Deletes a user snippet (core snippets cannot be deleted)",
+                "params": {
+                    "id": "Snippet ID to delete"
+                }
+            },
+            "duplicateSnippet": {
+                "desc": "Copies a core snippet to project snippets for editing",
+                "params": {
+                    "sourceId": "ID of snippet to duplicate",
+                    "newId": "New ID for the copy (optional)"
+                }
+            },
+            "insertSnippet": {
+                "desc": "Inserts a snippet into a page or component with unique textKeys",
+                "params": {
+                    "snippetId": "ID of snippet to insert",
+                    "targetType": "Target type (page, component, menu, footer)",
+                    "targetName": "Target name",
+                    "targetNodeId": "Target node ID (dot-separated path)",
+                    "position": "Insertion position (inside, before, after)"
+                }
+            }
+        },
+        "labels": {
+            "urlPatterns": "URL Patterns",
+            "parameters": "Parameters",
+            "required": "(required)",
+            "optional": "(optional)",
+            "parameters_93": "URL Parameter",
+            "parameters_106": "URL Parameter"
+        },
+        "urlPatternsDesc": "All API endpoints follow the pattern /management/{command}. Some commands accept URL path parameters for GET requests - these are shown with the command URL below. Use GET /management/help/{command} for detailed API documentation."
+    },
+    "tutorial": {
+        "title": "Getting Started with QuickSite",
+        "intro": "Follow this step-by-step guide to set up your first QuickSite project in minutes.",
+        "step1": {
+            "title": "1. Install Prerequisites",
+            "desc": "Make sure you have PHP 7.4+ (tested up to 8.4) and a web server (Apache, Nginx, or WAMP/XAMPP) installed on your system."
+        },
+        "step2": {
+            "title": "2. Clone the Repository",
+            "desc": "Clone the QuickSite template repository from GitHub and configure your web server to point to the public directory."
+        },
+        "step3": {
+            "title": "3. Configure Your Site",
+            "desc": "Edit the configuration files in the secure/config directory to set up your site name, languages, and API token."
+        },
+        "step4": {
+            "title": "4. Create Your First Route",
+            "desc": "Use the addRoute API command to create a new page, then add content with the editStructure command."
+        },
+        "step5": {
+            "title": "5. Build & Deploy",
+            "desc": "Generate a static build of your site using the build command, then upload the files to your hosting provider."
+        },
+        "next": {
+            "title": "Next Steps",
+            "desc": "Now that your site is running, explore more features:",
+            "docs": "Read the full API documentation",
+            "github": "Star us on GitHub"
+        }
+    },
+    "guides": {
+        "projects": {
+            "title": "Project Management",
+            "intro": "Manage multiple projects within a single QuickSite installation. Create, switch, export, and import projects.",
+            "architecture": {
+                "desc": "Projects are stored in secure/projects/{name}. Each project has its own templates, translations, and configuration."
+            },
+            "working": {
+                "desc": "Use switchProject to change context. All subsequent API calls operate on the active project until you switch again."
+            },
+            "backup": {
+                "desc": "Use exportProject to create ZIP backups. Import them later with importProject to restore or duplicate projects."
+            }
+        },
+        "i18n": {
+            "title": "Internationalization",
+            "add": {
+                "desc": "Add or update translation keys safely. setTranslationKeys performs a deep merge, so existing keys are preserved."
+            },
+            "intro": "Build multilingual sites with translation keys. QuickSite supports multiple languages with shared page structures.",
+            "health": {
+                "desc": "Check translation completeness across all languages. Find missing keys, unused translations, and get recommendations."
+            },
+            "newlang": {
+                "desc": "Add a new language to your site. This creates the translation file and registers the language in config."
+            }
+        },
+        "structure": {
+            "actions": {
+                "desc": "Use actions to insert, delete, or move nodes relative to others. insertAfter, insertBefore, and delete give you full control."
+            },
+            "showids": {
+                "desc": "Use showIds to see node identifiers for surgical editing. Each node gets a dot-notation ID like 0.2.1 for precise targeting."
+            },
+            "json": {
+                "desc": "QuickSite pages are defined as JSON trees. Each node has a tag (HTML element), optional params (attributes), and children (nested elements or text)."
+            },
+            "nodeid": {
+                "desc": "Target specific nodes for updates using their nodeId. This allows precise edits without replacing the entire structure."
+            },
+            "title": "Structure Editing",
+            "intro": "Master the JSON-based page structure system. Every element is a node with tag, params, and children."
+        },
+        "deploy": {
+            "title": "Deployment",
+            "space": {
+                "desc": "Configure the URL prefix for sites running in a subdirectory. Updates all internal links automatically."
+            },
+            "intro": "Build and deploy your site. Create optimized production builds with customizable folder names.",
+            "build": {
+                "desc": "Create a timestamped production build. Customize public and secure folder names for your hosting environment."
+            }
+        },
+        "urls": {
+            "title": "URL Management",
+            "intro": "Create URL aliases and redirects. Map multiple URLs to the same content or redirect old URLs.",
+            "redirect": {
+                "desc": "Create URL mappings with two types: redirect (301 HTTP redirect) or internal (transparent routing)."
+            }
+        },
+        "title": "Practical Guides",
+        "toc": {
+            "projects": "Project Management",
+            "assets": "Assets & Branding",
+            "deploy": "Deployment",
+            "security": "API Security",
+            "urls": "URL Management",
+            "css": "CSS & Theming",
+            "structure": "Structure Editing",
+            "i18n": "Internationalization",
+            "docs": "Documentation",
+            "title": "Table of Contents",
+            "pages": "Building Pages"
+        },
+        "intro": "Learn QuickSite through task-oriented tutorials. Each guide covers related API commands in real-world workflows.",
+        "footer": {
+            "title": "Ready to Build?",
+            "api": "API Reference",
+            "desc": "Explore the full API reference or check out the source code on GitHub.",
+            "github": "View on GitHub"
+        },
+        "assets": {
+            "title": "Assets & Branding",
+            "intro": "Manage media files and branding elements. Upload images, fonts, and other assets via the API.",
+            "favicon": {
+                "desc": "Set the site favicon from an uploaded image. The image should be square (ideally 32x32 or larger)."
+            },
+            "upload": {
+                "desc": "Upload files to categorized folders. Supports images, scripts, fonts, audio, and video files."
+            },
+            "pagetitle": {
+                "desc": "Update page titles per language. Titles appear in the browser tab and search results."
+            }
+        },
+        "security": {
+            "title": "API Security",
+            "create": {
+                "desc": "Generate new API tokens with specific permissions. Use * for full access or read for read-only access."
+            },
+            "intro": "Manage API access with tokens. Create, list, and revoke tokens with customizable permissions.",
+            "manage": {
+                "desc": "View existing tokens (values masked for security) and revoke tokens that are no longer needed."
+            }
+        },
+        "css": {
+            "title": "CSS & Theming",
+            "intro": "Control your site's appearance through the API. Manage CSS variables, rules, and animations programmatically.",
+            "variables": {
+                "desc": "CSS variables (custom properties) are defined in :root and can be changed instantly across your entire site."
+            },
+            "rules": {
+                "desc": "Add or update CSS rules for any selector. Styles are provided as key-value pairs and merged with existing rules."
+            },
+            "animations": {
+                "desc": "Create CSS keyframe animations that can be applied to elements using the animation property."
+            }
+        },
+        "docs": {
+            "title": "API Documentation",
+            "intro": "Access built-in help for all API endpoints. The help command provides detailed documentation.",
+            "help": {
+                "desc": "Get comprehensive documentation for all commands or detailed help for a specific endpoint."
+            }
+        },
+        "pages": {
+            "list": {
+                "desc": "View all pages in your project with their metadata, including routes and file locations."
+            },
+            "title": "Building Pages",
+            "create": {
+                "result": "This creates a new page at /about-us with an empty JSON structure ready for content.",
+                "desc": "Use addRoute to create a new page. This creates both the PHP file and the JSON structure file."
+            },
+            "intro": "Create, list, and delete pages in your QuickSite project. Each page consists of a PHP handler and a JSON structure file.",
+            "delete": {
+                "desc": "Remove a page completely. This deletes both the PHP handler and JSON structure file."
+            }
+        }
+    }
+}

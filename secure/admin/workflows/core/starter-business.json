@@ -1,0 +1,179 @@
+{
+    "$schema": "../schema.json",
+    "id": "starter-business",
+    "version": "1.1.0",
+    "meta": {
+        "icon": "🏢",
+        "titleKey": "workflows.specs.starterBusiness.title",
+        "descriptionKey": "workflows.specs.starterBusiness.description",
+        "category": "template",
+        "tags": ["business", "website", "starter", "template"],
+        "difficulty": "beginner"
+    },
+    "preWorkflows": ["fresh-start"],
+    "parameters": [],
+    "steps": [
+        { "command": "addRoute", "params": { "name": "about" } },
+        { "command": "addRoute", "params": { "name": "services" } },
+        { "command": "addRoute", "params": { "name": "contact" } },
+        { "command": "editStructure", "params": { 
+            "type": "menu",
+            "structure": [
+                { "tag": "nav", "params": { "class": "main-nav" }, "children": [
+                    { "tag": "a", "params": { "href": "/", "class": "nav-logo" }, "children": [{ "textKey": "site.name" }] },
+                    { "tag": "ul", "params": { "class": "nav-links" }, "children": [
+                        { "tag": "li", "children": [{ "tag": "a", "params": { "href": "/" }, "children": [{ "textKey": "nav.home" }] }] },
+                        { "tag": "li", "children": [{ "tag": "a", "params": { "href": "/services" }, "children": [{ "textKey": "nav.services" }] }] }
+                    ]}
+                ]}
+            ]
+        }},
+        { "command": "editStructure", "params": { 
+            "type": "footer",
+            "structure": [
+                { "tag": "footer", "params": { "class": "main-footer" }, "children": [
+                    { "tag": "div", "params": { "class": "footer-content" }, "children": [
+                        { "tag": "div", "params": { "class": "footer-brand" }, "children": [
+                            { "tag": "span", "params": { "class": "footer-logo" }, "children": [{ "textKey": "site.name" }] },
+                            { "tag": "p", "children": [{ "textKey": "site.tagline" }] }
+                        ]},
+                        { "tag": "nav", "params": { "class": "footer-nav" }, "children": [
+                            { "tag": "a", "params": { "href": "/about" }, "children": [{ "textKey": "nav.about" }] },
+                            { "tag": "a", "params": { "href": "/contact" }, "children": [{ "textKey": "nav.contact" }] }
+                        ]}
+                    ]},
+                    { "tag": "div", "params": { "class": "footer-bottom" }, "children": [
+                        { "tag": "p", "children": [{ "textKey": "footer.copyright" }] }
+                    ]}
+                ]}
+            ]
+        }},
+        { "command": "editStructure", "params": { 
+            "type": "page",
+            "name": "home", 
+            "structure": [
+                { "tag": "section", "params": { "class": "hero" }, "children": [
+                    { "tag": "h1", "children": [{ "textKey": "home.hero.title" }] },
+                    { "tag": "p", "children": [{ "textKey": "home.hero.subtitle" }] },
+                    { "tag": "a", "params": { "href": "/contact", "class": "btn btn-primary" }, "children": [{ "textKey": "common.cta" }] }
+                ]},
+                { "tag": "section", "params": { "class": "features" }, "children": [
+                    { "tag": "h2", "children": [{ "textKey": "home.features.title" }] },
+                    { "tag": "div", "params": { "class": "features-grid" }, "children": [
+                        { "tag": "div", "params": { "class": "feature-card" }, "children": [
+                            { "tag": "h3", "children": [{ "textKey": "home.features.f1.title" }] },
+                            { "tag": "p", "children": [{ "textKey": "home.features.f1.desc" }] }
+                        ]},
+                        { "tag": "div", "params": { "class": "feature-card" }, "children": [
+                            { "tag": "h3", "children": [{ "textKey": "home.features.f2.title" }] },
+                            { "tag": "p", "children": [{ "textKey": "home.features.f2.desc" }] }
+                        ]},
+                        { "tag": "div", "params": { "class": "feature-card" }, "children": [
+                            { "tag": "h3", "children": [{ "textKey": "home.features.f3.title" }] },
+                            { "tag": "p", "children": [{ "textKey": "home.features.f3.desc" }] }
+                        ]}
+                    ]}
+                ]}
+            ]
+        }},
+        { "command": "editStructure", "params": { 
+            "type": "page",
+            "name": "about", 
+            "structure": [
+                { "tag": "section", "params": { "class": "page-header" }, "children": [
+                    { "tag": "h1", "children": [{ "textKey": "about.title" }] },
+                    { "tag": "p", "children": [{ "textKey": "about.subtitle" }] }
+                ]},
+                { "tag": "section", "params": { "class": "about-content" }, "children": [
+                    { "tag": "h2", "children": [{ "textKey": "about.story.title" }] },
+                    { "tag": "p", "children": [{ "textKey": "about.story.content" }] }
+                ]}
+            ]
+        }},
+        { "command": "editStructure", "params": { 
+            "type": "page",
+            "name": "services", 
+            "structure": [
+                { "tag": "section", "params": { "class": "page-header" }, "children": [
+                    { "tag": "h1", "children": [{ "textKey": "services.title" }] },
+                    { "tag": "p", "children": [{ "textKey": "services.subtitle" }] }
+                ]},
+                { "tag": "section", "params": { "class": "services-grid" }, "children": [
+                    { "tag": "div", "params": { "class": "service-card" }, "children": [
+                        { "tag": "h3", "children": [{ "textKey": "services.s1.title" }] },
+                        { "tag": "p", "children": [{ "textKey": "services.s1.desc" }] }
+                    ]},
+                    { "tag": "div", "params": { "class": "service-card" }, "children": [
+                        { "tag": "h3", "children": [{ "textKey": "services.s2.title" }] },
+                        { "tag": "p", "children": [{ "textKey": "services.s2.desc" }] }
+                    ]},
+                    { "tag": "div", "params": { "class": "service-card" }, "children": [
+                        { "tag": "h3", "children": [{ "textKey": "services.s3.title" }] },
+                        { "tag": "p", "children": [{ "textKey": "services.s3.desc" }] }
+                    ]}
+                ]}
+            ]
+        }},
+        { "command": "editStructure", "params": { 
+            "type": "page",
+            "name": "contact", 
+            "structure": [
+                { "tag": "section", "params": { "class": "page-header" }, "children": [
+                    { "tag": "h1", "children": [{ "textKey": "contact.title" }] },
+                    { "tag": "p", "children": [{ "textKey": "contact.subtitle" }] }
+                ]},
+                { "tag": "section", "params": { "class": "contact-info" }, "children": [
+                    { "tag": "div", "params": { "class": "contact-item" }, "children": [
+                        { "tag": "h3", "children": [{ "textKey": "contact.email.label" }] },
+                        { "tag": "p", "children": [{ "textKey": "contact.email.value" }] }
+                    ]},
+                    { "tag": "div", "params": { "class": "contact-item" }, "children": [
+                        { "tag": "h3", "children": [{ "textKey": "contact.phone.label" }] },
+                        { "tag": "p", "children": [{ "textKey": "contact.phone.value" }] }
+                    ]},
+                    { "tag": "div", "params": { "class": "contact-item" }, "children": [
+                        { "tag": "h3", "children": [{ "textKey": "contact.address.label" }] },
+                        { "tag": "p", "children": [{ "textKey": "contact.address.value" }] }
+                    ]}
+                ]}
+            ]
+        }},
+        { "command": "setTranslationKeys", "params": { 
+            "language": "en", 
+            "translations": {
+                "site": { "name": "YourBusiness", "tagline": "Excellence in every detail" },
+                "page": { "titles": { "home": "Home", "about": "About Us", "services": "Services", "contact": "Contact" } },
+                "nav": { "home": "Home", "about": "About", "services": "Services", "contact": "Contact" },
+                "common": { "cta": "Get Started" },
+                "footer": { "copyright": "2025 YourBusiness. All rights reserved." },
+                "home": { 
+                    "hero": { "title": "Welcome to YourBusiness", "subtitle": "We deliver exceptional solutions for your needs." },
+                    "features": { "title": "Why Choose Us", "f1": { "title": "Quality", "desc": "Top-tier quality in everything we do." }, "f2": { "title": "Experience", "desc": "Years of industry expertise." }, "f3": { "title": "Support", "desc": "24/7 customer support." } }
+                },
+                "about": { "title": "About Us", "subtitle": "Learn more about our story", "story": { "title": "Our Story", "content": "Founded with a vision to deliver excellence..." } },
+                "services": { "title": "Our Services", "subtitle": "What we offer", "s1": { "title": "Consulting", "desc": "Expert advice for your business." }, "s2": { "title": "Development", "desc": "Custom solutions tailored to you." }, "s3": { "title": "Support", "desc": "Ongoing assistance when you need it." } },
+                "contact": { "title": "Contact Us", "subtitle": "Get in touch", "email": { "label": "Email", "value": "contact@yourbusiness.com" }, "phone": { "label": "Phone", "value": "+1 (555) 123-4567" }, "address": { "label": "Address", "value": "123 Business St, City, Country" } }
+            }
+        }},
+        { "command": "editStyles", "params": { 
+            "content": "/* GLOBAL STYLES */\n* { margin: 0; padding: 0; box-sizing: border-box; }\nbody { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--color-text); line-height: 1.6; background: var(--color-bg); }\na { color: var(--color-primary); text-decoration: none; transition: color 0.3s; }\na:hover { color: var(--color-primary-dark); }\n\n/* NAVIGATION */\n.main-nav { display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem; background: var(--color-bg-card); box-shadow: 0 2px 10px var(--shadow-color); position: sticky; top: 0; z-index: 100; }\n.nav-logo { font-size: 1.5rem; font-weight: 700; color: var(--color-primary); }\n.nav-links { display: flex; gap: 2rem; list-style: none; }\n.nav-links a { color: var(--color-text); font-weight: 500; }\n.nav-links a:hover { color: var(--color-primary); }\n\n/* HERO */\n.hero { text-align: center; padding: 6rem 2rem; background: linear-gradient(135deg, var(--color-bg-card) 0%, var(--color-bg) 100%); }\n.hero h1 { font-size: 3rem; margin-bottom: 1rem; color: var(--color-text); }\n.hero p { font-size: 1.25rem; color: var(--color-text-muted); margin-bottom: 2rem; max-width: 600px; margin-left: auto; margin-right: auto; }\n\n/* BUTTONS */\n.btn { display: inline-block; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; transition: all 0.3s; }\n.btn-primary { background: var(--color-primary); color: white; }\n.btn-primary:hover { background: var(--color-primary-dark); color: white; }\n\n/* FEATURES */\n.features { padding: 5rem 2rem; max-width: 1200px; margin: 0 auto; }\n.features h2 { text-align: center; font-size: 2rem; margin-bottom: 3rem; }\n.features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; }\n.feature-card { padding: 2rem; background: var(--color-bg-card); border-radius: 1rem; box-shadow: 0 4px 20px var(--shadow-color); transition: transform 0.3s; }\n.feature-card:hover { transform: translateY(-5px); }\n.feature-card h3 { color: var(--color-primary); margin-bottom: 0.5rem; }\n.feature-card p { color: var(--color-text-muted); }\n\n/* PAGE HEADER */\n.page-header { text-align: center; padding: 4rem 2rem; background: var(--color-bg-card); }\n.page-header h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }\n.page-header p { color: var(--color-text-muted); font-size: 1.1rem; }\n\n/* SERVICES */\n.services-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; padding: 3rem 2rem; max-width: 1200px; margin: 0 auto; }\n.service-card { padding: 2rem; background: var(--color-bg-card); border-radius: 0.5rem; border-left: 4px solid var(--color-primary); box-shadow: 0 2px 10px var(--shadow-color); }\n.service-card h3 { color: var(--color-primary); margin-bottom: 0.5rem; }\n.service-card p { color: var(--color-text-muted); }\n\n/* CONTACT */\n.contact-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; padding: 3rem 2rem; max-width: 900px; margin: 0 auto; }\n.contact-item { padding: 1.5rem; background: var(--color-bg-card); border-radius: 0.5rem; text-align: center; box-shadow: 0 2px 10px var(--shadow-color); }\n.contact-item h3 { color: var(--color-primary); margin-bottom: 0.5rem; font-size: 0.9rem; text-transform: uppercase; }\n.contact-item p { color: var(--color-text); }\n\n/* ABOUT */\n.about-content { padding: 3rem 2rem; max-width: 800px; margin: 0 auto; }\n.about-content h2 { color: var(--color-primary); margin-bottom: 1rem; }\n.about-content p { color: var(--color-text-muted); line-height: 1.8; }\n\n/* FOOTER */\n.main-footer { background: var(--color-bg-footer); color: var(--color-text-light); padding: 3rem 2rem 1rem; }\n.footer-content { display: flex; justify-content: space-between; align-items: flex-start; max-width: 1200px; margin: 0 auto; flex-wrap: wrap; gap: 2rem; }\n.footer-logo { font-size: 1.25rem; font-weight: 700; color: var(--color-primary); }\n.footer-brand p { color: var(--color-text-muted); margin-top: 0.5rem; font-size: 0.9rem; }\n.footer-nav { display: flex; gap: 1.5rem; }\n.footer-nav a { color: var(--color-text-muted); font-size: 0.9rem; }\n.footer-nav a:hover { color: var(--color-primary); }\n.footer-bottom { text-align: center; padding-top: 2rem; margin-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1); color: var(--color-text-muted); font-size: 0.85rem; }"
+        }},
+        { "command": "setRootVariables", "params": { 
+            "variables": {
+                "--color-primary": "#0d9488",
+                "--color-primary-light": "#14b8a6",
+                "--color-primary-dark": "#0f766e",
+                "--color-secondary": "#f59e0b",
+                "--color-bg": "#f8fafc",
+                "--color-bg-card": "#ffffff",
+                "--color-bg-footer": "#1e293b",
+                "--color-text": "#1e293b",
+                "--color-text-muted": "#64748b",
+                "--color-text-light": "#f8fafc",
+                "--color-border": "#e2e8f0",
+                "--shadow-color": "rgba(15, 23, 42, 0.1)"
+            }
+        }},
+        { "command": "setMultilingual", "params": { "enabled": false } }
+    ]
+}

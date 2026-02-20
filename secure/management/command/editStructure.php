@@ -2,6 +2,133 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+
+// SECURITY: Blocked tags that could execute scripts or inject styles
+const BLOCKED_TAGS = ['script', 'noscript', 'style', 'template', 'slot'];
+
+/**
+ * Internal function to find component usages (for delete safety check)
+ * Simplified version of findComponentUsages command
+ */
+function findComponentUsagesInternal(string $componentName): array {
+    $usages = [
+        'pages' => [],
+        'menu' => null,
+        'footer' => null,
+        'components' => []
+    ];
+    
+    $jsonDir = PROJECT_PATH . '/templates/model/json';
+    $componentsDir = $jsonDir . '/components';
+    
+    // Helper to find component in structure
+    $findInStructure = function($node, string $target, array &$found, string $path = '') use (&$findInStructure): void {
+        if (!is_array($node)) return;
+        if (isset($node['component']) && $node['component'] === $target) {
+            $found[] = $path ?: 'root';
+        }
+        if (isset($node['children']) && is_array($node['children'])) {
+            foreach ($node['children'] as $i => $child) {
+                $findInStructure($child, $target, $found, $path ? "{$path}.{$i}" : (string)$i);
+            }
+        }
+    };
+    
+    // Helper to scan file
+    $scanFile = function(string $file, string $target) use ($findInStructure): array {
+        if (!file_exists($file)) return [];
+        $content = @file_get_contents($file);
+        if ($content === false) return [];
+        $structure = json_decode($content, true);
+        if (json_last_error() !== JSON_ERROR_NONE) return [];
+        
+        $found = [];
+        if (isset($structure['tag']) || isset($structure['component']) || isset($structure['textKey'])) {
+            $findInStructure($structure, $target, $found, '0');
+        } else if (is_array($structure)) {
+            foreach ($structure as $i => $node) {
+                $findInStructure($node, $target, $found, (string)$i);
+            }
+        }
+        return $found;
+    };
+    
+    // Scan menu
+    $locations = $scanFile($jsonDir . '/menu.json', $componentName);
+    if (!empty($locations)) {
+        $usages['menu'] = ['type' => 'menu', 'locations' => $locations, 'count' => count($locations)];
+    }
+    
+    // Scan footer
+    $locations = $scanFile($jsonDir . '/footer.json', $componentName);
+    if (!empty($locations)) {
+        $usages['footer'] = ['type' => 'footer', 'locations' => $locations, 'count' => count($locations)];
+    }
+    
+    // Scan pages recursively
+    $scanPagesDir = function(string $dir, string $prefix = '') use (&$scanPagesDir, $scanFile, $componentName, &$usages): void {
+        if (!is_dir($dir)) return;
+        foreach (scandir($dir) as $item) {
+            if ($item === '.' || $item === '..') continue;
+            $path = $dir . '/' . $item;
+            if (is_dir($path)) {
+                $scanPagesDir($path, $prefix ? $prefix . '/' . $item : $item);
+            } else if (pathinfo($item, PATHINFO_EXTENSION) === 'json') {
+                $pageName = $prefix ? $prefix . '/' . pathinfo($item, PATHINFO_FILENAME) : pathinfo($item, PATHINFO_FILENAME);
+                $locations = $scanFile($path, $componentName);
+                if (!empty($locations)) {
+                    $usages['pages'][] = ['name' => $pageName, 'type' => 'page', 'locations' => $locations, 'count' => count($locations)];
+                }
+            }
+        }
+    };
+    $scanPagesDir($jsonDir . '/pages');
+    
+    // Scan other components
+    if (is_dir($componentsDir)) {
+        foreach (glob($componentsDir . '/*.json') as $file) {
+            $otherName = basename($file, '.json');
+            if ($otherName === $componentName) continue;
+            $locations = $scanFile($file, $componentName);
+            if (!empty($locations)) {
+                $usages['components'][] = ['name' => $otherName, 'type' => 'component', 'locations' => $locations, 'count' => count($locations)];
+            }
+        }
+    }
+    
+    return $usages;
+}
+
+/**
+ * Recursively validate structure for blocked tags
+ * @param mixed $node Node to validate
+ * @return string|null Error message if blocked tag found, null if valid
+ */
+function validateStructureTags($node): ?string {
+    if (!is_array($node)) {
+        return null;
+    }
+    
+    // Check if this node has a blocked tag
+    if (isset($node['tag']) && is_string($node['tag'])) {
+        if (in_array(strtolower($node['tag']), BLOCKED_TAGS, true)) {
+            return "Blocked tag '{$node['tag']}' not allowed (security restriction)";
+        }
+    }
+    
+    // Recursively check children
+    if (isset($node['children']) && is_array($node['children'])) {
+        foreach ($node['children'] as $child) {
+            $error = validateStructureTags($child);
+            if ($error !== null) {
+                return $error;
+            }
+        }
+    }
+    
+    return null;
+}
 
 $params = $trimParametersManagement->params();
 
@@ -112,6 +239,57 @@ if ($structure !== null && is_array($structure)) {
     }
 }
 
+// SECURITY: Validate no blocked tags (script, style, etc.) - skip for delete
+if ($structure !== null && is_array($structure)) {
+    // For pages/menu/footer (arrays of nodes)
+    if (isset($structure[0]) || empty($structure)) {
+        foreach ($structure as $node) {
+            $tagError = validateStructureTags($node);
+            if ($tagError !== null) {
+                ApiResponse::create(400, 'validation.blocked_tag')
+                    ->withMessage($tagError)
+                    ->withErrors([['field' => 'structure', 'reason' => 'blocked_tag']])
+                    ->send();
+            }
+        }
+    } else {
+        // For components (single object node)
+        $tagError = validateStructureTags($structure);
+        if ($tagError !== null) {
+            ApiResponse::create(400, 'validation.blocked_tag')
+                ->withMessage($tagError)
+                ->withErrors([['field' => 'structure', 'reason' => 'blocked_tag']])
+                ->send();
+        }
+    }
+}
+
+// SECURITY: Validate no reserved data-qs-* attributes - skip for delete
+// These are auto-generated by QuickSite for Visual Editor functionality
+if ($structure !== null && is_array($structure)) {
+    // For pages/menu/footer (arrays of nodes)
+    if (isset($structure[0]) || empty($structure)) {
+        foreach ($structure as $index => $node) {
+            $reserved = findReservedQsParamInStructure($node, 0, 50, "structure[{$index}]");
+            if ($reserved !== null) {
+                ApiResponse::create(400, 'validation.reserved_attribute')
+                    ->withMessage("Cannot use reserved attribute '{$reserved['key']}' at {$reserved['path']}. Attributes starting with 'data-qs-' are reserved for QuickSite. Use a different prefix like 'data-custom-' or 'data-app-'.")
+                    ->withErrors([['field' => $reserved['path'] . '.params.' . $reserved['key'], 'reason' => 'reserved_attribute']])
+                    ->send();
+            }
+        }
+    } else {
+        // For components (single object node)
+        $reserved = findReservedQsParamInStructure($structure, 0, 50, 'structure');
+        if ($reserved !== null) {
+            ApiResponse::create(400, 'validation.reserved_attribute')
+                ->withMessage("Cannot use reserved attribute '{$reserved['key']}' at {$reserved['path']}. Attributes starting with 'data-qs-' are reserved for QuickSite. Use a different prefix like 'data-custom-' or 'data-app-'.")
+                ->withErrors([['field' => $reserved['path'] . '.params.' . $reserved['key'], 'reason' => 'reserved_attribute']])
+                ->send();
+        }
+    }
+}
+
 // For pages and components, name is required
 if ($type === 'page' || $type === 'component') {
     if (!isset($params['name'])) {
@@ -122,7 +300,11 @@ if ($type === 'page' || $type === 'component') {
     
     $name = $params['name'];
     
-    // Type validation - name must be string
+    // Type validation - name must be string (allow numeric for routes like "404")
+    if (is_int($name) || is_float($name)) {
+        $name = (string) $name;
+    }
+    
     if (!is_string($name)) {
         ApiResponse::create(400, 'validation.invalid_type')
             ->withMessage('The name parameter must be a string.')
@@ -132,27 +314,19 @@ if ($type === 'page' || $type === 'component') {
             ->send();
     }
     
-    // Length validation - max 100 characters for name
-    if (strlen($name) > 100) {
+    // Length validation - max 200 characters for route paths
+    if (strlen($name) > 200) {
         ApiResponse::create(400, 'validation.invalid_length')
-            ->withMessage("The name parameter must not exceed 100 characters.")
+            ->withMessage("The name parameter must not exceed 200 characters.")
             ->withErrors([
-                ['field' => 'name', 'value' => $name, 'max_length' => 100]
+                ['field' => 'name', 'value' => $name, 'max_length' => 200]
             ])
             ->send();
     }
     
-    // Validate page exists (only for pages, not components - components can be created)
-    if ($type === 'page' && !in_array($name, ROUTES, true)) {
-        ApiResponse::create(404, 'route.not_found')
-            ->withMessage("Page '{$name}' does not exist")
-            ->withData(['available_routes' => ROUTES])
-            ->send();
-    }
-    
     // Check for path traversal attempts in name
+    // Allow forward slashes for nested page routes
     if (strpos($name, '..') !== false || 
-        strpos($name, '/') !== false || 
         strpos($name, '\\') !== false ||
         strpos($name, "\0") !== false) {
         ApiResponse::create(400, 'validation.invalid_format')
@@ -163,23 +337,53 @@ if ($type === 'page' || $type === 'component') {
             ->send();
     }
     
-    // Validate component name format (alphanumeric, hyphens, underscores)
-    if ($type === 'component' && !preg_match('/^[a-zA-Z0-9_-]+$/', $name)) {
+    // For components, block slashes entirely
+    if ($type === 'component' && strpos($name, '/') !== false) {
         ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage("Invalid component name. Use only alphanumeric, hyphens, and underscores")
-            ->withErrors([['field' => 'name', 'value' => $name]])
+            ->withMessage('Component name cannot contain slashes')
+            ->withErrors([
+                ['field' => 'name', 'reason' => 'invalid_character']
+            ])
             ->send();
+    }
+    
+    // Special pages that exist but are not in ROUTES (error pages, etc.)
+    $specialPages = ['404', '500', '403', '401'];
+    
+    // Validate page exists (only for pages, not components - components can be created)
+    // Allow special pages (404, 500, etc.) even if not in ROUTES
+    if ($type === 'page' && !routeExists($name, ROUTES) && !in_array($name, $specialPages, true)) {
+        ApiResponse::create(404, 'route.not_found')
+            ->withMessage("Page '{$name}' does not exist")
+            ->withData(['available_routes' => flattenRoutes(ROUTES), 'special_pages' => $specialPages])
+            ->send();
+    }
+    
+    // Validate each segment of the name
+    $segments = array_filter(explode('/', $name), fn($s) => $s !== '');
+    foreach ($segments as $segment) {
+        if (!RegexPatterns::match('identifier_alphanum', $segment)) {
+            ApiResponse::create(400, 'validation.invalid_format')
+                ->withMessage("Invalid segment '$segment'. Use only alphanumeric, hyphens, and underscores")
+                ->withErrors([RegexPatterns::validationError('identifier_alphanum', 'name', $segment)])
+                ->send();
+        }
     }
     
     // Build file path
     if ($type === 'page') {
-        $json_file = SECURE_FOLDER_PATH . '/templates/model/json/pages/' . $name . '.json';
+        // Use helper to resolve JSON path (supports folder structure)
+        $json_file = resolvePageJsonPath($name);
+        if ($json_file === null) {
+            // For new pages that don't exist yet, use folder structure
+            $json_file = getNewPagePath($name, 'json');
+        }
     } else { // component
-        $json_file = SECURE_FOLDER_PATH . '/templates/model/json/components/' . $name . '.json';
+        $json_file = PROJECT_PATH . '/templates/model/json/components/' . $name . '.json';
     }
 } else {
     // For menu/footer, use the type directly
-    $json_file = SECURE_FOLDER_PATH . '/templates/model/json/' . $type . '.json';
+    $json_file = PROJECT_PATH . '/templates/model/json/' . $type . '.json';
     $name = null;
 }
 
@@ -194,6 +398,33 @@ if (!file_exists($json_file) && $type !== 'component') {
 // For components with empty structure, delete the component file
 if ($type === 'component' && is_array($structure) && empty($structure)) {
     if (file_exists($json_file)) {
+        // Check if component is used by other components (block delete)
+        $usages = findComponentUsagesInternal($name);
+        
+        if (!empty($usages['components'])) {
+            $usingComponents = array_map(fn($c) => $c['name'], $usages['components']);
+            ApiResponse::create(400, 'operation.denied')
+                ->withMessage("Cannot delete component '{$name}': used by other components")
+                ->withData([
+                    'component' => $name,
+                    'used_by_components' => $usingComponents,
+                    'hint' => 'Remove references from these components first, or use force=true to delete anyway'
+                ])
+                ->send();
+        }
+        
+        // Warn about page/menu/footer usage but allow delete
+        $warnings = [];
+        if (!empty($usages['pages'])) {
+            $warnings[] = 'Used in ' . count($usages['pages']) . ' page(s): ' . implode(', ', array_map(fn($p) => $p['name'], $usages['pages']));
+        }
+        if ($usages['menu']) {
+            $warnings[] = 'Used in menu';
+        }
+        if ($usages['footer']) {
+            $warnings[] = 'Used in footer';
+        }
+        
         if (!unlink($json_file)) {
             ApiResponse::create(500, 'server.file_delete_failed')
                 ->withMessage("Failed to delete component file")
@@ -203,11 +434,12 @@ if ($type === 'component' && is_array($structure) && empty($structure)) {
         
         // Success - component deleted
         ApiResponse::create(200, 'operation.success')
-            ->withMessage('Component deleted successfully')
+            ->withMessage('Component deleted successfully' . (!empty($warnings) ? ' (with warnings)' : ''))
             ->withData([
                 'type' => $type,
                 'name' => $name,
-                'deleted' => true
+                'deleted' => true,
+                'warnings' => $warnings ?: null
             ])
             ->send();
     } else {
@@ -233,10 +465,10 @@ if ($type === 'component') {
 // ===== NodeId-based targeted edit mode =====
 if ($nodeId !== null) {
     // Validate nodeId format
-    if (!preg_match('/^[0-9]+(\.[0-9]+)*$/', $nodeId)) {
+    if (!RegexPatterns::match('node_id', $nodeId)) {
         ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Invalid nodeId format. Use dot notation like '0.2.1'")
-            ->withErrors([['field' => 'nodeId', 'value' => $nodeId]])
+            ->withErrors([RegexPatterns::validationError('node_id', 'nodeId', $nodeId)])
             ->send();
     }
     

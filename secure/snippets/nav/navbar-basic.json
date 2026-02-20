@@ -1,0 +1,69 @@
+{
+  "id": "navbar-basic",
+  "name": "Basic Navbar",
+  "category": "nav",
+  "description": "Simple horizontal navigation bar with logo and links",
+  "isCore": true,
+  "structure": {
+    "tag": "nav",
+    "params": { "class": "qs-snippet-navbar" },
+    "children": [
+      {
+        "tag": "a",
+        "params": { "href": "/", "class": "qs-snippet-navbar-logo" },
+        "children": [{ "textKey": "snippet.navbar.logo" }]
+      },
+      {
+        "tag": "ul",
+        "params": { "class": "qs-snippet-navbar-links" },
+        "children": [
+          {
+            "tag": "li",
+            "children": [
+              {
+                "tag": "a",
+                "params": { "href": "#" },
+                "children": [{ "textKey": "snippet.navbar.home" }]
+              }
+            ]
+          },
+          {
+            "tag": "li",
+            "children": [
+              {
+                "tag": "a",
+                "params": { "href": "#" },
+                "children": [{ "textKey": "snippet.navbar.about" }]
+              }
+            ]
+          },
+          {
+            "tag": "li",
+            "children": [
+              {
+                "tag": "a",
+                "params": { "href": "#" },
+                "children": [{ "textKey": "snippet.navbar.contact" }]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "translations": {
+    "en": {
+      "snippet.navbar.logo": "Logo",
+      "snippet.navbar.home": "Home",
+      "snippet.navbar.about": "About",
+      "snippet.navbar.contact": "Contact"
+    },
+    "fr": {
+      "snippet.navbar.logo": "Logo",
+      "snippet.navbar.home": "Accueil",
+      "snippet.navbar.about": "À propos",
+      "snippet.navbar.contact": "Contact"
+    }
+  },
+  "css": ".qs-snippet-navbar { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; background: #333; } .qs-snippet-navbar-logo { color: #fff; font-size: 1.5rem; font-weight: bold; text-decoration: none; } .qs-snippet-navbar-links { display: flex; list-style: none; margin: 0; padding: 0; gap: 1.5rem; } .qs-snippet-navbar-links a { color: #fff; text-decoration: none; } .qs-snippet-navbar-links a:hover { text-decoration: underline; }"
+}

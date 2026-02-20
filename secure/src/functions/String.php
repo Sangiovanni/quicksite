@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../classes/RegexPatterns.php';
+
 function removePrefix(string $haystack, string $prefix): string {
     // 1. Check if the $haystack string starts with the $prefix
     if (str_starts_with($haystack, $prefix)) {
@@ -22,9 +24,7 @@ function is_valid_route_name(string $input): bool
     if (empty($input)) {
         return false;
     }
-    $pattern = '/^[a-z0-9-]+$/';
-    
-    return (bool)preg_match($pattern, $input);
+    return RegexPatterns::match('route_name_simple', $input);
 }
 
 /**
@@ -39,6 +39,8 @@ function is_valid_word_string(string $input): bool
     if (empty($input)) {
         return false;
     }
+    // Using raw pattern here since this is a generic utility function
+    // that may need Unicode support beyond what's in RegexPatterns
     $pattern = '/^[\p{L}0-9-]+$/u';
     
     return (bool)preg_match($pattern, $input);

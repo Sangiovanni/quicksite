@@ -1,0 +1,60 @@
+<?php
+/**
+ * Role Definitions for Permission System
+ * 
+ * Copy this file to roles.php to use the default role definitions.
+ * You can customize roles and their allowed commands after copying.
+ * 
+ * Use the 'generateToken' and 'listRoles' API commands to manage roles.
+ * 
+ * Available roles: viewer, editor, designer, developer, admin
+ * The '*' role (superadmin) has access to all commands and cannot be modified here.
+ */
+
+return [
+    'viewer' => [
+        'description' => 'Read-only access to structure, content, and styles',
+        'builtin' => true,
+        'commands' => [
+            'help', 'getSizeInfo', 'getStructure', 'getRoutes', 'getSiteMap',
+            'listComponents', 'findComponentUsages', 'listPages',
+            'getTranslation', 'getTranslations', 'getTranslationKeys', 'getLangList',
+            'listAssets', 'getStyles', 'getRootVariables',
+            'listStyleRules', 'getStyleRule', 'getKeyframes', 'listKeyframes',
+            'getAnimatedSelectors', 'listAliases', 'listBuilds', 'getBuild',
+            'listRoles', 'getMyPermissions', 'listAiProviders',
+            'listJsFunctions', 'listInteractions', 'listApiEndpoints', 'getApiEndpoint',
+            'listSnippets', 'getSnippet',
+            'checkForUpdates',
+        ],
+    ],
+    'editor' => [
+        'description' => 'Content editing: pages, translations, components, assets',
+        'builtin' => true,
+        'commands' => [
+            // Inherits all viewer commands + content modification commands
+            // Use listRoles API command to see the full default list
+        ],
+    ],
+    'designer' => [
+        'description' => 'Style editing: CSS, animations, root variables',
+        'builtin' => true,
+        'commands' => [
+            // Inherits viewer commands + style modification commands
+        ],
+    ],
+    'developer' => [
+        'description' => 'Build, deploy, API management, routes',
+        'builtin' => true,
+        'commands' => [
+            // Inherits viewer commands + build/deploy/API commands
+        ],
+    ],
+    'admin' => [
+        'description' => 'Full access except system-level operations',
+        'builtin' => true,
+        'commands' => [
+            // All commands except superadmin-only ones
+        ],
+    ],
+];

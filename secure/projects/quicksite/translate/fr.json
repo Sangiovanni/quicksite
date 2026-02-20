@@ -1,0 +1,777 @@
+{
+    "cta": {
+        "viewDocs": "Documentation",
+        "github": "GitHub",
+        "getStarted": "Commencer",
+        "learnMore": "En savoir plus"
+    },
+    "site": {
+        "tagline": "CMS base fichiers",
+        "name": "Quicksite"
+    },
+    "home": {
+        "welcomeMessage": "Un CMS PHP moderne base sur JSON avec une API REST puissante. Parfait pour les landing pages, portfolios et microsites.",
+        "title": "Creez des sites rapidement.",
+        "hero": {
+            "title": "QuickSite",
+            "subtitle": "Créez et gérez vos sites web entièrement via une API REST. Aucun framework frontend requis.",
+            "cta_start": "Commencer",
+            "cta_docs": "Voir la doc"
+        },
+        "features": {
+            "title": "Fonctionnalités",
+            "api": {
+                "title": "Contrôle API Total",
+                "desc": "114+ commandes pour gérer tous les aspects de votre site - routes, pages, styles, traductions, assets, builds, et plus."
+            },
+            "i18n": {
+                "title": "Multi-Langues",
+                "desc": "Internationalisation intégrée avec détection automatique de la langue et gestion facile des traductions."
+            },
+            "css": {
+                "title": "Style Dynamique",
+                "desc": "Modifiez les variables CSS, règles et animations à la volée. Aucune étape de build requise."
+            },
+            "build": {
+                "title": "Déploiement en Un Clic",
+                "desc": "Générez des builds prêts pour la production avec PHP compilé, configs nettoyées et packaging ZIP."
+            }
+        },
+        "stats": {
+            "commands": "Commandes API",
+            "api": "100% API",
+            "dependencies": "Dépendances"
+        }
+    },
+    "page": {
+        "titles": {
+            "about": "A propos - Quicksite",
+            "features": "Fonctionnalites - Quicksite",
+            "home": "QuickSite - Créez des sites web par API",
+            "docs": "Documentation - QuickSite",
+            "get-started": "Commencer - QuickSite",
+            "privacy": "Politique de confidentialité - QuickSite",
+            "terms": "Conditions d'utilisation - QuickSite",
+            "404": "Page non trouvée - QuickSite",
+            "guides": "Guides - QuickSite"
+        }
+    },
+    "footer": {
+        "madeWith": "Fait avec amour pour les developpeurs",
+        "language": "Langue :",
+        "terms": "Conditions d'utilisations",
+        "privacy": "Politique de confidentialité",
+        "copyright": "© 2025 QuickSite. Fait avec ❤️ et des APIs."
+    },
+    "404": {
+        "message": "Désolé, la page que vous recherchez n'existe pas ou a été déplacée.",
+        "backHome": "Retour à l'Accueil",
+        "pageNotFound": "Page Non Trouvée"
+    },
+    "menu": {
+        "about": "A propos",
+        "features": "Fonctionnalites",
+        "terms": "Conditions",
+        "home": "Accueil",
+        "docs": "Documentation",
+        "getstarted": "Commencer",
+        "github": "GitHub",
+        "guides": "Guides"
+    },
+    "privacy": {
+        "title": "Politique de confidentialite",
+        "content": "Ceci est la politique de confidentialite de notre site web. Nous respectons votre vie privee."
+    },
+    "termOfUse": {
+        "title": "Conditions d utilisation",
+        "content": "Ce sont les conditions d utilisation de notre site web. En utilisant notre site, vous acceptez ces conditions."
+    },
+    "docs": {
+        "title": "Documentation API",
+        "intro": "Référence complète de toutes les commandes de gestion QuickSite. Tous les endpoints nécessitent une authentification.",
+        "auth": {
+            "title": "Authentification",
+            "desc": "Incluez votre token API dans l'en-tête Authorization pour toutes les requêtes :"
+        },
+        "cat": {
+            "folder": "Gestion des Dossiers",
+            "route": "Gestion des Routes",
+            "structure": "Gestion de la Structure",
+            "alias": "Alias d'URL",
+            "translation": "Gestion des Traductions",
+            "language": "Gestion des Langues",
+            "asset": "Gestion des Assets",
+            "style": "Gestion des Styles",
+            "css_vars": "Variables & Règles CSS",
+            "animations": "Animations CSS",
+            "customize": "Personnalisation du Site",
+            "build": "Build & Déploiement",
+            "auth": "Gestion des Tokens",
+            "docs": "Documentation",
+            "project": "Gestion des Projets",
+            "ai": "Intégration IA",
+            "roles": "Rôles & Permissions",
+            "storage": "Surveillance du Stockage",
+            "snippets": "Snippets"
+        },
+        "cmd": {
+            "setPublicSpace": {
+                "desc": "Définit l'espace/préfixe URL pour le site public. Crée un sous-répertoire dans le dossier public et y déplace tout le contenu. Utilisez une destination vide pour revenir à la racine. Note: L'URL du site change (ex: http://domaine/web/ quand défini sur \"web\")",
+                "params": {
+                    "destination": "Préfixe/espace URL pour le site public (chaîne vide pour supprimer)"
+                }
+            },
+            "renameSecureFolder": {
+                "desc": "Renomme le dossier secure/backend au niveau racine du serveur. Met à jour la constante SECURE_FOLDER_NAME. L'URL de gestion reste la même.",
+                "params": {
+                    "destination": "Nouveau nom de dossier (nom simple, sans chemins)"
+                }
+            },
+            "renamePublicFolder": {
+                "desc": "Renomme le dossier public au niveau racine du serveur. Met à jour toutes les références. Nécessite une mise à jour de la config Apache/serveur web après le renommage.",
+                "params": {
+                    "destination": "Nouveau nom de dossier (nom simple, sans chemins)"
+                }
+            },
+            "addRoute": {
+                "desc": "Crée une nouvelle route avec un template de page PHP et une structure JSON vide",
+                "params": {
+                    "route": "Nom de la route pour l'URL (minuscules, chiffres, tirets)"
+                }
+            },
+            "deleteRoute": {
+                "desc": "Supprime une route existante et ses fichiers associés (PHP et JSON). Supprime également tous les alias d'URL pointant vers cette route.",
+                "params": {
+                    "route": "Nom de la route à supprimer"
+                }
+            },
+            "getRoutes": {
+                "desc": "Retourne la liste de toutes les routes disponibles dans le système"
+            },
+            "getStructure": {
+                "desc": "Récupère la structure JSON d'une page, menu, footer ou composant. Options: showIds (ajoute les identifiants de nœuds), summary (aperçu de l'arbre), ou nodeId (obtient un nœud spécifique par chemin indexé à 0 comme 0.2.1)"
+            },
+            "editStructure": {
+                "desc": "Met à jour la structure JSON. Deux modes: remplacement complet (envoie la structure complète) ou édition ciblée (utilise nodeId + action: update, delete, insertBefore, insertAfter)",
+                "params": {
+                    "type": "Type de structure: page, menu, footer, component",
+                    "name": "Nom (requis pour page/composant)",
+                    "structure": "Structure JSON à sauvegarder",
+                    "nodeId": "Nœud cible pour l'édition chirurgicale (ex: 0.2.1)",
+                    "action": "update, delete, insertBefore, insertAfter"
+                }
+            },
+            "listComponents": {
+                "desc": "Liste tous les composants JSON réutilisables avec leurs métadonnées. Affiche les emplacements disponibles (placeholders) et les dépendances des composants."
+            },
+            "listPages": {
+                "desc": "Liste toutes les structures de pages JSON avec leurs métadonnées. Affiche le statut des routes, les composants utilisés et les clés de traduction."
+            },
+            "createAlias": {
+                "desc": "Crée un alias de redirection URL pointant vers une route existante. Supporte les redirections 301 ou le routage interne (transparent).",
+                "params": {
+                    "alias": "Chemin URL pour l'alias",
+                    "target": "Route cible vers laquelle rediriger",
+                    "type": "redirect (301) ou internal (transparent)"
+                }
+            },
+            "deleteAlias": {
+                "desc": "Supprime un alias de redirection URL existant.",
+                "params": {
+                    "alias": "Chemin URL de l'alias à supprimer"
+                }
+            },
+            "listAliases": {
+                "desc": "Liste tous les alias de redirection URL avec leurs cibles et types."
+            },
+            "getTranslation": {
+                "desc": "Récupère les traductions pour une seule langue"
+            },
+            "getTranslations": {
+                "desc": "Récupère les traductions pour toutes les langues"
+            },
+            "setTranslationKeys": {
+                "desc": "Définit/met à jour des clés de traduction spécifiques (fusion, pas de remplacement)",
+                "params": {
+                    "language": "Code de langue (ex: en, fr)",
+                    "translations": "Objet de clés à ajouter/mettre à jour (fusion sécurisée)"
+                }
+            },
+            "deleteTranslationKeys": {
+                "desc": "Supprime des clés de traduction spécifiques d'un fichier de langue",
+                "params": {
+                    "language": "Code de langue (ex: en, fr)",
+                    "keys": "Tableau de clés en notation pointée à supprimer"
+                }
+            },
+            "getTranslationKeys": {
+                "desc": "Analyse toutes les structures JSON et extrait les clés de traduction requises"
+            },
+            "validateTranslations": {
+                "desc": "Valide la complétude des traductions en comparant les clés requises avec les traductions existantes"
+            },
+            "getUnusedTranslationKeys": {
+                "desc": "Trouve les clés de traduction qui existent dans les fichiers de traduction mais ne sont utilisées dans aucune structure"
+            },
+            "analyzeTranslations": {
+                "desc": "Vérification complète de la santé des traductions - trouve les clés manquantes ET inutilisées"
+            },
+            "getLangList": {
+                "desc": "Retourne la liste des langues configurées et les paramètres multilingues"
+            },
+            "setMultilingual": {
+                "desc": "Active ou désactive le support multilingue. Synchronise les traductions entre default.json et le fichier de la langue par défaut.",
+                "params": {
+                    "enabled": "Booléen: true pour multilingue, false pour mono-langue"
+                }
+            },
+            "checkStructureMulti": {
+                "desc": "Analyse toutes les structures pour le contenu spécifique à une langue. À utiliser avant de passer en mode mono-langue."
+            },
+            "addLang": {
+                "desc": "Ajoute une nouvelle langue au système",
+                "params": {
+                    "code": "Code de langue ISO (ex: es, de)",
+                    "name": "Nom d'affichage (ex: Español)"
+                }
+            },
+            "deleteLang": {
+                "desc": "Supprime une langue du système",
+                "params": {
+                    "code": "Code de langue à supprimer (pas la défaut/dernière)"
+                }
+            },
+            "setDefaultLang": {
+                "desc": "Définit la langue par défaut du site",
+                "params": {
+                    "lang": "Code de langue à définir par défaut (doit exister)"
+                }
+            },
+            "uploadAsset": {
+                "desc": "Upload un fichier vers le dossier assets avec validation et nommage automatique",
+                "params": {
+                    "category": "images, scripts, font, audio, ou videos",
+                    "file": "Upload de fichier (multipart/form-data)"
+                }
+            },
+            "deleteAsset": {
+                "desc": "Supprime un fichier du dossier assets"
+            },
+            "listAssets": {
+                "desc": "Liste tous les fichiers dans le dossier assets avec métadonnées, optionnellement filtrés par catégorie"
+            },
+            "updateAssetMeta": {
+                "desc": "Met à jour les métadonnées (description, texte alternatif) d'un asset existant. Utile pour le contexte IA et l'accessibilité.",
+                "params": {
+                    "category": "Catégorie d'asset (images, scripts, font, audio, videos)",
+                    "filename": "Nom du fichier à mettre à jour",
+                    "description": "Description pour contexte IA (max 500 caractères)",
+                    "alt": "Texte alternatif pour images/accessibilité (max 200 caractères)"
+                }
+            },
+            "getStyles": {
+                "desc": "Récupère le contenu du fichier SCSS/CSS principal"
+            },
+            "editStyles": {
+                "desc": "Met à jour le contenu du fichier SCSS/CSS principal",
+                "params": {
+                    "content": "Contenu CSS complet (remplace le fichier)"
+                }
+            },
+            "getRootVariables": {
+                "desc": "Récupère toutes les propriétés CSS personnalisées (variables) définies dans le sélecteur :root"
+            },
+            "setRootVariables": {
+                "desc": "Ajoute ou met à jour des propriétés CSS personnalisées (variables) dans le sélecteur :root",
+                "params": {
+                    "variables": "Objet de variables CSS à définir/mettre à jour"
+                }
+            },
+            "listStyleRules": {
+                "desc": "Liste tous les sélecteurs CSS dans la feuille de style, organisés par scope global et media query"
+            },
+            "getStyleRule": {
+                "desc": "Obtient les styles CSS pour un sélecteur spécifique, optionnellement dans un contexte de media query"
+            },
+            "setStyleRule": {
+                "desc": "Ajoute ou met à jour une règle CSS pour n'importe quel sélecteur",
+                "params": {
+                    "selector": "Sélecteur CSS (ex: .btn-primary)",
+                    "styles": "Déclarations CSS (chaîne ou objet)",
+                    "mediaQuery": "Contexte media query (optionnel)"
+                }
+            },
+            "deleteStyleRule": {
+                "desc": "Supprime une règle CSS de la feuille de style",
+                "params": {
+                    "selector": "Sélecteur CSS à supprimer",
+                    "mediaQuery": "Contexte media query (optionnel)"
+                }
+            },
+            "getKeyframes": {
+                "desc": "Récupère toutes les animations @keyframes définies dans la feuille de style"
+            },
+            "setKeyframes": {
+                "desc": "Ajoute ou met à jour une animation @keyframes",
+                "params": {
+                    "name": "Nom de l'animation (alphanumérique)",
+                    "frames": "Objet avec les clés de frames (0%, 50%, from, to)"
+                }
+            },
+            "deleteKeyframes": {
+                "desc": "Supprime une animation @keyframes de la feuille de style",
+                "params": {
+                    "name": "Nom de l'animation à supprimer"
+                }
+            },
+            "editFavicon": {
+                "desc": "Met à jour le favicon du site avec une nouvelle image du dossier assets/images (PNG uniquement)",
+                "params": {
+                    "imageName": "Nom de fichier PNG depuis assets/images/"
+                }
+            },
+            "editTitle": {
+                "desc": "Met à jour le titre de page pour une route et une langue spécifiques dans le fichier de traduction (structure page.titles.{route})",
+                "params": {
+                    "route": "Nom de la route à mettre à jour",
+                    "lang": "Code de langue",
+                    "title": "Nouveau texte du titre de page"
+                }
+            },
+            "build": {
+                "desc": "Crée un build prêt pour la production avec des fichiers PHP compilés, renommage optionnel des dossiers, nettoyage de la config et création d'archive ZIP",
+                "params": {
+                    "public": "Nom/chemin personnalisé du dossier public",
+                    "secure": "Nom personnalisé du dossier secure (un seul niveau)",
+                    "space": "Sous-répertoire PUBLIC_FOLDER_SPACE"
+                }
+            },
+            "listBuilds": {
+                "desc": "Liste tous les builds disponibles avec leurs métadonnées incluant date de création, tailles, langues et nombre de pages"
+            },
+            "getBuild": {
+                "desc": "Obtient les infos détaillées d'un build spécifique incluant les données du manifest, le nombre de fichiers et le contenu du répertoire",
+                "params": {
+                    "name": "Nom du build (ex: build_20250101_120000)"
+                }
+            },
+            "deleteBuild": {
+                "desc": "Supprime un build spécifique incluant le dossier et l'archive ZIP",
+                "params": {
+                    "name": "Nom du build à supprimer"
+                }
+            },
+            "cleanBuilds": {
+                "desc": "Suppression en masse des builds plus anciens qu'un timestamp spécifié avec mode dry-run optionnel",
+                "params": {
+                    "before": "Timestamp Unix ou chaîne de date",
+                    "dry_run": "Aperçu sans suppression (défaut: false)"
+                }
+            },
+            "deployBuild": {
+                "desc": "Déploie un build vers les chemins de production avec verrouillage de fichiers et vérifications d'intégrité",
+                "params": {
+                    "name": "Nom du build à déployer",
+                    "publicPath": "Chemin absolu pour le dossier public",
+                    "securePath": "Chemin absolu pour le dossier secure",
+                    "overwrite": "Écraser les fichiers existants (défaut: false)"
+                }
+            },
+            "downloadBuild": {
+                "desc": "Obtient l'URL de téléchargement du fichier ZIP d'un build avec taille et infos du manifest",
+                "params": {
+                    "name": "Nom du build à télécharger"
+                }
+            },
+            "getCommandHistory": {
+                "desc": "Récupère l'historique d'exécution des commandes avec filtrage et pagination. Supporte le filtrage par date, commande, statut et token."
+            },
+            "clearCommandHistory": {
+                "desc": "Supprime les fichiers de log de commandes plus anciens qu'une date spécifiée. Affiche un aperçu sans confirm=true.",
+                "params": {
+                    "before": "Date au format AAAA-MM-JJ",
+                    "confirm": "Définir à true pour exécuter la suppression"
+                }
+            },
+            "generateToken": {
+                "desc": "Crée un nouveau token d'authentification API avec les permissions spécifiées. Nécessite la permission admin.",
+                "params": {
+                    "name": "Nom descriptif pour le token",
+                    "permissions": "Tableau: *, read, write, admin, command:name"
+                }
+            },
+            "listTokens": {
+                "desc": "Liste tous les tokens API avec valeurs masquées. Nécessite la permission admin."
+            },
+            "revokeToken": {
+                "desc": "Révoque (supprime définitivement) un token API. Nécessite la permission admin.",
+                "params": {
+                    "token_preview": "Aperçu du token depuis listTokens ou token complet"
+                }
+            },
+            "help": {
+                "desc": "Retourne la documentation pour toutes les commandes disponibles"
+            },
+            "listProjects": {
+                "desc": "Liste tous les projets disponibles dans l'environnement multi-projet"
+            },
+            "getActiveProject": {
+                "desc": "Retourne le nom du projet actuellement actif"
+            },
+            "switchProject": {
+                "desc": "Bascule vers un contexte de projet différent",
+                "params": {
+                    "project": "Nom du projet vers lequel basculer"
+                }
+            },
+            "createProject": {
+                "desc": "Crée un nouveau projet à partir du template",
+                "params": {
+                    "name": "Nom pour le nouveau projet (minuscules, alphanumériques, tirets autorisés)",
+                    "activate": "S'il faut basculer vers le nouveau projet après création (défaut: false)"
+                }
+            },
+            "deleteProject": {
+                "desc": "Supprime définitivement un projet et tous ses fichiers",
+                "params": {
+                    "project": "Nom du projet à supprimer",
+                    "confirm": "Doit être 'DELETE' pour confirmer la suppression"
+                }
+            },
+            "exportProject": {
+                "desc": "Crée une archive ZIP d'un projet pour sauvegarde ou transfert",
+                "params": {
+                    "project": "Projet à exporter (défaut: projet actif)"
+                }
+            },
+            "importProject": {
+                "desc": "Importe un projet depuis une archive ZIP",
+                "params": {
+                    "file": "Contenu du fichier ZIP encodé en Base64",
+                    "activate": "S'il faut basculer vers le projet importé (défaut: false)"
+                }
+            },
+            "downloadExport": {
+                "desc": "Télécharge une archive de projet précédemment exportée",
+                "params": {
+                    "filename": "Nom du fichier d'export à télécharger"
+                }
+            },
+            "clearExports": {
+                "desc": "Supprime tous les fichiers ZIP exportés pour libérer de l'espace disque"
+            },
+            "backupProject": {
+                "desc": "Crée une sauvegarde horodatée d'un projet pour récupération interne",
+                "params": {
+                    "name": "Nom du projet (par défaut: projet actif)",
+                    "max_backups": "Nombre maximum de sauvegardes à conserver (défaut: 5)"
+                }
+            },
+            "listBackups": {
+                "desc": "Liste toutes les sauvegardes disponibles pour un projet avec taille et date",
+                "params": {
+                    "name": "Nom du projet (par défaut: projet actif)"
+                }
+            },
+            "restoreBackup": {
+                "desc": "Restaure un projet depuis une sauvegarde (crée automatiquement une sauvegarde pré-restauration)",
+                "params": {
+                    "backup": "Nom horodaté de la sauvegarde à restaurer",
+                    "name": "Nom du projet (par défaut: projet actif)"
+                }
+            },
+            "deleteBackup": {
+                "desc": "Supprime une sauvegarde spécifique pour libérer de l'espace disque",
+                "params": {
+                    "backup": "Nom horodaté de la sauvegarde à supprimer",
+                    "name": "Nom du projet (par défaut: projet actif)"
+                }
+            },
+            "getSiteMap": {
+                "desc": "Génère un sitemap complet de toutes les routes × toutes les langues pour le SEO",
+                "params": {
+                    "format": "Format de sortie: json (défaut) ou text"
+                }
+            },
+            "getSizeInfo": {
+                "desc": "Retourne des informations détaillées sur le stockage de tous les dossiers du projet"
+            },
+            "listAiProviders": {
+                "desc": "Liste tous les fournisseurs IA supportés (OpenAI, Anthropic, Google, Mistral) pour l'intégration BYOK"
+            },
+            "detectProvider": {
+                "desc": "Détecte le fournisseur IA depuis un préfixe de clé API (sk- = OpenAI, sk-ant- = Anthropic)",
+                "params": {
+                    "key": "Clé API à analyser"
+                }
+            },
+            "testAiKey": {
+                "desc": "Teste si une clé API est valide en faisant un appel API minimal",
+                "params": {
+                    "key": "Clé API à tester",
+                    "provider": "Nom du fournisseur (requis si la clé n'a pas de préfixe détectable)"
+                }
+            },
+            "callAi": {
+                "desc": "Fait une requête de complétion IA via le fournisseur spécifié (proxy BYOK)",
+                "params": {
+                    "key": "Clé API pour le fournisseur",
+                    "provider": "Fournisseur à utiliser (openai, anthropic, google, mistral)",
+                    "model": "Nom du modèle (depuis la liste testAiKey)",
+                    "messages": "Tableau de messages chat avec rôle et contenu"
+                }
+            },
+            "listRoles": {
+                "desc": "Liste tous les rôles disponibles dans le système avec leur nombre de commandes"
+            },
+            "getMyPermissions": {
+                "desc": "Retourne le rôle du token actuel et les commandes accessibles"
+            },
+            "createRole": {
+                "desc": "Crée un nouveau rôle personnalisé avec des commandes spécifiées (superadmin uniquement)",
+                "params": {
+                    "name": "Nom du rôle (alphanumérique minuscule avec underscores)",
+                    "description": "Description lisible",
+                    "commands": "Tableau des noms de commandes que ce rôle peut exécuter"
+                }
+            },
+            "editRole": {
+                "desc": "Modifie un rôle existant. Les rôles intégrés ne peuvent avoir que leur description modifiée.",
+                "params": {
+                    "name": "Nom du rôle à modifier",
+                    "description": "Nouvelle description (optionnel)",
+                    "commands": "Nouvelle liste de commandes (rôles personnalisés uniquement)"
+                }
+            },
+            "deleteRole": {
+                "desc": "Supprime un rôle personnalisé (les rôles intégrés ne peuvent pas être supprimés)",
+                "params": {
+                    "name": "Nom du rôle à supprimer",
+                    "force": "Réassigner les tokens au rôle viewer si utilisé"
+                }
+            },
+            "listSnippets": {
+                "desc": "Liste tous les snippets disponibles (système + projet) par catégorie",
+                "params": {}
+            },
+            "getSnippet": {
+                "desc": "Récupère un snippet avec sa structure, traductions et CSS",
+                "params": {
+                    "id": "ID du snippet à récupérer"
+                }
+            },
+            "createSnippet": {
+                "desc": "Crée un nouveau snippet utilisateur dans le dossier snippets du projet",
+                "params": {
+                    "id": "ID unique du snippet",
+                    "name": "Nom d'affichage",
+                    "category": "Dossier de catégorie (nav, forms, cards, layouts)",
+                    "structure": "Structure du snippet",
+                    "description": "Description optionnelle",
+                    "translations": "Clés de traduction optionnelles"
+                }
+            },
+            "deleteSnippet": {
+                "desc": "Supprime un snippet utilisateur (les snippets système ne peuvent pas être supprimés)",
+                "params": {
+                    "id": "ID du snippet à supprimer"
+                }
+            },
+            "duplicateSnippet": {
+                "desc": "Copie un snippet système vers les snippets du projet pour modification",
+                "params": {
+                    "sourceId": "ID du snippet à dupliquer",
+                    "newId": "Nouvel ID pour la copie (optionnel)"
+                }
+            },
+            "insertSnippet": {
+                "desc": "Insère un snippet dans une page ou composant avec des textKeys uniques",
+                "params": {
+                    "snippetId": "ID du snippet à insérer",
+                    "targetType": "Type de cible (page, component, menu, footer)",
+                    "targetName": "Nom de la cible",
+                    "targetNodeId": "ID du nœud cible (chemin séparé par des points)",
+                    "position": "Position d'insertion (inside, before, after)"
+                }
+            }
+        },
+        "labels": {
+            "urlPatterns": "Formats d'URL",
+            "parameters": "Paramètres",
+            "required": "(requis)",
+            "optional": "(optionnel)",
+            "parameters_93": "Paramètre URL",
+            "parameters_106": "Paramètre URL"
+        },
+        "urlPatternsDesc": "Tous les endpoints API suivent le format /management/{commande}. Certaines commandes acceptent des paramètres de chemin URL pour les requêtes GET - ceux-ci sont affichés avec l'URL de la commande ci-dessous. Utilisez GET /management/help/{commande} pour la documentation API détaillée."
+    },
+    "tutorial": {
+        "title": "Premiers Pas avec QuickSite",
+        "intro": "Suivez ce guide étape par étape pour configurer votre premier projet QuickSite en quelques minutes.",
+        "step1": {
+            "title": "1. Installer les Prérequis",
+            "desc": "Assurez-vous d'avoir PHP 7.4+ (testé jusqu'à 8.4) et un serveur web (Apache, Nginx, ou WAMP/XAMPP) installés sur votre système."
+        },
+        "step2": {
+            "title": "2. Cloner le Dépôt",
+            "desc": "Clonez le dépôt du template QuickSite depuis GitHub et configurez votre serveur web pour pointer vers le dossier public."
+        },
+        "step3": {
+            "title": "3. Configurer Votre Site",
+            "desc": "Modifiez les fichiers de configuration dans le dossier secure/config pour définir le nom du site, les langues et le token API."
+        },
+        "step4": {
+            "title": "4. Créer Votre Première Route",
+            "desc": "Utilisez la commande API addRoute pour créer une nouvelle page, puis ajoutez du contenu avec la commande editStructure."
+        },
+        "step5": {
+            "title": "5. Build & Déploiement",
+            "desc": "Générez un build statique de votre site avec la commande build, puis uploadez les fichiers chez votre hébergeur."
+        },
+        "next": {
+            "title": "Étapes Suivantes",
+            "desc": "Maintenant que votre site fonctionne, explorez plus de fonctionnalités :",
+            "docs": "Lisez la documentation API complète",
+            "github": "Mettez-nous une étoile sur GitHub"
+        }
+    },
+    "guides": {
+        "title": "Guides Pratiques",
+        "intro": "Apprenez QuickSite à travers des tutoriels orientés tâches. Chaque guide couvre des commandes API liées dans des workflows réels.",
+        "toc": {
+            "title": "Table des Matières",
+            "projects": "Gestion des Projets",
+            "pages": "Créer des Pages",
+            "structure": "Édition de Structure",
+            "i18n": "Internationalisation",
+            "css": "CSS & Thèmes",
+            "assets": "Assets & Branding",
+            "urls": "Gestion des URLs",
+            "deploy": "Déploiement",
+            "security": "Sécurité API",
+            "docs": "Documentation"
+        },
+        "projects": {
+            "title": "Gestion des Projets",
+            "intro": "Gérez plusieurs projets au sein d'une seule installation QuickSite. Créez, basculez, exportez et importez des projets.",
+            "architecture": {
+                "desc": "Les projets sont stockés dans secure/projects/{nom}. Chaque projet a ses propres templates, traductions et configuration."
+            },
+            "working": {
+                "desc": "Utilisez switchProject pour changer de contexte. Tous les appels API suivants opèrent sur le projet actif jusqu'à ce que vous basculiez à nouveau."
+            },
+            "backup": {
+                "desc": "Utilisez exportProject pour créer des sauvegardes ZIP. Importez-les plus tard avec importProject pour restaurer ou dupliquer des projets."
+            }
+        },
+        "pages": {
+            "title": "Créer des Pages",
+            "intro": "Créez, listez et supprimez des pages dans votre projet QuickSite. Chaque page consiste en un handler PHP et un fichier de structure JSON.",
+            "create": {
+                "desc": "Utilisez addRoute pour créer une nouvelle page. Cela crée le fichier PHP et le fichier de structure JSON.",
+                "result": "Cela crée une nouvelle page à /about-us avec une structure JSON vide prête pour le contenu."
+            },
+            "list": {
+                "desc": "Affichez toutes les pages de votre projet avec leurs métadonnées, incluant les routes et emplacements de fichiers."
+            },
+            "delete": {
+                "desc": "Supprimez complètement une page. Cela supprime le handler PHP et le fichier de structure JSON."
+            }
+        },
+        "structure": {
+            "title": "Édition de Structure",
+            "intro": "Maîtrisez le système de structure de page basé sur JSON. Chaque élément est un nœud avec tag, params et children.",
+            "json": {
+                "desc": "Les pages QuickSite sont définies comme des arbres JSON. Chaque nœud a un tag (élément HTML), des params optionnels (attributs), et des children (éléments imbriqués ou texte)."
+            },
+            "showids": {
+                "desc": "Utilisez showIds pour voir les identifiants de nœuds pour l'édition chirurgicale. Chaque nœud obtient un ID en notation pointée comme 0.2.1 pour un ciblage précis."
+            },
+            "nodeid": {
+                "desc": "Ciblez des nœuds spécifiques pour les mises à jour en utilisant leur nodeId. Cela permet des éditions précises sans remplacer toute la structure."
+            },
+            "actions": {
+                "desc": "Utilisez les actions pour insérer, supprimer ou déplacer des nœuds par rapport aux autres. insertAfter, insertBefore et delete vous donnent un contrôle total."
+            }
+        },
+        "i18n": {
+            "title": "Internationalisation",
+            "intro": "Construisez des sites multilingues avec des clés de traduction. QuickSite supporte plusieurs langues avec des structures de page partagées.",
+            "add": {
+                "desc": "Ajoutez ou mettez à jour des clés de traduction en toute sécurité. setTranslationKeys effectue une fusion profonde, donc les clés existantes sont préservées."
+            },
+            "health": {
+                "desc": "Vérifiez la complétude des traductions dans toutes les langues. Trouvez les clés manquantes, les traductions non utilisées et obtenez des recommandations."
+            },
+            "newlang": {
+                "desc": "Ajoutez une nouvelle langue à votre site. Cela crée le fichier de traduction et enregistre la langue dans la config."
+            }
+        },
+        "css": {
+            "title": "CSS & Thèmes",
+            "intro": "Contrôlez l'apparence de votre site via l'API. Gérez les variables CSS, les règles et les animations de manière programmatique.",
+            "variables": {
+                "desc": "Les variables CSS (propriétés personnalisées) sont définies dans :root et peuvent être changées instantanément sur tout votre site."
+            },
+            "rules": {
+                "desc": "Ajoutez ou mettez à jour des règles CSS pour n'importe quel sélecteur. Les styles sont fournis comme paires clé-valeur et fusionnés avec les règles existantes."
+            },
+            "animations": {
+                "desc": "Créez des animations CSS keyframe qui peuvent être appliquées aux éléments en utilisant la propriété animation."
+            }
+        },
+        "assets": {
+            "title": "Assets & Branding",
+            "intro": "Gérez les fichiers média et éléments de marque. Uploadez des images, polices et autres assets via l'API.",
+            "upload": {
+                "desc": "Uploadez des fichiers vers des dossiers catégorisés. Supporte les images, scripts, polices, audio et fichiers vidéo."
+            },
+            "favicon": {
+                "desc": "Définissez le favicon du site depuis une image uploadée. L'image devrait être carrée (idéalement 32x32 ou plus)."
+            },
+            "pagetitle": {
+                "desc": "Mettez à jour les titres de page par langue. Les titres apparaissent dans l'onglet du navigateur et les résultats de recherche."
+            }
+        },
+        "urls": {
+            "title": "Gestion des URLs",
+            "intro": "Créez des alias d'URL et des redirections. Mappez plusieurs URLs vers le même contenu ou redirigez les anciennes URLs.",
+            "redirect": {
+                "desc": "Créez des mappings d'URL avec deux types : redirect (redirection HTTP 301) ou internal (routage transparent)."
+            }
+        },
+        "deploy": {
+            "title": "Déploiement",
+            "intro": "Buildez et déployez votre site. Créez des builds de production optimisés avec des noms de dossiers personnalisables.",
+            "build": {
+                "desc": "Créez un build de production horodaté. Personnalisez les noms de dossiers public et secure pour votre environnement d'hébergement."
+            },
+            "space": {
+                "desc": "Configurez le préfixe d'URL pour les sites tournant dans un sous-répertoire. Met à jour tous les liens internes automatiquement."
+            }
+        },
+        "security": {
+            "title": "Sécurité API",
+            "intro": "Gérez l'accès API avec des tokens. Créez, listez et révoquez des tokens avec des permissions personnalisables.",
+            "create": {
+                "desc": "Générez de nouveaux tokens API avec des permissions spécifiques. Utilisez * pour l'accès complet ou read pour l'accès en lecture seule."
+            },
+            "manage": {
+                "desc": "Affichez les tokens existants (valeurs masquées pour la sécurité) et révoquez les tokens qui ne sont plus nécessaires."
+            }
+        },
+        "docs": {
+            "title": "Documentation API",
+            "intro": "Accédez à l'aide intégrée pour tous les endpoints API. La commande help fournit une documentation détaillée.",
+            "help": {
+                "desc": "Obtenez une documentation complète pour toutes les commandes ou une aide détaillée pour un endpoint spécifique."
+            }
+        },
+        "footer": {
+            "title": "Prêt à Construire ?",
+            "desc": "Explorez la référence API complète ou consultez le code source sur GitHub.",
+            "api": "Référence API",
+            "github": "Voir sur GitHub"
+        }
+    }
+}

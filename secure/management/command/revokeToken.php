@@ -28,7 +28,7 @@ if (empty($params['token_preview'])) {
 $tokenPreview = trim($params['token_preview']);
 
 // Load current config
-$configPath = SECURE_FOLDER_PATH . '/config/auth.php';
+$configPath = SECURE_FOLDER_PATH . '/management/config/auth.php';
 $config = require $configPath;
 
 // Find matching token

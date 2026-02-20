@@ -47,29 +47,122 @@ class PageManagement {
 
         $translator = new Translator($this->lang);
         $trimParameters = new TrimParameters();
+        
+        // Check for editor mode (visual editor preview)
+        $editorMode = isset($_GET['_editor']) && $_GET['_editor'] === '1';
 
-        // Pass context with baseUrl and lang
+        // Pass context with baseUrl, lang, and route info
         $context = [
             'baseUrl' => BASE_URL,
             'lang' => MULTILINGUAL_SUPPORT ? $trimParameters->lang() : '',
-            'page' => $trimParameters->page(),
-            'id' => $trimParameters->id(),
-            'params' => $trimParameters->params()
+            // New nested route properties
+            'route' => $trimParameters->route(),           // ['guides', 'installation']
+            'routePath' => $trimParameters->routePath(),   // 'guides/installation'
+            'params' => $trimParameters->params(),
+            // Legacy compatibility (deprecated)
+            'page' => $trimParameters->page(),             // Last segment for backward compat
+            'id' => $trimParameters->id(),                 // First param for backward compat
+            // Editor mode
+            'editorMode' => $editorMode,
         ];
 
         $renderer = new JsonToHtmlRenderer($translator, $context);
 
-        // Render the main content
-        $body .= $renderer->renderMenu();
-        $body .= $this->content;
-        $body .= $renderer->renderFooter();
+        // Load route layout settings (menu/footer visibility)
+        require_once SECURE_FOLDER_PATH . '/src/classes/RouteLayoutManager.php';
+        $layoutManager = new RouteLayoutManager();
+        $layout = $layoutManager->getEffectiveLayout($trimParameters->routePath());
 
-        // Include scripts
+        // Render the main content with conditional menu/footer
+        if ($layout['menu']) {
+            $body .= $renderer->renderMenu();
+        }
+        $body .= $this->content;
+        if ($layout['footer']) {
+            $body .= $renderer->renderFooter();
+        }
+
+        // Always include QuickSite core library for {{call:...}} interactions
+        $body .= '<script src="' . BASE_URL . '/scripts/qs.js"></script>';
+        // Include custom functions if file exists and is not empty
+        $customJsPath = PUBLIC_FOLDER_ROOT . '/scripts/qs-custom.js';
+        if (file_exists($customJsPath) && filesize($customJsPath) > 500) {
+            $body .= '<script src="' . BASE_URL . '/scripts/qs-custom.js"></script>';
+        }
+        // Include API endpoint config if file exists and has real content
+        $apiConfigPath = PUBLIC_FOLDER_ROOT . '/scripts/qs-api-config.js';
+        if (file_exists($apiConfigPath) && filesize($apiConfigPath) > 100) {
+            $body .= '<script src="' . BASE_URL . '/scripts/qs-api-config.js"></script>';
+        }
+
+        // Include additional scripts
         if (!empty($this->scripts)) {
             foreach ($this->scripts as $script) {
                 $body .= '<script src="' . htmlspecialchars($script) . '"></script>'; 
             }
         }
+
+        // Inject page-level events (onload, onresize, onscroll)
+        if (!$editorMode) {
+            $pageEventsFile = PROJECT_PATH . '/data/page-events.json';
+            if (file_exists($pageEventsFile)) {
+                $pageEventsContent = @file_get_contents($pageEventsFile);
+                $pageEventsAll = $pageEventsContent !== false ? json_decode($pageEventsContent, true) : [];
+                $currentRoutePath = $trimParameters->routePath();
+                $currentPageEvents = $pageEventsAll[$currentRoutePath] ?? [];
+                
+                if (!empty($currentPageEvents)) {
+                    $eventScripts = [];
+                    
+                    // onload → DOMContentLoaded
+                    if (!empty($currentPageEvents['onload'])) {
+                        $onloadCalls = [];
+                        foreach ($currentPageEvents['onload'] as $callSyntax) {
+                            $transformed = $renderer->transformCallSyntaxPublic($callSyntax);
+                            if ($transformed && $transformed !== $callSyntax) {
+                                $onloadCalls[] = $transformed;
+                            }
+                        }
+                        if (!empty($onloadCalls)) {
+                            $eventScripts[] = 'document.addEventListener("DOMContentLoaded",function(){' . implode(';', $onloadCalls) . '});';
+                        }
+                    }
+                    
+                    // onresize → window resize listener
+                    if (!empty($currentPageEvents['onresize'])) {
+                        $resizeCalls = [];
+                        foreach ($currentPageEvents['onresize'] as $callSyntax) {
+                            $transformed = $renderer->transformCallSyntaxPublic($callSyntax);
+                            if ($transformed && $transformed !== $callSyntax) {
+                                $resizeCalls[] = $transformed;
+                            }
+                        }
+                        if (!empty($resizeCalls)) {
+                            $eventScripts[] = 'window.addEventListener("resize",function(){' . implode(';', $resizeCalls) . '});';
+                        }
+                    }
+                    
+                    // onscroll → window scroll listener
+                    if (!empty($currentPageEvents['onscroll'])) {
+                        $scrollCalls = [];
+                        foreach ($currentPageEvents['onscroll'] as $callSyntax) {
+                            $transformed = $renderer->transformCallSyntaxPublic($callSyntax);
+                            if ($transformed && $transformed !== $callSyntax) {
+                                $scrollCalls[] = $transformed;
+                            }
+                        }
+                        if (!empty($scrollCalls)) {
+                            $eventScripts[] = 'window.addEventListener("scroll",function(){' . implode(';', $scrollCalls) . '});';
+                        }
+                    }
+                    
+                    if (!empty($eventScripts)) {
+                        $body .= '<script>' . implode('', $eventScripts) . '</script>';
+                    }
+                }
+            }
+        }
+
         $body .= "</body>";
         $body .= "</html>";
 

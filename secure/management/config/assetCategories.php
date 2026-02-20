@@ -13,7 +13,6 @@
 
 return [
     'images',
-    'scripts',
     'font',
     'audio',
     'videos'

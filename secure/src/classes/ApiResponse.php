@@ -91,6 +91,17 @@ class ApiResponse {
     }
 
     /**
+     * Shortcut for success response (200 OK)
+     */
+    public static function success(?array $data = null): self {
+        $instance = self::create(200, 'operation.success');
+        if ($data !== null) {
+            $instance->data = $data;
+        }
+        return $instance;
+    }
+
+    /**
      * Create a custom response (not in registry)
      */
     public static function custom(int $status, string $code, string $message): self {
@@ -144,13 +155,59 @@ class ApiResponse {
     }
 
     /**
+     * Get the HTTP status code
+     */
+    public function getStatus(): int {
+        return $this->status;
+    }
+
+    /**
+     * Get the response code string
+     */
+    public function getCode(): string {
+        return $this->code;
+    }
+
+    /**
+     * Get response data
+     */
+    public function getData(): ?array {
+        return $this->data;
+    }
+
+    /**
+     * Convert response to array (for internal use without HTTP)
+     */
+    public function toArray(): array {
+        $response = [
+            'status' => $this->status,
+            'code' => $this->code,
+            'message' => $this->message,
+        ];
+        
+        if (!empty($this->data)) {
+            $response['data'] = $this->data;
+        }
+        
+        if (!empty($this->errors)) {
+            $response['errors'] = $this->errors;
+        }
+        
+        return $response;
+    }
+
+    /**
      * Send the JSON response and exit
      */
     public function send(): void {
         // Call logging callback if set
         if (self::$beforeSendCallback !== null) {
-            $status = $this->status >= 200 && $this->status < 300 ? 'success' : 'error';
-            call_user_func(self::$beforeSendCallback, $status, $this->code);
+            call_user_func(self::$beforeSendCallback, $this->status, $this->code);
+        }
+        
+        // Clear any output buffering
+        while (ob_get_level() > 0) {
+            ob_end_clean();
         }
         
         http_response_code($this->status);

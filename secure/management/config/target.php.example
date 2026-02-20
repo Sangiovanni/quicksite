@@ -1,0 +1,11 @@
+<?php
+/**
+ * Active Project Target Configuration
+ * 
+ * Copy this file to target.php and set your active project name.
+ * The project must exist in secure/projects/{name}/
+ */
+
+return [
+    'project' => 'quicksite'
+];

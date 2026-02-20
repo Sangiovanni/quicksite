@@ -22,6 +22,21 @@ require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/LockManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/ZipUtilities.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+
+/**
+ * Get active project name from target.php
+ */
+if (!function_exists('getActiveProjectName')) {
+    function getActiveProjectName(): ?string {
+        $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
+        if (file_exists($targetFile)) {
+            $target = include $targetFile;
+            return is_array($target) ? ($target['project'] ?? null) : $target;
+        }
+        return null;
+    }
+}
 
 // Get optional parameters for renaming folders in build
 $params = $trimParametersManagement->params();
@@ -250,9 +265,19 @@ foreach ($publicFiles as $file) {
     if (file_exists($source)) {
         $content = file_get_contents($source);
         
-        // Replace folder name references in copied files if names changed
-        if ($buildPublicName !== PUBLIC_FOLDER_NAME || $buildSecureName !== SECURE_FOLDER_NAME || $buildPublicSpace !== PUBLIC_FOLDER_SPACE) {
-            if ($file === 'init.php') {
+        if ($file === 'init.php') {
+            // === ALWAYS patch init.php for production builds ===
+            
+            // Replace PROJECT_PATH block: production builds don't use target.php
+            // All project files are at SECURE_FOLDER_PATH root (config.php, routes.php, templates/, translate/)
+            $content = preg_replace(
+                "/if\s*\(\s*!defined\('PROJECT_PATH'\)\s*\)\s*\{.*?\n\}/s",
+                "if (!defined('PROJECT_PATH')) {\n    define('PROJECT_PATH', SECURE_FOLDER_PATH);\n    define('PROJECT_NAME', 'production');\n}",
+                $content
+            );
+            
+            // Replace folder name references if names changed
+            if ($buildPublicName !== PUBLIC_FOLDER_NAME || $buildSecureName !== SECURE_FOLDER_NAME || $buildPublicSpace !== PUBLIC_FOLDER_SPACE) {
                 // Update SECURE_FOLDER_PATH in init.php (use SERVER_ROOT, not dirname)
                 $content = preg_replace(
                     "/define\('SECURE_FOLDER_PATH',\s*[^)]+\);/",
@@ -281,16 +306,25 @@ foreach ($publicFiles as $file) {
                     $content
                 );
             }
-            
-            // Update .htaccess fallback path if space is used
-            if ($file === '.htaccess' && $buildPublicSpace !== '') {
-                $fallback = '/' . $buildPublicSpace . '/index.php';
-                $content = preg_replace(
-                    "/FallbackResource\s+.*/",
-                    "FallbackResource " . $fallback,
-                    $content
-                );
-            }
+        }
+        
+        // Update .htaccess fallback path if space is used
+        if ($file === '.htaccess' && $buildPublicSpace !== '') {
+            $fallback = '/' . $buildPublicSpace . '/index.php';
+            $content = preg_replace(
+                "/FallbackResource\s+.*/",
+                "FallbackResource " . $fallback,
+                $content
+            );
+        }
+        
+        // Strip component preview section from index.php (dev-only feature, requires JsonToHtmlRenderer)
+        if ($file === 'index.php') {
+            $content = preg_replace(
+                '/\/\/ --- Component Preview Mode.*?exit;\s*\}\s*\n/s',
+                '',
+                $content
+            );
         }
         
         if (file_put_contents($dest, $content) === false) {
@@ -331,7 +365,7 @@ if (file_exists(SERVER_ROOT . '/LICENSE')) {
 // Step 3: Copy secure folder files (selective)
 
 // Copy routes.php
-if (!copy(SECURE_FOLDER_PATH . '/routes.php', $buildFullPath . '/' . $buildSecureName . '/routes.php')) {
+if (!copy(PROJECT_PATH . '/routes.php', $buildFullPath . '/' . $buildSecureName . '/routes.php')) {
     release_build_lock();
     ApiResponse::create(500, 'server.file_write_failed')
         ->withMessage("Failed to copy routes.php")
@@ -339,7 +373,7 @@ if (!copy(SECURE_FOLDER_PATH . '/routes.php', $buildFullPath . '/' . $buildSecur
 }
 
 // Copy and sanitize config.php (remove DB credentials)
-$configContent = file_get_contents(SECURE_FOLDER_PATH . '/config.php');
+$configContent = file_get_contents(PROJECT_PATH . '/config.php');
 if ($configContent === false) {
     release_build_lock();
     ApiResponse::create(500, 'server.file_write_failed')
@@ -406,7 +440,7 @@ if (!is_dir($translateDestPath)) {
 
 if (MULTILINGUAL_SUPPORT) {
     // Multilingual: copy all translation files
-    if (!copyDirectory(SECURE_FOLDER_PATH . '/translate', $translateDestPath)) {
+    if (!copyDirectory(PROJECT_PATH . '/translate', $translateDestPath)) {
         release_build_lock();
         ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage("Failed to copy /translate/ directory")
@@ -414,7 +448,7 @@ if (MULTILINGUAL_SUPPORT) {
     }
 } else {
     // Mono-language: copy only default.json
-    $defaultJsonPath = SECURE_FOLDER_PATH . '/translate/default.json';
+    $defaultJsonPath = PROJECT_PATH . '/translate/default.json';
     if (file_exists($defaultJsonPath)) {
         if (!copy($defaultJsonPath, $translateDestPath . '/default.json')) {
             release_build_lock();
@@ -430,11 +464,26 @@ if (MULTILINGUAL_SUPPORT) {
     }
 }
 
+// Copy aliases.json if it exists (for URL alias/redirect support)
+$aliasesSource = PROJECT_PATH . '/data/aliases.json';
+if (file_exists($aliasesSource)) {
+    $dataDir = $buildFullPath . '/' . $buildSecureName . '/data';
+    if (!is_dir($dataDir)) {
+        mkdir($dataDir, 0755, true);
+    }
+    if (!copy($aliasesSource, $dataDir . '/aliases.json')) {
+        release_build_lock();
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to copy aliases.json")
+            ->send();
+    }
+}
+
 // Step 4: Compile menu.php and footer.php using JsonToPhpCompiler
 $compiler = new JsonToPhpCompiler();
 
 // Compile menu
-$menuJsonPath = SECURE_FOLDER_PATH . '/templates/model/json/menu.json';
+$menuJsonPath = PROJECT_PATH . '/templates/model/json/menu.json';
 if (file_exists($menuJsonPath)) {
     $menuJson = json_decode(file_get_contents($menuJsonPath), true);
     if ($menuJson === null) {
@@ -454,7 +503,7 @@ if (file_exists($menuJsonPath)) {
 }
 
 // Compile footer
-$footerJsonPath = SECURE_FOLDER_PATH . '/templates/model/json/footer.json';
+$footerJsonPath = PROJECT_PATH . '/templates/model/json/footer.json';
 if (file_exists($footerJsonPath)) {
     $footerJson = json_decode(file_get_contents($footerJsonPath), true);
     if ($footerJson === null) {
@@ -473,12 +522,68 @@ if (file_exists($footerJsonPath)) {
     }
 }
 
+// Step 4.5: Compile API endpoints config to JavaScript
+require_once SECURE_FOLDER_PATH . '/src/classes/ApiEndpointManager.php';
+$apiManager = new ApiEndpointManager(PROJECT_PATH);
+$apiConfigPath = $buildFullPath . '/' . $buildPublicName . '/' . ($buildPublicSpace !== '' ? $buildPublicSpace . '/' : '') . 'scripts/qs-api-config.js';
+
+// Ensure scripts directory exists in build
+$scriptsDir = dirname($apiConfigPath);
+if (!is_dir($scriptsDir)) {
+    mkdir($scriptsDir, 0755, true);
+}
+
+// Write compiled API config
+if (!$apiManager->writeCompiledJs($apiConfigPath)) {
+    release_build_lock();
+    ApiResponse::create(500, 'server.file_write_failed')
+        ->withMessage("Failed to write qs-api-config.js")
+        ->send();
+}
+
+// Copy qs.js (required for all interaction/event functionality)
+$qsJsSource = PUBLIC_FOLDER_ROOT . '/scripts/qs.js';
+if (file_exists($qsJsSource)) {
+    if (!copy($qsJsSource, $scriptsDir . '/qs.js')) {
+        release_build_lock();
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to copy qs.js")
+            ->send();
+    }
+}
+
+// Copy qs-custom.js (user-defined custom functions)
+$qsCustomJsSource = PUBLIC_FOLDER_ROOT . '/scripts/qs-custom.js';
+if (file_exists($qsCustomJsSource) && filesize($qsCustomJsSource) > 500) {
+    if (!copy($qsCustomJsSource, $scriptsDir . '/qs-custom.js')) {
+        release_build_lock();
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to copy qs-custom.js")
+            ->send();
+    }
+}
+
+// Load page-level events for compilation into pages
+$pageEventsFile = PROJECT_PATH . '/data/page-events.json';
+$allPageEvents = [];
+if (file_exists($pageEventsFile)) {
+    $pageEventsContent = @file_get_contents($pageEventsFile);
+    if ($pageEventsContent !== false) {
+        $allPageEvents = json_decode($pageEventsContent, true) ?? [];
+    }
+}
+
 // Step 5: Compile all pages based on ROUTES
 $compiledPages = [];
 
-// First compile 404 page (special case)
-$page404JsonPath = SECURE_FOLDER_PATH . '/templates/model/json/pages/404.json';
-if (file_exists($page404JsonPath)) {
+// Load RouteLayoutManager for menu/footer visibility settings
+require_once SECURE_FOLDER_PATH . '/src/classes/RouteLayoutManager.php';
+$layoutManager = new RouteLayoutManager();
+
+// First compile 404 page (special case) - supports folder structure
+// 404 pages inherit layout from root (default: menu=true, footer=true)
+$page404JsonPath = resolvePageJsonPath('404');
+if ($page404JsonPath !== null && file_exists($page404JsonPath)) {
     $page404Json = json_decode(file_get_contents($page404JsonPath), true);
     if ($page404Json === null) {
         release_build_lock();
@@ -487,8 +592,13 @@ if (file_exists($page404JsonPath)) {
             ->send();
     }
     
-    $page404Php = $compiler->compilePage($page404Json, '404');
-    $page404FilePath = $buildFullPath . '/' . $buildSecureName . '/templates/pages/404.php';
+    // Get layout for 404 page (inherits from root)
+    $layout404 = $layoutManager->getEffectiveLayout('404');
+    $page404Events = $allPageEvents['404'] ?? [];
+    $page404Php = $compiler->compilePage($page404Json, '404', $layout404['menu'], $layout404['footer'], $page404Events);
+    // Create folder structure in build
+    @mkdir($buildFullPath . '/' . $buildSecureName . '/templates/pages/404', 0755, true);
+    $page404FilePath = $buildFullPath . '/' . $buildSecureName . '/templates/pages/404/404.php';
     
     if (file_put_contents($page404FilePath, $page404Php) === false) {
         release_build_lock();
@@ -500,12 +610,15 @@ if (file_exists($page404JsonPath)) {
     $compiledPages[] = '404';
 }
 
-// Then compile regular route pages
-foreach (ROUTES as $route) {
-    $pageJsonPath = SECURE_FOLDER_PATH . '/templates/model/json/pages/' . $route . '.json';
+// Then compile regular route pages (supports nested routes)
+$allRoutes = flattenRoutes(ROUTES);
+$skippedPages = [];
+foreach ($allRoutes as $route) {
+    $pageJsonPath = resolvePageJsonPath($route);
     
-    if (!file_exists($pageJsonPath)) {
-        // Skip if page JSON doesn't exist
+    if ($pageJsonPath === null || !file_exists($pageJsonPath)) {
+        // Track skipped pages (route exists but JSON missing)
+        $skippedPages[] = $route;
         continue;
     }
     
@@ -517,11 +630,19 @@ foreach (ROUTES as $route) {
             ->send();
     }
     
-    // Use route name as title (capitalize first letter)
-    $pageTitle = ucfirst(str_replace('-', ' ', $route));
+    // Use route name as title (capitalize first letter of last segment)
+    $routeName = basename($route);
+    $pageTitle = ucfirst(str_replace('-', ' ', $routeName));
     
-    $pagePhp = $compiler->compilePage($pageJson, $route);
-    $pageFilePath = $buildFullPath . '/' . $buildSecureName . '/templates/pages/' . $route . '.php';
+    // Get layout settings (with inheritance)
+    $pageLayout = $layoutManager->getEffectiveLayout($route);
+    $routeEvents = $allPageEvents[$route] ?? [];
+    $pagePhp = $compiler->compilePage($pageJson, $route, $pageLayout['menu'], $pageLayout['footer'], $routeEvents);
+    
+    // Create folder structure in build: route/route.php
+    $buildPageDir = $buildFullPath . '/' . $buildSecureName . '/templates/pages/' . $route;
+    @mkdir($buildPageDir, 0755, true);
+    $pageFilePath = $buildPageDir . '/' . $routeName . '.php';
     
     if (file_put_contents($pageFilePath, $pagePhp) === false) {
         release_build_lock();
@@ -661,6 +782,14 @@ $compressionRatio = round((1 - ($zipSize / $originalSize)) * 100, 1);
 // Release lock before sending response
 release_build_lock();
 
+// Count page events compiled
+$pageEventsCount = 0;
+foreach ($allPageEvents as $routeKey => $routeEvents) {
+    if (in_array($routeKey, $compiledPages, true) && !empty($routeEvents)) {
+        $pageEventsCount++;
+    }
+}
+
 // Step 8: Success response
 ApiResponse::create(201, 'operation.success')
     ->withMessage('Production build completed successfully')
@@ -673,12 +802,16 @@ ApiResponse::create(201, 'operation.success')
         'compression_ratio' => $compressionRatio . '%',
         'compiled_pages' => $compiledPages,
         'total_pages' => count($compiledPages),
+        'skipped_pages' => $skippedPages,
+        'skipped_count' => count($skippedPages),
+        'page_events_compiled' => $pageEventsCount,
         'public_folder_name' => $buildPublicName,
         'secure_folder_name' => $buildSecureName,
         'public_folder_space' => $buildPublicSpace,
         'config_sanitized' => true,
         'menu_compiled' => file_exists($buildFullPath . '/' . $buildSecureName . '/templates/menu.php'),
         'footer_compiled' => file_exists($buildFullPath . '/' . $buildSecureName . '/templates/footer.php'),
+        'scripts_copied' => file_exists($scriptsDir . '/qs.js'),
         'build_date' => date('Y-m-d H:i:s'),
         'readme_created' => true,
         'download_url' => BASE_URL . '/build/' . $zipFilename

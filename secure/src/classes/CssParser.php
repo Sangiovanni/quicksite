@@ -188,9 +188,8 @@ class CssParser {
             return null;
         }
         
-        // Look in global scope (outside @media blocks)
-        // First remove @media blocks
-        $globalContent = preg_replace('/@media\s*[^{]+\s*\{(?:[^{}]*\{[^{}]*\})*\s*\}/s', '', $this->content);
+        // Look in global scope (outside @media and @keyframes blocks)
+        $globalContent = $this->getGlobalContent();
         
         if (preg_match('/' . $escapedSelector . '\s*\{([^}]*)\}/s', $globalContent, $match)) {
             return [
@@ -204,15 +203,72 @@ class CssParser {
     }
     
     /**
-     * Set/update a style rule
+     * Parse CSS style declarations into an associative array
+     * @param string $styles CSS declarations string
+     * @return array Property => value pairs
+     */
+    private function parseStyleDeclarations(string $styles): array {
+        $result = [];
+        // Split by semicolons, but be careful with values containing semicolons (rare but possible)
+        $declarations = preg_split('/;\s*/', trim($styles), -1, PREG_SPLIT_NO_EMPTY);
+        
+        foreach ($declarations as $declaration) {
+            $declaration = trim($declaration);
+            if (empty($declaration)) continue;
+            
+            // Split on first colon only
+            $colonPos = strpos($declaration, ':');
+            if ($colonPos === false) continue;
+            
+            $property = trim(substr($declaration, 0, $colonPos));
+            $value = trim(substr($declaration, $colonPos + 1));
+            
+            if (!empty($property) && $value !== '') {
+                $result[$property] = $value;
+            }
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Merge new styles with existing styles
+     * @param string $existingStyles Current CSS declarations
+     * @param string $newStyles New CSS declarations to merge
+     * @param array $removeProperties Properties to remove from the result
+     * @return string Merged and formatted CSS declarations
+     */
+    private function mergeStyles(string $existingStyles, string $newStyles, array $removeProperties = []): string {
+        $existing = $this->parseStyleDeclarations($existingStyles);
+        $new = $this->parseStyleDeclarations($newStyles);
+        
+        // Merge - new values override existing
+        $merged = array_merge($existing, $new);
+        
+        // Remove specified properties
+        foreach ($removeProperties as $prop) {
+            unset($merged[$prop]);
+        }
+        
+        // Convert back to CSS string with proper formatting
+        $lines = [];
+        foreach ($merged as $property => $value) {
+            $lines[] = '    ' . $property . ': ' . $value . ';';
+        }
+        
+        return implode("\n", $lines);
+    }
+    
+    /**
+     * Set/update a style rule (merges with existing properties)
      * @param string $selector CSS selector
      * @param string $styles CSS declarations
      * @param string|null $mediaQuery Optional media query context
+     * @param array $removeProperties Properties to remove
      * @return array Operation result
      */
-    public function setStyleRule(string $selector, string $styles, ?string $mediaQuery = null): array {
+    public function setStyleRule(string $selector, string $styles, ?string $mediaQuery = null, array $removeProperties = []): array {
         $escapedSelector = preg_quote($selector, '/');
-        $formattedStyles = $this->formatStyles($styles);
         $action = 'added';
         
         if ($mediaQuery !== null) {
@@ -226,15 +282,40 @@ class CssParser {
                 $mediaFull = $mediaMatch[0][0];
                 
                 // Check if selector exists in this media query
-                $selectorPattern = '/(' . $escapedSelector . '\s*\{)[^}]*(\})/s';
+                $selectorPattern = '/' . $escapedSelector . '\s*\{([^}]*)\}/s';
                 
                 if (preg_match($selectorPattern, $mediaContent, $match)) {
-                    // Update existing rule - escape $ to prevent backreference issues
-                    $safeStyles = str_replace(['\\', '$'], ['\\\\', '\\$'], $formattedStyles);
-                    $newMediaContent = preg_replace($selectorPattern, '${1}' . "\n" . $safeStyles . "\n" . '${2}', $mediaContent);
-                    $action = 'updated';
+                    // Merge with existing rule
+                    $existingStyles = $match[1];
+                    $mergedStyles = $this->mergeStyles($existingStyles, $styles, $removeProperties);
+                    
+                    // If merged result is empty, remove the rule from media query
+                    if (trim($mergedStyles) === '') {
+                        $replacePattern = '/\s*' . $escapedSelector . '\s*\{[^}]*\}/s';
+                        $newMediaContent = preg_replace($replacePattern, '', $mediaContent);
+                        
+                        // If media query is now empty, delete the entire media block
+                        if (trim($newMediaContent) === '') {
+                            $this->content = substr($this->content, 0, $mediaStart) . substr($this->content, $mediaStart + strlen($mediaFull));
+                            // Clean up extra newlines
+                            $this->content = preg_replace('/\n{3,}/', "\n\n", $this->content);
+                            return [
+                                'action' => 'deleted',
+                                'selector' => $selector,
+                                'mediaQuery' => $mediaQuery
+                            ];
+                        }
+                        
+                        $action = 'deleted';
+                    } else {
+                        $safeStyles = str_replace(['\\', '$'], ['\\\\', '\\$'], $mergedStyles);
+                        $replacePattern = '/(' . $escapedSelector . '\s*\{)[^}]*(\})/s';
+                        $newMediaContent = preg_replace($replacePattern, '${1}' . "\n" . $safeStyles . "\n" . '${2}', $mediaContent);
+                        $action = 'updated';
+                    }
                 } else {
                     // Add new rule to media query
+                    $formattedStyles = $this->formatStyles($styles);
                     $newMediaContent = rtrim($mediaContent) . "\n    " . $selector . " {\n" . $formattedStyles . "\n    }\n";
                 }
                 
@@ -243,26 +324,37 @@ class CssParser {
                 
             } else {
                 // Media query doesn't exist, create it
+                $formattedStyles = $this->formatStyles($styles);
                 $newMediaBlock = "\n\n@media " . $mediaQuery . " {\n    " . $selector . " {\n" . $formattedStyles . "\n    }\n}";
                 $this->content = $this->appendToCustomSection($newMediaBlock);
             }
             
         } else {
             // Global scope
-            $selectorPattern = '/(' . $escapedSelector . '\s*\{)[^}]*(\})/s';
             
             // Check if it exists globally (not in @media)
             $existing = $this->getStyleRule($selector, null);
             
             if ($existing !== null) {
-                // Update existing - need to be careful not to match inside @media
-                // This is complex, so we'll use a different approach
+                // Merge with existing styles
                 $action = 'updated';
+                $mergedStyles = $this->mergeStyles($existing['styles'], $styles, $removeProperties);
+                
+                // If merged result is empty, delete the rule entirely
+                if (trim($mergedStyles) === '') {
+                    $this->deleteStyleRule($selector, null);
+                    return [
+                        'action' => 'deleted',
+                        'selector' => $selector,
+                        'mediaQuery' => $mediaQuery
+                    ];
+                }
                 
                 // Find and replace the rule outside of @media blocks
-                $this->content = $this->replaceGlobalRule($selector, $formattedStyles);
+                $this->content = $this->replaceGlobalRule($selector, $mergedStyles);
             } else {
                 // Add new rule
+                $formattedStyles = $this->formatStyles($styles);
                 $newRule = "\n" . $selector . " {\n" . $formattedStyles . "\n}";
                 $this->content = $this->appendToCustomSection($newRule);
             }
@@ -501,6 +593,163 @@ class CssParser {
         }
         
         return $result;
+    }
+    
+    /**
+     * Extract CSS rules that match a set of classes, IDs, and tags
+     * @param array $classes List of CSS class names (without .)
+     * @param array $ids List of element IDs (without #)
+     * @param array $tags List of HTML tag names
+     * @param bool $includeRelated Include related selectors (e.g., .class:hover, .class::before)
+     * @return array CSS rules grouped by scope (global, media queries)
+     */
+    public function getCssForSelectors(array $classes = [], array $ids = [], array $tags = [], bool $includeRelated = true): array {
+        $result = [
+            'global' => [],
+            'mediaQueries' => [],
+            'keyframes' => [],
+            'rootVariables' => []
+        ];
+        
+        // Build match patterns
+        $patterns = [];
+        
+        foreach ($classes as $class) {
+            $class = ltrim($class, '.');
+            // Match .class anywhere in selector
+            $patterns[] = '\.' . preg_quote($class, '/') . '(?![a-zA-Z0-9_-])';
+        }
+        
+        foreach ($ids as $id) {
+            $id = ltrim($id, '#');
+            $patterns[] = '#' . preg_quote($id, '/') . '(?![a-zA-Z0-9_-])';
+        }
+        
+        foreach ($tags as $tag) {
+            // Match tag at word boundaries (not preceded/followed by alphanumeric)
+            $patterns[] = '(?<![a-zA-Z0-9_-])' . preg_quote($tag, '/') . '(?![a-zA-Z0-9_-])';
+        }
+        
+        if (empty($patterns)) {
+            return $result;
+        }
+        
+        $combinedPattern = '/(' . implode('|', $patterns) . ')/i';
+        
+        // Get all selectors (returns flat array with 'selector' and 'mediaQuery' keys)
+        $allSelectors = $this->listSelectors();
+        
+        // Process each selector
+        foreach ($allSelectors as $selectorInfo) {
+            $selector = $selectorInfo['selector'];
+            $mediaQuery = $selectorInfo['mediaQuery'];
+            
+            if (preg_match($combinedPattern, $selector)) {
+                $rule = $this->getStyleRule($selector, $mediaQuery);
+                if ($rule !== null) {
+                    if ($mediaQuery === null) {
+                        // Global rule
+                        $result['global'][$selector] = $rule['styles'];
+                    } else {
+                        // Media query rule
+                        if (!isset($result['mediaQueries'][$mediaQuery])) {
+                            $result['mediaQueries'][$mediaQuery] = [];
+                        }
+                        $result['mediaQueries'][$mediaQuery][$selector] = $rule['styles'];
+                    }
+                }
+            }
+        }
+        
+        // Check if any matched rules use animations
+        $allCss = implode(' ', array_values($result['global']));
+        foreach ($result['mediaQueries'] as $rules) {
+            $allCss .= ' ' . implode(' ', array_values($rules));
+        }
+        
+        // Extract animation names used
+        if (preg_match_all('/animation(?:-name)?:\s*([a-zA-Z0-9_-]+)/i', $allCss, $animMatches)) {
+            $keyframes = $this->getKeyframes();
+            foreach (array_unique($animMatches[1]) as $animName) {
+                if (isset($keyframes[$animName])) {
+                    $result['keyframes'][$animName] = $keyframes[$animName];
+                }
+            }
+        }
+        
+        // Extract CSS variables used
+        if (preg_match_all('/var\((--[a-zA-Z0-9_-]+)\)/i', $allCss, $varMatches)) {
+            $rootVars = $this->getRootVariables();
+            foreach (array_unique($varMatches[1]) as $varName) {
+                if (isset($rootVars[$varName])) {
+                    $result['rootVariables'][$varName] = $rootVars[$varName];
+                }
+            }
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Format extracted CSS as a string
+     * @param array $cssData Output from getCssForSelectors
+     * @return string Formatted CSS
+     */
+    public function formatExtractedCss(array $cssData): string {
+        $output = '';
+        
+        // Root variables
+        if (!empty($cssData['rootVariables'])) {
+            $output .= ":root {\n";
+            foreach ($cssData['rootVariables'] as $name => $value) {
+                // $name already includes -- prefix
+                $output .= "    {$name}: {$value};\n";
+            }
+            $output .= "}\n\n";
+        }
+        
+        // Global rules
+        foreach ($cssData['global'] as $selector => $styles) {
+            $output .= "{$selector} {\n{$styles}\n}\n\n";
+        }
+        
+        // Media queries
+        foreach ($cssData['mediaQueries'] as $media => $rules) {
+            $output .= "@media {$media} {\n";
+            foreach ($rules as $selector => $styles) {
+                // Indent styles
+                $indentedStyles = preg_replace('/^/m', '    ', $styles);
+                $output .= "    {$selector} {\n{$indentedStyles}\n    }\n";
+            }
+            $output .= "}\n\n";
+        }
+        
+        // Keyframes
+        foreach ($cssData['keyframes'] as $name => $frames) {
+            $output .= "@keyframes {$name} {\n";
+            foreach ($frames as $key => $styles) {
+                $output .= "    {$key} {\n        {$styles}\n    }\n";
+            }
+            $output .= "}\n\n";
+        }
+        
+        return trim($output);
+    }
+    
+    /**
+     * Get content without @media and @keyframes blocks (global scope only)
+     * @return string CSS content with only global rules
+     */
+    private function getGlobalContent(): string {
+        $content = $this->content;
+        
+        // Remove @keyframes blocks (they have nested braces)
+        $content = preg_replace('/@keyframes\s+[\w-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/s', '', $content);
+        
+        // Remove @media blocks (they also have nested braces)
+        $content = preg_replace('/@media\s*[^{]+\s*\{(?:[^{}]*\{[^{}]*\})*\s*\}/s', '', $content);
+        
+        return $content;
     }
     
     /**

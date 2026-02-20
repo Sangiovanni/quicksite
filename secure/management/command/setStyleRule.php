@@ -6,11 +6,13 @@
  * Body: {
  *   "selector": ".btn-custom",
  *   "styles": "background: #007bff; color: white; padding: 10px 20px;",
- *   "mediaQuery": "(max-width: 768px)"  // optional
+ *   "mediaQuery": "(max-width: 768px)",  // optional
+ *   "removeProperties": ["border", "margin"]  // optional - properties to remove
  * }
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 // Get parameters
 $params = $trimParametersManagement->params();
@@ -30,6 +32,9 @@ if (!isset($params['styles'])) {
 $selector = trim($params['selector']);
 $styles = $params['styles'];
 $mediaQuery = isset($params['mediaQuery']) ? trim($params['mediaQuery']) : null;
+$removeProperties = isset($params['removeProperties']) && is_array($params['removeProperties']) 
+    ? array_map('trim', $params['removeProperties']) 
+    : [];
 
 // Convert styles array/object to string if necessary
 if (is_array($styles)) {
@@ -47,10 +52,10 @@ if (empty($selector)) {
         ->send();
 }
 
-// Validate styles
-if (empty($styles)) {
+// Validate styles - allow empty styles if removeProperties is provided
+if (empty($styles) && empty($removeProperties)) {
     ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage('Styles cannot be empty')
+        ->withMessage('Styles cannot be empty (unless removeProperties is provided)')
         ->send();
 }
 
@@ -75,9 +80,9 @@ foreach ($dangerousPatterns as $pattern) {
 }
 
 // Validate media query format if provided
-if ($mediaQuery !== null && !preg_match('/^\([^)]+\)$|^screen\s|^print\s|^all\s/i', $mediaQuery)) {
+if ($mediaQuery !== null && !RegexPatterns::match('media_query_basic', $mediaQuery)) {
     // Allow common media query formats
-    if (!preg_match('/^[\w\s\-\(\)\:\,\.]+$/', $mediaQuery)) {
+    if (!RegexPatterns::match('media_query_chars', $mediaQuery)) {
         ApiResponse::create(400, 'validation.invalid_media_query')
             ->withMessage('Invalid media query format')
             ->send();
@@ -113,7 +118,7 @@ try {
     
     // Parse and update
     $parser = new CssParser($content);
-    $result = $parser->setStyleRule($selector, $styles, $mediaQuery);
+    $result = $parser->setStyleRule($selector, $styles, $mediaQuery, $removeProperties);
     
     // Write updated content
     if (file_put_contents($styleFile, $parser->getContent()) === false) {

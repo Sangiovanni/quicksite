@@ -1,0 +1,37 @@
+<?php
+/**
+ * Authentication & CORS Configuration
+ * 
+ * Copy this file to auth.php and customize your tokens.
+ * 
+ * IMPORTANT: Replace ALL default tokens before deploying to production!
+ * Generate secure tokens with: bin2hex(random_bytes(32))
+ */
+
+return [
+    'authentication' => [
+        'enabled' => true,
+        'tokens' => [
+            // Replace with your own secure tokens
+            'CHANGE_ME_superadmin_token' => [
+                'name' => 'Default Superadmin Token',
+                'role' => '*',
+                'created' => date('Y-m-d'),
+                'note' => 'Replace this token before deploying to production',
+            ],
+            'CHANGE_ME_viewer_token' => [
+                'name' => 'Default Viewer Token',
+                'role' => 'viewer',
+                'created' => date('Y-m-d'),
+                'note' => 'Read-only access',
+            ],
+        ],
+    ],
+    'cors' => [
+        'enabled' => true,
+        'allowed_origins' => ['*'],
+        'allowed_methods' => ['POST', 'OPTIONS'],
+        'allowed_headers' => ['Content-Type', 'Authorization', 'Accept-Language'],
+        'max_age' => 3600,
+    ],
+];

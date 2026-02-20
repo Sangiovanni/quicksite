@@ -7,6 +7,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 $params = $trimParametersManagement->params();
 
@@ -35,7 +36,7 @@ foreach ($variables as $name => $value) {
     }
     
     // Basic CSS value validation - prevent injection
-    if (preg_match('/[<>{}]|javascript:|expression\s*\(/i', $value)) {
+    if (RegexPatterns::match('css_injection', $value)) {
         ApiResponse::create(400, 'validation.invalid_css')
             ->withMessage('Invalid CSS value detected')
             ->send();

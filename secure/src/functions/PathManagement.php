@@ -160,7 +160,10 @@ function recursive_move_template(string $source, string $destination, string $ex
         }
     }
 
-    rsort($source_dirs_to_clean); 
+    // Sort directories by path length (longest/deepest first) to ensure children are removed before parents
+    usort($source_dirs_to_clean, function($a, $b) {
+        return strlen($b) - strlen($a);
+    });
     
     foreach ($source_dirs_to_clean as $dir) {
         // We only attempt to remove if the directory is empty.
@@ -214,20 +217,33 @@ function replace_in_file(string $file_path, string $search, string $replace): bo
  * @param string $start_dir The deepest directory that should now be empty.
  * @param string $stop_dir The directory path where cleanup should stop (e.g., the shared root).
  */
-function cleanup_empty_source_chain(string $start_dir, string $stop_dir): void
+function cleanup_empty_source_chain(string $start_dir, string $stop_at_parent): void
 {
-    // Normalize paths and ensure the stop directory is an ancestor
+    // Normalize paths
     $current_dir = rtrim($start_dir, DIRECTORY_SEPARATOR);
-    $stop_dir = rtrim($stop_dir, DIRECTORY_SEPARATOR);
+    $stop_at_parent = rtrim($stop_at_parent, DIRECTORY_SEPARATOR);
+    
+    // Get the parent of stop_at_parent (we stop before reaching this level)
+    // This prevents us from accidentally deleting unrelated folders at the same level
+    $stop_parent = dirname($stop_at_parent);
 
-    // Loop until we reach the stopping point or the path cannot be reduced
-    while ($current_dir && $current_dir !== $stop_dir && dirname($current_dir) !== $current_dir) {
+    // Walk up the directory tree, removing empty directories
+    // We continue until we hit the same parent level as the stop directory
+    while ($current_dir && dirname($current_dir) !== $current_dir) {
+        $parent = dirname($current_dir);
+        
+        // Stop if we've reached the same parent level as the stop directory
+        if ($parent === $stop_parent) {
+            // Try to remove current_dir one last time, then stop
+            @rmdir($current_dir);
+            break;
+        }
         
         // Attempt to delete the current directory (only works if empty)
-        $deleted = @rmdir($current_dir);
+        @rmdir($current_dir);
 
         // Move up to the parent directory
-        $current_dir = dirname($current_dir);
+        $current_dir = $parent;
     }
 }
 

@@ -1,0 +1,137 @@
+{
+    "$schema": "../schema.json",
+    "id": "edit-page",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "✏️",
+        "titleKey": "ai.specs.editPage.title",
+        "descriptionKey": "ai.specs.editPage.description",
+        "category": "modification",
+        "tags": ["edit", "page", "modify", "update", "content"],
+        "difficulty": "intermediate"
+    },
+    "parameters": [
+        {
+            "id": "targetRoute",
+            "type": "select",
+            "labelKey": "ai.specs.editPage.params.targetRoute.label",
+            "helpKey": "ai.specs.editPage.params.targetRoute.help",
+            "optionsFrom": {
+                "data": "routes"
+            },
+            "required": true
+        },
+        {
+            "id": "nodeTarget",
+            "type": "nodeSelector",
+            "labelKey": "ai.specs.editPage.params.nodeTarget.label",
+            "helpKey": "ai.specs.editPage.params.nodeTarget.help",
+            "structures": ["page"],
+            "allowTextHint": true,
+            "optional": true
+        },
+        {
+            "id": "routeExample",
+            "type": "select",
+            "labelKey": "ai.specs.editPage.params.routeExample.label",
+            "helpKey": "ai.specs.editPage.params.routeExample.help",
+            "optionsFrom": {
+                "data": "routes",
+                "prepend": [
+                    {"value": "", "labelKey": "ai.specs.editPage.params.routeExample.options.none"}
+                ]
+            },
+            "default": ""
+        }
+    ],
+    "examples": [
+        {
+            "id": "updateHero",
+            "titleKey": "ai.specs.editPage.examples.updateHero.title",
+            "promptKey": "ai.specs.editPage.examples.updateHero.prompt"
+        },
+        {
+            "id": "redesignSection",
+            "titleKey": "ai.specs.editPage.examples.redesignSection.title",
+            "promptKey": "ai.specs.editPage.examples.redesignSection.prompt"
+        },
+        {
+            "id": "mimicPage",
+            "titleKey": "ai.specs.editPage.examples.mimicPage.title",
+            "promptKey": "ai.specs.editPage.examples.mimicPage.prompt"
+        }
+    ],
+    "dataRequirements": [
+        {
+            "id": "routes",
+            "command": "getRoutes",
+            "extract": "data.flat_routes"
+        },
+        {
+            "id": "languages",
+            "command": "getLangList",
+            "extract": "data"
+        },
+        {
+            "id": "pageStructure",
+            "command": "getStructure",
+            "urlParams": ["page", "{{param.targetRoute}}", "showIds"],
+            "extract": "data.structure",
+            "condition": "param.targetRoute"
+        },
+        {
+            "id": "pageCss",
+            "command": "getCssForStructure",
+            "urlParams": ["page", "{{param.targetRoute}}"],
+            "extract": "data.cssFormatted",
+            "condition": "param.targetRoute"
+        },
+        {
+            "id": "exampleStructure",
+            "command": "getStructure",
+            "urlParams": ["page", "{{param.routeExample}}", "showIds"],
+            "extract": "data.structure",
+            "condition": "param.routeExample"
+        },
+        {
+            "id": "exampleCss",
+            "command": "getCssForStructure",
+            "urlParams": ["page", "{{param.routeExample}}"],
+            "extract": "data.cssFormatted",
+            "condition": "param.routeExample"
+        },
+        {
+            "id": "components",
+            "command": "listComponents",
+            "extract": "data.components"
+        },
+        {
+            "id": "helpEditStructure",
+            "command": "help",
+            "urlParams": ["editStructure"],
+            "extract": "data"
+        },
+        {
+            "id": "helpSetTranslationKeys",
+            "command": "help",
+            "urlParams": ["setTranslationKeys"],
+            "extract": "data"
+        },
+        {
+            "id": "helpSetStyleRule",
+            "command": "help",
+            "urlParams": ["setStyleRule"],
+            "extract": "data"
+        }
+    ],
+    "relatedCommands": ["editStructure", "setTranslationKeys", "setStyleRule"],
+    "recommendedModels": {
+        "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
+        "anthropic": ["claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022"],
+        "google": ["gemini-1.5-pro", "gemini-1.5-flash"],
+        "deepseek": ["deepseek-chat"],
+        "mistral": ["mistral-large-latest"]
+    },
+    "promptTemplate": "edit-page.md",
+    "outputFormat": "json-commands"
+}

@@ -18,16 +18,21 @@ class TrimParametersManagement{
     }
     $this->additionnalCommand = $parts;
 
-    // Check for standard POST data (form-urlencoded)
+    // Start with GET parameters (query string)
+    if (!empty($_GET)) {
+        $this->params = $_GET;
+    }
+
+    // Check for standard POST data (form-urlencoded) - overrides GET
     if (!empty($_POST)) {
-        $this->params = $_POST;
+        $this->params = array_merge($this->params, $_POST);
     }
     else{
       // Check for JSON data - use pre-captured body if available (for logging)
       $json_data = defined('REQUEST_BODY_RAW') ? REQUEST_BODY_RAW : file_get_contents('php://input');
       $data = json_decode($json_data, true);
       if ($data !== null) {
-          $this->params = $data;
+          $this->params = array_merge($this->params, $data);
       }         
     }
   }

@@ -1,0 +1,58 @@
+{
+    "$schema": "../schema.json",
+    "id": "restyle",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "✨",
+        "titleKey": "ai.specs.restyle.title",
+        "descriptionKey": "ai.specs.restyle.description",
+        "category": "style",
+        "tags": ["style", "css", "redesign", "visual"],
+        "difficulty": "intermediate"
+    },
+    "parameters": [],
+    "examples": [
+        {
+            "id": "minimalist",
+            "titleKey": "ai.specs.restyle.examples.minimalist.title",
+            "promptKey": "ai.specs.restyle.examples.minimalist.prompt"
+        },
+        {
+            "id": "boldColorful",
+            "titleKey": "ai.specs.restyle.examples.boldColorful.title",
+            "promptKey": "ai.specs.restyle.examples.boldColorful.prompt"
+        },
+        {
+            "id": "glassmorphism",
+            "titleKey": "ai.specs.restyle.examples.glassmorphism.title",
+            "promptKey": "ai.specs.restyle.examples.glassmorphism.prompt"
+        }
+    ],
+    "dataRequirements": [
+        {
+            "id": "rootVariables",
+            "command": "getRootVariables",
+            "extract": "data.variables"
+        },
+        {
+            "id": "styles",
+            "command": "getStyles",
+            "extract": "data"
+        },
+        {
+            "id": "helpEditStyles",
+            "command": "help",
+            "urlParams": ["editStyles"],
+            "extract": "data"
+        },
+        {
+            "id": "helpSetRootVariables",
+            "command": "help",
+            "urlParams": ["setRootVariables"],
+            "extract": "data"
+        }
+    ],
+    "relatedCommands": ["editStyles", "setRootVariables"],
+    "promptTemplate": "restyle.md",
+    "outputFormat": "json-commands"
+}

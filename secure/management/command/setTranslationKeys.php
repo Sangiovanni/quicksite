@@ -5,11 +5,13 @@
  * Adds new keys, updates existing keys, keeps other keys untouched.
  * This is the safe way to update translations without losing existing content.
  * 
- * @param string language - Language code (e.g., 'en', 'fr')
+ * @param string language - Language code (e.g., 'en', 'fr') or 'default'
  * @param object translations - Keys to set/update (nested structure supported)
+ * @param bool replace - Optional. If true, replaces entire file instead of merging (default: false)
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 $params = $trimParametersManagement->params();
 
@@ -62,12 +64,10 @@ if (strlen($language) > 10) {
 // SECURITY: Validate language code format
 // Also supports "default" for mono-language mode
 $isDefault = ($language === 'default');
-if (!$isDefault && !preg_match('/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/', $language)) {
+if (!$isDefault && !RegexPatterns::match('language_code_extended', $language)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage('Invalid language code format')
-        ->withErrors([
-            ['field' => 'language', 'value' => $language, 'expected' => 'ISO 639 or BCP 47 format (e.g., en, fr, en-US, zh-Hans) or "default"']
-        ])
+        ->withErrors([RegexPatterns::validationError('language_code_extended', 'language', $language)])
         ->send();
 }
 
@@ -106,11 +106,15 @@ if ($translationSize > $maxSize) {
         ->send();
 }
 
-$translations_file = SECURE_FOLDER_PATH . '/translate/' . $language . '.json';
+// Optional: replace mode (replaces entire file instead of merging)
+$replaceMode = isset($params['replace']) && $params['replace'] === true;
+
+$translations_file = PROJECT_PATH . '/translate/' . $language . '.json';
 
 // Load existing translations (or empty array if file doesn't exist)
+// Skip loading if in replace mode - we'll just use the new translations
 $existingTranslations = [];
-if (file_exists($translations_file)) {
+if (!$replaceMode && file_exists($translations_file)) {
     $existingJson = @file_get_contents($translations_file);
     if ($existingJson !== false) {
         $decoded = json_decode($existingJson, true);
@@ -230,6 +234,38 @@ if (file_put_contents($translations_file, $json_content, LOCK_EX) === false) {
         ->send();
 }
 
+// Also update default.json to ensure it always has at least the same keys
+// This ensures mono-lingual mode works correctly and default always has minimal requirements
+$defaultUpdated = false;
+if (!$isDefault) {
+    $default_file = PROJECT_PATH . '/translate/default.json';
+    
+    // Load existing default translations
+    $existingDefault = [];
+    if (file_exists($default_file)) {
+        $defaultJson = @file_get_contents($default_file);
+        if ($defaultJson !== false) {
+            $decoded = json_decode($defaultJson, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $existingDefault = $decoded;
+            }
+        }
+    }
+    
+    // Merge new translations into default (default gets all keys from any language update)
+    $mergedDefault = mergeTranslations($existingDefault, $newTranslations);
+    
+    // Only write if there are actual changes
+    if ($mergedDefault !== $existingDefault) {
+        $defaultJsonContent = json_encode($mergedDefault, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($defaultJsonContent !== false) {
+            if (file_put_contents($default_file, $defaultJsonContent, LOCK_EX) !== false) {
+                $defaultUpdated = true;
+            }
+        }
+    }
+}
+
 ApiResponse::create(200, 'operation.success')
     ->withMessage('Translation keys updated successfully')
     ->withData([
@@ -237,6 +273,7 @@ ApiResponse::create(200, 'operation.success')
         'file' => $translations_file,
         'keys_added' => $keysAdded,
         'keys_updated' => $keysUpdated,
-        'keys_unchanged' => 'preserved'
+        'keys_unchanged' => 'preserved',
+        'default_synced' => $defaultUpdated
     ])
     ->send();

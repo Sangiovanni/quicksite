@@ -1,0 +1,991 @@
+/**
+ * Tag Examples CSS
+ * 
+ * Styles for HTML tag visual examples in the tag selector preview panel.
+ * Used by _tag-examples.php
+ * 
+ * Naming convention: .tag-ex-* prefix for all classes
+ */
+
+/* ==================== Preview Area Enhancements ==================== */
+
+.tag-selector__preview-render {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #212529;
+}
+
+/* Position toggle button to the right */
+.tag-selector__preview-header {
+    justify-content: space-between;
+}
+
+.tag-selector__preview-render p { margin: 0; }
+.tag-selector__preview-render h1, .tag-selector__preview-render h2, .tag-selector__preview-render h3,
+.tag-selector__preview-render h4, .tag-selector__preview-render h5, .tag-selector__preview-render h6 { margin: 0; line-height: 1.3; }
+.tag-selector__preview-render ul, .tag-selector__preview-render ol { margin: 0; }
+
+/* Code toggle button */
+.tag-selector__code-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: #f8f9fa;
+    color: #6c757d;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.tag-selector__code-toggle:hover {
+    background: #e9ecef;
+    color: #495057;
+    border-color: #ced4da;
+}
+
+.tag-selector__code-toggle.active {
+    background: #1976d2;
+    color: white;
+    border-color: #1976d2;
+}
+
+.tag-selector__code-toggle svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Code preview area */
+.tag-selector__preview-code {
+    margin-top: 8px;
+    background: #1e293b;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.tag-selector__preview-code pre {
+    margin: 0;
+    padding: 12px;
+    overflow-x: auto;
+}
+
+.tag-selector__preview-code code {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #e2e8f0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* ==================== Layout Containers ==================== */
+
+.tag-ex-container {
+    padding: 12px;
+    background: #e3f2fd;
+    border: 2px dashed #1976d2;
+    border-radius: 4px;
+    color: #1565c0;
+}
+
+.tag-ex-section {
+    padding: 12px;
+    background: #f3e5f5;
+    border-left: 4px solid #7b1fa2;
+}
+
+.tag-ex-section-title {
+    margin: 0 0 8px;
+    font-weight: 600;
+    color: #6a1b9a;
+}
+
+.tag-ex-section-content {
+    margin: 0;
+    font-size: 13px;
+    color: #4a148c;
+}
+
+.tag-ex-article {
+    padding: 12px;
+    background: #e8f5e9;
+    border: 1px solid #4caf50;
+    border-radius: 4px;
+}
+
+.tag-ex-article-title {
+    margin: 0 0 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #2e7d32;
+}
+
+.tag-ex-article-content {
+    margin: 0;
+    font-size: 13px;
+    color: #1b5e20;
+}
+
+.tag-ex-aside {
+    padding: 10px;
+    background: #fff8e1;
+    border-left: 3px solid #ff8f00;
+    font-size: 13px;
+}
+
+.tag-ex-aside-title {
+    font-weight: 600;
+    color: #e65100;
+}
+
+.tag-ex-header {
+    padding: 12px;
+    background: #263238;
+    color: white;
+    border-radius: 4px 4px 0 0;
+    font-weight: 600;
+}
+
+.tag-ex-footer {
+    padding: 10px;
+    background: #37474f;
+    color: #b0bec5;
+    text-align: center;
+    font-size: 12px;
+    border-radius: 0 0 4px 4px;
+}
+
+.tag-ex-main {
+    padding: 12px;
+    background: #eeeeee;
+    border: 2px solid #9e9e9e;
+    border-radius: 4px;
+}
+
+.tag-ex-main-title {
+    font-weight: 600;
+    color: #333333;
+}
+
+.tag-ex-main-content {
+    margin: 8px 0 0;
+    font-size: 13px;
+    color: #424242;
+}
+
+/* ==================== Navigation ==================== */
+
+.tag-ex-nav {
+    padding: 8px 12px;
+    background: #1565c0;
+    border-radius: 4px;
+    display: flex;
+    gap: 16px;
+}
+
+.tag-ex-nav-link {
+    color: white;
+    text-decoration: none;
+    font-size: 13px;
+}
+
+.tag-ex-nav-link:hover {
+    text-decoration: underline;
+}
+
+/* ==================== Figure & Caption ==================== */
+
+.tag-ex-figure {
+    margin: 0;
+    padding: 10px;
+    background: #eceff1;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.tag-ex-figure-placeholder {
+    background: #b0bec5;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    font-size: 24px;
+}
+
+.tag-ex-figcaption {
+    margin-top: 8px;
+    font-size: 12px;
+    font-style: italic;
+    color: #37474f;
+}
+
+/* ==================== Text Formatting ==================== */
+
+.tag-ex-paragraph {
+    line-height: 1.6;
+    color: #333;
+}
+
+.tag-ex-heading-1 { font-size: 24px; font-weight: 700; color: #1a237e; }
+.tag-ex-heading-2 { font-size: 20px; font-weight: 700; color: #283593; }
+.tag-ex-heading-3 { font-size: 18px; font-weight: 600; color: #303f9f; }
+.tag-ex-heading-4 { font-size: 16px; font-weight: 600; color: #3949ab; }
+.tag-ex-heading-5 { font-size: 14px; font-weight: 600; color: #303f9f; }
+.tag-ex-heading-6 { font-size: 12px; font-weight: 600; color: #3949ab; }
+
+.tag-ex-span-highlight {
+    background: #fff3e0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #e65100;
+    font-weight: 500;
+}
+
+.tag-ex-strong { font-weight: 700; color: #c62828; }
+.tag-ex-em { font-style: italic; color: #6a1b9a; }
+.tag-ex-bold { font-weight: 700; }
+.tag-ex-italic { font-style: italic; }
+.tag-ex-underline { text-decoration: underline; }
+.tag-ex-strikethrough { text-decoration: line-through; color: #555555; }
+
+.tag-ex-deleted {
+    text-decoration: line-through;
+    background: #ffcdd2;
+    padding: 2px 4px;
+    border-radius: 2px;
+    color: #b71c1c;
+}
+
+.tag-ex-inserted {
+    background: #c8e6c9;
+    padding: 2px 4px;
+    border-radius: 2px;
+    color: #1b5e20;
+    text-decoration: underline;
+}
+
+.tag-ex-mark {
+    background: #ffeb3b;
+    padding: 2px 4px;
+    border-radius: 2px;
+    color: #212121;
+}
+
+.tag-ex-small {
+    font-size: 11px;
+    color: #555555;
+}
+
+.tag-ex-sub { vertical-align: sub; font-size: 0.8em; }
+.tag-ex-sup { vertical-align: super; font-size: 0.8em; }
+
+.tag-ex-abbr {
+    text-decoration: underline dotted;
+    cursor: help;
+    color: #0277bd;
+}
+
+/* ==================== Code & Preformatted ==================== */
+
+.tag-ex-code {
+    background: #eceff1;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 13px;
+    color: #d32f2f;
+}
+
+.tag-ex-pre {
+    background: #263238;
+    color: #aed581;
+    padding: 12px;
+    border-radius: 4px;
+    margin: 0;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 12px;
+    overflow-x: auto;
+    white-space: pre;
+}
+
+.tag-ex-kbd {
+    background: #e0e0e0;
+    border: 1px solid #9e9e9e;
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 12px;
+    box-shadow: 0 2px 0 #757575;
+}
+
+.tag-ex-samp {
+    background: #eceff1;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 13px;
+    color: #37474f;
+    border: 1px solid #b0bec5;
+}
+
+.tag-ex-var {
+    font-style: italic;
+    color: #7b1fa2;
+    font-weight: 500;
+}
+
+/* ==================== Quotations ==================== */
+
+.tag-ex-blockquote {
+    margin: 0;
+    padding: 12px 16px;
+    border-left: 4px solid #1976d2;
+    background: #e3f2fd;
+    font-style: italic;
+    color: #1565c0;
+}
+
+.tag-ex-blockquote-footer {
+    margin-top: 8px;
+    font-size: 12px;
+    font-style: normal;
+    color: #0d47a1;
+}
+
+.tag-ex-q::before { content: '"'; }
+.tag-ex-q::after { content: '"'; }
+.tag-ex-q {
+    font-style: italic;
+    color: #5d4037;
+}
+
+.tag-ex-cite {
+    font-style: italic;
+    color: #00695c;
+}
+
+.tag-ex-dfn {
+    font-style: italic;
+    font-weight: 600;
+    color: #4527a0;
+}
+
+/* ==================== Address & Time ==================== */
+
+.tag-ex-address {
+    font-style: normal;
+    padding: 10px;
+    background: #eceff1;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #37474f;
+}
+
+.tag-ex-time {
+    font-weight: 600;
+    color: #00838f;
+}
+
+/* ==================== Line Breaks ==================== */
+
+.tag-ex-hr {
+    border: none;
+    border-top: 2px solid #bdbdbd;
+    margin: 12px 0;
+}
+
+/* ==================== Interactive Elements ==================== */
+
+.tag-ex-link {
+    color: #1976d2;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.tag-ex-link:hover {
+    color: #0d47a1;
+}
+
+.tag-ex-button {
+    padding: 8px 16px;
+    background: #1976d2;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.tag-ex-button:hover {
+    background: #1565c0;
+}
+
+.tag-ex-details {
+    border: 1px solid #9e9e9e;
+    border-radius: 4px;
+    padding: 8px;
+    background: #eeeeee;
+}
+
+.tag-ex-summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #333333;
+}
+
+.tag-ex-details-content {
+    margin: 8px 0 0;
+    font-size: 13px;
+    color: #424242;
+}
+
+.tag-ex-dialog-backdrop {
+    background: rgba(0,0,0,0.4);
+    padding: 20px;
+    border-radius: 4px;
+}
+
+.tag-ex-dialog {
+    background: white;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    max-width: 200px;
+    margin: auto;
+}
+
+.tag-ex-dialog-title {
+    margin: 0 0 8px;
+    font-weight: 600;
+    color: #212121;
+}
+
+.tag-ex-dialog-content {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: #424242;
+}
+
+.tag-ex-dialog-btn {
+    padding: 6px 16px;
+    background: #1976d2;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+/* ==================== Lists ==================== */
+
+.tag-ex-ul, .tag-ex-ol {
+    margin: 0;
+    padding-left: 24px;
+    color: #333;
+}
+
+.tag-ex-li {
+    padding: 4px 0;
+}
+
+.tag-ex-li-highlight {
+    background: #e3f2fd;
+    padding: 4px 8px;
+    margin: 2px 0;
+    border-radius: 3px;
+    color: #1565c0;
+}
+
+.tag-ex-dl {
+    margin: 0;
+}
+
+.tag-ex-dt {
+    font-weight: 600;
+    color: #37474f;
+}
+
+.tag-ex-dd {
+    margin: 4px 0 12px 20px;
+    color: #37474f;
+}
+
+.tag-ex-dd-styled {
+    margin: 4px 0 0 20px;
+    padding: 8px;
+    background: #eceff1;
+    border-left: 3px solid #1976d2;
+    color: #37474f;
+}
+
+.tag-ex-menu {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    gap: 8px;
+}
+
+.tag-ex-menu-btn {
+    padding: 6px 12px;
+    background: #eceff1;
+    border: 1px solid #b0bec5;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #37474f;
+}
+
+.tag-ex-menu-btn:hover {
+    background: #cfd8dc;
+}
+
+/* ==================== Media Placeholders ==================== */
+
+.tag-ex-img-placeholder {
+    display: inline-block;
+    background: #cfd8dc;
+    padding: 20px 40px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.tag-ex-img-icon {
+    font-size: 24px;
+    display: block;
+}
+
+.tag-ex-img-label {
+    font-size: 11px;
+    color: #37474f;
+    margin-top: 4px;
+}
+
+.tag-ex-video-player {
+    background: #212121;
+    border-radius: 4px;
+    padding: 20px;
+    text-align: center;
+}
+
+.tag-ex-video-icon {
+    color: white;
+    font-size: 32px;
+}
+
+.tag-ex-video-progress {
+    margin-top: 8px;
+    background: #424242;
+    height: 4px;
+    border-radius: 2px;
+}
+
+.tag-ex-video-progress-bar {
+    background: #f44336;
+    height: 4px;
+    width: 30%;
+    border-radius: 2px;
+}
+
+.tag-ex-audio-player {
+    background: #eceff1;
+    border-radius: 20px;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.tag-ex-audio-icon { font-size: 20px; }
+
+.tag-ex-audio-progress {
+    flex: 1;
+    background: #b0bec5;
+    height: 4px;
+    border-radius: 2px;
+}
+
+.tag-ex-audio-progress-bar {
+    background: #1976d2;
+    height: 4px;
+    width: 40%;
+    border-radius: 2px;
+}
+
+.tag-ex-video {
+    width: 100%;
+    max-width: 300px;
+    border-radius: 4px;
+    background: #212121;
+}
+
+.tag-ex-audio {
+    width: 100%;
+    max-width: 300px;
+}
+
+.tag-ex-iframe {
+    border: 2px solid #78909c;
+    border-radius: 4px;
+    padding: 20px;
+    text-align: center;
+    background: #eceff1;
+}
+
+.tag-ex-iframe-icon { font-size: 24px; }
+
+.tag-ex-iframe-label {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: #37474f;
+}
+
+.tag-ex-embed {
+    border: 2px dashed #607d8b;
+    border-radius: 4px;
+    padding: 20px;
+    text-align: center;
+    background: #eceff1;
+}
+
+.tag-ex-canvas {
+    border: 2px solid #90a4ae;
+    border-radius: 4px;
+    background: #ffffff;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #546e7a;
+    font-size: 12px;
+}
+
+.tag-ex-svg-demo {
+    text-align: center;
+    padding: 10px;
+}
+
+.tag-ex-map-container {
+    position: relative;
+    display: inline-block;
+}
+
+.tag-ex-map-placeholder {
+    background: #cfd8dc;
+    padding: 20px 40px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.tag-ex-map-area {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: 2px dashed;
+    border-radius: 3px;
+}
+
+.tag-ex-map-area-1 {
+    top: 5px;
+    left: 5px;
+    border-color: #f44336;
+}
+
+.tag-ex-map-area-2 {
+    bottom: 5px;
+    right: 5px;
+    border-color: #4caf50;
+}
+
+/* ==================== Form Elements ==================== */
+
+.tag-ex-form {
+    padding: 12px;
+    background: #eceff1;
+    border-radius: 4px;
+}
+
+.tag-ex-form-label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #37474f;
+}
+
+.tag-ex-form-input {
+    display: block;
+    width: 100%;
+    margin-top: 4px;
+    padding: 8px;
+    border: 1px solid #90a4ae;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 14px;
+    background: #ffffff;
+    color: #212529;
+}
+
+.tag-ex-form-input:focus {
+    outline: none;
+    border-color: #1976d2;
+    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+}
+
+.tag-ex-form-submit {
+    padding: 8px 20px;
+    background: #1976d2;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.tag-ex-textarea {
+    width: 100%;
+    height: 60px;
+    padding: 8px;
+    border: 1px solid #90a4ae;
+    border-radius: 4px;
+    resize: none;
+    box-sizing: border-box;
+    font-family: inherit;
+    font-size: 14px;
+    background: #ffffff;
+    color: #212529;
+}
+
+.tag-ex-select {
+    padding: 8px 12px;
+    border: 1px solid #90a4ae;
+    border-radius: 4px;
+    background: #ffffff;
+    min-width: 150px;
+    font-size: 14px;
+    color: #212529;
+}
+
+.tag-ex-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #212529;
+}
+
+.tag-ex-checkbox {
+    width: 18px;
+    height: 18px;
+}
+
+.tag-ex-fieldset {
+    border: 1px solid #90a4ae;
+    border-radius: 4px;
+    padding: 12px;
+    margin: 0;
+    background: #eceff1;
+}
+
+.tag-ex-legend {
+    padding: 0 8px;
+    font-weight: 600;
+    color: #1976d2;
+}
+
+.tag-ex-output {
+    padding: 10px;
+    background: #e8f5e9;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.tag-ex-output-label {
+    font-size: 12px;
+    color: #37474f;
+}
+
+.tag-ex-output-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #2e7d32;
+}
+
+.tag-ex-progress {
+    width: 100%;
+    height: 20px;
+    border-radius: 10px;
+}
+
+.tag-ex-progress-label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 13px;
+    color: #37474f;
+}
+
+.tag-ex-meter {
+    width: 100%;
+    height: 20px;
+}
+
+.tag-ex-meter-label {
+    font-size: 11px;
+    color: #37474f;
+}
+
+/* ==================== Table Elements ==================== */
+
+.tag-ex-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.tag-ex-table-header {
+    background: #1976d2;
+    color: white;
+}
+
+.tag-ex-th {
+    padding: 10px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.tag-ex-td {
+    padding: 10px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.tag-ex-tr-alt {
+    background: #e8e8e8;
+}
+
+.tag-ex-thead {
+    background: #263238;
+    color: white;
+}
+
+.tag-ex-tbody-highlight {
+    background: #eeeeee;
+}
+
+.tag-ex-tfoot {
+    background: #e3f2fd;
+    font-weight: 600;
+}
+
+.tag-ex-caption {
+    padding: 8px;
+    background: #fff3e0;
+    font-weight: 600;
+    text-align: left;
+    color: #e65100;
+}
+
+.tag-ex-colgroup-1 { background: #e3f2fd; }
+.tag-ex-colgroup-2 { background: #fff3e0; }
+.tag-ex-colgroup-3 { background: #e8f5e9; }
+
+/* ==================== Other Tags ==================== */
+
+.tag-ex-data {
+    background: #e8f5e9;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #2e7d32;
+}
+
+.tag-ex-bdi {
+    background: #fff3e0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #e65100;
+}
+
+.tag-ex-bdo {
+    background: #e3f2fd;
+    padding: 4px 8px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.tag-ex-ruby-text { font-size: 18px; }
+.tag-ex-rt { font-size: 10px; color: #1976d2; }
+.tag-ex-rp { color: #616161; }
+
+.tag-ex-slot {
+    padding: 10px;
+    background: #f3e5f5;
+    border-radius: 4px;
+}
+
+.tag-ex-slot-code {
+    font-size: 11px;
+    background: white;
+    padding: 4px 8px;
+    border-radius: 3px;
+    display: block;
+    font-family: monospace;
+    color: #7b1fa2;
+}
+
+.tag-ex-slot-desc {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: #6a1b9a;
+}
+
+.tag-ex-portal {
+    border: 2px dashed #9c27b0;
+    border-radius: 4px;
+    padding: 15px;
+    text-align: center;
+    background: #f3e5f5;
+}
+
+.tag-ex-portal-icon { font-size: 20px; }
+
+.tag-ex-portal-desc {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: #7b1fa2;
+}
+
+.tag-ex-code-snippet {
+    padding: 10px;
+    background: #263238;
+    color: #aed581;
+    font-family: monospace;
+    font-size: 11px;
+    border-radius: 4px;
+}
+
+.tag-ex-norender-msg {
+    padding: 10px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #37474f;
+}
+
+/* ==================== Price Display ==================== */
+
+.tag-ex-price-old {
+    text-decoration: line-through;
+    color: #555555;
+}
+
+.tag-ex-price-new {
+    font-weight: 700;
+    color: #c62828;
+}

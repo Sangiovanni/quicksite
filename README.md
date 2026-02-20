@@ -1,547 +1,210 @@
-# Quicksite (formerly Template Vitrine)
+# QuickSite
 
-A modern, JSON-based PHP CMS for building multilingual websites with a powerful management API. File-based storage, no database required — perfect for landing pages, portfolios, and microsites.
+A file-based PHP CMS with a built-in visual admin panel. Define page structures in JSON, manage everything through a REST API or the admin UI, and deploy production builds — no database required.
 
-> **🎯 Unique Niche**: While most CMS solutions require databases, Quicksite offers a fully API-managed, file-based architecture. Build and manage simple websites fast, without the complexity.
+> **Current version: `1.0.0-beta.1`** — Actively developed. Tutorials and documentation are on their way.
 
-## 📖 Origin Story
+## What is QuickSite?
 
-This project started as a simple HTML template. Then I kept solving the same problems over and over: managing translations, updating content across pages, deploying to different environments. 
+QuickSite started as a simple HTML template and evolved into a full CMS. The idea: manage an entire website — pages, translations, styles, assets, components — through a clean API, with all data stored as flat files you can version-control and deploy anywhere.
 
-So I asked myself: *"What if I could manage all of this through an API?"*
+It now includes a **visual admin panel** with an iframe-based page editor, letting you build and edit sites directly in the browser without writing code. The API remains the backbone — the admin panel is a client of its own API.
 
-That question turned a template into a CMS. The file-based architecture wasn't a limitation — it was a feature. No database setup, no migrations, just files you can version control, copy, and deploy anywhere.
+### Key features
 
-**The name `public_template` and `secure_template` in the codebase?** That's history. You can rename them with the built-in commands (`renamePublicFolder`, `renameSecureFolder`) to whatever fits your project — we use `public/` and `secure/` now.
+- **Visual Admin Panel** — iframe-based page editor with drag-and-drop node management, live preview, and component library
+- **119 API Commands** — RESTful endpoints covering pages, translations, styles, assets, builds, projects, backups, AI integration, and more
+- **JSON-Driven Templates** — page structures defined in JSON, compiled to optimized PHP for production
+- **Multilingual** — built-in translation system with validation, health checks, and mono/multi-language modes
+- **Multi-Project** — host multiple independent sites from one installation
+- **Production Builds** — one-command compilation, optimization, and ZIP packaging
+- **File-Based** — no database, no migrations. JSON + PHP files, deployable anywhere
+- **Role-Based Access** — bearer token auth with granular permissions (viewer, editor, designer, developer, admin, superadmin)
+- **Self-Updating** — built-in update checker and updater via GitHub
+- **AI Integration (BYOK)** — proxy AI requests through the server with your own API keys (OpenAI, Anthropic, Google, Mistral)
 
-## ✨ Features
+## Requirements
 
-### Core Capabilities
-- **JSON-Driven Templates**: Define page structures, menus, and components in JSON, compiled to optimized PHP
-- **Multilingual Support**: Built-in translation system with language switching and validation
-- **Production Builds**: One-command deployment with compilation, optimization, and ZIP packaging
-- **RESTful Management API**: 55 endpoints for complete site management
-- **File-Based Storage**: No database required - all configuration in JSON/PHP files
-- **Flexible Architecture**: Separate public and secure folders for clean deployment
-- **🔐 API Authentication**: Bearer token authentication with role-based permissions
-- **🌐 CORS Support**: Built-in cross-origin support for external UI clients (Flutter, React, etc.)
+- **PHP** 7.4+ (tested up to 8.4)
+- **Apache** with `mod_rewrite`
+- **PHP extensions**: json, fileinfo, zip
 
-### Management Features
-- **Page Management**: Add, delete, and modify routes dynamically
-- **Translation Management**: Multi-language support with validation and key extraction
-- **Asset Management**: Upload, organize, and manage images, fonts, videos, scripts
-- **Structure Editing**: Modify page structures, menus, footers, and components via API
-- **Style Management**: SCSS editing with automatic dangerous pattern blocking
-- **Build System**: Create production-ready deployments with custom folder names
-- **Token Management**: Generate, list, and revoke API tokens programmatically
-
-### Security
-- **Bearer Token Authentication**: All API endpoints protected by default
-- **Role-Based Permissions**: Granular access control (read/write/admin/command-specific)
-- **Path Validation**: Comprehensive protection against path traversal attacks
-- **File Locking**: Prevents concurrent operations and race conditions
-- **MIME Type Validation**: Verifies actual file content, not just extensions
-- **Input Sanitization**: All parameters validated with strict rules
-- **Config Sanitization**: Database credentials automatically removed from builds
-
-## 📋 Requirements
-
-- **PHP**: 7.4 or higher (tested up to 8.4)
-- **Apache**: mod_rewrite enabled
-- **Extensions**: json, fileinfo, zip
-- **Permissions**: Write access to public/secure folders
-
-## 🚀 Quick Start
-
-### Installation
+## Installation
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/Sangiovanni/template_vitrinne.git
-   cd template_vitrinne
+   git clone https://github.com/Sangiovanni/quicksite.git
+   cd quicksite
    ```
 
-2. **Configure Apache DocumentRoot**
-   Point your virtual host to the `public/` folder:
+2. **Point a virtual host to `public/`**
    ```apache
    <VirtualHost *:80>
-       ServerName yoursite.local
-       DocumentRoot "C:/path/to/quicksite/public"
-       
-       <Directory "C:/path/to/quicksite/public">
+       ServerName quicksite.local
+       DocumentRoot "/path/to/quicksite/public"
+       <Directory "/path/to/quicksite/public">
            AllowOverride All
            Require all granted
        </Directory>
    </VirtualHost>
    ```
 
-3. **Set Permissions**
+3. **Copy the config templates**
    ```bash
-   # Linux/Mac
-   chmod -R 755 public app
-   
-   # Windows: Ensure IIS_IUSRS or Apache user has read/write access
+   cd secure/management/config
+   cp target.php.example target.php
+   cp auth.php.example auth.php
+   cp roles.php.example roles.php
    ```
 
-4. **Configure Database** (if needed)
-   Edit `secure/config.php` with your database credentials.
+4. **Open the admin panel**
+   Navigate to `http://quicksite.local/admin/` in your browser. The default token is in `auth.php` — change it before going to production.
 
-5. **Access Your Site**
-   - **Public Site**: `http://yoursite.local/`
-   - **Management API**: `http://yoursite.local/management/`
+> **Why a virtual host?** QuickSite uses Apache's `FallbackResource` for clean URLs (`/about`, `/en/contact`) instead of query strings (`?page=about&lang=en`). This is the same approach used by WordPress, Laravel, and most modern PHP projects. The virtual host makes your local development environment match production — your `public/` folder is the document root, just like it would be on a real server. Subdirectory mode (e.g., `http://localhost/quicksite/public/`) is not supported.
 
-### ⚠️ First-Time Setup: Authentication
-
-The API is protected by default. Before using any endpoint:
-
-1. **Find the default token** in `secure/config/auth.php`:
-   ```php
-   'tvt_dev_default_change_me_in_production' => [...]
-   ```
-
-2. **Generate a new secure token** (recommended):
-   ```bash
-   curl -X POST http://yoursite.local/management/generateToken \
-     -H "Authorization: Bearer tvt_dev_default_change_me_in_production" \
-     -H "Content-Type: application/json" \
-     -d '{"name": "My Admin Token", "permissions": ["*"]}'
-   ```
-
-3. **Save your new token** - it won't be shown again!
-
-4. **Revoke the default token** (important for security):
-   ```bash
-   curl -X POST http://yoursite.local/management/revokeToken \
-     -H "Authorization: Bearer your_new_token_here" \
-     -H "Content-Type: application/json" \
-     -d '{"token_preview": "tvt_dev_...tion"}'
-   ```
-
-### Basic Usage
-
-#### Get Available Commands
-```bash
-curl -H "Authorization: Bearer your_token" \
-  http://yoursite.local/management/help
-```
-
-#### Add a New Page
-```bash
-curl -X POST http://yoursite.local/management/addRoute \
-  -H "Authorization: Bearer your_token" \
-  -H "Content-Type: application/json" \
-  -d '{"route": "about", "title": {"en": "About Us", "fr": "À Propos"}}'
-```
-
-#### Build for Production
-```bash
-curl -X POST http://yoursite.local/management/build \
-  -H "Authorization: Bearer your_token" \
-  -H "Content-Type: application/json" \
-  -d '{"public": "public", "secure": "app"}'
-```
-
-## 📚 Documentation
-
-### Authentication
-
-All API endpoints require authentication via Bearer token:
-
-```bash
-curl -H "Authorization: Bearer your_token_here" \
-  http://yoursite.local/management/help
-```
-
-**Permission Levels:**
-| Permission | Access |
-|------------|--------|
-| `*` | Full access to all commands |
-| `read` | Read-only: get*, list*, validate*, help |
-| `write` | Modifications: edit*, add*, delete*, upload* |
-| `admin` | Administrative: set*, rename*, build, tokens |
-| `command:name` | Specific command only (e.g., `command:build`) |
-
-**CORS Support:**
-- Development mode automatically allows `localhost:*` origins
-- Configure allowed origins in `secure/config/auth.php`
-- Supports preflight OPTIONS requests
-
-### API Endpoints
-
-#### **Authentication & Tokens**
-- `POST /management/generateToken` - Create new API token (admin)
-- `GET /management/listTokens` - List all tokens with masked values (read)
-- `POST /management/revokeToken` - Delete a token (admin)
-
-#### **Folder Management**
-- `POST /management/setPublicSpace` - Set URL space/prefix for public site
-- `POST /management/renameSecureFolder` - Rename secure/backend folder
-- `POST /management/renamePublicFolder` - Rename public folder
-
-#### **Page Management**
-- `POST /management/addRoute` - Create new page route
-- `POST /management/deleteRoute` - Remove page route
-- `GET /management/getRoutes` - List all routes
-
-#### **Structure Management**
-- `GET /management/getStructure/{type}/{name?}/{option?}` - Get page/menu/footer/component JSON
-  - Options: `showIds` (add node identifiers), `summary` (tree overview), `{nodeId}` (specific node)
-- `POST /management/editStructure` - Update structure JSON (full replacement or targeted nodeId edit)
-
-#### **Translation Management**
-- `GET /management/getTranslation/{lang}` - Get language translations
-- `GET /management/getTranslations` - Get all translations
-- `POST /management/setTranslationKeys` - Add/update translation keys (safe merge)
-- `POST /management/deleteTranslationKeys` - Remove translation keys
-- `GET /management/getTranslationKeys` - Extract all required translation keys
-- `GET /management/validateTranslations/{lang?}` - Validate translation completeness
-- `GET /management/getUnusedTranslationKeys/{lang?}` - Find orphaned keys not used in structures
-- `GET /management/analyzeTranslations/{lang?}` - Full health check (missing + unused + recommendations)
-- `GET /management/getLangList` - List supported languages
-- `POST /management/setMultilingual` - Switch between multilingual and mono-language modes
-- `POST /management/addLang` - Add new language (multilingual mode only)
-- `POST /management/deleteLang` - Delete language (multilingual mode only)
-
-#### **Asset Management**
-- `POST /management/uploadAsset` - Upload file to assets
-- `POST /management/deleteAsset` - Delete asset file
-- `GET /management/listAssets/{category?}` - List assets by category
-
-#### **Customization**
-- `POST /management/editFavicon` - Update favicon from assets
-- `POST /management/editTitle` - Update page title for specific language
-
-#### **CSS/Style Management**
-- `GET /management/getStyles` - Get CSS stylesheet content
-- `POST /management/editStyles` - Update CSS (with backup)
-- `GET /management/getRootVariables` - Get CSS custom properties from :root
-- `POST /management/setRootVariables` - Add/update CSS variables in :root
-- `GET /management/listStyleRules` - List all CSS selectors
-- `GET /management/getStyleRule/{selector}/{mediaQuery?}` - Get styles for specific selector
-- `POST /management/setStyleRule` - Add/update CSS rule
-- `POST /management/deleteStyleRule` - Remove CSS rule
-- `GET /management/getKeyframes` - Get all @keyframes animations
-- `POST /management/setKeyframes` - Add/update @keyframes animation
-- `POST /management/deleteKeyframes` - Remove @keyframes animation
-
-#### **Structure Discovery**
-- `GET /management/listComponents` - List all available components
-- `GET /management/listPages` - List all pages with metadata
-
-#### **URL Aliases**
-- `GET /management/listAliases` - List all URL aliases
-- `POST /management/createAlias` - Create route alias
-- `POST /management/deleteAlias` - Remove route alias
-
-#### **Build & Deploy**
-- `POST /management/build` - Create production build with optional folder renaming
-- `GET /management/listBuilds` - List all available builds with metadata
-- `GET /management/getBuild/{name}` - Get detailed info for specific build
-- `POST /management/deleteBuild` - Delete a specific build (folder + ZIP)
-- `POST /management/cleanBuilds` - Bulk delete builds older than timestamp
-- `POST /management/deployBuild` - Deploy build to production paths
-- `GET /management/downloadBuild/{name}` - Get download URL for build ZIP
-
-#### **Command History**
-- `GET /management/getCommandHistory` - Get command execution history with filtering
-- `POST /management/clearCommandHistory` - Delete old command logs
-
-#### **Documentation**
-- `GET /management/help/{command?}` - API documentation (all commands or specific)
-
-For complete API documentation with parameters, validation rules, and examples:
-```bash
-curl http://yoursite.local/management/help
-```
-
-### File Structure
+## Project structure
 
 ```
-quicksite/                    # (or your chosen project name)
-├── public/                   # Public web root
-│   ├── assets/              # Static assets (images, scripts, fonts, videos)
-│   ├── management/          # Management API endpoint
-│   ├── style/               # CSS stylesheets
-│   ├── index.php            # Main entry point
-│   ├── init.php             # Configuration & constants
-│   └── .htaccess            # URL rewriting rules
+quicksite/
+├── public/                       # Web root (Apache DocumentRoot points here)
+│   ├── index.php                 # Front controller — routes requests to pages
+│   ├── init.php                  # Bootstrap — defines all path constants
+│   ├── .htaccess                 # URL rewriting (FallbackResource → index.php)
+│   ├── admin/                    # Admin panel UI (HTML/JS/CSS)
+│   ├── management/               # API entry point
+│   │   ├── index.php             # API router — auth, dispatch, logging
+│   │   └── .htaccess             # Routes all /management/* to this index.php
+│   ├── assets/                   # Uploaded files organized by type
+│   │   ├── images/               # Image assets
+│   │   ├── font/                 # Font files
+│   │   ├── audio/                # Audio files
+│   │   └── videos/               # Video files
+│   ├── scripts/                  # Core front-end JS
+│   │   ├── qs.js                 # QuickSite runtime (show/hide, sort, routing)
+│   │   ├── qs-custom.js          # User-defined JS functions (managed via API)
+│   │   └── qs-api-config.js      # Client-side API endpoint configuration
+│   ├── style/                    # Site styles
+│   │   ├── style.css             # Main stylesheet (editable via API)
+│   │   └── index.php             # Style route handler
+│   └── build/                    # Production builds output (generated, gitignored)
 │
-├── secure/                  # Backend (renamed from secure_template)
-│   ├── config/              # Configuration files
-│   │   ├── auth.php         # Authentication & CORS settings
-│   │   └── aliases.json     # URL alias definitions
-│   ├── management/          # Management API implementation
-│   │   ├── command/         # API endpoints (55 commands)
-│   │   └── routes.php       # Management routes
-│   ├── material/            # Core classes
-│   │   └── Page.php         # Page rendering engine
-│   ├── src/                 # Utilities & functions
-│   │   ├── classes/         # JsonToPhpCompiler, ApiResponse, CssParser, etc.
-│   │   └── functions/       # PathManagement, AuthManagement, etc.
-│   ├── templates/           # Page templates & structures
-│   │   ├── model/           # Component templates
-│   │   └── pages/           # Page JSON structures
-│   ├── translate/           # Translation files
-│   │   ├── default.json
-│   │   ├── en.json
-│   │   └── fr.json
-│   ├── config.php           # Main configuration
-│   └── routes.php           # Public route definitions
+├── secure/                       # Backend (outside web root, not publicly accessible)
+│   ├── management/               # API engine (shared across all projects)
+│   │   ├── command/              # 119 command handler files (one per command)
+│   │   ├── config/               # API configuration
+│   │   │   ├── target.php        # Active project selector (gitignored)
+│   │   │   ├── auth.php          # Tokens and CORS config (gitignored)
+│   │   │   └── roles.php         # Role definitions (gitignored)
+│   │   └── routes.php            # Command whitelist
+│   ├── admin/                    # Admin panel backend
+│   │   ├── AdminRouter.php       # Admin routing and page rendering
+│   │   ├── config/               # Admin panel configuration
+│   │   ├── functions/            # Admin helper functions
+│   │   ├── templates/            # Admin panel page templates
+│   │   ├── translations/         # Admin UI translations
+│   │   └── workflows/            # Visual editor workflow specs
+│   ├── src/                      # Shared engine code
+│   │   ├── classes/              # Core classes (ApiResponse, JsonToHtmlRenderer,
+│   │   │                         #   JsonToPhpCompiler, CssParser, Translator, etc.)
+│   │   └── functions/            # Utility functions (auth, paths, logging, etc.)
+│   ├── projects/                 # Project data (one folder per project)
+│   │   └── quicksite/            # Default project
+│   │       ├── config.php        # Project config (languages, settings)
+│   │       ├── routes.php        # Public route definitions
+│   │       ├── templates/        # Page and component JSON structures
+│   │       ├── translate/        # Translation files (en.json, fr.json, etc.)
+│   │       ├── data/             # Project data (aliases, asset metadata)
+│   │       ├── public/           # Project-specific public files
+│   │       └── backups/          # Project backups (gitignored)
+│   ├── snippets/                 # Reusable component snippets (nav, cards, forms, etc.)
+│   ├── config/                   # Global config (currently unused, reserved)
+│   ├── exports/                  # Project export ZIPs (generated)
+│   └── logs/                     # Command execution logs (gitignored)
 │
-├── docs/                    # Documentation
-├── tests/                   # Test suite (gitignored)
-├── LICENSE                  # MIT License
-└── README.md               # This file
-```
-└── README.md               # This file
-```
-
-## 🔧 Advanced Usage
-
-### Custom Folder Structure
-
-Use `setPublicSpace` to create subdirectories for multi-site hosting:
-
-```bash
-# Move all public files into "web" subdirectory
-curl -X POST http://yoursite.local/management/setPublicSpace \
-  -H "Content-Type: application/json" \
-  -d '{"destination": "web"}'
-
-# Site now accessible at: http://yoursite.local/web/
-# Management at: http://yoursite.local/web/management/
-
-# Restore to root with empty destination
-curl -X POST http://yoursite.local/web/management/setPublicSpace \
-  -H "Content-Type: application/json" \
-  -d '{"destination": ""}'
+├── docs/                         # Documentation (coming soon)
+├── tests/                        # Test suite
+├── VERSION                       # Current version (1.0.0-beta.1)
+├── LICENSE                       # MIT
+└── README.md
 ```
 
-### Production Builds
+**Key concepts:**
+- **`public/`** is the only folder exposed to the web. Everything else is behind the firewall.
+- **`public/management/`** is the API gateway. Any client (admin panel, curl, Flutter app, custom UI) talks to QuickSite through this endpoint.
+- **`public/scripts/`** contains the core JS runtime. `qs.js` handles front-end features like show/hide triggers, sorting, and dynamic behavior. `qs-custom.js` holds user-defined JS functions managed via the `addJsFunction` / `editJsFunction` API commands.
+- **`secure/management/config/`** holds sensitive files (tokens, auth) that are gitignored. Template `.example` files are provided for installation.
+- **Projects** are fully isolated in `secure/projects/`. Each has its own pages, translations, routes, and assets. Switch between them with `switchProject`.
 
-The build system creates optimized deployments:
+### Folder customization
 
-```bash
-curl -X POST http://yoursite.local/management/build \
-  -H "Content-Type: application/json" \
-  -d '{
-    "public": "www/public",
-    "secure": "app",
-    "space": "site"
-  }'
+Three commands let you adapt the folder structure to match your hosting environment after installation:
+
+| Command | What it does | Example |
+|---------|-------------|---------|
+| `renamePublicFolder` | Renames the `public/` folder (e.g., to `www/` or `public_html/`). Updates `init.php` constants. Requires updating your Apache vhost after. | Shared hosting with a fixed `public_html/` document root |
+| `renameSecureFolder` | Renames the `secure/` folder (e.g., to `backend/` or `app/`). Updates `init.php` constants. | Convention matching or security by obscurity |
+| `setPublicSpace` | Moves public files into a subdirectory inside the document root, adjusting all `.htaccess` files and `init.php`. | Shared hosting where your site lives at `www.example.com/mysite/` — set space to `mysite` |
+
+## API overview
+
+The API is self-documenting. Once installed, call:
+
+```
+GET /management/help
 ```
 
-This creates:
-- **Compiled PHP**: JSON templates converted to optimized PHP files
-- **Clean Structure**: Management system and development files removed
-- **Sanitized Config**: Database credentials stripped from config
-- **ZIP Archive**: Complete deployment package
-- **Custom Names**: Folders renamed as specified
+This returns full documentation for all 119 commands, including parameters, examples, validation rules, and error codes. For a specific command:
 
-The `space` parameter creates a subdirectory inside the public folder, useful for shared hosting where you need specific URL paths.
-
-### Translation Workflow
-
-1. **Analyze Translation Health** (recommended starting point)
-   ```bash
-   curl http://yoursite.local/management/analyzeTranslations
-   # Returns: missing keys, unused keys, health_status, recommendations
-   ```
-
-2. **Find Missing Translations Only**
-   ```bash
-   curl http://yoursite.local/management/validateTranslations/fr
-   ```
-
-3. **Find Unused/Orphaned Keys**
-   ```bash
-   curl http://yoursite.local/management/getUnusedTranslationKeys
-   ```
-
-4. **Add Missing Translations** (safe merge - won't delete existing)
-   ```bash
-   curl -X POST http://yoursite.local/management/setTranslationKeys \
-     -H "Content-Type: application/json" \
-     -d '{
-       "language": "fr",
-       "translations": {
-         "menu": {"newpage": "Nouvelle Page"},
-         "footer": {"copyright": "Tous droits réservés"}
-       }
-     }'
-   ```
-
-5. **Clean Up Unused Keys** (optional)
-   ```bash
-   curl -X POST http://yoursite.local/management/deleteTranslationKeys \
-     -H "Content-Type: application/json" \
-     -d '{
-       "language": "fr",
-       "keys": ["old.unused.key", "legacy.section.title"]
-     }'
-   ```
-
-## 🏗️ Architecture
-
-### JSON to PHP Compilation
-
-Page structures are defined in JSON and compiled to PHP for optimal performance:
-
-**JSON Structure** (`secure/templates/pages/home.json`):
-```json
-{
-  "tag": "div",
-  "class": "container",
-  "children": [
-    {
-      "tag": "h1",
-      "textKey": "home.title"
-    },
-    {
-      "tag": "p",
-      "textKey": "home.welcomeMessage"
-    }
-  ]
-}
+```
+GET /management/help/addRoute
 ```
 
-**Compiled PHP** (build output):
-```php
-echo '<div class="container">';
-echo '<h1>' . htmlspecialchars($translator->translate('home.title')) . '</h1>';
-echo '<p>' . htmlspecialchars($translator->translate('home.welcomeMessage')) . '</p>';
-echo '</div>';
-```
+**Command categories**: pages, structure, translations, languages, assets, styles, CSS variables, animations, builds, projects, backups, export/import, tokens, roles, AI, snippets, JS functions, interactions, page events, API endpoints, system updates.
 
-### System Variables
+**Authentication**: All endpoints require a bearer token. Tokens are scoped to roles with granular command-level permissions.
 
-The compiler generates helper variables:
-- `$__lang` - Current language code
-- `$__current_page` - Current route (cleaned)
-- `$__base_url` - Site base URL
-- `processUrl($url, $lang)` - URL processor with language prefix
-- `buildLanguageSwitchUrl($targetLang)` - Language switcher URLs
+## Tutorials
 
-## 🔐 Security Features
+Step-by-step tutorials demonstrating the admin panel and API workflows are coming soon.
 
-- **Path Traversal Protection**: All path parameters validated against directory traversal
-- **File Type Validation**: MIME type checking, not just extension
-- **Concurrent Operation Safety**: File locking prevents race conditions
-- **Input Validation**: Strict validation rules for all parameters (max length, depth, allowed chars)
-- **Config Sanitization**: Credentials removed from production builds
-- **SCSS Safety**: Dangerous patterns blocked in style editing
+## Vision
 
-## 🗺️ Roadmap & Vision
+QuickSite is built on a **file-based, zero-database philosophy**. It targets a specific niche: sites that don't need a database — landing pages, portfolios, documentation sites, microsites — but still deserve proper tooling for content management, translations, and deployment.
 
-Template Vitrine follows a **file-based, zero-database philosophy** - but that doesn't mean it can't grow!
+The admin panel makes it accessible to non-developers, while the API keeps it powerful for automation and integration.
 
-### Current Version (v1.5.0)
-- ✅ Complete file-based CMS with JSON templates
-- ✅ RESTful API with 55 commands
-- ✅ Bearer token authentication with RBAC
-- ✅ CORS support for external UIs
-- ✅ Production build system
-- ✅ Comprehensive Guides page with practical tutorials
-- ✅ **Mono-Language Mode**: Switch between multilingual and single-language sites with `setMultilingual`
-- ✅ **Structure Audit**: `checkStructureMulti` command to find lang-specific content before switching modes
-- ✅ **Build Management**: List, get, delete, clean, deploy, and download builds via API
-- ✅ **Command Logging**: Audit trail with getCommandHistory and clearCommandHistory
+## Contributing
 
-### Upcoming Releases
-| Version | Feature | Description |
-|---------|---------|-------------|
-| **v1.6** | Admin Panel | Built-in API Explorer with command selector, dynamic forms, and persistent auth |
-
-### Future Vision
-| Feature | Status | Description |
-|---------|--------|-------------|
-| **Flutter UI** | 🔜 Planned | Cross-platform admin interface with drag-and-drop editing |
-| **Database Module** | 💡 Considering | Optional SQLite/MySQL module for dynamic content |
-| **User System** | 💡 Future | Multi-user authentication (building on current token system) |
-| **Plugin System** | 💡 Future | Extensible architecture for custom commands |
-
-### Philosophy
-> Keep the core **file-based and simple**. Database features will be **optional modules**, never requirements. This keeps Template Vitrine perfect for its niche: fast, portable, database-free websites.
-
-**Want to contribute to the roadmap?** Open an issue with your ideas!
-
-## 🤝 Contributing
-
-Contributions are welcome! This project is open source under the MIT License.
-
-### Review Policy
-
-All contributions go through code review to ensure:
-- **Security**: No vulnerabilities introduced
-- **Quality**: Clean, readable, well-documented code
-- **Consistency**: Follows existing patterns and conventions
-- **Testing**: New features include appropriate tests
-
-### How to Contribute
+Contributions are welcome under the MIT License.
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Submit a Pull Request
 
-**First-time contributors welcome!** Look for issues labeled `good first issue`.
+All contributions go through code review for security, quality, and consistency.
 
-## 📝 License
+## Acknowledgments
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Built using a **hybrid human-AI development approach** with GitHub Copilot (Claude).
 
-**TL;DR**: Free to use for any purpose (personal, commercial, etc.), just keep the copyright notice. No warranty provided.
+This project started as a bare draft — I never expected it to go this far. As it grew beyond what I initially imagined, I let some **vibecoding** happen, mainly in the admin panel and the visual editor. The result is a genuinely hybrid workflow:
 
-## 🙏 Acknowledgments
+- **I handle architecture, structure, and communication layers** — everything that defines how parts of the system talk to each other (routes, API responses, specs, configs). I keep close control over anything that faces the user or the AI (interaction schemas, for example).
+- **The agent gets more freedom on the JavaScript side** — JS is the language I'm least comfortable with, and I used this project as an opportunity to learn it more deeply and to test how far an AI agent can build things on its own.
+- **I didn't write a lot of code directly** — my role has been mostly architecture, communication design, and review. I refactor things along the way, but the approach is adaptive rather than prescriptive.
 
-This project was built using a **hybrid human-AI development approach**:
+It's an honest experiment in human-AI collaboration. I plan to share what I've learned about working with AI agents — how to communicate effectively, where to give freedom, and where to keep control — alongside the project tutorials.
 
-| Aspect | Approach |
-|--------|----------|
-| **Architecture & Design** | Human-designed system architecture and feature requirements |
-| **Implementation** | Developed with assistance from GitHub Copilot (Claude) |
-| **Testing & Validation** | Comprehensive human-led testing and quality assurance |
-| **Code Review** | All AI-generated code reviewed and validated by humans |
+## License
 
-The combination of human creativity and AI-assisted coding enabled rapid development while maintaining code quality, security, and maintainability.
+MIT — free for personal and commercial use. See [LICENSE](LICENSE).
 
-**Why mention this?** Transparency matters. AI-assisted development is a powerful tool when combined with human oversight and expertise. Every line of code in this project has been reviewed, tested, and validated.
+## Support
 
-**Development philosophy:**
-- 🔒 Security-first design
-- 🛠️ Developer experience
-- 🚀 Deployment flexibility
-- 📁 Zero-database architecture
-
-## 📞 Support
-
-For questions, issues, or feature requests:
 - **Issues**: [GitHub Issues](https://github.com/Sangiovanni/quicksite/issues)
-- **Documentation**: See `/management/help` endpoint for complete API reference
-- **Security Docs**: See [docs/](docs/) folder for security improvements and best practices
-
-## ☕ Support the Project
-
-If this project saves you time or helps your business, consider supporting its development:
-
-<a href="https://buymeacoffee.com/sangio" target="_blank">
-  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="40">
-</a>
-
-Your support helps fund:
-- 🔧 Ongoing maintenance and bug fixes
-- 🔐 Security updates and audits
-- ✨ New features (Flutter UI is next!)
-- 📚 Better documentation
-
-## 📚 Additional Documentation
-
-- **[docs/README.md](docs/README.md)** - Documentation overview and reading guide
-- **[docs/COMMAND_API_DOCUMENTATION.md](docs/COMMAND_API_DOCUMENTATION.md)** - Complete API reference
-- **[docs/ADDROUTE_SECURITY_IMPROVEMENTS.md](docs/ADDROUTE_SECURITY_IMPROVEMENTS.md)** - Security fixes in route management
-- **[docs/TRANSLATION_SECURITY_IMPROVEMENTS.md](docs/TRANSLATION_SECURITY_IMPROVEMENTS.md)** - Security fixes in translation system
+- **API Reference**: `GET /management/help` — built into every installation
+- **Buy Me a Coffee**: [buymeacoffee.com/sangio](https://buymeacoffee.com/sangio)
 
 ---
 
-**Made with ❤️ by [Ludovic](https://github.com/Sangiovanni) for the open source community**
+Made by [Sangio](https://github.com/Sangiovanni)

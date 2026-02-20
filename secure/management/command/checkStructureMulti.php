@@ -2,14 +2,15 @@
 /**
  * checkStructureMulti - Audit structures for multilingual-specific content
  * 
+ * @method GET
+ * @url /management/checkStructureMulti
+ * @auth required
+ * @permission read
+ * 
  * Scans all JSON structures (pages, menu, footer, components) for patterns
  * that would break in mono-language mode, such as lang= in href attributes.
  * 
  * Use this before switching to mono-language mode with setMultilingual.
- * 
- * @method GET
- * @route /management/checkStructureMulti
- * @return JSON Report of lang-specific content found
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
@@ -17,7 +18,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 /**
  * Recursively scan a structure for lang-specific patterns
  */
-function scanForLangPatterns(array $structure, string $source, string $path = ''): array {
+function scanForLangPatterns_check(array $structure, string $source, string $path = ''): array {
     $findings = [];
     
     foreach ($structure as $key => $value) {
@@ -25,7 +26,7 @@ function scanForLangPatterns(array $structure, string $source, string $path = ''
         
         if (is_array($value)) {
             // Recurse into nested structures
-            $findings = array_merge($findings, scanForLangPatterns($value, $source, $currentPath));
+            $findings = array_merge($findings, scanForLangPatterns_check($value, $source, $currentPath));
         } elseif (is_string($value)) {
             // Check for lang= patterns
             $patterns = [
@@ -64,7 +65,7 @@ function scanForLangPatterns(array $structure, string $source, string $path = ''
 /**
  * Scan a JSON file for lang patterns
  */
-function scanJsonFile(string $filePath, string $sourceName): array {
+function scanJsonFile_check(string $filePath, string $sourceName): array {
     if (!file_exists($filePath)) {
         return [];
     }
@@ -76,85 +77,97 @@ function scanJsonFile(string $filePath, string $sourceName): array {
         return [];
     }
     
-    return scanForLangPatterns($structure, $sourceName);
+    return scanForLangPatterns_check($structure, $sourceName);
 }
 
-// Main execution
-$allFindings = [];
-$scannedFiles = [];
+/**
+ * Command function for internal execution via CommandRunner
+ * 
+ * @param array $params Body parameters (unused for this command)
+ * @param array $urlParams URL segments (unused for this command)
+ * @return ApiResponse
+ */
+function __command_checkStructureMulti(array $params = [], array $urlParams = []): ApiResponse {
+    $allFindings = [];
+    $scannedFiles = [];
 
-// Scan pages
-$pagesDir = SECURE_FOLDER_PATH . '/templates/model/json/pages';
-if (is_dir($pagesDir)) {
-    $pageFiles = glob($pagesDir . '/*.json');
-    foreach ($pageFiles as $pageFile) {
-        $pageName = basename($pageFile, '.json');
-        $findings = scanJsonFile($pageFile, "page:{$pageName}");
+    // Scan pages
+    $pagesDir = PROJECT_PATH . '/templates/model/json/pages';
+    if (is_dir($pagesDir)) {
+        $pageFiles = glob($pagesDir . '/*.json');
+        foreach ($pageFiles as $pageFile) {
+            $pageName = basename($pageFile, '.json');
+            $findings = scanJsonFile_check($pageFile, "page:{$pageName}");
+            $allFindings = array_merge($allFindings, $findings);
+            $scannedFiles['pages'][] = $pageName;
+        }
+    }
+
+    // Scan menu
+    $menuPath = PROJECT_PATH . '/templates/model/json/menu.json';
+    if (file_exists($menuPath)) {
+        $findings = scanJsonFile_check($menuPath, 'menu');
         $allFindings = array_merge($allFindings, $findings);
-        $scannedFiles['pages'][] = $pageName;
+        $scannedFiles['menu'] = true;
     }
-}
 
-// Scan menu
-$menuPath = SECURE_FOLDER_PATH . '/templates/model/json/menu.json';
-if (file_exists($menuPath)) {
-    $findings = scanJsonFile($menuPath, 'menu');
-    $allFindings = array_merge($allFindings, $findings);
-    $scannedFiles['menu'] = true;
-}
-
-// Scan footer
-$footerPath = SECURE_FOLDER_PATH . '/templates/model/json/footer.json';
-if (file_exists($footerPath)) {
-    $findings = scanJsonFile($footerPath, 'footer');
-    $allFindings = array_merge($allFindings, $findings);
-    $scannedFiles['footer'] = true;
-}
-
-// Scan components
-$componentsDir = SECURE_FOLDER_PATH . '/templates/model/json/components';
-if (is_dir($componentsDir)) {
-    $componentFiles = glob($componentsDir . '/*.json');
-    foreach ($componentFiles as $componentFile) {
-        $componentName = basename($componentFile, '.json');
-        $findings = scanJsonFile($componentFile, "component:{$componentName}");
+    // Scan footer
+    $footerPath = PROJECT_PATH . '/templates/model/json/footer.json';
+    if (file_exists($footerPath)) {
+        $findings = scanJsonFile_check($footerPath, 'footer');
         $allFindings = array_merge($allFindings, $findings);
-        $scannedFiles['components'][] = $componentName;
+        $scannedFiles['footer'] = true;
     }
+
+    // Scan components
+    $componentsDir = PROJECT_PATH . '/templates/model/json/components';
+    if (is_dir($componentsDir)) {
+        $componentFiles = glob($componentsDir . '/*.json');
+        foreach ($componentFiles as $componentFile) {
+            $componentName = basename($componentFile, '.json');
+            $findings = scanJsonFile_check($componentFile, "component:{$componentName}");
+            $allFindings = array_merge($allFindings, $findings);
+            $scannedFiles['components'][] = $componentName;
+        }
+    }
+
+    // Group findings by source
+    $groupedFindings = [];
+    foreach ($allFindings as $finding) {
+        $source = $finding['source'];
+        if (!isset($groupedFindings[$source])) {
+            $groupedFindings[$source] = [];
+        }
+        $groupedFindings[$source][] = [
+            'path' => $finding['path'],
+            'pattern' => $finding['pattern'],
+            'match' => $finding['match'],
+            'value' => $finding['value']
+        ];
+    }
+
+    // Determine status
+    $totalFindings = count($allFindings);
+    $status = $totalFindings === 0 ? 'clean' : 'has_multilingual_content';
+    $message = $totalFindings === 0 
+        ? 'No multilingual-specific content found. Safe to switch to mono-language mode.'
+        : "Found {$totalFindings} multilingual-specific pattern(s). Review before switching to mono-language mode.";
+
+    return ApiResponse::create(200, 'operation.success')
+        ->withMessage($message)
+        ->withData([
+            'status' => $status,
+            'total_findings' => $totalFindings,
+            'findings_by_source' => $groupedFindings,
+            'affected_sources' => array_keys($groupedFindings),
+            'scanned' => $scannedFiles,
+            'recommendation' => $totalFindings > 0 
+                ? 'Remove or update lang-specific content before switching to mono-language mode, or these links may break.'
+                : 'You can safely use setMultilingual to switch to mono-language mode.'
+        ]);
 }
 
-// Group findings by source
-$groupedFindings = [];
-foreach ($allFindings as $finding) {
-    $source = $finding['source'];
-    if (!isset($groupedFindings[$source])) {
-        $groupedFindings[$source] = [];
-    }
-    $groupedFindings[$source][] = [
-        'path' => $finding['path'],
-        'pattern' => $finding['pattern'],
-        'match' => $finding['match'],
-        'value' => $finding['value']
-    ];
+// Execute via HTTP (only when not called internally)
+if (!defined('COMMAND_INTERNAL_CALL')) {
+    __command_checkStructureMulti()->send();
 }
-
-// Determine status
-$totalFindings = count($allFindings);
-$status = $totalFindings === 0 ? 'clean' : 'has_multilingual_content';
-$message = $totalFindings === 0 
-    ? 'No multilingual-specific content found. Safe to switch to mono-language mode.'
-    : "Found {$totalFindings} multilingual-specific pattern(s). Review before switching to mono-language mode.";
-
-ApiResponse::create(200, 'operation.success')
-    ->withMessage($message)
-    ->withData([
-        'status' => $status,
-        'total_findings' => $totalFindings,
-        'findings_by_source' => $groupedFindings,
-        'affected_sources' => array_keys($groupedFindings),
-        'scanned' => $scannedFiles,
-        'recommendation' => $totalFindings > 0 
-            ? 'Remove or update lang-specific content before switching to mono-language mode, or these links may break.'
-            : 'You can safely use setMultilingual to switch to mono-language mode.'
-    ])
-    ->send();

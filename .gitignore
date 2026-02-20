@@ -49,3 +49,30 @@ dist/
 tmp/
 temp/
 *.tmp
+
+# Personal notes
+NOTES/
+
+# Stats files (project metrics)
+stats/
+
+# Projects folder - ignore all except quicksite (starter template)
+secure/projects/*
+!secure/projects/quicksite/
+
+# Ignore backups inside quicksite too (user data)
+secure/projects/quicksite/backups/
+
+# Management config - local/sensitive files (use .example templates for setup)
+secure/management/config/target.php
+secure/management/config/auth.php
+secure/management/config/roles.php
+
+# Exports folder (temporary export ZIPs)
+secure/exports/
+
+# Build output
+public/build/
+
+# Logs
+secure/logs/

@@ -6,11 +6,13 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
  * 
  * Uploads files to assets folders with category-specific validation
  * Category passed via POST/multipart form data, file via $_FILES
+ * Optional description for AI context
  */
 
 // Get parameters from POST/JSON (handles multipart form-data)
 $params = $trimParametersManagement->params();
 $category = $params['category'] ?? null;
+$description = $params['description'] ?? null;
 
 // Validate category is provided
 if (empty($category)) {
@@ -54,6 +56,31 @@ if (!in_array($category, $validCategories, true)) {
             ['field' => 'category', 'value' => $category, 'allowed' => $validCategories]
         ])
         ->send();
+}
+
+// Validate description if provided (optional parameter)
+if ($description !== null) {
+    if (!is_string($description)) {
+        ApiResponse::create(400, 'validation.invalid_type')
+            ->withMessage('The description parameter must be a string.')
+            ->withErrors([
+                ['field' => 'description', 'reason' => 'invalid_type', 'expected' => 'string']
+            ])
+            ->send();
+    }
+    
+    // Limit description to 500 characters
+    if (strlen($description) > 500) {
+        ApiResponse::create(400, 'validation.invalid_length')
+            ->withMessage('The description parameter must not exceed 500 characters.')
+            ->withErrors([
+                ['field' => 'description', 'max_length' => 500, 'actual_length' => strlen($description)]
+            ])
+            ->send();
+    }
+    
+    // Trim the description
+    $description = trim($description);
 }
 
 // Check if file was uploaded
@@ -107,7 +134,6 @@ if (!is_uploaded_file($file['tmp_name'])) {
 // Validate file size (category-specific limits)
 $sizeLimits = [
     'images' => 5 * 1024 * 1024,    // 5MB
-    'scripts' => 1 * 1024 * 1024,   // 1MB
     'font' => 2 * 1024 * 1024,      // 2MB
     'audio' => 10 * 1024 * 1024,    // 10MB
     'videos' => 50 * 1024 * 1024    // 50MB
@@ -124,9 +150,9 @@ if ($file['size'] > $sizeLimits[$category]) {
 }
 
 // Validate MIME type based on category (detect actual content, not just extension)
+// SECURITY: 'scripts' category removed - JS uploads could enable XSS attacks
 $allowedMimes = [
     'images' => ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
-    'scripts' => ['application/javascript', 'text/javascript', 'application/x-javascript', 'text/plain'], // text/plain for .js sometimes
     'font' => ['font/ttf', 'font/otf', 'font/woff', 'font/woff2', 'application/x-font-ttf', 'application/x-font-otf', 'application/font-woff', 'application/font-woff2', 'application/octet-stream'], // fonts often detected as octet-stream
     'audio' => ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/x-wav'],
     'videos' => ['video/mp4', 'video/webm', 'video/ogg']
@@ -206,9 +232,9 @@ if (empty($extension)) {
 
 // Validate extension matches category BEFORE checking MIME
 // This prevents uploading .php files even if they somehow pass MIME checks
+// SECURITY: 'scripts' category removed - JS uploads disabled
 $validExtensions = [
     'images' => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'],
-    'scripts' => ['js'],
     'font' => ['ttf', 'otf', 'woff', 'woff2'],
     'audio' => ['mp3', 'wav', 'ogg'],
     'videos' => ['mp4', 'webm', 'ogv']
@@ -314,14 +340,71 @@ if ($actualSize !== $file['size']) {
         ->send();
 }
 
+// ============================================================
+// Store Asset Metadata
+// ============================================================
+$metadataPath = PROJECT_PATH . '/data/assets_metadata.json';
+$assetKey = $category . '/' . $finalFilename;
+$metadata = [];
+
+// Load existing metadata
+if (file_exists($metadataPath)) {
+    $metadataContent = file_get_contents($metadataPath);
+    $metadata = json_decode($metadataContent, true) ?: [];
+}
+
+// Build metadata for this asset
+$assetMeta = [
+    'uploaded' => date('c'), // ISO 8601 format
+    'mime_type' => $mimeType,
+    'size' => $file['size']
+];
+
+// Add description if provided
+if (!empty($description)) {
+    $assetMeta['description'] = $description;
+}
+
+// Auto-detect dimensions for images
+if ($category === 'images') {
+    $imageInfo = @getimagesize($targetFile);
+    if ($imageInfo !== false) {
+        $assetMeta['width'] = $imageInfo[0];
+        $assetMeta['height'] = $imageInfo[1];
+        $assetMeta['dimensions'] = $imageInfo[0] . 'x' . $imageInfo[1];
+    }
+}
+
+// Auto-detect duration for audio/video (if possible)
+// Note: This requires additional libraries, so we'll skip for now
+
+// Store metadata
+$metadata[$assetKey] = $assetMeta;
+
+// Save metadata file
+file_put_contents($metadataPath, json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+// Build response data
+$responseData = [
+    'filename' => $finalFilename,
+    'category' => $category,
+    'path' => '/assets/' . $category . '/' . $finalFilename,
+    'size' => $file['size'],
+    'mime_type' => $mimeType
+];
+
+// Include dimensions in response for images
+if (isset($assetMeta['dimensions'])) {
+    $responseData['dimensions'] = $assetMeta['dimensions'];
+}
+
+// Include description if provided
+if (!empty($description)) {
+    $responseData['description'] = $description;
+}
+
 // Success response
 ApiResponse::create(201, 'operation.success')
     ->withMessage("File uploaded successfully")
-    ->withData([
-        'filename' => $finalFilename,
-        'category' => $category,
-        'path' => '/assets/' . $category . '/' . $finalFilename,
-        'size' => $file['size'],
-        'mime_type' => $mimeType
-    ])
+    ->withData($responseData)
     ->send();

@@ -1,0 +1,57 @@
+{
+  "id": "card-basic",
+  "name": "Basic Card",
+  "category": "cards",
+  "description": "Simple card with image, title, text and button",
+  "isCore": true,
+  "structure": {
+    "tag": "div",
+    "params": { "class": "qs-snippet-card" },
+    "children": [
+      {
+        "tag": "img",
+        "params": { 
+          "src": "https://placehold.co/400x200/e2e8f0/64748b?text=Image",
+          "alt": "snippet.card.imageAlt",
+          "class": "qs-snippet-card-img"
+        }
+      },
+      {
+        "tag": "div",
+        "params": { "class": "qs-snippet-card-body" },
+        "children": [
+          {
+            "tag": "h3",
+            "params": { "class": "qs-snippet-card-title" },
+            "children": [{ "textKey": "snippet.card.title" }]
+          },
+          {
+            "tag": "p",
+            "params": { "class": "qs-snippet-card-text" },
+            "children": [{ "textKey": "snippet.card.text" }]
+          },
+          {
+            "tag": "a",
+            "params": { "href": "#", "class": "qs-snippet-btn qs-snippet-btn-primary" },
+            "children": [{ "textKey": "snippet.card.button" }]
+          }
+        ]
+      }
+    ]
+  },
+  "translations": {
+    "en": {
+      "snippet.card.imageAlt": "Card image",
+      "snippet.card.title": "Card Title",
+      "snippet.card.text": "Some quick example text to build on the card title and make up the bulk of the card's content.",
+      "snippet.card.button": "Learn More"
+    },
+    "fr": {
+      "snippet.card.imageAlt": "Image de carte",
+      "snippet.card.title": "Titre de la carte",
+      "snippet.card.text": "Un exemple de texte rapide pour compléter le titre de la carte et constituer l'essentiel du contenu.",
+      "snippet.card.button": "En savoir plus"
+    }
+  },
+  "css": ".qs-snippet-card { max-width: 350px; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; } .qs-snippet-card-img { width: 100%; height: auto; display: block; } .qs-snippet-card-body { padding: 1.5rem; } .qs-snippet-card-title { margin: 0 0 0.75rem; color: #333; } .qs-snippet-card-text { margin: 0 0 1rem; color: #666; line-height: 1.5; } .qs-snippet-btn { display: inline-block; padding: 0.5rem 1rem; border: none; border-radius: 4px; font-size: 0.9rem; text-decoration: none; cursor: pointer; } .qs-snippet-btn-primary { background: #007bff; color: #fff; } .qs-snippet-btn-primary:hover { background: #0056b3; }"
+}

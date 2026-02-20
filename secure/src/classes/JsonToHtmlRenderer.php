@@ -8,12 +8,27 @@
  * - Tag nodes: {tag, params, children}
  * - Text nodes: {textKey}
  * - Components: {component, data}
+ * 
+ * Editor Mode:
+ * When editorMode is enabled, adds data attributes for visual editor:
+ * - data-qs-struct: Structure type (menu, footer, page-{name})
+ * - data-qs-node: Node path (e.g., "0", "0.1", "0.1.2")
+ * - data-qs-component: Component name (on component root elements)
+ * - data-qs-in-component: Marker for elements inside a component
  */
 class JsonToHtmlRenderer {
     private $context = [];
     private $translator;
     private $componentCache = [];
     private $componentsPath;
+    
+    // Editor mode state
+    private $editorMode = false;
+    private $currentStructure = '';      // menu, footer, page-home
+    private $currentNodePath = [];       // Path as array [0, 1, 2]
+    private $inComponent = false;        // Are we inside a component?
+    private $currentComponentName = '';  // Current component name
+    private $currentComponentNode = '';  // Node path where component started
 
     /**
      * @param Translator $translator Instance of Translator for text resolution
@@ -22,23 +37,64 @@ class JsonToHtmlRenderer {
     public function __construct($translator, $context = []) {
         $this->translator = $translator;
         $this->context = $context;
-        $this->componentsPath = SECURE_FOLDER_PATH . '/templates/model/json/components/';
+        $this->componentsPath = PROJECT_PATH . '/templates/model/json/components/';
+        
+        // Auto-detect editor mode from query parameter if not explicitly set
+        // This ensures ALL renderer instances are in editor mode when ?_editor=1 is present
+        if (isset($context['editorMode'])) {
+            $this->editorMode = $context['editorMode'];
+        } else {
+            $this->editorMode = isset($_GET['_editor']) && $_GET['_editor'] === '1';
+        }
+    }
+    
+    /**
+     * Enable or disable editor mode
+     * When enabled, adds data attributes for visual editor element selection
+     * 
+     * @param bool $enabled Whether to enable editor mode
+     */
+    public function setEditorMode(bool $enabled): void {
+        $this->editorMode = $enabled;
     }
 
     /**
      * Render a page from its JSON file
      * 
-     * @param string $pageName Name of the page (e.g., 'home', 'about')
+     * @param string $pageName Name of the page (e.g., 'home', 'about') or path (e.g., 'guides/getting-started')
      * @return string Rendered HTML
      */
     public function renderPage(string $pageName): string {
-        return $this->renderJsonFile("/templates/model/json/pages/{$pageName}.json");
+        // Set structure context for editor mode
+        $this->currentStructure = 'page-' . str_replace('/', '-', $pageName);
+        $this->currentNodePath = [];
+        $this->inComponent = false;
+        
+        // Support both flat name ('home') and path ('guides/getting-started')
+        // Convention: ALL pages use folder structure - page/page.json
+        $routePath = trim($pageName, '/');
+        $segments = explode('/', $routePath);
+        $leafName = end($segments);
+        
+        // Try folder structure first: path/name/name.json
+        $folderPath = "/templates/model/json/pages/{$routePath}/{$leafName}.json";
+        if (file_exists(PROJECT_PATH . $folderPath)) {
+            return $this->renderJsonFile($folderPath);
+        }
+        
+        // Fallback to flat structure for backward compat: path/name.json
+        return $this->renderJsonFile("/templates/model/json/pages/{$routePath}.json");
     }
 
     /**
      * Render menu - just load and render the JSON
      */
     public function renderMenu(): string {
+        // Set structure context for editor mode
+        $this->currentStructure = 'menu';
+        $this->currentNodePath = [];
+        $this->inComponent = false;
+        
         return $this->renderJsonFile('/templates/model/json/menu.json');
     }
 
@@ -46,17 +102,112 @@ class JsonToHtmlRenderer {
      * Render footer - just load and render the JSON
      */
     public function renderFooter(): string {
+        // Set structure context for editor mode
+        $this->currentStructure = 'footer';
+        $this->currentNodePath = [];
+        $this->inComponent = false;
+        
         return $this->renderJsonFile('/templates/model/json/footer.json');
+    }
+
+    /**
+     * Render a component in isolation (for component editor preview)
+     * 
+     * @param string $componentName Name of the component to render
+     * @param array $sampleData Optional sample data for component variables
+     * @return string Rendered HTML
+     */
+    public function renderComponent(string $componentName, array $sampleData = []): string {
+        // Set structure context for editor mode - component editing
+        $this->currentStructure = 'component-' . $componentName;
+        $this->currentNodePath = [];
+        $this->inComponent = false; // Start as NOT in component (we're editing the component itself)
+        
+        // Load component template
+        $componentTemplate = $this->loadComponent($componentName);
+        if ($componentTemplate === null) {
+            return "<!-- Component not found: {$componentName} -->";
+        }
+        
+        // If no sample data provided, generate placeholder data from template
+        if (empty($sampleData)) {
+            $sampleData = $this->generatePlaceholderData($componentTemplate);
+        }
+        
+        // Process placeholders with sample data
+        $processedTemplate = $this->processComponentTemplate($componentTemplate, $sampleData);
+        
+        // Render the processed template
+        return $this->renderNode($processedTemplate, false);
+    }
+
+    /**
+     * Generate placeholder data from a component template
+     * Finds all placeholders like {{varName}} and creates sample values
+     * 
+     * @param array $template Component template structure
+     * @return array Sample data with placeholder names as keys
+     */
+    private function generatePlaceholderData(array $template): array {
+        $placeholders = [];
+        $this->extractPlaceholders($template, $placeholders);
+        
+        $sampleData = [];
+        foreach ($placeholders as $key) {
+            // Show placeholder name as-is for component preview
+            $sampleData[$key] = "{{" . $key . "}}";
+        }
+        
+        return $sampleData;
+    }
+
+    /**
+     * Recursively extract placeholder names from a template
+     * 
+     * @param array $node Current node to scan
+     * @param array &$placeholders Array to collect placeholder names
+     */
+    private function extractPlaceholders(array $node, array &$placeholders): void {
+        // Check textKey for placeholders
+        if (isset($node['textKey']) && preg_match_all('/\{\{(\w+)\}\}/', $node['textKey'], $matches)) {
+            foreach ($matches[1] as $key) {
+                if (!in_array($key, $placeholders)) {
+                    $placeholders[] = $key;
+                }
+            }
+        }
+        
+        // Check params for placeholders
+        if (isset($node['params']) && is_array($node['params'])) {
+            array_walk_recursive($node['params'], function($value) use (&$placeholders) {
+                if (is_string($value) && preg_match_all('/\{\{(\w+)\}\}/', $value, $matches)) {
+                    foreach ($matches[1] as $key) {
+                        if (!in_array($key, $placeholders)) {
+                            $placeholders[] = $key;
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Check children
+        if (isset($node['children']) && is_array($node['children'])) {
+            foreach ($node['children'] as $child) {
+                if (is_array($child)) {
+                    $this->extractPlaceholders($child, $placeholders);
+                }
+            }
+        }
     }
 
     /**
      * Render JSON file
      * 
-     * @param string $relativePath Path relative to SECURE_FOLDER_PATH
+     * @param string $relativePath Path relative to PROJECT_PATH
      * @return string Rendered HTML
      */
     private function renderJsonFile(string $relativePath): string {
-        $jsonPath = SECURE_FOLDER_PATH . $relativePath;
+        $jsonPath = PROJECT_PATH . $relativePath;
         
         if (!file_exists($jsonPath)) {
             error_log("JSON file not found: {$jsonPath}");
@@ -80,6 +231,13 @@ class JsonToHtmlRenderer {
             return "<!-- JSON must be an array -->";
         }
 
+        // Check if this is a single node (has 'tag' or 'component' or 'textKey') vs array of nodes
+        if (isset($data['tag']) || isset($data['component']) || isset($data['textKey'])) {
+            // Single root node - render directly
+            return $this->renderNode($data);
+        }
+
+        // Array of nodes - render each
         return $this->renderNodes($data);
     }
 
@@ -91,8 +249,14 @@ class JsonToHtmlRenderer {
      */
     private function renderNodes(array $nodes): string {
         $html = '';
+        $index = 0;
         foreach ($nodes as $node) {
+            // Push current index to path
+            $this->currentNodePath[] = $index;
             $html .= $this->renderNode($node);
+            // Pop after rendering
+            array_pop($this->currentNodePath);
+            $index++;
         }
         return $html;
     }
@@ -101,9 +265,10 @@ class JsonToHtmlRenderer {
      * Render a single node
      * 
      * @param mixed $node Node object (tag, text, or component)
+     * @param bool $isComponentRoot Whether this is the root element of a component
      * @return string Rendered HTML
      */
-    private function renderNode($node): string {
+    private function renderNode($node, bool $isComponentRoot = false): string {
         if (!is_array($node)) {
             error_log("Invalid node: must be an array");
             return "<!-- Invalid node -->";
@@ -114,12 +279,26 @@ class JsonToHtmlRenderer {
             $componentName = $node['component'];
             $componentData = $node['data'] ?? [];
             
+            // Save component context before entering
+            $prevInComponent = $this->inComponent;
+            $prevComponentName = $this->currentComponentName;
+            $prevComponentNode = $this->currentComponentNode;
+            
+            // Enter component context
+            $this->inComponent = true;
+            $this->currentComponentName = $componentName;
+            $this->currentComponentNode = implode('.', $this->currentNodePath);
+            
             // Process placeholders in component data
             $componentData = $this->processDataPlaceholders($componentData);
             
             // Load component template
             $componentTemplate = $this->loadComponent($componentName);
             if ($componentTemplate === null) {
+                // Restore context
+                $this->inComponent = $prevInComponent;
+                $this->currentComponentName = $prevComponentName;
+                $this->currentComponentNode = $prevComponentNode;
                 error_log("Component not found: {$componentName}");
                 return "<!-- Component not found: {$componentName} -->";
             }
@@ -127,8 +306,15 @@ class JsonToHtmlRenderer {
             // Replace placeholders with data
             $processedTemplate = $this->processComponentTemplate($componentTemplate, $componentData);
             
-            // Render the processed template
-            return $this->renderNode($processedTemplate);
+            // Render the processed template (mark as component root)
+            $html = $this->renderNode($processedTemplate, true);
+            
+            // Restore context after exiting component
+            $this->inComponent = $prevInComponent;
+            $this->currentComponentName = $prevComponentName;
+            $this->currentComponentNode = $prevComponentNode;
+            
+            return $html;
         }
 
         // Handle text node
@@ -138,7 +324,7 @@ class JsonToHtmlRenderer {
 
         // Handle tag node
         if (isset($node['tag'])) {
-            return $this->renderTagNode($node);
+            return $this->renderTagNode($node, $isComponentRoot);
         }
 
         error_log("Unknown node type: " . json_encode($node));
@@ -164,17 +350,37 @@ class JsonToHtmlRenderer {
             return htmlspecialchars($rawText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
 
-        // Use Translator::translate() which already uses htmlspecialchars
-        return htmlspecialchars($this->translator->translate($textKey), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        // Check if it's a variable placeholder (e.g., {{varName}}) - display as-is
+        if (preg_match('/^\{\{\w+\}\}$/', $textKey)) {
+            $displayText = htmlspecialchars($textKey, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            // In editor mode, wrap with data attribute for visibility
+            if ($this->editorMode) {
+                $escapedKey = htmlspecialchars($textKey, ENT_QUOTES);
+                return '<span data-qs-textkey="' . $escapedKey . '" data-qs-variable="true">' . $displayText . '</span>';
+            }
+            return $displayText;
+        }
+
+        // Get translated text
+        $translatedText = htmlspecialchars($this->translator->translate($textKey), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        
+        // In editor mode, wrap in span with data-qs-textkey for inline editing
+        if ($this->editorMode) {
+            $escapedKey = htmlspecialchars($textKey, ENT_QUOTES);
+            return '<span data-qs-textkey="' . $escapedKey . '">' . $translatedText . '</span>';
+        }
+
+        return $translatedText;
     }
 
     /**
      * Render a tag node (HTML element)
      * 
      * @param array $node Tag node with 'tag', 'params', 'children'
+     * @param bool $isComponentRoot Whether this is the root element of a component
      * @return string Rendered HTML element
      */
-    private function renderTagNode(array $node): string {
+    private function renderTagNode(array $node, bool $isComponentRoot = false): string {
         $tag = $node['tag'] ?? null;
         
         if (empty($tag)) {
@@ -187,6 +393,13 @@ class JsonToHtmlRenderer {
             error_log("Invalid tag name: {$tag}");
             return "<!-- Invalid tag name -->";
         }
+        
+        // SECURITY: Block dangerous tags that could execute scripts or inject styles
+        $blockedTags = ['script', 'noscript', 'style', 'template', 'slot'];
+        if (in_array(strtolower($tag), $blockedTags, true)) {
+            error_log("Blocked dangerous tag: {$tag}");
+            return "<!-- Blocked tag -->";
+        }
 
         $params = $node['params'] ?? [];
         $children = $node['children'] ?? null;
@@ -197,6 +410,11 @@ class JsonToHtmlRenderer {
         $isVoid = in_array(strtolower($tag), $voidElements);
 
         $html = '<' . htmlspecialchars($tag, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // Add editor mode attributes if enabled
+        if ($this->editorMode) {
+            $html .= $this->renderEditorAttributes($isComponentRoot);
+        }
 
         // Render attributes
         if (is_array($params) && !empty($params)) {
@@ -221,6 +439,37 @@ class JsonToHtmlRenderer {
 
         return $html;
     }
+    
+    /**
+     * Render editor mode data attributes
+     * 
+     * @param bool $isComponentRoot Whether this is the root element of a component
+     * @return string HTML attributes string
+     */
+    private function renderEditorAttributes(bool $isComponentRoot): string {
+        $attrs = '';
+        
+        // Always add structure identifier
+        $attrs .= ' data-qs-struct="' . htmlspecialchars($this->currentStructure, ENT_QUOTES) . '"';
+        
+        // Add node path
+        $nodePath = implode('.', $this->currentNodePath);
+        $attrs .= ' data-qs-node="' . htmlspecialchars($nodePath, ENT_QUOTES) . '"';
+        
+        // If we're inside a component
+        if ($this->inComponent) {
+            // Mark as in-component (for click handling - bubble up to component root)
+            $attrs .= ' data-qs-in-component';
+            
+            // On component root, add component name and the node where component is defined
+            if ($isComponentRoot) {
+                $attrs .= ' data-qs-component="' . htmlspecialchars($this->currentComponentName, ENT_QUOTES) . '"';
+                $attrs .= ' data-qs-component-node="' . htmlspecialchars($this->currentComponentNode, ENT_QUOTES) . '"';
+            }
+        }
+        
+        return $attrs;
+    }
 
     /**
      * Render an HTML attribute
@@ -236,9 +485,20 @@ class JsonToHtmlRenderer {
             return '';
         }
     
-        // Block event handler attributes (XSS vector)
+        // Handle event handler attributes (on*)
+        // Block raw JS, but allow {{call:...}} syntax which gets transformed to safe QS.* calls
         if (preg_match('/^on[a-z]+$/i', $name)) {
-            error_log("Event handler attributes not allowed: {$name}");
+            if (is_string($value) && strpos($value, '{{call:') !== false) {
+                // Transform {{call:...}} to QS.* function calls
+                $transformedValue = $this->transformCallSyntax($value);
+                // Double-check the result doesn't contain suspicious patterns
+                if ($this->isValidTransformedHandler($transformedValue)) {
+                    $escapedValue = htmlspecialchars($transformedValue, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    return ' ' . htmlspecialchars($name, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '="' . $escapedValue . '"';
+                }
+            }
+            // Block if not using {{call:...}} syntax or transformation failed
+            error_log("Event handler blocked (use {{call:...}} syntax): {$name}");
             return '';
         }
 
@@ -261,16 +521,160 @@ class JsonToHtmlRenderer {
             return '';
         }
 
+        // Translatable attributes - auto-translate if value looks like a translation key
+        $translatableAttributes = ['placeholder', 'title', 'alt', 'aria-label', 'aria-placeholder', 'aria-description'];
+        if (in_array($name, $translatableAttributes, true) && is_string($value)) {
+            // Check for __RAW__ prefix - use value as-is without translation
+            if (strpos($value, '__RAW__') === 0) {
+                $value = substr($value, 7); // Remove __RAW__ prefix
+            }
+            // Check if value looks like a translation key (contains dots, alphanumeric/underscore, no spaces)
+            elseif (preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/i', $value)) {
+                // It's a translation key - translate it
+                $value = $this->translator->translate($value);
+            }
+        }
+
         // Special handling for URL attributes
         $urlAttributes = ['href', 'src', 'data', 'poster', 'action', 'formaction', 'cite', 'srcset'];
         if (in_array($name, $urlAttributes, true) && is_string($value) && !empty($value)) {
-            $value = $this->processUrl($value);
+            // Process placeholders first (e.g., {{__current_page;lang=en}})
+            if (strpos($value, '{{__') !== false) {
+                $value = $this->processDataPlaceholders($value);
+            }
+            // Then process URL (add base URL, language prefix, etc.)
+            // Only if the value doesn't already look like a complete URL after placeholder processing
+            if (!preg_match('/^(https?:)?\/\//i', $value)) {
+                $value = $this->processUrl($value);
+            }
         }
 
         // Convert value to string and escape
         $escapedValue = htmlspecialchars((string)$value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         
         return ' ' . htmlspecialchars($name, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '="' . $escapedValue . '"';
+    }
+
+    /**
+     * Transform {{call:functionName:arg1,arg2}} syntax to QS.functionName('arg1', 'arg2')
+     * 
+     * Supports:
+     * - {{call:hide:#modal}} → QS.hide('#modal')
+     * - {{call:toggleClass:#menu,open}} → QS.toggleClass('#menu', 'open')
+     * - {{call:filter:event,.card,data-title}} → QS.filter(event, '.card', 'data-title')
+     * - Multiple calls: {{call:hide:#a}};{{call:show:#b}} → QS.hide('#a'); QS.show('#b')
+     * 
+     * Special keywords (not quoted): event, this
+     * 
+     * @param string $value The raw {{call:...}} syntax
+     * @return string Transformed JavaScript code
+     */
+    public function transformCallSyntaxPublic(string $value): string {
+        return $this->transformCallSyntax($value);
+    }
+
+    /**
+     * Transform {{call:...}} syntax into safe QS.*() JavaScript calls (internal)
+     * 
+     * @param string $value The attribute value containing {{call:...}} placeholders
+     * @return string Transformed JavaScript code
+     */
+    private function transformCallSyntax(string $value): string {
+        // Match all {{call:functionName:args}} or {{call:functionName}} patterns
+        return preg_replace_callback(
+            '/\{\{call:([a-zA-Z][a-zA-Z0-9]*)(:[^}]*)?\}\}/',
+            function ($matches) {
+                $functionName = $matches[1];
+                $argsString = isset($matches[2]) ? substr($matches[2], 1) : ''; // Remove leading ':'
+                
+                // Get allowed function names dynamically (core + custom)
+                $allowedFunctions = $this->getAllowedJsFunctions();
+                
+                if (!in_array($functionName, $allowedFunctions, true)) {
+                    error_log("Unknown QS function: {$functionName}");
+                    return '/* invalid function */';
+                }
+                
+                // Parse arguments (comma-separated)
+                if (empty($argsString)) {
+                    return "QS.{$functionName}()";
+                }
+                
+                // Special keywords that should not be quoted (JS variables)
+                $jsKeywords = ['event', 'this'];
+                
+                // Split by comma, but be careful with selectors that might contain commas
+                // For simplicity, treat each segment as a string argument
+                $args = array_map('trim', explode(',', $argsString));
+                $quotedArgs = array_map(function($arg) use ($jsKeywords) {
+                    // Don't quote JS keywords
+                    if (in_array($arg, $jsKeywords, true)) {
+                        return $arg;
+                    }
+                    // Escape single quotes in the argument
+                    $escaped = str_replace("'", "\\'", $arg);
+                    return "'{$escaped}'";
+                }, $args);
+                
+                return "QS.{$functionName}(" . implode(', ', $quotedArgs) . ")";
+            },
+            $value
+        );
+    }
+
+    /**
+     * Get all allowed JS function names (core + custom)
+     * Cached for performance within single render
+     * 
+     * @return array
+     */
+    private function getAllowedJsFunctions(): array {
+        static $allowedFunctions = null;
+        
+        if ($allowedFunctions === null) {
+            // Core functions (always available)
+            $allowedFunctions = [
+                'show', 'hide', 'toggle', 'toggleHide', 'addClass', 'removeClass',
+                'setValue', 'redirect', 'filter', 'scrollTo', 'focus', 'blur', 'fetch',
+                'renderList', 'toast'
+            ];
+            
+            // Add custom functions if JsFunctionManager is available
+            $managerPath = SECURE_FOLDER_PATH . '/src/classes/JsFunctionManager.php';
+            if (file_exists($managerPath)) {
+                require_once $managerPath;
+                $manager = new \JsFunctionManager();
+                $customFuncs = $manager->getCustomFunctions();
+                foreach ($customFuncs as $func) {
+                    $allowedFunctions[] = $func['name'];
+                }
+            }
+        }
+        
+        return $allowedFunctions;
+    }
+
+    /**
+     * Validate that a transformed event handler only contains safe QS.* calls
+     * 
+     * @param string $handler The transformed handler string
+     * @return bool True if safe, false if suspicious
+     */
+    private function isValidTransformedHandler(string $handler): bool {
+        // Remove all valid QS.functionName(...) calls and see what's left
+        $stripped = preg_replace('/QS\.[a-zA-Z]+\([^)]*\)/', '', $handler);
+        
+        // After removing QS calls, only semicolons, spaces, and comments should remain
+        $stripped = preg_replace('/[;\s]/', '', $stripped);
+        $stripped = preg_replace('/\/\*[^*]*\*\//', '', $stripped); // Remove /* comments */
+        
+        // If anything else remains, it's suspicious
+        if (!empty($stripped)) {
+            error_log("Suspicious content in transformed handler: {$stripped}");
+            return false;
+        }
+        
+        return true;
     }
 
     /**
@@ -517,5 +921,73 @@ class JsonToHtmlRenderer {
      */
     public function setContext(array $context) {
         $this->context = array_merge($this->context, $context);
+    }
+    
+    /**
+     * Render a single node from a structure at a specific path
+     * Used for dynamic DOM updates without full page reload
+     * 
+     * @param array $structure The full structure
+     * @param string $nodePath Node path like "0.1.2"
+     * @param string $structureName Structure name for editor mode (e.g., 'page-home', 'menu')
+     * @return string|null Rendered HTML or null if node not found
+     */
+    public function renderNodeAtPath(array $structure, string $nodePath, string $structureName = ''): ?string {
+        // Set structure context for editor mode
+        if ($structureName) {
+            $this->currentStructure = $structureName;
+        }
+        $this->inComponent = false;
+        
+        // Parse the node path
+        $indices = array_map('intval', explode('.', $nodePath));
+        
+        // Detect component structure (single object with 'tag') vs page structure (array of nodes)
+        $isComponent = isset($structure['tag']);
+        
+        // Navigate to the node
+        $node = null;
+        $current = $structure;
+        
+        foreach ($indices as $i => $index) {
+            if ($i === 0) {
+                if ($isComponent) {
+                    // Component: first index is into the root object's children
+                    if (!isset($current['children'][$index])) {
+                        return null;
+                    }
+                    $node = $current['children'][$index];
+                } else {
+                    // Page: first index is into the root array
+                    if (!isset($current[$index])) {
+                        return null;
+                    }
+                    $node = $current[$index];
+                }
+                $current = $node;
+            } else {
+                // Subsequent indices are into children
+                if (!isset($current['children'][$index])) {
+                    return null;
+                }
+                $node = $current['children'][$index];
+                $current = $node;
+            }
+        }
+        
+        if ($node === null) {
+            return null;
+        }
+        
+        // Set the node path for editor mode attributes
+        $this->currentNodePath = $indices;
+        array_pop($this->currentNodePath); // Remove last since renderNode will push it
+        
+        // Render the node
+        $this->currentNodePath[] = end($indices);
+        $html = $this->renderNode($node);
+        array_pop($this->currentNodePath);
+        
+        return $html;
     }
 }

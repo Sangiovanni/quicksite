@@ -1,0 +1,393 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "quicksite-workflow-schema",
+  "title": "QuickSite Workflow",
+  "description": "Schema for workflow files used in QuickSite admin panel (AI-assisted or manual)",
+  "type": "object",
+  "required": ["id", "version", "meta"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Reference to this schema"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Unique identifier for the workflow (kebab-case)"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of this workflow"
+    },
+    "meta": {
+      "type": "object",
+      "required": ["icon", "titleKey", "descriptionKey", "category"],
+      "properties": {
+        "icon": {
+          "type": "string",
+          "description": "Emoji icon for display"
+        },
+        "titleKey": {
+          "type": "string",
+          "description": "Translation key for the workflow title"
+        },
+        "descriptionKey": {
+          "type": "string",
+          "description": "Translation key for the workflow description"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["creation", "modification", "content", "style", "advanced", "wip", "template"],
+          "description": "Category for organizing workflows"
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tags for filtering and search"
+        },
+        "difficulty": {
+          "type": "string",
+          "enum": ["beginner", "intermediate", "advanced"],
+          "description": "Complexity level for user guidance"
+        }
+      }
+    },
+    "preWorkflows": {
+      "type": "array",
+      "description": "Workflows to run BEFORE this workflow's steps. Each can optionally specify params to pass.",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "Workflow ID to run with default params"
+          },
+          {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Workflow ID to run"
+              },
+              "params": {
+                "type": "object",
+                "description": "Parameters to pass to the sub-workflow. Can use {{param.x}} to forward values.",
+                "additionalProperties": true
+              }
+            }
+          }
+        ]
+      }
+    },
+    "postWorkflows": {
+      "type": "array",
+      "description": "Workflows to run AFTER this workflow's steps complete. Same format as preWorkflows.",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "Workflow ID to run with default params"
+          },
+          {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Workflow ID to run"
+              },
+              "params": {
+                "type": "object",
+                "description": "Parameters to pass to the sub-workflow. Can use {{param.x}} to forward values.",
+                "additionalProperties": true
+              }
+            }
+          }
+        ]
+      }
+    },
+    "parameters": {
+      "type": "array",
+      "description": "User-configurable parameters shown in the UI",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "labelKey"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Parameter identifier"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["text", "textarea", "select", "multiselect", "checkbox", "number", "nodeSelector"],
+            "description": "Input type for the parameter"
+          },
+          "labelKey": {
+            "type": "string",
+            "description": "Translation key for the label"
+          },
+          "placeholderKey": {
+            "type": "string",
+            "description": "Translation key for placeholder text"
+          },
+          "helpKey": {
+            "type": "string",
+            "description": "Translation key for help text"
+          },
+          "required": {
+            "type": "boolean",
+            "default": false
+          },
+          "default": {
+            "description": "Default value for the parameter"
+          },
+          "options": {
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["value", "labelKey"],
+                  "properties": {
+                    "value": { "type": "string" },
+                    "labelKey": { "type": "string" }
+                  }
+                }
+              },
+              {
+                "type": "string",
+                "pattern": "^dynamic:",
+                "description": "Dynamic options from a command, e.g., 'dynamic:getLangList.data.languages'"
+              }
+            ]
+          },
+          "validation": {
+            "type": "object",
+            "properties": {
+              "minLength": { "type": "integer" },
+              "maxLength": { "type": "integer" },
+              "pattern": { "type": "string" },
+              "min": { "type": "number" },
+              "max": { "type": "number" }
+            }
+          },
+          "condition": {
+            "type": "string",
+            "description": "Conditional expression to show/hide this parameter. Supports: paramId === value, paramId !== value, paramId (truthy). Example: 'multilingual === true'"
+          },
+          "structures": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["page", "menu", "footer", "component"]
+            },
+            "description": "For nodeSelector type: which structure types to show for node selection"
+          },
+          "allowTextHint": {
+            "type": "boolean",
+            "description": "For nodeSelector type: allow user to type a text hint instead of selecting a node"
+          },
+          "optional": {
+            "type": "boolean",
+            "description": "Whether this parameter can be left empty"
+          }
+        }
+      }
+    },
+    "examples": {
+      "type": "array",
+      "description": "Pre-defined example prompts",
+      "items": {
+        "type": "object",
+        "required": ["id", "titleKey", "promptKey"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Example identifier"
+          },
+          "titleKey": {
+            "type": "string",
+            "description": "Translation key for example title"
+          },
+          "promptKey": {
+            "type": "string",
+            "description": "Translation key for the example prompt text"
+          },
+          "params": {
+            "type": "object",
+            "description": "Pre-filled parameter values for this example"
+          }
+        }
+      }
+    },
+    "dataRequirements": {
+      "type": "array",
+      "description": "List of data needed from the system via CommandRunner",
+      "items": {
+        "type": "object",
+        "required": ["id", "command"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier used in prompt template"
+          },
+          "command": {
+            "type": "string",
+            "description": "Command name from CommandRunner whitelist"
+          },
+          "params": {
+            "type": "object",
+            "description": "Parameters to pass to the command"
+          },
+          "urlParams": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "URL parameters for the command"
+          },
+          "extract": {
+            "type": "string",
+            "description": "Dot-notation path to extract specific data (e.g., 'data.languages')"
+          },
+          "condition": {
+            "type": "string",
+            "description": "Parameter ID or expression. Data is only fetched when this evaluates to truthy. Example: 'targetPage' or 'multilingual === true'"
+          }
+        }
+      }
+    },
+    "relatedCommands": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "API commands that will be used in the generated output"
+    },
+    "recommendedModels": {
+      "type": "object",
+      "description": "Recommended AI models per provider for this spec",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "List of recommended model IDs for a provider"
+      },
+      "examples": [
+        {
+          "openai": ["gpt-4o", "gpt-4-turbo"],
+          "anthropic": ["claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022"],
+          "google": ["gemini-1.5-pro", "gemini-2.0-flash"]
+        }
+      ]
+    },
+    "providerNotes": {
+      "type": "object",
+      "description": "Provider-specific notes or warnings for this spec",
+      "additionalProperties": {
+        "type": "string",
+        "description": "Note text for a specific provider"
+      },
+      "examples": [
+        {
+          "openai": "Works best with GPT-4o for complex website creation",
+          "anthropic": "Claude models excel at following structured JSON output format"
+        }
+      ]
+    },
+    "promptTemplate": {
+      "type": "string",
+      "description": "Filename of the .md prompt template (same folder as spec)"
+    },
+    "outputFormat": {
+      "type": "string",
+      "enum": ["json-commands", "json-structure", "text"],
+      "default": "json-commands",
+      "description": "Expected output format from AI"
+    },
+    "preCommands": {
+      "type": "array",
+      "description": "Commands to execute BEFORE the AI-generated output (e.g., fresh start)",
+      "items": {
+        "$ref": "#/definitions/specCommand"
+      }
+    },
+    "postCommands": {
+      "type": "array",
+      "description": "Commands to execute AFTER the AI-generated output (e.g., lang-switch component)",
+      "items": {
+        "$ref": "#/definitions/specCommand"
+      }
+    },
+    "steps": {
+      "type": "array",
+      "description": "For manual workflows: commands to execute directly (no AI). Presence of steps without promptTemplate makes this a manual workflow.",
+      "items": {
+        "$ref": "#/definitions/specCommand"
+      }
+    }
+  },
+  "definitions": {
+    "specCommand": {
+      "type": "object",
+      "description": "A command or template to execute automatically",
+      "properties": {
+        "comment": {
+          "type": "string",
+          "description": "Optional comment for documentation/debugging purposes. Ignored during execution."
+        },
+        "condition": {
+          "type": "string",
+          "description": "Condition expression. Supports: param.X === value, config.MULTILINGUAL_SUPPORT === true, data.X for dataRequirements. Also supports && and || operators."
+        },
+        "forEach": {
+          "type": "string",
+          "description": "Data path to iterate over (e.g., 'routes', 'assets', 'langData.languages'). Generates one command per item. Use {{$key}} and {{$value}} in params."
+        },
+        "filter": {
+          "type": "string",
+          "description": "Filter expression for forEach items. Supports {{$key}}, {{$value}}, {{$value.prop}}, and {{dataPath}} references. Items where filter evaluates to false are skipped."
+        },
+        "template": {
+          "type": "string",
+          "description": "Name of a batch template to execute (mutually exclusive with command)"
+        },
+        "command": {
+          "type": "string",
+          "description": "API command name to execute (mutually exclusive with template)"
+        },
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+          "description": "HTTP method to use for the command. Default: POST for workflow steps.",
+          "default": "POST"
+        },
+        "params": {
+          "type": "object",
+          "description": "Parameters for the command. Supports {{config.X}}, {{param.X}}, {{dataRequirementId.path}}, and in forEach: {{$key}}, {{$value}}, {{$value.field}}",
+          "additionalProperties": true
+        },
+        "abortOnFail": {
+          "type": "boolean",
+          "description": "If true, abort the entire workflow if this command fails",
+          "default": false
+        }
+      },
+      "oneOf": [
+        { "required": ["template"] },
+        { "required": ["command", "params"] }
+      ]
+    },
+    "eachLoop": {
+      "type": "object",
+      "description": "Loop construct for generating arrays from config data",
+      "properties": {
+        "$each": {
+          "type": "string",
+          "description": "Source to iterate over, e.g., {{config.LANGUAGES_NAME}}"
+        },
+        "$item": {
+          "type": "object",
+          "description": "Template for each item. Use {{$key}} and {{$value}} for placeholders"
+        }
+      },
+      "required": ["$each", "$item"]
+    }
+  }
+}

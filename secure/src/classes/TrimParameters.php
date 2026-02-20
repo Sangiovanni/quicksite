@@ -1,98 +1,316 @@
 <?php
+/**
+ * TrimParameters - URL Parsing and Route Resolution
+ * 
+ * Parses the current URL and resolves it against the nested routes structure.
+ * Supports hierarchical routes up to 5 levels deep.
+ * 
+ * @example URL: /en/guides/installation/step-1
+ *   - lang: 'en'
+ *   - route: ['guides', 'installation']
+ *   - params: ['step-1']
+ */
+
 require_once __DIR__ . '/../functions/String.php';
 
-class TrimParameters{
-  private $folder = null;
-  private $lang = MULTILINGUAL_SUPPORT ? 'en' : null;
-  private $page = ROUTES[0] ?? 'home';
-  private $id = null;
-  private $params = [];
-  private static $supportedLangs = MULTILINGUAL_SUPPORT ?  ['fr', 'en'] : [];
-  private static $supportedRoute = ROUTES;
-
-  public function __construct() {
-    $request_uri = $_SERVER['REQUEST_URI'] ?? '';
-    $parsed_path = parse_url($request_uri, PHP_URL_PATH);
+class TrimParameters {
+    /** @var string|null Current language code */
+    private ?string $lang = null;
     
-    // Handle malformed URLs or null results
-    if ($parsed_path === null || $parsed_path === false) {
-        // Redirect to home or set as 404
-        $this->page = 'home';
-        return;
+    /** @var array Route segments as array, e.g., ['guides', 'installation'] */
+    private array $route = [];
+    
+    /** @var string Route as path string, e.g., 'guides/installation' */
+    private string $routePath = '';
+    
+    /** @var array Remaining URL segments after route resolution */
+    private array $params = [];
+    
+    /** @var bool Whether the route was found in routes.php */
+    private bool $routeFound = false;
+    
+    /** @var array Supported languages from config */
+    private static array $supportedLangs = [];
+    
+    /** @var array Routes structure from routes.php */
+    private static array $routes = [];
+    
+    /** @var int Maximum route depth allowed */
+    private const MAX_DEPTH = 5;
+
+    public function __construct() {
+        // Initialize static config
+        self::$supportedLangs = (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) 
+            ? (CONFIG['LANGUAGES_SUPPORTED'] ?? []) 
+            : [];
+        self::$routes = defined('ROUTES') ? ROUTES : [];
+        
+        // Set default language
+        if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) {
+            $this->lang = CONFIG['LANGUAGE_DEFAULT'] ?? 'en';
+        }
+        
+        // Parse URL
+        $this->parseUrl();
     }
     
-    $request_uri = trim($parsed_path, '/');
-    $folder = PUBLIC_FOLDER_SPACE;
-    $request_uri = removePrefix($request_uri, $folder ? trim($folder, '/') . '/' : '');
-    
-    // Filter out empty parts from multiple slashes
-    $parts = array_filter(explode('/', $request_uri), function($part) {
-        return $part !== '';
-    });
-    $parts = array_values($parts); // Re-index array
-    
-    if (count($parts) > 0) {
-        if (in_array($parts[0], self::$supportedLangs)) {
-            if(MULTILINGUAL_SUPPORT){
+    /**
+     * Parse the current URL and resolve route
+     */
+    private function parseUrl(): void {
+        $requestUri = $_SERVER['REQUEST_URI'] ?? '';
+        $parsedPath = parse_url($requestUri, PHP_URL_PATH);
+        
+        // Handle malformed URLs
+        if ($parsedPath === null || $parsedPath === false) {
+            $this->route = ['home'];
+            $this->routePath = 'home';
+            $this->routeFound = true;
+            return;
+        }
+        
+        $path = trim($parsedPath, '/');
+        
+        // Remove PUBLIC_FOLDER_SPACE prefix if present
+        $folder = defined('PUBLIC_FOLDER_SPACE') ? PUBLIC_FOLDER_SPACE : '';
+        if ($folder) {
+            $path = removePrefix($path, trim($folder, '/') . '/');
+        }
+        
+        // Split into segments, filter empty
+        $parts = array_values(array_filter(explode('/', $path), fn($p) => $p !== ''));
+        
+        // Extract language if multilingual
+        if (!empty($parts) && in_array($parts[0], self::$supportedLangs)) {
+            if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) {
                 $this->lang = array_shift($parts);
             }
         }
-    }
-    
-    if (count($parts) > 0) {
-        if (in_array($parts[0], self::$supportedRoute)) {
-            $this->page = array_shift($parts);
+        
+        // Resolve route against routes structure
+        if (empty($parts)) {
+            // Root URL → home
+            $this->route = ['home'];
+            $this->routePath = 'home';
+            $this->routeFound = isset(self::$routes['home']);
+        } else {
+            $resolved = $this->resolveRoute($parts, self::$routes);
+            $this->route = $resolved['route'];
+            $this->routePath = implode('/', $resolved['route']);
+            $this->params = $resolved['params'];
+            $this->routeFound = $resolved['found'];
         }
-        else{
-            $this->page = '404';
+    }
+    
+    /**
+     * Resolve URL segments against nested routes structure
+     * 
+     * A route is only "found" if ALL URL segments are matched.
+     * Partial matches (e.g., /about/you when only /about/us exists) return 404.
+     * 
+     * @param array $urlParts URL segments to resolve
+     * @param array $routes Routes structure to match against
+     * @return array ['route' => [...], 'params' => [...], 'found' => bool]
+     */
+    private function resolveRoute(array $urlParts, array $routes): array {
+        $matched = [];
+        $remaining = $urlParts;
+        $current = $routes;
+        $depth = 0;
+        
+        while (!empty($remaining) && $depth < self::MAX_DEPTH) {
+            $segment = $remaining[0];
+            
+            if (isset($current[$segment])) {
+                array_shift($remaining);
+                $matched[] = $segment;
+                $current = $current[$segment];
+                $depth++;
+            } else {
+                // Segment not found - this is a 404
+                // Don't partially match (e.g., /about/you should NOT resolve to /about)
+                break;
+            }
         }
+        
+        // Route is only found if we matched ALL segments
+        // If there are remaining unmatched segments, it's a 404
+        if (empty($matched) || !empty($remaining)) {
+            return [
+                'route' => ['404'],
+                'params' => $urlParts,
+                'found' => false
+            ];
+        }
+        
+        return [
+            'route' => $matched,
+            'params' => [],  // All segments matched, no remaining params
+            'found' => true
+        ];
     }
     
-    if(count($parts) > 0) {
-        $this->id = array_shift($parts);
+    /**
+     * Get route as array
+     * @return array e.g., ['guides', 'installation']
+     */
+    public function route(): array {
+        return $this->route;
     }
     
-    $this->params = $parts;
-  }
-
-  public function page() {
-    return $this->page;
-  }
-  public function lang() {
-    return $this->lang;
-  }
-  public function id() {
-    return $this->id;
-  }
-  public function params() {
-    return $this->params;
-  }
-
-  public function samePageUrl($lang = null) {
-    $currentLang = $lang ?? $this->lang;
-    $url = BASE_URL ;
-    if(MULTILINGUAL_SUPPORT){
-        $url .= $currentLang;
+    /**
+     * Get route as path string
+     * @return string e.g., 'guides/installation'
+     */
+    public function routePath(): string {
+        return $this->routePath;
     }
-    if ($this->page !== 'home') {
-      if(MULTILINGUAL_SUPPORT){
-          $url .= '/'.$this->page;
-      }
-      else{
-          $url .= $this->page;
-      }
-    } else {
-      // For home page, add trailing slash
-      if(MULTILINGUAL_SUPPORT){
-          $url .= '/';
-      }
+    
+    /**
+     * Get the top-level route (first segment)
+     * @return string e.g., 'guides'
+     */
+    public function rootRoute(): string {
+        return $this->route[0] ?? 'home';
     }
-    if ($this->id !== null) {
-      $url .= '/' . $this->id;
+    
+    /**
+     * Get remaining URL parameters after route
+     * @return array
+     */
+    public function params(): array {
+        return $this->params;
     }
-    if (!empty($this->params)) {
-      $url .= '/' . implode('/', $this->params);
+    
+    /**
+     * Get current language
+     * @return string|null
+     */
+    public function lang(): ?string {
+        return $this->lang;
     }
-    return $url;
-  }
+    
+    /**
+     * Check if route was found in routes.php
+     * @return bool
+     */
+    public function routeFound(): bool {
+        return $this->routeFound;
+    }
+    
+    /**
+     * Check if current route is home
+     * @return bool
+     */
+    public function isHome(): bool {
+        return $this->routePath === 'home';
+    }
+    
+    // =========================================================================
+    // LEGACY COMPATIBILITY METHODS
+    // These maintain backward compatibility during migration
+    // =========================================================================
+    
+    /**
+     * @deprecated Use routePath() or route()[0] instead
+     * Returns the last segment of the route for legacy template compatibility
+     */
+    public function page(): string {
+        return end($this->route) ?: 'home';
+    }
+    
+    /**
+     * @deprecated No longer used - params now contains all remaining segments
+     */
+    public function id(): ?string {
+        return $this->params[0] ?? null;
+    }
+    
+    /**
+     * Build URL for the same page in a different language
+     * Used by language switcher
+     * 
+     * @param string|null $lang Target language code
+     * @return string Full URL
+     */
+    public function samePageUrl(?string $lang = null): string {
+        $targetLang = $lang ?? $this->lang;
+        $url = defined('BASE_URL') ? BASE_URL : '/';
+        
+        // Add language prefix if multilingual
+        if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) {
+            $url .= $targetLang;
+        }
+        
+        // Add route path (skip 'home' for cleaner URLs)
+        if (!$this->isHome()) {
+            $separator = (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) ? '/' : '';
+            $url .= $separator . $this->routePath;
+        } else {
+            // For home, just ensure trailing slash if multilingual
+            if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) {
+                $url .= '/';
+            }
+        }
+        
+        // Add remaining params if any
+        if (!empty($this->params)) {
+            $url .= '/' . implode('/', $this->params);
+        }
+        
+        return $url;
+    }
+    
+    // =========================================================================
+    // STATIC UTILITY METHODS
+    // =========================================================================
+    
+    /**
+     * Check if a route path exists in routes structure
+     * 
+     * @param string $routePath Path like 'guides/installation'
+     * @param array|null $routes Routes structure (uses ROUTES if null)
+     * @return bool
+     */
+    public static function routeExists(string $routePath, ?array $routes = null): bool {
+        $routes = $routes ?? (defined('ROUTES') ? ROUTES : []);
+        $segments = array_filter(explode('/', $routePath), fn($p) => $p !== '');
+        
+        $current = $routes;
+        foreach ($segments as $segment) {
+            if (!isset($current[$segment])) {
+                return false;
+            }
+            $current = $current[$segment];
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Get children of a route
+     * 
+     * @param string $routePath Path like 'guides'
+     * @param array|null $routes Routes structure
+     * @return array Child route names
+     */
+    public static function getRouteChildren(string $routePath, ?array $routes = null): array {
+        $routes = $routes ?? (defined('ROUTES') ? ROUTES : []);
+        
+        if (empty($routePath)) {
+            return array_keys($routes);
+        }
+        
+        $segments = array_filter(explode('/', $routePath), fn($p) => $p !== '');
+        
+        $current = $routes;
+        foreach ($segments as $segment) {
+            if (!isset($current[$segment])) {
+                return [];
+            }
+            $current = $current[$segment];
+        }
+        
+        return array_keys($current);
+    }
 }

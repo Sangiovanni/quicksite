@@ -1,0 +1,60 @@
+{
+  "id": "hero-centered",
+  "name": "Centered Hero",
+  "category": "layouts",
+  "description": "Full-width hero section with centered title, subtitle and call-to-action",
+  "isCore": true,
+  "structure": {
+    "tag": "section",
+    "params": { "class": "qs-snippet-hero" },
+    "children": [
+      {
+        "tag": "div",
+        "params": { "class": "qs-snippet-hero-content" },
+        "children": [
+          {
+            "tag": "h1",
+            "params": { "class": "qs-snippet-hero-title" },
+            "children": [{ "textKey": "snippet.hero.title" }]
+          },
+          {
+            "tag": "p",
+            "params": { "class": "qs-snippet-hero-subtitle" },
+            "children": [{ "textKey": "snippet.hero.subtitle" }]
+          },
+          {
+            "tag": "div",
+            "params": { "class": "qs-snippet-hero-actions" },
+            "children": [
+              {
+                "tag": "a",
+                "params": { "href": "#", "class": "qs-snippet-btn qs-snippet-btn-primary qs-snippet-btn-lg" },
+                "children": [{ "textKey": "snippet.hero.cta" }]
+              },
+              {
+                "tag": "a",
+                "params": { "href": "#", "class": "qs-snippet-btn qs-snippet-btn-outline qs-snippet-btn-lg" },
+                "children": [{ "textKey": "snippet.hero.secondary" }]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "translations": {
+    "en": {
+      "snippet.hero.title": "Welcome to Our Website",
+      "snippet.hero.subtitle": "We create amazing digital experiences that help your business grow and succeed in the modern world.",
+      "snippet.hero.cta": "Get Started",
+      "snippet.hero.secondary": "Learn More"
+    },
+    "fr": {
+      "snippet.hero.title": "Bienvenue sur notre site",
+      "snippet.hero.subtitle": "Nous créons des expériences numériques exceptionnelles qui aident votre entreprise à se développer et à réussir dans le monde moderne.",
+      "snippet.hero.cta": "Commencer",
+      "snippet.hero.secondary": "En savoir plus"
+    }
+  },
+  "css": ".qs-snippet-hero { min-height: 60vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 4rem 2rem; text-align: center; } .qs-snippet-hero-content { max-width: 800px; } .qs-snippet-hero-title { font-size: 3rem; color: #fff; margin: 0 0 1rem; } .qs-snippet-hero-subtitle { font-size: 1.25rem; color: rgba(255,255,255,0.9); margin: 0 0 2rem; line-height: 1.6; } .qs-snippet-hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; } .qs-snippet-btn-lg { padding: 0.875rem 2rem; font-size: 1.1rem; } .qs-snippet-btn-outline { background: transparent; color: #fff; border: 2px solid #fff; } .qs-snippet-btn-outline:hover { background: #fff; color: #667eea; }"
+}

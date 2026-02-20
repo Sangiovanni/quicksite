@@ -1,13 +1,9 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
-// Check if multilingual mode is enabled
-if (!MULTILINGUAL_SUPPORT) {
-    ApiResponse::create(403, 'mode.requires_multilingual')
-        ->withMessage('The deleteLang command requires multilingual mode. Use setMultilingual to enable it first.')
-        ->withData(['current_mode' => 'mono-language'])
-        ->send();
-}
+// Note: Removed multilingual mode requirement to allow cleanup of orphaned languages
+// This supports fresh-start workflows that need to delete extra languages regardless of mode
 
 $params = $trimParametersManagement->params();
 
@@ -29,10 +25,10 @@ if (!is_string($params['code'])) {
 $langCode = trim($params['code']);
 
 // Validate language code format
-if (!preg_match('/^[a-z]{2,3}$/', $langCode)) {
+if (!RegexPatterns::match('language_code', $langCode)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage("Invalid language code format")
-        ->withErrors([['field' => 'code', 'value' => $langCode]])
+        ->withErrors([RegexPatterns::validationError('language_code', 'code', $langCode)])
         ->send();
 }
 
@@ -63,7 +59,7 @@ if (count(CONFIG['LANGUAGES_SUPPORTED']) === 1) {
 }
 
 // --- DELETE TRANSLATION FILE FIRST (safer - file can be recreated, config corruption is worse) ---
-$translation_file = SECURE_FOLDER_PATH . '/translate/' . $langCode . '.json';
+$translation_file = PROJECT_PATH . '/translate/' . $langCode . '.json';
 $deleted = false;
 
 if (file_exists($translation_file)) {

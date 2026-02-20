@@ -38,7 +38,7 @@ $alias = rtrim($alias, '/');
 if ($alias === '') $alias = '/';
 
 // Load existing aliases
-$aliasesFile = SECURE_FOLDER_PATH . '/config/aliases.json';
+$aliasesFile = PROJECT_PATH . '/data/aliases.json';
 
 if (!file_exists($aliasesFile)) {
     ApiResponse::create(404, 'api.error.not_found')

@@ -1,0 +1,112 @@
+{
+  "id": "contact-form",
+  "name": "Contact Form",
+  "category": "forms",
+  "description": "Basic contact form with name, email and message fields",
+  "isCore": true,
+  "structure": {
+    "tag": "form",
+    "params": { "class": "qs-snippet-contact-form" },
+    "children": [
+      {
+        "tag": "h2",
+        "params": { "class": "qs-snippet-form-title" },
+        "children": [{ "textKey": "snippet.contact.title" }]
+      },
+      {
+        "tag": "div",
+        "params": { "class": "qs-snippet-form-group" },
+        "children": [
+          {
+            "tag": "label",
+            "params": { "for": "name" },
+            "children": [{ "textKey": "snippet.contact.name" }]
+          },
+          {
+            "tag": "input",
+            "params": { 
+              "type": "text", 
+              "id": "name", 
+              "name": "name",
+              "class": "qs-snippet-input",
+              "placeholder": "snippet.contact.namePlaceholder",
+              "required": "required"
+            }
+          }
+        ]
+      },
+      {
+        "tag": "div",
+        "params": { "class": "qs-snippet-form-group" },
+        "children": [
+          {
+            "tag": "label",
+            "params": { "for": "email" },
+            "children": [{ "textKey": "snippet.contact.email" }]
+          },
+          {
+            "tag": "input",
+            "params": { 
+              "type": "email", 
+              "id": "email", 
+              "name": "email",
+              "class": "qs-snippet-input",
+              "placeholder": "snippet.contact.emailPlaceholder",
+              "required": "required"
+            }
+          }
+        ]
+      },
+      {
+        "tag": "div",
+        "params": { "class": "qs-snippet-form-group" },
+        "children": [
+          {
+            "tag": "label",
+            "params": { "for": "message" },
+            "children": [{ "textKey": "snippet.contact.message" }]
+          },
+          {
+            "tag": "textarea",
+            "params": { 
+              "id": "message", 
+              "name": "message",
+              "class": "qs-snippet-textarea",
+              "placeholder": "snippet.contact.messagePlaceholder",
+              "rows": "5",
+              "required": "required"
+            }
+          }
+        ]
+      },
+      {
+        "tag": "button",
+        "params": { "type": "submit", "class": "qs-snippet-btn qs-snippet-btn-primary" },
+        "children": [{ "textKey": "snippet.contact.submit" }]
+      }
+    ]
+  },
+  "translations": {
+    "en": {
+      "snippet.contact.title": "Contact Us",
+      "snippet.contact.name": "Name",
+      "snippet.contact.namePlaceholder": "Your name",
+      "snippet.contact.email": "Email",
+      "snippet.contact.emailPlaceholder": "your@email.com",
+      "snippet.contact.message": "Message",
+      "snippet.contact.messagePlaceholder": "Your message...",
+      "snippet.contact.submit": "Send Message"
+    },
+    "fr": {
+      "snippet.contact.title": "Contactez-nous",
+      "snippet.contact.name": "Nom",
+      "snippet.contact.namePlaceholder": "Votre nom",
+      "snippet.contact.email": "Email",
+      "snippet.contact.emailPlaceholder": "votre@email.com",
+      "snippet.contact.message": "Message",
+      "snippet.contact.messagePlaceholder": "Votre message...",
+      "snippet.contact.submit": "Envoyer"
+    }
+  },
+  "css": ".qs-snippet-contact-form { max-width: 500px; padding: 2rem; background: #f9f9f9; border-radius: 8px; } .qs-snippet-form-title { margin: 0 0 1.5rem; color: #333; } .qs-snippet-form-group { margin-bottom: 1rem; } .qs-snippet-form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #333; } .qs-snippet-input, .qs-snippet-textarea { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; box-sizing: border-box; } .qs-snippet-input:focus, .qs-snippet-textarea:focus { outline: none; border-color: #007bff; } .qs-snippet-btn { padding: 0.75rem 1.5rem; border: none; border-radius: 4px; font-size: 1rem; cursor: pointer; } .qs-snippet-btn-primary { background: #007bff; color: #fff; } .qs-snippet-btn-primary:hover { background: #0056b3; }"
+}

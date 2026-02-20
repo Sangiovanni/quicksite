@@ -15,6 +15,8 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 // Get request body
 $rawBody = defined('REQUEST_BODY_RAW') ? REQUEST_BODY_RAW : file_get_contents('php://input');
@@ -60,9 +62,10 @@ $target = rtrim($target, '/');
 if ($target === '') $target = '/';
 
 // Validate alias format
-if (!preg_match('/^\/[a-zA-Z0-9\/_-]*$/', $alias)) {
+if (!RegexPatterns::match('url_alias', $alias)) {
     ApiResponse::create(400, 'api.error.invalid_parameter')
         ->withMessage('Invalid alias format. Use alphanumeric characters, dashes, underscores, and slashes only')
+        ->withErrors([RegexPatterns::validationError('url_alias', 'alias', $alias)])
         ->send();
 }
 
@@ -74,7 +77,7 @@ if ($alias === $target) {
 }
 
 // Check alias doesn't conflict with existing routes
-$routesFile = SECURE_FOLDER_PATH . '/routes.php';
+$routesFile = PROJECT_PATH . '/routes.php';
 $routes = file_exists($routesFile) ? require($routesFile) : [];
 
 // Extract alias path segment (first part after /)
@@ -99,7 +102,7 @@ if (in_array($aliasSegment, $reservedPaths)) {
 }
 
 // Load existing aliases
-$aliasesFile = SECURE_FOLDER_PATH . '/config/aliases.json';
+$aliasesFile = PROJECT_PATH . '/data/aliases.json';
 $configDir = dirname($aliasesFile);
 
 // Ensure config directory exists
@@ -121,18 +124,20 @@ if (isset($aliases[$alias])) {
 }
 
 // Verify target route exists (either as a route or page)
-$targetSegment = trim($target, '/');
-if (strpos($targetSegment, '/') !== false) {
-    $targetSegment = explode('/', $targetSegment)[0];
-}
+$targetPath = trim($target, '/');
 
-$targetIsRoute = in_array($targetSegment, $routes);
-$targetIsPage = file_exists(SECURE_FOLDER_PATH . '/templates/model/json/pages/' . $targetSegment . '.json');
+// Check if target exists in routes (supports nested routes)
+$targetIsRoute = routeExists($targetPath, $routes);
+
+// Check if page JSON exists (supports folder structure)
+$targetIsPage = resolvePageJsonPath($targetPath) !== null;
+
 $targetIsAlias = isset($aliases[$target]);
 
 if (!$targetIsRoute && !$targetIsPage && !$targetIsAlias && $target !== '/') {
     ApiResponse::create(400, 'api.error.invalid_parameter')
         ->withMessage("Target '$target' does not exist as a route or page")
+        ->withData(['available_routes' => flattenRoutes($routes)])
         ->send();
 }
 

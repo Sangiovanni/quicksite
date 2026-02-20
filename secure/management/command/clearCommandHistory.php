@@ -15,6 +15,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/functions/LoggingManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 // Get request body (use pre-captured if available)
 $rawBody = defined('REQUEST_BODY_RAW') ? REQUEST_BODY_RAW : file_get_contents('php://input');
@@ -35,10 +36,10 @@ if (empty($body['before'])) {
 }
 
 // Validate date format
-if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $body['before'])) {
+if (!RegexPatterns::match('date_iso', $body['before'])) {
     ApiResponse::create(400, 'validation.invalid_date')
         ->withMessage('Invalid date format for "before" parameter')
-        ->withData(['expected_format' => 'YYYY-MM-DD'])
+        ->withErrors([RegexPatterns::validationError('date_iso', 'before', $body['before'])])
         ->send();
 }
 

@@ -10,8 +10,14 @@ class JsonToPhpCompiler {
     
     /**
      * Compile a full page JSON structure to PHP code
+     * 
+     * @param array $structure The page JSON structure
+     * @param string $pageTitle The page title key for translation
+     * @param bool $showMenu Whether to show the menu (default: true)
+     * @param bool $showFooter Whether to show the footer (default: true)
+     * @return string The compiled PHP code
      */
-    public function compilePage(array $structure, string $pageTitle): string {
+    public function compilePage(array $structure, string $pageTitle, bool $showMenu = true, bool $showFooter = true, array $pageEvents = []): string {
         $output = "<?php\n\n";
         $output .= "require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';\n";
         $output .= "\$trimParameters = new TrimParameters();\n";
@@ -28,11 +34,67 @@ class JsonToPhpCompiler {
         $output .= "\$content = '';\n";
         $output .= $this->compileNodes($structure);
         
+        // Compile page-level events (onload, onresize, onscroll) into a script tag
+        $pageEventsScript = $this->compilePageEvents($pageEvents);
+        
+        // Pass layout settings to Page constructor
+        $showMenuStr = $showMenu ? 'true' : 'false';
+        $showFooterStr = $showFooter ? 'true' : 'false';
+        $pageEventsScriptStr = addcslashes($pageEventsScript, "'\\");
+        
         $output .= "\nrequire_once SECURE_FOLDER_PATH . '/src/classes/Page.php';\n";
-        $output .= "\$page = new Page(\$pageTitle, \$content, \$lang);\n";
+        $output .= "\$page = new Page(\$pageTitle, \$content, \$lang, {$showMenuStr}, {$showFooterStr}, '{$pageEventsScriptStr}');\n";
         $output .= "\$page->render();\n";
         
         return $output;
+    }
+    
+    /**
+     * Compile page-level events into a <script> tag
+     * 
+     * Converts page-events.json entries for a single route into JavaScript event listeners.
+     * - onload → document.addEventListener("DOMContentLoaded", ...)
+     * - onresize → window.addEventListener("resize", ...)
+     * - onscroll → window.addEventListener("scroll", ...)
+     * 
+     * @param array $events The events for one page route, e.g. ['onload' => ['{{call:show:#modal}}']]
+     * @return string The compiled <script> tag, or empty string if no events
+     */
+    public function compilePageEvents(array $events): string {
+        if (empty($events)) {
+            return '';
+        }
+        
+        $eventScripts = [];
+        
+        // Map event names to their JS listener wrappers
+        $eventMap = [
+            'onload' => ['target' => 'document', 'event' => 'DOMContentLoaded'],
+            'onresize' => ['target' => 'window', 'event' => 'resize'],
+            'onscroll' => ['target' => 'window', 'event' => 'scroll'],
+        ];
+        
+        foreach ($eventMap as $eventName => $listener) {
+            if (!empty($events[$eventName]) && is_array($events[$eventName])) {
+                $calls = [];
+                foreach ($events[$eventName] as $callSyntax) {
+                    $transformed = $this->transformCallSyntax($callSyntax);
+                    // Only include valid transformed QS calls (skip unchanged or invalid)
+                    if ($transformed && $transformed !== $callSyntax && strpos($transformed, '/* invalid') === false) {
+                        $calls[] = $transformed;
+                    }
+                }
+                if (!empty($calls)) {
+                    $eventScripts[] = $listener['target'] . '.addEventListener("' . $listener['event'] . '",function(){' . implode(';', $calls) . '});';
+                }
+            }
+        }
+        
+        if (empty($eventScripts)) {
+            return '';
+        }
+        
+        return '<script>' . implode('', $eventScripts) . '</script>';
     }
     
     /**
@@ -235,6 +297,21 @@ class JsonToPhpCompiler {
             $urlAttributes = ['href', 'src', 'data', 'poster', 'action', 'formaction', 'cite', 'srcset'];
             
             foreach ($params as $attrName => $attrValue) {
+                // Handle event handler attributes (on*) - only allow {{call:...}} syntax
+                if (preg_match('/^on[a-z]+$/i', $attrName)) {
+                    if (is_string($attrValue) && strpos($attrValue, '{{call:') !== false) {
+                        $transformedValue = $this->transformCallSyntax($attrValue);
+                        if ($this->isValidTransformedHandler($transformedValue)) {
+                            $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(';
+                            $output .= var_export($transformedValue, true);
+                            $output .= ', ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
+                        }
+                        // Skip if transformation failed (blocked)
+                    }
+                    // Skip raw JS event handlers (blocked)
+                    continue;
+                }
+                
                 // Check if this is a URL attribute that needs language prefix
                 $needsUrlProcessing = in_array($attrName, $urlAttributes, true);
                 
@@ -300,7 +377,7 @@ class JsonToPhpCompiler {
         }
         
         // Load component JSON from development location
-        $componentPath = SECURE_FOLDER_PATH . '/templates/model/json/components/' . $componentName . '.json';
+        $componentPath = PROJECT_PATH . '/templates/model/json/components/' . $componentName . '.json';
         
         if (!file_exists($componentPath)) {
             return "// Component not found: {$componentName}\n";
@@ -412,6 +489,98 @@ class JsonToPhpCompiler {
         }
 
         return implode(' . ', $phpParts);
+    }
+
+    /**
+     * Transform {{call:functionName:arg1,arg2}} syntax to QS.functionName('arg1', 'arg2')
+     * Same logic as JsonToHtmlRenderer::transformCallSyntax()
+     * 
+     * Special keywords (not quoted): event, this
+     * 
+     * @param string $value The attribute value containing {{call:...}} placeholders
+     * @return string Transformed JavaScript code
+     */
+    private function transformCallSyntax(string $value): string {
+        return preg_replace_callback(
+            '/\{\{call:([a-zA-Z][a-zA-Z0-9]*)(:[^}]*)?\}\}/',
+            function ($matches) {
+                $functionName = $matches[1];
+                $argsString = isset($matches[2]) ? substr($matches[2], 1) : '';
+                
+                // Get allowed function names dynamically (core + custom)
+                $allowedFunctions = $this->getAllowedJsFunctions();
+                
+                if (!in_array($functionName, $allowedFunctions, true)) {
+                    return '/* invalid function */';
+                }
+                
+                if (empty($argsString)) {
+                    return "QS.{$functionName}()";
+                }
+                
+                // Special keywords that should not be quoted (JS variables)
+                $jsKeywords = ['event', 'this'];
+                
+                $args = array_map('trim', explode(',', $argsString));
+                $quotedArgs = array_map(function($arg) use ($jsKeywords) {
+                    if (in_array($arg, $jsKeywords, true)) {
+                        return $arg;
+                    }
+                    $escaped = str_replace("'", "\\'", $arg);
+                    return "'{$escaped}'";
+                }, $args);
+                
+                return "QS.{$functionName}(" . implode(', ', $quotedArgs) . ")";
+            },
+            $value
+        );
+    }
+
+    /**
+     * Get all allowed JS function names (core + custom)
+     * Cached for performance within single compile
+     * 
+     * @return array
+     */
+    private function getAllowedJsFunctions(): array {
+        static $allowedFunctions = null;
+        
+        if ($allowedFunctions === null) {
+            // Core functions (always available)
+            $allowedFunctions = [
+                'show', 'hide', 'toggle', 'toggleHide', 'addClass', 'removeClass',
+                'setValue', 'redirect', 'filter', 'scrollTo', 'focus', 'blur', 'fetch',
+                'renderList', 'toast'
+            ];
+            
+            // Add custom functions if JsFunctionManager is available
+            $managerPath = SECURE_FOLDER_PATH . '/src/classes/JsFunctionManager.php';
+            if (file_exists($managerPath)) {
+                require_once $managerPath;
+                $manager = new \JsFunctionManager();
+                $customFuncs = $manager->getCustomFunctions();
+                foreach ($customFuncs as $func) {
+                    $allowedFunctions[] = $func['name'];
+                }
+            }
+        }
+        
+        return $allowedFunctions;
+    }
+
+    /**
+     * Validate that a transformed event handler only contains safe QS.* calls
+     * Same logic as JsonToHtmlRenderer::isValidTransformedHandler()
+     * 
+     * @param string $handler The transformed handler string
+     * @return bool True if safe, false if suspicious
+     */
+    private function isValidTransformedHandler(string $handler): bool {
+        $stripped = preg_replace('/QS\.[a-zA-Z]+\([^)]*\)/', '', $handler);
+        $stripped = preg_replace('/[;\s]/', '', $stripped);
+        $stripped = preg_replace('/\/\*[^*]*\*\//', '', $stripped);
+        
+        return empty($stripped);
     }
 
 }

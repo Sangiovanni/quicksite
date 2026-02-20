@@ -1,0 +1,117 @@
+{
+    "$schema": "../schema.json",
+    "id": "create-landing",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "🚀",
+        "titleKey": "ai.specs.createLanding.title",
+        "descriptionKey": "ai.specs.createLanding.description",
+        "category": "creation",
+        "tags": ["create", "landing", "single-page", "from-scratch"],
+        "difficulty": "advanced"
+    },
+    "parameters": [
+        {
+            "id": "multilingual",
+            "type": "checkbox",
+            "labelKey": "ai.specs.createLanding.params.multilingual.label",
+            "helpKey": "ai.specs.createLanding.params.multilingual.help",
+            "default": true
+        },
+        {
+            "id": "languages",
+            "type": "text",
+            "labelKey": "ai.specs.createLanding.params.languages.label",
+            "placeholderKey": "ai.specs.createLanding.params.languages.placeholder",
+            "helpKey": "ai.specs.createLanding.params.languages.help",
+            "default": "en",
+            "condition": "multilingual === true"
+        }
+    ],
+    "examples": [
+        {
+            "id": "coffee-shop",
+            "titleKey": "ai.specs.createLanding.examples.coffeeShop.title",
+            "promptKey": "ai.specs.createLanding.examples.coffeeShop.prompt"
+        },
+        {
+            "id": "saas-product",
+            "titleKey": "ai.specs.createLanding.examples.saas.title",
+            "promptKey": "ai.specs.createLanding.examples.saas.prompt"
+        },
+        {
+            "id": "portfolio",
+            "titleKey": "ai.specs.createLanding.examples.portfolio.title",
+            "promptKey": "ai.specs.createLanding.examples.portfolio.prompt"
+        }
+    ],
+    "dataRequirements": [
+        {
+            "id": "helpSetMultilingual",
+            "command": "help",
+            "urlParams": ["setMultilingual"],
+            "extract": "data",
+            "condition": "multilingual === true"
+        },
+        {
+            "id": "helpAddLang",
+            "command": "help",
+            "urlParams": ["addLang"],
+            "extract": "data",
+            "condition": "multilingual === true"
+        },
+        {
+            "id": "helpEditStructure",
+            "command": "help",
+            "urlParams": ["editStructure"],
+            "extract": "data"
+        },
+        {
+            "id": "helpSetTranslationKeys",
+            "command": "help",
+            "urlParams": ["setTranslationKeys"],
+            "extract": "data"
+        },
+        {
+            "id": "helpEditStyles",
+            "command": "help",
+            "urlParams": ["editStyles"],
+            "extract": "data"
+        },
+        {
+            "id": "helpSetRootVariables",
+            "command": "help",
+            "urlParams": ["setRootVariables"],
+            "extract": "data"
+        }
+    ],
+    "relatedCommands": ["setMultilingual", "addLang", "editStructure", "setTranslationKeys", "editStyles", "setRootVariables"],
+    "postCommands": [
+        {
+            "condition": "param.multilingual === true",
+            "command": "editStructure",
+            "params": {
+                "type": "component",
+                "name": "lang-switch",
+                "structure": {
+                    "tag": "div",
+                    "params": { "class": "lang-switch" },
+                    "children": {
+                        "$each": "{{param.languages}}",
+                        "$item": {
+                            "tag": "a",
+                            "params": {
+                                "href": "{{__current_page;lang={{$value}}}}",
+                                "class": "lang-btn",
+                                "data-lang": "{{$value}}"
+                            },
+                            "children": [{ "text": "{{$value | langname}}" }]
+                        }
+                    }
+                }
+            }
+        }
+    ],
+    "promptTemplate": "create-landing.md",
+    "outputFormat": "json-commands"
+}

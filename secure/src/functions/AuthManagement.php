@@ -2,7 +2,7 @@
 /**
  * Authentication & CORS Management Functions
  * 
- * Handles API token validation and CORS header management.
+ * Handles API token validation, role-based permissions, and CORS header management.
  */
 
 /**
@@ -11,7 +11,7 @@
  * @return array Auth configuration
  */
 function loadAuthConfig(): array {
-    $configPath = SECURE_FOLDER_PATH . '/config/auth.php';
+    $configPath = SECURE_FOLDER_PATH . '/management/config/auth.php';
     
     if (!file_exists($configPath)) {
         // Return default restrictive config if file missing
@@ -21,7 +21,146 @@ function loadAuthConfig(): array {
         ];
     }
     
+    // Invalidate opcode cache if available (needed for dynamic config changes)
+    if (function_exists('opcache_invalidate')) {
+        opcache_invalidate($configPath, true);
+    }
+    
     return require $configPath;
+}
+
+/**
+ * Load roles configuration
+ * 
+ * @return array Role definitions
+ */
+function loadRolesConfig(): array {
+    $configPath = SECURE_FOLDER_PATH . '/management/config/roles.php';
+    
+    if (!file_exists($configPath)) {
+        return [];
+    }
+    
+    // Invalidate opcode cache if available (needed for dynamic config changes)
+    if (function_exists('opcache_invalidate')) {
+        opcache_invalidate($configPath, true);
+    }
+    
+    return require $configPath;
+}
+
+/**
+ * Get the master list of all commands from routes.php
+ * 
+ * @return array List of all command names
+ */
+function getAllCommands(): array {
+    $routesPath = SECURE_FOLDER_PATH . '/management/routes.php';
+    
+    if (!file_exists($routesPath)) {
+        return [];
+    }
+    
+    return require $routesPath;
+}
+
+/**
+ * Get commands for a specific role
+ * 
+ * @param string $roleName The role name
+ * @return array|null Array of command names, or null if role doesn't exist
+ */
+function getRoleCommands(string $roleName): ?array {
+    $roles = loadRolesConfig();
+    
+    if (!isset($roles[$roleName])) {
+        return null;
+    }
+    
+    return $roles[$roleName]['commands'] ?? [];
+}
+
+/**
+ * Check if a role name is valid (exists in roles.php)
+ * 
+ * @param string $roleName The role name to validate
+ * @return bool
+ */
+function isValidRole(string $roleName): bool {
+    // '*' is special - it's not a role, it's superadmin
+    if ($roleName === '*') {
+        return true;
+    }
+    
+    $roles = loadRolesConfig();
+    return isset($roles[$roleName]);
+}
+
+/**
+ * Check if a role is a builtin role (cannot be deleted)
+ * 
+ * @param string $roleName The role name
+ * @return bool
+ */
+function isBuiltinRole(string $roleName): bool {
+    $roles = loadRolesConfig();
+    return ($roles[$roleName]['builtin'] ?? false) === true;
+}
+
+/**
+ * Migrate old token format (permissions[]) to new format (role)
+ * Returns the role name for the token
+ * 
+ * @param array $tokenInfo Token info with old format
+ * @return string Role name
+ */
+function migrateTokenPermissions(array $tokenInfo): string {
+    $permissions = $tokenInfo['permissions'] ?? [];
+    
+    // Already has new format
+    if (isset($tokenInfo['role'])) {
+        return $tokenInfo['role'];
+    }
+    
+    // Migration mapping
+    if (in_array('*', $permissions)) {
+        return '*';
+    }
+    
+    if (in_array('admin', $permissions)) {
+        return 'admin';
+    }
+    
+    if (in_array('write', $permissions)) {
+        // read+write = editor
+        return 'editor';
+    }
+    
+    if (in_array('read', $permissions)) {
+        return 'viewer';
+    }
+    
+    // Default to viewer for unknown permissions
+    return 'viewer';
+}
+
+/**
+ * Get token info with normalized format (ensures 'role' exists)
+ * Handles migration from old permissions[] format
+ * 
+ * @param array $tokenInfo Raw token info from config
+ * @return array Normalized token info with 'role'
+ */
+function normalizeTokenInfo(array $tokenInfo): array {
+    // If already has 'role', return as-is
+    if (isset($tokenInfo['role'])) {
+        return $tokenInfo;
+    }
+    
+    // Migrate from old format
+    $tokenInfo['role'] = migrateTokenPermissions($tokenInfo);
+    
+    return $tokenInfo;
 }
 
 /**
@@ -35,7 +174,7 @@ function validateBearerToken(?string $authHeader): array {
     
     // Check if auth is enabled
     if (!($config['authentication']['enabled'] ?? true)) {
-        return ['valid' => true, 'token_info' => ['name' => 'Auth Disabled', 'permissions' => ['*']], 'error' => null];
+        return ['valid' => true, 'token_info' => ['name' => 'Auth Disabled', 'role' => '*'], 'error' => null];
     }
     
     // No header provided
@@ -57,59 +196,73 @@ function validateBearerToken(?string $authHeader): array {
         return ['valid' => false, 'token_info' => null, 'error' => 'Invalid or expired token'];
     }
     
-    return ['valid' => true, 'token_info' => $tokens[$token], 'error' => null];
+    // Normalize token info (handles migration from old format)
+    $tokenInfo = normalizeTokenInfo($tokens[$token]);
+    
+    return ['valid' => true, 'token_info' => $tokenInfo, 'error' => null];
 }
 
 /**
  * Check if token has permission for a specific command
  * 
- * @param array $tokenInfo Token information array
+ * @param array $tokenInfo Token information array (normalized)
  * @param string $command Command name being accessed
  * @return bool
  */
 function hasPermission(array $tokenInfo, string $command): bool {
-    $permissions = $tokenInfo['permissions'] ?? [];
+    // Normalize token info in case it's old format
+    $tokenInfo = normalizeTokenInfo($tokenInfo);
     
-    // Wildcard = full access
-    if (in_array('*', $permissions)) {
+    $role = $tokenInfo['role'] ?? 'viewer';
+    
+    // Superadmin = full access
+    if ($role === '*') {
         return true;
     }
     
-    // Specific command permission
-    if (in_array("command:{$command}", $permissions)) {
-        return true;
+    // Get commands for this role
+    $allowedCommands = getRoleCommands($role);
+    
+    if ($allowedCommands === null) {
+        // Invalid role - deny access
+        return false;
     }
     
-    // Category-based permissions
-    $readCommands = ['getRoutes', 'getStructure', 'getTranslation', 'getTranslations', 
-                     'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys',
-                     'analyzeTranslations', 'getLangList', 
-                     'listAssets', 'getStyles', 'getRootVariables', 'listStyleRules', 
-                     'getStyleRule', 'getKeyframes', 'help', 'listTokens'];
+    return in_array($command, $allowedCommands, true);
+}
+
+/**
+ * Get all permissions for a token
+ * 
+ * @param array $tokenInfo Token information array
+ * @return array ['role' => string, 'commands' => string[]]
+ */
+function getTokenPermissions(array $tokenInfo): array {
+    $tokenInfo = normalizeTokenInfo($tokenInfo);
+    $role = $tokenInfo['role'] ?? 'viewer';
     
-    $writeCommands = ['editStructure', 'setTranslationKeys', 'deleteTranslationKeys', 
-                      'addRoute', 'deleteRoute', 'addLang', 'deleteLang', 
-                      'uploadAsset', 'deleteAsset', 'editStyles', 
-                      'setRootVariables', 'setStyleRule', 'deleteStyleRule',
-                      'setKeyframes', 'deleteKeyframes',
-                      'editTitle', 'editFavicon'];
-    
-    $adminCommands = ['setPublicSpace', 'renameSecureFolder', 'renamePublicFolder', 
-                      'build', 'generateToken', 'revokeToken'];
-    
-    if (in_array('read', $permissions) && in_array($command, $readCommands)) {
-        return true;
+    if ($role === '*') {
+        // Superadmin gets all commands plus special commands
+        $allCommands = getAllCommands();
+        // Add new role management commands
+        $specialCommands = ['listRoles', 'getMyPermissions', 'createRole', 'editRole', 'deleteRole'];
+        $allCommands = array_unique(array_merge($allCommands, $specialCommands));
+        sort($allCommands);
+        return [
+            'role' => '*',
+            'commands' => $allCommands
+        ];
     }
     
-    if (in_array('write', $permissions) && in_array($command, $writeCommands)) {
-        return true;
+    $commands = getRoleCommands($role);
+    if ($commands === null) {
+        $commands = [];
     }
     
-    if (in_array('admin', $permissions) && in_array($command, $adminCommands)) {
-        return true;
-    }
-    
-    return false;
+    return [
+        'role' => $role,
+        'commands' => $commands
+    ];
 }
 
 /**
