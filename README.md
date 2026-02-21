@@ -171,7 +171,7 @@ Step-by-step tutorials demonstrating the admin panel and API workflows are comin
 
 QuickSite is built on a **file-based, zero-database philosophy**. It targets a specific niche: sites that don't need a database — landing pages, portfolios, documentation sites, microsites — but still deserve proper tooling for content management, translations, and deployment.
 
-The admin panel makes it accessible to non-developers, while the API keeps it powerful for automation and integration.
+The admin panel makes it accessible to non-developers, while the API keeps it powerful for automation and integration. Read more about the project's design principles in [PHILOSOPHY.md](PHILOSOPHY.md).
 
 ## Contributing
 
@@ -185,15 +185,7 @@ All contributions go through code review for security, quality, and consistency.
 
 ## Acknowledgments
 
-Built using a **hybrid human-AI development approach** with GitHub Copilot (Claude).
-
-This project started as a bare draft — I never expected it to go this far. As it grew beyond what I initially imagined, I let some **vibecoding** happen, mainly in the admin panel and the visual editor. The result is a genuinely hybrid workflow:
-
-- **I handle architecture, structure, and communication layers** — everything that defines how parts of the system talk to each other (routes, API responses, specs, configs). I keep close control over anything that faces the user or the AI (interaction schemas, for example).
-- **The agent gets more freedom on the JavaScript side** — JS is the language I'm least comfortable with, and I used this project as an opportunity to learn it more deeply and to test how far an AI agent can build things on its own.
-- **I didn't write a lot of code directly** — my role has been mostly architecture, communication design, and review. I refactor things along the way, but the approach is adaptive rather than prescriptive.
-
-It's an honest experiment in human-AI collaboration. I plan to share what I've learned about working with AI agents — how to communicate effectively, where to give freedom, and where to keep control — alongside the project tutorials.
+Built using a **hybrid human-AI development approach** — architecture and design decisions are human-driven, implementation assisted by GitHub Copilot (Claude). More about this workflow in [PHILOSOPHY.md](PHILOSOPHY.md).
 
 ## License
 
