@@ -50,9 +50,9 @@ function is_valid_relative_path(string $path, int $max_length = 255, int $max_de
     }
     
     // D. Check for invalid characters using a regular expression
-    // Only allows: letters, numbers, hyphens, underscores
+    // Only allows: letters, numbers, hyphens, underscores, dots
     // Format: segment or segment/segment/segment...
-    $valid_path_regex = '/^[a-zA-Z0-9_\-]+([\/][a-zA-Z0-9_\-]+)*$/';
+    $valid_path_regex = '/^[a-zA-Z0-9_\.\-]+([\/][a-zA-Z0-9_\.\-]+)*$/';
     if (!preg_match($valid_path_regex, $normalized_path)) {
         return false;
     }

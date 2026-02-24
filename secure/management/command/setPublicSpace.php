@@ -38,7 +38,7 @@ if (!is_valid_relative_path($relative_path_input, 255, 5, true)) {
             ['constraints' => [
                 'max_length' => 255,
                 'max_depth' => 5,
-                'allowed_chars' => 'a-z, A-Z, 0-9, hyphen, underscore, forward slash',
+                'allowed_chars' => 'a-z, A-Z, 0-9, dot, hyphen, underscore, forward slash',
                 'empty_allowed' => true
             ]]
         ])

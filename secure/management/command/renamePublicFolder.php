@@ -53,7 +53,7 @@ if (!is_valid_relative_path($new_folder_name, 255, 1, false)) {
             ['constraints' => [
                 'max_length' => 255,
                 'max_depth' => 1,
-                'allowed_chars' => 'a-z, A-Z, 0-9, hyphen, underscore',
+                'allowed_chars' => 'a-z, A-Z, 0-9, dot, hyphen, underscore',
                 'no_subdirectories' => true
             ]]
         ])

@@ -25,7 +25,7 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'URL prefix/space (use empty string "" to remove space and serve from root)',
                 'example' => 'web or app/v1/public',
-                'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/hyphens/underscores/forward-slash only, empty allowed'
+                'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/dots/hyphens/underscores/forward-slash only, empty allowed'
             ]
         ],
         'example_patch' => 'PATCH /management/setPublicSpace with body: {"destination": "web"} or {"destination": ""}',
@@ -60,7 +60,7 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'New folder path relative to server root. Can be nested (e.g., backends/project1) up to 5 levels deep. Cannot be empty.',
                 'example' => 'app_backend, secure_v2, or backends/project1',
-                'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/hyphens/underscores/forward-slashes only, cannot be empty'
+                'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/dots/hyphens/underscores/forward-slashes only, cannot be empty'
             ]
         ],
         'example_patch' => 'PATCH /management/renameSecureFolder with body: {"destination": "backends/mysite"}',
@@ -97,7 +97,7 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'New folder name (single name, no paths)',
                 'example' => 'www or public or web',
-                'validation' => 'Max 255 chars, single folder name only, alphanumeric/hyphens/underscores only'
+                'validation' => 'Max 255 chars, single folder name only, alphanumeric/dots/hyphens/underscores only'
             ]
         ],
         'example_patch' => 'PATCH /management/renamePublicFolder with body: {"destination": "www"}',
@@ -261,21 +261,21 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Custom name/path for public folder (default: public_template)',
                 'example' => 'public or www/v1/public',
-                'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/hyphens/underscores/forward-slash only'
+                'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/dots/hyphens/underscores/forward-slash only'
             ],
             'secure' => [
                 'required' => false,
                 'type' => 'string',
                 'description' => 'Custom name for secure folder - single level only (default: secure_template)',
                 'example' => 'backend or app',
-                'validation' => 'Max 255 chars, max 1 level (single folder name), alphanumeric/hyphens/underscores only'
+                'validation' => 'Max 255 chars, max 1 level (single folder name), alphanumeric/dots/hyphens/underscores only'
             ],
             'space' => [
                 'required' => false,
                 'type' => 'string',
                 'description' => 'PUBLIC_FOLDER_SPACE - subdirectory inside public folder for all public files (default: empty string)',
                 'example' => '' or 'web or space/v1',
-                'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/hyphens/underscores/forward-slash only, empty allowed'
+                'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/dots/hyphens/underscores/forward-slash only, empty allowed'
             ]
         ],
         'example_post' => 'POST /management/build with body: {"public": "www/public", "secure": "app", "space": "web"}',
