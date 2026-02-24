@@ -31,6 +31,18 @@ if (!defined('SECURE_FOLDER_PATH')) {
 }
 
 // ============================================================================
+// FIRST-INSTALL: Auto-create config files from .example templates
+// ============================================================================
+$configDir = SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'management' . DIRECTORY_SEPARATOR . 'config';
+foreach (['target.php', 'auth.php', 'roles.php'] as $configFile) {
+    $configFilePath = $configDir . DIRECTORY_SEPARATOR . $configFile;
+    $examplePath = $configFilePath . '.example';
+    if (!file_exists($configFilePath) && file_exists($examplePath)) {
+        copy($examplePath, $configFilePath);
+    }
+}
+
+// ============================================================================
 // PROJECT PATH - Points to the active project in secure/projects/{name}/
 // ============================================================================
 if (!defined('PROJECT_PATH')) {

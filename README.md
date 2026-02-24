@@ -49,16 +49,9 @@ It now includes a **visual admin panel** with an iframe-based page editor, letti
    </VirtualHost>
    ```
 
-3. **Copy the config templates**
-   ```bash
-   cd secure/management/config
-   cp target.php.example target.php
-   cp auth.php.example auth.php
-   cp roles.php.example roles.php
-   ```
-
-4. **Open the admin panel**
-   Navigate to `http://quicksite.local/admin/` in your browser. The default token is in `auth.php` — change it before going to production.
+3. **Open the admin panel**
+   Navigate to `http://quicksite.local/admin/` in your browser.
+   Config files (`target.php`, `auth.php`, `roles.php`) are auto-created from `.example` templates on first load. The default token is in `auth.php` — change it before going to production.
 
 > **Why a virtual host?** QuickSite uses Apache's `FallbackResource` for clean URLs (`/about`, `/en/contact`) instead of query strings (`?page=about&lang=en`). This is the same approach used by WordPress, Laravel, and most modern PHP projects. The virtual host makes your local development environment match production — your `public/` folder is the document root, just like it would be on a real server. Subdirectory mode (e.g., `http://localhost/quicksite/public/`) is not supported.
 
@@ -132,7 +125,7 @@ quicksite/
 - **`public/`** is the only folder exposed to the web. Everything else is behind the firewall.
 - **`public/management/`** is the API gateway. Any client (admin panel, curl, Flutter app, custom UI) talks to QuickSite through this endpoint.
 - **`public/scripts/`** contains the core JS runtime. `qs.js` handles front-end features like show/hide triggers, sorting, and dynamic behavior. `qs-custom.js` holds user-defined JS functions managed via the `addJsFunction` / `editJsFunction` API commands.
-- **`secure/management/config/`** holds sensitive files (tokens, auth) that are gitignored. Template `.example` files are provided for installation.
+- **`secure/management/config/`** holds sensitive files (tokens, auth) that are gitignored. They are auto-created from `.example` templates on first load.
 - **Projects** are fully isolated in `secure/projects/`. Each has its own pages, translations, routes, and assets. Switch between them with `switchProject`.
 
 ### Folder customization
