@@ -114,7 +114,7 @@ if (!write_htaccess_fallback($htaccess_path, $fallback)) {
 $management_htaccess_path = $new_base_path . DIRECTORY_SEPARATOR . 'management' . DIRECTORY_SEPARATOR . '.htaccess';
 $management_fallback = $relative_path_input !== '' ? '/' . $relative_path_input . '/management/index.php' : '/management/index.php';
 
-if (!write_htaccess_fallback($management_htaccess_path, $management_fallback)) {
+if (!write_htaccess_fallback($management_htaccess_path, $management_fallback, true)) {
     releaseLock($lock);
     
     ApiResponse::create(500, 'server.file_write_failed')

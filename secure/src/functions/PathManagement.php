@@ -83,6 +83,11 @@ function recursive_move_template(string $source, string $destination, string $ex
     $moves = [];
     $source_dirs_to_clean = [];
     $source_base = rtrim($source, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+    
+    // The exclude_folder_name may be a path like "quicksite/test".
+    // We need to exclude the top-level folder (first segment) since
+    // the destination is created inside the source directory.
+    $exclude_top_level = explode('/', str_replace('\\', '/', $exclude_folder_name))[0];
 
     try {
         $iterator = new RecursiveIteratorIterator(
@@ -95,7 +100,8 @@ function recursive_move_template(string $source, string $destination, string $ex
             $item_name = $item->getFilename();
             
             // 1. Pruning/Exclusion Check
-            if ($item->isDir() && $item_name === $exclude_folder_name) {
+            // Compare against top-level folder name (getFilename returns only last segment)
+            if ($item->isDir() && $exclude_top_level !== '' && $item_name === $exclude_top_level) {
                 // Prune the iterator to skip this directory and its contents
                 $iterator->next(); 
                 continue; 
@@ -254,7 +260,12 @@ function cleanup_empty_source_chain(string $start_dir, string $stop_at_parent): 
  * @param string $fallback_resource Fallback resource path (e.g., '/app/index.php')
  * @return bool Success
  */
-function write_htaccess_fallback(string $htaccess_path, string $fallback_resource): bool {
-    $content = "RewriteEngine On\nFallbackResource " . $fallback_resource;
+function write_htaccess_fallback(string $htaccess_path, string $fallback_resource, bool $forward_auth = false): bool {
+    $content = "RewriteEngine On\n";
+    if ($forward_auth) {
+        $content .= "\n# Forward Authorization header (stripped by Apache's mod_rewrite by default)\n";
+        $content .= "SetEnvIf Authorization .+ HTTP_AUTHORIZATION=$0\n";
+    }
+    $content .= "\nFallbackResource " . $fallback_resource;
     return file_put_contents($htaccess_path, $content, LOCK_EX) !== false;
 }
