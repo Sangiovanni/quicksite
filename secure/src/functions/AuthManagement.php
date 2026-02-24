@@ -285,6 +285,14 @@ function handleCors(?string $origin): bool {
         return true;
     }
     
+    // Same-origin check: if Origin matches the current host, it's not cross-origin
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '';
+    $selfOrigin = $scheme . '://' . $host;
+    if (strcasecmp($origin, $selfOrigin) === 0) {
+        return true; // Same-origin, no CORS headers needed
+    }
+    
     $isAllowed = false;
     
     // Development mode: allow any localhost
@@ -297,7 +305,8 @@ function handleCors(?string $origin): bool {
     // Check allowed origins list
     if (!$isAllowed) {
         $allowedOrigins = $corsConfig['allowed_origins'] ?? [];
-        $isAllowed = in_array($origin, $allowedOrigins);
+        // Support wildcard '*' to allow any origin
+        $isAllowed = in_array('*', $allowedOrigins) || in_array($origin, $allowedOrigins);
     }
     
     if ($isAllowed) {
