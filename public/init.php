@@ -22,7 +22,7 @@ if(!defined('SERVER_ROOT')){
     // This prevents issues when folder name appears multiple times in path
     // e.g., C:/wamp64/www/mysite/www -> C:/wamp64/www/mysite/ (not C:/wamp64//mysite/)
     $folderPattern = '/' . preg_quote(PUBLIC_FOLDER_NAME, '/') . '[\\\\\\/]?$/';
-    define('SERVER_ROOT', preg_replace($folderPattern, '', PUBLIC_FOLDER_ROOT));
+    define('SERVER_ROOT', rtrim(preg_replace($folderPattern, '', PUBLIC_FOLDER_ROOT), '/\\'));
 }
 
 if (!defined('SECURE_FOLDER_PATH')) {
@@ -110,15 +110,25 @@ foreach (['target.php', 'auth.php', 'roles.php'] as $configFile) {
 // FIRST-INSTALL: Auto-generate nginx config if not present
 // ============================================================================
 $nginxConfigPath = SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'nginx' . DIRECTORY_SEPARATOR . 'dynamic_routes.conf';
+$nginxSetupPending = SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'nginx' . DIRECTORY_SEPARATOR . '.setup_pending';
 if (!file_exists($nginxConfigPath)) {
     require_once SECURE_FOLDER_PATH . '/src/functions/NginxConfig.php';
     $nginxResult = write_nginx_dynamic_routes(PUBLIC_FOLDER_SPACE, SECURE_FOLDER_PATH);
 
-    // Detect nginx — show first-time setup instructions
-    // Apache users never see this (they don't need dynamic_routes.conf)
-    $serverSoftware = $_SERVER['SERVER_SOFTWARE'] ?? '';
-    if (stripos($serverSoftware, 'nginx') !== false && $nginxResult['success']) {
-        $cfgPath = htmlspecialchars($nginxResult['config_path']);
+    // Create setup_pending flag so the instructions page keeps showing
+    if ($nginxResult['success']) {
+        @file_put_contents($nginxSetupPending, date('Y-m-d H:i:s'));
+    }
+}
+
+// Detect nginx — show setup instructions until user confirms completion
+$serverSoftware = $_SERVER['SERVER_SOFTWARE'] ?? '';
+if (file_exists($nginxSetupPending) && stripos($serverSoftware, 'nginx') !== false) {
+    // If the user submitted the confirmation form, remove the flag and continue
+    if (isset($_POST['nginx_setup_done'])) {
+        @unlink($nginxSetupPending);
+    } else {
+        $cfgPath = htmlspecialchars(SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'nginx' . DIRECTORY_SEPARATOR . 'dynamic_routes.conf');
         $pubFolder = htmlspecialchars(PUBLIC_FOLDER_NAME);
         http_response_code(503);
         die(
@@ -135,11 +145,13 @@ if (!file_exists($nginxConfigPath)) {
             '.step h3{margin-top:0;color:#1a1a2e}' .
             '.note{margin-top:30px;padding:14px 18px;background:#fff8e1;border-left:4px solid #f9a825;border-radius:4px}' .
             '.note strong{color:#e65100}' .
+            '.done-btn{display:inline-block;margin-top:12px;padding:12px 28px;background:#4caf50;color:#fff;border:none;border-radius:6px;font-size:1em;font-weight:600;cursor:pointer}' .
+            '.done-btn:hover{background:#43a047}' .
             'hr{border:none;border-top:1px solid #ddd;margin:30px 0}' .
             'small{color:#888}' .
             '</style></head><body>' .
             '<h1>QuickSite &mdash; nginx Setup Required</h1>' .
-            '<p class="subtitle">First-time setup detected &mdash; this page appears only once.</p>' .
+            '<p class="subtitle">This page will keep showing until you confirm the setup is complete.</p>' .
             '<p>You are running <strong>nginx</strong>, which does not support <code>.htaccess</code> files. ' .
             'QuickSite has generated a routing configuration file for you, but it needs to be included in your nginx server block.</p>' .
 
@@ -151,9 +163,9 @@ if (!file_exists($nginxConfigPath)) {
             '<pre>sudo nginx -t &amp;&amp; sudo nginx -s reload</pre>' .
             '<p>On CloudPanel or similar panels, you may need to restart nginx from the panel UI instead.</p></div>' .
 
-            '<div class="step"><h3>Step 3 &mdash; Refresh this page</h3>' .
-            '<p>Once nginx is reloaded with the new config, <strong>refresh this page</strong>. ' .
-            'All routes will work and this message will not appear again.</p></div>' .
+            '<div class="step"><h3>Step 3 &mdash; Confirm setup</h3>' .
+            '<p>Once you have added the include directive and reloaded nginx, click the button below:</p>' .
+            '<form method="post"><button type="submit" name="nginx_setup_done" value="1" class="done-btn">I have completed the nginx setup</button></form></div>' .
 
             '<div class="note">' .
             '<strong>Renamed the public folder?</strong> If you renamed <code>public/</code> to something else ' .

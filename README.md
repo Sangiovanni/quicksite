@@ -51,6 +51,10 @@ setup.bat www.example.com
 
 This renames `public/` and updates `PUBLIC_FOLDER_NAME` in `init.php`. That's all — everything else (config files, nginx routing) is handled automatically on first page load.
 
+> **Linux servers (important):** If you cloned as `root`, PHP won't have write access to create config files. The setup script will attempt to fix this automatically, but if needed, run:  
+> `chown -R YOUR_WEB_USER:YOUR_WEB_USER /path/to/quicksite`  
+> Replace `YOUR_WEB_USER` with your php-fpm user (`www-data` on Ubuntu, or your CloudPanel/hosting panel site user).
+
 **Don't want to use scripts?** Rename `public/` manually and edit line 9 of `init.php` to match. On nginx, you'll see a first-load setup page with the exact `include` directive you need.
 
 ### Manual setup

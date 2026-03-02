@@ -629,7 +629,10 @@ async function initEnhancedFeatures() {
             await initClearHistoryForm();
             break;
         case 'generateToken':
-            initGenerateTokenForm();
+            await initGenerateTokenForm();
+            break;
+        case 'revokeToken':
+            await initRevokeTokenForm();
             break;
         case 'findComponentUsages':
             await initFindComponentUsagesForm();
@@ -1504,7 +1507,7 @@ async function initClearHistoryForm() {
 /**
  * Initialize generateToken form with quick-add buttons for common token names
  */
-function initGenerateTokenForm() {
+async function initGenerateTokenForm() {
     const form = document.getElementById('command-form');
     const nameInput = form.querySelector('[name="name"]');
     
@@ -1537,87 +1540,89 @@ function initGenerateTokenForm() {
     
     nameInput.parentNode.appendChild(buttonContainer);
     
-    // Add permission selector
-    const permInput = form.querySelector('[name="permissions"]');
-    if (permInput) {
-        // Create permission builder UI
-        const permBuilder = document.createElement('div');
-        permBuilder.className = 'permission-builder';
-        permBuilder.style.cssText = 'margin-top: 0.5rem;';
+    // Replace role text input with a select populated from listRoles API
+    const roleInput = form.querySelector('[name="role"]');
+    if (roleInput && roleInput.tagName !== 'SELECT') {
+        const roleSelect = document.createElement('select');
+        roleSelect.name = 'role';
+        roleSelect.id = roleInput.id;
+        roleSelect.className = 'admin-select';
+        roleSelect.required = roleInput.required;
+        roleSelect.innerHTML = '<option value="">Loading roles...</option>';
+        roleInput.replaceWith(roleSelect);
         
-        // Permission select
-        const permSelect = document.createElement('select');
-        permSelect.className = 'admin-select';
-        permSelect.style.cssText = 'display: inline-block; width: auto; min-width: 200px; margin-right: 0.5rem;';
-        permSelect.innerHTML = `
-            <option value="">-- Select permission --</option>
-            <optgroup label="Full Access">
-                <option value="*">* (Full access to all commands)</option>
-            </optgroup>
-            <optgroup label="Permission Categories">
-                <option value="read">read (get*, list*, validate*, help)</option>
-                <option value="write">write (edit*, add*, delete*, upload*)</option>
-                <option value="admin">admin (set*, rename*, build, tokens)</option>
-            </optgroup>
-            <optgroup label="Common Combinations">
-                <option value="read,write">read + write</option>
-                <option value="read,write,admin">read + write + admin</option>
-            </optgroup>
-        `;
-        
-        // Add button
-        const addBtn = document.createElement('button');
-        addBtn.type = 'button';
-        addBtn.className = 'admin-btn admin-btn--small admin-btn--primary';
-        addBtn.textContent = '+ Add';
-        addBtn.onclick = () => {
-            if (!permSelect.value) return;
-            
-            let currentPerms = [];
-            try {
-                currentPerms = JSON.parse(permInput.value || '[]');
-                if (!Array.isArray(currentPerms)) currentPerms = [];
-            } catch {
-                currentPerms = [];
+        try {
+            const result = await QuickSiteAdmin.apiRequest('listRoles', 'GET');
+            if (result.ok && result.data.data) {
+                const roles = result.data.data.roles || [];
+                let html = '<option value="">-- Select role --</option>';
+                html += '<option value="*">* - Superadmin (full access to all commands)</option>';
+                roles.forEach(r => {
+                    const count = r.command_count || 0;
+                    html += `<option value="${QuickSiteAdmin.escapeHtml(r.name)}">${QuickSiteAdmin.escapeHtml(r.name)} - ${QuickSiteAdmin.escapeHtml(r.description)} (${count} commands)</option>`;
+                });
+                roleSelect.innerHTML = html;
+            } else {
+                roleSelect.innerHTML = '<option value="">-- Select role --</option>' +
+                    '<option value="*">*</option>' +
+                    '<option value="viewer">viewer</option>' +
+                    '<option value="editor">editor</option>' +
+                    '<option value="designer">designer</option>' +
+                    '<option value="developer">developer</option>' +
+                    '<option value="admin">admin</option>';
             }
-            
-            // Handle comma-separated values (for combinations)
-            const newPerms = permSelect.value.split(',');
-            newPerms.forEach(p => {
-                if (!currentPerms.includes(p)) {
-                    currentPerms.push(p);
-                }
-            });
-            
-            permInput.value = JSON.stringify(currentPerms);
-            permSelect.value = '';
-        };
-        
-        // Clear button
-        const clearBtn = document.createElement('button');
-        clearBtn.type = 'button';
-        clearBtn.className = 'admin-btn admin-btn--small admin-btn--secondary';
-        clearBtn.textContent = 'Clear';
-        clearBtn.style.marginLeft = '0.5rem';
-        clearBtn.onclick = () => {
-            permInput.value = '[]';
-        };
-        
-        permBuilder.appendChild(permSelect);
-        permBuilder.appendChild(addBtn);
-        permBuilder.appendChild(clearBtn);
-        permInput.parentNode.appendChild(permBuilder);
-        
-        // Set default empty array
-        if (!permInput.value) {
-            permInput.value = '["read"]';
+        } catch (e) {
+            console.error('Failed to load roles:', e);
+            roleSelect.innerHTML = '<option value="">-- Select role --</option>' +
+                '<option value="*">*</option>' +
+                '<option value="viewer">viewer</option>' +
+                '<option value="editor">editor</option>' +
+                '<option value="designer">designer</option>' +
+                '<option value="developer">developer</option>' +
+                '<option value="admin">admin</option>';
         }
-        
-        // Add hint
-        const hint = document.createElement('p');
-        hint.className = 'admin-hint';
-        hint.innerHTML = '💡 Permissions control API access. <code>read</code> = view only, <code>write</code> = modify content, <code>admin</code> = system settings. Use <code>*</code> for full access.';
-        permInput.parentNode.appendChild(hint);
+    }
+}
+
+/**
+ * Initialize revokeToken form - replaces token_preview text input with a select
+ * populated from listTokens API
+ */
+async function initRevokeTokenForm() {
+    const form = document.getElementById('command-form');
+    const tokenInput = form.querySelector('[name="token_preview"]');
+    
+    if (!tokenInput || tokenInput.tagName === 'SELECT') return;
+    
+    const tokenSelect = document.createElement('select');
+    tokenSelect.name = 'token_preview';
+    tokenSelect.id = tokenInput.id;
+    tokenSelect.className = 'admin-select';
+    tokenSelect.required = tokenInput.required;
+    tokenSelect.innerHTML = '<option value="">Loading tokens...</option>';
+    tokenInput.replaceWith(tokenSelect);
+    
+    try {
+        const result = await QuickSiteAdmin.apiRequest('listTokens', 'GET');
+        if (result.ok && result.data.data) {
+            const tokens = result.data.data.tokens || [];
+            let html = '<option value="">-- Select token to revoke --</option>';
+            tokens.forEach(t => {
+                const preview = t.token_preview || '';
+                const name = t.name || 'Unnamed';
+                const role = t.role || t.permissions?.join(', ') || '?';
+                const isCurrent = t.is_current ? ' (current - cannot revoke)' : '';
+                html += `<option value="${QuickSiteAdmin.escapeHtml(preview)}" ${t.is_current ? 'disabled' : ''}>` +
+                    `${QuickSiteAdmin.escapeHtml(preview)} - ${QuickSiteAdmin.escapeHtml(name)} [${QuickSiteAdmin.escapeHtml(role)}]${isCurrent}</option>`;
+            });
+            tokenSelect.innerHTML = html;
+        } else {
+            // Fallback to text input if API fails
+            tokenSelect.replaceWith(tokenInput);
+        }
+    } catch (e) {
+        console.error('Failed to load tokens:', e);
+        tokenSelect.replaceWith(tokenInput);
     }
 }
 

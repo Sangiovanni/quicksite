@@ -85,6 +85,40 @@ else
     fi
 fi
 
+# ==========================================================
+# File ownership check
+# ==========================================================
+# PHP (via Apache/nginx + php-fpm) needs write access to secure/
+# for auto-creating config files, logs, exports, etc.
+# If cloned as root, files must be chown'd to the web server user.
+
+OWNERSHIP_WARNING=""
+CURRENT_USER="$(whoami)"
+
+if [ "$CURRENT_USER" = "root" ]; then
+    OWNERSHIP_WARNING="yes"
+    # Try to detect the web server user
+    WEB_USER=""
+    # CloudPanel: site user matches the htdocs parent folder name
+    HTDOCS_PARENT="$(basename "$(dirname "$SCRIPT_DIR")" 2>/dev/null || true)"
+    if id "$HTDOCS_PARENT" &>/dev/null 2>&1; then
+        WEB_USER="$HTDOCS_PARENT"
+    elif id "www-data" &>/dev/null 2>&1; then
+        WEB_USER="www-data"
+    elif id "nginx" &>/dev/null 2>&1; then
+        WEB_USER="nginx"
+    elif id "apache" &>/dev/null 2>&1; then
+        WEB_USER="apache"
+    fi
+
+    if [ -n "$WEB_USER" ]; then
+        echo -e "  ${BOLD}Fixing file ownership...${NC}"
+        chown -R "$WEB_USER:$WEB_USER" "$SCRIPT_DIR"
+        echo -e "  ${GREEN}✓${NC} Ownership set to ${BOLD}$WEB_USER${NC}"
+        OWNERSHIP_WARNING=""
+    fi
+fi
+
 echo ""
 echo -e "${BOLD}========================================${NC}"
 echo -e "${GREEN}${BOLD}  Setup complete${NC}"
@@ -92,6 +126,19 @@ echo -e "${BOLD}========================================${NC}"
 echo ""
 echo "  Public folder: $PUBLIC_FOLDER_NAME"
 echo ""
+
+if [ -n "$OWNERSHIP_WARNING" ]; then
+    echo -e "  ${RED}${BOLD}⚠ IMPORTANT: File ownership${NC}"
+    echo -e "  ${RED}You cloned as root. PHP needs write access to secure/.${NC}"
+    echo -e "  ${RED}Run this (replace USER with your web server / site user):${NC}"
+    echo ""
+    echo -e "    ${BOLD}chown -R USER:USER $(basename "$SCRIPT_DIR")/${NC}"
+    echo ""
+    echo -e "  ${RED}Common users: www-data (Ubuntu), nginx, apache,${NC}"
+    echo -e "  ${RED}or your CloudPanel site user (e.g. quicksite-test)${NC}"
+    echo ""
+fi
+
 echo "  Next steps:"
 echo "    1. Point your vhost DocumentRoot to the public folder"
 echo "    2. Restart your web server"

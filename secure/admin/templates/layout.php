@@ -240,26 +240,48 @@ $langNames = [
     
     <?php
     // ================================================================
-    // Security warning: detect default/insecure tokens
+    // Security warning: detect default/insecure tokens in auth config
+    // Shows as long as ANY default token exists, not just the current one
     // ================================================================
+    $hasDefaultToken = false;
+    $usingDefaultToken = false;
     if (!$isLoginPage) {
         $currentToken = $router->getToken();
-        $isDefaultToken = ($currentToken === 'CHANGE_ME_superadmin_token' || 
-                          (is_string($currentToken) && stripos($currentToken, 'default_change_me') !== false));
+        $authConfigPath = SECURE_FOLDER_PATH . '/management/config/auth.php';
+        if (file_exists($authConfigPath)) {
+            $authConfig = include $authConfigPath;
+            $allTokens = $authConfig['authentication']['tokens'] ?? [];
+            foreach ($allTokens as $tokenValue => $tokenInfo) {
+                if ($tokenValue === 'CHANGE_ME_superadmin_token' || 
+                    (is_string($tokenValue) && stripos($tokenValue, 'default_change_me') !== false)) {
+                    $hasDefaultToken = true;
+                    if ($tokenValue === $currentToken) {
+                        $usingDefaultToken = true;
+                    }
+                }
+            }
+        }
     }
     ?>
-    <?php if (!$isLoginPage && !empty($isDefaultToken)): ?>
+    <?php if (!$isLoginPage && $hasDefaultToken): ?>
     <div class="admin-security-warning" id="security-warning">
         <div class="admin-security-warning__content">
             <svg class="admin-security-warning__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0-3.42 0z"/>
                 <line x1="12" y1="9" x2="12" y2="13"/>
                 <line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
             <span>
-                <strong>Security:</strong> You are using a default API token. 
-                <a href="<?= $router->url('command', 'generateToken') ?>" class="admin-security-warning__link">Generate a secure token</a> 
+                <?php if ($usingDefaultToken): ?>
+                <strong>Security:</strong> You are using a default API token.
+                <a href="<?= $router->url('command', 'generateToken') ?>" class="admin-security-warning__link">Generate a secure token</a> with the <strong>* (Superadmin)</strong> role,
+                then log out and log back in with it so you can
+                <a href="<?= $router->url('command', 'revokeToken') ?>" class="admin-security-warning__link">revoke the default one</a>.
+                <?php else: ?>
+                <strong>Security:</strong> A default API token still exists in your configuration.
+                <a href="<?= $router->url('command', 'revokeToken') ?>" class="admin-security-warning__link">Revoke it</a>
                 before deploying to production.
+                <?php endif; ?>
             </span>
             <button type="button" class="admin-security-warning__dismiss" onclick="document.getElementById('security-warning').remove()" aria-label="Dismiss">&times;</button>
         </div>

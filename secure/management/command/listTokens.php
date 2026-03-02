@@ -21,17 +21,31 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 function __command_listTokens(array $params = [], array $urlParams = []): ApiResponse {
     $config = loadAuthConfig();
 
+    // Detect the currently-used token
+    $currentToken = getTokenFromRequest();
+    // Also check session token (admin panel)
+    if (!$currentToken && !empty($_SESSION['admin_token'])) {
+        $currentToken = $_SESSION['admin_token'];
+    }
+
     // Build safe token list (mask token values)
     $tokens = [];
     foreach ($config['authentication']['tokens'] as $token => $info) {
         // Show only first 8 and last 4 characters
         $masked = substr($token, 0, 8) . '...' . substr($token, -4);
         
+        // Support both old (permissions) and new (role) format
+        $role = $info['role'] ?? null;
+        if (!$role && isset($info['permissions'])) {
+            $role = migrateTokenPermissions($info);
+        }
+        
         $tokens[] = [
             'token_preview' => $masked,
-            'name' => $info['name'],
-            'permissions' => $info['permissions'],
-            'created' => $info['created'] ?? 'unknown'
+            'name' => $info['name'] ?? 'Unnamed',
+            'role' => $role ?? 'unknown',
+            'created' => $info['created'] ?? 'unknown',
+            'is_current' => ($token === $currentToken),
         ];
     }
 
