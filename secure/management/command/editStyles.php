@@ -74,7 +74,7 @@ foreach ($dangerousPatterns as $pattern => $description) {
     }
 }
 
-$styleFile = PUBLIC_FOLDER_ROOT . '/style/style.css';
+$styleFile = PUBLIC_FOLDER_ROOT .'/'. PUBLIC_FOLDER_SPACE . '/style/style.css';
 
 // Check if file exists
 if (!file_exists($styleFile)) {

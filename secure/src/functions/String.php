@@ -2,15 +2,32 @@
 
 require_once __DIR__ . '/../classes/RegexPatterns.php';
 
+// Polyfill for str_starts_with (PHP <8.0)
+if (!function_exists('str_starts_with')) {
+    function str_starts_with(string $haystack, string $needle): bool {
+        return $needle === '' || strpos($haystack, $needle) === 0;
+    }
+}
+
 function removePrefix(string $haystack, string $prefix): string {
-    // 1. Check if the $haystack string starts with the $prefix
+    // Normalize both to trim trailing slashes for comparison
+    $haystackNorm = rtrim($haystack, '/');
+    $prefixNorm = rtrim($prefix, '/');
+
+    // If haystack is exactly the prefix (with or without trailing slash), return empty string
+    if ($haystackNorm === $prefixNorm) {
+        return '';
+    }
+    // If haystack starts with prefix (with trailing slash), remove it
     if (str_starts_with($haystack, $prefix)) {
-        // 2. If it does, remove the $prefix part.
-        //    The length of the $prefix is used as the starting offset for substr().
         return substr($haystack, strlen($prefix));
     }
-
-    // 3. If it doesn't start with the $prefix, return the original string.
+    // If haystack starts with prefix (no trailing slash), remove it and any leading slash
+    if ($prefix && str_starts_with($haystack, $prefixNorm)) {
+        $rest = substr($haystack, strlen($prefixNorm));
+        return ltrim($rest, '/');
+    }
+    // Otherwise, return original string
     return $haystack;
 }
 

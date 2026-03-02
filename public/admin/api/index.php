@@ -38,6 +38,11 @@ if (!$token) {
 $requestUri = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
 $parts = explode('/', $requestUri);
 // Remove admin/api prefix
+// Remove PUBLIC_FOLDER_SPACE segments if present
+$spaceSegments = array_filter(explode('/', PUBLIC_FOLDER_SPACE));
+foreach ($spaceSegments as $_) {
+    array_shift($parts);
+}
 array_shift($parts); // admin
 array_shift($parts); // api
 $action = array_shift($parts) ?? '';
