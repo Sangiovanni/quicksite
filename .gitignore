@@ -71,6 +71,9 @@ secure/management/config/roles.php
 # Exports folder (temporary export ZIPs)
 secure/exports/
 
+# Nginx config (auto-generated per install)
+secure/nginx/
+
 # Build output
 public/build/
 

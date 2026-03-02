@@ -26,34 +26,174 @@ It now includes a **visual admin panel** with an iframe-based page editor, letti
 ## Requirements
 
 - **PHP** 7.4+ (tested up to 8.4)
-- **Apache** with `mod_rewrite`
+- **Web server**: Apache with `mod_rewrite` **or** nginx
 - **PHP extensions**: json, fileinfo, zip
 
 ## Installation
 
-1. **Clone the repository**
+```bash
+git clone https://github.com/Sangiovanni/quicksite.git
+cd quicksite
+```
+
+### Quick setup
+
+If your vhost expects a folder name other than `public/` (e.g. `www`, `public_html`, `www.example.com`):
+
+```bash
+# Linux / macOS
+chmod +x setup.sh
+./setup.sh www.example.com
+
+# Windows
+setup.bat www.example.com
+```
+
+This renames `public/` and updates `PUBLIC_FOLDER_NAME` in `init.php`. That's all — everything else (config files, nginx routing) is handled automatically on first page load.
+
+**Don't want to use scripts?** Rename `public/` manually and edit line 9 of `init.php` to match. On nginx, you'll see a first-load setup page with the exact `include` directive you need.
+
+### Manual setup
+
+<details>
+<summary><strong>Apache with virtual host</strong> (recommended)</summary>
+
+This is the standard setup. Point your document root to `public/`:
+
+```apache
+<VirtualHost *:80>
+    ServerName quicksite.local
+    DocumentRoot "/path/to/quicksite/public"
+    <Directory "/path/to/quicksite/public">
+        AllowOverride All
+        Require all granted
+    </Directory>
+</VirtualHost>
+```
+
+Add `127.0.0.1 quicksite.local` to your hosts file, restart Apache, and open `http://quicksite.local/admin/`.
+
+No file changes needed — the repo defaults work out of the box with a virtual host.
+
+</details>
+
+<details>
+<summary><strong>Apache in a subdirectory</strong> (shared hosting, WAMP, XAMPP)</summary>
+
+If your site lives at `http://localhost/mysite/` or `http://example.com/mysite/`:
+
+1. **Symlink or alias** the `public/` folder into your document root:
    ```bash
-   git clone https://github.com/Sangiovanni/quicksite.git
-   cd quicksite
+   ln -s /path/to/quicksite/public /var/www/html/mysite
+   ```
+   Or on WAMP: place/symlink the `public/` folder as `C:\wamp64\www\mysite`.
+
+2. **Edit `public/init.php`** — set the `PUBLIC_FOLDER_SPACE` constant:
+   ```php
+   define('PUBLIC_FOLDER_SPACE', 'mysite');   // was ''
    ```
 
-2. **Point a virtual host to `public/`**
-   ```apache
-   <VirtualHost *:80>
-       ServerName quicksite.local
-       DocumentRoot "/path/to/quicksite/public"
-       <Directory "/path/to/quicksite/public">
-           AllowOverride All
-           Require all granted
-       </Directory>
-   </VirtualHost>
+3. **Update the 3 `.htaccess` files** to include the subdirectory prefix:
+
+   `public/.htaccess`:
+   ```
+   RewriteEngine On
+   FallbackResource /mysite/index.php
    ```
 
-3. **Open the admin panel**
-   Navigate to `http://quicksite.local/admin/` in your browser.
-   Config files (`target.php`, `auth.php`, `roles.php`) are auto-created from `.example` templates on first load. The default token is in `auth.php` — change it before going to production.
+   `public/management/.htaccess`:
+   ```
+   RewriteEngine On
+   SetEnvIf Authorization .+ HTTP_AUTHORIZATION=$0
+   FallbackResource /mysite/management/index.php
+   ```
 
-> **Why a virtual host?** QuickSite uses Apache's `FallbackResource` for clean URLs (`/about`, `/en/contact`) instead of query strings (`?page=about&lang=en`). This is the same approach used by WordPress, Laravel, and most modern PHP projects. The virtual host makes your local development environment match production — your `public/` folder is the document root, just like it would be on a real server. Subdirectory mode (e.g., `http://localhost/quicksite/public/`) is not supported.
+   `public/admin/.htaccess`:
+   ```
+   RewriteEngine On
+   FallbackResource /mysite/admin/index.php
+   ```
+
+4. Open `http://localhost/mysite/admin/`.
+
+> Or just run `setup.sh` and choose option 2 — it does all of this automatically.
+
+</details>
+
+<details>
+<summary><strong>nginx</strong> (including CloudPanel, RunCloud, etc.)</summary>
+
+nginx ignores `.htaccess` files. QuickSite handles this automatically:
+
+- **On first page load**, QuickSite detects nginx and shows a setup page with the exact `include` directive you need to add to your nginx server block. Follow the instructions, reload nginx, and you're done.
+- The routing config file (`secure/nginx/dynamic_routes.conf`) is auto-generated — you never edit it manually.
+
+**Quick version** (for those who want to set it up before the first load):
+
+1. **Set your server block's root** to the `public/` folder:
+   ```nginx
+   server {
+       listen 80;
+       server_name quicksite.example.com;
+       root /path/to/quicksite/public;
+       index index.php;
+
+       # PHP processing
+       location ~ \.php$ {
+           fastcgi_pass unix:/run/php/php-fpm.sock;
+           fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+           include fastcgi_params;
+       }
+
+       # QuickSite routing (auto-generated)
+       include /path/to/quicksite/secure/nginx/dynamic_routes.conf;
+   }
+   ```
+
+2. **Generate the config** if it doesn't exist yet:
+   ```bash
+   # Option A: Run setup.sh (generates it for you)
+   ./setup.sh
+
+   # Option B: Just visit any page — it auto-generates on first load
+
+   # Option C: Generate manually with PHP CLI
+   php -r "require 'secure/src/functions/NginxConfig.php'; write_nginx_dynamic_routes('', realpath('secure'));"
+   ```
+
+3. **Test and reload**: `sudo nginx -t && sudo nginx -s reload`
+
+4. **(Optional) Enable auto-reload** — when `setPublicSpace` is called, QuickSite tries to reload nginx automatically. This requires a one-line sudoers entry:
+   ```bash
+   echo 'www-data ALL=(ALL) NOPASSWD: /usr/sbin/nginx' | sudo tee /etc/sudoers.d/quicksite-nginx
+   sudo chmod 440 /etc/sudoers.d/quicksite-nginx
+   ```
+   Replace `www-data` with your PHP process user. Without this, you'd reload manually after a `setPublicSpace` call.
+
+**Renamed the public folder?** Make sure `PUBLIC_FOLDER_NAME` in `init.php` (line 9) matches your folder name.
+
+For subdirectory installs on nginx (e.g., `example.com/mysite/`), edit `PUBLIC_FOLDER_SPACE` in `init.php` — the nginx config auto-adjusts.
+
+</details>
+
+<details>
+<summary><strong>PHP built-in server</strong> (quick testing only)</summary>
+
+```bash
+cd public
+php -S localhost:8000
+```
+
+Open `http://localhost:8000/admin/`. Clean URLs (`/about`, `/en/contact`) won't work — use Apache or nginx for full functionality.
+
+</details>
+
+### First load
+
+On first load, QuickSite auto-creates sensitive config files from `.example` templates:
+- `secure/management/config/auth.php` — API tokens (⚠️ change the default before production)
+- `secure/management/config/roles.php` — role definitions
+- `secure/management/config/target.php` — active project selector
 
 ## Project structure
 
@@ -110,12 +250,16 @@ quicksite/
 │   │       ├── public/           # Project-specific public files
 │   │       └── backups/          # Project backups (gitignored)
 │   ├── snippets/                 # Reusable component snippets (nav, cards, forms, etc.)
+│   ├── nginx/                    # Auto-generated nginx config (dynamic_routes.conf)
+│   ├── cron/                     # Optional cron scripts (nginx reload fallback)
 │   ├── config/                   # Global config (currently unused, reserved)
 │   ├── exports/                  # Project export ZIPs (generated)
 │   └── logs/                     # Command execution logs (gitignored)
 │
 ├── docs/                         # Documentation (coming soon)
 ├── tests/                        # Test suite
+├── setup.sh                      # Interactive setup wizard (Linux/macOS/Git Bash)
+├── setup.bat                     # Setup script (Windows)
 ├── VERSION                       # Current version (1.0.0-beta.1)
 ├── LICENSE                       # AGPL-3.0
 └── README.md
@@ -134,9 +278,11 @@ Three commands let you adapt the folder structure to match your hosting environm
 
 | Command | What it does | Example |
 |---------|-------------|---------|
-| `renamePublicFolder` | Renames the `public/` folder (e.g., to `www/` or `public_html/`). Updates `init.php` constants. Requires updating your Apache vhost after. | Shared hosting with a fixed `public_html/` document root |
+| `renamePublicFolder` | Renames the `public/` folder (e.g., to `www/` or `public_html/`). Updates `init.php` constants. Requires updating your web server config after. | Shared hosting with a fixed `public_html/` document root |
 | `renameSecureFolder` | Renames the `secure/` folder (e.g., to `backend/` or `app/`). Updates `init.php` constants. | Convention matching or security by obscurity |
-| `setPublicSpace` | Moves public files into a subdirectory inside the document root, adjusting all `.htaccess` files and `init.php`. | Shared hosting where your site lives at `www.example.com/mysite/` — set space to `mysite` |
+| `setPublicSpace` | Moves public files into a subdirectory inside the document root, adjusting all `.htaccess` files, nginx config, and `init.php`. | Shared hosting where your site lives at `www.example.com/mysite/` — set space to `mysite` |
+
+On nginx, `setPublicSpace` also regenerates `secure/nginx/dynamic_routes.conf` and attempts an automatic reload (if sudoers is configured). On Apache, `.htaccess` changes take effect immediately.
 
 ## API overview
 

@@ -208,7 +208,16 @@ $response_data = [
         'new_path' => $target_destination_path,
         'old_name' => SECURE_FOLDER_NAME,
         'new_name' => $relative_path_input,
-        'init_file_updated' => $init_path
+        'init_file_updated' => $init_path,
+        'next_steps' => [
+            '1. If using nginx: update the include path in your vhost config',
+            '   Old: include ' . $template_source_path . '/nginx/dynamic_routes.conf;',
+            '   New: include ' . $target_destination_path . '/nginx/dynamic_routes.conf;',
+            '2. If using nginx cron: update crontab path',
+            '   Old: ' . $template_source_path . '/cron/nginx_reload.sh',
+            '   New: ' . $target_destination_path . '/cron/nginx_reload.sh',
+            '3. Test and reload nginx: nginx -t && nginx -s reload'
+        ]
     ]
 ];
 

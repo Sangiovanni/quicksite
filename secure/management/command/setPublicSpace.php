@@ -2,6 +2,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/LockManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/NginxConfig.php';
 
 if (!array_key_exists('destination', $trimParametersManagement->params())) {
     ApiResponse::create(400, 'validation.required')
@@ -138,7 +139,10 @@ if (is_dir(dirname($admin_htaccess_path))) {
     }
 }
 
-// 4. Modify $target_destination_path/init.php (PUBLIC_FOLDER_SPACE constant) - still inside lock
+// 4. Generate nginx dynamic_routes.conf (for nginx servers — harmless on Apache)
+$nginxResult = write_nginx_dynamic_routes($relative_path_input, SECURE_FOLDER_PATH);
+
+// 5. Modify $target_destination_path/init.php (PUBLIC_FOLDER_SPACE constant) - still inside lock
 $init_path = $new_base_path . DIRECTORY_SEPARATOR . 'init.php';
 
 // The search pattern MUST match exactly what is in your file, including quotes and spaces.
@@ -187,6 +191,14 @@ $response_data = [
             'management' => $normalizePath($management_htaccess_path),
             'admin' => $normalizePath($admin_htaccess_path)
         ],
+        'nginx_config' => $nginxResult['success']
+            ? [
+                'updated' => true,
+                'path' => $normalizePath($nginxResult['config_path']),
+                'nginx_reloaded' => $nginxResult['nginx_reloaded'],
+                'reload_note' => $nginxResult['reload_note'] ?? null
+            ]
+            : ['updated' => false, 'error' => $nginxResult['error'] ?? 'unknown'],
         'warning' => 'Admin panel URL has changed. You may need to navigate to the new location.'
     ]
 ];

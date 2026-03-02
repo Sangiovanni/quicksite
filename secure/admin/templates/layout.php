@@ -238,6 +238,34 @@ $langNames = [
     </header>
     <?php endif; ?>
     
+    <?php
+    // ================================================================
+    // Security warning: detect default/insecure tokens
+    // ================================================================
+    if (!$isLoginPage) {
+        $currentToken = $router->getToken();
+        $isDefaultToken = ($currentToken === 'CHANGE_ME_superadmin_token' || 
+                          (is_string($currentToken) && stripos($currentToken, 'default_change_me') !== false));
+    }
+    ?>
+    <?php if (!$isLoginPage && !empty($isDefaultToken)): ?>
+    <div class="admin-security-warning" id="security-warning">
+        <div class="admin-security-warning__content">
+            <svg class="admin-security-warning__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span>
+                <strong>Security:</strong> You are using a default API token. 
+                <a href="<?= $router->url('command', 'generateToken') ?>" class="admin-security-warning__link">Generate a secure token</a> 
+                before deploying to production.
+            </span>
+            <button type="button" class="admin-security-warning__dismiss" onclick="document.getElementById('security-warning').remove()" aria-label="Dismiss">&times;</button>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Main Content -->
     <main class="admin-main<?= $isLoginPage ? ' admin-main--centered' : '' ?>">
         <?php require $templatePath; ?>

@@ -31,6 +31,70 @@ if (!defined('SECURE_FOLDER_PATH')) {
 }
 
 // ============================================================================
+// SAFETY CHECK: Verify SECURE_FOLDER_PATH exists
+// ============================================================================
+// If the user renamed public/ without updating PUBLIC_FOLDER_NAME,
+// SERVER_ROOT will be wrong and SECURE_FOLDER_PATH won't exist.
+if (!is_dir(SECURE_FOLDER_PATH)) {
+    http_response_code(500);
+    $detectedRoot = htmlspecialchars(PUBLIC_FOLDER_ROOT);
+    $computedSecure = htmlspecialchars(SECURE_FOLDER_PATH);
+    $publicName = htmlspecialchars(PUBLIC_FOLDER_NAME);
+    $actualFolder = basename(PUBLIC_FOLDER_ROOT);
+    die(
+        '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">' .
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0">' .
+        '<title>QuickSite - Configuration Error</title>' .
+        '<style>' .
+        'body{font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:60px auto;line-height:1.6;padding:0 20px;color:#333;background:#fafafa}' .
+        'h1{color:#c62828;margin-bottom:0.3em}' .
+        '.subtitle{color:#666;margin-top:0}' .
+        'code{background:#e8eaf0;padding:2px 6px;border-radius:3px;font-size:0.9em}' .
+        'pre{background:#1e1e2e;color:#cdd6f4;padding:16px 20px;border-radius:8px;overflow-x:auto;font-size:0.88em;line-height:1.5}' .
+        '.fix{margin:20px 0;padding:16px 20px;background:#fff;border-left:4px solid #4caf50;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,0.08)}' .
+        '.fix h3{margin-top:0;color:#2e7d32}' .
+        '.diag{margin:20px 0;padding:14px 18px;background:#fff3e0;border-left:4px solid #ff9800;border-radius:4px}' .
+        '.diag strong{color:#e65100}' .
+        'hr{border:none;border-top:1px solid #ddd;margin:30px 0}' .
+        'small{color:#888}' .
+        '</style></head><body>' .
+        '<h1>QuickSite &mdash; Configuration Error</h1>' .
+        '<p class="subtitle">The <code>secure/</code> folder could not be found.</p>' .
+
+        '<div class="diag">' .
+        '<strong>What happened:</strong>' .
+        '<p style="margin-bottom:0.5em">QuickSite uses <code>PUBLIC_FOLDER_NAME</code> to find the project root. ' .
+        'It strips that name from the document root path to locate the sibling <code>secure/</code> folder.</p>' .
+        '<ul style="margin-bottom:0">' .
+        '<li>Your document root is: <code>' . $detectedRoot . '</code></li>' .
+        '<li><code>PUBLIC_FOLDER_NAME</code> is set to: <code>' . $publicName . '</code></li>' .
+        '<li>Your actual folder name is: <code>' . htmlspecialchars($actualFolder) . '</code></li>' .
+        '</ul>' .
+        '<p style="margin-top:0.8em">Because <code>' . $publicName . '</code> does not match <code>' . htmlspecialchars($actualFolder) . '</code>, ' .
+        'QuickSite cannot find its way back to the project root and looks for <code>secure/</code> in the wrong place: ' .
+        '<code>' . $computedSecure . '</code></p>' .
+        '</div>' .
+
+        '<div class="fix"><h3>How to fix</h3>' .
+        '<p>Open <code>' . htmlspecialchars($actualFolder) . '/init.php</code> and change line 9:</p>' .
+        '<pre>define(\'PUBLIC_FOLDER_NAME\', \'' . $publicName . '\');  // wrong' . "\n" .
+        '// change to:' . "\n" .
+        'define(\'PUBLIC_FOLDER_NAME\', \'' . htmlspecialchars($actualFolder) . '\');  // correct</pre>' .
+        '<p>Then refresh this page.</p></div>' .
+
+        '<div class="fix"><h3>Alternatively, use the setup script</h3>' .
+        '<p>The setup scripts handle this automatically:</p>' .
+        '<pre># Linux / macOS' . "\n" .
+        './setup.sh ' . htmlspecialchars($actualFolder) . "\n\n" .
+        '# Windows' . "\n" .
+        'setup.bat ' . htmlspecialchars($actualFolder) . '</pre></div>' .
+
+        '<hr><p><small>Once fixed, QuickSite will create config files automatically on the next page load.</small></p>' .
+        '</body></html>'
+    );
+}
+
+// ============================================================================
 // FIRST-INSTALL: Auto-create config files from .example templates
 // ============================================================================
 $configDir = SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'management' . DIRECTORY_SEPARATOR . 'config';
@@ -39,6 +103,69 @@ foreach (['target.php', 'auth.php', 'roles.php'] as $configFile) {
     $examplePath = $configFilePath . '.example';
     if (!file_exists($configFilePath) && file_exists($examplePath)) {
         copy($examplePath, $configFilePath);
+    }
+}
+
+// ============================================================================
+// FIRST-INSTALL: Auto-generate nginx config if not present
+// ============================================================================
+$nginxConfigPath = SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'nginx' . DIRECTORY_SEPARATOR . 'dynamic_routes.conf';
+if (!file_exists($nginxConfigPath)) {
+    require_once SECURE_FOLDER_PATH . '/src/functions/NginxConfig.php';
+    $nginxResult = write_nginx_dynamic_routes(PUBLIC_FOLDER_SPACE, SECURE_FOLDER_PATH);
+
+    // Detect nginx — show first-time setup instructions
+    // Apache users never see this (they don't need dynamic_routes.conf)
+    $serverSoftware = $_SERVER['SERVER_SOFTWARE'] ?? '';
+    if (stripos($serverSoftware, 'nginx') !== false && $nginxResult['success']) {
+        $cfgPath = htmlspecialchars($nginxResult['config_path']);
+        $pubFolder = htmlspecialchars(PUBLIC_FOLDER_NAME);
+        http_response_code(503);
+        die(
+            '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">' .
+            '<meta name="viewport" content="width=device-width, initial-scale=1.0">' .
+            '<title>QuickSite - nginx Setup Required</title>' .
+            '<style>' .
+            'body{font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:60px auto;line-height:1.6;padding:0 20px;color:#333;background:#fafafa}' .
+            'h1{color:#1a1a2e;margin-bottom:0.3em}' .
+            '.subtitle{color:#666;margin-top:0;font-size:0.95em}' .
+            'code{background:#e8eaf0;padding:2px 6px;border-radius:3px;font-size:0.9em}' .
+            'pre{background:#1e1e2e;color:#cdd6f4;padding:16px 20px;border-radius:8px;overflow-x:auto;font-size:0.88em;line-height:1.5}' .
+            '.step{margin:20px 0;padding:16px 20px;background:#fff;border-left:4px solid #4a9eff;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,0.08)}' .
+            '.step h3{margin-top:0;color:#1a1a2e}' .
+            '.note{margin-top:30px;padding:14px 18px;background:#fff8e1;border-left:4px solid #f9a825;border-radius:4px}' .
+            '.note strong{color:#e65100}' .
+            'hr{border:none;border-top:1px solid #ddd;margin:30px 0}' .
+            'small{color:#888}' .
+            '</style></head><body>' .
+            '<h1>QuickSite &mdash; nginx Setup Required</h1>' .
+            '<p class="subtitle">First-time setup detected &mdash; this page appears only once.</p>' .
+            '<p>You are running <strong>nginx</strong>, which does not support <code>.htaccess</code> files. ' .
+            'QuickSite has generated a routing configuration file for you, but it needs to be included in your nginx server block.</p>' .
+
+            '<div class="step"><h3>Step 1 &mdash; Include the routing config</h3>' .
+            '<p>Add this line inside your nginx <code>server { }</code> block (e.g. in your vhost config or CloudPanel site settings):</p>' .
+            '<pre>include ' . $cfgPath . ';</pre></div>' .
+
+            '<div class="step"><h3>Step 2 &mdash; Test and reload nginx</h3>' .
+            '<pre>sudo nginx -t &amp;&amp; sudo nginx -s reload</pre>' .
+            '<p>On CloudPanel or similar panels, you may need to restart nginx from the panel UI instead.</p></div>' .
+
+            '<div class="step"><h3>Step 3 &mdash; Refresh this page</h3>' .
+            '<p>Once nginx is reloaded with the new config, <strong>refresh this page</strong>. ' .
+            'All routes will work and this message will not appear again.</p></div>' .
+
+            '<div class="note">' .
+            '<strong>Renamed the public folder?</strong> If you renamed <code>public/</code> to something else ' .
+            '(e.g. <code>www</code> or <code>public_html</code>), make sure <code>PUBLIC_FOLDER_NAME</code> ' .
+            'matches your folder name in <code>' . $pubFolder . '/init.php</code> (line 9).' .
+            '</div>' .
+
+            '<hr>' .
+            '<p><small>Generated config: <code>' . $cfgPath . '</code></small></p>' .
+            '<p><small>Server: ' . htmlspecialchars($serverSoftware) . '</small></p>' .
+            '</body></html>'
+        );
     }
 }
 

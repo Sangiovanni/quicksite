@@ -163,11 +163,15 @@ $response_data = [
         'new_path' => $target_path,
         'old_name' => $current_public_folder_name,
         'new_name' => $new_folder_name,
-        'warning' => 'You must update your Apache/web server DocumentRoot to point to: ' . $target_path,
+        'warning' => 'You must update your web server DocumentRoot/root to point to: ' . $target_path,
         'next_steps' => [
-            '1. Update Apache VirtualHost DocumentRoot to: ' . $target_path,
-            '2. Restart Apache/web server',
-            '3. Access site at new URL'
+            'Apache:',
+            '  1. Update VirtualHost DocumentRoot to: ' . $target_path,
+            '  2. Restart Apache: systemctl restart apache2',
+            'nginx:',
+            '  1. Update server block root to: root ' . $target_path . ';',
+            '  2. Test and reload: nginx -t && nginx -s reload',
+            'Then access site at new URL.'
         ]
     ]
 ];
