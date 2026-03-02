@@ -117,7 +117,7 @@ quicksite/
 ├── docs/                         # Documentation (coming soon)
 ├── tests/                        # Test suite
 ├── VERSION                       # Current version (1.0.0-beta.1)
-├── LICENSE                       # MIT
+├── LICENSE                       # AGPL-3.0
 └── README.md
 ```
 
@@ -168,7 +168,7 @@ The admin panel makes it accessible to non-developers, while the API keeps it po
 
 ## Contributing
 
-Contributions are welcome under the MIT License.
+Contributions are welcome under the AGPL-3.0 License.
 
 1. Fork the repository
 2. Create a feature branch
@@ -182,7 +182,7 @@ Built using a **hybrid human-AI development approach** — architecture and desi
 
 ## License
 
-MIT — free for personal and commercial use. See [LICENSE](LICENSE).
+AGPL-3.0 — free to use, modify, and self-host. If you offer QuickSite as a hosted service, you must share your modifications under the same license. See [LICENSE](LICENSE).
 
 ## Support
 
