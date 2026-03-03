@@ -201,7 +201,7 @@ if not exist "%SECURE_DIR%" (
 REM Move via PowerShell (supports nested paths like backends/project1)
 echo   Renaming: %SECURE_FOLDER_NAME% -^> %NEW_SECURE_NAME%
 set "PS_SEC_TEMP=%TEMP%\qs_setup_secure.ps1"
-echo $src = '%SECURE_DIR%' > "%PS_SEC_TEMP%"
+echo $src = '%SECURE_DIR%' -replace '/','\' > "%PS_SEC_TEMP%"
 echo $name = '%NEW_SECURE_NAME%' -replace '\\','/' >> "%PS_SEC_TEMP%"
 echo $root = '%SCRIPT_DIR%'.TrimEnd('\') >> "%PS_SEC_TEMP%"
 echo $dest = Join-Path $root ($name -replace '/','\') >> "%PS_SEC_TEMP%"
