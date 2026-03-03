@@ -163,16 +163,27 @@ else
         exit 1
     fi
 
+    # Remember old location for cleanup (before updating vars)
+    OLD_SECURE_DIR="$SECURE_DIR"
+
     # Create parent directories for nested paths
     PARENT_DIR="$(dirname "$TARGET")"
     if [ "$PARENT_DIR" != "$SCRIPT_DIR" ] && [ ! -d "$PARENT_DIR" ]; then
-        mkdir -p "$PARENT_DIR"
+        # Check if target is nested inside source (e.g. secure → secure/test)
+        # Can't mv a folder into itself, so use a temp rename first
+        if echo "$TARGET" | grep -q "^${SECURE_DIR}/"; then
+            TMP_DIR="$SCRIPT_DIR/.secure_move_tmp"
+            mv "$SECURE_DIR" "$TMP_DIR"
+            mkdir -p "$PARENT_DIR"
+            mv "$TMP_DIR" "$TARGET"
+        else
+            mkdir -p "$PARENT_DIR"
+            mv "$SECURE_DIR" "$TARGET"
+        fi
+    else
+        mv "$SECURE_DIR" "$TARGET"
     fi
 
-    # Remember old location for cleanup
-    OLD_SECURE_DIR="$SECURE_DIR"
-
-    mv "$SECURE_DIR" "$TARGET"
     SECURE_DIR="$TARGET"
     SECURE_FOLDER_NAME="$NEW_SECURE_NAME"
 
