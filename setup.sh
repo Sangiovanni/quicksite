@@ -172,7 +172,14 @@ else
     fi
 
     TARGET="$SCRIPT_DIR/$NEW_SECURE_NAME"
-    if [ -e "$TARGET" ]; then
+
+    # Detect un-nesting (e.g. secure/test → secure): target is ancestor of source
+    IS_UNNEST=false
+    if echo "$SECURE_DIR" | grep -q "^${TARGET}/"; then
+        IS_UNNEST=true
+    fi
+
+    if [ -e "$TARGET" ] && [ "$IS_UNNEST" != true ]; then
         echo -e "  ${RED}✗ Error: '$NEW_SECURE_NAME' already exists${NC}"
         exit 1
     fi
@@ -182,7 +189,26 @@ else
 
     # Perform the move
     PARENT_DIR="$(dirname "$TARGET")"
-    if echo "$TARGET" | grep -q "^${SECURE_DIR}/"; then
+    if [ "$IS_UNNEST" = true ]; then
+        # Un-nesting (e.g. secure/test → secure): target is parent of source
+        TMP_DIR="$SCRIPT_DIR/.secure_move_tmp"
+        mv "$SECURE_DIR" "$TMP_DIR"
+        # Remove the now-empty parent chain up to (and including) target
+        CLEANUP_DIR="$(dirname "$SECURE_DIR")"
+        while [ "$CLEANUP_DIR" != "$SCRIPT_DIR" ] && [ -d "$CLEANUP_DIR" ]; do
+            if [ -z "$(ls -A "$CLEANUP_DIR" 2>/dev/null)" ]; then
+                rmdir "$CLEANUP_DIR"
+                CLEANUP_DIR="$(dirname "$CLEANUP_DIR")"
+            else
+                break
+            fi
+        done
+        if [ -e "$TARGET" ]; then
+            echo -e "  ${YELLOW}⚠ Warning: '$NEW_SECURE_NAME' still contains other files.${NC}"
+            echo -e "  ${YELLOW}  They will be merged into the secure folder.${NC}"
+        fi
+        mv "$TMP_DIR" "$TARGET"
+    elif echo "$TARGET" | grep -q "^${SECURE_DIR}/"; then
         # Self-nesting (e.g. secure → secure/test): can't mv into itself
         TMP_DIR="$SCRIPT_DIR/.secure_move_tmp"
         mv "$SECURE_DIR" "$TMP_DIR"
