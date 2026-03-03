@@ -41,6 +41,8 @@ PUBLIC_SPACE=""
 CONF_FILE="$SCRIPT_DIR/.quicksite.conf"
 if [ -f "$CONF_FILE" ]; then
     source "$CONF_FILE"
+    # Backward compat: old conf format used PUBLIC_FOLDER_SPACE
+    PUBLIC_SPACE="${PUBLIC_SPACE:-$PUBLIC_FOLDER_SPACE}"
     PUBLIC_DIR="$SCRIPT_DIR/$PUBLIC_FOLDER_NAME"
     SECURE_DIR="$SCRIPT_DIR/$SECURE_FOLDER_NAME"
 fi
@@ -95,8 +97,12 @@ else
     PUBLIC_DIR="$SCRIPT_DIR/$NEW_PUBLIC_NAME"
     PUBLIC_FOLDER_NAME="$NEW_PUBLIC_NAME"
 
-    # Update PUBLIC_FOLDER_NAME in init.php
-    INIT_FILE="$PUBLIC_DIR/init.php"
+    # Update PUBLIC_FOLDER_NAME in init.php (account for URL space)
+    if [ -n "$PUBLIC_SPACE" ]; then
+        INIT_FILE="$PUBLIC_DIR/$PUBLIC_SPACE/init.php"
+    else
+        INIT_FILE="$PUBLIC_DIR/init.php"
+    fi
     if [ -f "$INIT_FILE" ]; then
         sed -i "s/define('PUBLIC_FOLDER_NAME',\s*'[^']*')/define('PUBLIC_FOLDER_NAME', '$NEW_PUBLIC_NAME')/" "$INIT_FILE"
     fi
@@ -163,15 +169,34 @@ else
         mkdir -p "$PARENT_DIR"
     fi
 
+    # Remember old location for cleanup
+    OLD_SECURE_DIR="$SECURE_DIR"
+
     mv "$SECURE_DIR" "$TARGET"
     SECURE_DIR="$TARGET"
     SECURE_FOLDER_NAME="$NEW_SECURE_NAME"
 
-    # Update SECURE_FOLDER_NAME in init.php
-    INIT_FILE="$PUBLIC_DIR/init.php"
+    # Update SECURE_FOLDER_NAME in init.php (account for URL space)
+    if [ -n "$PUBLIC_SPACE" ]; then
+        INIT_FILE="$PUBLIC_DIR/$PUBLIC_SPACE/init.php"
+    else
+        INIT_FILE="$PUBLIC_DIR/init.php"
+    fi
     if [ -f "$INIT_FILE" ]; then
         sed -i "s|define('SECURE_FOLDER_NAME',\s*'[^']*')|define('SECURE_FOLDER_NAME', '$NEW_SECURE_NAME')|" "$INIT_FILE"
     fi
+
+    # Cleanup empty parent directories from old nested path
+    OLD_PARENT="$(dirname "$OLD_SECURE_DIR")"
+    while [ "$OLD_PARENT" != "$SCRIPT_DIR" ] && [ -d "$OLD_PARENT" ]; do
+        if [ -z "$(ls -A "$OLD_PARENT" 2>/dev/null)" ]; then
+            rmdir "$OLD_PARENT"
+            OLD_PARENT="$(dirname "$OLD_PARENT")"
+        else
+            break
+        fi
+    done
+
     echo -e "  ${GREEN}✓${NC} Renamed → ${BOLD}$NEW_SECURE_NAME${NC}"
 fi
 
@@ -182,75 +207,121 @@ echo ""
 # ==========================================================
 echo -e "${BOLD}Step 3 — URL space / prefix${NC}"
 echo ""
-echo "  Add a URL prefix so the site is served from a subdirectory."
-echo "  Example: 'web' → site at http://domain/web/"
-echo "  Leave empty to serve from root (http://domain/)."
-echo ""
-read -p "  Space (Enter for none): " NEW_SPACE
+echo "  A URL space serves the site from a subdirectory."
+echo "  Example: 'web' → http://domain/web/"
 
-# Trim leading/trailing slashes
-NEW_SPACE=$(echo "$NEW_SPACE" | sed 's:^[/\\]*::; s:[/\\]*$::')
+DESIRED_SPACE="$PUBLIC_SPACE"
 
-if [ -z "$NEW_SPACE" ]; then
-    echo -e "  ${GREEN}✓${NC} No space — serving from root"
+if [ -n "$PUBLIC_SPACE" ]; then
+    echo ""
+    echo -e "  Current space: ${BOLD}$PUBLIC_SPACE${NC}"
+    echo ""
+    echo "  Enter a new space, type 'none' to remove it,"
+    echo "  or press Enter to keep the current space."
+    echo ""
+    read -p "  Space: " NEW_SPACE_INPUT
+
+    if [ -z "$NEW_SPACE_INPUT" ]; then
+        echo -e "  ${GREEN}✓${NC} Keeping '$PUBLIC_SPACE'"
+    elif [ "$NEW_SPACE_INPUT" = "none" ]; then
+        DESIRED_SPACE=""
+    elif [ "$NEW_SPACE_INPUT" = "$PUBLIC_SPACE" ]; then
+        echo -e "  ${GREEN}✓${NC} Keeping '$PUBLIC_SPACE'"
+    else
+        DESIRED_SPACE=$(echo "$NEW_SPACE_INPUT" | sed 's:^[/\\]*::; s:[/\\]*$::')
+    fi
 else
-    # Validate characters (alphanumeric, dots, hyphens, underscores, slashes)
-    if echo "$NEW_SPACE" | grep -qP '[^a-zA-Z0-9._/\-]'; then
-        echo -e "  ${RED}✗ Error: invalid characters in space name${NC}"
-        echo "  Allowed: a-z A-Z 0-9 . - _ /"
-        exit 1
+    echo ""
+    echo "  No space currently set."
+    echo "  Press Enter to skip, or enter a space name."
+    echo ""
+    read -p "  Space (Enter for none): " NEW_SPACE_INPUT
+
+    if [ -n "$NEW_SPACE_INPUT" ]; then
+        DESIRED_SPACE=$(echo "$NEW_SPACE_INPUT" | sed 's:^[/\\]*::; s:[/\\]*$::')
+    else
+        echo -e "  ${GREEN}✓${NC} No space — serving from root"
+    fi
+fi
+
+if [ "$DESIRED_SPACE" != "$PUBLIC_SPACE" ]; then
+    # Validate new space (if non-empty)
+    if [ -n "$DESIRED_SPACE" ]; then
+        if echo "$DESIRED_SPACE" | grep -qP '[^a-zA-Z0-9._/\-]'; then
+            echo -e "  ${RED}✗ Error: invalid characters in space name${NC}"
+            echo "  Allowed: a-z A-Z 0-9 . - _ /"
+            exit 1
+        fi
+        DEPTH=$(echo "$DESIRED_SPACE" | awk -F/ '{print NF}')
+        if [ "$DEPTH" -gt 5 ]; then
+            echo -e "  ${RED}✗ Error: space path too deep (max 5 levels)${NC}"
+            exit 1
+        fi
     fi
 
-    # Validate depth (max 5 levels)
-    DEPTH=$(echo "$NEW_SPACE" | awk -F/ '{print NF}')
-    if [ "$DEPTH" -gt 5 ]; then
-        echo -e "  ${RED}✗ Error: space path too deep (max 5 levels)${NC}"
-        exit 1
+    # Remove current space (move files back to public root)
+    if [ -n "$PUBLIC_SPACE" ]; then
+        SPACE_DIR="$PUBLIC_DIR/$PUBLIC_SPACE"
+        if [ -d "$SPACE_DIR" ]; then
+            for item in "$SPACE_DIR"/* "$SPACE_DIR"/.*; do
+                BASENAME="$(basename "$item")"
+                case "$BASENAME" in .|..) continue ;; esac
+                mv "$item" "$PUBLIC_DIR/" 2>/dev/null || true
+            done
+            TOP_SEGMENT=$(echo "$PUBLIC_SPACE" | cut -d/ -f1)
+            rm -rf "$PUBLIC_DIR/$TOP_SEGMENT" 2>/dev/null || true
+        fi
     fi
 
-    # Get the top-level segment (in case of nested path like app/v1)
-    TOP_SEGMENT=$(echo "$NEW_SPACE" | cut -d/ -f1)
-    SPACE_DIR="$PUBLIC_DIR/$NEW_SPACE"
+    # Set new space (move files from root into space dir)
+    if [ -n "$DESIRED_SPACE" ]; then
+        TOP_SEGMENT=$(echo "$DESIRED_SPACE" | cut -d/ -f1)
+        SPACE_DIR="$PUBLIC_DIR/$DESIRED_SPACE"
 
-    if [ -d "$SPACE_DIR" ]; then
-        echo -e "  ${RED}✗ Error: directory '$NEW_SPACE' already exists inside public folder${NC}"
-        exit 1
+        if [ -d "$SPACE_DIR" ]; then
+            echo -e "  ${RED}✗ Error: directory '$DESIRED_SPACE' already exists${NC}"
+            exit 1
+        fi
+
+        mkdir -p "$SPACE_DIR"
+
+        for item in "$PUBLIC_DIR"/* "$PUBLIC_DIR"/.*; do
+            BASENAME="$(basename "$item")"
+            case "$BASENAME" in .|..) continue ;; esac
+            [ "$BASENAME" = "$TOP_SEGMENT" ] && continue
+            mv "$item" "$SPACE_DIR/" 2>/dev/null || true
+        done
     fi
 
-    # Create the space directory (supports nested paths)
-    mkdir -p "$SPACE_DIR"
+    PUBLIC_SPACE="$DESIRED_SPACE"
 
-    # Move everything from public root into the space directory
-    # (skip the top-level segment directory we just created)
-    for item in "$PUBLIC_DIR"/* "$PUBLIC_DIR"/.*; do
-        BASENAME="$(basename "$item")"
-        case "$BASENAME" in
-            .|..) continue ;;
-        esac
-        [ "$BASENAME" = "$TOP_SEGMENT" ] && continue
-        mv "$item" "$SPACE_DIR/" 2>/dev/null || true
-    done
-
-    PUBLIC_SPACE="$NEW_SPACE"
-
-    # Update PUBLIC_FOLDER_SPACE in init.php
-    INIT_FILE="$SPACE_DIR/init.php"
+    # Update init.php
+    if [ -n "$PUBLIC_SPACE" ]; then
+        INIT_FILE="$PUBLIC_DIR/$PUBLIC_SPACE/init.php"
+    else
+        INIT_FILE="$PUBLIC_DIR/init.php"
+    fi
     if [ -f "$INIT_FILE" ]; then
-        sed -i "s/define('PUBLIC_FOLDER_SPACE',\s*'[^']*')/define('PUBLIC_FOLDER_SPACE', '$NEW_SPACE')/" "$INIT_FILE"
+        sed -i "s/define('PUBLIC_FOLDER_SPACE',\s*'[^']*')/define('PUBLIC_FOLDER_SPACE', '$PUBLIC_SPACE')/" "$INIT_FILE"
     fi
 
-    # Update .htaccess FallbackResource lines
-    if [ -f "$SPACE_DIR/.htaccess" ]; then
-        sed -i "s|FallbackResource .*|FallbackResource /$NEW_SPACE/index.php|" "$SPACE_DIR/.htaccess"
+    # Update .htaccess FallbackResource
+    if [ -n "$PUBLIC_SPACE" ]; then
+        HT_DIR="$PUBLIC_DIR/$PUBLIC_SPACE"
+        FALLBACK_PREFIX="/$PUBLIC_SPACE"
+    else
+        HT_DIR="$PUBLIC_DIR"
+        FALLBACK_PREFIX=""
     fi
-    if [ -f "$SPACE_DIR/management/.htaccess" ]; then
-        sed -i "s|FallbackResource .*|FallbackResource /$NEW_SPACE/management/index.php|" "$SPACE_DIR/management/.htaccess"
-    fi
-    if [ -f "$SPACE_DIR/admin/.htaccess" ]; then
-        sed -i "s|FallbackResource .*|FallbackResource /$NEW_SPACE/admin/index.php|" "$SPACE_DIR/admin/.htaccess"
-    fi
+    [ -f "$HT_DIR/.htaccess" ] && sed -i "s|FallbackResource .*|FallbackResource $FALLBACK_PREFIX/index.php|" "$HT_DIR/.htaccess"
+    [ -f "$HT_DIR/management/.htaccess" ] && sed -i "s|FallbackResource .*|FallbackResource $FALLBACK_PREFIX/management/index.php|" "$HT_DIR/management/.htaccess"
+    [ -f "$HT_DIR/admin/.htaccess" ] && sed -i "s|FallbackResource .*|FallbackResource $FALLBACK_PREFIX/admin/index.php|" "$HT_DIR/admin/.htaccess"
 
-    echo -e "  ${GREEN}✓${NC} Space set → http://domain/${BOLD}$NEW_SPACE${NC}/"
+    if [ -n "$PUBLIC_SPACE" ]; then
+        echo -e "  ${GREEN}✓${NC} Space set → http://domain/${BOLD}$PUBLIC_SPACE${NC}/"
+    else
+        echo -e "  ${GREEN}✓${NC} Space removed — serving from root"
+    fi
 fi
 
 echo ""
@@ -293,7 +364,7 @@ fi
 cat > "$CONF_FILE" << EOF
 PUBLIC_FOLDER_NAME=$PUBLIC_FOLDER_NAME
 SECURE_FOLDER_NAME=$SECURE_FOLDER_NAME
-PUBLIC_FOLDER_SPACE=$PUBLIC_SPACE
+PUBLIC_SPACE=$PUBLIC_SPACE
 EOF
 
 echo ""

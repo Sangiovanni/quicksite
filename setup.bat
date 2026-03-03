@@ -36,7 +36,7 @@ if exist "%CONF_FILE%" (
     for /f "usebackq tokens=1,2 delims==" %%a in ("%CONF_FILE%") do (
         if "%%a"=="PUBLIC_FOLDER_NAME" set "PUBLIC_FOLDER_NAME=%%b"
         if "%%a"=="SECURE_FOLDER_NAME" set "SECURE_FOLDER_NAME=%%b"
-        if "%%a"=="PUBLIC_FOLDER_SPACE" set "PUBLIC_SPACE=%%b"
+        if "%%a"=="PUBLIC_SPACE" set "PUBLIC_SPACE=%%b"
     )
     set "PUBLIC_DIR=!SCRIPT_DIR!!PUBLIC_FOLDER_NAME!"
     set "SECURE_DIR=!SCRIPT_DIR!!SECURE_FOLDER_NAME!"
@@ -118,11 +118,15 @@ echo   + Renamed to %NEW_PUBLIC_NAME%
 set "PUBLIC_DIR=%NEW_PUBLIC_DIR%"
 set "PUBLIC_FOLDER_NAME=%NEW_PUBLIC_NAME%"
 
-REM Update PUBLIC_FOLDER_NAME in init.php via temp PS1 script
-set "INIT_FILE=%SCRIPT_DIR%%NEW_PUBLIC_NAME%\init.php"
-if not exist "%INIT_FILE%" goto :step2
+REM Update PUBLIC_FOLDER_NAME in init.php (account for URL space)
+if not "%PUBLIC_SPACE%"=="" (
+    set "INIT_FILE=%SCRIPT_DIR%%NEW_PUBLIC_NAME%\%PUBLIC_SPACE%\init.php"
+) else (
+    set "INIT_FILE=%SCRIPT_DIR%%NEW_PUBLIC_NAME%\init.php"
+)
+if not exist "!INIT_FILE!" goto :step2
 
-call :update_init_constant "%INIT_FILE%" "PUBLIC_FOLDER_NAME" "%NEW_PUBLIC_NAME%"
+call :update_init_constant "!INIT_FILE!" "PUBLIC_FOLDER_NAME" "%NEW_PUBLIC_NAME%"
 echo.
 
 REM ==========================================================
@@ -188,6 +192,14 @@ echo if ($segments -gt 5) { Write-Host '  X Error: path too deep (max 5 levels)'
 echo $parent = Split-Path $dest >> "%PS_SEC_TEMP%"
 echo if ($parent -and -not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent -Force ^| Out-Null } >> "%PS_SEC_TEMP%"
 echo Move-Item $src $dest >> "%PS_SEC_TEMP%"
+echo # Cleanup empty parent directories from old nested path >> "%PS_SEC_TEMP%"
+echo $oldParent = Split-Path $src >> "%PS_SEC_TEMP%"
+echo while ($oldParent -ne $root -and (Test-Path $oldParent)) { >> "%PS_SEC_TEMP%"
+echo   if ((Get-ChildItem $oldParent -Force).Count -eq 0) { >> "%PS_SEC_TEMP%"
+echo     Remove-Item $oldParent >> "%PS_SEC_TEMP%"
+echo     $oldParent = Split-Path $oldParent >> "%PS_SEC_TEMP%"
+echo   } else { break } >> "%PS_SEC_TEMP%"
+echo } >> "%PS_SEC_TEMP%"
 echo Write-Host "  + Renamed to $name" >> "%PS_SEC_TEMP%"
 echo exit 0 >> "%PS_SEC_TEMP%"
 
@@ -202,10 +214,14 @@ del "%PS_SEC_TEMP%" 2>nul
 set "SECURE_FOLDER_NAME=%NEW_SECURE_NAME%"
 set "SECURE_DIR=%SCRIPT_DIR%%NEW_SECURE_NAME%"
 
-REM Update SECURE_FOLDER_NAME in init.php
-set "INIT_FILE=%PUBLIC_DIR%\init.php"
-if exist "%INIT_FILE%" (
-    call :update_init_constant "%INIT_FILE%" "SECURE_FOLDER_NAME" "%NEW_SECURE_NAME%"
+REM Update SECURE_FOLDER_NAME in init.php (account for URL space)
+if not "%PUBLIC_SPACE%"=="" (
+    set "INIT_FILE=%PUBLIC_DIR%\%PUBLIC_SPACE%\init.php"
+) else (
+    set "INIT_FILE=%PUBLIC_DIR%\init.php"
+)
+if exist "!INIT_FILE!" (
+    call :update_init_constant "!INIT_FILE!" "SECURE_FOLDER_NAME" "%NEW_SECURE_NAME%"
 )
 echo.
 
@@ -216,70 +232,107 @@ REM ==========================================================
 echo.
 echo Step 3 - URL space / prefix
 echo.
-echo   Add a URL prefix so the site is served from a subdirectory.
+echo   A URL space serves the site from a subdirectory.
 echo   Example: "web" makes the site http://domain/web/
-echo   Leave empty to serve from root (http://domain/).
-echo.
-set "NEW_SPACE="
-set /p "NEW_SPACE=  Space (Enter for none): "
 
-if "%NEW_SPACE%"=="" (
+if "%PUBLIC_SPACE%"=="" goto :step3_no_space
+
+echo.
+echo   Current space: %PUBLIC_SPACE%
+echo.
+echo   Enter a new space, type "none" to remove it,
+echo   or press Enter to keep the current space.
+echo.
+set "SPACE_INPUT="
+set /p "SPACE_INPUT=  Space: "
+
+if "!SPACE_INPUT!"=="" (
+    echo   OK Keeping "%PUBLIC_SPACE%"
+    goto :done
+)
+if /i "!SPACE_INPUT!"=="none" (
+    set "DESIRED_SPACE="
+    goto :step3_apply
+)
+if "!SPACE_INPUT!"=="%PUBLIC_SPACE%" (
+    echo   OK Keeping "%PUBLIC_SPACE%"
+    goto :done
+)
+set "DESIRED_SPACE=!SPACE_INPUT!"
+goto :step3_apply
+
+:step3_no_space
+echo.
+echo   No space currently set.
+echo   Press Enter to skip, or enter a space name.
+echo.
+set "SPACE_INPUT="
+set /p "SPACE_INPUT=  Space (Enter for none): "
+
+if "!SPACE_INPUT!"=="" (
     echo   OK No space - serving from root
     goto :done
 )
+set "DESIRED_SPACE=!SPACE_INPUT!"
 
-REM Validate characters and move files via PowerShell (more reliable for complex ops)
+:step3_apply
+REM Apply space change via PowerShell (handles validation, file moves, config updates)
 set "PS_SPACE_TEMP=%TEMP%\qs_setup_space.ps1"
 
-echo $space = '%NEW_SPACE%' > "%PS_SPACE_TEMP%"
-echo $publicDir = '%PUBLIC_DIR%' >> "%PS_SPACE_TEMP%"
+echo $publicDir = '%PUBLIC_DIR%' > "%PS_SPACE_TEMP%"
+echo $oldSpace = '%PUBLIC_SPACE%' >> "%PS_SPACE_TEMP%"
+echo $newSpace = '!DESIRED_SPACE!' >> "%PS_SPACE_TEMP%"
+echo $newSpace = $newSpace.Trim('/\') >> "%PS_SPACE_TEMP%"
 echo. >> "%PS_SPACE_TEMP%"
-echo # Trim slashes >> "%PS_SPACE_TEMP%"
-echo $space = $space.Trim('/\') >> "%PS_SPACE_TEMP%"
-echo if (-not $space) { Write-Host '  OK No space - serving from root'; exit 0 } >> "%PS_SPACE_TEMP%"
-echo. >> "%PS_SPACE_TEMP%"
-echo # Validate chars >> "%PS_SPACE_TEMP%"
-echo if ($space -notmatch '^[a-zA-Z0-9._/\-]+$') { >> "%PS_SPACE_TEMP%"
+echo # Validate new space >> "%PS_SPACE_TEMP%"
+echo if ($newSpace -and $newSpace -notmatch '^[a-zA-Z0-9._/\-]+$') { >> "%PS_SPACE_TEMP%"
 echo   Write-Host '  X Error: invalid characters in space name' >> "%PS_SPACE_TEMP%"
 echo   Write-Host '  Allowed: a-z A-Z 0-9 . - _ /' >> "%PS_SPACE_TEMP%"
 echo   exit 1 >> "%PS_SPACE_TEMP%"
 echo } >> "%PS_SPACE_TEMP%"
-echo. >> "%PS_SPACE_TEMP%"
-echo # Validate depth >> "%PS_SPACE_TEMP%"
-echo $depth = ($space -split '/').Count >> "%PS_SPACE_TEMP%"
-echo if ($depth -gt 5) { Write-Host '  X Error: space path too deep (max 5 levels)'; exit 1 } >> "%PS_SPACE_TEMP%"
-echo. >> "%PS_SPACE_TEMP%"
-echo $spaceDir = Join-Path $publicDir $space >> "%PS_SPACE_TEMP%"
-echo if (Test-Path $spaceDir) { Write-Host "  X Error: directory '$space' already exists inside public folder"; exit 1 } >> "%PS_SPACE_TEMP%"
-echo. >> "%PS_SPACE_TEMP%"
-echo # Create space directory >> "%PS_SPACE_TEMP%"
-echo New-Item -ItemType Directory -Path $spaceDir -Force ^| Out-Null >> "%PS_SPACE_TEMP%"
-echo. >> "%PS_SPACE_TEMP%"
-echo # Get top-level segment to skip >> "%PS_SPACE_TEMP%"
-echo $topSegment = ($space -split '/')[0] >> "%PS_SPACE_TEMP%"
-echo. >> "%PS_SPACE_TEMP%"
-echo # Move everything from public root into space directory >> "%PS_SPACE_TEMP%"
-echo Get-ChildItem -Path $publicDir -Force ^| Where-Object { $_.Name -ne $topSegment } ^| ForEach-Object { >> "%PS_SPACE_TEMP%"
-echo   Move-Item $_.FullName -Destination $spaceDir -Force >> "%PS_SPACE_TEMP%"
+echo if ($newSpace -and ($newSpace -split '/').Count -gt 5) { >> "%PS_SPACE_TEMP%"
+echo   Write-Host '  X Error: path too deep (max 5 levels)' >> "%PS_SPACE_TEMP%"
+echo   exit 1 >> "%PS_SPACE_TEMP%"
 echo } >> "%PS_SPACE_TEMP%"
 echo. >> "%PS_SPACE_TEMP%"
-echo # Update PUBLIC_FOLDER_SPACE in init.php >> "%PS_SPACE_TEMP%"
-echo $initFile = Join-Path $spaceDir 'init.php' >> "%PS_SPACE_TEMP%"
+echo # Remove old space (move files back to public root) >> "%PS_SPACE_TEMP%"
+echo if ($oldSpace) { >> "%PS_SPACE_TEMP%"
+echo   $oldDir = Join-Path $publicDir ($oldSpace -replace '/','\'  ) >> "%PS_SPACE_TEMP%"
+echo   if (Test-Path $oldDir) { >> "%PS_SPACE_TEMP%"
+echo     Get-ChildItem $oldDir -Force ^| ForEach-Object { Move-Item $_.FullName $publicDir -Force } >> "%PS_SPACE_TEMP%"
+echo     $top = ($oldSpace -split '/')[0] >> "%PS_SPACE_TEMP%"
+echo     Remove-Item (Join-Path $publicDir $top) -Recurse -Force -ErrorAction SilentlyContinue >> "%PS_SPACE_TEMP%"
+echo   } >> "%PS_SPACE_TEMP%"
+echo } >> "%PS_SPACE_TEMP%"
+echo. >> "%PS_SPACE_TEMP%"
+echo # Set new space (move files into space dir) >> "%PS_SPACE_TEMP%"
+echo if ($newSpace) { >> "%PS_SPACE_TEMP%"
+echo   $newDir = Join-Path $publicDir ($newSpace -replace '/','\') >> "%PS_SPACE_TEMP%"
+echo   if (Test-Path $newDir) { Write-Host "  X Error: '$newSpace' already exists"; exit 1 } >> "%PS_SPACE_TEMP%"
+echo   New-Item -ItemType Directory -Path $newDir -Force ^| Out-Null >> "%PS_SPACE_TEMP%"
+echo   $top = ($newSpace -split '/')[0] >> "%PS_SPACE_TEMP%"
+echo   Get-ChildItem $publicDir -Force ^| Where-Object { $_.Name -ne $top } ^| ForEach-Object { >> "%PS_SPACE_TEMP%"
+echo     Move-Item $_.FullName $newDir -Force >> "%PS_SPACE_TEMP%"
+echo   } >> "%PS_SPACE_TEMP%"
+echo } >> "%PS_SPACE_TEMP%"
+echo. >> "%PS_SPACE_TEMP%"
+echo # Determine where init.php and .htaccess are now >> "%PS_SPACE_TEMP%"
+echo $initDir = if ($newSpace) { Join-Path $publicDir ($newSpace -replace '/','\') } else { $publicDir } >> "%PS_SPACE_TEMP%"
+echo. >> "%PS_SPACE_TEMP%"
+echo # Update init.php >> "%PS_SPACE_TEMP%"
+echo $initFile = Join-Path $initDir 'init.php' >> "%PS_SPACE_TEMP%"
 echo if (Test-Path $initFile) { >> "%PS_SPACE_TEMP%"
 echo   $c = Get-Content $initFile -Raw >> "%PS_SPACE_TEMP%"
-echo   $c = $c -replace "define\('PUBLIC_FOLDER_SPACE',\s*'[^']*'\)", "define('PUBLIC_FOLDER_SPACE', '$space')" >> "%PS_SPACE_TEMP%"
+echo   $c = $c -replace "define\('PUBLIC_FOLDER_SPACE',\s*'[^']*'\)", "define('PUBLIC_FOLDER_SPACE', '$newSpace')" >> "%PS_SPACE_TEMP%"
 echo   [IO.File]::WriteAllText($initFile, $c, [System.Text.Encoding]::UTF8) >> "%PS_SPACE_TEMP%"
 echo } >> "%PS_SPACE_TEMP%"
 echo. >> "%PS_SPACE_TEMP%"
-echo # Update .htaccess FallbackResource lines >> "%PS_SPACE_TEMP%"
-echo $htMain = Join-Path $spaceDir '.htaccess' >> "%PS_SPACE_TEMP%"
-echo $htMgmt = Join-Path $spaceDir 'management\.htaccess' >> "%PS_SPACE_TEMP%"
-echo $htAdmin = Join-Path $spaceDir 'admin\.htaccess' >> "%PS_SPACE_TEMP%"
-echo. >> "%PS_SPACE_TEMP%"
+echo # Update .htaccess FallbackResource >> "%PS_SPACE_TEMP%"
+echo $prefix = if ($newSpace) { "/$newSpace" } else { '' } >> "%PS_SPACE_TEMP%"
 echo foreach ($pair in @( >> "%PS_SPACE_TEMP%"
-echo   @{ File=$htMain; Fallback="/$space/index.php" }, >> "%PS_SPACE_TEMP%"
-echo   @{ File=$htMgmt; Fallback="/$space/management/index.php" }, >> "%PS_SPACE_TEMP%"
-echo   @{ File=$htAdmin; Fallback="/$space/admin/index.php" } >> "%PS_SPACE_TEMP%"
+echo   @{ File=(Join-Path $initDir '.htaccess'); Fallback="$prefix/index.php" }, >> "%PS_SPACE_TEMP%"
+echo   @{ File=(Join-Path $initDir 'management\.htaccess'); Fallback="$prefix/management/index.php" }, >> "%PS_SPACE_TEMP%"
+echo   @{ File=(Join-Path $initDir 'admin\.htaccess'); Fallback="$prefix/admin/index.php" } >> "%PS_SPACE_TEMP%"
 echo )) { >> "%PS_SPACE_TEMP%"
 echo   if (Test-Path $pair.File) { >> "%PS_SPACE_TEMP%"
 echo     $c = Get-Content $pair.File -Raw >> "%PS_SPACE_TEMP%"
@@ -288,16 +341,16 @@ echo     [IO.File]::WriteAllText($pair.File, $c, [System.Text.Encoding]::UTF8) >
 echo   } >> "%PS_SPACE_TEMP%"
 echo } >> "%PS_SPACE_TEMP%"
 echo. >> "%PS_SPACE_TEMP%"
-echo Write-Host "  + Space set: site at http://domain/$space/" >> "%PS_SPACE_TEMP%"
+echo if ($newSpace) { Write-Host "  + Space set: $newSpace" } else { Write-Host '  + Space removed - serving from root' } >> "%PS_SPACE_TEMP%"
 echo exit 0 >> "%PS_SPACE_TEMP%"
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_SPACE_TEMP%" 2>nul
 if errorlevel 1 (
-    echo   X Failed to set URL space
+    echo   X Failed to update URL space
     del "%PS_SPACE_TEMP%" 2>nul
     goto :eof
 )
-set "PUBLIC_SPACE=%NEW_SPACE%"
+set "PUBLIC_SPACE=!DESIRED_SPACE!"
 del "%PS_SPACE_TEMP%" 2>nul
 echo.
 
@@ -307,7 +360,7 @@ REM Save config for re-run detection
 (
     echo PUBLIC_FOLDER_NAME=%PUBLIC_FOLDER_NAME%
     echo SECURE_FOLDER_NAME=%SECURE_FOLDER_NAME%
-    echo PUBLIC_FOLDER_SPACE=%PUBLIC_SPACE%
+    echo PUBLIC_SPACE=%PUBLIC_SPACE%
 ) > "%CONF_FILE%"
 
 echo.
