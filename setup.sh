@@ -302,7 +302,7 @@ if [ "$DESIRED_SPACE" != "$PUBLIC_SPACE" ]; then
         INIT_FILE="$PUBLIC_DIR/init.php"
     fi
     if [ -f "$INIT_FILE" ]; then
-        sed -i "s/define('PUBLIC_FOLDER_SPACE',\s*'[^']*')/define('PUBLIC_FOLDER_SPACE', '$PUBLIC_SPACE')/" "$INIT_FILE"
+        sed -i "s|define('PUBLIC_FOLDER_SPACE',\s*'[^']*')|define('PUBLIC_FOLDER_SPACE', '$PUBLIC_SPACE')|" "$INIT_FILE"
     fi
 
     # Update .htaccess FallbackResource
