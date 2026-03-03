@@ -55,6 +55,16 @@ REM ==========================================================
 echo Step 1 - Public folder name
 echo.
 
+REM Auto-detect if configured folder doesn't exist (crash recovery)
+if not exist "%PUBLIC_DIR%" (
+    for /d %%d in ("%SCRIPT_DIR%*") do (
+        if exist "%%d\init.php" (
+            set "PUBLIC_FOLDER_NAME=%%~nxd"
+            set "PUBLIC_DIR=!SCRIPT_DIR!!PUBLIC_FOLDER_NAME!"
+        )
+    )
+)
+
 set "NEW_PUBLIC_NAME=%~1"
 
 if not "%NEW_PUBLIC_NAME%"=="" goto :do_public_check
@@ -89,15 +99,8 @@ if "%NEW_PUBLIC_NAME%"=="%PUBLIC_FOLDER_NAME%" (
     goto :step2
 )
 if not exist "%PUBLIC_DIR%" (
-    echo   X Error: "public" folder not found - already renamed?
-    REM Try to detect existing renamed folder
-    for /d %%d in ("%SCRIPT_DIR%*") do (
-        if exist "%%d\init.php" (
-            set "PUBLIC_DIR=%%d"
-            set "PUBLIC_FOLDER_NAME=%%~nxd"
-        )
-    )
-    goto :step2
+    echo   X Error: public folder "%PUBLIC_FOLDER_NAME%" not found
+    goto :eof
 )
 set "NEW_PUBLIC_DIR=%SCRIPT_DIR%%NEW_PUBLIC_NAME%"
 if exist "%NEW_PUBLIC_DIR%" (
@@ -127,12 +130,28 @@ if not "%PUBLIC_SPACE%"=="" (
 if not exist "!INIT_FILE!" goto :step2
 
 call :update_init_constant "!INIT_FILE!" "PUBLIC_FOLDER_NAME" "%NEW_PUBLIC_NAME%"
+
+REM Save config after step 1 (crash recovery)
+(
+    echo PUBLIC_FOLDER_NAME=%PUBLIC_FOLDER_NAME%
+    echo SECURE_FOLDER_NAME=%SECURE_FOLDER_NAME%
+    echo PUBLIC_SPACE=%PUBLIC_SPACE%
+) > "%CONF_FILE%"
 echo.
 
 REM ==========================================================
 REM Step 2: Rename secure folder
 REM ==========================================================
 :step2
+
+REM Save config after step 1 even if public wasn't renamed
+if not exist "%CONF_FILE%" (
+    (
+        echo PUBLIC_FOLDER_NAME=%PUBLIC_FOLDER_NAME%
+        echo SECURE_FOLDER_NAME=%SECURE_FOLDER_NAME%
+        echo PUBLIC_SPACE=%PUBLIC_SPACE%
+    ) > "%CONF_FILE%"
+)
 echo.
 echo Step 2 - Secure folder name
 echo.
@@ -191,17 +210,14 @@ echo $segments = ($name -split '/').Count >> "%PS_SEC_TEMP%"
 echo if ($segments -gt 5) { Write-Host '  X Error: path too deep (max 5 levels)'; exit 1 } >> "%PS_SEC_TEMP%"
 echo $parent = Split-Path $dest >> "%PS_SEC_TEMP%"
 echo # Check if target is nested inside source (e.g. secure -^> secure/test) >> "%PS_SEC_TEMP%"
-echo $isSelfNested = $dest.StartsWith($src + '\') >> "%PS_SEC_TEMP%"
-echo if ($parent -and -not (Test-Path $parent)) { >> "%PS_SEC_TEMP%"
-echo   if ($isSelfNested) { >> "%PS_SEC_TEMP%"
-echo     $tmp = Join-Path $root '.secure_move_tmp' >> "%PS_SEC_TEMP%"
-echo     Move-Item $src $tmp >> "%PS_SEC_TEMP%"
-echo     New-Item -ItemType Directory -Path $parent -Force ^| Out-Null >> "%PS_SEC_TEMP%"
-echo     Move-Item $tmp $dest >> "%PS_SEC_TEMP%"
-echo   } else { >> "%PS_SEC_TEMP%"
-echo     New-Item -ItemType Directory -Path $parent -Force ^| Out-Null >> "%PS_SEC_TEMP%"
-echo     Move-Item $src $dest >> "%PS_SEC_TEMP%"
-echo   } >> "%PS_SEC_TEMP%"
+echo if ($dest.StartsWith($src + '\')) { >> "%PS_SEC_TEMP%"
+echo   $tmp = Join-Path $root '.secure_move_tmp' >> "%PS_SEC_TEMP%"
+echo   Move-Item $src $tmp >> "%PS_SEC_TEMP%"
+echo   if ($parent) { New-Item -ItemType Directory -Path $parent -Force ^| Out-Null } >> "%PS_SEC_TEMP%"
+echo   Move-Item $tmp $dest >> "%PS_SEC_TEMP%"
+echo } elseif ($parent -and -not (Test-Path $parent)) { >> "%PS_SEC_TEMP%"
+echo   New-Item -ItemType Directory -Path $parent -Force ^| Out-Null >> "%PS_SEC_TEMP%"
+echo   Move-Item $src $dest >> "%PS_SEC_TEMP%"
 echo } else { >> "%PS_SEC_TEMP%"
 echo   Move-Item $src $dest >> "%PS_SEC_TEMP%"
 echo } >> "%PS_SEC_TEMP%"
@@ -236,6 +252,13 @@ if not "%PUBLIC_SPACE%"=="" (
 if exist "!INIT_FILE!" (
     call :update_init_constant "!INIT_FILE!" "SECURE_FOLDER_NAME" "%NEW_SECURE_NAME%"
 )
+
+REM Save config after step 2 (crash recovery)
+(
+    echo PUBLIC_FOLDER_NAME=%PUBLIC_FOLDER_NAME%
+    echo SECURE_FOLDER_NAME=%SECURE_FOLDER_NAME%
+    echo PUBLIC_SPACE=%PUBLIC_SPACE%
+) > "%CONF_FILE%"
 echo.
 
 REM ==========================================================

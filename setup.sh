@@ -42,10 +42,19 @@ CONF_FILE="$SCRIPT_DIR/.quicksite.conf"
 if [ -f "$CONF_FILE" ]; then
     source "$CONF_FILE"
     # Backward compat: old conf format used PUBLIC_FOLDER_SPACE
-    PUBLIC_SPACE="${PUBLIC_SPACE:-$PUBLIC_FOLDER_SPACE}"
+    PUBLIC_SPACE="${PUBLIC_SPACE:-${PUBLIC_FOLDER_SPACE:-}}"
     PUBLIC_DIR="$SCRIPT_DIR/$PUBLIC_FOLDER_NAME"
     SECURE_DIR="$SCRIPT_DIR/$SECURE_FOLDER_NAME"
 fi
+
+# Helper: save current state to conf (crash recovery)
+save_conf() {
+    cat > "$CONF_FILE" << CONFEOF
+PUBLIC_FOLDER_NAME=$PUBLIC_FOLDER_NAME
+SECURE_FOLDER_NAME=$SECURE_FOLDER_NAME
+PUBLIC_SPACE=$PUBLIC_SPACE
+CONFEOF
+}
 
 echo ""
 echo -e "${BOLD}========================================${NC}"
@@ -58,6 +67,17 @@ echo ""
 # ==========================================================
 echo -e "${BOLD}Step 1 — Public folder name${NC}"
 echo ""
+
+# Auto-detect if configured folder doesn't exist (crash recovery)
+if [ ! -d "$PUBLIC_DIR" ]; then
+    for d in "$SCRIPT_DIR"/*/; do
+        if [ -f "$d/init.php" ] || ls "$d"/*/init.php >/dev/null 2>&1; then
+            PUBLIC_FOLDER_NAME="$(basename "$d")"
+            PUBLIC_DIR="$SCRIPT_DIR/$PUBLIC_FOLDER_NAME"
+            break
+        fi
+    done
+fi
 
 NEW_PUBLIC_NAME="${1:-}"
 
@@ -80,15 +100,8 @@ elif [ "$NEW_PUBLIC_NAME" = "$SECURE_FOLDER_NAME" ]; then
     echo -e "  ${RED}✗ Error: cannot use the same name as the secure folder${NC}"
     exit 1
 elif [ ! -d "$PUBLIC_DIR" ]; then
-    echo -e "  ${RED}✗ Error: '$PUBLIC_FOLDER_NAME' folder not found${NC}"
-    # Try to detect existing renamed folder
-    for d in "$SCRIPT_DIR"/*/; do
-        if [ -f "$d/init.php" ]; then
-            PUBLIC_FOLDER_NAME="$(basename "$d")"
-            PUBLIC_DIR="$SCRIPT_DIR/$PUBLIC_FOLDER_NAME"
-            echo -e "  Found existing public folder: ${BOLD}$PUBLIC_FOLDER_NAME${NC}"
-        fi
-    done
+    echo -e "  ${RED}✗ Error: public folder '$PUBLIC_FOLDER_NAME' not found${NC}"
+    exit 1
 elif [ -d "$SCRIPT_DIR/$NEW_PUBLIC_NAME" ]; then
     echo -e "  ${RED}✗ Error: folder '$NEW_PUBLIC_NAME' already exists${NC}"
     exit 1
@@ -109,6 +122,7 @@ else
     echo -e "  ${GREEN}✓${NC} Renamed: public → ${BOLD}$NEW_PUBLIC_NAME${NC}"
 fi
 
+save_conf
 echo ""
 
 # ==========================================================
@@ -166,20 +180,17 @@ else
     # Remember old location for cleanup (before updating vars)
     OLD_SECURE_DIR="$SECURE_DIR"
 
-    # Create parent directories for nested paths
+    # Perform the move
     PARENT_DIR="$(dirname "$TARGET")"
-    if [ "$PARENT_DIR" != "$SCRIPT_DIR" ] && [ ! -d "$PARENT_DIR" ]; then
-        # Check if target is nested inside source (e.g. secure → secure/test)
-        # Can't mv a folder into itself, so use a temp rename first
-        if echo "$TARGET" | grep -q "^${SECURE_DIR}/"; then
-            TMP_DIR="$SCRIPT_DIR/.secure_move_tmp"
-            mv "$SECURE_DIR" "$TMP_DIR"
-            mkdir -p "$PARENT_DIR"
-            mv "$TMP_DIR" "$TARGET"
-        else
-            mkdir -p "$PARENT_DIR"
-            mv "$SECURE_DIR" "$TARGET"
-        fi
+    if echo "$TARGET" | grep -q "^${SECURE_DIR}/"; then
+        # Self-nesting (e.g. secure → secure/test): can't mv into itself
+        TMP_DIR="$SCRIPT_DIR/.secure_move_tmp"
+        mv "$SECURE_DIR" "$TMP_DIR"
+        mkdir -p "$PARENT_DIR"
+        mv "$TMP_DIR" "$TARGET"
+    elif [ "$PARENT_DIR" != "$SCRIPT_DIR" ]; then
+        mkdir -p "$PARENT_DIR"
+        mv "$SECURE_DIR" "$TARGET"
     else
         mv "$SECURE_DIR" "$TARGET"
     fi
@@ -211,6 +222,7 @@ else
     echo -e "  ${GREEN}✓${NC} Renamed → ${BOLD}$NEW_SECURE_NAME${NC}"
 fi
 
+save_conf
 echo ""
 
 # ==========================================================
@@ -371,12 +383,8 @@ if [ "$CURRENT_USER" = "root" ]; then
     fi
 fi
 
-# Save config for re-run detection
-cat > "$CONF_FILE" << EOF
-PUBLIC_FOLDER_NAME=$PUBLIC_FOLDER_NAME
-SECURE_FOLDER_NAME=$SECURE_FOLDER_NAME
-PUBLIC_SPACE=$PUBLIC_SPACE
-EOF
+# Save final config
+save_conf
 
 echo ""
 echo -e "${BOLD}========================================${NC}"
