@@ -3,17 +3,19 @@
 # QuickSite — Post-Clone Setup Script
 # ==========================================================
 #
-# Run this after cloning to match the public folder name
-# to your virtual host DocumentRoot.
+# Run this after cloning to configure folder names and URL
+# prefix before your first page load.
 #
 # Usage:
 #   chmod +x setup.sh
 #   ./setup.sh                        # interactive
-#   ./setup.sh www.example.com        # direct rename
+#   ./setup.sh <public_name>          # rename public folder only
 #
 # What it does:
-#   - Renames "public/" to match your vhost (e.g. www, public_html)
-#   - Updates PUBLIC_FOLDER_NAME in init.php
+#   1. Renames "public/" to match your vhost (e.g. www, public_html)
+#   2. Renames "secure/" for obscurity (e.g. backend, app)
+#   3. Sets a URL prefix/space (e.g. "web" → http://domain/web/)
+#   - Updates init.php constants and .htaccess FallbackResource
 #
 # Everything else (config files, nginx routing, admin panel)
 # is handled automatically on first page load.
@@ -24,17 +26,35 @@ set -euo pipefail
 # Colors
 GREEN='\033[0;32m'
 RED='\033[0;31m'
+YELLOW='\033[0;33m'
 BOLD='\033[1m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PUBLIC_DIR="$SCRIPT_DIR/public"
+SECURE_DIR="$SCRIPT_DIR/secure"
 PUBLIC_FOLDER_NAME="public"
+SECURE_FOLDER_NAME="secure"
+PUBLIC_SPACE=""
+
+# Read existing config if available (re-run detection)
+CONF_FILE="$SCRIPT_DIR/.quicksite.conf"
+if [ -f "$CONF_FILE" ]; then
+    source "$CONF_FILE"
+    PUBLIC_DIR="$SCRIPT_DIR/$PUBLIC_FOLDER_NAME"
+    SECURE_DIR="$SCRIPT_DIR/$SECURE_FOLDER_NAME"
+fi
 
 echo ""
 echo -e "${BOLD}========================================${NC}"
 echo -e "${BOLD}       QuickSite Setup${NC}"
 echo -e "${BOLD}========================================${NC}"
+echo ""
+
+# ==========================================================
+# Step 1: Rename public folder
+# ==========================================================
+echo -e "${BOLD}Step 1 — Public folder name${NC}"
 echo ""
 
 NEW_PUBLIC_NAME="${1:-}"
@@ -44,26 +64,26 @@ if [ -z "$NEW_PUBLIC_NAME" ]; then
     echo "  If your vhost expects a specific name (e.g. 'www',"
     echo "  'www.example.com', 'public_html'), you can rename it now."
     echo ""
-    echo -e "  Current name: ${BOLD}public${NC}"
+    echo -e "  Current name: ${BOLD}$PUBLIC_FOLDER_NAME${NC}"
     echo ""
-    read -p "  New name (Enter to keep 'public'): " NEW_PUBLIC_NAME
+    read -p "  New name (Enter to keep '$PUBLIC_FOLDER_NAME'): " NEW_PUBLIC_NAME
 fi
 
-if [ -z "$NEW_PUBLIC_NAME" ] || [ "$NEW_PUBLIC_NAME" = "public" ]; then
-    echo -e "  ${GREEN}✓${NC} Keeping 'public'"
-    PUBLIC_FOLDER_NAME="public"
+if [ -z "$NEW_PUBLIC_NAME" ] || [ "$NEW_PUBLIC_NAME" = "$PUBLIC_FOLDER_NAME" ]; then
+    echo -e "  ${GREEN}✓${NC} Keeping '$PUBLIC_FOLDER_NAME'"
 elif echo "$NEW_PUBLIC_NAME" | grep -q '[/\\]'; then
     echo -e "  ${RED}✗ Error: folder name cannot contain slashes${NC}"
     exit 1
-elif [ "$NEW_PUBLIC_NAME" = "secure" ]; then
-    echo -e "  ${RED}✗ Error: cannot use 'secure' as the public folder name${NC}"
+elif [ "$NEW_PUBLIC_NAME" = "$SECURE_FOLDER_NAME" ]; then
+    echo -e "  ${RED}✗ Error: cannot use the same name as the secure folder${NC}"
     exit 1
 elif [ ! -d "$PUBLIC_DIR" ]; then
-    echo -e "  ${RED}✗ Error: 'public' folder not found — already renamed?${NC}"
+    echo -e "  ${RED}✗ Error: '$PUBLIC_FOLDER_NAME' folder not found${NC}"
     # Try to detect existing renamed folder
     for d in "$SCRIPT_DIR"/*/; do
         if [ -f "$d/init.php" ]; then
             PUBLIC_FOLDER_NAME="$(basename "$d")"
+            PUBLIC_DIR="$SCRIPT_DIR/$PUBLIC_FOLDER_NAME"
             echo -e "  Found existing public folder: ${BOLD}$PUBLIC_FOLDER_NAME${NC}"
         fi
     done
@@ -71,19 +91,169 @@ elif [ -d "$SCRIPT_DIR/$NEW_PUBLIC_NAME" ]; then
     echo -e "  ${RED}✗ Error: folder '$NEW_PUBLIC_NAME' already exists${NC}"
     exit 1
 else
-    echo -e "  Renaming: public → ${BOLD}$NEW_PUBLIC_NAME${NC}"
     mv "$PUBLIC_DIR" "$SCRIPT_DIR/$NEW_PUBLIC_NAME"
     PUBLIC_DIR="$SCRIPT_DIR/$NEW_PUBLIC_NAME"
     PUBLIC_FOLDER_NAME="$NEW_PUBLIC_NAME"
-    echo -e "  ${GREEN}✓${NC} Renamed successfully"
 
     # Update PUBLIC_FOLDER_NAME in init.php
     INIT_FILE="$PUBLIC_DIR/init.php"
     if [ -f "$INIT_FILE" ]; then
         sed -i "s/define('PUBLIC_FOLDER_NAME',\s*'[^']*')/define('PUBLIC_FOLDER_NAME', '$NEW_PUBLIC_NAME')/" "$INIT_FILE"
-        echo -e "  ${GREEN}✓${NC} Updated PUBLIC_FOLDER_NAME in init.php"
+    fi
+    echo -e "  ${GREEN}✓${NC} Renamed: public → ${BOLD}$NEW_PUBLIC_NAME${NC}"
+fi
+
+echo ""
+
+# ==========================================================
+# Step 2: Rename secure folder
+# ==========================================================
+echo -e "${BOLD}Step 2 — Secure folder name${NC}"
+echo ""
+
+# Detect current secure folder (may already be renamed)
+if [ ! -d "$SECURE_DIR" ]; then
+    # Try to find it via SECURE_FOLDER_NAME in init.php
+    INIT_FILE="$PUBLIC_DIR/init.php"
+    if [ -f "$INIT_FILE" ]; then
+        DETECTED=$(grep -oP "define\('SECURE_FOLDER_NAME',\s*'\K[^']*" "$INIT_FILE" 2>/dev/null || true)
+        if [ -n "$DETECTED" ] && [ -d "$SCRIPT_DIR/$DETECTED" ]; then
+            SECURE_DIR="$SCRIPT_DIR/$DETECTED"
+            SECURE_FOLDER_NAME="$DETECTED"
+        fi
     fi
 fi
+
+echo "  The secure folder holds the QuickSite engine."
+echo "  Rename it for obscurity, or nest it in a subdirectory."
+echo "  Examples: 'backend', 'app', 'backends/project1'"
+echo ""
+echo -e "  Current name: ${BOLD}$SECURE_FOLDER_NAME${NC}"
+echo ""
+read -p "  New name (Enter to keep '$SECURE_FOLDER_NAME'): " NEW_SECURE_NAME
+
+# Normalize backslashes to forward slashes, trim leading/trailing slashes
+NEW_SECURE_NAME=$(echo "$NEW_SECURE_NAME" | sed 's:\\:/:g; s:^/*::; s:/*$::')
+
+if [ -z "$NEW_SECURE_NAME" ] || [ "$NEW_SECURE_NAME" = "$SECURE_FOLDER_NAME" ]; then
+    echo -e "  ${GREEN}✓${NC} Keeping '$SECURE_FOLDER_NAME'"
+elif [ "$NEW_SECURE_NAME" = "$PUBLIC_FOLDER_NAME" ]; then
+    echo -e "  ${RED}✗ Error: cannot use the same name as the public folder${NC}"
+    exit 1
+elif [ ! -d "$SECURE_DIR" ]; then
+    echo -e "  ${RED}✗ Error: secure folder '$SECURE_FOLDER_NAME' not found${NC}"
+    exit 1
+else
+    # Validate depth (max 5 levels)
+    DEPTH=$(echo "$NEW_SECURE_NAME" | awk -F/ '{print NF}')
+    if [ "$DEPTH" -gt 5 ]; then
+        echo -e "  ${RED}✗ Error: path too deep (max 5 levels)${NC}"
+        exit 1
+    fi
+
+    TARGET="$SCRIPT_DIR/$NEW_SECURE_NAME"
+    if [ -e "$TARGET" ]; then
+        echo -e "  ${RED}✗ Error: '$NEW_SECURE_NAME' already exists${NC}"
+        exit 1
+    fi
+
+    # Create parent directories for nested paths
+    PARENT_DIR="$(dirname "$TARGET")"
+    if [ "$PARENT_DIR" != "$SCRIPT_DIR" ] && [ ! -d "$PARENT_DIR" ]; then
+        mkdir -p "$PARENT_DIR"
+    fi
+
+    mv "$SECURE_DIR" "$TARGET"
+    SECURE_DIR="$TARGET"
+    SECURE_FOLDER_NAME="$NEW_SECURE_NAME"
+
+    # Update SECURE_FOLDER_NAME in init.php
+    INIT_FILE="$PUBLIC_DIR/init.php"
+    if [ -f "$INIT_FILE" ]; then
+        sed -i "s|define('SECURE_FOLDER_NAME',\s*'[^']*')|define('SECURE_FOLDER_NAME', '$NEW_SECURE_NAME')|" "$INIT_FILE"
+    fi
+    echo -e "  ${GREEN}✓${NC} Renamed → ${BOLD}$NEW_SECURE_NAME${NC}"
+fi
+
+echo ""
+
+# ==========================================================
+# Step 3: Set URL space / prefix
+# ==========================================================
+echo -e "${BOLD}Step 3 — URL space / prefix${NC}"
+echo ""
+echo "  Add a URL prefix so the site is served from a subdirectory."
+echo "  Example: 'web' → site at http://domain/web/"
+echo "  Leave empty to serve from root (http://domain/)."
+echo ""
+read -p "  Space (Enter for none): " NEW_SPACE
+
+# Trim leading/trailing slashes
+NEW_SPACE=$(echo "$NEW_SPACE" | sed 's:^[/\\]*::; s:[/\\]*$::')
+
+if [ -z "$NEW_SPACE" ]; then
+    echo -e "  ${GREEN}✓${NC} No space — serving from root"
+else
+    # Validate characters (alphanumeric, dots, hyphens, underscores, slashes)
+    if echo "$NEW_SPACE" | grep -qP '[^a-zA-Z0-9._/\-]'; then
+        echo -e "  ${RED}✗ Error: invalid characters in space name${NC}"
+        echo "  Allowed: a-z A-Z 0-9 . - _ /"
+        exit 1
+    fi
+
+    # Validate depth (max 5 levels)
+    DEPTH=$(echo "$NEW_SPACE" | awk -F/ '{print NF}')
+    if [ "$DEPTH" -gt 5 ]; then
+        echo -e "  ${RED}✗ Error: space path too deep (max 5 levels)${NC}"
+        exit 1
+    fi
+
+    # Get the top-level segment (in case of nested path like app/v1)
+    TOP_SEGMENT=$(echo "$NEW_SPACE" | cut -d/ -f1)
+    SPACE_DIR="$PUBLIC_DIR/$NEW_SPACE"
+
+    if [ -d "$SPACE_DIR" ]; then
+        echo -e "  ${RED}✗ Error: directory '$NEW_SPACE' already exists inside public folder${NC}"
+        exit 1
+    fi
+
+    # Create the space directory (supports nested paths)
+    mkdir -p "$SPACE_DIR"
+
+    # Move everything from public root into the space directory
+    # (skip the top-level segment directory we just created)
+    for item in "$PUBLIC_DIR"/* "$PUBLIC_DIR"/.*; do
+        BASENAME="$(basename "$item")"
+        case "$BASENAME" in
+            .|..) continue ;;
+        esac
+        [ "$BASENAME" = "$TOP_SEGMENT" ] && continue
+        mv "$item" "$SPACE_DIR/" 2>/dev/null || true
+    done
+
+    PUBLIC_SPACE="$NEW_SPACE"
+
+    # Update PUBLIC_FOLDER_SPACE in init.php
+    INIT_FILE="$SPACE_DIR/init.php"
+    if [ -f "$INIT_FILE" ]; then
+        sed -i "s/define('PUBLIC_FOLDER_SPACE',\s*'[^']*')/define('PUBLIC_FOLDER_SPACE', '$NEW_SPACE')/" "$INIT_FILE"
+    fi
+
+    # Update .htaccess FallbackResource lines
+    if [ -f "$SPACE_DIR/.htaccess" ]; then
+        sed -i "s|FallbackResource .*|FallbackResource /$NEW_SPACE/index.php|" "$SPACE_DIR/.htaccess"
+    fi
+    if [ -f "$SPACE_DIR/management/.htaccess" ]; then
+        sed -i "s|FallbackResource .*|FallbackResource /$NEW_SPACE/management/index.php|" "$SPACE_DIR/management/.htaccess"
+    fi
+    if [ -f "$SPACE_DIR/admin/.htaccess" ]; then
+        sed -i "s|FallbackResource .*|FallbackResource /$NEW_SPACE/admin/index.php|" "$SPACE_DIR/admin/.htaccess"
+    fi
+
+    echo -e "  ${GREEN}✓${NC} Space set → http://domain/${BOLD}$NEW_SPACE${NC}/"
+fi
+
+echo ""
 
 # ==========================================================
 # File ownership check
@@ -119,17 +289,28 @@ if [ "$CURRENT_USER" = "root" ]; then
     fi
 fi
 
+# Save config for re-run detection
+cat > "$CONF_FILE" << EOF
+PUBLIC_FOLDER_NAME=$PUBLIC_FOLDER_NAME
+SECURE_FOLDER_NAME=$SECURE_FOLDER_NAME
+PUBLIC_FOLDER_SPACE=$PUBLIC_SPACE
+EOF
+
 echo ""
 echo -e "${BOLD}========================================${NC}"
 echo -e "${GREEN}${BOLD}  Setup complete${NC}"
 echo -e "${BOLD}========================================${NC}"
 echo ""
-echo "  Public folder: $PUBLIC_FOLDER_NAME"
+echo "  Public folder:  $PUBLIC_FOLDER_NAME"
+echo "  Secure folder:  $SECURE_FOLDER_NAME"
+if [ -n "$PUBLIC_SPACE" ]; then
+    echo "  URL space:      $PUBLIC_SPACE"
+fi
 echo ""
 
 if [ -n "$OWNERSHIP_WARNING" ]; then
     echo -e "  ${RED}${BOLD}⚠ IMPORTANT: File ownership${NC}"
-    echo -e "  ${RED}You cloned as root. PHP needs write access to secure/.${NC}"
+    echo -e "  ${RED}You cloned as root. PHP needs write access to $SECURE_FOLDER_NAME/.${NC}"
     echo -e "  ${RED}Run this (replace USER with your web server / site user):${NC}"
     echo ""
     echo -e "    ${BOLD}chown -R USER:USER $(basename "$SCRIPT_DIR")/${NC}"
