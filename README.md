@@ -38,24 +38,39 @@ cd quicksite
 
 ### Quick setup
 
-If your vhost expects a folder name other than `public/` (e.g. `www`, `public_html`, `www.example.com`):
+Run the interactive setup wizard:
 
 ```bash
 # Linux / macOS
 chmod +x setup.sh
-./setup.sh www.example.com
+./setup.sh
 
 # Windows
+setup.bat
+```
+
+The wizard walks you through 3 optional steps:
+
+1. **Rename the public folder** — match your vhost DocumentRoot (e.g. `www`, `public_html`, `www.example.com`)
+2. **Rename the secure folder** — obscure the backend, optionally nest it (e.g. `backend`, `app`, `backends/project1`)
+3. **Set a URL space** — serve from a subdirectory (e.g. `mysite` → `http://domain/mysite/`)
+
+All three are optional — press Enter to skip any step. The scripts update `init.php` constants, `.htaccess` files, and nginx routing config automatically. Everything else (config files, nginx setup page) is handled on first page load.
+
+The scripts are **re-runnable** — they save their state to `.quicksite.conf` and detect current folder names on restart, even after a partial run or crash.
+
+> **Linux servers (recommended workflow):** Clone as `root`, then run `chmod +x setup.sh && ./setup.sh`. The script detects `root` and automatically fixes file ownership to your web server user (CloudPanel site user, `www-data`, `nginx`, or `apache`). If auto-detection fails, run manually:  
+> `chown -R YOUR_WEB_USER:YOUR_WEB_USER /path/to/quicksite`  
+> Replace `YOUR_WEB_USER` with your php-fpm user.
+
+You can also pass the public folder name as an argument to skip the interactive prompt:
+
+```bash
+./setup.sh www.example.com
 setup.bat www.example.com
 ```
 
-This renames `public/` and updates `PUBLIC_FOLDER_NAME` in `init.php`. That's all — everything else (config files, nginx routing) is handled automatically on first page load.
-
-> **Linux servers (important):** If you cloned as `root`, PHP won't have write access to create config files. The setup script will attempt to fix this automatically, but if needed, run:  
-> `chown -R YOUR_WEB_USER:YOUR_WEB_USER /path/to/quicksite`  
-> Replace `YOUR_WEB_USER` with your php-fpm user (`www-data` on Ubuntu, or your CloudPanel/hosting panel site user).
-
-**Don't want to use scripts?** Rename `public/` manually and edit line 9 of `init.php` to match. On nginx, you'll see a first-load setup page with the exact `include` directive you need.
+**Don't want to use scripts?** Rename folders manually and edit `init.php` to match (`PUBLIC_FOLDER_NAME`, `SECURE_FOLDER_NAME`, `PUBLIC_FOLDER_SPACE`). On nginx, you'll see a first-load setup page with the exact `include` directive you need.
 
 ### Manual setup
 
@@ -120,7 +135,7 @@ If your site lives at `http://localhost/mysite/` or `http://example.com/mysite/`
 
 4. Open `http://localhost/mysite/admin/`.
 
-> Or just run `setup.sh` and choose option 2 — it does all of this automatically.
+> Or just run `setup.sh` — step 3 of the wizard handles all of this automatically.
 
 </details>
 
@@ -167,16 +182,16 @@ nginx ignores `.htaccess` files. QuickSite handles this automatically:
 
 3. **Test and reload**: `sudo nginx -t && sudo nginx -s reload`
 
-4. **(Optional) Enable auto-reload** — when `setPublicSpace` is called, QuickSite tries to reload nginx automatically. This requires a one-line sudoers entry:
+4. **(Optional) Enable auto-reload** — when the setup script changes the URL space, it tries to reload nginx automatically. This requires a one-line sudoers entry:
    ```bash
    echo 'www-data ALL=(ALL) NOPASSWD: /usr/sbin/nginx' | sudo tee /etc/sudoers.d/quicksite-nginx
    sudo chmod 440 /etc/sudoers.d/quicksite-nginx
    ```
-   Replace `www-data` with your PHP process user. Without this, you'd reload manually after a `setPublicSpace` call.
+   Replace `www-data` with your PHP process user. Without this, reload manually after changing the space: `sudo nginx -t && sudo nginx -s reload`
 
-**Renamed the public folder?** Make sure `PUBLIC_FOLDER_NAME` in `init.php` (line 9) matches your folder name.
+**Renamed the public folder?** Run `setup.sh` — it handles everything. Or manually update `PUBLIC_FOLDER_NAME` in `init.php`.
 
-For subdirectory installs on nginx (e.g., `example.com/mysite/`), edit `PUBLIC_FOLDER_SPACE` in `init.php` — the nginx config auto-adjusts.
+For subdirectory installs on nginx (e.g., `example.com/mysite/`), set the URL space in `setup.sh` step 3 — the nginx config auto-adjusts.
 
 </details>
 
@@ -278,15 +293,15 @@ quicksite/
 
 ### Folder customization
 
-Three commands let you adapt the folder structure to match your hosting environment after installation:
+The setup scripts (`setup.sh` / `setup.bat`) handle all folder customization:
 
-| Command | What it does | Example |
-|---------|-------------|---------|
-| `renamePublicFolder` | Renames the `public/` folder (e.g., to `www/` or `public_html/`). Updates `init.php` constants. Requires updating your web server config after. | Shared hosting with a fixed `public_html/` document root |
-| `renameSecureFolder` | Renames the `secure/` folder (e.g., to `backend/` or `app/`). Updates `init.php` constants. | Convention matching or security by obscurity |
-| `setPublicSpace` | Moves public files into a subdirectory inside the document root, adjusting all `.htaccess` files, nginx config, and `init.php`. | Shared hosting where your site lives at `www.example.com/mysite/` — set space to `mysite` |
+| Step | What it does | Example |
+|------|-------------|--------|
+| **1. Public folder** | Renames `public/` to match your vhost DocumentRoot. Updates `init.php`. | `public_html`, `www`, `www.example.com` |
+| **2. Secure folder** | Renames `secure/` for obscurity, supports nesting. Updates `init.php`. | `backend`, `app`, `backends/project1` |
+| **3. URL space** | Moves files into a subdirectory, adjusts `.htaccess`, nginx config, and `init.php`. | `mysite` → `http://domain/mysite/` |
 
-On nginx, `setPublicSpace` also regenerates `secure/nginx/dynamic_routes.conf` and attempts an automatic reload (if sudoers is configured). On Apache, `.htaccess` changes take effect immediately.
+All steps support renaming, nesting, un-nesting, and are re-runnable. On nginx, changing the space regenerates `secure/nginx/dynamic_routes.conf` and attempts an automatic reload. On Apache, `.htaccess` changes take effect immediately.
 
 ## API overview
 
