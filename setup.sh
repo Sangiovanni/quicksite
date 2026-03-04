@@ -366,6 +366,60 @@ if [ "$DESIRED_SPACE" != "$PUBLIC_SPACE" ]; then
     [ -f "$HT_DIR/management/.htaccess" ] && sed -i "s|FallbackResource .*|FallbackResource $FALLBACK_PREFIX/management/index.php|" "$HT_DIR/management/.htaccess"
     [ -f "$HT_DIR/admin/.htaccess" ] && sed -i "s|FallbackResource .*|FallbackResource $FALLBACK_PREFIX/admin/index.php|" "$HT_DIR/admin/.htaccess"
 
+    # Regenerate nginx dynamic_routes.conf if it already exists
+    NGINX_CONF="$SECURE_DIR/nginx/dynamic_routes.conf"
+    if [ -f "$NGINX_CONF" ]; then
+        if [ -n "$PUBLIC_SPACE" ]; then
+            PREFIX="/$PUBLIC_SPACE"
+        else
+            PREFIX=""
+        fi
+        LOCATION_PATH="${PREFIX:-/}"
+        [ -n "$PREFIX" ] && LOCATION_PATH="${PREFIX}/"
+        DATE_NOW=$(date '+%Y-%m-%d %H:%M:%S')
+        cat > "$NGINX_CONF" << NGINXEOF
+# ==========================================================
+# QuickSite — nginx dynamic routes configuration
+# ==========================================================
+# Auto-generated on ${DATE_NOW} by QuickSite setup.sh
+# Do NOT edit manually — regenerated when public space changes.
+#
+# Usage: Include this file in your nginx server {} block:
+#   include /path/to/secure/nginx/dynamic_routes.conf;
+#
+# Manual reload: nginx -t && nginx -s reload
+# ==========================================================
+
+# Admin panel API (AJAX helper for dynamic form fields)
+location ${PREFIX}/admin/api/ {
+    try_files \$uri \$uri/ ${PREFIX}/admin/api/index.php\$is_args\$args;
+}
+
+# Management API (QuickSite command endpoint)
+location ${PREFIX}/management/ {
+    try_files \$uri \$uri/ ${PREFIX}/management/index.php\$is_args\$args;
+}
+
+# Admin panel
+location ${PREFIX}/admin/ {
+    try_files \$uri \$uri/ ${PREFIX}/admin/index.php\$is_args\$args;
+}
+
+# Public site (catch-all for QuickSite routes)
+location ${LOCATION_PATH} {
+    try_files \$uri \$uri/ ${PREFIX}/index.php\$is_args\$args;
+}
+NGINXEOF
+        echo -e "  ${GREEN}✓${NC} Updated nginx dynamic_routes.conf"
+
+        # Attempt nginx reload
+        if command -v nginx &>/dev/null; then
+            if nginx -t 2>/dev/null; then
+                nginx -s reload 2>/dev/null && echo -e "  ${GREEN}✓${NC} nginx reloaded" || true
+            fi
+        fi
+    fi
+
     if [ -n "$PUBLIC_SPACE" ]; then
         echo -e "  ${GREEN}✓${NC} Space set → http://domain/${BOLD}$PUBLIC_SPACE${NC}/"
     else
