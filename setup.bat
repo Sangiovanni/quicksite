@@ -473,12 +473,14 @@ echo.
 echo   Next steps:
 echo     1. Ensure your vhost DocumentRoot points to the public folder
 echo     2. Restart your web server
-echo     3. Open http://your-domain/admin/
+echo     3. Visit http://your-domain/ once (generates config files)
+echo     4. On nginx: follow the setup page to include the routing config,
+echo        then reload nginx. On Apache: you're done.
+echo     5. Open http://your-domain/admin/
 echo.
 echo   Default API token: CHANGE_ME_superadmin_token
 echo   Config files (auth.php, target.php, roles.php) are auto-created
 echo   on first page load from .example templates.
-echo   On nginx, you will see a first-load instructions page.
 echo.
 
 pause
