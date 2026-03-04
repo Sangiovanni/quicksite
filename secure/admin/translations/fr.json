@@ -217,25 +217,9 @@
         }
     },
     "commandForm": {
-        "warning": {
-            "urlChange": {
-                "title": "Changement de structure d'URL",
-                "message": "Cette commande modifiera la structure des URL de votre site. L'URL du panneau d'administration changera, et vous serez automatiquement redirigé vers le nouvel emplacement après l'exécution."
-            },
-            "serverConfig": {
-                "title": "Configuration serveur requise",
-                "advanced": "Utilisateurs avancés uniquement !",
-                "message": "Cette commande renomme le dossier public physique. Après l'exécution, votre site sera inaccessible jusqu'à ce que vous mettiez à jour la configuration de votre serveur (VirtualHost Apache, config nginx, etc.) pour pointer vers le nouveau nom de dossier.",
-                "useCase": "Cas d'utilisation : basculement entre environnements de test/production partageant la même racine serveur avec différentes configurations DNS."
-            }
-        },
         "batchMode": {
             "title": "Mode batch",
             "message": "Configurez les paramètres de la commande et cliquez sur \"Ajouter à la file\" pour ajouter cette commande à votre file d'attente. La commande ne sera pas exécutée tant que vous n'aurez pas lancé l'ensemble du batch."
-        },
-        "badge": {
-            "changesUrls": "Modifie les URLs",
-            "serverConfigRequired": "Config serveur requise"
         },
         "saveToQueue": "Ajouter à la file",
         "backToBatch": "Retour au batch",

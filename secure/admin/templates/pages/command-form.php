@@ -10,13 +10,6 @@
 
 // $selectedCommand is already set from command.php
 
-// Commands that change URL structure - need special warning
-$urlChangingCommands = []; // Reserved for future URL-changing commands
-$serverConfigCommands = []; // Reserved for future server config commands
-
-$isUrlChanging = in_array($selectedCommand, $urlChangingCommands);
-$isServerConfig = in_array($selectedCommand, $serverConfigCommands);
-
 // Load command documentation
 $commandDoc = null;
 $helpPath = SECURE_FOLDER_PATH . '/management/command/help.php';
@@ -57,41 +50,6 @@ function getCommandDocumentation(string $command): ?array {
 
 
 
-<?php if ($isUrlChanging): ?>
-<div class="admin-alert admin-alert--warning" style="margin-bottom: var(--space-lg);">
-    <svg class="admin-alert__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-        <line x1="12" y1="9" x2="12" y2="13"/>
-        <line x1="12" y1="17" x2="12.01" y2="17"/>
-    </svg>
-    <div>
-        <strong>⚠️ <?= __admin('commandForm.warning.urlChange.title') ?></strong>
-        <p style="margin: var(--space-xs) 0 0;">
-            <?= __admin('commandForm.warning.urlChange.message') ?>
-        </p>
-    </div>
-</div>
-<?php endif; ?>
-
-<?php if ($isServerConfig): ?>
-<div class="admin-alert admin-alert--error" style="margin-bottom: var(--space-lg);">
-    <svg class="admin-alert__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/>
-        <line x1="12" y1="8" x2="12" y2="12"/>
-        <line x1="12" y1="16" x2="12.01" y2="16"/>
-    </svg>
-    <div>
-        <strong>🚨 <?= __admin('commandForm.warning.serverConfig.title') ?></strong>
-        <p style="margin: var(--space-xs) 0 0;">
-            <strong><?= __admin('commandForm.warning.serverConfig.advanced') ?></strong> <?= __admin('commandForm.warning.serverConfig.message') ?>
-        </p>
-        <p style="margin: var(--space-xs) 0 0; font-size: var(--font-size-sm); opacity: 0.9;">
-            <?= __admin('commandForm.warning.serverConfig.useCase') ?>
-        </p>
-    </div>
-</div>
-<?php endif; ?>
-
 <!-- Batch Mode Banner (shown via JavaScript when ?batch=1) -->
 <div class="admin-alert admin-alert--info" id="batch-mode-banner" style="display: none; margin-bottom: var(--space-lg);">
     <svg class="admin-alert__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -121,16 +79,6 @@ function getCommandDocumentation(string $command): ?array {
     </div>
     <h1 class="admin-page-header__title">
         <code><?= adminEscape($selectedCommand) ?></code>
-        <?php if ($isUrlChanging): ?>
-        <span class="badge badge--warning" style="margin-left: var(--space-sm); font-size: var(--font-size-xs);">
-            <?= __admin('commandForm.badge.changesUrls') ?>
-        </span>
-        <?php endif; ?>
-        <?php if ($isServerConfig): ?>
-        <span class="badge badge--error" style="margin-left: var(--space-sm); font-size: var(--font-size-xs);">
-            ⚠️ <?= __admin('commandForm.badge.serverConfigRequired') ?>
-        </span>
-        <?php endif; ?>
     </h1>
     <p class="admin-page-header__subtitle" id="command-description">
         <?= __admin('common.loading') ?>

@@ -209,25 +209,9 @@
         }
     },
     "commandForm": {
-        "warning": {
-            "urlChange": {
-                "title": "URL Structure Change",
-                "message": "This command will change your site's URL structure. The admin panel URL will change, and you will be automatically redirected to the new location after execution."
-            },
-            "serverConfig": {
-                "title": "Server Configuration Required",
-                "advanced": "Advanced users only!",
-                "message": "This command renames the physical public folder. After execution, your site will be inaccessible until you update your server configuration (Apache VirtualHost, nginx config, etc.) to point to the new folder name.",
-                "useCase": "Use case: switching between test/production environments sharing the same server root with different DNS configurations."
-            }
-        },
         "batchMode": {
             "title": "Batch Mode",
             "message": "Configure the command parameters and click \"Save to Queue\" to add this command to your batch queue. The command will not be executed until you run the entire batch."
-        },
-        "badge": {
-            "changesUrls": "Changes URLs",
-            "serverConfigRequired": "Server Config Required"
         },
         "saveToQueue": "Save to Queue",
         "backToBatch": "Back to Batch",
