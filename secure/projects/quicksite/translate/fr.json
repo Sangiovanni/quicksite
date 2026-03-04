@@ -94,7 +94,6 @@
             "desc": "Incluez votre token API dans l'en-tête Authorization pour toutes les requêtes :"
         },
         "cat": {
-            "folder": "Gestion des Dossiers",
             "route": "Gestion des Routes",
             "structure": "Gestion de la Structure",
             "alias": "Alias d'URL",
@@ -115,24 +114,6 @@
             "snippets": "Snippets"
         },
         "cmd": {
-            "setPublicSpace": {
-                "desc": "Définit l'espace/préfixe URL pour le site public. Crée un sous-répertoire dans le dossier public et y déplace tout le contenu. Utilisez une destination vide pour revenir à la racine. Note: L'URL du site change (ex: http://domaine/web/ quand défini sur \"web\")",
-                "params": {
-                    "destination": "Préfixe/espace URL pour le site public (chaîne vide pour supprimer)"
-                }
-            },
-            "renameSecureFolder": {
-                "desc": "Renomme le dossier secure/backend au niveau racine du serveur. Met à jour la constante SECURE_FOLDER_NAME. L'URL de gestion reste la même.",
-                "params": {
-                    "destination": "Nouveau nom de dossier (nom simple, sans chemins)"
-                }
-            },
-            "renamePublicFolder": {
-                "desc": "Renomme le dossier public au niveau racine du serveur. Met à jour toutes les références. Nécessite une mise à jour de la config Apache/serveur web après le renommage.",
-                "params": {
-                    "destination": "Nouveau nom de dossier (nom simple, sans chemins)"
-                }
-            },
             "addRoute": {
                 "desc": "Crée une nouvelle route avec un template de page PHP et une structure JSON vide",
                 "params": {

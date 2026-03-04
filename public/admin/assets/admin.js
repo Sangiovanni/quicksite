@@ -576,12 +576,6 @@ const QuickSiteAdmin = {
     ],
 
     /**
-     * Commands that change critical paths and need special handling
-     * Note: renameSecureFolder doesn't change public URLs, so it's not included
-     */
-    pathChangingCommands: ['setPublicSpace', 'renamePublicFolder'],
-
-    /**
      * Handle command form submission
      */
     async handleCommandSubmit(e) {
@@ -607,27 +601,6 @@ const QuickSiteAdmin = {
                     title: 'Confirm Action',
                     type: 'warning',
                     confirmText: 'Execute',
-                    confirmClass: 'primary'
-                }
-            );
-            
-            if (!confirmed) {
-                return;
-            }
-        }
-        
-        // Special warning for path-changing commands
-        if (this.pathChangingCommands.includes(command)) {
-            const confirmed = await this.confirm(
-                `⚠️ WARNING: This command will change your site's URL structure!\n\n` +
-                `• The admin panel URL will change\n` +
-                `• You will be redirected to the new location\n` +
-                `• Make sure you remember the new URL\n\n` +
-                `Do you want to continue?`,
-                {
-                    title: 'URL Structure Change',
-                    type: 'warning',
-                    confirmText: 'Yes, Change URL',
                     confirmClass: 'primary'
                 }
             );
@@ -703,12 +676,6 @@ const QuickSiteAdmin = {
                 
                 // Show toast notification
                 if (result.ok) {
-                    // Special handling for path-changing commands
-                    if (this.pathChangingCommands.includes(command) && result.data?.data) {
-                        this.handlePathChange(command, result.data.data, data);
-                        return; // Don't reset button, we're redirecting
-                    }
-                    
                     this.showToast('Command executed successfully!', 'success');
                     
                     // Dispatch custom event for command success
@@ -771,73 +738,6 @@ const QuickSiteAdmin = {
         const pre = button.closest('.admin-code').querySelector('pre');
         if (pre && window.QuickSiteUtils) {
             window.QuickSiteUtils.copyToClipboard(pre.textContent, 'Response copied to clipboard!');
-        }
-    },
-
-    /**
-     * Handle path-changing commands (setPublicSpace, etc.)
-     * Calculates new admin URL and redirects
-     */
-    handlePathChange(command, responseData, requestData) {
-        let newAdminUrl;
-        const protocol = window.location.protocol;
-        const host = window.location.host;
-        
-        if (command === 'setPublicSpace') {
-            // Get the new destination from the response or request
-            const newSpace = responseData.destination ?? requestData.destination ?? '';
-            
-            if (newSpace) {
-                newAdminUrl = `${protocol}//${host}/${newSpace}/admin/dashboard`;
-            } else {
-                newAdminUrl = `${protocol}//${host}/admin/dashboard`;
-            }
-        } else if (command === 'renamePublicFolder' || command === 'renameSecureFolder') {
-            // For folder rename, the public space doesn't change, so just reload
-            newAdminUrl = this.config.adminBase + '/dashboard';
-        }
-        
-        // Store success message to show after redirect
-        this.setPendingMessage(
-            `✅ ${command} executed successfully! URL structure updated.`,
-            'success',
-            8000
-        );
-        
-        // Show countdown message
-        const responseDiv = document.getElementById('command-response');
-        if (responseDiv) {
-            let countdown = 3;
-            const updateCountdown = () => {
-                responseDiv.innerHTML = `
-                    <div class="admin-alert admin-alert--success">
-                        <strong>Success!</strong> Redirecting to new admin URL in ${countdown}...
-                    </div>
-                    <div class="admin-code admin-code--response">
-                        <pre>${this.escapeHtml(JSON.stringify(responseData, null, 2))}</pre>
-                    </div>
-                    <p style="margin-top: var(--space-md);">
-                        <strong>New URL:</strong> <a href="${newAdminUrl}">${newAdminUrl}</a>
-                    </p>
-                `;
-            };
-            
-            updateCountdown();
-            
-            const interval = setInterval(() => {
-                countdown--;
-                if (countdown <= 0) {
-                    clearInterval(interval);
-                    window.location.href = newAdminUrl;
-                } else {
-                    updateCountdown();
-                }
-            }, 1000);
-        } else {
-            // No response div, redirect immediately
-            setTimeout(() => {
-                window.location.href = newAdminUrl;
-            }, 500);
         }
     },
 

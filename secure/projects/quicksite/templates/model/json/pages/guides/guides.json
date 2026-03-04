@@ -1400,39 +1400,6 @@
                                 "textKey": "__RAW__build"
                             }
                         ]
-                    },
-                    {
-                        "tag": "span",
-                        "params": {
-                            "class": "command-tag"
-                        },
-                        "children": [
-                            {
-                                "textKey": "__RAW__setPublicSpace"
-                            }
-                        ]
-                    },
-                    {
-                        "tag": "span",
-                        "params": {
-                            "class": "command-tag"
-                        },
-                        "children": [
-                            {
-                                "textKey": "__RAW__renameSecureFolder"
-                            }
-                        ]
-                    },
-                    {
-                        "tag": "span",
-                        "params": {
-                            "class": "command-tag"
-                        },
-                        "children": [
-                            {
-                                "textKey": "__RAW__renamePublicFolder"
-                            }
-                        ]
                     }
                 ]
             },
@@ -1494,7 +1461,7 @@
                         "tag": "code",
                         "children": [
                             {
-                                "textKey": "__RAW__# Move site to subdirectory (e.g., /web/)\ncurl -X POST http://yoursite.local/management/setPublicSpace \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"destination\": \"web\"}'\n\n# Site now at: http://domain.com/web/\n# Restore to root with empty destination: {\"destination\": \"\"}"
+                                "textKey": "__RAW__# Run the interactive setup wizard\n# Linux/macOS:\n./setup.sh\n\n# Windows:\nsetup.bat\n\n# The wizard lets you rename folders and set the URL prefix\n# (e.g., serve from /web/ instead of root)"
                             }
                         ]
                     }

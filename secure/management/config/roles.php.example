@@ -148,7 +148,6 @@ return [
             // Build & deploy commands
             'build', 'deleteBuild', 'cleanBuilds', 'deployBuild', 'downloadBuild',
             // Admin-specific commands
-            'setPublicSpace', 'renameSecureFolder', 'renamePublicFolder',
             'listProjects', 'getActiveProject', 'switchProject', 'createProject', 'deleteProject',
             'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup',
             'exportProject', 'importProject', 'downloadExport', 'clearExports',

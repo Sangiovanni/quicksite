@@ -77,7 +77,6 @@
             "desc": "Include your API token in the Authorization header for all requests:"
         },
         "cat": {
-            "folder": "Folder Management",
             "route": "Route Management",
             "structure": "Structure Management",
             "alias": "URL Aliases",
@@ -98,24 +97,6 @@
             "snippets": "Snippets"
         },
         "cmd": {
-            "setPublicSpace": {
-                "desc": "Sets the URL space/prefix for the public site. Creates a subdirectory inside the public folder and moves all content there. Use empty destination to restore to root. Note: Site URL changes (e.g., http://domain/web/ when set to \"web\")",
-                "params": {
-                    "destination": "URL prefix/space for public site (empty string to remove)"
-                }
-            },
-            "renameSecureFolder": {
-                "desc": "Renames the secure/backend folder at server root level. Updates SECURE_FOLDER_NAME constant. Management URL stays the same.",
-                "params": {
-                    "destination": "New folder name (single name, no paths)"
-                }
-            },
-            "renamePublicFolder": {
-                "desc": "Renames the public folder at server root level. Updates all references. Requires Apache/web server config update after rename.",
-                "params": {
-                    "destination": "New folder name (single name, no paths)"
-                }
-            },
             "addRoute": {
                 "desc": "Creates a new route with PHP page template and empty JSON structure",
                 "params": {

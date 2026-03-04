@@ -75,11 +75,6 @@ function isAdminAjax(): bool {
 function getCommandCategories(): array {
     // This will be populated from help.php response
     return [
-        'folder_management' => [
-            'label' => 'Folder Management',
-            'icon' => 'folder',
-            'commands' => ['setPublicSpace', 'renameSecureFolder', 'renamePublicFolder']
-        ],
         'route_management' => [
             'label' => 'Route Management',
             'icon' => 'route',

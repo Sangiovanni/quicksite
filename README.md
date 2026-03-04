@@ -13,7 +13,7 @@ It now includes a **visual admin panel** with an iframe-based page editor, letti
 ### Key features
 
 - **Visual Admin Panel** — iframe-based page editor with drag-and-drop node management, live preview, and component library
-- **119 API Commands** — RESTful endpoints covering pages, translations, styles, assets, builds, projects, backups, AI integration, and more
+- **116 API Commands** — RESTful endpoints covering pages, translations, styles, assets, builds, projects, backups, AI integration, and more
 - **JSON-Driven Templates** — page structures defined in JSON, compiled to optimized PHP for production
 - **Multilingual** — built-in translation system with validation, health checks, and mono/multi-language modes
 - **Multi-Project** — host multiple independent sites from one installation
@@ -242,7 +242,7 @@ quicksite/
 │
 ├── secure/                       # Backend (outside web root, not publicly accessible)
 │   ├── management/               # API engine (shared across all projects)
-│   │   ├── command/              # 119 command handler files (one per command)
+│   │   ├── command/              # 116 command handler files (one per command)
 │   │   ├── config/               # API configuration
 │   │   │   ├── target.php        # Active project selector (gitignored)
 │   │   │   ├── auth.php          # Tokens and CORS config (gitignored)
@@ -311,7 +311,7 @@ The API is self-documenting. Once installed, call:
 GET /management/help
 ```
 
-This returns full documentation for all 119 commands, including parameters, examples, validation rules, and error codes. For a specific command:
+This returns full documentation for all 116 commands, including parameters, examples, validation rules, and error codes. For a specific command:
 
 ```
 GET /management/help/addRoute

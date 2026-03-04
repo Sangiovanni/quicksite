@@ -36,7 +36,7 @@ function generate_nginx_config(string $publicFolderSpace): string {
     $config .= "#   include /path/to/secure/nginx/dynamic_routes.conf;\n";
     $config .= "#\n";
     $config .= "# QuickSite attempts to reload nginx automatically when\n";
-    $config .= "# setPublicSpace is called (requires sudoers setup).\n";
+    $config .= "# the public space configuration changes (requires sudoers setup).\n";
     $config .= "#\n";
     $config .= "# Manual reload: nginx -t && nginx -s reload\n";
     $config .= "# Cron fallback: secure/cron/nginx_reload.sh (optional)\n";
@@ -190,7 +190,7 @@ function try_nginx_reload(string $nginxDir): array {
         $logFile = $logDir . DIRECTORY_SEPARATOR . 'nginx_reload.log';
         file_put_contents(
             $logFile,
-            '[' . date('Y-m-d H:i:s') . '] OK: nginx reloaded by PHP (setPublicSpace)' . "\n",
+            '[' . date('Y-m-d H:i:s') . '] OK: nginx reloaded by PHP (public space change)' . "\n",
             FILE_APPEND | LOCK_EX
         );
     }

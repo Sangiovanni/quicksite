@@ -11,8 +11,8 @@
 // $selectedCommand is already set from command.php
 
 // Commands that change URL structure - need special warning
-$urlChangingCommands = ['setPublicSpace']; // Changes admin URL, auto-redirect
-$serverConfigCommands = ['renamePublicFolder']; // Requires server config change
+$urlChangingCommands = []; // Reserved for future URL-changing commands
+$serverConfigCommands = []; // Reserved for future server config commands
 
 $isUrlChanging = in_array($selectedCommand, $urlChangingCommands);
 $isServerConfig = in_array($selectedCommand, $serverConfigCommands);

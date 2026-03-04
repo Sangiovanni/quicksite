@@ -97,7 +97,6 @@
             "desc": "Include your API token in the Authorization header for all requests:"
         },
         "cat": {
-            "folder": "Folder Management",
             "route": "Route Management",
             "structure": "Structure Management",
             "alias": "URL Aliases",

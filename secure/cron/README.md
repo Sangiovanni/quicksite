@@ -8,7 +8,7 @@
 
 ### How nginx reloading works
 
-When `setPublicSpace` is called, QuickSite:
+When the public space configuration changes (via setup scripts), QuickSite:
 1. Updates `secure/nginx/dynamic_routes.conf`
 2. Tries `sudo nginx -t && sudo nginx -s reload` directly from PHP
 3. If that works → done, instant reload
@@ -87,7 +87,7 @@ Reload attempts (successes and failures) are logged to `secure/logs/nginx_reload
 
 ### If not using cron
 
-**Manual reload:** After any `setPublicSpace` call, you can reload manually:
+**Manual reload:** After any public space change, you can reload manually:
 
 ```bash
 nginx -t && nginx -s reload

@@ -16,115 +16,6 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 
 // Define commands in global scope for access from __command_help()
 $GLOBALS['__help_commands'] = [
-    'setPublicSpace' => [
-        'description' => 'Sets the URL space/prefix for the public site. Creates a subdirectory inside the public folder and moves all content there. Use empty destination to restore to root. Note: Site URL changes (e.g., http://domain/web/ when set to "web")',
-        'method' => 'PATCH',
-        'parameters' => [
-            'destination' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'URL prefix/space (use empty string "" to remove space and serve from root)',
-                'example' => 'web or app/v1/public',
-                'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/dots/hyphens/underscores/forward-slash only, empty allowed'
-            ]
-        ],
-        'example_patch' => 'PATCH /management/setPublicSpace with body: {"destination": "web"} or {"destination": ""}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Public space successfully set',
-            'data' => [
-                'old_path' => 'C:/path/to/public',
-                'new_path' => 'C:/path/to/public/web',
-                'destination' => 'web',
-                'init_file_updated' => 'C:/path/to/public/web/init.php'
-            ]
-        ],
-        'error_responses' => [
-            '400.validation.required' => 'Missing destination parameter',
-            '400.validation.invalid_type' => 'destination must be a string',
-            '400.validation.invalid_format' => 'Invalid path format (max 255 chars, max 5 levels)',
-            '409.conflict.same_path' => 'Source and destination are the same',
-            '423.locked' => 'Operation locked by another process',
-            '500.server.file_write_failed' => 'Failed to move files or update .htaccess/init.php'
-        ],
-        'notes' => 'Sets the URL space/prefix by creating a subdirectory inside the public folder. Updates PUBLIC_FOLDER_SPACE constant and .htaccess files. After setting to "web", site becomes http://domain/web/ and management at http://domain/web/management. Use renamePublicFolder to actually rename the public folder itself.'
-    ],
-    
-    'renameSecureFolder' => [
-        'description' => 'Renames or moves the secure/backend folder. Supports nested paths for organizing multiple deployments (e.g., backends/project1). Updates SECURE_FOLDER_NAME constant. Management URL stays the same.',
-        'method' => 'PATCH',
-        'parameters' => [
-            'destination' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'New folder path relative to server root. Can be nested (e.g., backends/project1) up to 5 levels deep. Cannot be empty.',
-                'example' => 'app_backend, secure_v2, or backends/project1',
-                'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/dots/hyphens/underscores/forward-slashes only, cannot be empty'
-            ]
-        ],
-        'example_patch' => 'PATCH /management/renameSecureFolder with body: {"destination": "backends/mysite"}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Secure folder successfully renamed',
-            'data' => [
-                'old_path' => '/path/to/secure_template',
-                'new_path' => '/path/to/app',
-                'old_name' => 'secure_template',
-                'new_name' => 'app',
-                'init_file_updated' => '/path/to/init.php'
-            ]
-        ],
-        'error_responses' => [
-            '400.validation.required' => 'Missing destination parameter',
-            '400.validation.invalid_type' => 'destination must be a string',
-            '400.validation.invalid_format' => 'Must be single folder name (no subdirectories/slashes), cannot be empty, max 255 chars',
-            '409.conflict.same_path' => 'Source and destination are the same',
-            '409.conflict.duplicate' => 'A folder with this name already exists',
-            '423.locked' => 'Operation locked by another process',
-            '500.server.file_write_failed' => 'Failed to rename folder or update init.php'
-        ],
-        'notes' => 'Renames the secure/backend folder at server root level (e.g., secure_template → app). Restricted to single folder name (no nesting) due to init.php path resolution. Management URL does NOT change. Uses file locking to prevent concurrent operations.'
-    ],
-
-    'renamePublicFolder' => [
-        'description' => 'Renames the public folder at server root level. Updates all references. Requires Apache/web server config update after rename.',
-        'method' => 'PATCH',
-        'parameters' => [
-            'destination' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'New folder name (single name, no paths)',
-                'example' => 'www or public or web',
-                'validation' => 'Max 255 chars, single folder name only, alphanumeric/dots/hyphens/underscores only'
-            ]
-        ],
-        'example_patch' => 'PATCH /management/renamePublicFolder with body: {"destination": "www"}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Public folder successfully renamed',
-            'data' => [
-                'old_path' => '/path/to/public_template',
-                'new_path' => '/path/to/www',
-                'old_name' => 'public_template',
-                'new_name' => 'www',
-                'init_file_updated' => '/path/to/www/init.php'
-            ]
-        ],
-        'error_responses' => [
-            '400.validation.required' => 'Missing destination parameter',
-            '400.validation.invalid_type' => 'destination must be a string',
-            '400.validation.invalid_format' => 'Must be single folder name (no paths/slashes), cannot be empty',
-            '409.conflict.same_path' => 'Source and destination are the same',
-            '409.conflict.duplicate' => 'A folder with this name already exists',
-            '423.locked' => 'Operation locked by another process',
-            '500.server.file_write_failed' => 'Failed to rename folder or update init.php'
-        ],
-        'notes' => 'Renames the public folder at server root level (e.g., public_template → www). After renaming, you must update your Apache/web server DocumentRoot to point to the new folder name. Uses file locking to prevent concurrent operations.'
-    ],
-    
     'addRoute' => [
         'description' => 'Creates a new route with PHP page template and empty JSON structure. Supports nested routes (e.g., "guides/getting-started").',
         'method' => 'POST',
@@ -2143,12 +2034,12 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Role to assign to the token',
                 'valid_values' => [
-                    '*' => 'Superadmin - full access to all 107 commands including token/role management',
+                    '*' => 'Superadmin - full access to all 104 commands including token/role management',
                     'viewer' => 'Read-only access (30 commands)',
                     'editor' => 'Content editing - structure, translations, assets, APIs (65 commands)',
                     'designer' => 'Style editing - CSS, animations, visual elements, APIs (72 commands)',
                     'developer' => 'Build and deploy access (79 commands)',
-                    'admin' => 'Full access except token/role management (100 commands)',
+                    'admin' => 'Full access except token/role management (97 commands)',
                     '<custom>' => 'Any custom role name created via createRole'
                 ],
                 'example' => 'editor or designer or admin'
@@ -3549,7 +3440,7 @@ $GLOBALS['__help_commands'] = [
                 'is_superadmin' => false
             ]
         ],
-        'notes' => 'Use this to determine what commands the current token can execute. Useful for building permission-aware UIs. Superadmin (*) users have is_superadmin=true and access to all 107 commands.'
+        'notes' => 'Use this to determine what commands the current token can execute. Useful for building permission-aware UIs. Superadmin (*) users have is_superadmin=true and access to all 104 commands.'
     ],
     
     'createRole' => [
@@ -4991,7 +4882,6 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
             'total' => count($commands),
             'base_url' => rtrim(BASE_URL, '/') . '/management',
             'command_categories' => [
-                'folder_management' => ['setPublicSpace', 'renameSecureFolder', 'renamePublicFolder'],
                 'route_management' => ['addRoute', 'deleteRoute', 'setRouteLayout', 'getRoutes', 'getSiteMap'],
                 'structure_management' => ['getStructure', 'editStructure', 'listComponents', 'findComponentUsages', 'renameComponent', 'duplicateComponent', 'listPages'],
                 'node_management' => ['moveNode', 'deleteNode', 'addNode', 'editNode', 'addComponentToNode', 'editComponentToNode'],
@@ -5022,12 +4912,12 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'token_format' => 'tvt_<48 hex characters>',
                 'default_token' => 'tvt_dev_default_change_me_in_production (CHANGE IN PRODUCTION!)',
                 'role_system' => [
-                    '*' => 'Superadmin - full access to all 114 commands including token/role management',
+                    '*' => 'Superadmin - full access to all 111 commands including token/role management',
                     'viewer' => 'Read-only access (32 commands) - get*, list*, validate*, help, listAiProviders, listJsFunctions, listInteractions, listApiEndpoints, listSnippets, getSnippet',
                     'editor' => 'Content editing (71 commands) - viewer + structure, translations, assets, interactions, APIs, snippets',
                     'designer' => 'Style editing (78 commands) - editor + CSS, animations, visual elements',
                     'developer' => 'Build access (85 commands) - designer + build, deploy, projects, AI, listJsFunctions',
-                    'admin' => 'Full except tokens (107 commands) - developer + all except token/role management + JS functions'
+                    'admin' => 'Full except tokens (104 commands) - developer + all except token/role management + JS functions'
                 ],
                 'endpoints' => [
                     'listRoles' => 'View available roles (* sees commands, others see names only)',
