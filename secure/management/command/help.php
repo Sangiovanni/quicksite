@@ -147,6 +147,13 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Creates a production-ready build with compiled PHP files, optional folder renaming, config sanitization, and ZIP archive creation',
         'method' => 'POST',
         'parameters' => [
+            'name' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Custom build folder name. If omitted, auto-generates build_YYYYMMDD_HHMMSS. Fails if name already exists.',
+                'example' => 'v2-staging',
+                'validation' => 'Max 100 chars, alphanumeric/dots/hyphens/underscores, must start with alphanumeric'
+            ],
             'public' => [
                 'required' => false,
                 'type' => 'string',
@@ -330,7 +337,7 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'deployBuild' => [
-        'description' => 'Copies a build to production paths (public and secure folders)',
+        'description' => 'Deploys a build to a target root directory. The build\'s public and secure folders are copied as subdirectories of the target path.',
         'method' => 'POST',
         'parameters' => [
             'name' => [
@@ -340,39 +347,34 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'build_20251214_084504',
                 'validation' => 'Must match format build_YYYYMMDD_HHMMSS'
             ],
-            'publicPath' => [
+            'targetPath' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Absolute path where public folder contents should be copied',
-                'example' => 'C:/wamp64/www/mysite (Windows) or /var/www/mysite (Linux)',
+                'description' => 'Absolute path to the root directory. The build\'s public and secure folders will be placed inside it.',
+                'example' => '/var/www/mysite',
                 'validation' => 'Must be absolute path, no path traversal (..)'
-            ],
-            'securePath' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Absolute path where secure folder contents should be copied',
-                'example' => 'C:/wamp64/www/mysite_app',
-                'validation' => 'Must be absolute path, different from publicPath, not nested'
             ],
             'overwrite' => [
                 'required' => false,
                 'type' => 'boolean',
-                'description' => 'If true, overwrite existing files in destination',
+                'description' => 'If true, overwrite existing files. When false, returns list of file conflicts instead.',
                 'example' => false,
                 'validation' => 'Boolean true/false (default: false)'
             ]
         ],
-        'example_post' => 'POST /management/deployBuild with body: {"name": "build_20251214_084504", "publicPath": "C:/wamp64/www/prod", "securePath": "C:/wamp64/www/prod_app"}',
+        'example_post' => 'POST /management/deployBuild with body: {"name": "build_20251214_084504", "targetPath": "C:/wamp64/www/prod"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
             'message' => 'Build deployed successfully',
             'data' => [
                 'build' => 'build_20251214_084504',
-                'deployed_to' => ['public' => 'C:/wamp64/www/prod', 'secure' => 'C:/wamp64/www/prod_app'],
+                'target' => 'C:/wamp64/www/prod',
+                'folders' => ['public' => 'www.mysite.com', 'secure' => 'secure'],
+                'deployed_paths' => ['public' => 'C:/wamp64/www/prod/www.mysite.com', 'secure' => 'C:/wamp64/www/prod/secure'],
                 'public_deployment' => ['files_copied' => 28, 'directories_created' => 7],
                 'secure_deployment' => ['files_copied' => 18, 'directories_created' => 6],
-                'extra_files_copied' => ['LICENSE', 'README.txt', 'build_manifest.json']
+                'root_files_copied' => ['LICENSE', 'README.txt', 'build_manifest.json']
             ]
         ],
         'error_responses' => [
@@ -380,12 +382,12 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'Path must be absolute',
             '400.validation.security_violation' => 'Path traversal (..) not allowed',
             '404.build.not_found' => 'Build not found',
-            '409.conflict.directory_not_empty' => 'Destination not empty (use overwrite=true)',
+            '409.conflict.files_exist' => 'Files would be overwritten (use overwrite=true). Returns detailed conflict list.',
             '409.conflict.operation_in_progress' => 'Another deployment in progress',
-            '500.server.directory_create_failed' => 'Failed to create destination directory',
-            '500.server.permission_denied' => 'Destination not writable'
+            '500.server.directory_create_failed' => 'Failed to create target directory',
+            '500.server.permission_denied' => 'Target directory not writable'
         ],
-        'notes' => 'SECURITY: Allows copying to any absolute path - protect your API token! The secure folder should be placed outside the web root. LICENSE and README are copied to secure folder. Uses file locking to prevent concurrent deployments.'
+        'notes' => 'SECURITY: Allows copying to any absolute path - protect your API token! The folder names come from the build manifest (set during build). Without overwrite=true, the command scans for file conflicts and returns a detailed list. Uses file locking to prevent concurrent deployments.'
     ],
     
     'downloadBuild' => [

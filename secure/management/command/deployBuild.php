@@ -1,20 +1,21 @@
 <?php
 /**
- * Deploy Build Command - Copies a build to production paths
+ * Deploy Build Command - Copies a build to a target root directory
  * 
  * Method: POST
  * Endpoint: /management/deployBuild
  * 
  * Parameters:
  * - name: Build folder name (e.g., build_20251213_185955)
- * - publicPath: Absolute path where public folder contents should be copied
- * - securePath: Absolute path where secure folder contents should be copied
+ * - targetPath: Absolute path to the root directory where the build will be deployed
+ *               The build's public and secure folders will be placed inside this path.
+ *               Example: /var/www/mysite -> creates /var/www/mysite/{publicFolder}/ and /var/www/mysite/{secureFolder}/
  * - overwrite: (optional) If true, overwrite existing files (default: false)
+ *              When false, the command scans for file conflicts first and returns them.
  * 
  * SECURITY NOTE:
- * - This command allows copying to arbitrary paths
- * - The secure folder MUST be outside the web root for security
- * - Protect your API token - anyone with access can deploy anywhere
+ * - This command allows copying to arbitrary paths on the filesystem
+ * - Protect your API token - anyone with access can deploy anywhere the PHP process can write
  * - Path traversal attempts (..) are blocked
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
@@ -24,8 +25,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 $params = $trimParametersManagement->params();
 $buildName = $params['name'] ?? null;
-$publicPath = $params['publicPath'] ?? null;
-$securePath = $params['securePath'] ?? null;
+$targetPath = $params['targetPath'] ?? null;
 $overwrite = $params['overwrite'] ?? false;
 
 // === VALIDATION ===
@@ -45,33 +45,18 @@ if (!is_string($buildName) || !RegexPatterns::match('build_name', $buildName)) {
         ->send();
 }
 
-// Validate publicPath
-if (empty($publicPath)) {
+// Validate targetPath
+if (empty($targetPath)) {
     ApiResponse::create(400, 'validation.required')
-        ->withMessage('publicPath is required')
-        ->withErrors([['field' => 'publicPath', 'reason' => 'missing']])
+        ->withMessage('targetPath is required')
+        ->withErrors([['field' => 'targetPath', 'reason' => 'missing']])
         ->send();
 }
 
-if (!is_string($publicPath)) {
+if (!is_string($targetPath)) {
     ApiResponse::create(400, 'validation.invalid_type')
-        ->withMessage('publicPath must be a string')
-        ->withErrors([['field' => 'publicPath', 'expected' => 'string']])
-        ->send();
-}
-
-// Validate securePath
-if (empty($securePath)) {
-    ApiResponse::create(400, 'validation.required')
-        ->withMessage('securePath is required')
-        ->withErrors([['field' => 'securePath', 'reason' => 'missing']])
-        ->send();
-}
-
-if (!is_string($securePath)) {
-    ApiResponse::create(400, 'validation.invalid_type')
-        ->withMessage('securePath must be a string')
-        ->withErrors([['field' => 'securePath', 'expected' => 'string']])
+        ->withMessage('targetPath must be a string')
+        ->withErrors([['field' => 'targetPath', 'expected' => 'string']])
         ->send();
 }
 
@@ -84,7 +69,7 @@ if (isset($params['overwrite']) && !is_bool($overwrite)) {
 }
 
 // Security: Block path traversal attempts
-if (strpos($publicPath, '..') !== false || strpos($securePath, '..') !== false) {
+if (strpos($targetPath, '..') !== false) {
     ApiResponse::create(400, 'validation.security_violation')
         ->withMessage('Path traversal is not allowed')
         ->withErrors([
@@ -93,56 +78,20 @@ if (strpos($publicPath, '..') !== false || strpos($securePath, '..') !== false) 
         ->send();
 }
 
-// Normalize paths (handle both Windows and Unix)
-$publicPath = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $publicPath), DIRECTORY_SEPARATOR);
-$securePath = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $securePath), DIRECTORY_SEPARATOR);
+// Normalize path (handle both Windows and Unix)
+$targetPath = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $targetPath), DIRECTORY_SEPARATOR);
 
-// Security: Ensure paths are absolute
-$isAbsolutePublic = (PHP_OS_FAMILY === 'Windows') 
-    ? preg_match('/^[A-Za-z]:/', $publicPath) 
-    : (strpos($publicPath, '/') === 0);
+// Security: Ensure path is absolute
+$isAbsolute = (PHP_OS_FAMILY === 'Windows')
+    ? preg_match('/^[A-Za-z]:/', $targetPath)
+    : (strpos($targetPath, '/') === 0);
 
-$isAbsoluteSecure = (PHP_OS_FAMILY === 'Windows') 
-    ? preg_match('/^[A-Za-z]:/', $securePath) 
-    : (strpos($securePath, '/') === 0);
-
-if (!$isAbsolutePublic) {
+if (!$isAbsolute) {
     ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage('publicPath must be an absolute path')
+        ->withMessage('targetPath must be an absolute path')
         ->withErrors([
-            ['field' => 'publicPath', 'value' => $publicPath],
+            ['field' => 'targetPath', 'value' => $targetPath],
             ['example' => PHP_OS_FAMILY === 'Windows' ? 'C:\\wamp64\\www\\mysite' : '/var/www/mysite']
-        ])
-        ->send();
-}
-
-if (!$isAbsoluteSecure) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage('securePath must be an absolute path')
-        ->withErrors([
-            ['field' => 'securePath', 'value' => $securePath],
-            ['example' => PHP_OS_FAMILY === 'Windows' ? 'C:\\wamp64\\www\\mysite_app' : '/var/www/mysite_app']
-        ])
-        ->send();
-}
-
-// Security: Public and secure paths must be different
-if ($publicPath === $securePath) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage('publicPath and securePath must be different')
-        ->withErrors([
-            ['reason' => 'Deploying both folders to the same location would overwrite files']
-        ])
-        ->send();
-}
-
-// Security: One cannot be inside the other
-if (strpos($publicPath, $securePath) === 0 || strpos($securePath, $publicPath) === 0) {
-    ApiResponse::create(400, 'validation.security_violation')
-        ->withMessage('One deployment path cannot be inside the other')
-        ->withErrors([
-            ['publicPath' => $publicPath, 'securePath' => $securePath],
-            ['reason' => 'Nested deployment paths could cause security issues']
         ])
         ->send();
 }
@@ -210,61 +159,85 @@ if (!is_dir($sourceSecure)) {
         ->send();
 }
 
-// === CHECK DESTINATION DIRECTORIES ===
+// Determine destination paths
+$destPublic = $targetPath . DIRECTORY_SEPARATOR . $buildPublicName;
+$destSecure = $targetPath . DIRECTORY_SEPARATOR . $buildSecureName;
 
-// Check if destination directories exist and are writable
-$publicExists = is_dir($publicPath);
-$secureExists = is_dir($securePath);
+// === FILE CONFLICT DETECTION ===
 
-if (!$overwrite) {
-    if ($publicExists && count(scandir($publicPath)) > 2) { // More than . and ..
-        ApiResponse::create(409, 'conflict.directory_not_empty')
-            ->withMessage('Public destination directory is not empty')
-            ->withData([
-                'path' => $publicPath,
-                'hint' => 'Set overwrite=true to replace existing files'
-            ])
-            ->send();
+/**
+ * Scan source directory and find files that already exist at destination.
+ * Returns array of relative paths that would be overwritten.
+ */
+function findConflicts(string $source, string $dest): array {
+    $conflicts = [];
+    if (!is_dir($dest)) return $conflicts;
+    
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($source, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::LEAVES_ONLY
+    );
+    
+    foreach ($iterator as $item) {
+        $relativePath = $iterator->getSubPathname();
+        $destFile = $dest . DIRECTORY_SEPARATOR . $relativePath;
+        if (file_exists($destFile)) {
+            $conflicts[] = $relativePath;
+        }
     }
     
-    if ($secureExists && count(scandir($securePath)) > 2) {
-        ApiResponse::create(409, 'conflict.directory_not_empty')
-            ->withMessage('Secure destination directory is not empty')
-            ->withData([
-                'path' => $securePath,
-                'hint' => 'Set overwrite=true to replace existing files'
-            ])
+    return $conflicts;
+}
+
+// Also check root-level files (LICENSE, README.txt, build_manifest.json)
+$rootFiles = ['LICENSE', 'README.txt', 'build_manifest.json'];
+$rootConflicts = [];
+foreach ($rootFiles as $rootFile) {
+    if (file_exists($buildFolder . '/' . $rootFile) && file_exists($targetPath . DIRECTORY_SEPARATOR . $rootFile)) {
+        $rootConflicts[] = $rootFile;
+    }
+}
+
+$publicConflicts = findConflicts($sourcePublic, $destPublic);
+$secureConflicts = findConflicts($sourceSecure, $destSecure);
+$totalConflicts = count($publicConflicts) + count($secureConflicts) + count($rootConflicts);
+
+if ($totalConflicts > 0 && !$overwrite) {
+    ApiResponse::create(409, 'conflict.files_exist')
+        ->withMessage("Found {$totalConflicts} file(s) that would be overwritten")
+        ->withData([
+            'total_conflicts' => $totalConflicts,
+            'root_conflicts' => $rootConflicts,
+            'public_conflicts' => [
+                'folder' => $buildPublicName,
+                'count' => count($publicConflicts),
+                'files' => array_slice($publicConflicts, 0, 50)
+            ],
+            'secure_conflicts' => [
+                'folder' => $buildSecureName,
+                'count' => count($secureConflicts),
+                'files' => array_slice($secureConflicts, 0, 50)
+            ],
+            'hint' => 'Set overwrite=true to replace existing files'
+        ])
+        ->send();
+}
+
+// === CHECK/CREATE TARGET DIRECTORY ===
+
+if (!is_dir($targetPath)) {
+    if (!mkdir($targetPath, 0755, true)) {
+        ApiResponse::create(500, 'server.directory_create_failed')
+            ->withMessage('Failed to create target directory')
+            ->withData(['path' => $targetPath])
             ->send();
     }
 }
 
-// Create directories if they don't exist
-if (!$publicExists && !mkdir($publicPath, 0755, true)) {
-    ApiResponse::create(500, 'server.directory_create_failed')
-        ->withMessage('Failed to create public destination directory')
-        ->withData(['path' => $publicPath])
-        ->send();
-}
-
-if (!$secureExists && !mkdir($securePath, 0755, true)) {
-    ApiResponse::create(500, 'server.directory_create_failed')
-        ->withMessage('Failed to create secure destination directory')
-        ->withData(['path' => $securePath])
-        ->send();
-}
-
-// Check writability
-if (!is_writable($publicPath)) {
+if (!is_writable($targetPath)) {
     ApiResponse::create(500, 'server.permission_denied')
-        ->withMessage('Public destination directory is not writable')
-        ->withData(['path' => $publicPath])
-        ->send();
-}
-
-if (!is_writable($securePath)) {
-    ApiResponse::create(500, 'server.permission_denied')
-        ->withMessage('Secure destination directory is not writable')
-        ->withData(['path' => $securePath])
+        ->withMessage('Target directory is not writable')
+        ->withData(['path' => $targetPath])
         ->send();
 }
 
@@ -285,12 +258,19 @@ function release_deploy_lock() {
 
 // === COPY FILES ===
 
+// Track all created files and directories for rollback on failure
+$createdFiles = [];
+$createdDirs = [];
+
 /**
- * Recursively copy a directory
+ * Recursively copy a directory, tracking all created items for rollback
  */
-function copyDirectory($source, $dest, $overwrite = false) {
+function copyDirectory(string $source, string $dest, bool $overwrite, array &$createdFiles, array &$createdDirs): array {
     if (!is_dir($dest)) {
-        mkdir($dest, 0755, true);
+        if (!mkdir($dest, 0755, true)) {
+            return ['files' => 0, 'directories' => 0, 'error' => "Failed to create directory: {$dest}"];
+        }
+        $createdDirs[] = $dest;
     }
     
     $iterator = new RecursiveIteratorIterator(
@@ -306,12 +286,22 @@ function copyDirectory($source, $dest, $overwrite = false) {
         
         if ($item->isDir()) {
             if (!is_dir($destPath)) {
-                mkdir($destPath, 0755, true);
+                if (!mkdir($destPath, 0755, true)) {
+                    return ['files' => $copiedFiles, 'directories' => $copiedDirs, 'error' => "Failed to create directory: {$destPath}"];
+                }
+                $createdDirs[] = $destPath;
                 $copiedDirs++;
             }
         } else {
-            if ($overwrite || !file_exists($destPath)) {
-                copy($item->getPathname(), $destPath);
+            $fileExisted = file_exists($destPath);
+            if ($overwrite || !$fileExisted) {
+                if (!copy($item->getPathname(), $destPath)) {
+                    return ['files' => $copiedFiles, 'directories' => $copiedDirs, 'error' => "Failed to copy file: {$destPath}"];
+                }
+                // Only track for rollback if we created a new file (not overwrote)
+                if (!$fileExisted) {
+                    $createdFiles[] = $destPath;
+                }
                 $copiedFiles++;
             }
         }
@@ -320,29 +310,88 @@ function copyDirectory($source, $dest, $overwrite = false) {
     return ['files' => $copiedFiles, 'directories' => $copiedDirs];
 }
 
+/**
+ * Attempt rollback: remove all NEW files and directories created during deployment.
+ * Does not touch files that were overwritten (they are already changed).
+ */
+function rollbackDeployment(array $createdFiles, array $createdDirs): array {
+    $rollbackErrors = [];
+    
+    // Delete files first (in reverse order)
+    foreach (array_reverse($createdFiles) as $file) {
+        if (file_exists($file) && !@unlink($file)) {
+            $rollbackErrors[] = "Could not remove file: {$file}";
+        }
+    }
+    
+    // Delete directories in reverse order (deepest first)
+    foreach (array_reverse($createdDirs) as $dir) {
+        if (is_dir($dir)) {
+            if (count(scandir($dir)) <= 2) {
+                if (!@rmdir($dir)) {
+                    $rollbackErrors[] = "Could not remove directory: {$dir}";
+                }
+            } else {
+                $rollbackErrors[] = "Directory not empty after file cleanup: {$dir}";
+            }
+        }
+    }
+    
+    return $rollbackErrors;
+}
+
 // Copy public folder
-$publicResult = copyDirectory($sourcePublic, $publicPath, $overwrite);
+$publicResult = copyDirectory($sourcePublic, $destPublic, $overwrite, $createdFiles, $createdDirs);
+
+if (isset($publicResult['error'])) {
+    $rollbackErrors = rollbackDeployment($createdFiles, $createdDirs);
+    release_deploy_lock();
+    ApiResponse::create(500, 'deploy.copy_failed')
+        ->withMessage('Deployment failed while copying public folder')
+        ->withData([
+            'error' => $publicResult['error'],
+            'files_copied_before_failure' => $publicResult['files'],
+            'rollback_attempted' => true,
+            'rollback_complete' => empty($rollbackErrors),
+            'rollback_errors' => $rollbackErrors ?: null
+        ])
+        ->send();
+}
 
 // Copy secure folder
-$secureResult = copyDirectory($sourceSecure, $securePath, $overwrite);
+$secureResult = copyDirectory($sourceSecure, $destSecure, $overwrite, $createdFiles, $createdDirs);
 
-// Copy LICENSE and README to secure folder
-$licensePath = $buildFolder . '/LICENSE';
-$readmePath = $buildFolder . '/README.txt';
-$manifestDestPath = $securePath . '/build_manifest.json';
+if (isset($secureResult['error'])) {
+    $rollbackErrors = rollbackDeployment($createdFiles, $createdDirs);
+    release_deploy_lock();
+    ApiResponse::create(500, 'deploy.copy_failed')
+        ->withMessage('Deployment failed while copying secure folder')
+        ->withData([
+            'error' => $secureResult['error'],
+            'files_copied_before_failure' => $publicResult['files'] + $secureResult['files'],
+            'rollback_attempted' => true,
+            'rollback_complete' => empty($rollbackErrors),
+            'rollback_errors' => $rollbackErrors ?: null
+        ])
+        ->send();
+}
 
+// Copy root-level files (LICENSE, README.txt, build_manifest.json)
 $extraFiles = [];
-if (file_exists($licensePath)) {
-    copy($licensePath, $securePath . '/LICENSE');
-    $extraFiles[] = 'LICENSE';
-}
-if (file_exists($readmePath)) {
-    copy($readmePath, $securePath . '/README.txt');
-    $extraFiles[] = 'README.txt';
-}
-if (file_exists($manifestPath)) {
-    copy($manifestPath, $manifestDestPath);
-    $extraFiles[] = 'build_manifest.json';
+foreach ($rootFiles as $rootFile) {
+    $sourceFile = $buildFolder . '/' . $rootFile;
+    $destFile = $targetPath . DIRECTORY_SEPARATOR . $rootFile;
+    if (file_exists($sourceFile)) {
+        $fileExisted = file_exists($destFile);
+        if ($overwrite || !$fileExisted) {
+            if (copy($sourceFile, $destFile)) {
+                if (!$fileExisted) {
+                    $createdFiles[] = $destFile;
+                }
+                $extraFiles[] = $rootFile;
+            }
+        }
+    }
 }
 
 // Release lock
@@ -353,13 +402,14 @@ ApiResponse::create(200, 'operation.success')
     ->withMessage('Build deployed successfully')
     ->withData([
         'build' => $buildName,
-        'deployed_to' => [
-            'public' => $publicPath,
-            'secure' => $securePath
-        ],
-        'source_folders' => [
+        'target' => $targetPath,
+        'folders' => [
             'public' => $buildPublicName,
             'secure' => $buildSecureName
+        ],
+        'deployed_paths' => [
+            'public' => $destPublic,
+            'secure' => $destSecure
         ],
         'public_deployment' => [
             'files_copied' => $publicResult['files'],
@@ -369,7 +419,8 @@ ApiResponse::create(200, 'operation.success')
             'files_copied' => $secureResult['files'],
             'directories_created' => $secureResult['directories']
         ],
-        'extra_files_copied' => $extraFiles,
-        'overwrite_mode' => $overwrite
+        'root_files_copied' => $extraFiles,
+        'overwrite_mode' => $overwrite,
+        'files_overwritten' => $overwrite ? $totalConflicts : 0
     ])
     ->send();

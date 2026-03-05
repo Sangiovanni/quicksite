@@ -195,7 +195,7 @@ function createProjectConfig(string $siteName, string $defaultLang): string {
     ];
     $defaultLangName = $commonLanguages[$defaultLang] ?? ucfirst($defaultLang);
     
-    return "<?php\n/**\n * Site Configuration\n * Created: " . date('Y-m-d H:i:s') . "\n */\n\nreturn [\n    'SITE_NAME' => '" . addslashes($siteName) . "',\n    'LANGUAGE_DEFAULT' => '$defaultLang',\n    'LANGUAGES_SUPPORTED' => ['$defaultLang'],\n    'LANGUAGES_NAME' => ['$defaultLang' => '$defaultLangName'],\n    'MULTILINGUAL_SUPPORT' => false,\n    \n    // Database (optional)\n    'DB_HOST' => '',\n    'DB_NAME' => '',\n    'DB_USER' => '',\n    'DB_PASS' => ''\n];\n";
+    return "<?php\n/**\n * Site Configuration\n * Created: " . date('Y-m-d H:i:s') . "\n */\n\nreturn [\n    'SITE_NAME' => '" . addslashes($siteName) . "',\n    'LANGUAGE_DEFAULT' => '$defaultLang',\n    'LANGUAGES_SUPPORTED' => ['$defaultLang'],\n    'LANGUAGES_NAME' => ['$defaultLang' => '$defaultLangName'],\n    'MULTILINGUAL_SUPPORT' => false\n];\n";
 }
 
 /**

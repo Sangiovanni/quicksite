@@ -313,6 +313,7 @@
             "build": {
                 "desc": "Creates a production-ready build with compiled PHP files, optional folder renaming, config sanitization, and ZIP archive creation",
                 "params": {
+                    "name": "Custom build folder name (auto-generated if omitted)",
                     "public": "Custom public folder name/path",
                     "secure": "Custom secure folder name (single level)",
                     "space": "PUBLIC_FOLDER_SPACE subdirectory"
@@ -341,12 +342,11 @@
                 }
             },
             "deployBuild": {
-                "desc": "Deploy a build to production paths with file locking and integrity checks",
+                "desc": "Deploy a build to a target root directory. Public and secure folders are placed as subdirectories.",
                 "params": {
                     "name": "Build name to deploy",
-                    "publicPath": "Absolute path for public folder",
-                    "securePath": "Absolute path for secure folder",
-                    "overwrite": "Overwrite existing files (default: false)"
+                    "targetPath": "Absolute path to the root directory where the build will be deployed",
+                    "overwrite": "Overwrite existing files. Without this, returns a list of file conflicts (default: false)"
                 }
             },
             "downloadBuild": {

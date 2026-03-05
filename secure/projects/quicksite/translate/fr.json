@@ -322,6 +322,7 @@
             "build": {
                 "desc": "Crée un build prêt pour la production avec des fichiers PHP compilés, renommage optionnel des dossiers, nettoyage de la config et création d'archive ZIP",
                 "params": {
+                    "name": "Nom personnalisé du dossier de build (auto-généré si omis)",
                     "public": "Nom/chemin personnalisé du dossier public",
                     "secure": "Nom personnalisé du dossier secure (un seul niveau)",
                     "space": "Sous-répertoire PUBLIC_FOLDER_SPACE"
@@ -350,12 +351,11 @@
                 }
             },
             "deployBuild": {
-                "desc": "Déploie un build vers les chemins de production avec verrouillage de fichiers et vérifications d'intégrité",
+                "desc": "Déploie un build vers un répertoire racine cible. Les dossiers public et secure sont placés comme sous-répertoires.",
                 "params": {
                     "name": "Nom du build à déployer",
-                    "publicPath": "Chemin absolu pour le dossier public",
-                    "securePath": "Chemin absolu pour le dossier secure",
-                    "overwrite": "Écraser les fichiers existants (défaut: false)"
+                    "targetPath": "Chemin absolu vers le répertoire racine où le build sera déployé",
+                    "overwrite": "Écraser les fichiers existants. Sans cela, retourne la liste des conflits de fichiers (défaut: false)"
                 }
             },
             "downloadBuild": {

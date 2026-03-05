@@ -6214,7 +6214,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "__RAW__publicPath"
+                                                                "textKey": "__RAW__targetPath"
                                                             }
                                                         ]
                                                     },
@@ -6236,45 +6236,7 @@
                                                         "tag": "span",
                                                         "children": [
                                                             {
-                                                                "textKey": "docs.cmd.deployBuild.params.publicPath"
-                                                            }
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "tag": "li",
-                                                "children": [
-                                                    {
-                                                        "params": {
-                                                            "class": "param-name"
-                                                        },
-                                                        "tag": "span",
-                                                        "children": [
-                                                            {
-                                                                "textKey": "__RAW__securePath"
-                                                            }
-                                                        ]
-                                                    },
-                                                    {
-                                                        "params": {
-                                                            "class": "param-required"
-                                                        },
-                                                        "tag": "span",
-                                                        "children": [
-                                                            {
-                                                                "textKey": "docs.labels.required"
-                                                            }
-                                                        ]
-                                                    },
-                                                    {
-                                                        "params": {
-                                                            "class": "param-desc"
-                                                        },
-                                                        "tag": "span",
-                                                        "children": [
-                                                            {
-                                                                "textKey": "docs.cmd.deployBuild.params.securePath"
+                                                                "textKey": "docs.cmd.deployBuild.params.targetPath"
                                                             }
                                                         ]
                                                     }

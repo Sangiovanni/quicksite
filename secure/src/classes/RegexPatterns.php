@@ -110,14 +110,14 @@ class RegexPatterns
         ],
         
         'build_name' => [
-            'pattern' => '/^build_\d{8}_\d{6}$/',
-            'description' => 'Build identifier (build_YYYYMMDD_HHMMSS)',
-            'examples' => ['build_20241217_143052', 'build_20240101_000000']
+            'pattern' => '/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/',
+            'description' => 'Build folder name (auto-generated like build_YYYYMMDD_HHMMSS or custom name)',
+            'examples' => ['build_20241217_143052', 'v2-staging', 'my_production_build']
         ],
         
         'build_name_parse' => [
             'pattern' => '/^build_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})$/',
-            'description' => 'Build identifier with capture groups for date/time parts',
+            'description' => 'Auto-generated build name with capture groups for date/time parts',
             'examples' => ['build_20241217_143052']
         ],
         

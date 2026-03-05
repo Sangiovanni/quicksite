@@ -3,6 +3,8 @@
  * Build Command - Creates production-ready deployments
  * 
  * Parameters:
+ * - name (optional): Custom build folder name. If omitted, auto-generates build_YYYYMMDD_HHMMSS.
+ *                     Must not already exist (delete first if reusing a name).
  * - public (optional): Custom public folder name/path (max 5 levels, e.g., 'www/v1/public')
  * - secure (optional): Custom secure folder name (max 1 level, e.g., 'backend')
  * - space (optional): URL path prefix - creates subdirectory inside public folder (max 5 levels, e.g., '' or 'space')
@@ -39,10 +41,34 @@ if (!function_exists('getActiveProjectName')) {
 }
 
 // Get optional parameters for renaming folders in build
+// Defaults are standard names (public/secure/''), NOT the QuickSite installation's own folder names
 $params = $trimParametersManagement->params();
-$buildPublicName = $params['public'] ?? PUBLIC_FOLDER_NAME;
-$buildSecureName = $params['secure'] ?? SECURE_FOLDER_NAME;
-$buildPublicSpace = $params['space'] ?? PUBLIC_FOLDER_SPACE;
+$buildPublicName = $params['public'] ?? 'public';
+$buildSecureName = $params['secure'] ?? 'secure';
+$buildPublicSpace = $params['space'] ?? '';
+$buildCustomName = $params['name'] ?? '';
+
+// Validate optional custom build name
+if (!empty($buildCustomName)) {
+    if (!is_string($buildCustomName)) {
+        ApiResponse::create(400, 'validation.invalid_type')
+            ->withMessage('name parameter must be a string')
+            ->withData(['field' => 'name', 'expected' => 'string'])
+            ->send();
+    }
+    if (strlen($buildCustomName) > 100) {
+        ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('name must be 100 characters or less')
+            ->withErrors([['field' => 'name', 'max_length' => 100, 'actual_length' => strlen($buildCustomName)]])
+            ->send();
+    }
+    if (!preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/', $buildCustomName)) {
+        ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('name must contain only letters, numbers, hyphens, underscores and dots (must start with alphanumeric)')
+            ->withErrors([['field' => 'name', 'value' => $buildCustomName, 'allowed' => 'a-z, A-Z, 0-9, -, _, . (start with alphanumeric)']])
+            ->send();
+    }
+}
 
 // Validate public folder name parameter
 if (!empty($params['public'])) {
@@ -89,18 +115,17 @@ if (!empty($params['secure'])) {
             ->send();
     }
     
-    // Path validation (max 1 level - single folder name only)
-    if (!is_valid_relative_path($buildSecureName, 255, 1, false)) {
+    // Path validation (max 5 levels deep, like public folder)
+    if (!is_valid_relative_path($buildSecureName, 255, 5, false)) {
         ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage("Invalid secure folder name (single folder name only, e.g., 'app' or 'backend')")
+            ->withMessage("Invalid secure folder name (max 5 levels deep, e.g., 'app' or 'backend/core')")
             ->withErrors([
                 ['field' => 'secure', 'value' => $buildSecureName],
                 ['constraints' => [
                     'max_length' => 255,
-                    'max_depth' => 1,
-                    'allowed_chars' => 'a-z, A-Z, 0-9, hyphen, underscore',
-                    'empty_allowed' => false,
-                    'note' => 'Nested paths not allowed for secure folder due to init.php path resolution limitations'
+                    'max_depth' => 5,
+                    'allowed_chars' => 'a-z, A-Z, 0-9, hyphen, underscore, forward slash',
+                    'empty_allowed' => false
                 ]]
             ])
             ->send();
@@ -200,7 +225,7 @@ function release_build_lock() {
 // Define build path (inside locked section)
 $buildPath = PUBLIC_FOLDER_ROOT . '/build';
 $timestamp = date('Ymd_His');
-$buildFolderName = 'build_' . $timestamp;
+$buildFolderName = $buildCustomName !== '' ? $buildCustomName : 'build_' . $timestamp;
 $buildFullPath = $buildPath . '/' . $buildFolderName;
 
 // Step 1: Create/clear build directory
@@ -213,7 +238,19 @@ if (!file_exists($buildPath)) {
     }
 }
 
-// Create timestamped build folder
+// Check if custom-named folder already exists
+if ($buildCustomName !== '' && is_dir($buildFullPath)) {
+    release_build_lock();
+    ApiResponse::create(409, 'conflict.already_exists')
+        ->withMessage("A build with this name already exists")
+        ->withData([
+            'name' => $buildCustomName,
+            'hint' => 'Delete the existing build first with deleteBuild, or choose a different name'
+        ])
+        ->send();
+}
+
+// Create build folder
 if (!mkdir($buildFullPath, 0755, true)) {
     release_build_lock();
     ApiResponse::create(500, 'server.directory_create_failed')
@@ -268,6 +305,20 @@ foreach ($publicFiles as $file) {
         if ($file === 'init.php') {
             // === ALWAYS patch init.php for production builds ===
             
+            // Strip FIRST-INSTALL config auto-creation block (management layer not present in builds)
+            $content = preg_replace(
+                '/\/\/ =+\r?\n\/\/ FIRST-INSTALL: Auto-create config files.*?(?=\/\/ =+\r?\n\/\/ FIRST-INSTALL: Auto-generate nginx)/s',
+                '',
+                $content
+            );
+            
+            // Strip FIRST-INSTALL nginx auto-generation + setup wizard block (NginxConfig.php not in builds)
+            $content = preg_replace(
+                '/\/\/ =+\r?\n\/\/ FIRST-INSTALL: Auto-generate nginx.*?(?=\/\/ =+\r?\n\/\/ PROJECT PATH)/s',
+                '',
+                $content
+            );
+            
             // Replace PROJECT_PATH block: production builds don't use target.php
             // All project files are at SECURE_FOLDER_PATH root (config.php, routes.php, templates/, translate/)
             $content = preg_replace(
@@ -276,36 +327,36 @@ foreach ($publicFiles as $file) {
                 $content
             );
             
-            // Replace folder name references if names changed
-            if ($buildPublicName !== PUBLIC_FOLDER_NAME || $buildSecureName !== SECURE_FOLDER_NAME || $buildPublicSpace !== PUBLIC_FOLDER_SPACE) {
-                // Update SECURE_FOLDER_PATH in init.php (use SERVER_ROOT, not dirname)
-                $content = preg_replace(
-                    "/define\('SECURE_FOLDER_PATH',\s*[^)]+\);/",
-                    "define('SECURE_FOLDER_PATH', SERVER_ROOT . DIRECTORY_SEPARATOR . '" . $buildSecureName . "');",
-                    $content
-                );
-                
-                // Update PUBLIC_FOLDER_NAME constant
-                $content = preg_replace(
-                    "/define\('PUBLIC_FOLDER_NAME',\s*'[^']+'\);/",
-                    "define('PUBLIC_FOLDER_NAME', '" . $buildPublicName . "');",
-                    $content
-                );
-                
-                // Update SECURE_FOLDER_NAME constant
-                $content = preg_replace(
-                    "/define\('SECURE_FOLDER_NAME',\s*'[^']+'\);/",
-                    "define('SECURE_FOLDER_NAME', '" . $buildSecureName . "');",
-                    $content
-                );
-                
-                // Update PUBLIC_FOLDER_SPACE constant
-                $content = preg_replace(
-                    "/define\('PUBLIC_FOLDER_SPACE',\s*'[^']*'\);/",
-                    "define('PUBLIC_FOLDER_SPACE', '" . $buildPublicSpace . "');",
-                    $content
-                );
-            }
+            // Always patch folder name constants to match build target values
+            // (source init.php may have different values from the QuickSite installation)
+            
+            // Update SECURE_FOLDER_PATH in init.php (use SERVER_ROOT, not dirname)
+            $content = preg_replace(
+                "/define\('SECURE_FOLDER_PATH',\s*[^)]+\);/",
+                "define('SECURE_FOLDER_PATH', SERVER_ROOT . DIRECTORY_SEPARATOR . '" . $buildSecureName . "');",
+                $content
+            );
+            
+            // Update PUBLIC_FOLDER_NAME constant
+            $content = preg_replace(
+                "/define\('PUBLIC_FOLDER_NAME',\s*'[^']+'\);/",
+                "define('PUBLIC_FOLDER_NAME', '" . $buildPublicName . "');",
+                $content
+            );
+            
+            // Update SECURE_FOLDER_NAME constant
+            $content = preg_replace(
+                "/define\('SECURE_FOLDER_NAME',\s*'[^']+'\);/",
+                "define('SECURE_FOLDER_NAME', '" . $buildSecureName . "');",
+                $content
+            );
+            
+            // Update PUBLIC_FOLDER_SPACE constant
+            $content = preg_replace(
+                "/define\('PUBLIC_FOLDER_SPACE',\s*'[^']*'\);/",
+                "define('PUBLIC_FOLDER_SPACE', '" . $buildPublicSpace . "');",
+                $content
+            );
         }
         
         // Update .htaccess fallback path if space is used
@@ -372,33 +423,8 @@ if (!copy(PROJECT_PATH . '/routes.php', $buildFullPath . '/' . $buildSecureName 
         ->send();
 }
 
-// Copy and sanitize config.php (remove DB credentials)
-$configContent = file_get_contents(PROJECT_PATH . '/config.php');
-if ($configContent === false) {
-    release_build_lock();
-    ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage("Failed to read config.php")
-        ->send();
-}
-
-// Remove database credentials (replace with empty strings)
-$configContent = preg_replace(
-    [
-        "/'DB_HOST'\s*=>\s*'[^']*'/",
-        "/'DB_NAME'\s*=>\s*'[^']*'/",
-        "/'DB_USER'\s*=>\s*'[^']*'/",
-        "/'DB_PASS'\s*=>\s*'[^']*'/"
-    ],
-    [
-        "'DB_HOST' => ''",
-        "'DB_NAME' => ''",
-        "'DB_USER' => ''",
-        "'DB_PASS' => ''"
-    ],
-    $configContent
-);
-
-if (file_put_contents($buildFullPath . '/' . $buildSecureName . '/config.php', $configContent) === false) {
+// Copy config.php
+if (!copy(PROJECT_PATH . '/config.php', $buildFullPath . '/' . $buildSecureName . '/config.php')) {
     release_build_lock();
     ApiResponse::create(500, 'server.file_write_failed')
         ->withMessage("Failed to write sanitized config.php")
@@ -409,7 +435,8 @@ if (file_put_contents($buildFullPath . '/' . $buildSecureName . '/config.php', $
 $classFiles = [
     'Page.php',
     'Translator.php',
-    'TrimParameters.php'
+    'TrimParameters.php',
+    'RegexPatterns.php'
 ];
 
 foreach ($classFiles as $file) {
@@ -668,25 +695,25 @@ FOLDER STRUCTURE:
 
 DEPLOYMENT STEPS:
 
-1. Configure Database (REQUIRED):
-   Edit {$buildSecureName}/config.php and set:
-   - DB_HOST (e.g., 'localhost')
-   - DB_NAME (your database name)
-   - DB_USER (database username)
-   - DB_PASS (database password)
-
-2. Upload Files:
+1. Upload Files:
    - Upload {$buildPublicName}/ contents to your web root
    - Upload {$buildSecureName}/ to parent directory of web root
 
-3. Update init.php (if needed):
+2. Update init.php (if needed):
    - Edit {$buildPublicName}/init.php
    - Verify SECURE_FOLDER_PATH points to correct location
 
-4. Set Permissions:
+3. Set Permissions:
    - Directories: 755
    - Files: 644
    - Ensure PHP can read {$buildSecureName}/ folder
+
+4. nginx Users Only:
+   nginx does not support .htaccess files. A ready-to-use nginx config
+   snippet is included in this build: {$buildSecureName}/nginx_routes.conf
+   Add this line inside your nginx server { } block:
+     include /path/to/{$buildSecureName}/nginx_routes.conf;
+   Then test and reload: nginx -t && nginx -s reload
 
 5. Test:
    - Visit your domain
@@ -695,7 +722,7 @@ DEPLOYMENT STEPS:
 
 NOTES:
 - This is a production build (no management API)
-- Database credentials are intentionally blank for security
+- No database required — QuickSite is entirely file-based
 - All pages are pre-compiled for performance
 - Language mode: %LANG_MODE%
 
@@ -710,6 +737,11 @@ $langMode = MULTILINGUAL_SUPPORT ? 'Multilingual (all language files included)' 
 $readme = str_replace('%LANG_MODE%', $langMode, $readme);
 
 file_put_contents($buildFullPath . '/README.txt', $readme);
+
+// Step 6a: Generate nginx config snippet for nginx users
+require_once SECURE_FOLDER_PATH . '/src/functions/NginxConfig.php';
+$nginxConfig = generate_nginx_config($buildPublicSpace);
+file_put_contents($buildFullPath . '/' . $buildSecureName . '/nginx_routes.conf', $nginxConfig);
 
 // Step 6b: Create build manifest for listBuilds/getBuild commands
 $manifest = [

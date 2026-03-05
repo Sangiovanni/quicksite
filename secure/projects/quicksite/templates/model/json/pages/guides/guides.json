@@ -1525,7 +1525,7 @@
                         "tag": "code",
                         "children": [
                             {
-                                "textKey": "__RAW__# Deploy a build to production\ncurl -X POST http://yoursite.local/management/deployBuild \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"name\": \"build_20250101_120000\",\n    \"publicPath\": \"/var/www/production/public\",\n    \"securePath\": \"/var/www/production/app\",\n    \"overwrite\": false\n  }'\n\n# Get download URL for a build ZIP\ncurl http://yoursite.local/management/downloadBuild/build_20250101_120000 \\\n  -H \"Authorization: Bearer YOUR_TOKEN\""
+                                "textKey": "__RAW__# Deploy a build to a target root directory\ncurl -X POST http://yoursite.local/management/deployBuild \\\n  -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"name\": \"build_20250101_120000\",\n    \"targetPath\": \"/var/www/production\",\n    \"overwrite\": false\n  }'\n\n# Get download URL for a build ZIP\ncurl http://yoursite.local/management/downloadBuild/build_20250101_120000 \\\n  -H \"Authorization: Bearer YOUR_TOKEN\""
                             }
                         ]
                     }

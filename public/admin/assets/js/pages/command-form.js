@@ -623,6 +623,7 @@ async function initEnhancedFeatures() {
         case 'getBuild':
         case 'deleteBuild':
         case 'downloadBuild':
+        case 'deployBuild':
             await initBuildSelectForm();
             break;
         case 'clearCommandHistory':
