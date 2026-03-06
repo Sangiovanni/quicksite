@@ -667,10 +667,16 @@
     if (form) {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
-            const formData = new FormData(form);
             const params = {};
-            formData.forEach((value, key) => {
-                if (value) params[key] = value;
+            form.querySelectorAll('input, select, textarea').forEach(input => {
+                if (!input.name) return;
+                // Skip inputs inside hidden conditional groups
+                if (input.closest('.ai-spec-form__group--hidden')) return;
+                if (input.type === 'checkbox') {
+                    params[input.name] = input.checked ? 'true' : 'false';
+                } else if (input.value) {
+                    params[input.name] = input.value;
+                }
             });
             
             if (isManualWorkflow) {

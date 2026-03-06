@@ -782,9 +782,40 @@ class WorkflowManager {
     private function evaluateDataCondition(string $condition, array $userParams): bool {
         // Handle negation
         $negate = false;
-        if (str_starts_with($condition, '!')) {
+        if (str_starts_with($condition, '!') && !str_starts_with($condition, '!=')) {
             $negate = true;
-            $condition = substr($condition, 1);
+            $condition = ltrim(substr($condition, 1));
+        }
+        
+        // Handle comparison operators (e.g., "multilingual === true")
+        if (preg_match('/^([\w.]+)\s*(===?|!==?)\s*(.+)$/', $condition, $matches)) {
+            $paramName = trim($matches[1]);
+            $operator = $matches[2];
+            $rightRaw = trim($matches[3]);
+            
+            // Resolve left side
+            $left = $userParams[$paramName] ?? null;
+            // Normalize boolean-like strings
+            if ($left === 'true' || $left === 'on' || $left === '1') $left = true;
+            if ($left === 'false' || $left === 'off' || $left === '0') $left = false;
+            
+            // Parse right side
+            $right = match($rightRaw) {
+                'true' => true,
+                'false' => false,
+                'null' => null,
+                default => is_numeric($rightRaw) ? (int)$rightRaw : trim($rightRaw, "'\"")
+            };
+            
+            $result = match($operator) {
+                '=', '==' => $left == $right,
+                '===' => $left === $right,
+                '!=' => $left != $right,
+                '!==' => $left !== $right,
+                default => false
+            };
+            
+            return $negate ? !$result : $result;
         }
         
         // Simple param check - just check if param is truthy
@@ -953,7 +984,11 @@ class WorkflowManager {
         // Check for param.xxx
         if (str_starts_with($ref, 'param.')) {
             $key = substr($ref, 6);
-            return $userParams[$key] ?? null;
+            $value = $userParams[$key] ?? null;
+            // Normalize boolean-like strings from URL query parameters
+            if ($value === 'true' || $value === 'on' || $value === '1') return true;
+            if ($value === 'false' || $value === 'off' || $value === '0') return false;
+            return $value;
         }
         
         // Check for data.xxx
