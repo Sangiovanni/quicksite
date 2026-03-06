@@ -501,7 +501,7 @@ code{
     gap: var(--space-sm);
 }
 
-.admin-checkbox {
+input.admin-checkbox {
     width: 18px;
     height: 18px;
     accent-color: var(--admin-accent);

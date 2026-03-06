@@ -886,55 +886,60 @@ function formatBytes(int $bytes, int $precision = 1): string {
 }
 
 /**
- * Make an internal API call using cURL
+ * Execute a management command directly in-process (no HTTP call).
+ * 
+ * Parses endpoint like "listBuilds" or "getTranslation/en" or "getStructure/page/home/showIds"
+ * into command name + URL params, then calls the __command_* function directly.
  */
 function makeInternalApiCall(string $endpoint, string $token): array {
-    $baseUrl = rtrim(BASE_URL, '/');
-    $url = $baseUrl . '/management/' . $endpoint;
+    // Parse endpoint: first segment is the command, rest are URL params
+    $segments = explode('/', trim($endpoint, '/'));
+    $command = array_shift($segments);
+    $urlParams = $segments;
     
-    // For local development, use localhost if BASE_URL is virtual
-    if (strpos($url, 'template.vitrine') !== false) {
-        // Replace with localhost since we're calling from the same server
-        $localUrl = str_replace('http://template.vitrine', 'http://127.0.0.1', $url);
-        // Add Host header
-        $headers = [
-            'Authorization: Bearer ' . $token,
-            'Content-Type: application/json',
-            'Host: template.vitrine'
-        ];
-    } else {
-        $localUrl = $url;
-        $headers = [
-            'Authorization: Bearer ' . $token,
-            'Content-Type: application/json'
-        ];
+    // Validate command exists in routes
+    if (!defined('ROUTES_MANAGEMENT_PATH')) {
+        define('ROUTES_MANAGEMENT_PATH', SERVER_ROOT . '/' . SECURE_FOLDER_NAME . '/management/routes.php');
+    }
+    if (!defined('ROUTES_MANAGEMENT')) {
+        define('ROUTES_MANAGEMENT', require ROUTES_MANAGEMENT_PATH);
     }
     
-    $ch = curl_init();
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $localUrl,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_TIMEOUT => 10,
-        CURLOPT_FOLLOWLOCATION => true
-    ]);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
-    
-    if ($error) {
-        return ['success' => false, 'error' => 'Network error: ' . $error];
+    if (!in_array($command, ROUTES_MANAGEMENT)) {
+        return ['success' => false, 'error' => "Command not found: {$command}"];
     }
     
-    $data = json_decode($response, true);
-    
-    if ($httpCode >= 200 && $httpCode < 300) {
-        return ['success' => true, 'data' => $data['data'] ?? $data];
+    // Load command file with COMMAND_INTERNAL_CALL to prevent auto-execution
+    if (!defined('COMMAND_INTERNAL_CALL')) {
+        define('COMMAND_INTERNAL_CALL', true);
     }
     
-    return ['success' => false, 'error' => $data['message'] ?? 'API error'];
+    $commandFile = SECURE_FOLDER_PATH . '/management/command/' . $command . '.php';
+    if (!file_exists($commandFile)) {
+        return ['success' => false, 'error' => "Command file not found: {$command}"];
+    }
+    
+    require_once $commandFile;
+    
+    $functionName = '__command_' . $command;
+    if (!function_exists($functionName)) {
+        return ['success' => false, 'error' => "Command function not found: {$functionName}"];
+    }
+    
+    try {
+        /** @var ApiResponse $response */
+        $response = $functionName([], $urlParams);
+        $status = $response->getStatus();
+        $data = $response->getData();
+        
+        if ($status >= 200 && $status < 300) {
+            return ['success' => true, 'data' => $data ?? []];
+        }
+        
+        return ['success' => false, 'error' => $response->toArray()['message'] ?? 'Command error'];
+    } catch (\Throwable $e) {
+        return ['success' => false, 'error' => 'Command execution error: ' . $e->getMessage()];
+    }
 }
 
 /**

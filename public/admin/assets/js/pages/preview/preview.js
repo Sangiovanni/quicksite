@@ -3139,9 +3139,9 @@
                 return;
             }
             
-            // Check if already injected
-            if (iframeDoc.getElementById('quicksite-overlay-styles')) {
-                console.log('[Preview] Overlay styles found, marking as injected');
+            // Check if script is already alive (has event listeners)
+            if (iframeDoc.getElementById('quicksite-overlay-script') && iframeDoc.getElementById('quicksite-overlay-styles')) {
+                console.log('[Preview] Overlay already present in DOM, marking as injected');
                 overlayInjected = true;
                 return;
             }
@@ -3604,11 +3604,12 @@
     iframe.addEventListener('load', function() {
         clearTimeout(loadingTimeout);
         hideLoading();
-        // Inject overlay immediately and with a backup timeout
+        // A new document loaded — previous overlay is gone regardless of flag
+        overlayInjected = false;
         injectOverlay();
         // Retry injection in case document wasn't fully ready
-        setTimeout(injectOverlay, 50);
-        setTimeout(injectOverlay, 200);
+        setTimeout(function() { if (!overlayInjected) injectOverlay(); }, 50);
+        setTimeout(function() { if (!overlayInjected) injectOverlay(); }, 200);
     });
     
     targetSelect.addEventListener('change', function() {
@@ -6226,16 +6227,12 @@
     
     // Try to inject overlay immediately if iframe is already loaded
     // (handles case where script runs after iframe load event)
+    // Guard: skip about:blank / empty documents — the load event will handle the real page
     if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
-        console.log('[Preview] Iframe already loaded, injecting overlay');
-        injectOverlay();
-    }
-    
-    // Also try after a short delay (handles race conditions)
-    setTimeout(function() {
-        if (!overlayInjected) {
-            console.log('[Preview] Delayed injection attempt');
+        const loc = iframe.contentWindow?.location?.href || '';
+        if (loc && loc !== 'about:blank' && loc !== '') {
+            console.log('[Preview] Iframe already loaded, injecting overlay');
             injectOverlay();
         }
-    }, 300);
+    }
 })();

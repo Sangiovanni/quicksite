@@ -154,6 +154,12 @@
             "confirm_delete_backup": "Supprimer la sauvegarde",
             "delete": "Supprimer",
             "confirmDelete": "Êtes-vous sûr de vouloir supprimer ce projet ? Cette action est irréversible.",
+            "createTitle": "Créer un nouveau projet",
+            "nameLabel": "Nom du projet",
+            "nameHelp": "Minuscules, chiffres et tirets uniquement",
+            "nameRequired": "Le nom du projet est requis",
+            "activateAfterCreate": "Activer ce projet après la création",
+            "createBtn": "Créer le projet",
             "createModal": {
                 "title": "Créer un nouveau projet",
                 "name": "Nom du projet",
