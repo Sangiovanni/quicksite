@@ -154,8 +154,9 @@
             "title": "Storage Overview",
             "projects": "Projects",
             "backups": "Backups",
+            "exports": "Exports",
             "admin": "Admin",
-            "other": "Other"
+            "system": "System"
         },
         "structure": {
             "title": "Structure Overview",

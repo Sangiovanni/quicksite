@@ -313,6 +313,9 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
                + $publicRootFilesSize
                + $secureRootFilesSize;
     
+    // Exports: secure/exports (zip archives)
+    $exportsSpace = $secureFolders['exports']['size'];
+    
     // Total backups across all projects
     $totalBackupsSize = 0;
     foreach ($projectsData['projects'] as $project) {
@@ -340,6 +343,11 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
                 'size' => $totalBackupsSize,
                 'size_formatted' => sizeinfo_formatSize($totalBackupsSize),
                 'description' => 'All project backups'
+            ],
+            'exports' => [
+                'size' => $exportsSpace,
+                'size_formatted' => sizeinfo_formatSize($exportsSpace),
+                'description' => 'Export ZIP archives'
             ],
             'admin' => [
                 'size' => $adminSpace,

@@ -33,8 +33,9 @@ $baseUrl = rtrim(BASE_URL, '/');
         <div class="storage-overview__bar" id="storage-bar">
             <div class="storage-overview__segment storage-overview__segment--projects" id="storage-seg-projects" style="width: 0%"></div>
             <div class="storage-overview__segment storage-overview__segment--backups" id="storage-seg-backups" style="width: 0%"></div>
+            <div class="storage-overview__segment storage-overview__segment--exports" id="storage-seg-exports" style="width: 0%"></div>
             <div class="storage-overview__segment storage-overview__segment--admin" id="storage-seg-admin" style="width: 0%"></div>
-            <div class="storage-overview__segment storage-overview__segment--other" id="storage-seg-other" style="width: 0%"></div>
+            <div class="storage-overview__segment storage-overview__segment--system" id="storage-seg-system" style="width: 0%"></div>
         </div>
         <div class="storage-overview__legend">
             <div class="storage-overview__legend-item">
@@ -48,14 +49,19 @@ $baseUrl = rtrim(BASE_URL, '/');
                 <span class="storage-overview__legend-value" id="storage-val-backups">--</span>
             </div>
             <div class="storage-overview__legend-item">
+                <span class="storage-overview__legend-color storage-overview__legend-color--exports"></span>
+                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.exports') ?></span>
+                <span class="storage-overview__legend-value" id="storage-val-exports">--</span>
+            </div>
+            <div class="storage-overview__legend-item">
                 <span class="storage-overview__legend-color storage-overview__legend-color--admin"></span>
                 <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.admin') ?></span>
                 <span class="storage-overview__legend-value" id="storage-val-admin">--</span>
             </div>
             <div class="storage-overview__legend-item">
-                <span class="storage-overview__legend-color storage-overview__legend-color--other"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.other') ?></span>
-                <span class="storage-overview__legend-value" id="storage-val-other">--</span>
+                <span class="storage-overview__legend-color storage-overview__legend-color--system"></span>
+                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.system') ?></span>
+                <span class="storage-overview__legend-value" id="storage-val-system">--</span>
             </div>
         </div>
     </div>

@@ -467,14 +467,15 @@
                 document.getElementById('storage-total').textContent = summary.total?.size_formatted || '--';
                 
                 const totalBytes = summary.total?.size || 1;
-                const categories = ['projects', 'backups', 'admin', 'other'];
+                const categories = ['projects', 'backups', 'exports', 'admin', 'system'];
                 
-                const otherBytes = (byCategory.management?.size || 0) + (byCategory.core?.size || 0);
+                const systemBytes = (byCategory.management?.size || 0) + (byCategory.core?.size || 0);
                 const sizes = {
                     projects: byCategory.projects?.size || 0,
                     backups: byCategory.backups?.size || 0,
+                    exports: byCategory.exports?.size || 0,
                     admin: byCategory.admin?.size || 0,
-                    other: otherBytes
+                    system: systemBytes
                 };
                 
                 categories.forEach(cat => {

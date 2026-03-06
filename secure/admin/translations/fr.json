@@ -98,8 +98,9 @@
             "title": "Aperçu du stockage",
             "projects": "Projets",
             "backups": "Sauvegardes",
+            "exports": "Exports",
             "admin": "Admin",
-            "other": "Autre"
+            "system": "Système"
         },
         "structure": {
             "title": "Aperçu de la Structure",

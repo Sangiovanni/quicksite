@@ -2718,7 +2718,11 @@ kbd {
     background: var(--admin-warning, #f59e0b);
 }
 
-.storage-overview__segment--other {
+.storage-overview__segment--exports {
+    background: var(--admin-info, #8b5cf6);
+}
+
+.storage-overview__segment--system {
     background: var(--admin-text-muted, #6b7280);
 }
 
@@ -2753,7 +2757,11 @@ kbd {
     background: var(--admin-warning, #f59e0b);
 }
 
-.storage-overview__legend-color--other {
+.storage-overview__legend-color--exports {
+    background: var(--admin-info, #8b5cf6);
+}
+
+.storage-overview__legend-color--system {
     background: var(--admin-text-muted, #6b7280);
 }
 
