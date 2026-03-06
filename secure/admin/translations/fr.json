@@ -98,9 +98,18 @@
             "title": "Aperçu du stockage",
             "projects": "Projets",
             "backups": "Sauvegardes",
+            "builds": "Builds",
             "exports": "Exports",
             "admin": "Admin",
-            "system": "Système"
+            "system": "Système",
+            "manageSpace": "Gérer l'espace",
+            "noItems": "Aucun élément",
+            "deleted": "Supprimé",
+            "confirmDelete": "Supprimer cet élément ?",
+            "exportFiles": "fichier(s) d'export",
+            "clearAll": "Tout supprimer",
+            "confirmClearExports": "Supprimer tous les fichiers d'export ?",
+            "exportsCleared": "Exports supprimés"
         },
         "structure": {
             "title": "Aperçu de la Structure",

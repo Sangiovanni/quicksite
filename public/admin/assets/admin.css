@@ -2726,6 +2726,10 @@ kbd {
     background: var(--admin-text-muted, #6b7280);
 }
 
+.storage-overview__segment--builds {
+    background: #ef4444;
+}
+
 .storage-overview__legend {
     display: flex;
     flex-wrap: wrap;
@@ -2765,6 +2769,10 @@ kbd {
     background: var(--admin-text-muted, #6b7280);
 }
 
+.storage-overview__legend-color--builds {
+    background: #ef4444;
+}
+
 .storage-overview__legend-label {
     font-size: var(--font-size-sm);
     color: var(--admin-text-muted);
@@ -2774,6 +2782,182 @@ kbd {
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-semibold);
     color: var(--admin-text);
+}
+
+/* Manage Space */
+.manage-space {
+    margin-top: var(--space-lg);
+    border-top: 1px solid var(--admin-border);
+}
+
+.manage-space__toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    width: 100%;
+    padding: var(--space-sm) 0;
+    background: none;
+    border: none;
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.manage-space__toggle:hover {
+    color: var(--admin-text);
+}
+
+.manage-space__chevron {
+    margin-left: auto;
+    transition: transform 0.2s;
+}
+
+.manage-space__toggle--open .manage-space__chevron {
+    transform: rotate(180deg);
+}
+
+.manage-space__body {
+    padding-bottom: var(--space-md);
+}
+
+.manage-space__section {
+    margin-bottom: var(--space-lg);
+}
+
+.manage-space__section:last-child {
+    margin-bottom: 0;
+}
+
+.manage-space__section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-xs) 0;
+    margin-bottom: var(--space-xs);
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.manage-space__section-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--admin-text);
+}
+
+.manage-space__section-count {
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+    background: var(--admin-bg-tertiary);
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+}
+
+.manage-space__list {
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.manage-space__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-xs) var(--space-sm);
+    border-bottom: 1px solid var(--admin-border-light, var(--admin-border));
+    gap: var(--space-sm);
+}
+
+.manage-space__item:last-child {
+    border-bottom: none;
+}
+
+.manage-space__item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.manage-space__item-name {
+    font-size: var(--font-size-sm);
+    color: var(--admin-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.manage-space__item-meta {
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+}
+
+.manage-space__item-badge {
+    font-size: 10px;
+    background: var(--admin-bg-tertiary);
+    color: var(--admin-text-muted);
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+    vertical-align: middle;
+}
+
+.manage-space__delete-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--admin-text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.manage-space__delete-btn:hover {
+    color: var(--admin-danger, #ef4444);
+    border-color: var(--admin-danger, #ef4444);
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.manage-space__delete-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.manage-space__clear-btn {
+    flex-shrink: 0;
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    color: var(--admin-danger, #ef4444);
+    background: none;
+    border: 1px solid var(--admin-danger, #ef4444);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.manage-space__clear-btn:hover {
+    background: var(--admin-danger, #ef4444);
+    color: #fff;
+}
+
+.manage-space__clear-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.manage-space__empty,
+.manage-space__loading {
+    padding: var(--space-md);
+    text-align: center;
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
 }
 
 /* Responsive project manager */

@@ -292,11 +292,13 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
     // SUMMARY BY CATEGORY
     // ========================================
     
-    // Project-related: public/assets + public/style + public/build + secure/projects
+    // Project-related: public/assets + public/style + secure/projects (without builds)
     $projectSpace = $publicFolders['assets']['size'] 
                   + $publicFolders['style']['size'] 
-                  + $publicFolders['build']['size']
                   + $projectsData['total']['size'];
+    
+    // Builds: public/build (production deployments)
+    $buildsSpace = $publicFolders['build']['size'];
     
     // Admin-related: public/admin + secure/admin
     $adminSpace = $publicFolders['admin']['size'] 
@@ -343,6 +345,11 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
                 'size' => $totalBackupsSize,
                 'size_formatted' => sizeinfo_formatSize($totalBackupsSize),
                 'description' => 'All project backups'
+            ],
+            'builds' => [
+                'size' => $buildsSpace,
+                'size_formatted' => sizeinfo_formatSize($buildsSpace),
+                'description' => 'Production builds'
             ],
             'exports' => [
                 'size' => $exportsSpace,

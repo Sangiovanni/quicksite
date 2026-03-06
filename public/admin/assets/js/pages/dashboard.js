@@ -467,12 +467,13 @@
                 document.getElementById('storage-total').textContent = summary.total?.size_formatted || '--';
                 
                 const totalBytes = summary.total?.size || 1;
-                const categories = ['projects', 'backups', 'exports', 'admin', 'system'];
+                const categories = ['projects', 'backups', 'builds', 'exports', 'admin', 'system'];
                 
                 const systemBytes = (byCategory.management?.size || 0) + (byCategory.core?.size || 0);
                 const sizes = {
                     projects: byCategory.projects?.size || 0,
                     backups: byCategory.backups?.size || 0,
+                    builds: byCategory.builds?.size || 0,
                     exports: byCategory.exports?.size || 0,
                     admin: byCategory.admin?.size || 0,
                     system: systemBytes
@@ -497,6 +498,215 @@
             }
         } catch (error) {
             console.error('Failed to load storage info:', error);
+        }
+    }
+
+    // ========================================================================
+    // Manage Space
+    // ========================================================================
+
+    let manageSpaceLoaded = false;
+
+    function setupManageSpace() {
+        const toggle = document.getElementById('manage-space-toggle');
+        const body = document.getElementById('manage-space-body');
+        if (!toggle || !body) return;
+
+        toggle.addEventListener('click', () => {
+            const isOpen = body.style.display !== 'none';
+            body.style.display = isOpen ? 'none' : 'block';
+            toggle.classList.toggle('manage-space__toggle--open', !isOpen);
+            if (!isOpen && !manageSpaceLoaded) {
+                manageSpaceLoaded = true;
+                loadManageSpaceBuilds();
+                loadManageSpaceExports();
+                loadManageSpaceBackups();
+            }
+        });
+    }
+
+    async function loadManageSpaceBuilds() {
+        const list = document.getElementById('manage-builds-list');
+        const count = document.getElementById('manage-builds-count');
+        if (!list) return;
+
+        list.innerHTML = '<div class="manage-space__loading">' + t('common.loading', 'Loading...') + '</div>';
+
+        try {
+            const result = await QuickSiteAdmin.apiRequest('listBuilds');
+            const builds = result.data?.data?.builds || [];
+            count.textContent = builds.length;
+
+            if (builds.length === 0) {
+                list.innerHTML = '<div class="manage-space__empty">' + t('dashboard.storage.noItems', 'No items') + '</div>';
+                return;
+            }
+
+            list.innerHTML = builds.map(b => {
+                const sizeMb = (b.folder_size_mb || 0) + (b.zip_size_mb || 0);
+                const sizeStr = sizeMb < 1 ? (sizeMb * 1024).toFixed(0) + ' KB' : sizeMb.toFixed(2) + ' MB';
+                const date = b.created ? new Date(b.created).toLocaleDateString() : '--';
+                return `<div class="manage-space__item" data-build="${QuickSiteAdmin.escapeHtml(b.name)}">
+                    <div class="manage-space__item-info">
+                        <span class="manage-space__item-name">${QuickSiteAdmin.escapeHtml(b.name)}</span>
+                        <span class="manage-space__item-meta">${date} · ${sizeStr}</span>
+                    </div>
+                    <button type="button" class="manage-space__delete-btn" title="${t('common.delete', 'Delete')}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </button>
+                </div>`;
+            }).join('');
+
+            list.querySelectorAll('.manage-space__delete-btn').forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const item = this.closest('.manage-space__item');
+                    const name = item.dataset.build;
+                    if (!confirm(t('dashboard.storage.confirmDelete', 'Delete this item?') + '\n' + name)) return;
+                    this.disabled = true;
+                    try {
+                        const res = await QuickSiteAdmin.apiRequest('deleteBuild', 'POST', { name });
+                        if (res.ok) {
+                            item.remove();
+                            const remaining = list.querySelectorAll('.manage-space__item').length;
+                            count.textContent = remaining;
+                            if (remaining === 0) {
+                                list.innerHTML = '<div class="manage-space__empty">' + t('dashboard.storage.noItems', 'No items') + '</div>';
+                            }
+                            loadStorageOverview();
+                            QuickSiteAdmin.showToast(t('dashboard.storage.deleted', 'Deleted') + ': ' + name, 'success');
+                        } else {
+                            QuickSiteAdmin.showToast(res.data?.message || 'Delete failed', 'error');
+                            this.disabled = false;
+                        }
+                    } catch (e) {
+                        QuickSiteAdmin.showToast('Delete failed', 'error');
+                        this.disabled = false;
+                    }
+                });
+            });
+        } catch (error) {
+            list.innerHTML = '<div class="manage-space__empty">' + t('common.error', 'Error loading data') + '</div>';
+        }
+    }
+
+    async function loadManageSpaceExports() {
+        const list = document.getElementById('manage-exports-list');
+        const count = document.getElementById('manage-exports-count');
+        if (!list) return;
+
+        list.innerHTML = '<div class="manage-space__loading">' + t('common.loading', 'Loading...') + '</div>';
+
+        try {
+            const result = await QuickSiteAdmin.apiRequest('getSizeInfo');
+            const exports = result.data?.data?.secure_folders?.exports || {};
+            const totalBytes = exports.size || 0;
+            const fileCount = exports.files || 0;
+            count.textContent = fileCount;
+
+            if (fileCount === 0) {
+                list.innerHTML = '<div class="manage-space__empty">' + t('dashboard.storage.noItems', 'No items') + '</div>';
+                return;
+            }
+
+            list.innerHTML = `<div class="manage-space__item manage-space__item--summary">
+                <div class="manage-space__item-info">
+                    <span class="manage-space__item-name">${fileCount} ${t('dashboard.storage.exportFiles', 'export file(s)')}</span>
+                    <span class="manage-space__item-meta">${formatSize(totalBytes)}</span>
+                </div>
+                <button type="button" class="manage-space__clear-btn" id="clear-exports-btn">
+                    ${t('dashboard.storage.clearAll', 'Clear All')}
+                </button>
+            </div>`;
+
+            document.getElementById('clear-exports-btn').addEventListener('click', async function() {
+                if (!confirm(t('dashboard.storage.confirmClearExports', 'Clear all export files?'))) return;
+                this.disabled = true;
+                try {
+                    const res = await QuickSiteAdmin.apiRequest('clearExports', 'POST', { confirm: true });
+                    if (res.ok) {
+                        count.textContent = '0';
+                        list.innerHTML = '<div class="manage-space__empty">' + t('dashboard.storage.noItems', 'No items') + '</div>';
+                        loadStorageOverview();
+                        QuickSiteAdmin.showToast(t('dashboard.storage.exportsCleared', 'Exports cleared'), 'success');
+                    } else {
+                        QuickSiteAdmin.showToast(res.data?.message || 'Clear failed', 'error');
+                        this.disabled = false;
+                    }
+                } catch (e) {
+                    QuickSiteAdmin.showToast('Clear failed', 'error');
+                    this.disabled = false;
+                }
+            });
+        } catch (error) {
+            list.innerHTML = '<div class="manage-space__empty">' + t('common.error', 'Error loading data') + '</div>';
+        }
+    }
+
+    async function loadManageSpaceBackups() {
+        const list = document.getElementById('manage-backups-list');
+        const count = document.getElementById('manage-backups-count');
+        if (!list) return;
+
+        list.innerHTML = '<div class="manage-space__loading">' + t('common.loading', 'Loading...') + '</div>';
+
+        try {
+            const result = await QuickSiteAdmin.apiRequest('listBackups');
+            const backups = result.data?.data?.backups || [];
+            count.textContent = backups.length;
+
+            if (backups.length === 0) {
+                list.innerHTML = '<div class="manage-space__empty">' + t('dashboard.storage.noItems', 'No items') + '</div>';
+                return;
+            }
+
+            list.innerHTML = backups.map(b => {
+                const date = b.created_relative || b.created_formatted || '--';
+                const size = b.size_formatted || '--';
+                const typeLabel = b.type !== 'manual' ? ` <span class="manage-space__item-badge">${QuickSiteAdmin.escapeHtml(b.type)}</span>` : '';
+                return `<div class="manage-space__item" data-backup="${QuickSiteAdmin.escapeHtml(b.name)}">
+                    <div class="manage-space__item-info">
+                        <span class="manage-space__item-name">${QuickSiteAdmin.escapeHtml(b.name)}${typeLabel}</span>
+                        <span class="manage-space__item-meta">${date} · ${size}</span>
+                    </div>
+                    <button type="button" class="manage-space__delete-btn" title="${t('common.delete', 'Delete')}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </button>
+                </div>`;
+            }).join('');
+
+            list.querySelectorAll('.manage-space__delete-btn').forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const item = this.closest('.manage-space__item');
+                    const name = item.dataset.backup;
+                    if (!confirm(t('dashboard.storage.confirmDelete', 'Delete this item?') + '\n' + name)) return;
+                    this.disabled = true;
+                    try {
+                        const res = await QuickSiteAdmin.apiRequest('deleteBackup', 'DELETE', { backup: name });
+                        if (res.ok) {
+                            item.remove();
+                            const remaining = list.querySelectorAll('.manage-space__item').length;
+                            count.textContent = remaining;
+                            if (remaining === 0) {
+                                list.innerHTML = '<div class="manage-space__empty">' + t('dashboard.storage.noItems', 'No items') + '</div>';
+                            }
+                            loadStorageOverview();
+                            QuickSiteAdmin.showToast(t('dashboard.storage.deleted', 'Deleted') + ': ' + name, 'success');
+                        } else {
+                            QuickSiteAdmin.showToast(res.data?.message || 'Delete failed', 'error');
+                            this.disabled = false;
+                        }
+                    } catch (e) {
+                        QuickSiteAdmin.showToast('Delete failed', 'error');
+                        this.disabled = false;
+                    }
+                });
+            });
+        } catch (error) {
+            list.innerHTML = '<div class="manage-space__empty">' + t('common.error', 'Error loading data') + '</div>';
         }
     }
 
@@ -1212,6 +1422,9 @@
         
         // Setup project manager event listeners
         setupProjectManagerEvents();
+        
+        // Setup manage space toggle
+        setupManageSpace();
         
         // Setup structure panel (collapsible)
         setupStructurePanel();

@@ -33,6 +33,7 @@ $baseUrl = rtrim(BASE_URL, '/');
         <div class="storage-overview__bar" id="storage-bar">
             <div class="storage-overview__segment storage-overview__segment--projects" id="storage-seg-projects" style="width: 0%"></div>
             <div class="storage-overview__segment storage-overview__segment--backups" id="storage-seg-backups" style="width: 0%"></div>
+            <div class="storage-overview__segment storage-overview__segment--builds" id="storage-seg-builds" style="width: 0%"></div>
             <div class="storage-overview__segment storage-overview__segment--exports" id="storage-seg-exports" style="width: 0%"></div>
             <div class="storage-overview__segment storage-overview__segment--admin" id="storage-seg-admin" style="width: 0%"></div>
             <div class="storage-overview__segment storage-overview__segment--system" id="storage-seg-system" style="width: 0%"></div>
@@ -49,6 +50,11 @@ $baseUrl = rtrim(BASE_URL, '/');
                 <span class="storage-overview__legend-value" id="storage-val-backups">--</span>
             </div>
             <div class="storage-overview__legend-item">
+                <span class="storage-overview__legend-color storage-overview__legend-color--builds"></span>
+                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.builds') ?></span>
+                <span class="storage-overview__legend-value" id="storage-val-builds">--</span>
+            </div>
+            <div class="storage-overview__legend-item">
                 <span class="storage-overview__legend-color storage-overview__legend-color--exports"></span>
                 <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.exports') ?></span>
                 <span class="storage-overview__legend-value" id="storage-val-exports">--</span>
@@ -62,6 +68,51 @@ $baseUrl = rtrim(BASE_URL, '/');
                 <span class="storage-overview__legend-color storage-overview__legend-color--system"></span>
                 <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.system') ?></span>
                 <span class="storage-overview__legend-value" id="storage-val-system">--</span>
+            </div>
+        </div>
+
+        <!-- Manage Space -->
+        <div class="manage-space" id="manage-space">
+            <button type="button" class="manage-space__toggle" id="manage-space-toggle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+                <?= __admin('dashboard.storage.manageSpace', 'Manage Space') ?>
+                <svg class="manage-space__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </button>
+            <div class="manage-space__body" id="manage-space-body" style="display: none;">
+                <div class="manage-space__section" id="manage-space-builds">
+                    <div class="manage-space__section-header">
+                        <span class="manage-space__section-title">
+                            <span class="storage-overview__legend-color storage-overview__legend-color--builds"></span>
+                            <?= __admin('dashboard.storage.builds', 'Builds') ?>
+                        </span>
+                        <span class="manage-space__section-count" id="manage-builds-count">--</span>
+                    </div>
+                    <div class="manage-space__list" id="manage-builds-list"></div>
+                </div>
+                <div class="manage-space__section" id="manage-space-exports">
+                    <div class="manage-space__section-header">
+                        <span class="manage-space__section-title">
+                            <span class="storage-overview__legend-color storage-overview__legend-color--exports"></span>
+                            <?= __admin('dashboard.storage.exports', 'Exports') ?>
+                        </span>
+                        <span class="manage-space__section-count" id="manage-exports-count">--</span>
+                    </div>
+                    <div class="manage-space__list" id="manage-exports-list"></div>
+                </div>
+                <div class="manage-space__section" id="manage-space-backups">
+                    <div class="manage-space__section-header">
+                        <span class="manage-space__section-title">
+                            <span class="storage-overview__legend-color storage-overview__legend-color--backups"></span>
+                            <?= __admin('dashboard.storage.backups', 'Backups') ?>
+                        </span>
+                        <span class="manage-space__section-count" id="manage-backups-count">--</span>
+                    </div>
+                    <div class="manage-space__list" id="manage-backups-list"></div>
+                </div>
             </div>
         </div>
     </div>

@@ -154,9 +154,18 @@
             "title": "Storage Overview",
             "projects": "Projects",
             "backups": "Backups",
+            "builds": "Builds",
             "exports": "Exports",
             "admin": "Admin",
-            "system": "System"
+            "system": "System",
+            "manageSpace": "Manage Space",
+            "noItems": "No items",
+            "deleted": "Deleted",
+            "confirmDelete": "Delete this item?",
+            "exportFiles": "export file(s)",
+            "clearAll": "Clear All",
+            "confirmClearExports": "Clear all export files?",
+            "exportsCleared": "Exports cleared"
         },
         "structure": {
             "title": "Structure Overview",
