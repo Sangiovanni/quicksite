@@ -2952,6 +2952,19 @@ kbd {
     cursor: not-allowed;
 }
 
+.manage-space__project-label {
+    font-weight: var(--font-weight-normal);
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-xs);
+}
+
+.manage-space__tip {
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+    font-style: italic;
+    padding: var(--space-xs) 0;
+}
+
 .manage-space__empty,
 .manage-space__loading {
     padding: var(--space-md);

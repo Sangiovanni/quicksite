@@ -165,7 +165,8 @@
             "exportFiles": "export file(s)",
             "clearAll": "Clear All",
             "confirmClearExports": "Clear all export files?",
-            "exportsCleared": "Exports cleared"
+            "exportsCleared": "Exports cleared",
+            "backupsTip": "Switch project to manage other projects\u2019 backups."
         },
         "structure": {
             "title": "Structure Overview",

@@ -108,9 +108,11 @@ $baseUrl = rtrim(BASE_URL, '/');
                         <span class="manage-space__section-title">
                             <span class="storage-overview__legend-color storage-overview__legend-color--backups"></span>
                             <?= __admin('dashboard.storage.backups', 'Backups') ?>
+                            <span class="manage-space__project-label" id="manage-backups-project"></span>
                         </span>
                         <span class="manage-space__section-count" id="manage-backups-count">--</span>
                     </div>
+                    <div class="manage-space__tip" id="manage-backups-tip"></div>
                     <div class="manage-space__list" id="manage-backups-list"></div>
                 </div>
             </div>

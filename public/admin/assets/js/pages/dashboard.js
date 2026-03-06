@@ -647,7 +647,16 @@
     async function loadManageSpaceBackups() {
         const list = document.getElementById('manage-backups-list');
         const count = document.getElementById('manage-backups-count');
+        const projectLabel = document.getElementById('manage-backups-project');
+        const tip = document.getElementById('manage-backups-tip');
         if (!list) return;
+
+        if (projectLabel && currentProject) {
+            projectLabel.textContent = '(' + currentProject + ')';
+        }
+        if (tip) {
+            tip.textContent = t('dashboard.storage.backupsTip', 'Switch project to manage other projects\u2019 backups.');
+        }
 
         list.innerHTML = '<div class="manage-space__loading">' + t('common.loading', 'Loading...') + '</div>';
 

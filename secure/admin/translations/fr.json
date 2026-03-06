@@ -109,7 +109,8 @@
             "exportFiles": "fichier(s) d'export",
             "clearAll": "Tout supprimer",
             "confirmClearExports": "Supprimer tous les fichiers d'export ?",
-            "exportsCleared": "Exports supprimés"
+            "exportsCleared": "Exports supprimés",
+            "backupsTip": "Changez de projet pour gérer les sauvegardes d\u2019autres projets."
         },
         "structure": {
             "title": "Aperçu de la Structure",
