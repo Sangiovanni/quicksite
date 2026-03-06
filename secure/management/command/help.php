@@ -374,7 +374,7 @@ $GLOBALS['__help_commands'] = [
                 'deployed_paths' => ['public' => 'C:/wamp64/www/prod/www.mysite.com', 'secure' => 'C:/wamp64/www/prod/secure'],
                 'public_deployment' => ['files_copied' => 28, 'directories_created' => 7],
                 'secure_deployment' => ['files_copied' => 18, 'directories_created' => 6],
-                'root_files_copied' => ['LICENSE', 'README.txt', 'build_manifest.json']
+                'license_copied' => true
             ]
         ],
         'error_responses' => [

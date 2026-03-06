@@ -687,41 +687,42 @@ $readme = <<<README
 PRODUCTION BUILD - DEPLOYMENT INSTRUCTIONS
 =======================================================
 
-This build was generated on: %DATE%
+Generated on: %DATE%
 
 FOLDER STRUCTURE:
-- {$buildPublicName}/  -> Deploy to your web root (public_html, www, etc.)
-- {$buildSecureName}/  -> Deploy OUTSIDE web root (one level up from public)
+
+  your-server/
+  ├── {$buildPublicName}/    <-- This IS your web root (document root)
+  └── {$buildSecureName}/    <-- Sibling folder, next to the public one
 
 DEPLOYMENT STEPS:
 
-1. Upload Files:
-   - Upload {$buildPublicName}/ contents to your web root
-   - Upload {$buildSecureName}/ to parent directory of web root
+1. Upload both folders to your server so they sit side by side.
+   Point your web server's document root to the {$buildPublicName}/ folder.
+   Example with a typical hosting layout:
+     /home/user/htdocs/{$buildPublicName}/    <- document root
+     /home/user/htdocs/{$buildSecureName}/    <- private, not web-accessible
 
-2. Update init.php (if needed):
-   - Edit {$buildPublicName}/init.php
-   - Verify SECURE_FOLDER_PATH points to correct location
-
-3. Set Permissions:
+2. Permissions (should already be correct from the build):
    - Directories: 755
    - Files: 644
-   - Ensure PHP can read {$buildSecureName}/ folder
+   - PHP must be able to read {$buildSecureName}/
 
-4. nginx Users Only:
-   nginx does not support .htaccess files. A ready-to-use nginx config
-   snippet is included in this build: {$buildSecureName}/nginx_routes.conf
-   Add this line inside your nginx server { } block:
+3. nginx only — .htaccess is not supported by nginx:
+   A ready-to-use config snippet is included:
+     {$buildSecureName}/nginx_routes.conf
+   Add this inside your server { } block:
      include /path/to/{$buildSecureName}/nginx_routes.conf;
-   Then test and reload: nginx -t && nginx -s reload
+   Then test and reload:
+     nginx -t && nginx -s reload
 
-5. Test:
+4. Test:
    - Visit your domain
-   - Check all pages work
+   - Check all pages load correctly
    - Test language switching (if multilingual)
 
 NOTES:
-- This is a production build (no management API)
+- This is a production build (no management API included)
 - No database required — QuickSite is entirely file-based
 - All pages are pre-compiled for performance
 - Language mode: %LANG_MODE%

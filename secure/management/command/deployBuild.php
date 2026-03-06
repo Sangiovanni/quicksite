@@ -189,25 +189,16 @@ function findConflicts(string $source, string $dest): array {
     return $conflicts;
 }
 
-// Also check root-level files (LICENSE, README.txt, build_manifest.json)
-$rootFiles = ['LICENSE', 'README.txt', 'build_manifest.json'];
-$rootConflicts = [];
-foreach ($rootFiles as $rootFile) {
-    if (file_exists($buildFolder . '/' . $rootFile) && file_exists($targetPath . DIRECTORY_SEPARATOR . $rootFile)) {
-        $rootConflicts[] = $rootFile;
-    }
-}
-
+// Check for file conflicts in public/secure directories
 $publicConflicts = findConflicts($sourcePublic, $destPublic);
 $secureConflicts = findConflicts($sourceSecure, $destSecure);
-$totalConflicts = count($publicConflicts) + count($secureConflicts) + count($rootConflicts);
+$totalConflicts = count($publicConflicts) + count($secureConflicts);
 
 if ($totalConflicts > 0 && !$overwrite) {
     ApiResponse::create(409, 'conflict.files_exist')
         ->withMessage("Found {$totalConflicts} file(s) that would be overwritten")
         ->withData([
             'total_conflicts' => $totalConflicts,
-            'root_conflicts' => $rootConflicts,
             'public_conflicts' => [
                 'folder' => $buildPublicName,
                 'count' => count($publicConflicts),
@@ -376,21 +367,17 @@ if (isset($secureResult['error'])) {
         ->send();
 }
 
-// Copy root-level files (LICENSE, README.txt, build_manifest.json)
-$extraFiles = [];
-foreach ($rootFiles as $rootFile) {
-    $sourceFile = $buildFolder . '/' . $rootFile;
-    $destFile = $targetPath . DIRECTORY_SEPARATOR . $rootFile;
-    if (file_exists($sourceFile)) {
-        $fileExisted = file_exists($destFile);
-        if ($overwrite || !$fileExisted) {
-            if (copy($sourceFile, $destFile)) {
-                if (!$fileExisted) {
-                    $createdFiles[] = $destFile;
-                }
-                $extraFiles[] = $rootFile;
-            }
+// Copy LICENSE to target (always overwrite silently — same license file)
+$licenseCopied = false;
+$licenseSource = $buildFolder . '/LICENSE';
+$licenseDest = $targetPath . DIRECTORY_SEPARATOR . 'LICENSE';
+if (file_exists($licenseSource)) {
+    $fileExisted = file_exists($licenseDest);
+    if (copy($licenseSource, $licenseDest)) {
+        if (!$fileExisted) {
+            $createdFiles[] = $licenseDest;
         }
+        $licenseCopied = true;
     }
 }
 
@@ -419,7 +406,7 @@ ApiResponse::create(200, 'operation.success')
             'files_copied' => $secureResult['files'],
             'directories_created' => $secureResult['directories']
         ],
-        'root_files_copied' => $extraFiles,
+        'license_copied' => $licenseCopied,
         'overwrite_mode' => $overwrite,
         'files_overwritten' => $overwrite ? $totalConflicts : 0
     ])
