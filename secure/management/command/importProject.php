@@ -9,7 +9,7 @@
  * - PHP files in ZIP are skipped (logged as warnings)
  * - config.php rebuilt from validated config.json
  * - routes.php rebuilt from validated routes.json
- * - All page/component PHP rebuilt from JSON using JsonToPhpCompiler
+ * - Page PHP wrappers rebuilt from JSON using JsonToHtmlRenderer (dev mode)
  * 
  * @method POST
  * @route /management/importProject
@@ -24,13 +24,13 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/JsonToPhpCompiler.php';
 
 // Allowed keys in config.json import (security: whitelist only)
 const IMPORT_ALLOWED_CONFIG_KEYS = [
     'SITE_NAME',
     'LANGUAGES_SUPPORTED',
     'LANGUAGE_DEFAULT',
+    'LANGUAGES_NAME',
     'MULTILINGUAL_SUPPORT',
     'TITLE',
     'FAVICON'
@@ -387,7 +387,6 @@ function rebuildPhpFromJson(string $projectPath): array {
         'config_rebuilt' => false,
         'routes_rebuilt' => false,
         'pages_rebuilt' => 0,
-        'components_rebuilt' => 0,
         'menu_rebuilt' => false,
         'footer_rebuilt' => false
     ];
@@ -476,62 +475,31 @@ function rebuildPhpFromJson(string $projectPath): array {
         $stats['routes_rebuilt'] = true;
     }
     
-    // 3. Rebuild page PHP files from JSON structures
-    $compiler = new JsonToPhpCompiler();
+    // 3. Rebuild page PHP files as development wrappers (use JsonToHtmlRenderer)
     $pagesJsonDir = $projectPath . '/templates/model/json/pages';
     
     if (is_dir($pagesJsonDir)) {
-        $result = rebuildPagesFromJson($pagesJsonDir, $projectPath . '/templates/pages', $compiler, $stats);
+        $result = rebuildPageWrappers($pagesJsonDir, $projectPath . '/templates/pages', $stats);
         if (!$result['success']) {
             return $result;
         }
     }
     
-    // 4. Rebuild component PHP files from JSON structures
-    $componentsJsonDir = $projectPath . '/templates/model/json/components';
-    
-    if (is_dir($componentsJsonDir)) {
-        $result = rebuildComponentsFromJson($componentsJsonDir, $projectPath . '/templates/components', $compiler, $stats);
-        if (!$result['success']) {
-            return $result;
-        }
-    }
-    
-    // 5. Rebuild menu.php from menu.json
-    $menuJsonPath = $projectPath . '/templates/model/json/menu.json';
-    if (file_exists($menuJsonPath)) {
-        $menuJson = json_decode(file_get_contents($menuJsonPath), true);
-        if ($menuJson !== null) {
-            $menuPhp = $compiler->compileMenuOrFooter($menuJson);
-            file_put_contents($projectPath . '/templates/menu.php', $menuPhp);
-            $stats['menu_rebuilt'] = true;
-        }
-    }
-    
-    // 6. Rebuild footer.php from footer.json
-    $footerJsonPath = $projectPath . '/templates/model/json/footer.json';
-    if (file_exists($footerJsonPath)) {
-        $footerJson = json_decode(file_get_contents($footerJsonPath), true);
-        if ($footerJson !== null) {
-            $footerPhp = $compiler->compileMenuOrFooter($footerJson);
-            file_put_contents($projectPath . '/templates/footer.php', $footerPhp);
-            $stats['footer_rebuilt'] = true;
-        }
-    }
+    // Menu, footer, and components don't need compiled PHP in development mode.
+    // JsonToHtmlRenderer handles them dynamically from JSON at runtime.
+    $stats['menu_rebuilt'] = true;
+    $stats['footer_rebuilt'] = true;
     
     return ['success' => true, 'stats' => $stats];
 }
 
 /**
- * Rebuild page PHP files from JSON directory (recursive for nested routes)
- * 
- * JSON structure: pages/home/home.json OR pages/404.json
- * PHP structure:  pages/home/home.php, pages/404/404.php
- * 
- * Rule: If JSON is in folder matching its name (home/home.json), create same structure
- *       If JSON is at root (404.json), create folder (404/404.php)
+ * Generate development page wrapper PHP files.
+ * Each page gets a thin wrapper that delegates rendering to JsonToHtmlRenderer,
+ * which reads the JSON structure at runtime and adds data-qs-* attributes
+ * needed by the visual editor.
  */
-function rebuildPagesFromJson(string $jsonDir, string $phpDir, JsonToPhpCompiler $compiler, array &$stats, string $prefix = ''): array {
+function rebuildPageWrappers(string $jsonDir, string $phpDir, array &$stats, string $prefix = ''): array {
     $items = scandir($jsonDir);
     
     foreach ($items as $item) {
@@ -542,60 +510,37 @@ function rebuildPagesFromJson(string $jsonDir, string $phpDir, JsonToPhpCompiler
         $jsonPath = $jsonDir . '/' . $item;
         
         if (is_dir($jsonPath)) {
-            // It's a directory - check if it contains a JSON file with same name
             $expectedJsonFile = $item . '.json';
             $hasMatchingJson = file_exists($jsonPath . '/' . $expectedJsonFile);
-            
-            // Calculate current route
             $currentRoute = $prefix ? $prefix . '/' . $item : $item;
             
-            // Create matching PHP directory
             $subPhpDir = $phpDir . '/' . $item;
             @mkdir($subPhpDir, 0755, true);
             
-            // If this folder has a matching JSON file, compile it
             if ($hasMatchingJson) {
-                $pageJsonFile = $jsonPath . '/' . $expectedJsonFile;
-                $pageJson = json_decode(file_get_contents($pageJsonFile), true);
-                if ($pageJson !== null) {
-                    $pagePhp = $compiler->compilePage($pageJson, $currentRoute);
-                    $phpPath = $subPhpDir . '/' . $item . '.php';
-                    
-                    if (file_put_contents($phpPath, $pagePhp) === false) {
-                        return ['success' => false, 'error' => "Failed to write: $item.php at $phpPath"];
-                    }
-                    $stats['pages_rebuilt']++;
+                $phpPath = $subPhpDir . '/' . $item . '.php';
+                if (file_put_contents($phpPath, generatePageWrapper($currentRoute, $item)) === false) {
+                    return ['success' => false, 'error' => "Failed to write: $item.php at $phpPath"];
                 }
+                $stats['pages_rebuilt']++;
             }
             
-            // Recurse for nested routes (but skip the already-processed matching JSON)
-            $result = rebuildPagesFromJsonSubdir($jsonPath, $subPhpDir, $compiler, $stats, $currentRoute, $expectedJsonFile);
+            // Recurse for nested routes
+            $result = rebuildPageWrappers($jsonPath, $subPhpDir, $stats, $currentRoute);
             if (!$result['success']) {
                 return $result;
             }
         } elseif (pathinfo($item, PATHINFO_EXTENSION) === 'json') {
-            // It's a JSON file at this level (not in a matching folder)
-            // Example: pages/404.json → pages/404/404.php
-            
             $routeName = pathinfo($item, PATHINFO_FILENAME);
             $currentRoute = $prefix ? $prefix . '/' . $routeName : $routeName;
             
-            $pageJson = json_decode(file_get_contents($jsonPath), true);
-            if ($pageJson === null) {
-                return ['success' => false, 'error' => "Invalid JSON in: $currentRoute.json"];
-            }
-            
-            $pagePhp = $compiler->compilePage($pageJson, $currentRoute);
-            
-            // Create folder for this page
             $pageDir = $phpDir . '/' . $routeName;
             @mkdir($pageDir, 0755, true);
             
             $phpPath = $pageDir . '/' . $routeName . '.php';
-            if (file_put_contents($phpPath, $pagePhp) === false) {
+            if (file_put_contents($phpPath, generatePageWrapper($currentRoute, $routeName)) === false) {
                 return ['success' => false, 'error' => "Failed to write: $routeName.php"];
             }
-            
             $stats['pages_rebuilt']++;
         }
     }
@@ -604,98 +549,33 @@ function rebuildPagesFromJson(string $jsonDir, string $phpDir, JsonToPhpCompiler
 }
 
 /**
- * Helper to recurse into subdirectories, skipping already-processed files
+ * Generate the development page wrapper PHP code.
+ * This matches the format used by working projects (quicksite, test-bin).
  */
-function rebuildPagesFromJsonSubdir(string $jsonDir, string $phpDir, JsonToPhpCompiler $compiler, array &$stats, string $prefix, string $skipFile): array {
-    $items = scandir($jsonDir);
-    
-    foreach ($items as $item) {
-        if ($item === '.' || $item === '..' || $item === $skipFile) {
-            continue;
-        }
-        
-        $jsonPath = $jsonDir . '/' . $item;
-        
-        if (is_dir($jsonPath)) {
-            // Nested subdirectory
-            $subName = $item;
-            $currentRoute = $prefix . '/' . $subName;
-            $expectedJsonFile = $subName . '.json';
-            $hasMatchingJson = file_exists($jsonPath . '/' . $expectedJsonFile);
-            
-            $subPhpDir = $phpDir . '/' . $subName;
-            @mkdir($subPhpDir, 0755, true);
-            
-            if ($hasMatchingJson) {
-                $pageJsonFile = $jsonPath . '/' . $expectedJsonFile;
-                $pageJson = json_decode(file_get_contents($pageJsonFile), true);
-                if ($pageJson !== null) {
-                    $pagePhp = $compiler->compilePage($pageJson, $currentRoute);
-                    $phpPath = $subPhpDir . '/' . $subName . '.php';
-                    file_put_contents($phpPath, $pagePhp);
-                    $stats['pages_rebuilt']++;
-                }
-            }
-            
-            $result = rebuildPagesFromJsonSubdir($jsonPath, $subPhpDir, $compiler, $stats, $currentRoute, $expectedJsonFile);
-            if (!$result['success']) {
-                return $result;
-            }
-        } elseif (pathinfo($item, PATHINFO_EXTENSION) === 'json') {
-            // Loose JSON file in subdirectory
-            $routeName = pathinfo($item, PATHINFO_FILENAME);
-            $currentRoute = $prefix . '/' . $routeName;
-            
-            $pageJson = json_decode(file_get_contents($jsonPath), true);
-            if ($pageJson !== null) {
-                $pagePhp = $compiler->compilePage($pageJson, $currentRoute);
-                $phpPath = $phpDir . '/' . $routeName . '.php';
-                file_put_contents($phpPath, $pagePhp);
-                $stats['pages_rebuilt']++;
-            }
-        }
-    }
-    
-    return ['success' => true];
-}
+function generatePageWrapper(string $routePath, string $pageName): string {
+    return <<<PHP
+<?php
 
-/**
- * Rebuild component PHP files from JSON directory
- */
-function rebuildComponentsFromJson(string $jsonDir, string $phpDir, JsonToPhpCompiler $compiler, array &$stats): array {
-    $items = scandir($jsonDir);
-    
-    foreach ($items as $item) {
-        if ($item === '.' || $item === '..') {
-            continue;
-        }
-        
-        $jsonPath = $jsonDir . '/' . $item;
-        
-        if (pathinfo($item, PATHINFO_EXTENSION) === 'json') {
-            // Compile JSON to PHP (components use compileMenuOrFooter style)
-            $componentJson = json_decode(file_get_contents($jsonPath), true);
-            if ($componentJson === null) {
-                continue; // Skip invalid JSON
-            }
-            
-            $componentName = pathinfo($item, PATHINFO_FILENAME);
-            
-            // compileMenuOrFooter expects an array of nodes — wrap single-node components
-            if (isset($componentJson['tag']) || isset($componentJson['textKey']) || isset($componentJson['component'])) {
-                $componentJson = [$componentJson];
-            }
-            
-            $componentPhp = $compiler->compileMenuOrFooter($componentJson);
-            
-            $phpPath = $phpDir . '/' . $componentName . '.php';
-            if (file_put_contents($phpPath, $componentPhp) !== false) {
-                $stats['components_rebuilt']++;
-            }
-        }
-    }
-    
-    return ['success' => true];
+require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';
+\$trimParameters = new TrimParameters();
+require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
+\$translator = new Translator(\$trimParameters->lang());
+\$lang = \$trimParameters->lang();
+
+require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
+\$renderer = new JsonToHtmlRenderer(\$translator);
+
+\$content = \$renderer->renderPage('$routePath');
+
+// Now use this constant to include files from your src folder
+require_once SECURE_FOLDER_PATH . '/src/classes/PageManagement.php';
+
+// Get page title from translation
+\$pageTitle = \$translator->translate('page.titles.$routePath');
+
+\$page = new PageManagement(\$pageTitle, \$content, \$lang);
+\$page->render();
+PHP;
 }
 
 /**
