@@ -5,7 +5,7 @@
  * @method GET
  * @url /management/help
  * @url /management/help/{commandName}
- * @auth required
+ * @auth none (public)
  * @permission read
  * 
  * Returns comprehensive documentation for all API commands,

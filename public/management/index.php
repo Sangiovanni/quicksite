@@ -80,6 +80,33 @@ if ($origin) {
 }
 
 // ============================================================================
+// Public Routes (no authentication required)
+// ============================================================================
+$PUBLIC_COMMANDS = ['help'];
+
+// Parse the command early to check if it's public
+$requestUri = $_SERVER['REQUEST_URI'] ?? '';
+$uriPath = parse_url($requestUri, PHP_URL_PATH);
+$segments = array_values(array_filter(explode('/', $uriPath)));
+// Command is the segment after "management"
+$earlyCommand = null;
+foreach ($segments as $i => $seg) {
+    if ($seg === 'management' && isset($segments[$i + 1])) {
+        $earlyCommand = $segments[$i + 1];
+        break;
+    }
+}
+
+if ($earlyCommand && in_array($earlyCommand, $PUBLIC_COMMANDS, true)) {
+    // Set up TrimParametersManagement so the command can read URL segments
+    require_once SECURE_FOLDER_PATH . '/src/classes/TrimParametersManagement.php';
+    $trimParametersManagement = new TrimParametersManagement();
+    // Skip auth entirely — execute the public command directly
+    require_once SECURE_FOLDER_PATH . '/management/command/' . $earlyCommand . '.php';
+    exit;
+}
+
+// ============================================================================
 // Authentication
 // ============================================================================
 $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
