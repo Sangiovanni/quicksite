@@ -2,13 +2,19 @@
 
 A file-based PHP CMS with a built-in visual admin panel. Define page structures in JSON, manage everything through a REST API or the admin UI, and deploy production builds — no database required.
 
-> **Current version: `1.0.0-beta.1`** — Actively developed. Tutorials and documentation are on their way.
+> **Current version: `1.0.0-beta.1`** — Actively developed.
+
+![QuickSite Admin Panel](docs/screenshot-admin.jpg)
+
+<!-- [![Watch the demo](docs/video-thumbnail.png)](https://youtube.com/watch?v=XXXX) -->
 
 ## What is QuickSite?
 
 QuickSite started as a simple HTML template and evolved into a full CMS. The idea: manage an entire website — pages, translations, styles, assets, components — through a clean API, with all data stored as flat files you can version-control and deploy anywhere.
 
 It now includes a **visual admin panel** with an iframe-based page editor, letting you build and edit sites directly in the browser without writing code. The API remains the backbone — the admin panel is a client of its own API.
+
+QuickSite focuses on **frontend sites** — it manages HTML structure, CSS, translations, and assets. It doesn't handle backend logic or databases, though the built-in [interactions system](docs/README.md) can connect your pages to external APIs and services.
 
 ### Key features
 
@@ -31,10 +37,19 @@ It now includes a **visual admin panel** with an iframe-based page editor, letti
 
 ## Installation
 
+> **Important:** QuickSite requires a **virtual host** (Apache vhost or nginx server block) pointing to the `public/` folder. It does not work as a subdirectory under `localhost/` without a vhost.
+
 ```bash
+# Option 1: Clone into a new folder
 git clone https://github.com/Sangiovanni/quicksite.git
 cd quicksite
+
+# Option 2: Clone directly into the current directory (e.g. your vhost parent)
+cd /path/to/your/site
+git clone https://github.com/Sangiovanni/quicksite.git .
 ```
+
+After cloning, configure your web server's virtual host to point its document root to the `public/` folder, then run the setup wizard.
 
 ### Quick setup
 
@@ -53,7 +68,7 @@ The wizard walks you through 3 optional steps:
 
 1. **Rename the public folder** — match your vhost DocumentRoot (e.g. `www`, `public_html`, `www.example.com`)
 2. **Rename the secure folder** — obscure the backend, optionally nest it (e.g. `backend`, `app`, `backends/project1`)
-3. **Set a URL space** — serve from a subdirectory (e.g. `mysite` → `http://domain/mysite/`)
+3. **Set a URL space** — serve from a subdirectory path after the domain (e.g. `mysite` → `http://domain.com/mysite/` — for deployment targets, not for replacing vhosts)
 
 All three are optional — press Enter to skip any step. The scripts update `init.php` constants, `.htaccess` files, and nginx routing config automatically. Everything else (config files, nginx setup page) is handled on first page load.
 
@@ -97,49 +112,6 @@ No file changes needed — the repo defaults work out of the box with a virtual 
 </details>
 
 <details>
-<summary><strong>Apache in a subdirectory</strong> (shared hosting, WAMP, XAMPP)</summary>
-
-If your site lives at `http://localhost/mysite/` or `http://example.com/mysite/`:
-
-1. **Symlink or alias** the `public/` folder into your document root:
-   ```bash
-   ln -s /path/to/quicksite/public /var/www/html/mysite
-   ```
-   Or on WAMP: place/symlink the `public/` folder as `C:\wamp64\www\mysite`.
-
-2. **Edit `public/init.php`** — set the `PUBLIC_FOLDER_SPACE` constant:
-   ```php
-   define('PUBLIC_FOLDER_SPACE', 'mysite');   // was ''
-   ```
-
-3. **Update the 3 `.htaccess` files** to include the subdirectory prefix:
-
-   `public/.htaccess`:
-   ```
-   RewriteEngine On
-   FallbackResource /mysite/index.php
-   ```
-
-   `public/management/.htaccess`:
-   ```
-   RewriteEngine On
-   SetEnvIf Authorization .+ HTTP_AUTHORIZATION=$0
-   FallbackResource /mysite/management/index.php
-   ```
-
-   `public/admin/.htaccess`:
-   ```
-   RewriteEngine On
-   FallbackResource /mysite/admin/index.php
-   ```
-
-4. Open `http://localhost/mysite/admin/`.
-
-> Or just run `setup.sh` — step 3 of the wizard handles all of this automatically.
-
-</details>
-
-<details>
 <summary><strong>nginx</strong> (including CloudPanel, RunCloud, etc.)</summary>
 
 nginx ignores `.htaccess` files. QuickSite handles this automatically:
@@ -169,25 +141,25 @@ nginx ignores `.htaccess` files. QuickSite handles this automatically:
    }
    ```
 
-2. **Generate the config** if it doesn't exist yet:
+2. **Generate the routing config** — visit any page in your browser. QuickSite detects nginx and auto-generates `secure/nginx/dynamic_routes.conf`, then shows a setup page with the exact `include` directive to add.
+
+   Alternatively, generate it from the command line:
    ```bash
-   # Option A: Run setup.sh (generates it for you)
-   ./setup.sh
-
-   # Option B: Just visit any page — it auto-generates on first load
-
-   # Option C: Generate manually with PHP CLI
    php -r "require 'secure/src/functions/NginxConfig.php'; write_nginx_dynamic_routes('', realpath('secure'));"
    ```
 
-3. **Test and reload**: `sudo nginx -t && sudo nginx -s reload`
+3. **Test and reload**:
+   ```bash
+   sudo nginx -t && sudo nginx -s reload
+   ```
+   > **CloudPanel users:** You can also just open the vhost tab in CloudPanel and click Save — it triggers a reload automatically.
 
-4. **(Optional) Enable auto-reload** — when the setup script changes the URL space, it tries to reload nginx automatically. This requires a one-line sudoers entry:
+4. **(Advanced, optional) Enable auto-reload** — when the setup script changes the URL space, it can reload nginx automatically. This requires a sudoers entry:
    ```bash
    echo 'www-data ALL=(ALL) NOPASSWD: /usr/sbin/nginx' | sudo tee /etc/sudoers.d/quicksite-nginx
    sudo chmod 440 /etc/sudoers.d/quicksite-nginx
    ```
-   Replace `www-data` with your PHP process user. Without this, reload manually after changing the space: `sudo nginx -t && sudo nginx -s reload`
+   Replace `www-data` with your PHP process user. Most users won't need this — reload manually or via your hosting panel.
 
 **Renamed the public folder?** Run `setup.sh` — it handles everything. Or manually update `PUBLIC_FOLDER_NAME` in `init.php`.
 
@@ -210,9 +182,11 @@ Open `http://localhost:8000/admin/`. Clean URLs (`/about`, `/en/contact`) won't 
 ### First load
 
 On first load, QuickSite auto-creates sensitive config files from `.example` templates:
-- `secure/management/config/auth.php` — API tokens (⚠️ change the default before production)
+- `secure/management/config/auth.php` — API tokens
 - `secure/management/config/roles.php` — role definitions
 - `secure/management/config/target.php` — active project selector
+
+> **⚠️ Token setup:** The default installation includes a placeholder token. On first login, the admin panel will prompt you to generate a new secure token. Follow the guided steps: generate a new token → log out → log back in with the new token → revoke the default placeholder. Do this before exposing the site publicly.
 
 ## Project structure
 
@@ -271,7 +245,6 @@ quicksite/
 │   ├── snippets/                 # Reusable component snippets (nav, cards, forms, etc.)
 │   ├── nginx/                    # Auto-generated nginx config (dynamic_routes.conf)
 │   ├── cron/                     # Optional cron scripts (nginx reload fallback)
-│   ├── config/                   # Global config (currently unused, reserved)
 │   ├── exports/                  # Project export ZIPs (generated)
 │   └── logs/                     # Command execution logs (gitignored)
 │
@@ -319,11 +292,11 @@ GET /management/help/addRoute
 
 **Command categories**: pages, structure, translations, languages, assets, styles, CSS variables, animations, builds, projects, backups, export/import, tokens, roles, AI, snippets, JS functions, interactions, page events, API endpoints, system updates.
 
-**Authentication**: All endpoints require a bearer token. Tokens are scoped to roles with granular command-level permissions.
+**Authentication**: All endpoints except `help` require a bearer token (`Authorization: Bearer <token>`). The `help` endpoint is publicly accessible — it serves as live API documentation. Tokens are scoped to roles with granular command-level permissions.
 
 ## Tutorials
 
-Step-by-step tutorials demonstrating the admin panel and API workflows are coming soon.
+Step-by-step tutorials for the admin panel, visual editor, and API workflows are planned.
 
 ## Vision
 
@@ -333,13 +306,16 @@ The admin panel makes it accessible to non-developers, while the API keeps it po
 
 ## Contributing
 
-Contributions are welcome under the AGPL-3.0 License.
+Contributions are welcome under the AGPL-3.0 License — and not just code.
 
-1. Fork the repository
-2. Create a feature branch
-3. Submit a Pull Request
+**Ways to contribute:**
+- **Bug reports & feature requests** — open an [issue](https://github.com/Sangiovanni/quicksite/issues). Every report helps.
+- **Translations** — improve existing translations or add new languages.
+- **Workflow specs & templates** — create or improve the structured specs that power AI workflows.
+- **Documentation** — if something is unclear, help us make it better.
+- **Code** — fork → feature branch → pull request.
 
-All contributions go through code review for security, quality, and consistency.
+All contributions go through review for security, quality, and consistency.
 
 ## Acknowledgments
 
