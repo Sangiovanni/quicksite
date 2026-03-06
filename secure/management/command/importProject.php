@@ -30,7 +30,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/JsonToPhpCompiler.php';
 const IMPORT_ALLOWED_CONFIG_KEYS = [
     'SITE_NAME',
     'LANGUAGES_SUPPORTED',
-    'DEFAULT_LANGUAGE',
+    'LANGUAGE_DEFAULT',
     'MULTILINGUAL_SUPPORT',
     'TITLE',
     'FAVICON'
@@ -66,9 +66,10 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         $file = $_FILES['file'];
         
         if ($file['error'] !== UPLOAD_ERR_OK) {
+            $uploadError = getUploadErrorMessage($file['error']);
             return ApiResponse::create(400, 'upload.failed')
-                ->withMessage('File upload failed')
-                ->withData(['error_code' => $file['error'], 'error' => getUploadErrorMessage($file['error'])]);
+                ->withMessage("File upload failed: $uploadError")
+                ->withData(['error_code' => $file['error'], 'error' => $uploadError]);
         }
         
         // Validate file type
@@ -173,6 +174,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         '/templates/model/json',
         '/templates/model/json/pages',
         '/templates/model/json/components',
+        '/config',
         '/translate',
         '/data',
         '/public',
@@ -413,8 +415,8 @@ function rebuildPhpFromJson(string $projectPath): array {
         if (!isset($validConfig['LANGUAGES_SUPPORTED'])) {
             $validConfig['LANGUAGES_SUPPORTED'] = ['en'];
         }
-        if (!isset($validConfig['DEFAULT_LANGUAGE'])) {
-            $validConfig['DEFAULT_LANGUAGE'] = 'en';
+        if (!isset($validConfig['LANGUAGE_DEFAULT'])) {
+            $validConfig['LANGUAGE_DEFAULT'] = $validConfig['LANGUAGES_SUPPORTED'][0] ?? 'en';
         }
         if (!isset($validConfig['MULTILINGUAL_SUPPORT'])) {
             $validConfig['MULTILINGUAL_SUPPORT'] = false;
@@ -435,7 +437,7 @@ function rebuildPhpFromJson(string $projectPath): array {
         $defaultConfig = [
             'SITE_NAME' => basename($projectPath),
             'LANGUAGES_SUPPORTED' => ['en'],
-            'DEFAULT_LANGUAGE' => 'en',
+            'LANGUAGE_DEFAULT' => 'en',
             'MULTILINGUAL_SUPPORT' => false
         ];
         $configPhp = "<?php\n/**\n * Site Configuration (default)\n * Created on import: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($defaultConfig, true) . ";\n";
@@ -678,6 +680,12 @@ function rebuildComponentsFromJson(string $jsonDir, string $phpDir, JsonToPhpCom
             }
             
             $componentName = pathinfo($item, PATHINFO_FILENAME);
+            
+            // compileMenuOrFooter expects an array of nodes — wrap single-node components
+            if (isset($componentJson['tag']) || isset($componentJson['textKey']) || isset($componentJson['component'])) {
+                $componentJson = [$componentJson];
+            }
+            
             $componentPhp = $compiler->compileMenuOrFooter($componentJson);
             
             $phpPath = $phpDir . '/' . $componentName . '.php';

@@ -8,6 +8,7 @@
  * Export format v2.0:
  * - config.json (sanitized from config.php)
  * - routes.json (from routes.php)
+ * - config/*.json (project settings: route-layout, custom-js-functions, etc.)
  * - templates/model/json/ (JSON structures only)
  * - translate/*.json
  * - data/*.json
@@ -30,7 +31,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 const EXPORT_ALLOWED_CONFIG_KEYS = [
     'SITE_NAME',
     'LANGUAGES_SUPPORTED',
-    'DEFAULT_LANGUAGE',
+    'LANGUAGE_DEFAULT',
     'MULTILINGUAL_SUPPORT',
     'TITLE',
     'FAVICON'
@@ -101,25 +102,31 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
         // 2. Export routes.php as routes.json
         exportRoutesAsJson($zip, $projectPath, $projectName, $stats);
         
-        // 3. Export templates/model/json/ (JSON structures only - no PHP!)
+        // 3. Export config/*.json (project settings)
+        $configDir = $projectPath . '/config';
+        if (is_dir($configDir)) {
+            addJsonFilesOnly($zip, $configDir, $projectName . '/config', $stats);
+        }
+        
+        // 4. Export templates/model/json/ (JSON structures only - no PHP!)
         $jsonModelPath = $projectPath . '/templates/model/json';
         if (is_dir($jsonModelPath)) {
             addDirectoryToZip($zip, $jsonModelPath, $projectName . '/templates/model/json', $stats);
         }
         
-        // 4. Export translate/*.json
+        // 5. Export translate/*.json
         $translatePath = $projectPath . '/translate';
         if (is_dir($translatePath)) {
             addJsonFilesOnly($zip, $translatePath, $projectName . '/translate', $stats);
         }
         
-        // 5. Export data/*.json
+        // 6. Export data/*.json
         $dataPath = $projectPath . '/data';
         if (is_dir($dataPath)) {
             addJsonFilesOnly($zip, $dataPath, $projectName . '/data', $stats);
         }
         
-        // 6. Export public/ (assets only, no PHP)
+        // 7. Export public/ (assets only, no PHP)
         if ($includePublic) {
             $publicPath = $projectPath . '/public';
             if (is_dir($publicPath)) {
@@ -127,7 +134,7 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
             }
         }
         
-        // 7. Add metadata file
+        // 8. Add metadata file
         $metadata = createExportMetadata($projectName, $projectPath, $stats);
         $zip->addFromString($projectName . '/export_info.json', json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         $stats['files']++;
