@@ -22,7 +22,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 function __command_getKeyframes(array $params = [], array $urlParams = []): ApiResponse {
     $name = $urlParams[0] ?? null;
 
-    $styleFile = PUBLIC_FOLDER_ROOT . '/style/style.css';
+    $styleFile = PUBLIC_CONTENT_PATH . '/style/style.css';
 
     // Check file exists
     if (!file_exists($styleFile)) {

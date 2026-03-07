@@ -35,7 +35,7 @@ function __command_getStyleRule(array $params = [], array $urlParams = []): ApiR
     // URL decode the selector
     $selector = urldecode($selector);
 
-    $styleFile = PUBLIC_FOLDER_ROOT . '/style/style.css';
+    $styleFile = PUBLIC_CONTENT_PATH . '/style/style.css';
 
     // Check file exists
     if (!file_exists($styleFile)) {

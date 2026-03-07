@@ -89,7 +89,7 @@ if ($mediaQuery !== null && !RegexPatterns::match('media_query_basic', $mediaQue
     }
 }
 
-$styleFile = PUBLIC_FOLDER_ROOT . '/style/style.css';
+$styleFile = PUBLIC_CONTENT_PATH . '/style/style.css';
 
 // Check file exists
 if (!file_exists($styleFile)) {

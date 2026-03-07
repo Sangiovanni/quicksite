@@ -97,7 +97,7 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
     }
     
     // Regenerate qs-api-config.js for live development
-    $apiConfigPath = PUBLIC_FOLDER_ROOT . '/scripts/qs-api-config.js';
+    $apiConfigPath = PUBLIC_CONTENT_PATH . '/scripts/qs-api-config.js';
     $manager->writeCompiledJs($apiConfigPath);
     
     // Cascade cleanup when an endpoint was deleted

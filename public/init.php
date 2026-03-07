@@ -17,6 +17,15 @@ if(!defined('PUBLIC_FOLDER_SPACE')){
     define('PUBLIC_FOLDER_SPACE', '');
 }
 
+// PUBLIC_CONTENT_PATH = the live directory where site content lives (style/, assets/, scripts/)
+// When a space is defined (e.g. 'quicksite'), content is at PUBLIC_FOLDER_ROOT/quicksite/
+// When no space is used, content is at PUBLIC_FOLDER_ROOT directly
+if (!defined('PUBLIC_CONTENT_PATH')) {
+    define('PUBLIC_CONTENT_PATH', PUBLIC_FOLDER_SPACE !== '' 
+        ? PUBLIC_FOLDER_ROOT . '/' . PUBLIC_FOLDER_SPACE 
+        : PUBLIC_FOLDER_ROOT);
+}
+
 if(!defined('SERVER_ROOT')){
     // Remove only the rightmost occurrence of PUBLIC_FOLDER_NAME from path
     // This prevents issues when folder name appears multiple times in path

@@ -63,7 +63,7 @@ function __command_listAssets(array $params = [], array $urlParams = []): ApiRes
         }
     }
 
-    $assetsPath = PUBLIC_FOLDER_ROOT . '/assets/';
+    $assetsPath = PUBLIC_CONTENT_PATH . '/assets/';
     $result = [];
 
     // Determine which categories to scan

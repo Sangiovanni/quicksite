@@ -194,7 +194,7 @@ function __command_backupProject(array $params = [], array $urlParams = []): Api
     }
     
     if ($activeProject === $projectName) {
-        $livePublicPath = PUBLIC_FOLDER_ROOT;
+        $livePublicPath = PUBLIC_CONTENT_PATH;
         $projectPublicPath = $projectPath . '/public';
         
         // Sync key folders from live to project before backup

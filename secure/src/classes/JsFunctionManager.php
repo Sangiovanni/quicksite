@@ -43,7 +43,7 @@ class JsFunctionManager {
         $this->configPath = $basePath . '/config/custom-js-functions.json';
         
         // Output always goes to live public folder
-        $this->outputPath = PUBLIC_FOLDER_ROOT . '/scripts/qs-custom.js';
+        $this->outputPath = PUBLIC_CONTENT_PATH . '/scripts/qs-custom.js';
         
         // Ensure config directory exists
         $configDir = dirname($this->configPath);

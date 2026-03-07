@@ -53,7 +53,7 @@ function extractBaseSelectorAndPseudo(string $selector): array {
  * @return ApiResponse
  */
 function __command_getAnimatedSelectors(array $params = [], array $urlParams = []): ApiResponse {
-    $styleFile = PUBLIC_FOLDER_ROOT . '/style/style.css';
+    $styleFile = PUBLIC_CONTENT_PATH . '/style/style.css';
 
     // Check file exists
     if (!file_exists($styleFile)) {

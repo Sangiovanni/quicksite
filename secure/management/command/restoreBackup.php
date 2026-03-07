@@ -165,7 +165,7 @@ function __command_restoreBackup(array $params = [], array $urlParams = []): Api
         }
         
         if ($activeProject === $projectName) {
-            $livePublicPath = PUBLIC_FOLDER_ROOT;
+            $livePublicPath = PUBLIC_CONTENT_PATH;
             $projectPublicPath = $projectPath . '/public';
             
             $foldersToSync = ['assets', 'style'];
@@ -269,7 +269,7 @@ function __command_restoreBackup(array $params = [], array $urlParams = []): Api
     if ($activeProject === $projectName) {
         // Sync restored public folder to actual public folder
         $projectPublicPath = $projectPath . '/public';
-        $livePublicPath = PUBLIC_FOLDER_ROOT;
+        $livePublicPath = PUBLIC_CONTENT_PATH;
         
         if (is_dir($projectPublicPath)) {
             // Copy public contents to live folder

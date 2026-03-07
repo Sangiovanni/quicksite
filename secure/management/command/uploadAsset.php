@@ -262,7 +262,7 @@ if (in_array($extension, $dangerousExtensions, true)) {
 }
 
 // Build target path (use PUBLIC_FOLDER_ROOT not PUBLIC_FOLDER_PATH)
-$targetDir = PUBLIC_FOLDER_ROOT . '/assets/' . $category . '/';
+$targetDir = PUBLIC_CONTENT_PATH . '/assets/' . $category . '/';
 
 // Validate target directory exists
 if (!is_dir($targetDir)) {

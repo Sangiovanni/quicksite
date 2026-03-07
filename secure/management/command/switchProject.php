@@ -154,7 +154,7 @@ function __command_switchProject(array $params = [], array $urlParams = []): Api
         $projectPublicPath = $projectPath . '/public';
         
         if (is_dir($projectPublicPath)) {
-            $copyResult = copyProjectPublicFiles($projectPublicPath, PUBLIC_FOLDER_ROOT);
+            $copyResult = copyProjectPublicFiles($projectPublicPath, PUBLIC_CONTENT_PATH);
             $result['public_files_copied'] = $copyResult['success'];
             $result['public_copy_details'] = $copyResult;
         } else {
@@ -176,7 +176,7 @@ function __command_switchProject(array $params = [], array $urlParams = []): Api
     // Regenerate qs-api-config.js with project's API configurations
     require_once SECURE_FOLDER_PATH . '/src/classes/ApiEndpointManager.php';
     $apiManager = new ApiEndpointManager($projectPath);
-    $apiConfigPath = PUBLIC_FOLDER_ROOT . '/scripts/qs-api-config.js';
+    $apiConfigPath = PUBLIC_CONTENT_PATH . '/scripts/qs-api-config.js';
     $apiConfigWritten = $apiManager->writeCompiledJs($apiConfigPath);
     $result['api_config_regenerated'] = $apiConfigWritten;
     
@@ -275,7 +275,7 @@ function copyDirectoryContents(string $source, string $destination): bool {
  * @return bool Success status
  */
 function syncLiveToProject(string $projectPath): bool {
-    $livePublicPath = PUBLIC_FOLDER_ROOT;
+    $livePublicPath = PUBLIC_CONTENT_PATH;
     $projectPublicPath = $projectPath . '/public';
     
     // Ensure project public folder exists

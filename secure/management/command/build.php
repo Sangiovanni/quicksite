@@ -388,7 +388,7 @@ foreach ($publicFiles as $file) {
 }
 
 // Copy /style/ directory recursively (using FileSystem utility)
-if (!copyDirectory(PUBLIC_FOLDER_ROOT . '/style', $publicContentPath . '/style')) {
+if (!copyDirectory(PUBLIC_CONTENT_PATH . '/style', $publicContentPath . '/style')) {
     release_build_lock();
     ApiResponse::create(500, 'server.file_write_failed')
         ->withMessage("Failed to copy /style/ directory")
@@ -396,7 +396,7 @@ if (!copyDirectory(PUBLIC_FOLDER_ROOT . '/style', $publicContentPath . '/style')
 }
 
 // Copy /assets/ directory recursively
-if (!copyDirectory(PUBLIC_FOLDER_ROOT . '/assets', $publicContentPath . '/assets')) {
+if (!copyDirectory(PUBLIC_CONTENT_PATH . '/assets', $publicContentPath . '/assets')) {
     release_build_lock();
     ApiResponse::create(500, 'server.file_write_failed')
         ->withMessage("Failed to copy /assets/ directory")
@@ -569,7 +569,7 @@ if (!$apiManager->writeCompiledJs($apiConfigPath)) {
 }
 
 // Copy qs.js (required for all interaction/event functionality)
-$qsJsSource = PUBLIC_FOLDER_ROOT . '/scripts/qs.js';
+$qsJsSource = PUBLIC_CONTENT_PATH . '/scripts/qs.js';
 if (file_exists($qsJsSource)) {
     if (!copy($qsJsSource, $scriptsDir . '/qs.js')) {
         release_build_lock();
@@ -580,7 +580,7 @@ if (file_exists($qsJsSource)) {
 }
 
 // Copy qs-custom.js (user-defined custom functions)
-$qsCustomJsSource = PUBLIC_FOLDER_ROOT . '/scripts/qs-custom.js';
+$qsCustomJsSource = PUBLIC_CONTENT_PATH . '/scripts/qs-custom.js';
 if (file_exists($qsCustomJsSource) && filesize($qsCustomJsSource) > 500) {
     if (!copy($qsCustomJsSource, $scriptsDir . '/qs-custom.js')) {
         release_build_lock();

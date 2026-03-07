@@ -18,7 +18,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
  * @return ApiResponse
  */
 function __command_getStyles(array $params = [], array $urlParams = []): ApiResponse {
-    $styleFile = PUBLIC_FOLDER_ROOT . '/style/style.css';
+    $styleFile = PUBLIC_CONTENT_PATH . '/style/style.css';
 
     // Check if file exists
     if (!file_exists($styleFile)) {

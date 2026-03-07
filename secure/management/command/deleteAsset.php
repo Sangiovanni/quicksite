@@ -123,7 +123,7 @@ if (!RegexPatterns::match('file_name_with_ext', $filename)) {
 }
 
 // Build file path
-$filePath = PUBLIC_FOLDER_ROOT . '/assets/' . $category . '/' . $filename;
+$filePath = PUBLIC_CONTENT_PATH . '/assets/' . $category . '/' . $filename;
 
 // Check if file exists
 if (!file_exists($filePath)) {

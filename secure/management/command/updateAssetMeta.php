@@ -67,7 +67,7 @@ if (!in_array($category, $validCategories, true)) {
 $filename = basename($filename);
 
 // Check file exists
-$filePath = PUBLIC_FOLDER_ROOT . '/assets/' . $category . '/' . $filename;
+$filePath = PUBLIC_CONTENT_PATH . '/assets/' . $category . '/' . $filename;
 if (!file_exists($filePath) || !is_file($filePath)) {
     ApiResponse::create(404, 'asset.not_found')
         ->withMessage("Asset not found: {$category}/{$filename}")

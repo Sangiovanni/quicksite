@@ -65,7 +65,7 @@ function __command_addApi(array $params = [], array $urlParams = []): ApiRespons
     }
     
     // Regenerate qs-api-config.js for live development
-    $apiConfigPath = PUBLIC_FOLDER_ROOT . '/scripts/qs-api-config.js';
+    $apiConfigPath = PUBLIC_CONTENT_PATH . '/scripts/qs-api-config.js';
     $manager->writeCompiledJs($apiConfigPath);
     
     return ApiResponse::create(201, 'operation.success')
