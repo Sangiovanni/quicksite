@@ -119,7 +119,7 @@
                                 "class": "lang-btn",
                                 "data-lang": "{{$value}}"
                             },
-                            "children": [{ "text": "{{$value | langname}}" }]
+                            "children": [{ "textKey": "__RAW__{{$value | langname}}" }]
                         }
                     }
                 }

@@ -130,6 +130,34 @@ function validateStructureTags($node): ?string {
     return null;
 }
 
+/**
+ * Normalize structure nodes: convert "text" keys to "textKey" with __RAW__ prefix.
+ * AI models sometimes output {"text": "Hello"} instead of {"textKey": "__RAW__Hello"}.
+ * This auto-corrects at save time so the renderer doesn't produce <!-- Unknown node type -->.
+ */
+function normalizeStructureTextNodes(&$node): void {
+    if (!is_array($node)) return;
+    
+    // If node has "text" but not "tag", "component", or "textKey", convert it
+    if (isset($node['text']) && !isset($node['tag']) && !isset($node['component']) && !isset($node['textKey'])) {
+        $textValue = $node['text'];
+        // Add __RAW__ prefix if not already a translation key pattern (contains dots like "section.title")
+        if (is_string($textValue) && strpos($textValue, '.') === false && strpos($textValue, '__RAW__') !== 0) {
+            $node['textKey'] = '__RAW__' . $textValue;
+        } else {
+            $node['textKey'] = $textValue;
+        }
+        unset($node['text']);
+    }
+    
+    // Recurse into children
+    if (isset($node['children']) && is_array($node['children'])) {
+        foreach ($node['children'] as &$child) {
+            normalizeStructureTextNodes($child);
+        }
+    }
+}
+
 $params = $trimParametersManagement->params();
 
 // Check for nodeId-based edit mode
@@ -536,6 +564,16 @@ if ($nodeId !== null) {
     // Use the modified structure
     $structure = $result['structure'];
     
+    // Normalize "text" -> "textKey" in structure (AI models sometimes output wrong key)
+    if (is_array($structure)) {
+        if (isset($structure[0]) || empty($structure)) {
+            foreach ($structure as &$n) { normalizeStructureTextNodes($n); }
+            unset($n);
+        } else {
+            normalizeStructureTextNodes($structure);
+        }
+    }
+    
     // Encode and write
     $json_content = json_encode($structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if ($json_content === false) {
@@ -565,6 +603,16 @@ if ($nodeId !== null) {
 }
 
 // ===== Full structure replacement mode =====
+
+// Normalize "text" -> "textKey" in structure (AI models sometimes output wrong key)
+if (is_array($structure)) {
+    if (isset($structure[0]) || empty($structure)) {
+        foreach ($structure as &$n) { normalizeStructureTextNodes($n); }
+        unset($n);
+    } else {
+        normalizeStructureTextNodes($structure);
+    }
+}
 
 // Encode structure to JSON
 $json_content = json_encode($structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
