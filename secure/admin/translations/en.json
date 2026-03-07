@@ -842,8 +842,8 @@
                     },
                     "languages": {
                         "label": "Languages",
-                        "placeholder": "en, fr, es",
-                        "help": "Comma-separated language codes"
+                        "placeholder": "en, fr, es, ja, de...",
+                        "help": "Comma-separated ISO 639-1 two-letter codes"
                     }
                 },
                 "examples": {
@@ -862,8 +862,8 @@
                     },
                     "languages": {
                         "label": "Languages",
-                        "placeholder": "en, fr, es",
-                        "help": "Comma-separated language codes"
+                        "placeholder": "en, fr, es, ja, de...",
+                        "help": "Comma-separated ISO 639-1 two-letter codes"
                     },
                     "pages": {
                         "label": "Pages to create",

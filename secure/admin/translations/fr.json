@@ -856,8 +856,8 @@
                     },
                     "languages": {
                         "label": "Langues",
-                        "placeholder": "en, fr, es",
-                        "help": "Codes de langue séparés par des virgules"
+                        "placeholder": "en, fr, es, ja, de...",
+                        "help": "Codes ISO 639-1 séparés par des virgules"
                     }
                 },
                 "examples": {
@@ -876,8 +876,8 @@
                     },
                     "languages": {
                         "label": "Langues",
-                        "placeholder": "en, fr, es",
-                        "help": "Codes de langue séparés par des virgules"
+                        "placeholder": "en, fr, es, ja, de...",
+                        "help": "Codes ISO 639-1 séparés par des virgules"
                     },
                     "pages": {
                         "label": "Pages à créer",

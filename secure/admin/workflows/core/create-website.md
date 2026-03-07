@@ -25,8 +25,10 @@ You are creating a complete multi-page website from a blank QuickSite project.
 {{#if param.multilingual === true}}
 1. **Languages FIRST** (required for multilingual):
    - `addLang` → add each additional language BEFORE enabling multilingual
+   - Language codes MUST be valid **ISO 639-1** two-letter codes (e.g. `fr`, `es`, `ja`, `de`). If the user provided an incorrect code (e.g. `jp` instead of `ja`), use the correct ISO 639-1 code.
    - `setMultilingual` → enable multi-language mode AFTER having 2+ languages
    - Languages: {{param.languages}}
+   - **⚠️ The default language already exists, so you MUST produce exactly one `addLang` command for EACH language in the list above EXCEPT the default. Count them — every language must be present. Do NOT skip any.**
 
    **⚠️ CRITICAL: setMultilingual EXACT syntax:**
    ```json
