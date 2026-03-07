@@ -105,9 +105,25 @@
                                 "class": "lang-btn",
                                 "data-lang": "{{$value}}"
                             },
-                            "children": [{ "text": "{{$value | langname}}" }]
+                            "children": [{ "textKey": "__RAW__{{$value | langname}}" }]
                         }
                     }
+                }
+            }
+        },
+        {
+            "condition": "param.multilingual === true",
+            "command": "editStructure",
+            "params": {
+                "type": "footer",
+                "action": "appendChild",
+                "path": "0.children",
+                "node": {
+                    "tag": "div",
+                    "params": { "class": "footer-lang" },
+                    "children": [
+                        { "component": "lang-switch" }
+                    ]
                 }
             }
         }

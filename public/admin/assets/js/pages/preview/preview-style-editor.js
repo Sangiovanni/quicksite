@@ -148,7 +148,7 @@
     
     function getThemeVariables() {
         if (getThemeVariablesFn) return getThemeVariablesFn();
-        if (window.PreviewStyleTheme) return PreviewStyleTheme.getVariables();
+        if (window.PreviewStyleTheme && PreviewStyleTheme.isLoaded()) return PreviewStyleTheme.getCurrent();
         return {};
     }
     
@@ -166,6 +166,11 @@
      */
     async function openStyleEditor(selector, matchCount = 0) {
         if (!styleEditor) return;
+        
+        // Auto-load theme variables if not already loaded (for CSS var dropdowns)
+        if (window.PreviewStyleTheme && !PreviewStyleTheme.isLoaded()) {
+            PreviewStyleTheme.load();
+        }
         
         editingSelector = selector;
         editingSelectorCount = matchCount;
@@ -922,6 +927,13 @@
         });
         
         activeColorPicker = picker;
+        
+        // Hide the swatch wrapper created by QSColorPicker (we already have our own swatch button)
+        const cpWrapper = tempInput.parentNode;
+        if (cpWrapper?.classList.contains('qs-cp-input-wrap')) {
+            cpWrapper.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;';
+        }
+        
         tempInput.click();
     }
     

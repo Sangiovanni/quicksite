@@ -1966,7 +1966,12 @@
                 window.PreviewStyleAnimations?.openAnimationPreviewModal || function() {}
             );
             PreviewTransitionEditor.setGetKeyframesData(() => keyframesData);
-            PreviewTransitionEditor.setGetThemeVariables(() => originalThemeVariables);
+            PreviewTransitionEditor.setGetThemeVariables(() => {
+                if (window.PreviewStyleTheme && PreviewStyleTheme.isLoaded()) {
+                    return PreviewStyleTheme.getCurrent();
+                }
+                return originalThemeVariables;
+            });
             PreviewTransitionEditor.init();
         }
     }
@@ -2975,7 +2980,12 @@
             // Set up callbacks for module integration
             PreviewStyleEditor.setShowToast(showToast);
             PreviewStyleEditor.setGetIframe(() => iframe);
-            PreviewStyleEditor.setGetThemeVariables(() => originalThemeVariables);
+            PreviewStyleEditor.setGetThemeVariables(() => {
+                if (window.PreviewStyleTheme && PreviewStyleTheme.isLoaded()) {
+                    return PreviewStyleTheme.getCurrent();
+                }
+                return originalThemeVariables;
+            });
             PreviewStyleEditor.setGetPropertyTypes((prop) => KEYFRAME_PROPERTY_TYPES[prop] || { type: 'text' });
         }
     }
@@ -6235,4 +6245,9 @@
             injectOverlay();
         }
     }
+
+    // Export shared classes for cross-module use (preview-style-editor.js)
+    window.QSPropertySelector = QSPropertySelector;
+    window.QSValueInput = QSValueInput;
+    window.KEYFRAME_PROPERTY_TYPES = KEYFRAME_PROPERTY_TYPES;
 })();
