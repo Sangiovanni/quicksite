@@ -636,6 +636,9 @@
                 specPostCommandsRaw = data.data.postCommandsRaw || [];
                 specUserParams = data.data.userParams || {};
                 
+                console.log('[PostCmd Debug] Stored postCommandsRaw:', specPostCommandsRaw.length, 'items', JSON.stringify(specPostCommandsRaw));
+                console.log('[PostCmd Debug] userParams:', JSON.stringify(specUserParams));
+                
                 // Get user's custom prompt
                 const userPrompt = userPromptTextarea ? userPromptTextarea.value.trim() : '';
                 
@@ -1877,9 +1880,12 @@
         }
         
         // Wait for filesystem to settle after AI commands before post-commands
+        console.log('[PostCmd Debug] Main loop done. specPostCommandsRaw.length =', specPostCommandsRaw.length);
         if (specPostCommandsRaw.length > 0) {
             if (progressText) progressText.textContent = 'Waiting for filesystem to settle...';
             await new Promise(resolve => setTimeout(resolve, 1500));
+        } else {
+            console.warn('[PostCmd Debug] specPostCommandsRaw is EMPTY - no post-commands will execute');
         }
         
         // After all AI commands executed, resolve and execute post-commands
