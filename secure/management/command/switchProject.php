@@ -229,8 +229,26 @@ function copyProjectPublicFiles(string $source, string $destination): array {
     // Copy .htaccess if exists
     $htaccessSrc = $source . '/.htaccess';
     if (file_exists($htaccessSrc)) {
-        if (copy($htaccessSrc, $destination . '/.htaccess')) {
+        $destHtaccess = $destination . '/.htaccess';
+        if (copy($htaccessSrc, $destHtaccess)) {
             $result['copied'][] = '.htaccess';
+            // Ensure FallbackResource paths include the URL space prefix
+            if (PUBLIC_FOLDER_SPACE !== '') {
+                $content = file_get_contents($destHtaccess);
+                $space = trim(PUBLIC_FOLDER_SPACE, '/');
+                // Normalize: strip any existing space prefix, then re-add it
+                $content = preg_replace(
+                    '#^(FallbackResource\s+)/' . preg_quote($space, '#') . '/#m',
+                    '$1/',
+                    $content
+                );
+                $content = preg_replace(
+                    '#^(FallbackResource\s+)/#m',
+                    '$1/' . $space . '/',
+                    $content
+                );
+                file_put_contents($destHtaccess, $content);
+            }
         }
     }
     

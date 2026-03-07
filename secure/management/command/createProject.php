@@ -137,8 +137,9 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     // Create menu.json and footer.json
     createMenuAndFooter($projectPath, $siteName);
     
-    // Create .htaccess
-    file_put_contents($projectPath . '/public/.htaccess', "RewriteEngine On\nFallbackResource /index.php\n", LOCK_EX);
+    // Create .htaccess with space-aware FallbackResource
+    $fallbackPath = PUBLIC_FOLDER_SPACE !== '' ? '/' . trim(PUBLIC_FOLDER_SPACE, '/') . '/index.php' : '/index.php';
+    file_put_contents($projectPath . '/public/.htaccess', "RewriteEngine On\nFallbackResource $fallbackPath\n", LOCK_EX);
     
     // Create basic style.css
     createBasicStyles($projectPath);
