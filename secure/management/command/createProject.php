@@ -155,7 +155,49 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     
     // Switch to project if requested
     if ($switchTo) {
+        // Sync live public files back to the previous project before switching
+        // This prevents CSS/asset loss when creating multiple projects in sequence
         $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
+        if (file_exists($targetFile)) {
+            $prevTarget = include $targetFile;
+            $prevName = is_array($prevTarget) ? ($prevTarget['project'] ?? null) : $prevTarget;
+            if ($prevName && $prevName !== $projectName) {
+                $prevProjectPath = SECURE_FOLDER_PATH . '/projects/' . $prevName;
+                if (is_dir($prevProjectPath)) {
+                    $prevPublicPath = $prevProjectPath . '/public';
+                    if (!is_dir($prevPublicPath)) {
+                        mkdir($prevPublicPath, 0755, true);
+                    }
+                    foreach (['style', 'assets'] as $folder) {
+                        $liveSrc = PUBLIC_CONTENT_PATH . '/' . $folder;
+                        $projDst = $prevPublicPath . '/' . $folder;
+                        if (is_dir($liveSrc)) {
+                            // Remove old and copy fresh from live
+                            if (is_dir($projDst)) {
+                                $di = new RecursiveDirectoryIterator($projDst, FilesystemIterator::SKIP_DOTS);
+                                $ri = new RecursiveIteratorIterator($di, RecursiveIteratorIterator::CHILD_FIRST);
+                                foreach ($ri as $file) {
+                                    $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
+                                }
+                                rmdir($projDst);
+                            }
+                            // Copy live folder to project
+                            $si = new RecursiveIteratorIterator(
+                                new RecursiveDirectoryIterator($liveSrc, RecursiveDirectoryIterator::SKIP_DOTS),
+                                RecursiveIteratorIterator::SELF_FIRST
+                            );
+                            mkdir($projDst, 0755, true);
+                            foreach ($si as $item) {
+                                $dest = $projDst . '/' . $si->getSubPathname();
+                                $item->isDir() ? (is_dir($dest) || mkdir($dest, 0755, true)) : copy($item->getPathname(), $dest);
+                            }
+                        }
+                    }
+                    $result['previous_project_synced'] = $prevName;
+                }
+            }
+        }
+
         $targetContent = "<?php\n/**\n * Active Project Target Configuration\n * Updated: " . date('Y-m-d H:i:s') . "\n */\n\nreturn [\n    'project' => '" . addslashes($projectName) . "'\n];\n";
         
         // Use fopen/fwrite/fflush for explicit sync
