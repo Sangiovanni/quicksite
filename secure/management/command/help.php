@@ -370,7 +370,7 @@ $GLOBALS['__help_commands'] = [
             'data' => [
                 'build' => 'build_20251214_084504',
                 'target' => 'C:/wamp64/www/prod',
-                'folders' => ['public' => 'www.mysite.com', 'secure' => 'secure'],
+                'folders' => ['public' => 'www.mysite.com', 'secure' => 'secure', 'space' => 'web'],
                 'deployed_paths' => ['public' => 'C:/wamp64/www/prod/www.mysite.com', 'secure' => 'C:/wamp64/www/prod/secure'],
                 'public_deployment' => ['files_copied' => 28, 'directories_created' => 7],
                 'secure_deployment' => ['files_copied' => 18, 'directories_created' => 6],
@@ -387,7 +387,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.directory_create_failed' => 'Failed to create target directory',
             '500.server.permission_denied' => 'Target directory not writable'
         ],
-        'notes' => 'SECURITY: Allows copying to any absolute path - protect your API token! The folder names come from the build manifest (set during build). Without overwrite=true, the command scans for file conflicts and returns a detailed list. Uses file locking to prevent concurrent deployments.'
+        'notes' => 'SECURITY: Allows copying to any absolute path - protect your API token! The folder names come from the build manifest (set during build). The "space" field from the manifest is shown in the response — if it is empty, public files are placed at the public root level (not inside a subdirectory). Without overwrite=true, the command scans for file conflicts and returns a detailed list. Uses file locking to prevent concurrent deployments.'
     ],
     
     'downloadBuild' => [

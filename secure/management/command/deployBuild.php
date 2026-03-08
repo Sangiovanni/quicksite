@@ -112,25 +112,49 @@ if (!is_dir($buildFolder)) {
 $manifestPath = $buildFolder . '/build_manifest.json';
 $buildPublicName = null;
 $buildSecureName = null;
+$buildSpace = null;
 
 if (file_exists($manifestPath)) {
     $manifest = json_decode(file_get_contents($manifestPath), true);
     if ($manifest) {
         $buildPublicName = $manifest['public'] ?? null;
         $buildSecureName = $manifest['secure'] ?? null;
+        $buildSpace = $manifest['space'] ?? '';
     }
 }
 
-// If no manifest, scan for folders
+// If no manifest, scan for folders (handles nested secure paths like "secure/business")
 if (!$buildPublicName || !$buildSecureName) {
+    $foundDirs = [];
     foreach (scandir($buildFolder) as $item) {
         if ($item === '.' || $item === '..' || !is_dir($buildFolder . '/' . $item)) continue;
-        
-        // Secure folder has config.php
-        if (file_exists($buildFolder . '/' . $item . '/config.php')) {
-            $buildSecureName = $item;
+        $foundDirs[] = $item;
+    }
+    
+    // Try to identify secure folder by recursively searching for config.php
+    foreach ($foundDirs as $dir) {
+        $dirPath = $buildFolder . '/' . $dir;
+        // Direct config.php (flat secure folder like "backend/config.php")
+        if (file_exists($dirPath . '/config.php')) {
+            $buildSecureName = $dir;
         } else {
-            $buildPublicName = $item;
+            // Check one level deeper for nested secure paths (e.g., "secure/business/config.php")
+            foreach (scandir($dirPath) as $sub) {
+                if ($sub === '.' || $sub === '..') continue;
+                if (is_dir($dirPath . '/' . $sub) && file_exists($dirPath . '/' . $sub . '/config.php')) {
+                    $buildSecureName = $dir . '/' . $sub;
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Public folder is whichever top-level dir is NOT the secure root
+    $secureRoot = $buildSecureName ? explode('/', $buildSecureName)[0] : null;
+    foreach ($foundDirs as $dir) {
+        if ($dir !== $secureRoot) {
+            $buildPublicName = $dir;
+            break;
         }
     }
 }
@@ -162,6 +186,24 @@ if (!is_dir($sourceSecure)) {
 // Determine destination paths
 $destPublic = $targetPath . DIRECTORY_SEPARATOR . $buildPublicName;
 $destSecure = $targetPath . DIRECTORY_SEPARATOR . $buildSecureName;
+
+// === SAFETY CHECK: Warn when deploying without space to existing multi-project directory ===
+$spaceWarning = null;
+if (empty($buildSpace) && is_dir($destPublic)) {
+    // Check if the destination public dir already has subdirectories (indicating multi-project / space usage)
+    $existingSubdirs = [];
+    foreach (scandir($destPublic) as $item) {
+        if ($item === '.' || $item === '..') continue;
+        if (is_dir($destPublic . DIRECTORY_SEPARATOR . $item) && $item !== 'build') {
+            $existingSubdirs[] = $item;
+        }
+    }
+    if (count($existingSubdirs) > 0) {
+        $spaceWarning = 'This build has no "space" parameter — public files will be placed directly in ' 
+            . $buildPublicName . '/ root alongside existing subdirectories: ' . implode(', ', $existingSubdirs) 
+            . '. If this is a multi-project setup, rebuild with space=<projectname> to place files in their own subdirectory.';
+    }
+}
 
 // === FILE CONFLICT DETECTION ===
 
@@ -195,22 +237,27 @@ $secureConflicts = findConflicts($sourceSecure, $destSecure);
 $totalConflicts = count($publicConflicts) + count($secureConflicts);
 
 if ($totalConflicts > 0 && !$overwrite) {
+    $conflictData = [
+        'total_conflicts' => $totalConflicts,
+        'public_conflicts' => [
+            'folder' => $buildPublicName,
+            'count' => count($publicConflicts),
+            'files' => array_slice($publicConflicts, 0, 50)
+        ],
+        'secure_conflicts' => [
+            'folder' => $buildSecureName,
+            'count' => count($secureConflicts),
+            'files' => array_slice($secureConflicts, 0, 50)
+        ],
+        'space' => $buildSpace ?: '(none — files at public root)',
+        'hint' => 'Set overwrite=true to replace existing files'
+    ];
+    if ($spaceWarning) {
+        $conflictData['warning'] = $spaceWarning;
+    }
     ApiResponse::create(409, 'conflict.files_exist')
         ->withMessage("Found {$totalConflicts} file(s) that would be overwritten")
-        ->withData([
-            'total_conflicts' => $totalConflicts,
-            'public_conflicts' => [
-                'folder' => $buildPublicName,
-                'count' => count($publicConflicts),
-                'files' => array_slice($publicConflicts, 0, 50)
-            ],
-            'secure_conflicts' => [
-                'folder' => $buildSecureName,
-                'count' => count($secureConflicts),
-                'files' => array_slice($secureConflicts, 0, 50)
-            ],
-            'hint' => 'Set overwrite=true to replace existing files'
-        ])
+        ->withData($conflictData)
         ->send();
 }
 
@@ -385,29 +432,36 @@ if (file_exists($licenseSource)) {
 release_deploy_lock();
 
 // === SUCCESS RESPONSE ===
+$responseData = [
+    'build' => $buildName,
+    'target' => $targetPath,
+    'folders' => [
+        'public' => $buildPublicName,
+        'secure' => $buildSecureName,
+        'space' => $buildSpace ?: '(none — files at public root)'
+    ],
+    'deployed_paths' => [
+        'public' => $destPublic,
+        'secure' => $destSecure
+    ],
+    'public_deployment' => [
+        'files_copied' => $publicResult['files'],
+        'directories_created' => $publicResult['directories']
+    ],
+    'secure_deployment' => [
+        'files_copied' => $secureResult['files'],
+        'directories_created' => $secureResult['directories']
+    ],
+    'license_copied' => $licenseCopied,
+    'overwrite_mode' => $overwrite,
+    'files_overwritten' => $overwrite ? $totalConflicts : 0
+];
+
+if ($spaceWarning) {
+    $responseData['warning'] = $spaceWarning;
+}
+
 ApiResponse::create(200, 'operation.success')
     ->withMessage('Build deployed successfully')
-    ->withData([
-        'build' => $buildName,
-        'target' => $targetPath,
-        'folders' => [
-            'public' => $buildPublicName,
-            'secure' => $buildSecureName
-        ],
-        'deployed_paths' => [
-            'public' => $destPublic,
-            'secure' => $destSecure
-        ],
-        'public_deployment' => [
-            'files_copied' => $publicResult['files'],
-            'directories_created' => $publicResult['directories']
-        ],
-        'secure_deployment' => [
-            'files_copied' => $secureResult['files'],
-            'directories_created' => $secureResult['directories']
-        ],
-        'license_copied' => $licenseCopied,
-        'overwrite_mode' => $overwrite,
-        'files_overwritten' => $overwrite ? $totalConflicts : 0
-    ])
+    ->withData($responseData)
     ->send();
