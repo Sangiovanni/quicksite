@@ -284,7 +284,7 @@ window.QuickSiteAPI = (function() {
             throw new Error('No authentication token');
         }
 
-        let url = `/admin/api/${action}`;
+        let url = `${config.adminBase}/api/${action}`;
         if (params.length > 0) {
             url += '/' + params.join('/');
         }
