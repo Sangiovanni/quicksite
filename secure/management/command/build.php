@@ -223,7 +223,7 @@ function release_build_lock() {
 }
 
 // Define build path (inside locked section)
-$buildPath = PUBLIC_FOLDER_ROOT . '/build';
+$buildPath = PUBLIC_CONTENT_PATH . '/build';
 $timestamp = date('Ymd_His');
 $buildFolderName = $buildCustomName !== '' ? $buildCustomName : 'build_' . $timestamp;
 $buildFullPath = $buildPath . '/' . $buildFolderName;

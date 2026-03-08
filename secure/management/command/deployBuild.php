@@ -98,7 +98,7 @@ if (!$isAbsolute) {
 
 // === BUILD VALIDATION ===
 
-$buildDir = PUBLIC_FOLDER_ROOT . '/build';
+$buildDir = PUBLIC_CONTENT_PATH . '/build';
 $buildFolder = $buildDir . '/' . $buildName;
 
 if (!is_dir($buildFolder)) {

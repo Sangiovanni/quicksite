@@ -69,7 +69,7 @@ if (isset($params['dry_run']) && !is_bool($dryRun)) {
         ->send();
 }
 
-$buildPath = PUBLIC_FOLDER_ROOT . '/build';
+$buildPath = PUBLIC_CONTENT_PATH . '/build';
 
 // Check if build directory exists
 if (!is_dir($buildPath)) {

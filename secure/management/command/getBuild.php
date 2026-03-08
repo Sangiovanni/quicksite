@@ -42,7 +42,7 @@ function __command_getBuild(array $params = [], array $urlParams = []): ApiRespo
             ->withErrors([RegexPatterns::validationError('build_name', 'name', $buildName)]);
     }
 
-    $buildPath = PUBLIC_FOLDER_ROOT . '/build';
+    $buildPath = PUBLIC_CONTENT_PATH . '/build';
     $buildFolder = $buildPath . '/' . $buildName;
 
     // Check if build folder exists

@@ -45,7 +45,7 @@ if (!RegexPatterns::match('build_name', $buildName)) {
         ->send();
 }
 
-$buildPath = PUBLIC_FOLDER_ROOT . '/build';
+$buildPath = PUBLIC_CONTENT_PATH . '/build';
 $buildFolder = $buildPath . '/' . $buildName;
 $zipPath = $buildPath . '/' . $buildName . '.zip';
 

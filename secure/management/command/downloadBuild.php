@@ -35,7 +35,7 @@ if (!RegexPatterns::match('build_name', $buildName)) {
         ->send();
 }
 
-$buildPath = PUBLIC_FOLDER_ROOT . '/build';
+$buildPath = PUBLIC_CONTENT_PATH . '/build';
 $zipPath = $buildPath . '/' . $buildName . '.zip';
 
 // Check if ZIP file exists

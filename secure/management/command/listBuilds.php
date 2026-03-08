@@ -25,7 +25,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
  * @return ApiResponse
  */
 function __command_listBuilds(array $params = [], array $urlParams = []): ApiResponse {
-    $buildPath = PUBLIC_FOLDER_ROOT . '/build';
+    $buildPath = PUBLIC_CONTENT_PATH . '/build';
 
     // Check if build directory exists
     if (!is_dir($buildPath)) {
