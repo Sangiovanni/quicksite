@@ -544,7 +544,9 @@ switch ($action) {
                 'id' => $spec['id'],
                 'version' => $spec['version'],
                 'meta' => $spec['meta'],
-                'source' => $spec['_source'] ?? 'core'
+                'source' => $spec['_source'] ?? 'core',
+                'relatedCommands' => $spec['relatedCommands'] ?? [],
+                'hasSteps' => !empty($spec['steps'])
             ];
         }, $specs);
         

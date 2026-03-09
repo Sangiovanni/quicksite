@@ -9,11 +9,52 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 
 $workflowManager = new WorkflowManager();
 $specsByCategory = $workflowManager->getSpecsByCategory();
 $baseUrl = rtrim(BASE_URL, '/');
 
+// Get user's allowed commands for role-based workflow filtering
+$userAllowedCommands = null;
+$currentToken = $router->getToken();
+if ($currentToken) {
+    $authConfig = loadAuthConfig();
+    $tokens = $authConfig['authentication']['tokens'] ?? [];
+    if (isset($tokens[$currentToken])) {
+        $tokenInfo = normalizeTokenInfo($tokens[$currentToken]);
+        $perms = getTokenPermissions($tokenInfo);
+        $userAllowedCommands = $perms['commands'] ?? null;
+    }
+}
+
+// Filter workflows: hide those requiring commands the user cannot run
+if ($userAllowedCommands !== null) {
+    foreach ($specsByCategory as $category => &$specs) {
+        $specs = array_filter($specs, function($spec) use ($userAllowedCommands) {
+            // Check relatedCommands field
+            $required = $spec['relatedCommands'] ?? [];
+            // Also extract commands from steps
+            if (!empty($spec['steps'])) {
+                foreach ($spec['steps'] as $step) {
+                    if (!empty($step['command'])) {
+                        $required[] = $step['command'];
+                    }
+                }
+            }
+            if (empty($required)) return true;
+            // User must have ALL required commands
+            foreach (array_unique($required) as $cmd) {
+                if (!in_array($cmd, $userAllowedCommands, true)) {
+                    return false;
+                }
+            }
+            return true;
+        });
+        if (empty($specs)) unset($specsByCategory[$category]);
+    }
+    unset($specs);
+}
 // Category display configuration
 $categoryConfig = [
     'creation' => [

@@ -210,10 +210,12 @@
     }
 
     /** Execution summary line */
-    function htmlSummary(successCount, failCount) {
+    function htmlSummary(successCount, failCount, abortedAt) {
         const el = document.createElement('div');
         el.style.cssText = 'text-align: center; padding: 12px; margin-top: 8px; border-top: 1px solid var(--admin-border); font-weight: 500;';
-        el.innerHTML = `✅ ${successCount} succeeded` + (failCount > 0 ? ` &nbsp;|&nbsp; ❌ ${failCount} failed` : '');
+        let html = `✅ ${successCount} succeeded` + (failCount > 0 ? ` &nbsp;|&nbsp; ❌ ${failCount} failed` : '');
+        if (abortedAt) html += ` &nbsp;|&nbsp; ⛔ Aborted at: ${abortedAt}`;
+        el.innerHTML = html;
         return el;
     }
 
@@ -1546,13 +1548,25 @@
                     resultItem.querySelector('.result-item__message').textContent =
                         result.message || result.data?.message || (isSuccess ? 'Success' : 'Failed');
                 }
-                if (isSuccess) successCount++; else failCount++;
+                if (isSuccess) successCount++; else {
+                    failCount++;
+                    if (cmd.abortOnFail) {
+                        if (els.executionProgress) els.executionProgress.style.display = 'none';
+                        if (els.executionResults) els.executionResults.appendChild(htmlSummary(successCount, failCount, cmd.command));
+                        return;
+                    }
+                }
             } catch (error) {
                 failCount++;
                 if (resultItem) {
                     resultItem.className = 'result-item result-item--error';
                     resultItem.querySelector('.result-item__icon').textContent = '❌';
                     resultItem.querySelector('.result-item__message').textContent = error.message;
+                }
+                if (cmd.abortOnFail) {
+                    if (els.executionProgress) els.executionProgress.style.display = 'none';
+                    if (els.executionResults) els.executionResults.appendChild(htmlSummary(successCount, failCount, cmd.command));
+                    return;
                 }
             }
             await new Promise(resolve => setTimeout(resolve, 100));

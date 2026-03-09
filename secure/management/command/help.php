@@ -387,7 +387,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.directory_create_failed' => 'Failed to create target directory',
             '500.server.permission_denied' => 'Target directory not writable'
         ],
-        'notes' => 'SECURITY: Allows copying to any absolute path - protect your API token! The folder names come from the build manifest (set during build). The "space" field from the manifest is shown in the response — if it is empty, public files are placed at the public root level (not inside a subdirectory). Without overwrite=true, the command scans for file conflicts and returns a detailed list. Uses file locking to prevent concurrent deployments.'
+        'notes' => 'SECURITY: Allows copying to any absolute path - protect your API token! The folder names come from the build manifest (set during build). The "space" field from the manifest is shown in the response — if it is empty, public files are placed at the public root level (not inside a subdirectory). Without overwrite=true, the command scans for file conflicts and returns a detailed list. Uses file locking to prevent concurrent deployments. NGINX USERS: The build includes a ready-to-use nginx_routes.conf inside the secure folder. After deploying, add "include /path/to/secure/nginx_routes.conf;" inside your server {} block, then run "nginx -t && nginx -s reload". Apache users (.htaccess) need no extra step.'
     ],
     
     'downloadBuild' => [

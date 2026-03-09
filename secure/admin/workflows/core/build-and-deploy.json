@@ -1,0 +1,90 @@
+{
+    "$schema": "../schema.json",
+    "id": "build-and-deploy",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "🚀",
+        "titleKey": "workflows.specs.buildAndDeploy.title",
+        "descriptionKey": "workflows.specs.buildAndDeploy.description",
+        "category": "advanced",
+        "tags": ["build", "deploy", "production"],
+        "difficulty": "intermediate"
+    },
+    "parameters": [
+        {
+            "id": "buildName",
+            "type": "text",
+            "labelKey": "workflows.specs.buildAndDeploy.params.buildName.label",
+            "helpKey": "workflows.specs.buildAndDeploy.params.buildName.help",
+            "placeholder": "my-release",
+            "default": ""
+        },
+        {
+            "id": "publicFolder",
+            "type": "text",
+            "labelKey": "workflows.specs.buildAndDeploy.params.publicFolder.label",
+            "helpKey": "workflows.specs.buildAndDeploy.params.publicFolder.help",
+            "placeholder": "public",
+            "default": "public"
+        },
+        {
+            "id": "secureFolder",
+            "type": "text",
+            "labelKey": "workflows.specs.buildAndDeploy.params.secureFolder.label",
+            "helpKey": "workflows.specs.buildAndDeploy.params.secureFolder.help",
+            "placeholder": "secure",
+            "default": "secure"
+        },
+        {
+            "id": "spaceFolder",
+            "type": "text",
+            "labelKey": "workflows.specs.buildAndDeploy.params.spaceFolder.label",
+            "helpKey": "workflows.specs.buildAndDeploy.params.spaceFolder.help",
+            "placeholder": "",
+            "default": ""
+        },
+        {
+            "id": "targetPath",
+            "type": "text",
+            "labelKey": "workflows.specs.buildAndDeploy.params.targetPath.label",
+            "helpKey": "workflows.specs.buildAndDeploy.params.targetPath.help",
+            "placeholder": "/var/www/mysite",
+            "validation": {
+                "required": true
+            }
+        },
+        {
+            "id": "overwrite",
+            "type": "checkbox",
+            "labelKey": "workflows.specs.buildAndDeploy.params.overwrite.label",
+            "helpKey": "workflows.specs.buildAndDeploy.params.overwrite.help",
+            "default": false
+        }
+    ],
+    "relatedCommands": ["build", "deployBuild"],
+    "steps": [
+        {
+            "comment": "=== PHASE 1: BUILD ===",
+            "command": "build",
+            "method": "POST",
+            "abortOnFail": true,
+            "params": {
+                "name": "{{param.buildName}}",
+                "public": "{{param.publicFolder}}",
+                "secure": "{{param.secureFolder}}",
+                "space": "{{param.spaceFolder}}"
+            }
+        },
+        {
+            "comment": "=== PHASE 2: DEPLOY ===",
+            "command": "deployBuild",
+            "method": "POST",
+            "abortOnFail": true,
+            "params": {
+                "name": "{{param.buildName}}",
+                "targetPath": "{{param.targetPath}}",
+                "overwrite": "{{param.overwrite}}"
+            }
+        }
+    ]
+}
