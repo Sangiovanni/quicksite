@@ -80,6 +80,9 @@
             "command": "deployBuild",
             "method": "POST",
             "abortOnFail": true,
+            "retryOn": [409],
+            "maxRetries": 3,
+            "retryDelayMs": 2000,
             "params": {
                 "name": "{{param.buildName}}",
                 "targetPath": "{{param.targetPath}}",

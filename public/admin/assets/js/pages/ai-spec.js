@@ -1521,47 +1521,74 @@
             }
             const resultItem = document.getElementById('result-' + i);
 
-            try {
-                const params = {};
-                for (const [key, value] of Object.entries(cmd)) {
-                    if (key !== 'command' && key !== 'method') params[key] = value;
-                }
-                const method = cmd.method || 'POST';
-                const url = config.managementUrl + cmd.command;
-                const options = {
-                    method,
-                    headers: { 'Authorization': 'Bearer ' + config.token, 'Content-Type': 'application/json' }
-                };
-                if (method !== 'GET' && method !== 'DELETE' && Object.keys(params).length > 0) {
-                    options.body = JSON.stringify(params);
-                }
-                const response = await fetch(url, options);
-                const text = await response.text();
-                let result;
-                try { result = text ? JSON.parse(text) : { status: response.status }; }
-                catch (e) { result = { status: response.status, message: text || 'No response' }; }
+            const maxAttempts = (cmd.retryOn && cmd.retryOn.length > 0) ? (cmd.maxRetries || 3) : 1;
+            const retryDelay = cmd.retryDelayMs || 1000;
+            let lastError = null;
+            let lastResult = null;
+            let lastResponse = null;
+            let succeeded = false;
 
-                const isSuccess = response.ok || result.status === 200 || result.success;
-                if (resultItem) {
-                    resultItem.className = 'result-item ' + (isSuccess ? 'result-item--success' : 'result-item--error');
-                    resultItem.querySelector('.result-item__icon').textContent = isSuccess ? '✅' : '❌';
-                    resultItem.querySelector('.result-item__message').textContent =
-                        result.message || result.data?.message || (isSuccess ? 'Success' : 'Failed');
-                }
-                if (isSuccess) successCount++; else {
-                    failCount++;
-                    if (cmd.abortOnFail) {
-                        if (els.executionProgress) els.executionProgress.style.display = 'none';
-                        if (els.executionResults) els.executionResults.appendChild(htmlSummary(successCount, failCount, cmd.command));
-                        return;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    if (attempt > 1) {
+                        if (els.progressText) {
+                            els.progressText.textContent = `Retrying ${cmd.command} (attempt ${attempt}/${maxAttempts})...`;
+                        }
+                        if (resultItem) {
+                            resultItem.querySelector('.result-item__message').textContent = `Retry ${attempt}/${maxAttempts} in ${retryDelay / 1000}s...`;
+                            resultItem.querySelector('.result-item__icon').textContent = '🔄';
+                        }
+                        await new Promise(resolve => setTimeout(resolve, retryDelay));
                     }
+
+                    const params = {};
+                    for (const [key, value] of Object.entries(cmd)) {
+                        if (!['command', 'method', 'abortOnFail', 'retryOn', 'maxRetries', 'retryDelayMs', 'comment', 'condition', 'forEach', 'filter'].includes(key)) params[key] = value;
+                    }
+                    const method = cmd.method || 'POST';
+                    const url = config.managementUrl + cmd.command;
+                    const options = {
+                        method,
+                        headers: { 'Authorization': 'Bearer ' + config.token, 'Content-Type': 'application/json' }
+                    };
+                    if (method !== 'GET' && method !== 'DELETE' && Object.keys(params).length > 0) {
+                        options.body = JSON.stringify(params);
+                    }
+                    lastResponse = await fetch(url, options);
+                    const text = await lastResponse.text();
+                    try { lastResult = text ? JSON.parse(text) : { status: lastResponse.status }; }
+                    catch (e) { lastResult = { status: lastResponse.status, message: text || 'No response' }; }
+
+                    const isSuccess = lastResponse.ok || lastResult.status === 200 || lastResult.success;
+                    if (isSuccess) { succeeded = true; break; }
+
+                    // Check if this status code is retryable
+                    if (cmd.retryOn && cmd.retryOn.includes(lastResponse.status) && attempt < maxAttempts) {
+                        continue; // retry
+                    }
+                    break; // non-retryable failure
+                } catch (error) {
+                    lastError = error;
+                    if (cmd.retryOn && attempt < maxAttempts) continue; // retry on network error
+                    break;
                 }
-            } catch (error) {
+            }
+
+            if (succeeded) {
+                successCount++;
+                if (resultItem) {
+                    resultItem.className = 'result-item result-item--success';
+                    resultItem.querySelector('.result-item__icon').textContent = '✅';
+                    resultItem.querySelector('.result-item__message').textContent =
+                        lastResult.message || lastResult.data?.message || 'Success';
+                }
+            } else {
                 failCount++;
                 if (resultItem) {
                     resultItem.className = 'result-item result-item--error';
                     resultItem.querySelector('.result-item__icon').textContent = '❌';
-                    resultItem.querySelector('.result-item__message').textContent = error.message;
+                    resultItem.querySelector('.result-item__message').textContent =
+                        lastError ? lastError.message : (lastResult?.message || lastResult?.data?.message || 'Failed');
                 }
                 if (cmd.abortOnFail) {
                     if (els.executionProgress) els.executionProgress.style.display = 'none';

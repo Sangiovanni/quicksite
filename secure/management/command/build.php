@@ -204,13 +204,23 @@ if (!is_dir(SECURE_FOLDER_PATH)) {
         ->send();
 }
 
+// Define build path before locking (so we can scope the lock to this build)
+$buildPath = PUBLIC_CONTENT_PATH . '/build';
+$timestamp = date('Ymd_His');
+$buildFolderName = $buildCustomName !== '' ? $buildCustomName : 'build_' . $timestamp;
+$buildFullPath = $buildPath . '/' . $buildFolderName;
+
+// Sanitize folder name for lock file (replace / with _ to make it filename-safe)
+$lockId = 'build_' . str_replace('/', '_', $buildFolderName);
+
 // === CRITICAL SECTION: Use file lock to prevent concurrent builds ===
-// Acquire exclusive lock (blocks other processes)
-$lock = acquireLock('build');
+// Lock is scoped per build name — different builds can run in parallel
+$lock = acquireLock($lockId);
 
 if (!$lock) {
     ApiResponse::create(409, 'conflict.operation_in_progress')
-        ->withMessage('Another build operation is in progress. Please wait and try again.')
+        ->withMessage('Another build with this name is already in progress. Please wait and try again.')
+        ->withData(['buildName' => $buildFolderName])
         ->send();
 }
 
@@ -221,12 +231,6 @@ function release_build_lock() {
         releaseLock($lock);
     }
 }
-
-// Define build path (inside locked section)
-$buildPath = PUBLIC_CONTENT_PATH . '/build';
-$timestamp = date('Ymd_His');
-$buildFolderName = $buildCustomName !== '' ? $buildCustomName : 'build_' . $timestamp;
-$buildFullPath = $buildPath . '/' . $buildFolderName;
 
 // Step 1: Create/clear build directory
 if (!file_exists($buildPath)) {

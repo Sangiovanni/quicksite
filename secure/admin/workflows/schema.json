@@ -367,6 +367,25 @@
           "type": "boolean",
           "description": "If true, abort the entire workflow if this command fails",
           "default": false
+        },
+        "retryOn": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "description": "HTTP status codes that should trigger an automatic retry (e.g., [409, 503]). Only retries when the response status matches one of these codes."
+        },
+        "maxRetries": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 3,
+          "description": "Maximum number of retry attempts when retryOn matches. Default: 3."
+        },
+        "retryDelayMs": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 30000,
+          "default": 1000,
+          "description": "Delay in milliseconds between retry attempts. Default: 1000ms."
         }
       },
       "oneOf": [

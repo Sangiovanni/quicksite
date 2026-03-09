@@ -98,10 +98,12 @@ if (!$isAbsolute) {
 
 // === BUILD VALIDATION ===
 
-// Check that no build is currently in progress (would mean files are incomplete)
-if (isLocked('build')) {
-    ApiResponse::create(409, 'conflict.operation_in_progress')
-        ->withMessage('A build operation is currently in progress. Wait for it to complete before deploying.')
+// Check that no build with this name is currently in progress (would mean files are incomplete)
+$buildLockId = 'build_' . str_replace('/', '_', $buildName);
+if (isLocked($buildLockId)) {
+    ApiResponse::create(409, 'conflict.build_in_progress')
+        ->withMessage('A build operation for "' . $buildName . '" is currently in progress. Wait for it to complete before deploying.')
+        ->withData(['buildName' => $buildName])
         ->send();
 }
 
@@ -286,12 +288,14 @@ if (!is_writable($targetPath)) {
         ->send();
 }
 
-// === ACQUIRE LOCK ===
-$lock = acquireLock('deploy');
+// === ACQUIRE LOCK (scoped to target path so parallel deploys to different targets are allowed) ===
+$deployLockId = 'deploy_' . md5($targetPath);
+$lock = acquireLock($deployLockId);
 
 if (!$lock) {
     ApiResponse::create(409, 'conflict.operation_in_progress')
-        ->withMessage('Another deployment is in progress')
+        ->withMessage('Another deployment to this target is already in progress')
+        ->withData(['targetPath' => $targetPath])
         ->send();
 }
 
