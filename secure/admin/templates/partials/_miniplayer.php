@@ -67,4 +67,4 @@ $miniplayerSiteUrl .= '?_editor=1';
 </div>
 
 <!-- Miniplayer JavaScript -->
-<script src="<?= $baseUrl ?>/admin/assets/js/components/miniplayer.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/components/miniplayer.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/components/miniplayer.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/components/miniplayer.js') ?>"></script>

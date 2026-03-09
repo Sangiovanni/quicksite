@@ -86,4 +86,4 @@
         baseUrl: '<?= rtrim(BASE_URL, '/') ?>'
     };
 </script>
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/docs.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/docs.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/docs.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/docs.js') ?>"></script>

@@ -296,7 +296,7 @@ $publicFiles = [
 ];
 
 foreach ($publicFiles as $file) {
-    $source = PUBLIC_FOLDER_ROOT . '/' . $file;
+    $source = PUBLIC_CONTENT_PATH . '/' . $file;
     $dest = $publicContentPath . '/' . $file;  // Use publicContentPath (includes space if set)
     
     if (file_exists($source)) {

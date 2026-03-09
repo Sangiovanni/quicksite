@@ -15,7 +15,7 @@ $baseUrl = rtrim(BASE_URL, '/');
 window.QUICKSITE_CONFIG = window.QUICKSITE_CONFIG || {};
 window.QUICKSITE_CONFIG.commandUrl = '<?= $router->url('command') ?>';
 </script>
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/history.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/history.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/history.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/history.js') ?>"></script>
 
 <div class="admin-page-header">
     <h1 class="admin-page-header__title"><?= __admin('history.title') ?></h1>

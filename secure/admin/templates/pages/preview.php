@@ -108,7 +108,7 @@ if (is_dir($componentsDir)) {
     <?php include __DIR__ . '/preview/main-area.php'; ?>
 </div><!-- End preview-workspace -->
 
-<script src="<?= $baseUrl ?>/admin/assets/js/components/colorpicker.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/components/colorpicker.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/components/colorpicker.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/components/colorpicker.js') ?>"></script>
 <?php include __DIR__ . '/preview-config.php'; ?>
 
 </div><!-- End preview-page wrapper -->

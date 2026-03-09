@@ -678,4 +678,4 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
 </div>
 
 
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/ai-spec.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/ai-spec.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/ai-spec.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai-spec.js') ?>"></script>

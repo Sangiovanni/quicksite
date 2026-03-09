@@ -144,7 +144,7 @@ function getCommandDocumentation(string $command): ?array {
     </div>
 </div>
 
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/command-form.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/command-form.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/command-form.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/command-form.js') ?>"></script>
 
 </div> <!-- .admin-command-form-page -->
 

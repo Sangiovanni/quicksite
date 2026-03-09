@@ -17,7 +17,7 @@ $assetVersion = '1.0.0';
 // Helper to get versioned asset URL
 $versionedAsset = function($path) use ($baseUrl, $assetVersion) {
     // In development, use filemtime for instant cache invalidation
-    $fullPath = PUBLIC_FOLDER_ROOT . '/admin/assets' . $path;
+    $fullPath = PUBLIC_CONTENT_PATH . '/admin/assets' . $path;
     if (file_exists($fullPath)) {
         $version = filemtime($fullPath);
     } else {

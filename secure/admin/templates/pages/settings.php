@@ -18,7 +18,7 @@ window.QUICKSITE_CONFIG.commandUrl = '<?= $router->getBaseUrl() ?>/command';
 window.QUICKSITE_CONFIG.aiSettingsUrl = '<?= $router->url('ai-settings') ?>';
 window.QUICKSITE_CONFIG.quicksiteVersion = '<?= defined('QUICKSITE_VERSION') ? QUICKSITE_VERSION : '1.6.0' ?>';
 </script>
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/settings.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/settings.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/settings.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/settings.js') ?>"></script>
 
 <div class="admin-page-header">
     <h1 class="admin-page-header__title"><?= __admin('settings.title') ?></h1>

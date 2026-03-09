@@ -154,7 +154,7 @@ window.QUICKSITE_CONFIG.translations = {
     saved: '<?= __admin('workflows.editor.saved', 'Workflow saved successfully!') ?>'
 };
 </script>
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/ai-editor.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/ai-editor.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/ai-editor.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai-editor.js') ?>"></script>
 
 <div class="ai-editor">
     <!-- Breadcrumb -->

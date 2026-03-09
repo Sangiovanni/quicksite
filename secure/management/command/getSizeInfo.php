@@ -148,7 +148,7 @@ if (!function_exists('sizeinfo_getFolderInfo')) {
  */
 function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiResponse {
     // Normalize paths using realpath for proper resolution
-    $publicRoot = realpath(PUBLIC_FOLDER_ROOT) ?: PUBLIC_FOLDER_ROOT;
+    $publicRoot = realpath(PUBLIC_CONTENT_PATH) ?: PUBLIC_CONTENT_PATH;
     $secureRoot = realpath(SECURE_FOLDER_PATH) ?: SECURE_FOLDER_PATH;
     
     // Convert backslashes to forward slashes for consistency

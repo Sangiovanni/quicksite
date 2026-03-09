@@ -246,16 +246,16 @@ window.PreviewConfig = {
 </script>
 
 <!-- Preview JavaScript Modules (load order matters) -->
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-state.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/preview/preview-state.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-navigation.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/preview/preview-navigation.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-theme.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/preview/preview-style-theme.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-animations.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/preview/preview-style-animations.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-selectors.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/preview/preview-style-selectors.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-editor.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/preview/preview-style-editor.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-js-interactions.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/preview/preview-js-interactions.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-transition-editor.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/preview/preview-transition-editor.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-miniplayer.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/preview/preview-miniplayer.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-sidebar-resize.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/preview/preview-sidebar-resize.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-state.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-state.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-navigation.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-navigation.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-theme.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-theme.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-animations.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-animations.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-selectors.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-selectors.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-editor.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-editor.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-js-interactions.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-js-interactions.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-transition-editor.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-transition-editor.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-miniplayer.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-miniplayer.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-sidebar-resize.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-sidebar-resize.js') ?>"></script>
 
 <!-- Preview JavaScript (Main) -->
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/preview/preview.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview.js') ?>"></script>

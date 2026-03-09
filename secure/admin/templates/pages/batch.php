@@ -189,4 +189,4 @@ $baseUrl = rtrim(BASE_URL, '/');
     </div>
 </div>
 
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/batch.js?v=<?= filemtime(PUBLIC_FOLDER_ROOT . '/admin/assets/js/pages/batch.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/batch.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/batch.js') ?>"></script>
