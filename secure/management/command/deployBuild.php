@@ -98,6 +98,13 @@ if (!$isAbsolute) {
 
 // === BUILD VALIDATION ===
 
+// Check that no build is currently in progress (would mean files are incomplete)
+if (isLocked('build')) {
+    ApiResponse::create(409, 'conflict.operation_in_progress')
+        ->withMessage('A build operation is currently in progress. Wait for it to complete before deploying.')
+        ->send();
+}
+
 $buildDir = PUBLIC_CONTENT_PATH . '/build';
 $buildFolder = $buildDir . '/' . $buildName;
 
