@@ -1009,6 +1009,10 @@
                         "placeholder": "ex: /var/www/monsite ou C:\\wamp64\\www\\monsite",
                         "help": "Chemin absolu sur le serveur où le build sera déployé. Les dossiers public et sécurisé seront créés comme enfants de ce chemin."
                     },
+                    "deletePrevious": {
+                        "label": "Supprimer le build existant d'abord",
+                        "help": "Si un build avec ce nom existe déjà, le supprimer avant d'en créer un nouveau. Utile lors d'une reconstruction pour éviter les fichiers obsolètes."
+                    },
                     "overwrite": {
                         "label": "Écraser les fichiers existants",
                         "help": "Si coché, les fichiers existants au chemin cible seront remplacés. Sinon le déploiement sera annulé si des conflits sont trouvés."

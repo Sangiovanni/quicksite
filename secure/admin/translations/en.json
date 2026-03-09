@@ -995,6 +995,10 @@
                         "placeholder": "e.g., /var/www/mysite or C:\\wamp64\\www\\mysite",
                         "help": "Absolute path on the server where the build will be deployed. The public and secure folders will be created as children of this path."
                     },
+                    "deletePrevious": {
+                        "label": "Delete existing build first",
+                        "help": "If a build with this name already exists, delete it before creating a new one. Useful when rebuilding to avoid stale files."
+                    },
                     "overwrite": {
                         "label": "Overwrite existing files",
                         "help": "If checked, existing files at the target path will be replaced. Otherwise the deploy will abort if conflicts are found."

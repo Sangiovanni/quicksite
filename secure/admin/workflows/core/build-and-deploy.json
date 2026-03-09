@@ -60,6 +60,13 @@
             "default": ""
         },
         {
+            "id": "deletePrevious",
+            "type": "checkbox",
+            "labelKey": "workflows.specs.buildAndDeploy.params.deletePrevious.label",
+            "helpKey": "workflows.specs.buildAndDeploy.params.deletePrevious.help",
+            "default": false
+        },
+        {
             "id": "overwrite",
             "type": "checkbox",
             "labelKey": "workflows.specs.buildAndDeploy.params.overwrite.label",
@@ -67,8 +74,18 @@
             "default": false
         }
     ],
-    "relatedCommands": ["build", "deployBuild"],
+    "relatedCommands": ["build", "deployBuild", "deleteBuild"],
     "steps": [
+        {
+            "comment": "=== PHASE 0: DELETE EXISTING BUILD (optional) ===",
+            "command": "deleteBuild",
+            "method": "DELETE",
+            "condition": "param.deletePrevious === true",
+            "abortOnFail": false,
+            "params": {
+                "name": "{{param.buildName}}"
+            }
+        },
         {
             "comment": "=== PHASE 1: BUILD ===",
             "command": "build",
