@@ -348,10 +348,11 @@ $GLOBALS['__help_commands'] = [
                 'validation' => 'Must match format build_YYYYMMDD_HHMMSS'
             ],
             'targetPath' => [
-                'required' => true,
+                'required' => false,
                 'type' => 'string',
-                'description' => 'Absolute path to the root directory. The build\'s public and secure folders will be placed inside it.',
+                'description' => 'Absolute path to the root directory. The build\'s public and secure folders will be placed inside it. Defaults to SERVER_ROOT (current project root) when omitted.',
                 'example' => '/var/www/mysite',
+                'default' => 'SERVER_ROOT',
                 'validation' => 'Must be absolute path, no path traversal (..)'
             ],
             'overwrite' => [

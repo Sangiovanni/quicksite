@@ -34,6 +34,11 @@ if (is_string($rawOverwrite)) {
     $overwrite = (bool) $rawOverwrite;
 }
 
+// Default targetPath to SERVER_ROOT (the project root where public/ and secure/ live)
+if (empty($targetPath)) {
+    $targetPath = SERVER_ROOT;
+}
+
 // === VALIDATION ===
 
 // Validate build name
@@ -52,13 +57,6 @@ if (!is_string($buildName) || !RegexPatterns::match('build_name', $buildName)) {
 }
 
 // Validate targetPath
-if (empty($targetPath)) {
-    ApiResponse::create(400, 'validation.required')
-        ->withMessage('targetPath is required')
-        ->withErrors([['field' => 'targetPath', 'reason' => 'missing']])
-        ->send();
-}
-
 if (!is_string($targetPath)) {
     ApiResponse::create(400, 'validation.invalid_type')
         ->withMessage('targetPath must be a string')

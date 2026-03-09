@@ -44,14 +44,20 @@
             "default": ""
         },
         {
+            "id": "customTarget",
+            "type": "checkbox",
+            "labelKey": "workflows.specs.buildAndDeploy.params.customTarget.label",
+            "helpKey": "workflows.specs.buildAndDeploy.params.customTarget.help",
+            "default": false
+        },
+        {
             "id": "targetPath",
             "type": "text",
             "labelKey": "workflows.specs.buildAndDeploy.params.targetPath.label",
             "helpKey": "workflows.specs.buildAndDeploy.params.targetPath.help",
             "placeholderKey": "workflows.specs.buildAndDeploy.params.targetPath.placeholder",
-            "validation": {
-                "required": true
-            }
+            "condition": "customTarget === true",
+            "default": ""
         },
         {
             "id": "overwrite",

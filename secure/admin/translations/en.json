@@ -986,6 +986,10 @@
                         "placeholder": "e.g., blog, my/project",
                         "help": "Optional sub-path inside the public folder. If set, the site will be at yoursite.com/space instead of the root. Leave empty for root deployment."
                     },
+                    "customTarget": {
+                        "label": "Deploy to a different server path",
+                        "help": "By default, the build deploys to the current server root (where the public and secure folders already live). Check this to specify a different target path."
+                    },
                     "targetPath": {
                         "label": "Target Path",
                         "placeholder": "e.g., /var/www/mysite or C:\\wamp64\\www\\mysite",

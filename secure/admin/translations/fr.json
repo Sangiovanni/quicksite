@@ -1000,6 +1000,10 @@
                         "placeholder": "ex: blog, mon/projet",
                         "help": "Sous-chemin optionnel dans le dossier public. Si défini, le site sera à votresite.com/espace au lieu de la racine. Laisser vide pour un déploiement à la racine."
                     },
+                    "customTarget": {
+                        "label": "Déployer vers un autre chemin serveur",
+                        "help": "Par défaut, le build se déploie vers la racine serveur actuelle (où les dossiers public et sécurisé se trouvent déjà). Cochez ceci pour spécifier un chemin cible différent."
+                    },
                     "targetPath": {
                         "label": "Chemin cible",
                         "placeholder": "ex: /var/www/monsite ou C:\\wamp64\\www\\monsite",
