@@ -16,7 +16,7 @@
             "type": "text",
             "labelKey": "workflows.specs.buildAndDeploy.params.buildName.label",
             "helpKey": "workflows.specs.buildAndDeploy.params.buildName.help",
-            "placeholder": "my-release",
+            "placeholderKey": "workflows.specs.buildAndDeploy.params.buildName.placeholder",
             "default": ""
         },
         {
@@ -24,7 +24,7 @@
             "type": "text",
             "labelKey": "workflows.specs.buildAndDeploy.params.publicFolder.label",
             "helpKey": "workflows.specs.buildAndDeploy.params.publicFolder.help",
-            "placeholder": "public",
+            "placeholderKey": "workflows.specs.buildAndDeploy.params.publicFolder.placeholder",
             "default": "public"
         },
         {
@@ -32,7 +32,7 @@
             "type": "text",
             "labelKey": "workflows.specs.buildAndDeploy.params.secureFolder.label",
             "helpKey": "workflows.specs.buildAndDeploy.params.secureFolder.help",
-            "placeholder": "secure",
+            "placeholderKey": "workflows.specs.buildAndDeploy.params.secureFolder.placeholder",
             "default": "secure"
         },
         {
@@ -40,7 +40,7 @@
             "type": "text",
             "labelKey": "workflows.specs.buildAndDeploy.params.spaceFolder.label",
             "helpKey": "workflows.specs.buildAndDeploy.params.spaceFolder.help",
-            "placeholder": "",
+            "placeholderKey": "workflows.specs.buildAndDeploy.params.spaceFolder.placeholder",
             "default": ""
         },
         {
@@ -48,7 +48,7 @@
             "type": "text",
             "labelKey": "workflows.specs.buildAndDeploy.params.targetPath.label",
             "helpKey": "workflows.specs.buildAndDeploy.params.targetPath.help",
-            "placeholder": "/var/www/mysite",
+            "placeholderKey": "workflows.specs.buildAndDeploy.params.targetPath.placeholder",
             "validation": {
                 "required": true
             }

@@ -26,7 +26,13 @@ require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 $params = $trimParametersManagement->params();
 $buildName = $params['name'] ?? null;
 $targetPath = $params['targetPath'] ?? null;
-$overwrite = $params['overwrite'] ?? false;
+// Cast overwrite to boolean (form checkboxes send "true"/"false" strings)
+$rawOverwrite = $params['overwrite'] ?? false;
+if (is_string($rawOverwrite)) {
+    $overwrite = in_array(strtolower($rawOverwrite), ['true', '1', 'yes'], true);
+} else {
+    $overwrite = (bool) $rawOverwrite;
+}
 
 // === VALIDATION ===
 
@@ -60,13 +66,7 @@ if (!is_string($targetPath)) {
         ->send();
 }
 
-// Validate overwrite is boolean
-if (isset($params['overwrite']) && !is_bool($overwrite)) {
-    ApiResponse::create(400, 'validation.invalid_type')
-        ->withMessage('overwrite must be a boolean')
-        ->withErrors([['field' => 'overwrite', 'expected' => 'boolean']])
-        ->send();
-}
+
 
 // Security: Block path traversal attempts
 if (strpos($targetPath, '..') !== false) {

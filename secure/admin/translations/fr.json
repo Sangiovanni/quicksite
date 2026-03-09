@@ -976,6 +976,41 @@
                 "title": "Page d'Atterrissage (Multilingue)",
                 "description": "Landing page avec traductions EN + FR et sélecteur de langue."
             },
+            "buildAndDeploy": {
+                "title": "Build & Déploiement",
+                "description": "Créer une version de production de votre site web et la déployer vers un chemin serveur cible en une seule étape.",
+                "params": {
+                    "buildName": {
+                        "label": "Nom du build",
+                        "placeholder": "ex: ma-release-v2",
+                        "help": "Un nom mémorable pour identifier ce build (utilisé aussi si vous voulez le télécharger plus tard en ZIP)"
+                    },
+                    "publicFolder": {
+                        "label": "Dossier public",
+                        "placeholder": "ex: public, www, html",
+                        "help": "Le nom du dossier racine accessible depuis le web sur le serveur cible (généralement le même que celui utilisé pour votre déploiement QuickSite)"
+                    },
+                    "secureFolder": {
+                        "label": "Dossier sécurisé",
+                        "placeholder": "ex: secure, backend",
+                        "help": "Le dossier pour les fichiers côté serveur, placé comme frère du dossier public sur la cible (non accessible depuis le web)"
+                    },
+                    "spaceFolder": {
+                        "label": "Espace (sous-chemin URL)",
+                        "placeholder": "ex: blog, mon/projet",
+                        "help": "Sous-chemin optionnel dans le dossier public. Si défini, le site sera à votresite.com/espace au lieu de la racine. Laisser vide pour un déploiement à la racine."
+                    },
+                    "targetPath": {
+                        "label": "Chemin cible",
+                        "placeholder": "ex: /var/www/monsite ou C:\\wamp64\\www\\monsite",
+                        "help": "Chemin absolu sur le serveur où le build sera déployé. Les dossiers public et sécurisé seront créés comme enfants de ce chemin."
+                    },
+                    "overwrite": {
+                        "label": "Écraser les fichiers existants",
+                        "help": "Si coché, les fichiers existants au chemin cible seront remplacés. Sinon le déploiement sera annulé si des conflits sont trouvés."
+                    }
+                }
+            },
             "freshStart": {
                 "title": "Nouveau Départ",
                 "description": "Réinitialiser le projet à un état propre. Supprime toutes les routes (sauf home), les assets et les langues supplémentaires.",

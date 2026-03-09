@@ -287,8 +287,11 @@ class WorkflowManager {
                         'params' => $this->resolveStepParams($step['params'] ?? [], $context)
                     ];
                     
-                    if (isset($step['abortOnFail'])) {
-                        $resolvedStep['abortOnFail'] = $step['abortOnFail'];
+                    // Carry over execution control properties
+                    foreach (['abortOnFail', 'retryOn', 'maxRetries', 'retryDelayMs'] as $prop) {
+                        if (isset($step[$prop])) {
+                            $resolvedStep[$prop] = $step[$prop];
+                        }
                     }
                     
                     $expandedSteps[] = $resolvedStep;
@@ -413,8 +416,11 @@ class WorkflowManager {
                 'params' => $this->resolveStepParams($step['params'] ?? [], $itemContext)
             ];
             
-            if (isset($step['abortOnFail'])) {
-                $resolvedStep['abortOnFail'] = $step['abortOnFail'];
+            // Carry over execution control properties
+            foreach (['abortOnFail', 'retryOn', 'maxRetries', 'retryDelayMs'] as $prop) {
+                if (isset($step[$prop])) {
+                    $resolvedStep[$prop] = $step[$prop];
+                }
             }
             
             $expanded[] = $resolvedStep;

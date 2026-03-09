@@ -962,6 +962,41 @@
                 "title": "Landing Page (Multilingual)",
                 "description": "Single-page landing with EN + FR translations and language switcher."
             },
+            "buildAndDeploy": {
+                "title": "Build & Deploy",
+                "description": "Create a production build of your website and deploy it to a target server path in one step.",
+                "params": {
+                    "buildName": {
+                        "label": "Build Name",
+                        "placeholder": "e.g., my-release-v2",
+                        "help": "A memorable name to identify this build (also used if you want to download it later as a ZIP)"
+                    },
+                    "publicFolder": {
+                        "label": "Public Folder",
+                        "placeholder": "e.g., public, www, html",
+                        "help": "The web-accessible root folder name on the target server (usually the same as the one used for your QuickSite deployment)"
+                    },
+                    "secureFolder": {
+                        "label": "Secure Folder",
+                        "placeholder": "e.g., secure, backend",
+                        "help": "The folder for server-side files, placed as a sibling to the public folder on the target (not web-accessible)"
+                    },
+                    "spaceFolder": {
+                        "label": "Space (URL sub-path)",
+                        "placeholder": "e.g., blog, my/project",
+                        "help": "Optional sub-path inside the public folder. If set, the site will be at yoursite.com/space instead of the root. Leave empty for root deployment."
+                    },
+                    "targetPath": {
+                        "label": "Target Path",
+                        "placeholder": "e.g., /var/www/mysite or C:\\wamp64\\www\\mysite",
+                        "help": "Absolute path on the server where the build will be deployed. The public and secure folders will be created as children of this path."
+                    },
+                    "overwrite": {
+                        "label": "Overwrite existing files",
+                        "help": "If checked, existing files at the target path will be replaced. Otherwise the deploy will abort if conflicts are found."
+                    }
+                }
+            },
             "freshStart": {
                 "title": "Fresh Start",
                 "description": "Reset the project to a clean state. Deletes all routes (except home), assets, and extra languages.",

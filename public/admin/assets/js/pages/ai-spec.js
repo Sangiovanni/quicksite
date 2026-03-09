@@ -492,7 +492,15 @@
             els.executeManualBtn.addEventListener('click', function() {
                 const steps = window._manualWorkflowSteps || [];
                 if (steps.length === 0) { alert('No steps to execute'); return; }
-                const commands = steps.map(step => ({ command: step.command, ...step.params }));
+                const commands = steps.map(step => {
+                    const cmd = { command: step.command, ...step.params };
+                    if (step.method) cmd.method = step.method;
+                    if (step.abortOnFail != null) cmd.abortOnFail = step.abortOnFail;
+                    if (step.retryOn) cmd.retryOn = step.retryOn;
+                    if (step.maxRetries) cmd.maxRetries = step.maxRetries;
+                    if (step.retryDelayMs) cmd.retryDelayMs = step.retryDelayMs;
+                    return cmd;
+                });
                 executeManualWorkflowCommands(config, els, commands);
             });
         }
