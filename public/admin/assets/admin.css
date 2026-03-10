@@ -993,6 +993,317 @@ input.admin-checkbox {
 }
 
 /* =============================================================================
+   WORKFLOW BROWSER PAGE
+   ============================================================================= */
+.ai-browser {
+    padding: var(--space-lg);
+}
+
+.ai-browser__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-xl);
+}
+
+.ai-browser__actions {
+    display: flex;
+    gap: var(--space-sm);
+}
+
+.ai-browser__title {
+    font-size: var(--font-size-2xl);
+    font-weight: 600;
+    color: var(--admin-text);
+    margin-bottom: var(--space-sm);
+}
+
+.ai-browser__subtitle {
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-lg);
+}
+
+.ai-browser__intro {
+    background: var(--admin-card-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-xl);
+}
+
+.ai-browser__intro-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-weight: 600;
+    margin-bottom: var(--space-md);
+    color: var(--admin-text);
+}
+
+.ai-browser__intro-steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-md);
+}
+
+.ai-browser__step {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+}
+
+.ai-browser__step-number {
+    width: 24px;
+    height: 24px;
+    background: var(--admin-primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.ai-browser__step-text {
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+}
+
+/* Workflow Categories */
+.ai-category {
+    margin-bottom: var(--space-xl);
+}
+
+.ai-category__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-sm);
+    border-bottom: 2px solid var(--admin-border);
+}
+
+.ai-category__icon {
+    font-size: var(--font-size-xl);
+}
+
+.ai-category__title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--admin-text);
+}
+
+.ai-category__count {
+    background: var(--admin-bg-tertiary);
+    color: var(--admin-text-muted);
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    margin-left: auto;
+}
+
+.ai-category--hidden {
+    display: none;
+}
+
+/* Workflow Spec Cards Grid */
+.ai-specs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--space-md);
+}
+
+.ai-spec-card {
+    background: var(--admin-card-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    transition: all 0.2s ease;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.ai-spec-card:hover {
+    border-color: var(--admin-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.ai-spec-card--hidden {
+    display: none;
+}
+
+.ai-spec-card__header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+}
+
+.ai-spec-card__icon {
+    font-size: var(--font-size-2xl);
+    line-height: 1;
+}
+
+.ai-spec-card__title {
+    font-weight: 600;
+    color: var(--admin-text);
+    font-size: var(--font-size-md);
+    flex: 1;
+}
+
+.ai-spec-card__badge {
+    font-size: var(--font-size-xs);
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.ai-spec-card:hover .ai-spec-card__badge {
+    opacity: 1;
+}
+
+.ai-spec-card__desc {
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+    margin-bottom: var(--space-md);
+}
+
+.ai-spec-card__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+}
+
+.ai-spec-card__tag {
+    background: var(--admin-bg-tertiary);
+    color: var(--admin-text-muted);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+}
+
+.ai-spec-card__difficulty {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--font-size-xs);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+}
+
+.ai-spec-card__difficulty--beginner {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.ai-spec-card__difficulty--intermediate {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.ai-spec-card__difficulty--advanced {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* Workflow Browser Filters */
+.ai-browser__filters {
+    display: flex;
+    gap: var(--space-md);
+    margin-bottom: var(--space-xl);
+    flex-wrap: wrap;
+}
+
+.ai-browser__search {
+    min-width: 250px;
+    position: relative;
+    margin-bottom: 10px;
+}
+
+.ai-browser__search-input {
+    padding: var(--space-sm) var(--space-md) var(--space-sm) 40px;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    background: var(--admin-card-bg);
+    color: var(--admin-text);
+}
+
+.ai-browser__search-input:focus {
+    outline: none;
+    border-color: var(--admin-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.ai-browser__search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--admin-text-muted);
+    pointer-events: none;
+}
+
+.ai-browser__tags {
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.ai-browser__tag-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-full);
+    background: var(--admin-card-bg);
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.ai-browser__tag-btn:hover {
+    border-color: var(--admin-primary);
+    color: var(--admin-primary);
+}
+
+.ai-browser__tag-btn--active {
+    background: var(--admin-primary);
+    border-color: var(--admin-primary);
+    color: white;
+}
+
+.ai-browser__tag-btn--active:hover {
+    background: var(--admin-primary-dark, #2563eb);
+    color: white;
+}
+
+.ai-browser__no-results {
+    text-align: center;
+    padding: var(--space-xl);
+    color: var(--admin-text-muted);
+    display: none;
+}
+
+/* Empty State */
+.ai-empty-state {
+    text-align: center;
+    padding: var(--space-2xl);
+    color: var(--admin-text-muted);
+}
+
+.ai-empty-state__icon {
+    font-size: 3rem;
+    margin-bottom: var(--space-md);
+    opacity: 0.5;
+}
+
+/* =============================================================================
    AI EDITOR PAGE
    ============================================================================= */
 .ai-editor {
