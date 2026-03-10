@@ -177,9 +177,23 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                     <?= __admin('ai.spec.parameters', 'Parameters') ?>
                 </div>
                 <div class="ai-spec-card__body">
-                    <form id="spec-params-form" class="ai-spec-form">
+                    <?php $loadPreset = $spec['loadPreset'] ?? null; ?>
+                    <form id="spec-params-form" class="ai-spec-form"<?php if ($loadPreset): ?> data-load-preset="<?= htmlspecialchars(json_encode($loadPreset), ENT_QUOTES, 'UTF-8') ?>"<?php endif; ?>>
+                        <?php if ($loadPreset): ?>
+                        <div class="ai-spec-form__group ai-spec-preset">
+                            <label class="ai-spec-form__label" for="preset-select">
+                                <?= __admin($loadPreset['labelKey'] ?? 'workflows.loadPreset.label', 'Load existing build') ?>
+                            </label>
+                            <select id="preset-select" class="ai-spec-form__input ai-spec-preset__select" disabled>
+                                <option value=""><?= __admin($loadPreset['placeholderKey'] ?? 'workflows.loadPreset.placeholder', '-- New build (default) --') ?></option>
+                            </select>
+                        </div>
+                        <hr class="ai-spec-preset__divider">
+                        <?php endif; ?>
                         <?php foreach ($parameters as $param): ?>
-                        <?php if (($param['type'] ?? 'text') === 'checkbox'): ?>
+                        <?php if (($param['type'] ?? 'text') === 'hidden'): ?>
+                        <input type="hidden" id="param-<?= htmlspecialchars($param['id']) ?>" name="<?= htmlspecialchars($param['id']) ?>" value="<?= htmlspecialchars($param['default'] ?? '') ?>" />
+                        <?php elseif (($param['type'] ?? 'text') === 'checkbox'): ?>
                         <div class="ai-spec-form__group ai-spec-form__checkbox-group"<?php if (isset($param['condition'])): ?> data-condition="<?= htmlspecialchars($param['condition']) ?>"<?php endif; ?>>
                             <input 
                                 type="checkbox"

@@ -19,8 +19,6 @@ class AdminRouter {
         'command',     // Individual command pages
         'history',     // Command history viewer
         'settings',    // Settings and configuration
-        'batch',       // Batch command execution
-        'docs',        // API documentation
         'workflows',   // Workflows (AI and manual)
         'ai-settings', // AI Provider Settings (BYOK)
         'preview',     // Visual Editor (route kept as 'preview' for URL compatibility)

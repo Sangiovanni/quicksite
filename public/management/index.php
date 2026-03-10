@@ -177,6 +177,9 @@ if (!hasPermission($currentTokenInfo, $command)) {
 // Execute Command
 // ============================================================================
 
+// Prevent browsers from caching API responses (ensures fresh data after mutations)
+header('Cache-Control: no-store');
+
 // Parse request body for logging
 $requestBody = json_decode(REQUEST_BODY_RAW, true) ?? [];
 

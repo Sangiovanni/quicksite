@@ -12,6 +12,7 @@
     let apisData = {};
     let currentTestEndpoint = null;
     let pendingDelete = null;
+    const AUTH_TOKEN_STORAGE_KEY = 'qs_api_auth_tokens';
 
     // DOM Ready
     document.addEventListener('DOMContentLoaded', init);
@@ -85,6 +86,22 @@
             if (e.key === 'Escape') {
                 const openModal = document.querySelector('.admin-modal[style*="flex"]');
                 if (openModal) closeModal(openModal);
+            }
+        });
+
+        // Toggle expand/collapse styling (delegated)
+        document.addEventListener('click', (e) => {
+            const card = e.target.closest('.api-card');
+            if (card) {
+                const body = card.querySelector('.api-card__body');
+                const chevron = card.querySelector('.api-card__chevron');
+                if (card.classList.contains('api-card--expanded')) {
+                    body.style.display = 'block';
+                    chevron.style.transform = 'rotate(90deg)';
+                } else {
+                    body.style.display = 'none';
+                    chevron.style.transform = 'rotate(0deg)';
+                }
             }
         });
     }
@@ -207,9 +224,7 @@
             <div class="admin-card api-card" data-api-id="${escapeHtml(apiId)}">
                 <div class="api-card__header" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: var(--space-sm);">
-                        <svg class="api-card__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" style="transition: transform 0.2s;">
-                            <polyline points="9 18 15 12 9 6"/>
-                        </svg>
+                        ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.chevronRight, 20, 'api-card__chevron')}
                         <div>
                             <h3 style="margin: 0; display: flex; align-items: center; gap: var(--space-xs);">
                                 ${escapeHtml(api.name || apiId)}
@@ -224,24 +239,15 @@
                     <div style="display: flex; gap: var(--space-xs);">
                         <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" 
                                 data-action="add-endpoint" data-api="${escapeHtml(apiId)}" title="Add Endpoint">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <line x1="12" y1="5" x2="12" y2="19"/>
-                                <line x1="5" y1="12" x2="19" y2="12"/>
-                            </svg>
+                            ${QuickSiteUtils.iconPlus(16)}
                         </button>
                         <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" 
                                 data-action="edit-api" data-api="${escapeHtml(apiId)}" title="Edit API">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                            </svg>
+                            ${QuickSiteUtils.iconEdit(16)}
                         </button>
                         <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost admin-btn--danger-hover" 
                                 data-action="delete-api" data-api="${escapeHtml(apiId)}" title="Delete API">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <polyline points="3 6 5 6 21 6"/>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                            </svg>
+                            ${QuickSiteUtils.iconTrash(16)}
                         </button>
                     </div>
                 </div>
@@ -260,22 +266,12 @@
                                    style="flex: 1;">
                             <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost api-auth-token__toggle" 
                                     data-api="${escapeHtml(apiId)}" title="Show/Hide">
-                                <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                    <circle cx="12" cy="12" r="3"/>
-                                </svg>
-                                <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="display: none;">
-                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                                    <line x1="1" y1="1" x2="23" y2="23"/>
-                                </svg>
+                                ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.eye, 16, 'icon-eye')}
+                                ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.eyeOff, 16, 'icon-eye-off', 'style="display: none;"')}
                             </button>
                             <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost api-auth-token__save" 
                                     data-api="${escapeHtml(apiId)}" title="Save token">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
-                                    <polyline points="17,21 17,13 7,13 7,21"/>
-                                    <polyline points="7,3 7,8 15,8"/>
-                                </svg>
+                                ${QuickSiteUtils.iconSave(16)}
                             </button>
                         </div>
                     </div>
@@ -339,47 +335,23 @@
                         <button type="button" class="admin-btn admin-btn--xs admin-btn--ghost" 
                                 data-action="test-endpoint" data-api="${escapeHtml(apiId)}" data-endpoint="${escapeHtml(endpoint.id)}" 
                                 title="Test">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                                <polygon points="5 3 19 12 5 21 5 3"/>
-                            </svg>
+                            ${QuickSiteUtils.iconPlay(14)}
                         </button>
                         <button type="button" class="admin-btn admin-btn--xs admin-btn--ghost" 
                                 data-action="edit-endpoint" data-api="${escapeHtml(apiId)}" data-endpoint="${escapeHtml(endpoint.id)}" 
                                 title="Edit">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                            </svg>
+                            ${QuickSiteUtils.iconEdit()}
                         </button>
                         <button type="button" class="admin-btn admin-btn--xs admin-btn--ghost admin-btn--danger-hover" 
                                 data-action="delete-endpoint" data-api="${escapeHtml(apiId)}" data-endpoint="${escapeHtml(endpoint.id)}" 
                                 title="Delete">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                                <polyline points="3 6 5 6 21 6"/>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                            </svg>
+                            ${QuickSiteUtils.iconTrash()}
                         </button>
                     </div>
                 </td>
             </tr>
         `;
     }
-
-    // Toggle expand/collapse styling
-    document.addEventListener('click', (e) => {
-        const card = e.target.closest('.api-card');
-        if (card) {
-            const body = card.querySelector('.api-card__body');
-            const chevron = card.querySelector('.api-card__chevron');
-            if (card.classList.contains('api-card--expanded')) {
-                body.style.display = 'block';
-                chevron.style.transform = 'rotate(90deg)';
-            } else {
-                body.style.display = 'none';
-                chevron.style.transform = 'rotate(0deg)';
-            }
-        }
-    });
 
     // =========================================================================
     // Action Handlers
@@ -504,7 +476,7 @@
                 // For edit, we need to handle ID change
                 if (originalId !== apiId) {
                     // Delete old, create new
-                    await QuickSiteAdmin.apiRequest('deleteApi', 'DELETE', { apiId: originalId });
+                    await QuickSiteAdmin.apiRequest('deleteApi', 'POST', { apiId: originalId });
                 }
                 response = await QuickSiteAdmin.apiRequest('editApi', 'POST', params);
             } else {
@@ -685,7 +657,7 @@
         try {
             let response;
             if (pendingDelete.type === 'api') {
-                response = await QuickSiteAdmin.apiRequest('deleteApi', 'DELETE', { apiId: pendingDelete.apiId });
+                response = await QuickSiteAdmin.apiRequest('deleteApi', 'POST', { apiId: pendingDelete.apiId });
             } else {
                 response = await QuickSiteAdmin.apiRequest('editApi', 'POST', { 
                     apiId: pendingDelete.apiId, 
@@ -696,7 +668,7 @@
             if (response.ok) {
                 showToast(response.data?.message || 'Deleted successfully', 'success');
                 closeModal(document.getElementById('modal-confirm-delete'));
-                loadApis();
+                await loadApis();
             } else {
                 showToast(response.data?.message || 'Failed to delete', 'error');
             }
@@ -711,9 +683,6 @@
     // =========================================================================
     // Test Endpoint
     // =========================================================================
-    
-    // Storage key for auth tokens
-    const AUTH_TOKEN_STORAGE_KEY = 'qs_api_auth_tokens';
 
     function openTestModal(apiId, endpointId) {
         const api = apisData[apiId];
@@ -924,20 +893,21 @@
      */
     function toggleTokenVisibility(e) {
         const btn = e.currentTarget;
-        const apiId = btn.dataset.api;
         const card = btn.closest('.api-card');
+        if (!card) return;
         const input = card.querySelector('.api-auth-token__input');
+        if (!input) return;
         const iconEye = btn.querySelector('.icon-eye');
         const iconEyeOff = btn.querySelector('.icon-eye-off');
         
         if (input.type === 'password') {
             input.type = 'text';
-            iconEye.style.display = 'none';
-            iconEyeOff.style.display = 'block';
+            if (iconEye) iconEye.style.display = 'none';
+            if (iconEyeOff) iconEyeOff.style.display = '';
         } else {
             input.type = 'password';
-            iconEye.style.display = 'block';
-            iconEyeOff.style.display = 'none';
+            if (iconEye) iconEye.style.display = '';
+            if (iconEyeOff) iconEyeOff.style.display = 'none';
         }
     }
     
@@ -1011,7 +981,7 @@
         }
 
         btn.disabled = true;
-        btn.innerHTML = '<span class="admin-spinner admin-spinner--sm"></span> Testing...';
+        btn.innerHTML = QuickSiteUtils.htmlSpinner() + ' Testing...';
         
         document.getElementById('test-response-status').innerHTML = '';
         document.getElementById('test-response-time').textContent = 'Executing...';
@@ -1069,9 +1039,7 @@
         } finally {
             btn.disabled = false;
             btn.innerHTML = `
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                    <polygon points="5 3 19 12 5 21 5 3"/>
-                </svg>
+                ${QuickSiteUtils.iconPlay(16)}
                 Run Test
             `;
         }

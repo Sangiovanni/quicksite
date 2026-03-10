@@ -226,9 +226,7 @@
         } catch (error) {
             console.error('Failed to load animations:', error);
             animationsLoading.innerHTML = `
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
-                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
+                ${QuickSiteUtils.iconAlertCircle(24)}
                 <span>${PreviewConfig.i18n.loadAnimationsFailed}</span>
             `;
         }
@@ -259,22 +257,15 @@
                 <div class="preview-keyframe-item__actions">
                     <button type="button" class="preview-keyframe-item__btn preview-keyframe-item__btn--preview" 
                             data-action="preview" title="${PreviewConfig.i18n.previewAnimation}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                            <polygon points="5 3 19 12 5 21 5 3"/>
-                        </svg>
+                        ${QuickSiteUtils.iconPlay(14)}
                     </button>
                     <button type="button" class="preview-keyframe-item__btn preview-keyframe-item__btn--edit" 
                             data-action="edit" title="${PreviewConfig.i18n.edit}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
+                        ${QuickSiteUtils.iconEdit()}
                     </button>
                     <button type="button" class="preview-keyframe-item__btn preview-keyframe-item__btn--delete" 
                             data-action="delete" title="${PreviewConfig.i18n.delete}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                        </svg>
+                        ${QuickSiteUtils.iconTrash()}
                     </button>
                 </div>
             </div>
@@ -435,19 +426,14 @@
             const relatedList = item.relatedTriggers.map(r => `<code>${escapeHtml(r.selector)}</code>`).join(', ');
             orphanHintHtml = `
                 <div class="preview-animated-selector__orphan-hint">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-                    </svg>
+                    ${QuickSiteUtils.iconInfo(12)}
                     <span>${PreviewConfig.i18n.mayBeTriggeredVia}: ${relatedList}</span>
                 </div>
             `;
         } else if (item.isOrphan) {
             orphanHintHtml = `
                 <div class="preview-animated-selector__orphan-hint preview-animated-selector__orphan-hint--warning">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
+                    ${QuickSiteUtils.iconWarning(12)}
                     <span>${PreviewConfig.i18n.noDirectTrigger}</span>
                 </div>
             `;
@@ -459,9 +445,7 @@
                     <div class="preview-animated-selector__main">
                         <code class="preview-animated-selector__name">${escapeHtml(item.baseSelector)}</code>
                         <span class="preview-animated-selector__details">${detailsHtml}</span>
-                        <svg class="preview-animated-selector__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                            <path d="M5 12h14"/><path d="M12 5l7 7-7 7"/>
-                        </svg>
+                        ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.arrowRight, 12, 'preview-animated-selector__arrow')}
                     </div>
                     ${orphanHintHtml}
                 </div>
@@ -491,16 +475,12 @@
             <div class="preview-animated-selector-group" data-type="${type}">
                 <div class="preview-animated-selector-group__header preview-animated-selector-group__header--clickable" data-selector="${escapeHtml(item.selector || item.baseSelector)}">
                     <button type="button" class="preview-animated-selector-group__toggle" title="${PreviewConfig.i18n.toggleStates}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                            <polyline points="6 9 12 15 18 9"/>
-                        </svg>
+                        ${QuickSiteUtils.iconChevronDown(12)}
                     </button>
                     <code class="preview-animated-selector__name">${escapeHtml(item.baseSelector)}</code>
                     <span class="preview-animated-selector__details">${detailsHtml}</span>
                     <span class="preview-animated-selector__state-count">${item.states.length} ${PreviewConfig.i18n.states}</span>
-                    <svg class="preview-animated-selector__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                        <path d="M5 12h14"/><path d="M12 5l7 7-7 7"/>
-                    </svg>
+                    ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.arrowRight, 12, 'preview-animated-selector__arrow')}
                 </div>
                 <div class="preview-animated-selector-group__states">
                     ${statesHtml}
@@ -944,10 +924,7 @@
                 <div class="preview-keyframe-modal__frame-actions">
                     ${keyframeFrames.length > 1 ? `
                         <button type="button" class="preview-keyframe-modal__delete-frame" title="${PreviewConfig.i18n.deleteFrame}">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="3 6 5 6 21 6"></polyline>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                            </svg>
+                            ${QuickSiteUtils.iconTrash()}
                         </button>
                     ` : ''}
                 </div>
@@ -1027,10 +1004,7 @@
                            placeholder="${PreviewConfig.i18n.keyframePropertyValue}"
                            data-frame="${frameIndex}" data-prop="${propIndex}" data-field="value">
                     <button type="button" class="preview-keyframe-modal__delete-property" title="${PreviewConfig.i18n.deleteKeyframeProperty}">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
+                        ${QuickSiteUtils.iconClose(12)}
                     </button>
                 `;
                 
@@ -1070,10 +1044,7 @@
             addPropBtn.type = 'button';
             addPropBtn.className = 'preview-keyframe-modal__add-property';
             addPropBtn.innerHTML = `
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
+                ${QuickSiteUtils.iconPlus(12)}
                 ${PreviewConfig.i18n.addKeyframeProperty}
             `;
             addPropBtn.addEventListener('click', () => addKeyframeProperty(frameIndex));
@@ -1089,10 +1060,7 @@
         addFrameBtn.type = 'button';
         addFrameBtn.className = 'preview-keyframe-modal__add-frame';
         addFrameBtn.innerHTML = `
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
+            ${QuickSiteUtils.iconPlus(14)}
             ${PreviewConfig.i18n.addFrame}
         `;
         addFrameBtn.addEventListener('click', () => promptAddFrame());

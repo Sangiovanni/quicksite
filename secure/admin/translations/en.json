@@ -191,11 +191,9 @@
         "subtitle": "Browse and execute API commands",
         "tabs": {
             "commands": "Commands",
-            "history": "History",
-            "docs": "Docs"
+            "history": "History"
         },
         "searchPlaceholder": "Search commands...",
-        "openQueue": "Open Queue",
         "allCategories": "All Categories",
         "method": "Method",
         "parameters": "Parameters",
@@ -220,16 +218,9 @@
         }
     },
     "commandForm": {
-        "batchMode": {
-            "title": "Batch Mode",
-            "message": "Configure the command parameters and click \"Save to Queue\" to add this command to your batch queue. The command will not be executed until you run the entire batch."
-        },
-        "saveToQueue": "Save to Queue",
-        "backToBatch": "Back to Batch",
         "errors": {
             "docNotFound": "Command documentation not found",
-            "docLoadFailed": "Failed to load command documentation:",
-            "fileUploadBatch": "File uploads cannot be added to batch queue"
+            "docLoadFailed": "Failed to load command documentation:"
         }
     },
     "history": {
@@ -315,8 +306,6 @@
         "apiEndpoints": "API Endpoints",
         "aiApiKeys": "AI API Keys",
         "structure": "Structure",
-        "batch": "Command Queue",
-        "docs": "Docs",
         "workflows": "Workflows",
         "visualEditor": "Visual Editor",
         "preview": "Visual Editor",
@@ -560,54 +549,6 @@
             }
         }
     },
-    "batch": {
-        "title": "Batch Execution",
-        "subtitle": "Execute multiple commands in sequence",
-        "queue": "Command Queue",
-        "addCommands": "Add Commands",
-        "results": "Execution Results",
-        "emptyQueue": "No commands in queue",
-        "emptyQueueHint": "Add commands from the list on the right",
-        "executeAndClear": "Execute & Clear Queue",
-        "executeAndKeep": "Execute & Keep Queue",
-        "searchPlaceholder": "Search commands...",
-        "clearResults": "Clear Results",
-        "importJson": {
-            "title": "Import JSON Commands",
-            "hint": "Paste a JSON array of commands to add them to the queue. Perfect for AI-generated command sequences.",
-            "label": "JSON Commands Array",
-            "addToQueue": "Add to Queue"
-        }
-    },
-    "docs": {
-        "title": "API Documentation",
-        "subtitle": "Complete reference for all available API commands",
-        "quickReference": "Quick Reference",
-        "commandReference": "Command Reference",
-        "searchPlaceholder": "Search commands...",
-        "loading": "Loading documentation...",
-        "quickRef": {
-            "apiBaseUrl": "API Base URL",
-            "authentication": "Authentication",
-            "includeTokenVia": "Include token via:",
-            "header": "Header:",
-            "query": "Query:",
-            "postBody": "POST body:",
-            "responseFormat": "Response Format"
-        },
-        "section": {
-            "description": "Description",
-            "parameters": "Parameters"
-        },
-        "noParameters": "No parameters required",
-        "noDescription": "No description",
-        "copyUrl": "Copy URL",
-        "urlCopied": "URL copied to clipboard",
-        "errors": {
-            "couldNotLoad": "Could not load documentation",
-            "copyFailed": "Could not copy URL"
-        }
-    },
     "workflows": {
         "title": "Workflows",
         "subtitle": "Automated task sequences - manual or AI-assisted",
@@ -683,7 +624,6 @@
             "pasteJson": "Paste JSON to begin"
         },
         "executeNow": "Execute Now",
-        "openInBatch": "Open in Batch",
         "executionComplete": "Execution Complete",
         "clear": "Clear",
         "browser": {
@@ -736,7 +676,6 @@
             "generatePrompt": "Generate Prompt",
             "copyPrompt": "Copy",
             "copied": "Copied!",
-            "goToBatch": "Go to Batch Panel",
             "chars": "chars",
             "words": "words"
         },
@@ -969,7 +908,7 @@
                     "buildName": {
                         "label": "Build Name",
                         "placeholder": "e.g., my-release-v2",
-                        "help": "A memorable name to identify this build (also used if you want to download it later as a ZIP)"
+                        "help": "A unique name to identify this build. Use the preset selector above to load values from an existing build, or type a new name to create a fresh one."
                     },
                     "publicFolder": {
                         "label": "Public Folder",
@@ -1003,6 +942,10 @@
                         "label": "Overwrite existing files",
                         "help": "If checked, existing files at the target path will be replaced. Otherwise the deploy will abort if conflicts are found."
                     }
+                },
+                "loadPreset": {
+                    "label": "Load an existing build",
+                    "placeholder": "-- New build (default) --"
                 }
             },
             "freshStart": {

@@ -101,7 +101,7 @@ $langNames = [
         
         <?php
             // Determine which nav group should be highlighted
-            $buildPages = ['workflows', 'batch', 'command', 'preview'];
+            $buildPages = ['workflows', 'command', 'preview'];
             $settingsPages = ['settings', 'apis', 'ai-settings'];
             $isBuildActive = in_array($currentPage, $buildPages);
             $isSettingsActive = in_array($currentPage, $settingsPages);
@@ -361,15 +361,7 @@ $langNames = [
                 commandForm: {
                     errors: {
                         docNotFound: '<?= __adminJs('commandForm.errors.docNotFound') ?>',
-                        docLoadFailed: '<?= __adminJs('commandForm.errors.docLoadFailed') ?>',
-                        fileUploadBatch: '<?= __adminJs('commandForm.errors.fileUploadBatch') ?>'
-                    }
-                },
-                docs: {
-                    urlCopied: '<?= __adminJs('docs.urlCopied') ?>',
-                    errors: {
-                        couldNotLoad: '<?= __adminJs('docs.errors.couldNotLoad') ?>',
-                        copyFailed: '<?= __adminJs('docs.errors.copyFailed') ?>'
+                        docLoadFailed: '<?= __adminJs('commandForm.errors.docLoadFailed') ?>'
                     }
                 },
                 settings: {
@@ -383,9 +375,6 @@ $langNames = [
                         languagesFailed: '<?= __adminJs('settings.errors.languagesFailed') ?>',
                         defaultLangFailed: '<?= __adminJs('settings.errors.defaultLangFailed') ?>'
                     }
-                },
-                ai: {
-                    executionComplete: '<?= __adminJs('ai.executionComplete') ?>'
                 }
             },
             adminLang: '<?= $currentLang ?>'

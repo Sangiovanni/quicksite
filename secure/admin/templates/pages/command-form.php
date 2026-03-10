@@ -39,7 +39,6 @@ function getCommandDocumentation(string $command): ?array {
 
 <div class="admin-command-form-page"
      data-command-name="<?= adminAttr($selectedCommand) ?>"
-     data-batch-url="<?= $router->url('batch') ?>"
      data-t-no-parameters="<?= adminAttr(__admin('commands.noParameters')) ?>"
      data-t-required-params="<?= adminAttr(__admin('commands.requiredParams')) ?>"
      data-t-optional-params="<?= adminAttr(__admin('commands.optionalParams')) ?>"
@@ -49,24 +48,6 @@ function getCommandDocumentation(string $command): ?array {
      data-t-error-responses="<?= adminAttr(__admin('commands.errorResponses')) ?>">
 
 
-
-<!-- Batch Mode Banner (shown via JavaScript when ?batch=1) -->
-<div class="admin-alert admin-alert--info" id="batch-mode-banner" style="display: none; margin-bottom: var(--space-lg);">
-    <svg class="admin-alert__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="8" y1="6" x2="21" y2="6"/>
-        <line x1="8" y1="12" x2="21" y2="12"/>
-        <line x1="8" y1="18" x2="21" y2="18"/>
-        <line x1="3" y1="6" x2="3.01" y2="6"/>
-        <line x1="3" y1="12" x2="3.01" y2="12"/>
-        <line x1="3" y1="18" x2="3.01" y2="18"/>
-    </svg>
-    <div>
-        <strong>📋 <?= __admin('commandForm.batchMode.title') ?></strong>
-        <p style="margin: var(--space-xs) 0 0;">
-            <?= __admin('commandForm.batchMode.message') ?>
-        </p>
-    </div>
-</div>
 
 <div class="admin-page-header">
     <div class="admin-breadcrumb">
@@ -110,9 +91,6 @@ function getCommandDocumentation(string $command): ?array {
                     <button type="reset" class="admin-btn admin-btn--outline">
                         <?= __admin('common.reset') ?>
                     </button>
-                    <a href="<?= $router->url('batch') ?>" class="admin-btn admin-btn--secondary" id="cancel-batch-btn" style="display: none;">
-                        Cancel
-                    </a>
                 </div>
             </form>
         </div>

@@ -160,9 +160,7 @@
         } catch (error) {
             console.error('[PreviewStyleTheme] Error loading theme variables:', error);
             themeLoading.innerHTML = `
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24" style="color: #ef4444;">
-                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
+                ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.alertCircle, 24, null, 'style="color: #ef4444;"')}
                 <span style="color: #ef4444;">${i18n.themeLoadError || 'Failed to load theme'}</span>
             `;
         }
@@ -266,88 +264,45 @@
     }
     
     /**
-     * Render font inputs
+     * Render text-based variable inputs (fonts, spacing, other)
      */
+    function renderTextInputs(container, variables, emptyMsg, placeholder) {
+        if (!container) return;
+        container.innerHTML = '';
+        
+        if (variables.length === 0) {
+            if (emptyMsg) container.innerHTML = `<p class="preview-theme-empty">${emptyMsg}</p>`;
+            return;
+        }
+        
+        variables.forEach(({ name, value }) => {
+            const item = document.createElement('div');
+            item.className = 'preview-theme-input';
+            item.innerHTML = `
+                <label class="preview-theme-input__label">${formatVariableName(name)}</label>
+                <input type="text" class="preview-theme-input__field" value="${value}" data-var="${name}" data-original="${value}"${placeholder ? ` placeholder="${placeholder}"` : ''}>
+            `;
+            
+            const input = item.querySelector('.preview-theme-input__field');
+            input.addEventListener('change', (e) => handleVariableChange(name, e.target.value));
+            input.addEventListener('input', (e) => previewThemeVariable(name, e.target.value));
+            
+            container.appendChild(item);
+        });
+    }
+    
     function renderFontInputs(container, variables) {
-        if (!container) return;
-        container.innerHTML = '';
-        
         const i18n = getI18n();
-        
-        if (variables.length === 0) {
-            container.innerHTML = `<p class="preview-theme-empty">${i18n.noFontVariables || 'No font variables'}</p>`;
-            return;
-        }
-        
-        variables.forEach(({ name, value }) => {
-            const item = document.createElement('div');
-            item.className = 'preview-theme-input';
-            item.innerHTML = `
-                <label class="preview-theme-input__label">${formatVariableName(name)}</label>
-                <input type="text" class="preview-theme-input__field" value="${value}" data-var="${name}" data-original="${value}">
-            `;
-            
-            const input = item.querySelector('.preview-theme-input__field');
-            input.addEventListener('change', (e) => handleVariableChange(name, e.target.value));
-            input.addEventListener('input', (e) => previewThemeVariable(name, e.target.value));
-            
-            container.appendChild(item);
-        });
+        renderTextInputs(container, variables, i18n.noFontVariables || 'No font variables');
     }
     
-    /**
-     * Render spacing inputs
-     */
     function renderSpacingInputs(container, variables) {
-        if (!container) return;
-        container.innerHTML = '';
-        
         const i18n = getI18n();
-        
-        if (variables.length === 0) {
-            container.innerHTML = `<p class="preview-theme-empty">${i18n.noSpacingVariables || 'No spacing variables'}</p>`;
-            return;
-        }
-        
-        variables.forEach(({ name, value }) => {
-            const item = document.createElement('div');
-            item.className = 'preview-theme-input';
-            item.innerHTML = `
-                <label class="preview-theme-input__label">${formatVariableName(name)}</label>
-                <input type="text" class="preview-theme-input__field" value="${value}" data-var="${name}" data-original="${value}" placeholder="e.g. 1rem, 16px">
-            `;
-            
-            const input = item.querySelector('.preview-theme-input__field');
-            input.addEventListener('change', (e) => handleVariableChange(name, e.target.value));
-            input.addEventListener('input', (e) => previewThemeVariable(name, e.target.value));
-            
-            container.appendChild(item);
-        });
+        renderTextInputs(container, variables, i18n.noSpacingVariables || 'No spacing variables', 'e.g. 1rem, 16px');
     }
     
-    /**
-     * Render other inputs
-     */
     function renderOtherInputs(container, variables) {
-        if (!container) return;
-        container.innerHTML = '';
-        
-        if (variables.length === 0) return;
-        
-        variables.forEach(({ name, value }) => {
-            const item = document.createElement('div');
-            item.className = 'preview-theme-input';
-            item.innerHTML = `
-                <label class="preview-theme-input__label">${formatVariableName(name)}</label>
-                <input type="text" class="preview-theme-input__field" value="${value}" data-var="${name}" data-original="${value}">
-            `;
-            
-            const input = item.querySelector('.preview-theme-input__field');
-            input.addEventListener('change', (e) => handleVariableChange(name, e.target.value));
-            input.addEventListener('input', (e) => previewThemeVariable(name, e.target.value));
-            
-            container.appendChild(item);
-        });
+        renderTextInputs(container, variables);
     }
     
     // ==================== Change Handling ====================

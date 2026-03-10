@@ -94,6 +94,8 @@ window.QuickSiteAPI = (function() {
     // Core API Methods
     // ============================================
 
+    let redirectingToLogin = false;
+
     /**
      * Make an API request to the QuickSite management API
      * 
@@ -188,6 +190,14 @@ window.QuickSiteAPI = (function() {
                 }));
             }
 
+            // Auto-logout on 401 — token is invalid or expired
+            if (response.status === 401 && !redirectingToLogin) {
+                redirectingToLogin = true;
+                clearToken();
+                window.location.href = config.adminBase + '/login';
+                return { ok: false, status: 401, data: result };
+            }
+
             return {
                 ok: response.ok,
                 status: response.status,
@@ -243,6 +253,14 @@ window.QuickSiteAPI = (function() {
 
             const result = await response.json();
             
+            // Auto-logout on 401
+            if (response.status === 401 && !redirectingToLogin) {
+                redirectingToLogin = true;
+                clearToken();
+                window.location.href = config.adminBase + '/login';
+                return { ok: false, status: 401, data: result };
+            }
+
             // Dispatch event for successful uploads
             if (response.ok) {
                 window.dispatchEvent(new CustomEvent('quicksite:command-executed', {

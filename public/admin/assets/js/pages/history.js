@@ -68,12 +68,7 @@
     async function loadHistory() {
         const t = window.QUICKSITE_CONFIG?.translations?.common || {};
         
-        historyContent.innerHTML = `
-            <div class="admin-loading">
-                <span class="admin-spinner"></span>
-                <span>${t.loading || 'Loading...'}</span>
-            </div>
-        `;
+        historyContent.innerHTML = QuickSiteUtils.htmlLoading(t.loading || 'Loading...');
 
         // Build query parameters
         const date = filterDate?.value || '';
@@ -130,16 +125,11 @@
     function renderEmpty() {
         const t = window.QUICKSITE_CONFIG?.translations?.history || {};
         
-        historyContent.innerHTML = `
-            <div class="admin-empty">
-                <svg class="admin-empty__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <polyline points="12 6 12 12 16 14"/>
-                </svg>
-                <h3 class="admin-empty__title">${t.noHistory || 'No history found'}</h3>
-                <p class="admin-empty__desc">${t.noHistoryFiltered || 'No command history found for the selected filters.'}</p>
-            </div>
-        `;
+        historyContent.innerHTML = QuickSiteUtils.htmlEmptyState(
+            QuickSiteUtils.iconClock(),
+            t.noHistory || 'No history found',
+            t.noHistoryFiltered || 'No command history found for the selected filters.'
+        );
         pagination.style.display = 'none';
     }
 
@@ -196,15 +186,12 @@
                             <code>${QuickSiteAdmin.escapeHtml(entry.command)}</code>
                         </a>
                     </td>
-                    <td><span class="badge badge--${entry.method.toLowerCase()}">${entry.method}</span></td>
+                    <td>${QuickSiteUtils.htmlMethodBadge(entry.method)}</td>
                     <td><span class="badge ${statusClass}">${statusText}</span></td>
                     <td>${entry.duration_ms}ms</td>
                     <td>
                         <button class="admin-btn admin-btn--ghost admin-btn--sm" onclick="showDetail('${entryJson}')">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                <circle cx="12" cy="12" r="3"/>
-                            </svg>
+                            ${QuickSiteUtils.iconEye(16)}
                         </button>
                     </td>
                 </tr>
@@ -281,7 +268,7 @@
                 </div>
                 <div class="admin-detail-item">
                     <label>Method</label>
-                    <span class="badge badge--${entry.method.toLowerCase()}">${entry.method}</span>
+                    ${QuickSiteUtils.htmlMethodBadge(entry.method)}
                 </div>
                 <div class="admin-detail-item">
                     <label>Duration</label>

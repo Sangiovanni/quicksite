@@ -449,6 +449,13 @@ const QuickSiteAdmin = {
             }));
         }
 
+        // Auto-logout on 401 — token is invalid or expired
+        if (response.status === 401 && window.QuickSiteAPI) {
+            window.QuickSiteAPI.clearToken();
+            window.location.href = (this.config.adminBase || '/admin') + '/login';
+            return { ok: false, status: 401, data: result };
+        }
+
         return {
             ok: response.ok,
             status: response.status,
@@ -582,11 +589,6 @@ const QuickSiteAdmin = {
         e.preventDefault();
         
         const form = e.target;
-        
-        // Check if form is in batch mode - if so, don't execute (batch handler will take over)
-        if (form.dataset.batchMode === 'true') {
-            return;
-        }
         
         const command = form.dataset.command;
         const method = form.dataset.method || 'POST';

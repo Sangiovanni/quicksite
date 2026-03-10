@@ -197,46 +197,36 @@
     }
     
     // ============================================
-    // Event Listeners
-    // ============================================
-    
-    // Button controls
-    if (reloadBtn) reloadBtn.addEventListener('click', reload);
-    if (gotoBtn) gotoBtn.addEventListener('click', gotoPreviewPage);
-    if (closeBtn) closeBtn.addEventListener('click', hide);
-    
-    // Drag events
-    if (header) header.addEventListener('mousedown', onDragStart);
-    document.addEventListener('mousemove', onDragMove);
-    document.addEventListener('mouseup', onDragEnd);
-    
-    // Iframe load handling
-    iframe.addEventListener('load', function() {
-        iframeLoaded = true;
-        loading.style.display = 'none';
-    });
-    
-    // Save size on resize
-    const resizeObserver = new ResizeObserver(() => {
-        if (isActive) {
-            saveState();
-        }
-    });
-    resizeObserver.observe(miniplayer);
-    
-    // Listen for command execution events to auto-reload
-    window.addEventListener('quicksite:command-executed', function(e) {
-        if (isActive && iframeLoaded) {
-            // Small delay to let the server process the command
-            setTimeout(reload, 500);
-        }
-    });
-    
-    // ============================================
     // Initialization
     // ============================================
     
     function init() {
+        // Event listeners
+        if (reloadBtn) reloadBtn.addEventListener('click', reload);
+        if (gotoBtn) gotoBtn.addEventListener('click', gotoPreviewPage);
+        if (closeBtn) closeBtn.addEventListener('click', hide);
+        
+        if (header) header.addEventListener('mousedown', onDragStart);
+        document.addEventListener('mousemove', onDragMove);
+        document.addEventListener('mouseup', onDragEnd);
+        
+        iframe.addEventListener('load', function() {
+            iframeLoaded = true;
+            loading.style.display = 'none';
+        });
+        
+        const resizeObserver = new ResizeObserver(() => {
+            if (isActive) saveState();
+        });
+        resizeObserver.observe(miniplayer);
+        
+        window.addEventListener('quicksite:command-executed', function() {
+            if (isActive && iframeLoaded) {
+                setTimeout(reload, 500);
+            }
+        });
+        
+        // Restore state
         const state = loadState();
         
         // Apply saved position/size

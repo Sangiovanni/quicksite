@@ -17,6 +17,8 @@
     let currentProject = null;
     let allProjects = [];
     let pendingRestoreBackup = null;
+    let manageSpaceLoaded = false;
+    let dashStructureLoaded = null; // Stores { type, name, structure }
 
     // ========================================================================
     // Helper Functions
@@ -128,19 +130,13 @@
                     html += `<div class="sitemap__tree-node${isExpanded ? ' sitemap__tree-node--open' : ''}" style="--depth: ${depth}">
                         <div class="sitemap__tree-header">
                             <button class="sitemap__tree-toggle" type="button" aria-label="Toggle">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                                    <polyline points="9 18 15 12 9 6"/>
-                                </svg>
+                                ${QuickSiteUtils.iconChevronRight(12)}
                             </button>
                             <a href="${QuickSiteAdmin.escapeHtml(url)}" target="_blank" class="sitemap__route sitemap__route--parent" title="${QuickSiteAdmin.escapeHtml(url)}">
-                                <svg class="sitemap__route-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                                </svg>
+                                ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.folder, 14, 'sitemap__route-icon')}
                                 <span class="sitemap__route-name">${name}</span>
                                 <span class="sitemap__route-path">${routePath}</span>
-                                <svg class="sitemap__route-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-                                </svg>
+                                ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.externalLink, 12, 'sitemap__route-external')}
                             </a>
                         </div>
                         <div class="sitemap__tree-children">
@@ -149,8 +145,8 @@
                     </div>`;
                 } else {
                     const iconPath = isHome 
-                        ? '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>'
-                        : '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>';
+                        ? QuickSiteUtils.ICON_PATHS.home
+                        : QuickSiteUtils.ICON_PATHS.file;
                     
                     html += `<a href="${QuickSiteAdmin.escapeHtml(url)}" target="_blank" class="sitemap__route sitemap__route--leaf" style="--depth: ${depth}" title="${QuickSiteAdmin.escapeHtml(url)}">
                         <svg class="sitemap__route-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
@@ -158,9 +154,7 @@
                         </svg>
                         <span class="sitemap__route-name">${name}</span>
                         <span class="sitemap__route-path">${routePath}</span>
-                        <svg class="sitemap__route-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-                        </svg>
+                        ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.externalLink, 12, 'sitemap__route-external')}
                     </a>`;
                 }
             }
@@ -275,9 +269,7 @@
                     html += `<div class="sitemap__lang ${isOpen ? 'sitemap__lang--open' : ''}" data-lang="${lang}">`;
                     
                     html += `<div class="sitemap__lang-header" data-toggle-lang="${lang}">
-                        <svg class="sitemap__lang-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                            <polyline points="9 18 15 12 9 6"/>
-                        </svg>
+                        ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.chevronRight, 16, 'sitemap__lang-toggle')}
                         <span class="sitemap__lang-flag">${getFlagEmoji(lang)}</span>
                         <span class="sitemap__lang-name">${QuickSiteAdmin.escapeHtml(langName)}</span>
                         ${isDefault ? `<span class="badge badge--primary">${sitemap.default || 'Default'}</span>` : ''}
@@ -413,9 +405,7 @@
                 infoContainer.innerHTML = `
                     <div class="project-manager__info">
                         <div class="project-manager__name">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                            </svg>
+                            ${QuickSiteUtils.iconFolder(20)}
                             <span>${QuickSiteAdmin.escapeHtml(currentProject)}</span>
                             <span class="badge badge--primary">${proj.active || 'Active'}</span>
                         </div>
@@ -505,8 +495,6 @@
     // Manage Space
     // ========================================================================
 
-    let manageSpaceLoaded = false;
-
     function setupManageSpace() {
         const toggle = document.getElementById('manage-space-toggle');
         const body = document.getElementById('manage-space-body');
@@ -552,9 +540,7 @@
                         <span class="manage-space__item-meta">${date} · ${sizeStr}</span>
                     </div>
                     <button type="button" class="manage-space__delete-btn" title="${t('common.delete', 'Delete')}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                        </svg>
+                        ${QuickSiteUtils.iconTrash()}
                     </button>
                 </div>`;
             }).join('');
@@ -680,9 +666,7 @@
                         <span class="manage-space__item-meta">${date} · ${size}</span>
                     </div>
                     <button type="button" class="manage-space__delete-btn" title="${t('common.delete', 'Delete')}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                        </svg>
+                        ${QuickSiteUtils.iconTrash()}
                     </button>
                 </div>`;
             }).join('');
@@ -762,7 +746,7 @@
             if (!newProject || newProject === currentProject) return;
             
             this.disabled = true;
-            this.innerHTML = '<span class="spinner"></span> ' + (common.loading || 'Switching...');
+            this.innerHTML = QuickSiteUtils.htmlSpinner() + ' ' + (common.loading || 'Switching...');
             try {
                 const result = await QuickSiteAdmin.apiRequest('switchProject', 'POST', { project: newProject });
                 if (result.ok) {
@@ -798,7 +782,7 @@
             }
             
             this.disabled = true;
-            this.innerHTML = '<span class="spinner"></span> ' + (common.loading || 'Creating...');
+            this.innerHTML = QuickSiteUtils.htmlSpinner() + ' ' + (common.loading || 'Creating...');
             try {
                 const result = await QuickSiteAdmin.apiRequest('createProject', 'POST', {
                     name: name,
@@ -1031,7 +1015,7 @@
         const proj = t('dashboard.projects', {});
         const common = t('common', {});
         
-        container.innerHTML = `<div class="admin-loading"><span class="admin-spinner"></span><span>${common.loading || 'Loading...'}</span></div>`;
+        container.innerHTML = QuickSiteUtils.htmlLoading(common.loading || 'Loading...');
         
         try {
             const result = await QuickSiteAdmin.apiRequest('listBackups', 'GET');
@@ -1078,10 +1062,7 @@
                     <div class="backup-item" data-backup="${QuickSiteAdmin.escapeHtml(backup.name)}">
                         <div class="backup-item__info">
                             <div class="backup-item__name">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                                    <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
-                                </svg>
+                                ${QuickSiteUtils.iconSave(16)}
                                 <span>${QuickSiteAdmin.escapeHtml(backup.name)}</span>
                                 ${typeLabel}
                             </div>
@@ -1095,17 +1076,11 @@
                         </div>
                         <div class="backup-item__actions">
                             <button type="button" class="admin-btn admin-btn--sm admin-btn--primary btn-restore-this" data-backup="${QuickSiteAdmin.escapeHtml(backup.name)}">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                                    <path d="M3 3v5h5"/>
-                                </svg>
+                                ${QuickSiteUtils.iconRefresh()}
                                 ${proj.restore_btn || 'Restore'}
                             </button>
                             <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost admin-btn--danger btn-delete-backup" data-backup="${QuickSiteAdmin.escapeHtml(backup.name)}">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                                    <polyline points="3 6 5 6 21 6"/>
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                </svg>
+                                ${QuickSiteUtils.iconTrash()}
                             </button>
                         </div>
                     </div>
@@ -1159,8 +1134,6 @@
     // ========================================================================
     // Structure Panel
     // ========================================================================
-
-    let dashStructureLoaded = null; // Stores { type, name, structure }
 
     /**
      * Toggle the structure panel open/closed
@@ -1254,7 +1227,7 @@
         
         const trans = window.QUICKSITE_CONFIG?.translations?.structure?.tree || {};
         
-        treeContainer.innerHTML = `<div class="admin-loading"><span class="admin-spinner"></span> ${trans.loading || 'Loading structure...'}</div>`;
+        treeContainer.innerHTML = QuickSiteUtils.htmlLoading(trans.loading || 'Loading structure...');
         
         try {
             let urlParams = [type];
@@ -1376,49 +1349,58 @@
     }
 
     // ========================================================================
-    // Initialization
+    // Restore Confirm Modal
     // ========================================================================
 
-    document.addEventListener('DOMContentLoaded', async function() {
-        // Initialize restore confirm modal handlers
+    function setupRestoreConfirmModal() {
         const restoreCheckbox = document.getElementById('restore-create-backup');
         if (restoreCheckbox) {
             restoreCheckbox.addEventListener('change', updateRestoreWarning);
         }
         
         const confirmRestoreBtn = document.getElementById('btn-confirm-restore');
-        if (confirmRestoreBtn) {
-            confirmRestoreBtn.addEventListener('click', async function() {
-                if (!pendingRestoreBackup) return;
+        if (!confirmRestoreBtn) return;
+
+        const restoreSvg = QuickSiteUtils.iconRefresh(16);
+
+        confirmRestoreBtn.addEventListener('click', async function() {
+            if (!pendingRestoreBackup) return;
+            
+            const proj = t('dashboard.projects', {});
+            const createBackup = document.getElementById('restore-create-backup').checked;
+            
+            this.disabled = true;
+            this.innerHTML = QuickSiteUtils.htmlSpinner(16) + ' ' + (proj.restoring || 'Restoring...');
+            
+            try {
+                const result = await QuickSiteAdmin.apiRequest('restoreBackup', 'POST', { 
+                    backup: pendingRestoreBackup,
+                    create_backup: createBackup
+                });
                 
-                const proj = t('dashboard.projects', {});
-                const createBackup = document.getElementById('restore-create-backup').checked;
-                
-                this.disabled = true;
-                this.innerHTML = '<span class="admin-spinner" style="width: 16px; height: 16px;"></span> ' + (proj.restoring || 'Restoring...');
-                
-                try {
-                    const result = await QuickSiteAdmin.apiRequest('restoreBackup', 'POST', { 
-                        backup: pendingRestoreBackup,
-                        create_backup: createBackup
-                    });
-                    
-                    if (result.ok) {
-                        QuickSiteAdmin.showToast(proj.restore_success || 'Backup restored successfully', 'success');
-                        closeAllModals();
-                        window.location.href = window.location.pathname + '?restored=' + Date.now();
-                    } else {
-                        QuickSiteAdmin.showToast(result.data?.message || 'Failed to restore backup', 'error');
-                        this.disabled = false;
-                        this.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> ${proj.restoreBtn || 'Restore'}`;
-                    }
-                } catch (error) {
-                    QuickSiteAdmin.showToast('Failed to restore backup', 'error');
+                if (result.ok) {
+                    QuickSiteAdmin.showToast(proj.restore_success || 'Backup restored successfully', 'success');
+                    closeAllModals();
+                    window.location.href = window.location.pathname + '?restored=' + Date.now();
+                } else {
+                    QuickSiteAdmin.showToast(result.data?.message || 'Failed to restore backup', 'error');
                     this.disabled = false;
-                    this.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> ${proj.restoreBtn || 'Restore'}`;
+                    this.innerHTML = `${restoreSvg} ${proj.restoreBtn || 'Restore'}`;
                 }
-            });
-        }
+            } catch (error) {
+                QuickSiteAdmin.showToast('Failed to restore backup', 'error');
+                this.disabled = false;
+                this.innerHTML = `${restoreSvg} ${proj.restoreBtn || 'Restore'}`;
+            }
+        });
+    }
+
+    // ========================================================================
+    // Initialization
+    // ========================================================================
+
+    document.addEventListener('DOMContentLoaded', async function() {
+        setupRestoreConfirmModal();
         
         // Load all dashboard data in parallel
         await Promise.all([

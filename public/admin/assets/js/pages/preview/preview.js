@@ -550,9 +550,7 @@
             this.triggerEl.className = 'qs-property-selector__trigger';
             this.triggerEl.innerHTML = `
                 <span class="qs-property-selector__text">${this.currentValue || this.placeholder}</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                    <polyline points="6 9 12 15 18 9"/>
-                </svg>
+                ${QuickSiteUtils.iconChevronDown(12)}
             `;
             
             this.triggerEl.addEventListener('click', (e) => {
@@ -751,9 +749,7 @@
                     const warningItem = document.createElement('div');
                     warningItem.className = 'qs-property-selector__warning';
                     warningItem.innerHTML = `
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                        </svg>
+                        ${QuickSiteUtils.iconAlertCircle(14)}
                         <span>${PreviewConfig.i18n.propertyAlreadyExists}</span>
                     `;
                     listEl.appendChild(warningItem);
@@ -1283,10 +1279,7 @@
                         <button type="button" class="preview-keyframe-modal__transform-edit-btn admin-btn admin-btn--xs admin-btn--secondary"
                                 data-frame="${frameIndex}" data-prop="${propIndex}"
                                 title="${PreviewConfig.i18n.openTransformEditor}">
-                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                            </svg>
+                            ${QuickSiteUtils.iconEdit(12)}
                             ${PreviewConfig.i18n.edit}
                         </button>
                     </div>`;
@@ -1700,10 +1693,7 @@
                 <div class="transform-editor__function-name">${func.fn}</div>
                 <div class="transform-editor__params">${inputsHTML}</div>
                 <button type="button" class="transform-editor__delete" title="${PreviewConfig.i18n.removeFunction}">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
+                    ${QuickSiteUtils.iconClose(14)}
                 </button>
             `;
             
@@ -3611,104 +3601,112 @@
     
     // ==================== Event Handlers ====================
     
-    iframe.addEventListener('load', function() {
-        clearTimeout(loadingTimeout);
-        hideLoading();
-        // A new document loaded — previous overlay is gone regardless of flag
-        overlayInjected = false;
-        injectOverlay();
-        // Retry injection in case document wasn't fully ready
-        setTimeout(function() { if (!overlayInjected) injectOverlay(); }, 50);
-        setTimeout(function() { if (!overlayInjected) injectOverlay(); }, 200);
-    });
-    
-    targetSelect.addEventListener('change', function() {
-        // Parse unified dropdown value: "type:name" (e.g., "page:home" or "component:feature-item")
-        const value = this.value;
-        const colonIdx = value.indexOf(':');
-        if (colonIdx === -1) {
-            // Fallback for legacy format - treat as page
-            navigateTo('page', value);
-            return;
+    function initIframeAndControls() {
+        iframe.addEventListener('load', function() {
+            clearTimeout(loadingTimeout);
+            hideLoading();
+            // A new document loaded — previous overlay is gone regardless of flag
+            overlayInjected = false;
+            injectOverlay();
+            // Retry injection in case document wasn't fully ready
+            setTimeout(function() { if (!overlayInjected) injectOverlay(); }, 50);
+            setTimeout(function() { if (!overlayInjected) injectOverlay(); }, 200);
+        });
+        
+        targetSelect.addEventListener('change', function() {
+            // Parse unified dropdown value: "type:name" (e.g., "page:home" or "component:feature-item")
+            const value = this.value;
+            const colonIdx = value.indexOf(':');
+            if (colonIdx === -1) {
+                // Fallback for legacy format - treat as page
+                navigateTo('page', value);
+                return;
+            }
+            const type = value.substring(0, colonIdx);
+            const name = value.substring(colonIdx + 1);
+            navigateTo(type, name);
+        });
+        
+        if (langSelect) {
+            langSelect.addEventListener('change', function() {
+                // Reload with current edit target
+                navigateTo(currentEditType, currentEditName);
+            });
         }
-        const type = value.substring(0, colonIdx);
-        const name = value.substring(colonIdx + 1);
-        navigateTo(type, name);
-    });
-    
-    if (langSelect) {
-        langSelect.addEventListener('change', function() {
-            // Reload with current edit target
-            navigateTo(currentEditType, currentEditName);
+        
+        reloadBtn.addEventListener('click', reloadPreview);
+        
+        deviceBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                setDevice(this.dataset.device);
+            });
+        });
+        
+        modeBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                setMode(this.dataset.mode);
+            });
+        });
+        
+        // Mobile tool buttons (bottom toolbar on small screens)
+        const mobileBtns = document.querySelectorAll('.preview-mobile-tool');
+        mobileBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Update active state for mobile buttons
+                mobileBtns.forEach(b => b.classList.remove('preview-mobile-tool--active'));
+                this.classList.add('preview-mobile-tool--active');
+                // Also sync desktop buttons
+                setMode(this.dataset.mode);
+            });
         });
     }
     
-    reloadBtn.addEventListener('click', reloadPreview);
-    
-    deviceBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            setDevice(this.dataset.device);
-        });
-    });
-    
-    modeBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            setMode(this.dataset.mode);
-        });
-    });
-    
-    // Mobile tool buttons (bottom toolbar on small screens)
-    const mobileBtns = document.querySelectorAll('.preview-mobile-tool');
-    mobileBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            // Update active state for mobile buttons
-            mobileBtns.forEach(b => b.classList.remove('preview-mobile-tool--active'));
-            this.classList.add('preview-mobile-tool--active');
-            // Also sync desktop buttons
-            setMode(this.dataset.mode);
-        });
-    });
+    initIframeAndControls();
     
     // ==================== Keyboard Shortcuts ====================
     
-    document.addEventListener('keydown', function(e) {
-        // Ignore if typing in an input/textarea
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
-            return;
-        }
-        
-        // Arrow keys - Navigate selection (only in select mode with a selection)
-        if (currentMode === 'select' && selectedStruct && selectedNode) {
-            if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-                if (window.PreviewNavigation && PreviewNavigation.handleArrowKey(e.key)) {
+    function initKeyboardShortcuts() {
+        document.addEventListener('keydown', function(e) {
+            // Ignore if typing in an input/textarea
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+                return;
+            }
+            
+            // Arrow keys - Navigate selection (only in select mode with a selection)
+            if (currentMode === 'select' && selectedStruct && selectedNode) {
+                if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    if (window.PreviewNavigation && PreviewNavigation.handleArrowKey(e.key)) {
+                        e.preventDefault();
+                        return;
+                    }
+                }
+            }
+            
+            // Escape - Clear selection and hide info
+            if (e.key === 'Escape') {
+                // Clear selection if we have one
+                if (selectedStruct && selectedNode) {
+                    hideNodePanel();
+                    if (iframe.contentWindow) {
+                        iframe.contentWindow.postMessage({ action: 'clearSelection' }, '*');
+                    }
+                }
+                return;
+            }
+            
+            // Delete or Backspace - Delete selected node
+            if (e.key === 'Delete' || (e.key === 'Backspace' && e.metaKey)) {
+                // Only if we have a selected node
+                if (selectedStruct && selectedNode) {
                     e.preventDefault();
-                    return;
+                    deleteSelectedNode();
                 }
+                return;
             }
-        }
-        
-        // Escape - Clear selection and hide info
-        if (e.key === 'Escape') {
-            // Clear selection if we have one
-            if (selectedStruct && selectedNode) {
-                hideNodePanel();
-                if (iframe.contentWindow) {
-                    iframe.contentWindow.postMessage({ action: 'clearSelection' }, '*');
-                }
-            }
-            return;
-        }
-        
-        // Delete or Backspace - Delete selected node
-        if (e.key === 'Delete' || (e.key === 'Backspace' && e.metaKey)) {
-            // Only if we have a selected node
-            if (selectedStruct && selectedNode) {
-                e.preventDefault();
-                deleteSelectedNode();
-            }
-            return;
-        }
-    });
+        });
+    }
+    
+    initKeyboardShortcuts();
     
     if (nodeClose) {
         nodeClose.addEventListener('click', hideNodePanel);
@@ -3864,15 +3862,17 @@
             
             showToast(msg, 'success');
             
-            // Live DOM update - clone source node in iframe (no reload needed)
-            if (newNodeId && selectedNode !== '') {
+            // Live DOM update - use server-rendered HTML to show correct translations
+            const renderedHtml = result.data?.data?.html;
+            if (newNodeId && selectedNode !== '' && renderedHtml) {
                 sendToIframe('duplicateNode', {
                     struct: selectedStruct,
                     sourceNodeId: selectedNode,
-                    newNodeId: newNodeId
+                    newNodeId: newNodeId,
+                    html: renderedHtml
                 });
             } else {
-                // Root duplication - full reload needed
+                // Root duplication or no rendered HTML - full reload needed
                 reloadPreview();
             }
             
@@ -3888,189 +3888,175 @@
     
     // ==================== Contextual Area Event Listeners (Phase 8) ====================
     
-    // Toggle collapse/expand
-    if (contextualToggle) {
-        contextualToggle.addEventListener('click', toggleContextualArea);
-    }
-    
-    // Contextual area action buttons (wire to same handlers as floating panel)
-    if (ctxNodeAdd) {
-        ctxNodeAdd.addEventListener('click', function() {
-            if (selectedStruct == null || selectedNode == null) {
-                showToast(PreviewConfig.i18n.selectNodeFirst, 'warning');
-                return;
-            }
-            if (selectedNode === '' && currentEditType !== 'component') {
-                showToast(PreviewConfig.i18n?.selectChildElement || 'This is the component root. Select a child element to use actions.', 'info');
-                return;
-            }
-            setMode('add');
-            showSidebarAddForm();
-        });
-    }
-    
-    // Back to Select button (from Add mode)
-    if (addBackToSelect) {
-        addBackToSelect.addEventListener('click', function() {
-            setMode('select');
-        });
-    }
-    
-    // Tools show names checkbox
-    if (toolsShowNames && sidebarTools) {
-        // Restore state from localStorage (default: show names = true)
-        const showNames = localStorage.getItem('quicksite-tools-show-names') !== 'false';
-        toolsShowNames.checked = showNames;
-        if (!showNames) {
-            sidebarTools.classList.add('preview-sidebar__tools--icons-only');
+    function initContextualBindings() {
+        // Toggle collapse/expand
+        if (contextualToggle) {
+            contextualToggle.addEventListener('click', toggleContextualArea);
         }
         
-        toolsShowNames.addEventListener('change', function() {
-            if (this.checked) {
-                sidebarTools.classList.remove('preview-sidebar__tools--icons-only');
-            } else {
+        // Contextual area action buttons (wire to same handlers as floating panel)
+        if (ctxNodeAdd) {
+            ctxNodeAdd.addEventListener('click', function() {
+                if (selectedStruct == null || selectedNode == null) {
+                    showToast(PreviewConfig.i18n.selectNodeFirst, 'warning');
+                    return;
+                }
+                if (selectedNode === '' && currentEditType !== 'component') {
+                    showToast(PreviewConfig.i18n?.selectChildElement || 'This is the component root. Select a child element to use actions.', 'info');
+                    return;
+                }
+                setMode('add');
+                showSidebarAddForm();
+            });
+        }
+        
+        // Back to Select button (from Add mode)
+        if (addBackToSelect) {
+            addBackToSelect.addEventListener('click', function() {
+                setMode('select');
+            });
+        }
+        
+        // Tools show names checkbox
+        if (toolsShowNames && sidebarTools) {
+            // Restore state from localStorage (default: show names = true)
+            const showNames = localStorage.getItem('quicksite-tools-show-names') !== 'false';
+            toolsShowNames.checked = showNames;
+            if (!showNames) {
                 sidebarTools.classList.add('preview-sidebar__tools--icons-only');
             }
-            localStorage.setItem('quicksite-tools-show-names', this.checked);
-        });
-    }
-    
-    if (ctxNodeDelete) {
-        ctxNodeDelete.addEventListener('click', deleteSelectedNode);
-    }
-    
-    if (ctxNodeStyle) {
-        ctxNodeStyle.addEventListener('click', function() {
-            // Store element info for style mode preselection
-            const preselect = {
-                classes: selectedElementClasses,
-                tag: selectedElementTag,
-                selector: null
-            };
             
-            // Determine best selector: first class or tag
-            if (selectedElementClasses && selectedElementClasses !== '-') {
-                const firstClass = selectedElementClasses.split(' ')[0].trim();
-                if (firstClass) {
-                    preselect.selector = '.' + firstClass;
+            toolsShowNames.addEventListener('change', function() {
+                if (this.checked) {
+                    sidebarTools.classList.remove('preview-sidebar__tools--icons-only');
+                } else {
+                    sidebarTools.classList.add('preview-sidebar__tools--icons-only');
                 }
-            } else if (selectedElementTag && selectedElementTag !== '-') {
-                preselect.selector = selectedElementTag.toLowerCase();
-            }
-            
-            // Switch to style mode with preselection data
-            setMode('style', preselect);
+                localStorage.setItem('quicksite-tools-show-names', this.checked);
+            });
+        }
+        
+        if (ctxNodeDelete) {
+            ctxNodeDelete.addEventListener('click', deleteSelectedNode);
+        }
+        
+        if (ctxNodeStyle) {
+            ctxNodeStyle.addEventListener('click', function() {
+                // Store element info for style mode preselection
+                const preselect = {
+                    classes: selectedElementClasses,
+                    tag: selectedElementTag,
+                    selector: null
+                };
+                
+                // Determine best selector: first class or tag
+                if (selectedElementClasses && selectedElementClasses !== '-') {
+                    const firstClass = selectedElementClasses.split(' ')[0].trim();
+                    if (firstClass) {
+                        preselect.selector = '.' + firstClass;
+                    }
+                } else if (selectedElementTag && selectedElementTag !== '-') {
+                    preselect.selector = selectedElementTag.toLowerCase();
+                }
+                
+                // Switch to style mode with preselection data
+                setMode('style', preselect);
+            });
+        }
+        
+        // Save as Snippet
+        if (ctxNodeSaveSnippet) {
+            ctxNodeSaveSnippet.addEventListener('click', showSaveSnippetForm);
+        }
+        if (saveSnippetClose) {
+            saveSnippetClose.addEventListener('click', hideSaveSnippetForm);
+        }
+        if (saveSnippetCancel) {
+            saveSnippetCancel.addEventListener('click', hideSaveSnippetForm);
+        }
+        
+        // Variables panel button
+        if (ctxNodeVariables) {
+            ctxNodeVariables.addEventListener('click', showVariablesPanel);
+        }
+        if (variablesPanelClose) {
+            variablesPanelClose.addEventListener('click', hideVariablesPanel);
+        }
+        
+        // Auto-generate ID from name
+        if (saveSnippetName) {
+            saveSnippetName.addEventListener('input', function() {
+                if (saveSnippetId) {
+                    // Auto-generate slug from name
+                    const slug = this.value
+                        .toLowerCase()
+                        .trim()
+                        .replace(/[^a-z0-9\s-]/g, '')
+                        .replace(/\s+/g, '-')
+                        .replace(/-+/g, '-');
+                    saveSnippetId.value = slug;
+                }
+            });
+        }
+        
+        if (saveSnippetSubmit) {
+            saveSnippetSubmit.addEventListener('click', submitSaveSnippet);
+        }
+        if (deleteSnippetBtn) {
+            deleteSnippetBtn.addEventListener('click', deleteSelectedSnippet);
+        }
+        
+        // Mobile section toggle handlers
+        document.querySelectorAll('.preview-mobile-section__toggle').forEach(toggle => {
+            toggle.addEventListener('click', function() {
+                const section = this.closest('.preview-mobile-section');
+                if (section) {
+                    section.classList.toggle('preview-mobile-section--expanded');
+                }
+            });
         });
+        
+        // Global element info bar toggle (at bottom of preview)
+        if (globalElementInfoToggle) {
+            globalElementInfoToggle.addEventListener('click', function() {
+                if (globalElementInfo) {
+                    globalElementInfo.classList.toggle('preview-element-info--expanded');
+                }
+            });
+        }
+        
+        // Mobile action buttons (wire to same handlers)
+        if (mobileCtxAdd) {
+            mobileCtxAdd.addEventListener('click', function() {
+                if (selectedStruct == null || selectedNode == null) {
+                    showToast(PreviewConfig.i18n.selectNodeFirst, 'warning');
+                    return;
+                }
+                if (selectedNode === '' && currentEditType !== 'component') {
+                    showToast(PreviewConfig.i18n?.selectChildElement || 'This is the component root. Select a child element to use actions.', 'info');
+                    return;
+                }
+                setMode('add');
+                showSidebarAddForm();
+            });
+        }
+        
+        if (mobileCtxDuplicate) {
+            mobileCtxDuplicate.addEventListener('click', duplicateSelectedNode);
+        }
+        
+        if (mobileCtxDelete) {
+            mobileCtxDelete.addEventListener('click', deleteSelectedNode);
+        }
     }
     
-    // ==================== Save as Snippet Event Listeners ====================
+    initContextualBindings();
     
-    // Show save snippet form
-    if (ctxNodeSaveSnippet) {
-        ctxNodeSaveSnippet.addEventListener('click', showSaveSnippetForm);
-    }
+    // ==================== Module Initializations ====================
     
-    // Close/Cancel save snippet form
-    if (saveSnippetClose) {
-        saveSnippetClose.addEventListener('click', hideSaveSnippetForm);
-    }
-    if (saveSnippetCancel) {
-        saveSnippetCancel.addEventListener('click', hideSaveSnippetForm);
-    }
-    
-    // Variables panel button
-    if (ctxNodeVariables) {
-        ctxNodeVariables.addEventListener('click', showVariablesPanel);
-    }
-    if (variablesPanelClose) {
-        variablesPanelClose.addEventListener('click', hideVariablesPanel);
-    }
-    
-    // Auto-generate ID from name
-    if (saveSnippetName) {
-        saveSnippetName.addEventListener('input', function() {
-            if (saveSnippetId) {
-                // Auto-generate slug from name
-                const slug = this.value
-                    .toLowerCase()
-                    .trim()
-                    .replace(/[^a-z0-9\s-]/g, '')
-                    .replace(/\s+/g, '-')
-                    .replace(/-+/g, '-');
-                saveSnippetId.value = slug;
-            }
-        });
-    }
-    
-    // Submit save snippet form
-    if (saveSnippetSubmit) {
-        saveSnippetSubmit.addEventListener('click', submitSaveSnippet);
-    }
-    
-    // Delete snippet button
-    if (deleteSnippetBtn) {
-        deleteSnippetBtn.addEventListener('click', deleteSelectedSnippet);
-    }
-    
-    // ==================== Mobile Sections Event Listeners ====================
-
-    // Mobile section toggle handlers
-    document.querySelectorAll('.preview-mobile-section__toggle').forEach(toggle => {
-        toggle.addEventListener('click', function() {
-            const section = this.closest('.preview-mobile-section');
-            if (section) {
-                section.classList.toggle('preview-mobile-section--expanded');
-            }
-        });
-    });
-    
-    // Global element info bar toggle (at bottom of preview)
-    if (globalElementInfoToggle) {
-        globalElementInfoToggle.addEventListener('click', function() {
-            if (globalElementInfo) {
-                globalElementInfo.classList.toggle('preview-element-info--expanded');
-            }
-        });
-    }
-    
-    // Mobile action buttons (wire to same handlers)
-    if (mobileCtxAdd) {
-        mobileCtxAdd.addEventListener('click', function() {
-            if (selectedStruct == null || selectedNode == null) {
-                showToast(PreviewConfig.i18n.selectNodeFirst, 'warning');
-                return;
-            }
-            if (selectedNode === '' && currentEditType !== 'component') {
-                showToast(PreviewConfig.i18n?.selectChildElement || 'This is the component root. Select a child element to use actions.', 'info');
-                return;
-            }
-            setMode('add');
-            showSidebarAddForm();
-        });
-    }
-    
-    if (mobileCtxDuplicate) {
-        mobileCtxDuplicate.addEventListener('click', duplicateSelectedNode);
-    }
-    
-    if (mobileCtxDelete) {
-        mobileCtxDelete.addEventListener('click', deleteSelectedNode);
-    }
-    
-    // ==================== Theme Variables Event Listeners (Phase 8.3) ====================
-    
-    // Initialize style tabs
     initStyleTabs();
-    
-    // Initialize selector browser (Phase 8.4)
     initSelectorBrowser();
-    
-    // Keyframe editor now handled by preview-style-animations.js module (auto-initializes)
-    
-    // Initialize transform editor (Phase 9.3.1 Step 5)
     initTransformEditorHandlers();
-    
-    // Theme buttons now handled by preview-style-theme.js module
 
 
     // ==================== Sidebar Add/Edit Forms (Phase 8 - Mode Refactoring) ====================
@@ -4291,14 +4277,14 @@
                 renderSnippetCards();
             } else {
                 addSnippetCards.innerHTML = `<div class="snippet-selector__empty">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                    ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.ban, null)}
                     <span>${PreviewConfig.i18n.noSnippetsFound || 'No snippets found'}</span>
                 </div>`;
             }
         } catch (error) {
             console.error('[Preview] Failed to load snippets:', error);
             addSnippetCards.innerHTML = `<div class="snippet-selector__empty">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.ban, null)}
                 <span>${PreviewConfig.i18n.errorLoadingSnippets || 'Error loading snippets'}</span>
             </div>`;
         }
@@ -4867,9 +4853,7 @@
                    placeholder="${PreviewConfig.i18n.paramValue || 'value'}"
                    data-param-index="${sidebarAddCustomParamsCount}">
             <button type="button" class="preview-contextual-form__remove-param" title="${PreviewConfig.i18n.remove || 'Remove'}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
+                ${QuickSiteUtils.iconClose(14)}
             </button>
         `;
         row.querySelector('.preview-contextual-form__remove-param').addEventListener('click', () => row.remove());
@@ -4928,11 +4912,12 @@
             throw new Error('Invalid structure type');
         }
         
+        const isRoot = !selectedNode && selectedNode !== 0;
         const requestData = {
             type: structInfo.type,
-            targetNodeId: selectedNode === '' ? 'root' : selectedNode,
+            targetNodeId: isRoot ? 'root' : String(selectedNode),
             tag: tag,
-            position: selectedNode === '' ? 'inside' : position
+            position: isRoot ? 'inside' : position
         };
         if (structInfo.name) requestData.name = structInfo.name;
         if (classes) requestData.params = { class: classes, ...params };
@@ -4993,11 +4978,12 @@
             throw new Error('Invalid structure type');
         }
         
+        const isRoot = !selectedNode && selectedNode !== 0;
         const requestData = {
             type: structInfo.type,
-            targetNodeId: selectedNode === '' ? 'root' : selectedNode,
+            targetNodeId: isRoot ? 'root' : String(selectedNode),
             component: componentName,
-            position: selectedNode === '' ? 'inside' : position
+            position: isRoot ? 'inside' : position
         };
         if (structInfo.name) requestData.name = structInfo.name;
         if (Object.keys(vars).length > 0) requestData.data = vars;
@@ -5049,10 +5035,11 @@
         }
         
         // Use the new insertSnippet command which handles full structure + translations
+        const isRoot = !selectedNode && selectedNode !== 0;
         const requestData = {
             type: structInfo.type,
-            targetNodeId: selectedNode === '' ? 'root' : selectedNode,
-            position: selectedNode === '' ? 'inside' : position,
+            targetNodeId: isRoot ? 'root' : String(selectedNode),
+            position: isRoot ? 'inside' : position,
             snippetId: selectedSnippetId
         };
         if (structInfo.name) requestData.name = structInfo.name;

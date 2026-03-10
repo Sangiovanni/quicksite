@@ -505,9 +505,7 @@
         const varDropdownBtn = document.createElement('button');
         varDropdownBtn.type = 'button';
         varDropdownBtn.className = 'preview-style-property__var-btn';
-        varDropdownBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-            <polyline points="6 9 12 15 18 9"/>
-        </svg>`;
+        varDropdownBtn.innerHTML = QuickSiteUtils.iconChevronDown(12);
         varDropdownBtn.title = PreviewConfig.i18n.selectVariable;
         varDropdownBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -530,9 +528,7 @@
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.className = 'preview-style-property__delete';
-        deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>`;
+        deleteBtn.innerHTML = QuickSiteUtils.iconClose(14);
         deleteBtn.title = PreviewConfig.i18n.delete;
         deleteBtn.addEventListener('click', () => {
             deleteProperty(row.dataset.property, isNew);

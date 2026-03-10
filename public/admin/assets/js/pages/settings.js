@@ -26,6 +26,18 @@
         autoExecute: 'quicksite_ai_auto_execute'
     };
     
+    // Shared template helpers
+    function renderDefinitionList(items) {
+        return `<dl class="admin-definition-list">${items.map(([label, value]) =>
+            `<dt>${label}</dt><dd>${value}</dd>`).join('')}</dl>`;
+    }
+    function showError(container, error) {
+        container.innerHTML = `<p class="admin-text-error">Error: ${error.message}</p>`;
+    }
+    function showMuted(container, text) {
+        container.innerHTML = `<p class="admin-text-muted">${text}</p>`;
+    }
+    
     /**
      * Initialize the settings page
      */
@@ -65,21 +77,12 @@
                 const providerCount = Object.keys(providers).length;
                 const defaultName = providers[defaultProvider]?.name || defaultProvider;
                 
-                container.innerHTML = `
-                    <dl class="admin-definition-list">
-                        <dt>Status</dt>
-                        <dd><span class="admin-badge admin-badge--success">Configured</span></dd>
-                        
-                        <dt>Providers</dt>
-                        <dd>${providerCount} provider${providerCount > 1 ? 's' : ''} configured</dd>
-                        
-                        <dt>Default Provider</dt>
-                        <dd>${defaultName}</dd>
-                        
-                        <dt>Storage</dt>
-                        <dd>${persist ? 'Persistent (localStorage)' : 'Session only (cleared on tab close)'}</dd>
-                    </dl>
-                `;
+                container.innerHTML = renderDefinitionList([
+                    ['Status', '<span class="admin-badge admin-badge--success">Configured</span>'],
+                    ['Providers', `${providerCount} provider${providerCount > 1 ? 's' : ''} configured`],
+                    ['Default Provider', defaultName],
+                    ['Storage', persist ? 'Persistent (localStorage)' : 'Session only (cleared on tab close)']
+                ]);
             } catch (e) {
                 container.innerHTML = '<p class="admin-text-muted">No AI providers configured</p>';
             }
@@ -87,10 +90,7 @@
             container.innerHTML = `
                 <p class="admin-text-muted">No AI providers configured.</p>
                 <a href="${aiSettingsUrl}" class="admin-btn admin-btn--primary" style="margin-top: var(--space-sm);">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                        <line x1="12" y1="5" x2="12" y2="19"/>
-                        <line x1="5" y1="12" x2="19" y2="12"/>
-                    </svg>
+                    ${QuickSiteUtils.iconPlus(16)}
                     Add API Key
                 </a>
             `;
@@ -140,22 +140,11 @@
                     'viewer': 'Read-only access to view content and settings'
                 };
                 
-                container.innerHTML = `
-                    <dl class="admin-definition-list">
-                        <dt>Your Role</dt>
-                        <dd>
-                            <span class="admin-badge admin-badge--${badgeClass}">
-                                ${isSuperAdmin ? '⭐ Superadmin' : role}
-                            </span>
-                        </dd>
-                        
-                        <dt>Access Level</dt>
-                        <dd>${roleDescriptions[role] || 'Custom role'}</dd>
-                        
-                        <dt>Available Commands</dt>
-                        <dd>${isSuperAdmin ? 'All (77 commands)' : commandCount + ' commands'}</dd>
-                    </dl>
-                    ${!isSuperAdmin ? `
+                container.innerHTML = renderDefinitionList([
+                    ['Your Role', `<span class="admin-badge admin-badge--${badgeClass}">${isSuperAdmin ? '⭐ Superadmin' : role}</span>`],
+                    ['Access Level', roleDescriptions[role] || 'Custom role'],
+                    ['Available Commands', isSuperAdmin ? 'All (77 commands)' : commandCount + ' commands']
+                ]) + (!isSuperAdmin ? `
                     <details style="margin-top: var(--space-md);">
                         <summary class="admin-text-muted" style="cursor: pointer;">View your accessible commands</summary>
                         <div style="margin-top: var(--space-sm); max-height: 200px; overflow-y: auto;">
@@ -164,13 +153,12 @@
                             </div>
                         </div>
                     </details>
-                    ` : ''}
-                `;
+                    ` : '');
             } else {
-                container.innerHTML = '<p class="admin-text-muted">Could not load permissions</p>';
+                showMuted(container, 'Could not load permissions');
             }
         } catch (error) {
-            container.innerHTML = `<p class="admin-text-error">Error: ${error.message}</p>`;
+            showError(container, error);
         }
     }
     
@@ -189,26 +177,17 @@
                 const version = config.quicksiteVersion || info.version || '1.6.0';
                 const realBaseUrl = info.base_url ? info.base_url.replace(/\/+/g, '/').replace(':/', '://') : baseUrl;
                 
-                container.innerHTML = `
-                    <dl class="admin-definition-list">
-                        <dt>API Version</dt>
-                        <dd><code>${version}</code></dd>
-                        
-                        <dt>Total Commands</dt>
-                        <dd>${info.total || Object.keys(info.commands || {}).length || 0}</dd>
-                        
-                        <dt>Base URL</dt>
-                        <dd><code>${realBaseUrl}</code></dd>
-                        
-                        <dt>Server Time</dt>
-                        <dd>${new Date().toLocaleString()}</dd>
-                    </dl>
-                `;
+                container.innerHTML = renderDefinitionList([
+                    ['API Version', `<code>${version}</code>`],
+                    ['Total Commands', info.total || Object.keys(info.commands || {}).length || 0],
+                    ['Base URL', `<code>${realBaseUrl}</code>`],
+                    ['Server Time', new Date().toLocaleString()]
+                ]);
             } else {
-                container.innerHTML = '<p class="admin-text-muted">Could not load system info</p>';
+                showMuted(container, 'Could not load system info');
             }
         } catch (error) {
-            container.innerHTML = `<p class="admin-text-error">Error: ${error.message}</p>`;
+            showError(container, error);
         }
     }
     
@@ -252,7 +231,7 @@
                 </dl>
             `;
         } catch (error) {
-            container.innerHTML = `<p class="admin-text-error">Error: ${error.message}</p>`;
+            showError(container, error);
         }
     }
     
@@ -270,7 +249,7 @@
                 const routes = result.data.data.flat_routes;
                 
                 if (routes.length === 0) {
-                    container.innerHTML = '<p class="admin-text-muted">No routes configured</p>';
+                    showMuted(container, 'No routes configured');
                     return;
                 }
                 
@@ -288,10 +267,10 @@
                 
                 container.innerHTML = html;
             } else {
-                container.innerHTML = '<p class="admin-text-muted">Could not load routes</p>';
+                showMuted(container, 'Could not load routes');
             }
         } catch (error) {
-            container.innerHTML = `<p class="admin-text-error">Error: ${error.message}</p>`;
+            showError(container, error);
         }
     }
     
@@ -312,7 +291,7 @@
                 const langNames = data.language_names || {};
                 
                 if (langs.length === 0) {
-                    container.innerHTML = '<p class="admin-text-muted">No languages configured</p>';
+                    showMuted(container, 'No languages configured');
                     return;
                 }
                 
@@ -341,10 +320,10 @@
                 
                 container.innerHTML = html;
             } else {
-                container.innerHTML = '<p class="admin-text-muted">Could not load languages</p>';
+                showMuted(container, 'Could not load languages');
             }
         } catch (error) {
-            container.innerHTML = `<p class="admin-text-error">Error: ${error.message}</p>`;
+            showError(container, error);
         }
     }
     

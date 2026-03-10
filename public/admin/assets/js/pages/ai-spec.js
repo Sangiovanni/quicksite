@@ -450,6 +450,7 @@
         initNodeSelectors();
         updateConditionalFields(els);
         loadAutoOptions(els);
+        initPresetLoader(config, els);
 
         if (!config.isManualWorkflow && config.hasNoParams) {
             generatePrompt(config, els, state, {});
@@ -1759,6 +1760,93 @@
         }
         if (els.autoExecuteCheckbox) {
             els.autoExecuteCheckbox.checked = localStorage.getItem('quicksite_ai_auto_execute') === 'true';
+        }
+    }
+
+    /**
+     * Initialize the "load preset" select — fetch existing items from the API,
+     * populate a <select> above the form parameters, and fill in mapped fields
+     * when the user picks an item.  The user can still edit any field afterwards.
+     * If the final buildName matches an existing item we set the companion
+     * hidden param so the build step is skipped.
+     */
+    function initPresetLoader(config, els) {
+        if (!els.form) return;
+        const raw = els.form.dataset.loadPreset;
+        if (!raw) return;
+
+        let preset;
+        try { preset = JSON.parse(raw); } catch { return; }
+
+        const { command, dataPath, valueField, setParam, fieldMap } = preset;
+        if (!command || !fieldMap) return;
+
+        const select = document.getElementById('preset-select');
+        if (!select) return;
+
+        // Hidden param (e.g. buildExists)
+        const hiddenInput = setParam ? els.form.querySelector(`input[name="${setParam}"]`) : null;
+
+        // Store fetched data rows keyed by the value field
+        let dataByKey = {};
+        let nameSet = new Set();
+
+        (async () => {
+            try {
+                const resp = await fetch(config.managementUrl + encodeURIComponent(command), {
+                    headers: { 'Authorization': 'Bearer ' + config.token }
+                });
+                const result = await resp.json();
+                if (!resp.ok || !result.data) { select.disabled = false; return; }
+
+                const items = dataPath ? result.data[dataPath] : result.data;
+                if (!Array.isArray(items) || !items.length) { select.disabled = false; return; }
+
+                items.forEach(item => {
+                    const key = valueField ? item[valueField] : item;
+                    if (!key) return;
+                    dataByKey[key] = item;
+                    nameSet.add(key);
+                    const opt = document.createElement('option');
+                    opt.value = key;
+                    opt.textContent = key;
+                    select.appendChild(opt);
+                });
+
+                select.disabled = false;
+            } catch (e) {
+                console.warn('Failed to load presets for', command, e);
+                select.disabled = false;
+            }
+        })();
+
+        // When user picks a preset, fill in the mapped fields
+        select.addEventListener('change', () => {
+            const key = select.value;
+            const row = dataByKey[key];
+            if (!row) {
+                // "New build" selected — reset companion flag
+                if (hiddenInput) { hiddenInput.value = 'false'; els.form.dispatchEvent(new Event('change')); }
+                return;
+            }
+            for (const [paramId, dataField] of Object.entries(fieldMap)) {
+                const input = els.form.querySelector(`[name="${paramId}"]`);
+                if (input) input.value = row[dataField] ?? '';
+            }
+            if (hiddenInput) { hiddenInput.value = 'true'; els.form.dispatchEvent(new Event('change')); }
+        });
+
+        // Also watch the name field: if user edits it to match an existing
+        // build ⇒ set buildExists=true, otherwise false.
+        const nameParamId = Object.entries(fieldMap).find(([, df]) => df === valueField)?.[0];
+        const nameInput = nameParamId ? els.form.querySelector(`[name="${nameParamId}"]`) : null;
+        if (nameInput && hiddenInput) {
+            const syncMatch = () => {
+                hiddenInput.value = nameSet.has(nameInput.value.trim()) ? 'true' : 'false';
+                els.form.dispatchEvent(new Event('change'));
+            };
+            nameInput.addEventListener('input', syncMatch);
+            nameInput.addEventListener('change', syncMatch);
         }
     }
 

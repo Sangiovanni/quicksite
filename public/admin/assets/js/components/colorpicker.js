@@ -741,6 +741,28 @@
             });
         }
         
+        /**
+         * Clean up any active drag operations
+         */
+        _cleanupDrag() {
+            this._isDragging = false;
+            
+            // Clean up drag listeners from all slider elements
+            [this.svArea, this.hueSlider, this.alphaSlider].forEach(el => {
+                if (el && el._upHandler) {
+                    window.removeEventListener('mousemove', el._moveHandler, true);
+                    window.removeEventListener('mouseup', el._upHandler, true);
+                    window.removeEventListener('touchmove', el._moveHandler);
+                    window.removeEventListener('touchend', el._upHandler);
+                    window.removeEventListener('blur', el._upHandler);
+                    el._moveHandler = null;
+                    el._upHandler = null;
+                }
+            });
+            
+            this._activeElement = null;
+        }
+        
         _onSVChange(x, y, width, height) {
             const s = Math.max(0, Math.min(100, (x / width) * 100));
             const v = Math.max(0, Math.min(100, (1 - y / height) * 100));
@@ -997,28 +1019,6 @@
             
             document.removeEventListener('click', this._onDocumentClick);
             document.removeEventListener('keydown', this._onDocumentKeydown);
-        }
-        
-        /**
-         * Clean up any active drag operations
-         */
-        _cleanupDrag() {
-            this._isDragging = false;
-            
-            // Clean up drag listeners from all slider elements
-            [this.svArea, this.hueSlider, this.alphaSlider].forEach(el => {
-                if (el && el._upHandler) {
-                    window.removeEventListener('mousemove', el._moveHandler, true);
-                    window.removeEventListener('mouseup', el._upHandler, true);
-                    window.removeEventListener('touchmove', el._moveHandler);
-                    window.removeEventListener('touchend', el._upHandler);
-                    window.removeEventListener('blur', el._upHandler);
-                    el._moveHandler = null;
-                    el._upHandler = null;
-                }
-            });
-            
-            this._activeElement = null;
         }
         
         /**

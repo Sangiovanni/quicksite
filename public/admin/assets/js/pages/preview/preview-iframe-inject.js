@@ -72,7 +72,7 @@
                 removeNodeFromDom(e.data.struct, e.data.nodeId);
             }
             if (e.data.action === 'duplicateNode') {
-                duplicateNodeInDom(e.data.struct, e.data.sourceNodeId, e.data.newNodeId);
+                duplicateNodeInDom(e.data.struct, e.data.sourceNodeId, e.data.newNodeId, e.data.html);
             }
             if (e.data.action === 'rollbackDrag') {
                 rollbackDrag();
@@ -580,8 +580,8 @@
     }
     
     // Duplicate a node in the DOM (clone and insert after with new nodeId)
-    function duplicateNodeInDom(struct, sourceNodeId, newNodeId) {
-        console.log('[QuickSite] Duplicating node:', { struct, sourceNodeId, newNodeId });
+    function duplicateNodeInDom(struct, sourceNodeId, newNodeId, html) {
+        console.log('[QuickSite] Duplicating node:', { struct, sourceNodeId, newNodeId, hasHtml: !!html });
         
         // Find the source element - try direct match first, then within struct container
         let sourceEl = document.querySelector('[data-qs-struct="' + struct + '"][data-qs-node="' + sourceNodeId + '"]');
@@ -653,33 +653,39 @@
             reindexChildNodes(el, struct, elNodeId, incrementedNodeId);
         });
         
-        // THEN: Deep clone the source element
-        const clonedEl = sourceEl.cloneNode(true);
+        // THEN: Insert the new element using server-rendered HTML (correct translations)
+        // or fall back to cloneNode if no HTML provided
+        let newEl;
+        if (html) {
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+            newEl = temp.firstElementChild;
+        }
+        if (!newEl) {
+            // Fallback: deep clone source element and update node IDs
+            newEl = sourceEl.cloneNode(true);
+            newEl.setAttribute('data-qs-node', newNodeId);
+            const children = newEl.querySelectorAll('[data-qs-node]');
+            children.forEach(function(child) {
+                const childNodeId = child.getAttribute('data-qs-node');
+                if (childNodeId && childNodeId.startsWith(sourceNodeId + '.')) {
+                    const suffix = childNodeId.substring(sourceNodeId.length);
+                    child.setAttribute('data-qs-node', newNodeId + suffix);
+                }
+            });
+        }
         
-        // Update the cloned element's node ID
-        clonedEl.setAttribute('data-qs-node', newNodeId);
-        
-        // Update all child node IDs (replace sourceNodeId prefix with newNodeId prefix)
-        const children = clonedEl.querySelectorAll('[data-qs-node]');
-        children.forEach(function(child) {
-            const childNodeId = child.getAttribute('data-qs-node');
-            if (childNodeId && childNodeId.startsWith(sourceNodeId + '.')) {
-                const suffix = childNodeId.substring(sourceNodeId.length);
-                child.setAttribute('data-qs-node', newNodeId + suffix);
-            }
-        });
-        
-        // Remove selected class from clone
-        clonedEl.classList.remove('qs-selected', 'qs-hover');
+        // Remove selected class from new element
+        newEl.classList.remove('qs-selected', 'qs-hover');
         
         // Insert after source element
-        sourceEl.parentNode.insertBefore(clonedEl, sourceEl.nextSibling);
+        sourceEl.parentNode.insertBefore(newEl, sourceEl.nextSibling);
         
         console.log('[QuickSite] Node duplicated successfully:', newNodeId);
         
         // Select the new element and notify parent (updates info bar)
-        selectElementAndNotify(clonedEl);
-        clonedEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        selectElementAndNotify(newEl);
+        newEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
     
     /**

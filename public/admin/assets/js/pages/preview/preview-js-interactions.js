@@ -769,9 +769,7 @@
         var toggle = document.createElement('button');
         toggle.type = 'button';
         toggle.className = 'preview-contextual-js-form-advanced-toggle';
-        toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
-            'class="preview-contextual-js-form-advanced-chevron">' +
-            '<polyline points="9 6 15 12 9 18"/></svg>' +
+        toggle.innerHTML = QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.chevronRight, 14, 'preview-contextual-js-form-advanced-chevron') +
             (PreviewConfig.i18n?.advanced || 'Advanced');
         
         var content = document.createElement('div');
@@ -1473,8 +1471,7 @@
                 '<button type="button" class="preview-contextual-js-page-events__delete" ' +
                     'data-event="' + interaction.event + '" data-index="' + interaction.index + '" ' +
                     'title="' + (PreviewConfig.i18n?.delete || 'Delete') + '">' +
-                    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-                    '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+                    QuickSiteUtils.iconClose(14) +
                 '</button></div>';
         });
         

@@ -205,11 +205,9 @@
         "subtitle": "Parcourir et exécuter les commandes API",
         "tabs": {
             "commands": "Commandes",
-            "history": "Historique",
-            "docs": "Docs"
+            "history": "Historique"
         },
         "searchPlaceholder": "Rechercher des commandes...",
-        "openQueue": "Ouvrir la file",
         "allCategories": "Toutes les catégories",
         "method": "Méthode",
         "parameters": "Paramètres",
@@ -234,16 +232,9 @@
         }
     },
     "commandForm": {
-        "batchMode": {
-            "title": "Mode batch",
-            "message": "Configurez les paramètres de la commande et cliquez sur \"Ajouter à la file\" pour ajouter cette commande à votre file d'attente. La commande ne sera pas exécutée tant que vous n'aurez pas lancé l'ensemble du batch."
-        },
-        "saveToQueue": "Ajouter à la file",
-        "backToBatch": "Retour au batch",
         "errors": {
             "docNotFound": "Documentation de la commande introuvable",
-            "docLoadFailed": "Échec du chargement de la documentation :",
-            "fileUploadBatch": "Les téléchargements de fichiers ne peuvent pas être ajoutés à la file d'attente"
+            "docLoadFailed": "Échec du chargement de la documentation :"
         }
     },
     "history": {
@@ -329,8 +320,6 @@
         "apiEndpoints": "Points d'accès API",
         "aiApiKeys": "Clés API IA",
         "structure": "Structure",
-        "batch": "File de commandes",
-        "docs": "Documentation",
         "workflows": "Workflows",
         "visualEditor": "Éditeur visuel",
         "preview": "Éditeur visuel",
@@ -574,54 +563,6 @@
             }
         }
     },
-    "batch": {
-        "title": "Exécution batch",
-        "subtitle": "Exécuter plusieurs commandes en séquence",
-        "queue": "File de commandes",
-        "addCommands": "Ajouter des commandes",
-        "results": "Résultats d'exécution",
-        "emptyQueue": "Aucune commande dans la file",
-        "emptyQueueHint": "Ajoutez des commandes depuis la liste à droite",
-        "executeAndClear": "Exécuter et vider la file",
-        "executeAndKeep": "Exécuter et garder la file",
-        "searchPlaceholder": "Rechercher des commandes...",
-        "clearResults": "Effacer les résultats",
-        "importJson": {
-            "title": "Importer des commandes JSON",
-            "hint": "Collez un tableau JSON de commandes pour les ajouter à la file. Parfait pour les séquences générées par IA.",
-            "label": "Tableau JSON de commandes",
-            "addToQueue": "Ajouter à la file"
-        }
-    },
-    "docs": {
-        "title": "Documentation API",
-        "subtitle": "Référence complète de toutes les commandes API disponibles",
-        "quickReference": "Référence rapide",
-        "commandReference": "Référence des commandes",
-        "searchPlaceholder": "Rechercher des commandes...",
-        "loading": "Chargement de la documentation...",
-        "quickRef": {
-            "apiBaseUrl": "URL de base API",
-            "authentication": "Authentification",
-            "includeTokenVia": "Inclure le jeton via :",
-            "header": "En-tête :",
-            "query": "Requête :",
-            "postBody": "Corps POST :",
-            "responseFormat": "Format de réponse"
-        },
-        "section": {
-            "description": "Description",
-            "parameters": "Paramètres"
-        },
-        "noParameters": "Aucun paramètre requis",
-        "noDescription": "Pas de description",
-        "copyUrl": "Copier l'URL",
-        "urlCopied": "URL copiée dans le presse-papiers",
-        "errors": {
-            "couldNotLoad": "Impossible de charger la documentation",
-            "copyFailed": "Impossible de copier l'URL"
-        }
-    },
     "workflows": {
         "title": "Workflows",
         "subtitle": "Séquences de tâches automatisées - manuelles ou assistées par IA",
@@ -697,7 +638,6 @@
             "pasteJson": "Collez le JSON pour commencer"
         },
         "executeNow": "Exécuter maintenant",
-        "openInBatch": "Ouvrir dans Batch",
         "executionComplete": "Exécution terminée",
         "clear": "Effacer",
         "browser": {
@@ -750,7 +690,6 @@
             "generatePrompt": "Générer le prompt",
             "copyPrompt": "Copier",
             "copied": "Copié !",
-            "goToBatch": "Aller au panneau Batch",
             "chars": "caractères",
             "words": "mots"
         },
@@ -983,7 +922,7 @@
                     "buildName": {
                         "label": "Nom du build",
                         "placeholder": "ex: ma-release-v2",
-                        "help": "Un nom mémorable pour identifier ce build (utilisé aussi si vous voulez le télécharger plus tard en ZIP)"
+                        "help": "Un nom unique pour identifier ce build. Utilisez le sélecteur ci-dessus pour charger les valeurs d'un build existant, ou tapez un nouveau nom pour en créer un nouveau."
                     },
                     "publicFolder": {
                         "label": "Dossier public",
@@ -1017,6 +956,10 @@
                         "label": "Écraser les fichiers existants",
                         "help": "Si coché, les fichiers existants au chemin cible seront remplacés. Sinon le déploiement sera annulé si des conflits sont trouvés."
                     }
+                },
+                "loadPreset": {
+                    "label": "Charger un build existant",
+                    "placeholder": "-- Nouveau build (par défaut) --"
                 }
             },
             "freshStart": {

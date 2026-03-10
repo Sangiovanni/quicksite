@@ -152,7 +152,7 @@
         
         const originalHtml = previewBtn.innerHTML;
         previewBtn.disabled = true;
-        previewBtn.innerHTML = `<span class="admin-spinner"></span> ${t('loading', 'Loading...')}`;
+        previewBtn.innerHTML = `${QuickSiteUtils.htmlSpinner()} ${t('loading', 'Loading...')}`;
         
         try {
             const response = await fetch(`${apiBaseUrl}/api/ai-spec-preview`, {
@@ -206,7 +206,7 @@
         
         const originalHtml = saveBtn.innerHTML;
         saveBtn.disabled = true;
-        saveBtn.innerHTML = `<span class="admin-spinner"></span> ${t('saving', 'Saving...')}`;
+        saveBtn.innerHTML = `${QuickSiteUtils.htmlSpinner()} ${t('saving', 'Saving...')}`;
         
         try {
             const response = await fetch(`${apiBaseUrl}/api/ai-spec-save`, {

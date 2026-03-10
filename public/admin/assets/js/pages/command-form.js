@@ -34,145 +34,9 @@
         };
 
 const COMMAND_NAME = container.dataset.commandName || '';
-const BATCH_URL = container.dataset.batchUrl || '';
-
-// Batch mode detection
-const urlParams = new URLSearchParams(window.location.search);
-const IS_BATCH_MODE = urlParams.get('batch') === '1';
-const BATCH_ID = urlParams.get('batchId');
 
 // Load documentation immediately (init() already waits for DOM ready)
-loadCommandDocumentation().then(() => {
-    // Initialize batch mode if detected
-    if (IS_BATCH_MODE) {
-        initBatchMode();
-    }
-});
-
-/**
- * Initialize batch mode UI and behavior
- */
-function initBatchMode() {
-    // Show batch mode banner
-    document.getElementById('batch-mode-banner').style.display = 'flex';
-    
-    // Mark form as batch mode (prevents QuickSiteAdmin.handleCommandSubmit from executing)
-    const form = document.getElementById('command-form');
-    form.dataset.batchMode = 'true';
-    
-    // Change submit button text
-    const submitBtn = document.getElementById('submit-btn');
-    submitBtn.innerHTML = `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-        </svg>
-        Save to Queue
-    `;
-    submitBtn.classList.remove('admin-btn--primary');
-    submitBtn.classList.add('admin-btn--success');
-    
-    // Show cancel button
-    document.getElementById('cancel-batch-btn').style.display = 'inline-flex';
-    
-    // Update breadcrumb to go back to batch page
-    const breadcrumbLink = document.getElementById('breadcrumb-link');
-    if (breadcrumbLink) {
-        breadcrumbLink.href = BATCH_URL;
-        breadcrumbLink.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <polyline points="15 18 9 12 15 6"/>
-            </svg>
-            Back to Batch
-        `;
-    }
-    
-    // Add batch submit handler
-    form.addEventListener('submit', handleBatchSubmit);
-}
-
-/**
- * Handle form submission in batch mode - save to queue instead of executing
- */
-function handleBatchSubmit(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const form = e.target;
-    const formData = new FormData(form);
-    const params = {};
-    const urlParams = [];
-    
-    // Collect form data
-    for (const [key, value] of formData.entries()) {
-        // Skip empty values
-        if (!value) continue;
-        
-        // Skip file inputs (can't serialize files to localStorage)
-        const input = form.querySelector(`[name="${key}"]`);
-        if (input?.type === 'file') {
-            QuickSiteAdmin.showToast('File uploads cannot be added to batch queue', 'warning');
-            continue;
-        }
-        
-        // Handle URL parameters
-        if (input?.dataset.urlParam !== undefined) {
-            if (value) urlParams.push(value);
-        } else {
-            // Try to parse JSON values
-            try {
-                params[key] = JSON.parse(value);
-            } catch {
-                params[key] = value;
-            }
-        }
-    }
-    
-    // Update the batch queue in localStorage
-    const queueKey = 'admin_batch_queue';
-    let queue = [];
-    
-    try {
-        queue = JSON.parse(localStorage.getItem(queueKey) || '[]');
-    } catch (e) {
-        queue = [];
-    }
-    
-    if (BATCH_ID) {
-        // Update existing item
-        const itemIndex = queue.findIndex(item => item.id === parseInt(BATCH_ID));
-        if (itemIndex !== -1) {
-            queue[itemIndex].params = params;
-            queue[itemIndex].urlParams = urlParams;
-            QuickSiteAdmin.showToast(`Updated "${COMMAND_NAME}" in queue`, 'success');
-        } else {
-            // Item not found, add as new
-            queue.push({
-                id: Date.now(),
-                command: COMMAND_NAME,
-                params: params,
-                urlParams: urlParams
-            });
-            QuickSiteAdmin.showToast(`Added "${COMMAND_NAME}" to queue`, 'success');
-        }
-    } else {
-        // Add new item
-        queue.push({
-            id: Date.now(),
-            command: COMMAND_NAME,
-            params: params,
-            urlParams: urlParams
-        });
-        QuickSiteAdmin.showToast(`Added "${COMMAND_NAME}" to queue`, 'success');
-    }
-    
-    // Save and redirect back to batch page
-    localStorage.setItem(queueKey, JSON.stringify(queue));
-    
-    setTimeout(() => {
-        window.location.href = BATCH_URL;
-    }, 500);
-}
+loadCommandDocumentation();
 
 async function loadCommandDocumentation() {
     try {
@@ -184,11 +48,6 @@ async function loadCommandDocumentation() {
             renderCommandDocs(doc);
             // Initialize enhanced features after form renders
             await initEnhancedFeatures();
-            
-            // If in batch mode, pre-fill form with saved params
-            if (IS_BATCH_MODE && BATCH_ID) {
-                await prefillFromBatchQueue();
-            }
         } else {
             document.getElementById('command-params').innerHTML = `
                 <div class="admin-alert admin-alert--error">
@@ -203,342 +62,6 @@ async function loadCommandDocumentation() {
             </div>
         `;
     }
-}
-
-/**
- * Pre-fill form fields from batch queue item
- * This is called after initEnhancedFeatures() so selects are already converted
- * For cascading selects, we need to set values and wait for async population
- */
-async function prefillFromBatchQueue() {
-    const queueKey = 'admin_batch_queue';
-    let queue = [];
-    
-    try {
-        const stored = localStorage.getItem(queueKey);
-        queue = JSON.parse(stored || '[]');
-    } catch (e) {
-        console.error('Failed to parse batch queue:', e);
-        return;
-    }
-    
-    const batchIdNum = parseInt(BATCH_ID);
-    const item = queue.find(i => i.id === batchIdNum);
-    
-    if (!item) {
-        console.error('Batch item not found:', BATCH_ID);
-        return;
-    }
-    
-    const form = document.getElementById('command-form');
-    if (!form) {
-        console.error('Form not found!');
-        return;
-    }
-    
-    const params = item.params || {};
-    const urlParamsData = item.urlParams || [];
-    
-    // Commands with cascading selects need special handling with loading state
-    const cascadingCommands = ['editStructure', 'getStructure', 'deleteAsset', 'downloadAsset', 'updateAssetMeta'];
-    
-    if (cascadingCommands.includes(COMMAND_NAME)) {
-        // Show loading overlay while cascading selects load
-        showFormLoadingOverlay('Loading saved parameters...');
-        
-        try {
-            await prefillCascadingForm(form, params, urlParamsData);
-            QuickSiteAdmin.showToast('Form restored from queue', 'success');
-        } catch (e) {
-            console.error('Pre-fill error:', e);
-            // Show saved params as fallback reminder
-            showSavedParamsReminder(params);
-        } finally {
-            hideFormLoadingOverlay();
-        }
-    } else {
-        // Simple form - just fill all fields
-        await prefillSimpleForm(form, params, urlParamsData);
-        QuickSiteAdmin.showToast('Form pre-filled with saved parameters', 'info');
-    }
-}
-
-/**
- * Show a loading overlay on the form
- */
-function showFormLoadingOverlay(message = 'Loading...') {
-    const form = document.getElementById('command-form');
-    if (!form) return;
-    
-    // Make form container position relative
-    const formContainer = form.parentElement;
-    formContainer.style.position = 'relative';
-    
-    // Create overlay
-    const overlay = document.createElement('div');
-    overlay.id = 'form-loading-overlay';
-    overlay.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(var(--admin-bg-rgb, 255,255,255), 0.9);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 100;
-        border-radius: var(--radius-lg);
-    `;
-    overlay.innerHTML = `
-        <div class="admin-spinner" style="width: 40px; height: 40px; margin-bottom: var(--space-md);"></div>
-        <p style="color: var(--admin-text); font-weight: 500;">${QuickSiteAdmin.escapeHtml(message)}</p>
-    `;
-    
-    formContainer.appendChild(overlay);
-}
-
-/**
- * Hide the form loading overlay
- */
-function hideFormLoadingOverlay() {
-    const overlay = document.getElementById('form-loading-overlay');
-    if (overlay) {
-        overlay.remove();
-    }
-}
-
-/**
- * Show a reminder of saved params for complex forms (fallback when loading fails)
- */
-function showSavedParamsReminder(params) {
-    // Build a summary of saved params
-    const summary = Object.entries(params)
-        .filter(([key, value]) => value && key !== 'structure') // Exclude structure (it's long)
-        .map(([key, value]) => `<strong>${key}:</strong> ${QuickSiteAdmin.escapeHtml(String(value).substring(0, 50))}`)
-        .join('<br>');
-    
-    // Add notice before the form
-    const form = document.getElementById('command-form');
-    const existingNotice = document.getElementById('batch-params-notice');
-    if (existingNotice) existingNotice.remove();
-    
-    if (summary) {
-        const notice = document.createElement('div');
-        notice.id = 'batch-params-notice';
-        notice.className = 'admin-alert admin-alert--info';
-        notice.style.marginBottom = 'var(--space-md)';
-        notice.innerHTML = `
-            <strong>Saved parameters for this queued command:</strong><br>
-            ${summary}
-            <br><small style="opacity: 0.7">Please re-select the options below, then update the queue.</small>
-        `;
-        form.parentNode.insertBefore(notice, form);
-    }
-}
-
-/**
- * Pre-fill a simple form (no cascading selects)
- */
-async function prefillSimpleForm(form, params, urlParamsData) {
-    // Pre-fill URL params (in order they appear in form)
-    const urlParamInputs = form.querySelectorAll('[data-url-param]');
-    urlParamInputs.forEach((input, index) => {
-        if (urlParamsData[index]) {
-            input.value = urlParamsData[index];
-        }
-    });
-    
-    // Pre-fill regular params
-    Object.entries(params).forEach(([key, value]) => {
-        setFormFieldValue(form, key, value);
-    });
-}
-
-/**
- * Pre-fill a form with cascading selects
- * Must set parent selects first and wait for child options to load
- * For editStructure, the structure textarea is the key - always fill that
- */
-async function prefillCascadingForm(form, params, urlParamsData) {
-    console.log('prefillCascadingForm called with:', params);
-    
-    // Determine which fields to fill based on command
-    if (COMMAND_NAME === 'editStructure' || COMMAND_NAME === 'getStructure') {
-        // Order: type → name → nodeId → action → structure (LAST!)
-        const typeSelect = form.querySelector('[name="type"]');
-        const nameSelect = form.querySelector('[name="name"]');
-        const nodeIdSelect = form.querySelector('[name="nodeId"]') || form.querySelector('[name="option"]');
-        const actionSelect = form.querySelector('[name="action"]');
-        const structureField = form.querySelector('[name="structure"]');
-        
-        console.log('Found fields:', {
-            type: !!typeSelect,
-            name: !!nameSelect,
-            nodeId: !!nodeIdSelect,
-            action: !!actionSelect,
-            structure: !!structureField
-        });
-        
-        // Save structure value to fill at the end
-        const structureValue = params.structure !== undefined
-            ? (typeof params.structure === 'string' ? params.structure : JSON.stringify(params.structure, null, 2))
-            : null;
-        
-        // 1) Set type first
-        if (params.type && typeSelect) {
-            console.log('Step 1: Setting type to:', params.type);
-            typeSelect.value = params.type;
-            typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-            
-            // 2) For page/component, wait for name select options to load
-            if (params.type === 'page' || params.type === 'component') {
-                console.log('Step 2: Waiting for name select options...');
-                const nameLoaded = await waitForSelectOptions(nameSelect, 3000);
-                console.log('Name options loaded:', nameLoaded);
-                
-                // 3) Set name value
-                if (nameLoaded && params.name) {
-                    console.log('Step 3: Setting name to:', params.name);
-                    nameSelect.value = params.name;
-                    nameSelect.dispatchEvent(new Event('change', { bubbles: true }));
-                    
-                    // 4) Wait for nodeId options to load
-                    if (nodeIdSelect) {
-                        console.log('Step 4: Waiting for nodeId select options...');
-                        const nodeIdLoaded = await waitForSelectOptions(nodeIdSelect, 3000);
-                        console.log('NodeId options loaded:', nodeIdLoaded);
-                        
-                        // 5) Set nodeId
-                        if (nodeIdLoaded && params.nodeId) {
-                            console.log('Step 5: Setting nodeId to:', params.nodeId);
-                            nodeIdSelect.value = params.nodeId;
-                        }
-                    }
-                }
-            } else {
-                // For menu/footer, wait for nodeId options directly
-                if (nodeIdSelect) {
-                    console.log('Step 2 (menu/footer): Waiting for nodeId options...');
-                    const nodeIdLoaded = await waitForSelectOptions(nodeIdSelect, 3000);
-                    console.log('NodeId options loaded:', nodeIdLoaded);
-                    
-                    if (nodeIdLoaded && params.nodeId) {
-                        console.log('Step 3: Setting nodeId to:', params.nodeId);
-                        nodeIdSelect.value = params.nodeId;
-                    }
-                }
-            }
-        }
-        
-        // 6) Set action
-        if (params.action && actionSelect) {
-            console.log('Step 6: Setting action to:', params.action);
-            actionSelect.value = params.action;
-            // Don't dispatch change event here - it might try to load node content
-        }
-        
-        // 7) Fill structure LAST so it doesn't get overwritten by any auto-load
-        if (structureValue && structureField) {
-            console.log('Step 7: Filling structure field, length:', structureValue.length);
-            // Small delay to ensure any auto-load from action change has started
-            await new Promise(r => setTimeout(r, 100));
-            structureField.value = structureValue;
-            console.log('Structure field filled successfully');
-        }
-        
-    } else if (COMMAND_NAME === 'deleteAsset' || COMMAND_NAME === 'downloadAsset') {
-        // Order: type → path
-        const typeSelect = form.querySelector('[name="type"]');
-        const pathSelect = form.querySelector('[name="path"]');
-        
-        if (params.type && typeSelect) {
-            typeSelect.value = params.type;
-            typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-            await waitForSelectOptions(pathSelect, 500);
-        }
-        
-        if (params.path && pathSelect) {
-            pathSelect.value = params.path;
-        }
-    }
-    
-    // Fill any remaining params not handled above
-    const handledKeys = ['type', 'name', 'nodeId', 'option', 'action', 'structure', 'path'];
-    Object.entries(params).forEach(([key, value]) => {
-        if (!handledKeys.includes(key)) {
-            setFormFieldValue(form, key, value);
-        }
-    });
-}
-
-/**
- * Wait for a select element to become enabled AND have options loaded
- * Returns true if options were loaded, false if timeout
- */
-function waitForSelectOptions(select, timeout = 3000) {
-    return new Promise(resolve => {
-        if (!select) {
-            console.log('waitForSelectOptions: select is null');
-            resolve(false);
-            return;
-        }
-        
-        const startTime = Date.now();
-        
-        const checkInterval = setInterval(() => {
-            const elapsed = Date.now() - startTime;
-            
-            // First check if enabled (might start disabled)
-            if (select.disabled) {
-                // Still disabled, keep waiting unless timeout
-                if (elapsed > timeout) {
-                    console.log('waitForSelectOptions: timeout waiting for enable after', elapsed, 'ms');
-                    clearInterval(checkInterval);
-                    resolve(false);
-                }
-                return; // Keep waiting
-            }
-            
-            // Select is enabled, now check for options
-            if (select.options.length > 1) {
-                console.log('waitForSelectOptions: options loaded after', elapsed, 'ms:', select.options.length);
-                clearInterval(checkInterval);
-                resolve(true);
-            } else if (elapsed > timeout) {
-                console.log('waitForSelectOptions: timeout after', elapsed, 'ms, options:', select.options.length);
-                clearInterval(checkInterval);
-                resolve(false);
-            }
-            // Keep waiting for options
-        }, 50);
-    });
-}
-
-/**
- * Set a single form field value
- */
-function setFormFieldValue(form, key, value) {
-    const input = form.querySelector(`[name="${key}"]`);
-    if (!input) {
-        console.warn('setFormFieldValue: field not found:', key);
-        return false;
-    }
-    
-    if (input.tagName === 'TEXTAREA') {
-        input.value = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-        console.log('setFormFieldValue: set textarea', key, 'length:', input.value.length);
-    } else if (input.tagName === 'SELECT') {
-        input.value = value;
-        console.log('setFormFieldValue: set select', key, 'to:', value);
-    } else if (input.type === 'checkbox') {
-        input.checked = !!value;
-    } else {
-        input.value = value;
-        console.log('setFormFieldValue: set input', key, 'to:', value);
-    }
-    return true;
 }
 
 /**
@@ -861,8 +384,8 @@ async function initEditStructureForm() {
         });
     }
     
-    // Pre-fill form from URL parameters (but NOT in batch mode - that's handled separately)
-    if (!IS_BATCH_MODE && prefillType) {
+    // Pre-fill form from URL parameters
+    if (prefillType) {
         typeSelect.value = prefillType;
         
         // Trigger cascading for name select
@@ -884,8 +407,8 @@ async function initEditStructureForm() {
         }
     }
     
-    // Pre-fill action (but NOT in batch mode)
-    if (!IS_BATCH_MODE && prefillAction && actionSelect) {
+    // Pre-fill action
+    if (prefillAction && actionSelect) {
         actionSelect.value = prefillAction;
         // If action is update and nodeId is set, load the node content
         if (prefillAction === 'update' && prefillNodeId) {
@@ -1089,11 +612,7 @@ function initMultiFileUploadForm() {
     const label = document.createElement('div');
     label.className = 'admin-file-input__label';
     label.innerHTML = `
-        <svg class="admin-file-input__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/>
-            <line x1="12" y1="3" x2="12" y2="15"/>
-        </svg>
+        ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.upload, null, 'admin-file-input__icon')}
         <div class="admin-file-input__text">
             <span>Click to select files or drag and drop</span>
             <span class="admin-file-input__hint">You can select multiple files • Max 10MB per file</span>
@@ -1174,10 +693,7 @@ function initMultiFileUploadForm() {
                         <span class="admin-file-list__size">${formatFileSize(file.size)}</span>
                         <span class="admin-file-list__status" id="file-status-${index}"></span>
                         <button type="button" class="admin-file-list__remove" onclick="removeFile(${index})" title="Remove">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <line x1="18" y1="6" x2="6" y2="18"/>
-                                <line x1="6" y1="6" x2="18" y2="18"/>
-                            </svg>
+                            ${QuickSiteUtils.iconClose(16)}
                         </button>
                     </li>
                 `).join('')}
@@ -1256,11 +772,11 @@ function initMultiFileUploadForm() {
             const statusEl = document.getElementById(`file-status-${i}`);
             
             // Update button
-            submitBtn.innerHTML = `<span class="admin-spinner"></span> Uploading ${i + 1}/${selectedFiles.length}...`;
+            submitBtn.innerHTML = `${QuickSiteUtils.htmlSpinner()} Uploading ${i + 1}/${selectedFiles.length}...`;
             
             // Update status in file list
             if (statusEl) {
-                statusEl.innerHTML = '<span class="admin-spinner" style="width:16px;height:16px;"></span>';
+                statusEl.innerHTML = QuickSiteUtils.htmlSpinner(16);
             }
             
             // Add progress item
@@ -1268,7 +784,7 @@ function initMultiFileUploadForm() {
                 <div class="admin-upload-progress__item" id="progress-item-${i}">
                     <span class="admin-upload-progress__name">${file.name}</span>
                     <span class="admin-upload-progress__status" id="progress-status-${i}">
-                        <span class="admin-spinner" style="width:14px;height:14px;"></span> Uploading...
+                        ${QuickSiteUtils.htmlSpinner(14)} Uploading...
                     </span>
                 </div>
             `;
@@ -3564,11 +3080,7 @@ function initFileUploadForm() {
         const label = document.createElement('div');
         label.className = 'admin-file-input__label';
         label.innerHTML = `
-            <svg class="admin-file-input__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
+            ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.upload, null, 'admin-file-input__icon')}
             <div class="admin-file-input__text">
                 <span>Click to select a file or drag and drop</span>
                 <span class="admin-file-input__hint">Max file size: 10MB</span>

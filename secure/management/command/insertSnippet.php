@@ -338,7 +338,7 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
             ->withMessage('Name is required for page/component structures');
     }
     
-    if (!$targetNodeId) {
+    if ($targetNodeId === null || $targetNodeId === '') {
         return ApiResponse::create(400, 'validation.target_required')
             ->withMessage('Target node ID is required');
     }
