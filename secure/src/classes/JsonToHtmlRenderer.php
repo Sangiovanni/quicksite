@@ -350,8 +350,8 @@ class JsonToHtmlRenderer {
             return htmlspecialchars($rawText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
 
-        // Check if it's a variable placeholder (e.g., {{varName}}) - display as-is
-        if (preg_match('/^\{\{\w+\}\}$/', $textKey)) {
+        // Check if it's a variable placeholder (e.g., {{varName}} or {{$varName}}) - display as-is
+        if (preg_match('/^\{\{\$?\w+\}\}$/', $textKey)) {
             $displayText = htmlspecialchars($textKey, ENT_QUOTES | ENT_HTML5, 'UTF-8');
             // In editor mode, wrap with data attribute for visibility
             if ($this->editorMode) {
@@ -722,8 +722,8 @@ class JsonToHtmlRenderer {
      */
     private function processComponentTemplate($template, array $data) {
         if (is_string($template)) {
-            // Replace {{placeholder}} with actual value
-            return preg_replace_callback('/\{\{(\w+)\}\}/', function($matches) use ($data) {
+            // Replace {{placeholder}} or {{$placeholder}} with actual value
+            return preg_replace_callback('/\{\{(\$?\w+)\}\}/', function($matches) use ($data) {
                 $key = $matches[1];
                 return $data[$key] ?? $matches[0]; // Keep placeholder if no data
             }, $template);

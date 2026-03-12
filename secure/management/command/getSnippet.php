@@ -62,7 +62,7 @@ function resolveComponentPlaceholders(array $node, array $data): array {
     $result = [];
     
     if (isset($node['textKey']) && is_string($node['textKey'])) {
-        $textKey = preg_replace_callback('/\{\{([^}]+)\}\}/', function($m) use ($data) {
+        $textKey = preg_replace_callback('/\{\{(\$?\w+)\}\}/', function($m) use ($data) {
             return $data[$m[1]] ?? $m[0];
         }, $node['textKey']);
         $result['textKey'] = $textKey;
@@ -75,7 +75,7 @@ function resolveComponentPlaceholders(array $node, array $data): array {
         $result['params'] = [];
         foreach ($node['params'] as $key => $value) {
             if (is_string($value)) {
-                $result['params'][$key] = preg_replace_callback('/\{\{([^}]+)\}\}/', function($m) use ($data) {
+                $result['params'][$key] = preg_replace_callback('/\{\{(\$?\w+)\}\}/', function($m) use ($data) {
                     return $data[$m[1]] ?? $m[0];
                 }, $value);
             } else {

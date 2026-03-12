@@ -166,6 +166,22 @@ function convertDotNotationToNested(array $flat): array {
 $newTranslations = convertDotNotationToNested($newTranslations);
 
 /**
+ * Recursively remove keys containing {{ (unresolved component placeholders)
+ * These are invalid translation keys that should never be written to files
+ */
+function sanitizePlaceholderKeys(array $data): array {
+    $clean = [];
+    foreach ($data as $key => $value) {
+        if (is_string($key) && strpos($key, '{{') !== false) {
+            continue; // Skip keys with unresolved placeholders
+        }
+        $clean[$key] = is_array($value) ? sanitizePlaceholderKeys($value) : $value;
+    }
+    return $clean;
+}
+$newTranslations = sanitizePlaceholderKeys($newTranslations);
+
+/**
  * Recursively merge translations (deep merge)
  * New values overwrite existing, but non-specified keys are preserved
  */

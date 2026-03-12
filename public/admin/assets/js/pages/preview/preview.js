@@ -3439,9 +3439,15 @@
             return;
         }
         
-        // Get current language from the selector
-        const langSelect = document.getElementById('lang-select');
-        const lang = langSelect ? langSelect.value : 'en';
+        // Reject unresolved component variable placeholders (e.g., {{$icon}})
+        if (textKey.includes('{{')) {
+            console.warn('[Preview] Ignoring edit on unresolved variable placeholder:', textKey);
+            showToast('Cannot edit unresolved component variable', 'warning');
+            return;
+        }
+        
+        // Get current language from the preview selector
+        const lang = getCurrentLang();
         
         try {
             // Call setTranslationKeys API
