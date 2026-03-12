@@ -107,23 +107,30 @@ function extractComponentVariables($node, &$variables = []) {
 }
 
 /**
- * Count existing instances of a component in a structure
+ * Get next unique instance number for a component by scanning translation keys.
+ * Prevents key collisions after component deletions by finding the highest
+ * existing instance number in the translation file, not counting structure nodes.
  */
-function countComponentInstances($nodes, $componentName, $count = 0) {
-    if (!is_array($nodes)) {
-        return $count;
+function getNextComponentInstanceNumber(string $structureName, string $componentName): int {
+    $translationFile = PROJECT_PATH . '/translate/default.json';
+    $maxN = 0;
+    
+    if (file_exists($translationFile)) {
+        $content = @file_get_contents($translationFile);
+        if ($content !== false) {
+            $translations = json_decode($content, true);
+            if (is_array($translations) && isset($translations[$structureName]) && is_array($translations[$structureName])) {
+                $pattern = '/^' . preg_quote($componentName, '/') . '(\d+)$/';
+                foreach (array_keys($translations[$structureName]) as $key) {
+                    if (preg_match($pattern, (string)$key, $matches)) {
+                        $maxN = max($maxN, (int)$matches[1]);
+                    }
+                }
+            }
+        }
     }
     
-    foreach ($nodes as $node) {
-        if (isset($node['component']) && $node['component'] === $componentName) {
-            $count++;
-        }
-        if (isset($node['children']) && is_array($node['children'])) {
-            $count = countComponentInstances($node['children'], $componentName, $count);
-        }
-    }
-    
-    return $count;
+    return $maxN + 1;
 }
 
 /**
@@ -258,9 +265,9 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
     // Get structure name for translation key prefix
     $structureName = $name ?? $type;
     
-    // Count existing instances of this component to generate unique suffix
-    $instanceCount = countComponentInstances($structure, $componentName);
-    $instanceNumber = $instanceCount + 1;
+    // Get next unique instance number by scanning translation keys
+    // This prevents key collisions when components are deleted and re-added
+    $instanceNumber = getNextComponentInstanceNumber($structureName, $componentName);
     
     // Build data bindings with auto-generated textKeys
     $finalData = [];
