@@ -4445,8 +4445,11 @@
     function renderSnippetPreview(snippetData) {
         if (!addSnippetPreviewFrame) return;
         
+        // Use expanded preview structure if available (for component-based snippets)
+        const structureToRender = snippetData.previewStructure || snippetData.structure;
+        
         // Build HTML from structure
-        const html = buildSnippetHtml(snippetData.structure, snippetData);
+        const html = buildSnippetHtml(structureToRender, snippetData);
         
         // Get project CSS URL if available
         const projectStyleUrl = PreviewConfig.projectStyleUrl || '';

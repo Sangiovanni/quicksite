@@ -83,6 +83,62 @@ function flattenKeys(array $arr, string $prefix = ''): array {
 }
 
 /**
+ * Extract component variables with type detection (for snippet component processing).
+ * Mirrors extractComponentVariables from addComponentToNode.
+ */
+function extractSnippetComponentVariables(array $node, array &$variables = []): array {
+    if (!is_array($node)) return $variables;
+    
+    $translatableParams = ['alt', 'placeholder', 'title', 'aria-label', 'aria-placeholder', 'aria-description'];
+    
+    if (isset($node['params']) && is_array($node['params'])) {
+        foreach ($node['params'] as $paramName => $value) {
+            if (is_string($value) && preg_match_all('/\{\{([^}]+)\}\}/', $value, $matches)) {
+                foreach ($matches[1] as $varName) {
+                    if (str_starts_with($varName, '__') || strpos($varName, ';') !== false) continue;
+                    if (!isset($variables[$varName])) {
+                        $type = in_array($paramName, $translatableParams, true) ? 'textKey' : 'param';
+                        $variables[$varName] = ['name' => $varName, 'type' => $type];
+                    }
+                }
+            }
+        }
+    }
+    
+    if (isset($node['textKey']) && is_string($node['textKey'])) {
+        if (preg_match_all('/\{\{([^}]+)\}\}/', $node['textKey'], $matches)) {
+            foreach ($matches[1] as $varName) {
+                if (str_starts_with($varName, '__') || strpos($varName, ';') !== false) continue;
+                if (!isset($variables[$varName])) {
+                    $variables[$varName] = ['name' => $varName, 'type' => 'textKey'];
+                }
+            }
+        }
+    }
+    
+    if (isset($node['children']) && is_array($node['children'])) {
+        foreach ($node['children'] as $child) {
+            extractSnippetComponentVariables($child, $variables);
+        }
+    }
+    
+    return $variables;
+}
+
+/**
+ * Get a nested value from an array using dot notation
+ */
+function getNestedValue(array $arr, string $key) {
+    $parts = explode('.', $key);
+    $current = $arr;
+    foreach ($parts as $part) {
+        if (!is_array($current) || !isset($current[$part])) return null;
+        $current = $current[$part];
+    }
+    return $current;
+}
+
+/**
  * Process snippet structure recursively:
  * - Replace textKeys with new unique keys
  * - Build mapping of old -> new keys for translations
@@ -130,11 +186,40 @@ function processSnippetStructure(array $node, string $prefix, int &$itemCounter,
         }
     }
     
-    // Handle component references (rare in snippets but possible)
+    // Handle component references - remap data values to new unique textKeys
     if (isset($node['component'])) {
         $processed['component'] = $node['component'];
-        if (isset($node['data'])) {
-            $processed['data'] = $node['data'];
+        if (isset($node['data']) && is_array($node['data'])) {
+            $processed['data'] = [];
+            
+            // Load component definition to detect variable types
+            $componentPath = PROJECT_PATH . '/templates/model/json/components/' . $node['component'] . '.json';
+            $componentVars = [];
+            if (file_exists($componentPath)) {
+                $compContent = @file_get_contents($componentPath);
+                if ($compContent !== false) {
+                    $compStructure = json_decode($compContent, true);
+                    if (is_array($compStructure)) {
+                        extractSnippetComponentVariables($compStructure, $componentVars);
+                    }
+                }
+            }
+            
+            foreach ($node['data'] as $varName => $oldValue) {
+                // Check if this variable is a textKey type (translatable)
+                $isTextKey = isset($componentVars[$varName]) && $componentVars[$varName]['type'] === 'textKey';
+                
+                if ($isTextKey && is_string($oldValue)) {
+                    // Generate new unique key and map old -> new
+                    $newKey = $prefix . '.item' . $itemCounter;
+                    $itemCounter++;
+                    $keyMapping[$oldValue] = $newKey;
+                    $processed['data'][$varName] = $newKey;
+                } else {
+                    // Non-textKey variables (params like href, class) - keep as-is
+                    $processed['data'][$varName] = $oldValue;
+                }
+            }
         }
     }
     
@@ -181,8 +266,14 @@ function addSnippetTranslations(array $keyMapping, array $snippetTranslations): 
                 // Fallback to English
                 $value = $snippetTranslations['en'][$oldKey];
             } else {
-                // Use the old key as placeholder text
-                $value = ucwords(str_replace(['.', '_', '-'], ' ', basename($oldKey)));
+                // Fallback: look up old key in project translations (for component data remapping)
+                $existingValue = getNestedValue($translations, $oldKey);
+                if ($existingValue !== null && is_string($existingValue)) {
+                    $value = $existingValue;
+                } else {
+                    // Last resort: formatted key name
+                    $value = ucwords(str_replace(['.', '_', '-'], ' ', basename($oldKey)));
+                }
             }
             
             // Set nested key
@@ -427,8 +518,8 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
     
     // Add translations to project
     $addedTranslations = [];
-    if (!empty($keyMapping) && isset($snippet['translations'])) {
-        $addedTranslations = addSnippetTranslations($keyMapping, $snippet['translations']);
+    if (!empty($keyMapping)) {
+        $addedTranslations = addSnippetTranslations($keyMapping, $snippet['translations'] ?? []);
     }
     
     // Insert processed structure into target
