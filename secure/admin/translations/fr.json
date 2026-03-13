@@ -679,7 +679,7 @@
             "parameters": "Paramètres",
             "examples": "Exemples",
             "yourPrompt": "Votre demande",
-            "yourPromptPlaceholder": "Décrivez ce que vous voulez créer... Cliquez sur un exemple pour remplir automatiquement.",
+            "yourPromptPlaceholder": "Décrivez votre site : type, palette de couleurs, pages, style... Laissez vide pour un résultat général que vous pourrez affiner dans l'éditeur visuel.",
             "relatedCommands": "Commandes associées",
             "generatedPrompt": "Prompt généré",
             "generating": "Génération du prompt...",

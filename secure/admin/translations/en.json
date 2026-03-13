@@ -665,7 +665,7 @@
             "parameters": "Parameters",
             "examples": "Examples",
             "yourPrompt": "Your Prompt",
-            "yourPromptPlaceholder": "Describe what you want to create... Click an example to fill this automatically.",
+            "yourPromptPlaceholder": "Describe your website: type, color theme, pages, style... Leave empty for a general result you can refine in the visual editor.",
             "relatedCommands": "Related Commands",
             "generatedPrompt": "Generated Prompt",
             "generating": "Generating prompt...",

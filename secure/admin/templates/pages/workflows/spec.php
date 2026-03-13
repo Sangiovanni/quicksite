@@ -156,7 +156,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                 <textarea 
                     id="user-prompt" 
                     class="ai-spec-user-prompt__textarea" 
-                    placeholder="<?= __admin('ai.spec.yourPromptPlaceholder', 'Describe what you want to create... Click an example to fill this automatically.') ?>"
+                    placeholder="<?= __admin('ai.spec.yourPromptPlaceholder', 'Describe your website: type, color theme, pages, style... Leave empty for a general result you can refine in the visual editor.') ?>"
                 ></textarea>
             </div>
         </div>
