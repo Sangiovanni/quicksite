@@ -1,63 +1,42 @@
 {
     "404": {
-        "title": "ページが見つかりません",
+        "pageNotFound": "Page Not Found",
         "message": "お探しのページは存在しません。",
-        "backHome": "ホームに戻る"
+        "backHome": "ホームに戻る",
+        "title": "ページが見つかりません"
     },
     "site": {
-        "name": "VotreEntreprise",
-        "tagline": "L'excellence dans chaque detail"
+        "name": "My Website"
     },
     "page": {
         "titles": {
+            "404": "Not Found",
             "home": "Apex Consulting | 戦略的ビジネスソリューション",
             "about": "私たちについて | Apex Consulting",
             "services": "サービス | Apex Consulting",
-            "contact": "お問い合わせ | Apex Consulting",
-            "team": "チーム | Apex Consulting"
+            "team": "チーム | Apex Consulting",
+            "contact": "お問い合わせ | Apex Consulting"
         }
     },
-    "nav": {
-        "home": "Accueil",
-        "about": "A propos",
-        "services": "Services",
-        "contact": "Contact"
-    },
-    "common": {
-        "cta": "Commencer"
-    },
-    "footer": {
-        "copyright": "© 2025 Apex Consulting. All rights reserved.",
-        "language": "Langue :",
-        "tagline": "明日の課題に向けた戦略的ソリューション。",
-        "about": "会社概要",
+    "menu": {
+        "logo": "Apex Consulting",
+        "home": "ホーム",
+        "about": "私たちについて",
         "services": "サービス",
         "team": "チーム",
         "contact": "お問い合わせ"
     },
+    "footer": {
+        "tagline": "明日の課題に向けた戦略的ソリューション。",
+        "copyright": "© 2025 Apex Consulting. All rights reserved."
+    },
     "home": {
         "hero": {
+            "eyebrow": "信頼されるビジネスコンサルタント",
             "title": "持続的な成功に向けてビジネスを変革する",
             "subtitle": "私たちはリーディング企業と協力し、成長・革新・持続的な競争優位をもたらす戦略を構築します。",
-            "eyebrow": "信頼されるビジネスコンサルタント",
             "cta": "対話を始める",
-            "ctaSecondary": "サービスを探る",
-            "cta2": "サービスを見る"
-        },
-        "features": {
-            "title": "Pourquoi nous choisir",
-            "f1": {
-                "title": "Qualite",
-                "desc": "Une qualite superieure dans tout ce que nous faisons."
-            },
-            "f2": {
-                "title": "Experience",
-                "desc": "Des annees d'expertise dans le secteur."
-            },
-            "f3": {
-                "title": "Support",
-                "desc": "Assistance client 24h/24 et 7j/7."
-            }
+            "ctaSecondary": "サービスを探る"
         },
         "stats": {
             "clients": {
@@ -75,85 +54,27 @@
             "countries": {
                 "number": "35ヶ国以上",
                 "label": "グローバル展開"
-            },
-            "experts": {
-                "number": "45",
-                "label": "シニアコンサルタント"
             }
         },
         "services": {
             "title": "私たちのサービス",
             "subtitle": "お客様の固有のニーズに合わせた包括的なコンサルティングサービス。",
-            "learnMore": "詳しく見る →",
-            "cta": "全サービスを見る"
+            "learnMore": "詳しく見る →"
         },
         "cta": {
             "title": "ビジネスを次のレベルへ",
             "subtitle": "私たちの専門知識がどのようにお客様の成長を加速し、最も複雑な課題を解決できるかをご相談ください。",
             "button": "無料相談を予約する"
-        },
-        "service-card5": {
-            "$icon": "component third",
-            "$title": "",
-            "$desc": "",
-            "$cta": ""
-        },
-        "service-card6": {
-            "$icon": "",
-            "$title": "",
-            "$desc": "",
-            "$cta": ""
-        },
-        "item6": "",
-        "item7": "",
-        "item8": "",
-        "item9": "",
-        "service-card9": {
-            "$icon": "",
-            "$title": "",
-            "$desc": "",
-            "$cta": ""
-        },
-        "service-card4": {
-            "$icon": "component seocn title",
-            "$title": "sad",
-            "$desc": "",
-            "$cta": ""
-        },
-        "item10": "snippet title",
-        "item11": "",
-        "item12": "",
-        "item13": "",
-        "item14": "snippet",
-        "item15": "",
-        "item16": "",
-        "item17": "",
-        "item18": "snippet in between",
-        "item19": "",
-        "item20": "",
-        "item21": "",
-        "service-card7": {
-            "$icon": "component fourth",
-            "$title": "",
-            "$desc": "",
-            "$cta": ""
-        },
-        "testimonial": {
-            "title": "お客様の声",
-            "quote": "Apex Conseilは当社の業務モデルを変革し、年間420万ユーロのコスト削減と顧客満足度32%向上を実現しました。戦略的ビジョンと実行力の両方を備えたチームでした。",
-            "author": "— Marie-Claire Fontaine, CEO, Groupe Atlantique"
         }
     },
     "about": {
         "title": "Apex Consultingについて",
-        "subtitle": "Decouvrez notre histoire",
+        "lead": "20年以上にわたり、複雑な環境を乗り越え変革を主導する組織の信頼できるパートナーとして歩んできました。",
         "story": {
             "title": "私たちのストーリー",
-            "content": "Fondee avec la vision de delivrer l'excellence...",
             "p1": "2003年に設立されたApex Consultingは、企業には深い業界専門知識とクライアントの成功への真摯なコミットメントを兼ね備えたアドバイザーが必要だという信念のもとに生まれました。",
             "p2": "私たちの学際的なチームは、様々な業界や学術的背景を持つ専門家を集め、クライアントに包括的かつ全体的な指針を提供しています。"
         },
-        "lead": "20年以上にわたり、複雑な環境を乗り越え変革を主導する組織の信頼できるパートナーとして歩んできました。",
         "values": {
             "title": "私たちの価値観",
             "integrity": {
@@ -171,22 +92,6 @@
             "innovation": {
                 "title": "イノベーション — ",
                 "desc": "変化を受け入れ、常により良い解決策を追求します。"
-            },
-            "v1": {
-                "title": "厳密さ",
-                "desc": "すべての提言は徹底的な分析、検証済みデータ、実証済みのフレームワークに基づいています。"
-            },
-            "v2": {
-                "title": "パートナーシップ",
-                "desc": "クライアントと並走し、知識を移転し、内部能力を構築します。"
-            },
-            "v3": {
-                "title": "インパクト",
-                "desc": "成功は成果物だけでなく、クライアントが達成する有形の結果で測ります。"
-            },
-            "v4": {
-                "title": "誠実さ",
-                "desc": "クライアントが望む答えでなくとも、率直なアドバイスを提供します。"
             }
         },
         "mission": {
@@ -196,19 +101,6 @@
     },
     "services": {
         "title": "私たちのサービス",
-        "subtitle": "Ce que nous proposons",
-        "s1": {
-            "title": "Conseil",
-            "desc": "Des conseils experts pour votre entreprise."
-        },
-        "s2": {
-            "title": "Developpement",
-            "desc": "Des solutions sur mesure adaptees a vos besoins."
-        },
-        "s3": {
-            "title": "Support",
-            "desc": "Une assistance continue quand vous en avez besoin."
-        },
         "lead": "戦略立案から実際の実装まで、測定可能な成果をもたらすよう設計された包括的なコンサルティングサービスを提供します。",
         "cta": "始める →",
         "strategy": {
@@ -263,98 +155,7 @@
                 "title": "実装",
                 "desc": "実行段階でお客様と並走し、進捗を監視しながら継続的な成果を確保するために適応します。"
             }
-        },
-        "item1": {
-            "icon": "⚖️",
-            "title": "戦略・変革",
-            "short": "大胆な戦略を策定し、永続的な価値を生み出す変革を実行します。",
-            "desc": "経営チームと共に戦略的方向性を定め、競争ポジショニングを評価し、将来の市場で勝つために必要な組織能力を構築します。",
-            "f1": "コーポレート・事業戦略",
-            "f2": "M&A・統合",
-            "f3": "ビジネスモデル変革"
-        },
-        "item2": {
-            "icon": "📊",
-            "title": "財務パフォーマンス",
-            "short": "財務構造を最適化し、組織全体の価値を引き出します。",
-            "desc": "財務アドバイザリーの専門家がCFOや取締役会と協力し、財務パフォーマンスの改善、リスク管理、資本配分の効率化を実現します。",
-            "f1": "コスト変革と効率化",
-            "f2": "財務モデリングと予測",
-            "f3": "運転資本の最適化"
-        },
-        "item3": {
-            "icon": "🌍",
-            "title": "デジタル・テクノロジー",
-            "short": "デジタル能力を活用して成長を加速し、業務を近代化します。",
-            "desc": "テクノロジー戦略の策定、大規模デジタルプログラムの管理、データ・アナリティクス能力の構築を支援します。",
-            "f1": "デジタル戦略・ロードマップ",
-            "f2": "データ・AI・アナリティクス",
-            "f3": "テクノロジープログラムガバナンス"
-        },
-        "item4": {
-            "icon": "🏗️",
-            "title": "オペレーション・サプライチェーン",
-            "short": "戦略的野心を実現するレジリエントで効率的な業務体制を構築します。",
-            "desc": "リーン経営からグローバルサプライチェーンの再設計まで、俊敏性と耐性を構築しながら卓越した業務を実現します。",
-            "f1": "業務効率化・リーン",
-            "f2": "サプライチェーン設計・最適化",
-            "f3": "調達・ソーシング戦略"
         }
-    },
-    "contact": {
-        "title": "お問い合わせ",
-        "subtitle": "Prenez contact",
-        "email": {
-            "label": "Email",
-            "value": "contact@votreentreprise.com"
-        },
-        "phone": {
-            "label": "Telephone",
-            "value": "+33 (0)1 23 45 67 89"
-        },
-        "address": {
-            "label": "Adresse",
-            "value": "123 Rue des Affaires, Ville, France"
-        },
-        "lead": "議論したい課題がありますか？私たちのチームがお手伝いします。ご連絡いただき、対話を始めましょう。",
-        "info": {
-            "title": "ご連絡先",
-            "address": {
-                "icon": "📍",
-                "label": "オフィス住所",
-                "value": "1200 Avenue of the Americas, New York, NY 10036, アメリカ"
-            },
-            "email": {
-                "icon": "✉️",
-                "label": "メール",
-                "value": "hello@apexconsulting.com"
-            },
-            "phone": {
-                "icon": "📞",
-                "label": "電話",
-                "value": "+1 (212) 555-0190"
-            },
-            "hours": {
-                "label": "営業時間",
-                "value": "月曜〜金曜 9:00〜18:30"
-            }
-        },
-        "form": {
-            "title": "メッセージを送る",
-            "name": "氏名",
-            "email": "メールアドレス",
-            "subject": "件名",
-            "message": "メッセージ",
-            "submit": "送信する"
-        }
-    },
-    "menu": {
-        "logo": "Apex Consulting",
-        "home": "ホーム",
-        "about": "私たちについて",
-        "services": "サービス",
-        "team": "チーム",
-        "contact": "お問い合わせ"
     },
     "team": {
         "title": "私たちのチーム",
@@ -396,6 +197,36 @@
             "title": "チームに参加する",
             "text": "私たちは常に優れた人材を求めています。複雑なビジネス課題の解決に情熱を持っている方は、ぜひご連絡ください。",
             "cta": "お問い合わせ"
+        }
+    },
+    "contact": {
+        "title": "お問い合わせ",
+        "lead": "議論したい課題がありますか？私たちのチームがお手伝いします。ご連絡いただき、対話を始めましょう。",
+        "info": {
+            "title": "ご連絡先",
+            "address": {
+                "icon": "📍",
+                "label": "オフィス住所",
+                "value": "1200 Avenue of the Americas, New York, NY 10036, アメリカ"
+            },
+            "email": {
+                "icon": "✉️",
+                "label": "メール",
+                "value": "hello@apexconsulting.com"
+            },
+            "phone": {
+                "icon": "📞",
+                "label": "電話",
+                "value": "+1 (212) 555-0190"
+            }
+        },
+        "form": {
+            "title": "メッセージを送る",
+            "name": "氏名",
+            "email": "メールアドレス",
+            "subject": "件名",
+            "message": "メッセージ",
+            "submit": "送信する"
         }
     }
 }

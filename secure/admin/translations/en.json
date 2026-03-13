@@ -676,6 +676,7 @@
             "generatePrompt": "Generate Prompt",
             "copyPrompt": "Copy",
             "copied": "Copied!",
+            "emptyPromptWarning": "No user prompt provided. The AI will produce a generic result. Consider describing what you want for better output.",
             "chars": "chars",
             "words": "words"
         },

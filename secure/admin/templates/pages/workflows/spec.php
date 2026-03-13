@@ -425,6 +425,24 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                     </button>
                 </div>
             </div>
+            <?php elseif ($isAiWorkflow): ?>
+            <!-- Generate Prompt button for AI workflows without parameters -->
+            <div class="ai-spec-card">
+                <div class="ai-spec-card__header">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    <?= __admin('workflows.spec.actions', 'Actions') ?>
+                </div>
+                <div class="ai-spec-card__body">
+                    <p class="ai-spec-form__help" style="margin-bottom: var(--space-sm);">
+                        <?= __admin('ai.spec.noParamsPromptHint', 'Describe what you want in the prompt above, then generate.') ?>
+                    </p>
+                    <button type="button" id="generate-prompt-btn" class="admin-btn admin-btn--primary" style="width: 100%;">
+                        <?= __admin('ai.spec.generatePrompt', 'Generate Prompt') ?>
+                    </button>
+                </div>
+            </div>
             <?php endif; ?>
             
             <?php if (!empty($relatedCommands)): ?>
@@ -474,6 +492,14 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                         <span><?= __admin('ai.spec.generating', 'Generating prompt...') ?></span>
                     </div>
                     <textarea id="prompt-output" class="ai-spec-prompt__textarea" readonly placeholder="<?= __admin('ai.spec.promptPlaceholder', 'Fill in the parameters and click Generate to create a prompt...') ?>"></textarea>
+                    <div id="empty-prompt-warning" class="ai-spec-prompt__warning" style="display: none;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            <line x1="12" y1="9" x2="12" y2="13"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <?= __admin('ai.spec.emptyPromptWarning', 'No user prompt provided. The AI will produce a generic result. Consider describing what you want for better output.') ?>
+                    </div>
                     <div class="ai-spec-prompt__actions">
                         <!-- Primary Action: Copy (works for everyone) -->
                         <button type="button" id="copy-prompt" class="admin-btn admin-btn--primary" disabled>

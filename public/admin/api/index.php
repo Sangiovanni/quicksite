@@ -857,22 +857,48 @@ switch ($action) {
         
         // Fetch data requirements
         $data = [];
+        $dataError = null;
         try {
             $data = $manager->fetchDataRequirements($workflow, $userParams);
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
+            $dataError = $e->getMessage();
             $data = ['_error' => $e->getMessage()];
         }
         
         // Generate expanded steps
-        $steps = $manager->generateSteps($workflow, $userParams, $data, []);
+        $stepsError = null;
+        try {
+            $steps = $manager->generateSteps($workflow, $userParams, $data, []);
+        } catch (\Throwable $e) {
+            $stepsError = $e->getMessage();
+            $steps = [];
+        }
         
-        echo json_encode([
+        $response = [
             'success' => true,
             'data' => [
                 'steps' => $steps,
                 'count' => count($steps)
             ]
-        ]);
+        ];
+        
+        // Add debug info when step count is unexpectedly low
+        if (count($steps) === 0 || $dataError || $stepsError) {
+            $response['data']['_debug'] = [
+                'dataKeys' => array_keys($data),
+                'dataSummary' => array_map(function($v) {
+                    if ($v === null) return 'null';
+                    if (is_array($v)) return 'array(' . count($v) . ')';
+                    return gettype($v) . ':' . substr(json_encode($v), 0, 100);
+                }, $data),
+                'dataError' => $dataError,
+                'stepsError' => $stepsError,
+                'workflowHasSteps' => isset($workflow['steps']) && count($workflow['steps']) > 0,
+                'workflowStepCount' => count($workflow['steps'] ?? []),
+            ];
+        }
+        
+        echo json_encode($response);
         break;
     
     case 'workflow-phases':

@@ -690,6 +690,7 @@
             "generatePrompt": "Générer le prompt",
             "copyPrompt": "Copier",
             "copied": "Copié !",
+            "emptyPromptWarning": "Aucun prompt utilisateur fourni. L'IA produira un résultat générique. Décrivez ce que vous souhaitez pour un meilleur résultat.",
             "chars": "caractères",
             "words": "mots"
         },

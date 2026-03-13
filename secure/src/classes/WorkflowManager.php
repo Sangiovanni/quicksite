@@ -418,6 +418,7 @@ class WorkflowManager {
         
         foreach ($subWorkflows as $subWorkflow) {
             // Parse sub-workflow definition
+            $condition = null;
             if (is_string($subWorkflow)) {
                 $workflowId = $subWorkflow;
                 $subParams = [];
@@ -1010,13 +1011,25 @@ class WorkflowManager {
             }
         }
         
+        // Build commands context from relatedCommands + fetched help data
+        $commandsContext = $this->buildCommandsContext($workflow, $fetchedData);
+        
         // First pass: Handle {{#if}} conditionals
         $template = $this->processConditionals($template, $userParams, $fetchedData);
         
-        // Second pass: Replace {{#each}} loops
-        $template = $this->processEachLoops($template, $fetchedData);
+        // Second pass: Replace {{#each}} loops (supports data.X and commands)
+        $template = $this->processEachLoops($template, $fetchedData, $commandsContext);
         
-        // Third pass: Replace direct data references {{data.xxx}}
+        // Third pass: Replace {{json X}} helper — JSON-encode a data value
+        $template = preg_replace_callback('/\{\{json\s+(\w+)\}\}/', function($matches) use ($fetchedData) {
+            $key = $matches[1];
+            if (!isset($fetchedData[$key])) return '(no data)';
+            $value = $fetchedData[$key];
+            if (is_array($value) && isset($value['_error'])) return "(error loading {$key})";
+            return json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        }, $template);
+        
+        // Fourth pass: Replace direct data references {{data.xxx}} and {{data.xxx.yyy}}
         $template = preg_replace_callback('/\{\{data\.(\w+)(?:\.(\w+))?\}\}/', function($matches) use ($fetchedData) {
             $key = $matches[1];
             $subKey = $matches[2] ?? null;
@@ -1039,13 +1052,13 @@ class WorkflowManager {
             return $this->formatValue($value);
         }, $template);
         
-        // Fourth pass: Replace {{param.xxx}} user parameters
+        // Fifth pass: Replace {{param.xxx}} user parameters
         $template = preg_replace_callback('/\{\{param\.(\w+)\}\}/', function($matches) use ($userParams) {
             $key = $matches[1];
             return $userParams[$key] ?? '';
         }, $template);
         
-        // Fifth pass: Replace {{helpers.xxx}} - static helper values
+        // Sixth pass: Replace {{helpers.xxx}} - static helper values
         $template = preg_replace_callback('/\{\{helpers\.(\w+)(?:\s+([^}]+))?\}\}/', function($matches) {
             $helper = $matches[1];
             $args = isset($matches[2]) ? trim($matches[2]) : '';
@@ -1056,6 +1069,23 @@ class WorkflowManager {
                 'timestamp' => time(),
                 default => ''
             };
+        }, $template);
+        
+        // Seventh pass: Replace bare data references {{xxx}} and {{xxx.yyy}}
+        // This catches any remaining {{word}} or {{word.word}} that wasn't handled above
+        $template = preg_replace_callback('/\{\{(\w+)(?:\.(\w+))?\}\}/', function($matches) use ($fetchedData) {
+            $key = $matches[1];
+            $subKey = $matches[2] ?? null;
+            
+            if (!isset($fetchedData[$key])) return $matches[0]; // leave unknown placeholders
+            $value = $fetchedData[$key];
+            if (is_array($value) && isset($value['_error'])) return "(error loading {$key})";
+            
+            if ($subKey && is_array($value)) {
+                $value = $value[$subKey] ?? null;
+            }
+            
+            return $this->formatValue($value);
         }, $template);
         
         return trim($template);
@@ -1147,6 +1177,20 @@ class WorkflowManager {
             return $value;
         }
         
+        // Check fetchedData for bare references (e.g., "styles.css" → $fetchedData['styles']['css'])
+        $parts = explode('.', $ref);
+        if (count($parts) >= 1 && isset($fetchedData[$parts[0]])) {
+            $value = $fetchedData[$parts[0]];
+            for ($i = 1; $i < count($parts); $i++) {
+                if (is_array($value) && isset($value[$parts[$i]])) {
+                    $value = $value[$parts[$i]];
+                } else {
+                    return null;
+                }
+            }
+            return $value;
+        }
+        
         // Direct param check (for backward compatibility)
         return $userParams[$ref] ?? null;
     }
@@ -1176,28 +1220,92 @@ class WorkflowManager {
     }
     
     /**
-     * Process {{#each}} loops in template
+     * Build commands context from relatedCommands + fetched help data
+     * 
+     * Maps relatedCommands to their help data fetched via dataRequirements.
+     * Looks for dataRequirement IDs matching "help*" that used the help command.
      */
-    private function processEachLoops(string $template, array $fetchedData): string {
-        // Pattern: {{#each data.xxx}}...{{this}} or {{@key}} or {{this.field}}...{{/each}}
-        $pattern = '/\{\{#each\s+data\.(\w+)\}\}(.*?)\{\{\/each\}\}/s';
+    private function buildCommandsContext(array $workflow, array $fetchedData): array {
+        $relatedCommands = $workflow['relatedCommands'] ?? [];
+        if (empty($relatedCommands)) return [];
         
-        return preg_replace_callback($pattern, function($matches) use ($fetchedData) {
-            $dataKey = $matches[1];
+        $commands = [];
+        foreach ($relatedCommands as $cmdName) {
+            // Try to find help data in fetchedData (convention: "helpCommandName" or "help_commandName")
+            $found = false;
+            foreach ($fetchedData as $dataId => $dataValue) {
+                // Match helpEditStyles, helpSetRootVariables, etc.
+                $normalizedCmd = strtolower($cmdName);
+                $normalizedId = strtolower($dataId);
+                if ($normalizedId === 'help' . $normalizedCmd || $normalizedId === 'help_' . $normalizedCmd) {
+                    if (is_array($dataValue) && !isset($dataValue['_error'])) {
+                        $commands[$cmdName] = $dataValue;
+                        $found = true;
+                        break;
+                    }
+                }
+            }
+            if (!$found) {
+                // Try fetching help live if CommandRunner is available
+                try {
+                    $helpData = CommandRunner::extractData('help', [], [$cmdName], 'data');
+                    if ($helpData) {
+                        $commands[$cmdName] = $helpData;
+                    }
+                } catch (\Throwable $e) {
+                    // Skip this command
+                }
+            }
+        }
+        
+        return $commands;
+    }
+    
+    /**
+     * Process {{#each}} loops in template
+     * 
+     * Supports:
+     * - {{#each data.xxx}} — iterate over fetchedData[xxx]
+     * - {{#each commands}} — iterate over built commands context
+     * - {{formatCommand @key this}} — format command help as markdown
+     * - {{@key}}, {{this}}, {{this.field}} — standard loop variables
+     */
+    private function processEachLoops(string $template, array $fetchedData, array $commandsContext = []): string {
+        // Generic pattern: {{#each SOMETHING}}...{{/each}}
+        $pattern = '/\{\{#each\s+([\w.]+)\}\}(.*?)\{\{\/each\}\}/s';
+        
+        return preg_replace_callback($pattern, function($matches) use ($fetchedData, $commandsContext) {
+            $source = $matches[1];
             $loopContent = $matches[2];
             
-            if (!isset($fetchedData[$dataKey]) || !is_array($fetchedData[$dataKey])) {
+            // Resolve the items to iterate over
+            $items = null;
+            if ($source === 'commands') {
+                $items = $commandsContext;
+            } elseif (str_starts_with($source, 'data.')) {
+                $dataKey = substr($source, 5);
+                $items = $fetchedData[$dataKey] ?? null;
+            } else {
+                // Bare name — check fetchedData
+                $items = $fetchedData[$source] ?? null;
+            }
+            
+            if (!is_array($items) || empty($items)) {
                 return '';
             }
             
-            $items = $fetchedData[$dataKey];
             $output = '';
             
             foreach ($items as $key => $item) {
                 $itemOutput = $loopContent;
                 
+                // Replace {{formatCommand @key this}} — special helper
+                $itemOutput = preg_replace_callback('/\{\{formatCommand\s+@key\s+this\}\}/', function() use ($key, $item) {
+                    return $this->formatCommand($key, is_array($item) ? $item : []);
+                }, $itemOutput);
+                
                 // Replace {{@key}}
-                $itemOutput = str_replace('{{@key}}', $key, $itemOutput);
+                $itemOutput = str_replace('{{@key}}', (string)$key, $itemOutput);
                 
                 // Replace {{this}} with the whole item (formatted)
                 $itemOutput = str_replace('{{this}}', $this->formatValue($item), $itemOutput);

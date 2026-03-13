@@ -392,6 +392,7 @@
             apiIntegrationWrapper: document.getElementById('api-integration-wrapper'),
             providerSelector: document.getElementById('provider-selector'),
             previewManualStepsBtn: document.getElementById('preview-manual-steps'),
+            generatePromptBtn: document.getElementById('generate-prompt-btn'),
             executeManualBtn: document.getElementById('execute-manual-workflow'),
             exportBtn: document.getElementById('export-spec'),
             aiResponseSection: document.querySelector('.ai-response-section'),
@@ -453,9 +454,6 @@
         loadAutoOptions(els);
         initPresetLoader(config, els);
 
-        if (!config.isManualWorkflow && config.hasNoParams) {
-            generatePrompt(config, els, state, {});
-        }
         if (config.isManualWorkflow && config.hasNoParams) {
             setTimeout(() => generateManualSteps(config, els, {}), 100);
         }
@@ -489,6 +487,9 @@
         // -- Manual workflow --
         if (els.previewManualStepsBtn) {
             els.previewManualStepsBtn.addEventListener('click', () => generateManualSteps(config, els, {}));
+        }
+        if (els.generatePromptBtn) {
+            els.generatePromptBtn.addEventListener('click', () => generatePrompt(config, els, state, {}));
         }
         if (els.executeManualBtn) {
             els.executeManualBtn.addEventListener('click', function() {
@@ -704,6 +705,19 @@
                 let finalPrompt = data.data.prompt;
                 if (userPrompt) {
                     finalPrompt += '\n\n---\n\n**User Request:**\n' + userPrompt;
+                } else {
+                    // No user prompt: tell the AI to make assumptions
+                    finalPrompt += '\n\n---\n\n**User Request:**\n'
+                        + 'The user has not provided a specific request. '
+                        + 'Make reasonable assumptions based on the context above. '
+                        + 'Imagine a modern, professional result with sensible defaults. '
+                        + 'Do NOT ask for clarification — just produce a complete output.';
+                    // Show visual hint to the user
+                    const warningEl = document.getElementById('empty-prompt-warning');
+                    if (warningEl) {
+                        warningEl.style.display = 'block';
+                        setTimeout(() => { warningEl.style.display = 'none'; }, 8000);
+                    }
                 }
 
                 if (els.promptOutput) els.promptOutput.value = finalPrompt;
@@ -1115,7 +1129,28 @@
         if (els.executionProgress) els.executionProgress.style.display = 'flex';
         if (els.executionResults) els.executionResults.innerHTML = '';
 
-        const phases = state.phases || [];
+        let phases = state.phases || [];
+
+        // FAILSAFE: if phases is empty, recover from API
+        if (phases.length === 0 && config.specId) {
+            console.warn('[ai-spec] phases is empty — recovering from API...');
+            try {
+                const formParams = els.form ? collectFormParams(els.form) : {};
+                const queryString = new URLSearchParams(formParams).toString();
+                const url = config.adminBase + '/api/workflow-phases/' + config.specId + (queryString ? '?' + queryString : '');
+                const resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + config.token } });
+                const result = await resp.json();
+                if (result.success && result.data?.phases?.length) {
+                    phases = result.data.phases;
+                    state.phases = phases;
+                    state.userParams = Object.keys(state.userParams || {}).length > 0 ? state.userParams : formParams;
+                    console.warn('[ai-spec] RECOVERED phases from API, count:', phases.length);
+                }
+            } catch (e) {
+                console.error('[ai-spec] Failed to recover phases:', e);
+            }
+        }
+
         const hasPostWorkflowPhases = phases.some(p => p.type === 'postWorkflow');
         let globalIndex = 0;
 
@@ -1580,6 +1615,10 @@
             });
             const result = await response.json();
             if (!result.success) throw new Error(result.message || 'Failed to generate steps');
+
+            if (result.data._debug) {
+                console.warn('[ai-spec] workflow-generate-steps debug:', result.data._debug);
+            }
 
             const steps = result.data.steps || [];
             if (stepCount) stepCount.textContent = steps.length + ' command' + (steps.length !== 1 ? 's' : '');

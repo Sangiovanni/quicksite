@@ -4016,6 +4016,24 @@ kbd {
     border-radius: var(--radius-sm);
 }
 
+.ai-spec-prompt__warning {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: var(--font-size-sm);
+    color: #92400e;
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm) var(--space-md);
+    margin-top: var(--space-sm);
+}
+
+.ai-spec-prompt__warning svg {
+    flex-shrink: 0;
+    color: #d97706;
+}
+
 .ai-spec-prompt__stats {
     font-size: var(--font-size-xs);
     color: var(--admin-text-muted);
