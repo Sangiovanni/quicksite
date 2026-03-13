@@ -281,10 +281,12 @@ class WorkflowManager {
                     }
                 } else {
                     // Single step - resolve params
+                    $resolvedParams = $this->resolveStepParams($step['params'] ?? [], $context);
+                    $resolvedParams = $this->resolveEachLoops($resolvedParams, $context);
                     $resolvedStep = [
                         'command' => $step['command'],
                         'method' => $step['method'] ?? 'POST',
-                        'params' => $this->resolveStepParams($step['params'] ?? [], $context)
+                        'params' => $resolvedParams
                     ];
                     
                     // Carry over execution control properties
@@ -410,10 +412,12 @@ class WorkflowManager {
                 '$item' => $value  // Alias
             ]);
             
+            $resolvedParams = $this->resolveStepParams($step['params'] ?? [], $itemContext);
+            $resolvedParams = $this->resolveEachLoops($resolvedParams, $itemContext);
             $resolvedStep = [
                 'command' => $step['command'],
                 'method' => $step['method'] ?? 'POST',
-                'params' => $this->resolveStepParams($step['params'] ?? [], $itemContext)
+                'params' => $resolvedParams
             ];
             
             // Carry over execution control properties
