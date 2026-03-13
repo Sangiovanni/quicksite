@@ -975,6 +975,10 @@
                         "help": "Si coché, les langues supplémentaires ne seront PAS supprimées"
                     }
                 }
+            },
+            "updateLangSwitch": {
+                "title": "Mettre à jour le sélecteur de langue",
+                "description": "Reconstruire le composant de sélection de langue à partir des langues actuelles du projet."
             }
         }
     },

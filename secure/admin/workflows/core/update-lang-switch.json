@@ -1,0 +1,47 @@
+{
+    "$schema": "../schema.json",
+    "id": "update-lang-switch",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "🌐",
+        "titleKey": "workflows.specs.updateLangSwitch.title",
+        "descriptionKey": "workflows.specs.updateLangSwitch.description",
+        "category": "modification",
+        "tags": ["language", "switch", "multilingual"],
+        "difficulty": "beginner"
+    },
+    "parameters": [],
+    "dataRequirements": [
+        {
+            "id": "langData",
+            "command": "getLangList",
+            "extract": "data"
+        }
+    ],
+    "steps": [
+        {
+            "condition": "data.langData.languages",
+            "command": "editStructure",
+            "params": {
+                "type": "component",
+                "name": "lang-switch",
+                "structure": {
+                    "tag": "div",
+                    "params": { "class": "lang-switch" },
+                    "children": {
+                        "$each": "{{data.langData.languages}}",
+                        "$item": {
+                            "tag": "a",
+                            "params": {
+                                "href": "{{__current_page;lang={{$value}}}}",
+                                "class": "lang-btn",
+                                "data-lang": "{{$value}}"
+                            },
+                            "children": [{ "textKey": "__RAW__{{$value | langname}}" }]
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}

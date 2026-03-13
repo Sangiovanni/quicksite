@@ -2,7 +2,7 @@
     "404": {
         "title": "ページが見つかりません",
         "message": "お探しのページは存在しません。",
-        "backHome": "ホームへ戻る"
+        "backHome": "ホームに戻る"
     },
     "site": {
         "name": "VotreEntreprise",
@@ -10,11 +10,11 @@
     },
     "page": {
         "titles": {
-            "home": "ホーム | Apex Conseil",
-            "about": "会社概要 | Apex Conseil",
-            "services": "サービス | Apex Conseil",
-            "contact": "お問い合わせ | Apex Conseil",
-            "team": "チーム | Apex Conseil"
+            "home": "Apex Consulting | 戦略的ビジネスソリューション",
+            "about": "私たちについて | Apex Consulting",
+            "services": "サービス | Apex Consulting",
+            "contact": "お問い合わせ | Apex Consulting",
+            "team": "チーム | Apex Consulting"
         }
     },
     "nav": {
@@ -27,9 +27,9 @@
         "cta": "Commencer"
     },
     "footer": {
-        "copyright": "© 2025 Apex Conseil. 全著作権所有。",
+        "copyright": "© 2025 Apex Consulting. All rights reserved.",
         "language": "Langue :",
-        "tagline": "野心ある組織のための戦略コンサルティング。",
+        "tagline": "明日の課題に向けた戦略的ソリューション。",
         "about": "会社概要",
         "services": "サービス",
         "team": "チーム",
@@ -37,10 +37,10 @@
     },
     "home": {
         "hero": {
-            "title": "専門知識でビジネスを変革する",
-            "subtitle": "私たちは組織が複雑な課題を乗り越え、成長を促進し、持続的な競争優位を築くことを支援します。",
-            "eyebrow": "戦略コンサルティング",
-            "cta": "相談を予約する",
+            "title": "持続的な成功に向けてビジネスを変革する",
+            "subtitle": "私たちはリーディング企業と協力し、成長・革新・持続的な競争優位をもたらす戦略を構築します。",
+            "eyebrow": "信頼されるビジネスコンサルタント",
+            "cta": "対話を始める",
             "ctaSecondary": "サービスを探る",
             "cta2": "サービスを見る"
         },
@@ -61,16 +61,16 @@
         },
         "stats": {
             "clients": {
-                "number": "200+",
-                "label": "支援企業数"
+                "number": "500社以上",
+                "label": "クライアント実績"
             },
             "projects": {
-                "number": "850+",
+                "number": "1,200件以上",
                 "label": "完了プロジェクト"
             },
             "years": {
-                "number": "18",
-                "label": "年の経験"
+                "number": "20年以上",
+                "label": "業界経験"
             },
             "countries": {
                 "number": "35ヶ国以上",
@@ -82,8 +82,8 @@
             }
         },
         "services": {
-            "title": "専門分野",
-            "subtitle": "業界と課題に合わせたコンサルティングソリューション。",
+            "title": "私たちのサービス",
+            "subtitle": "お客様の固有のニーズに合わせた包括的なコンサルティングサービス。",
             "learnMore": "詳しく見る →",
             "cta": "全サービスを見る"
         },
@@ -145,15 +145,15 @@
         }
     },
     "about": {
-        "title": "Apex Conseilについて",
+        "title": "Apex Consultingについて",
         "subtitle": "Decouvrez notre histoire",
         "story": {
-            "title": "私たちの歴史",
+            "title": "私たちのストーリー",
             "content": "Fondee avec la vision de delivrer l'excellence...",
-            "p1": "2006年に元エグゼクティブと研究者のチームによって設立されたApex Conseilは、シンプルな信念に基づいています：最高のコンサルティングは厳密な分析フレームワーク、深い業界知識、そしてクライアントとの真のパートナーシップを組み合わせるものです。",
-            "p2": "現在、パリ、リヨン、ブリュッセルにオフィスを構え、金融サービス、ヘルスケア、製造業、公共機関など幅広い分野でヨーロッパ全域のクライアントにサービスを提供しています。"
+            "p1": "2003年に設立されたApex Consultingは、企業には深い業界専門知識とクライアントの成功への真摯なコミットメントを兼ね備えたアドバイザーが必要だという信念のもとに生まれました。",
+            "p2": "私たちの学際的なチームは、様々な業界や学術的背景を持つ専門家を集め、クライアントに包括的かつ全体的な指針を提供しています。"
         },
-        "lead": "20年近くにわたり、私たちは主要な組織の最も複雑な戦略的課題を共に乗り越えてきました。",
+        "lead": "20年以上にわたり、複雑な環境を乗り越え変革を主導する組織の信頼できるパートナーとして歩んできました。",
         "values": {
             "title": "私たちの価値観",
             "integrity": {
@@ -209,11 +209,8 @@
             "title": "Support",
             "desc": "Une assistance continue quand vous en avez besoin."
         },
-        "lead": "戦略策定から業務効率化まで、最も重要な優先事項にわたる総合的なコンサルティングを提供します。",
-        "cta": {
-            "title": "課題についてご相談しますか？",
-            "button": "チームに連絡する"
-        },
+        "lead": "戦略立案から実際の実装まで、測定可能な成果をもたらすよう設計された包括的なコンサルティングサービスを提供します。",
+        "cta": "始める →",
         "strategy": {
             "title": "企業戦略",
             "short": "データドリブンな戦略で組織の長期的成功へのポジションを確立します。",
@@ -319,23 +316,23 @@
             "label": "Adresse",
             "value": "123 Rue des Affaires, Ville, France"
         },
-        "lead": "具体的な課題をお持ちの方も、支援の可能性を探りたい方も、ぜひお気軽にご連絡ください。",
+        "lead": "議論したい課題がありますか？私たちのチームがお手伝いします。ご連絡いただき、対話を始めましょう。",
         "info": {
-            "title": "オフィス案内",
+            "title": "ご連絡先",
             "address": {
                 "icon": "📍",
-                "label": "住所",
-                "value": "14 Avenue de l'Opéra, 75001 パリ"
+                "label": "オフィス住所",
+                "value": "1200 Avenue of the Americas, New York, NY 10036, アメリカ"
             },
             "email": {
                 "icon": "✉️",
                 "label": "メール",
-                "value": "contact@apex-conseil.fr"
+                "value": "hello@apexconsulting.com"
             },
             "phone": {
                 "icon": "📞",
                 "label": "電話",
-                "value": "+33 1 42 60 00 00"
+                "value": "+1 (212) 555-0190"
             },
             "hours": {
                 "label": "営業時間",
@@ -344,7 +341,7 @@
         },
         "form": {
             "title": "メッセージを送る",
-            "name": "お名前",
+            "name": "氏名",
             "email": "メールアドレス",
             "subject": "件名",
             "message": "メッセージ",
@@ -352,48 +349,48 @@
         }
     },
     "menu": {
-        "logo": "APEX CONSEIL",
+        "logo": "Apex Consulting",
         "home": "ホーム",
-        "about": "会社概要",
+        "about": "私たちについて",
         "services": "サービス",
         "team": "チーム",
         "contact": "お問い合わせ"
     },
     "team": {
         "title": "私たちのチーム",
-        "lead": "コンサルタントは深い専門知識と業界知識を兼ね備え、お客様の成功に真摯に取り組みます。",
+        "lead": "私たちの強みは人にあります。クライアントの成功への情熱で結ばれた、多様な経験豊富なプロフェッショナルの集団です。",
         "leadership": {
             "title": "リーダーシップチーム"
         },
         "member1": {
-            "name": "Sophie Martin",
-            "role": "マネージングパートナー",
-            "bio": "元McKinseyパートナー。金融サービスと小売業での戦略・企業変革において20年の経験を持つ。"
+            "name": "ジェームズ・ミッチェル",
+            "role": "マネージング・パートナー & CEO",
+            "bio": "北米とヨーロッパのFortune 500企業を対象に、大規模変革を20年以上リードしてきた実績を持ちます。"
         },
         "member2": {
-            "name": "Antoine Bernard",
-            "role": "パートナー（財務パフォーマンス）",
-            "bio": "公認会計士・元CFO。財務再編、M&A、中堅企業向け価値創造プログラムを専門とする。"
+            "name": "ソフィア・レイエス",
+            "role": "パートナー、企業戦略",
+            "bio": "元マッキンゼーのストラテジストで、市場参入・M&A・競争ポジショニングに深い専門知識を持ちます。"
         },
         "member3": {
-            "name": "Lucie Charpentier",
-            "role": "パートナー（デジタル・テクノロジー）",
-            "bio": "テクノロジー戦略家・元CTO。ヘルスケアと物流における複雑なデジタル変革を主導してきた実績を持つ。"
+            "name": "エレナ・コバックス",
+            "role": "パートナー、デジタル変革",
+            "bio": "製造・小売・金融分野で60以上のデジタル変革プログラムを主導してきたテクノロジーリーダーです。"
         },
         "member4": {
-            "name": "Pierre Dubois",
-            "role": "シニアマネージャー（戦略）",
-            "bio": "HECパリ卒業。ヨーロッパ市場での市場参入、成長戦略、競合分析を専門とする。"
+            "name": "デビッド・リャン",
+            "role": "パートナー、財務アドバイザリー",
+            "bio": "CFAかつ元投資銀行家で、複雑な再構築やクロスボーダー取引を専門とします。"
         },
         "member5": {
-            "name": "Mélanie Rousseau",
-            "role": "シニアマネージャー（オペレーション）",
-            "bio": "産業エンジニア・リーン専門家。クライアントに5,000万ユーロ超の業務改善効果をもたらした。"
+            "name": "アマラ・メンサ",
+            "role": "ディレクター、イノベーション実践",
+            "bio": "デザイン思考の専門家でイノベーションコーチとして、継続的改善の文化構築を支援します。"
         },
         "member6": {
-            "name": "François Nguyen",
-            "role": "マネージャー（データ・アナリティクス）",
-            "bio": "データサイエンティスト・コンサルタント。製造業と消費財における高度分析の実践的応用をリードする。"
+            "name": "トーマス・ベルガー",
+            "role": "ディレクター、タレント＆HR",
+            "bio": "組織心理学者かつHRベテランで、リーダーシップ開発と人材計画を専門とします。"
         },
         "join": {
             "title": "チームに参加する",

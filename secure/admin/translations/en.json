@@ -961,6 +961,10 @@
                         "help": "If checked, additional languages will NOT be removed"
                     }
                 }
+            },
+            "updateLangSwitch": {
+                "title": "Update Language Switch",
+                "description": "Rebuild the language switch component based on the current project languages."
             }
         }
     },

@@ -698,6 +698,10 @@ class WorkflowManager {
             // Handle {{placeholder}} syntax (full value is a placeholder)
             if (preg_match('/^\{\{([^{}]+)\}\}$/', $value, $matches)) {
                 $path = trim($matches[1]);
+                // Preserve system placeholders (e.g. {{__current_page;lang=en}}) — they're resolved at render time
+                if (str_starts_with($path, '__')) {
+                    return $value;
+                }
                 // Use empty string as fallback for missing params (not the raw template)
                 // This ensures unresolved {{param.X}} becomes '' rather than literal '{{param.X}}'
                 $resolved = $this->resolvePathWithFilters($path, $context, '');
@@ -707,6 +711,10 @@ class WorkflowManager {
             // Handle inline {{placeholders}} in strings (not containing nested braces)
             return preg_replace_callback('/\{\{([^{}]+)\}\}/', function($matches) use ($context) {
                 $path = trim($matches[1]);
+                // Preserve system placeholders — resolved at render time, not workflow time
+                if (str_starts_with($path, '__')) {
+                    return $matches[0];
+                }
                 $resolved = $this->resolvePathWithFilters($path, $context, '');
                 return is_scalar($resolved) ? $resolved : json_encode($resolved);
             }, $value);

@@ -10,11 +10,11 @@
     },
     "page": {
         "titles": {
-            "home": "Home | Apex Conseil",
-            "about": "About Us | Apex Conseil",
-            "services": "Our Services | Apex Conseil",
-            "contact": "Contact | Apex Conseil",
-            "team": "Our Team | Apex Conseil"
+            "home": "Apex Consulting | Strategic Business Solutions",
+            "about": "About Us | Apex Consulting",
+            "services": "Our Services | Apex Consulting",
+            "contact": "Contact Us | Apex Consulting",
+            "team": "Our Team | Apex Consulting"
         }
     },
     "nav": {
@@ -27,22 +27,22 @@
         "cta": "Commencer"
     },
     "footer": {
-        "copyright": "© 2025 Apex Conseil. All rights reserved.",
+        "copyright": "© 2025 Apex Consulting. All rights reserved.",
         "language": "Langue :",
-        "tagline": "Strategic consulting for ambitious organizations.",
-        "about": "About",
-        "services": "Services",
-        "team": "Team",
-        "contact": "Contact"
+        "tagline": "Strategic solutions for tomorrow's challenges.",
+        "about": "会社概要",
+        "services": "サービス",
+        "team": "チーム",
+        "contact": "お問い合わせ"
     },
     "home": {
         "hero": {
-            "title": "Transform Your Business with Expert Guidance",
-            "subtitle": "We help organizations navigate complexity, drive growth, and build lasting competitive advantage.",
-            "eyebrow": "Strategic Consulting",
-            "cta": "Schedule a Consultation",
-            "ctaSecondary": "サービスを探る",
-            "cta2": "Explore Our Services"
+            "title": "Transform Your Business for Lasting Success",
+            "subtitle": "We partner with leading organizations to craft strategies that drive growth, innovation, and sustainable competitive advantage.",
+            "eyebrow": "Trusted Business Consultants",
+            "cta": "Start a Conversation",
+            "ctaSecondary": "Explore Our Services",
+            "cta2": "サービスを見る"
         },
         "features": {
             "title": "Pourquoi nous choisir",
@@ -61,36 +61,36 @@
         },
         "stats": {
             "clients": {
-                "number": "200+",
+                "number": "500+",
                 "label": "Clients Served"
             },
             "projects": {
-                "number": "850+",
+                "number": "1,200+",
                 "label": "Projects Completed"
             },
             "years": {
-                "number": "18",
+                "number": "20+",
                 "label": "Years of Experience"
             },
             "countries": {
-                "number": "35ヶ国以上",
-                "label": "グローバル展開"
+                "number": "35+",
+                "label": "Countries Reached"
             },
             "experts": {
                 "number": "45",
-                "label": "Senior Consultants"
+                "label": "シニアコンサルタント"
             }
         },
         "services": {
-            "title": "Our Areas of Expertise",
-            "subtitle": "Comprehensive consulting solutions tailored to your industry and challenges.",
-            "learnMore": "詳しく見る →",
-            "cta": "View All Services"
+            "title": "What We Do",
+            "subtitle": "Comprehensive consulting services tailored to your unique business needs.",
+            "learnMore": "Learn More →",
+            "cta": "全サービスを見る"
         },
         "cta": {
-            "title": "ビジネスを次のレベルへ",
-            "subtitle": "私たちの専門知識がどのようにお客様の成長を加速し、最も複雑な課題を解決できるかをご相談ください。",
-            "button": "無料相談を予約する"
+            "title": "Ready to Elevate Your Business?",
+            "subtitle": "Let's discuss how our expertise can accelerate your growth and solve your most complex challenges.",
+            "button": "Schedule a Free Consultation"
         },
         "service-card5": {
             "$icon": "component third",
@@ -139,59 +139,59 @@
             "$cta": ""
         },
         "testimonial": {
-            "title": "What Our Clients Say",
-            "quote": "Apex Conseil transformed our operational model, delivering €4.2M in annual savings while improving customer satisfaction scores by 32%. Their team brought both strategic vision and hands-on execution.",
+            "title": "お客様の声",
+            "quote": "Apex Conseilは当社の業務モデルを変革し、年間420万ユーロのコスト削減と顧客満足度32%向上を実現しました。戦略的ビジョンと実行力の両方を備えたチームでした。",
             "author": "— Marie-Claire Fontaine, CEO, Groupe Atlantique"
         }
     },
     "about": {
-        "title": "About Apex Conseil",
+        "title": "About Apex Consulting",
         "subtitle": "Decouvrez notre histoire",
         "story": {
             "title": "Our Story",
             "content": "Fondee avec la vision de delivrer l'excellence...",
-            "p1": "Founded in 2006 by a team of former executives and academic researchers, Apex Conseil was built on a simple belief: that the best consulting combines rigorous analytical frameworks with deep industry knowledge and genuine partnership with our clients.",
-            "p2": "Today, with offices in Paris, Lyon, and Brussels, we serve clients across Europe in sectors ranging from financial services and healthcare to manufacturing and public institutions. Our multidisciplinary teams bring together expertise in strategy, operations, digital transformation, and organizational change."
+            "p1": "Founded in 2003, Apex Consulting was built on the belief that businesses deserve advisors who combine deep industry expertise with genuine commitment to client success. What started as a small strategy boutique has grown into a global firm with offices across four continents.",
+            "p2": "Our multidisciplinary teams bring together experts from diverse industries and academic backgrounds, ensuring our clients receive well-rounded, holistic guidance that accounts for every dimension of their business environment."
         },
-        "lead": "For nearly two decades, we have guided leading organizations through their most complex strategic challenges.",
+        "lead": "For over two decades, we have been the trusted partner for organizations navigating complexity and driving transformational change.",
         "values": {
             "title": "Our Values",
             "integrity": {
-                "title": "誠実さ — ",
-                "desc": "すべての行動において最高の倫理基準を維持します。"
+                "title": "Integrity — ",
+                "desc": "We uphold the highest ethical standards in everything we do."
             },
             "excellence": {
-                "title": "卓越性 — ",
-                "desc": "厳格な分析と革新的な思考によって優れた結果を提供します。"
+                "title": "Excellence — ",
+                "desc": "We deliver superior results through rigorous analysis and innovative thinking."
             },
             "partnership": {
-                "title": "パートナーシップ — ",
-                "desc": "クライアントの成功を自分たちの成功として捉え、協力して取り組みます。"
+                "title": "Partnership — ",
+                "desc": "We work collaboratively, treating client success as our own success."
             },
             "innovation": {
-                "title": "イノベーション — ",
-                "desc": "変化を受け入れ、常により良い解決策を追求します。"
+                "title": "Innovation — ",
+                "desc": "We embrace change and continuously seek better solutions."
             },
             "v1": {
-                "title": "Rigor",
-                "desc": "Every recommendation is grounded in thorough analysis, verified data, and tested frameworks."
+                "title": "厳密さ",
+                "desc": "すべての提言は徹底的な分析、検証済みデータ、実証済みのフレームワークに基づいています。"
             },
             "v2": {
-                "title": "Partnership",
-                "desc": "We work alongside our clients — transferring knowledge and building internal capability."
+                "title": "パートナーシップ",
+                "desc": "クライアントと並走し、知識を移転し、内部能力を構築します。"
             },
             "v3": {
-                "title": "Impact",
-                "desc": "We measure success by the tangible results our clients achieve, not by deliverables alone."
+                "title": "インパクト",
+                "desc": "成功は成果物だけでなく、クライアントが達成する有形の結果で測ります。"
             },
             "v4": {
-                "title": "Integrity",
-                "desc": "We provide candid counsel, even when it is not what clients hoped to hear."
+                "title": "誠実さ",
+                "desc": "クライアントが望む答えでなくとも、率直なアドバイスを提供します。"
             }
         },
         "mission": {
-            "title": "私たちのミッション",
-            "text": "世界中の組織が、責任ある持続可能な方法で最も大胆な目標を達成するために必要な戦略・ツール・洞察を提供します。"
+            "title": "Our Mission",
+            "text": "To empower organizations worldwide with the strategies, tools, and insights they need to achieve their boldest ambitions — responsibly and sustainably."
         }
     },
     "services": {
@@ -209,103 +209,100 @@
             "title": "Support",
             "desc": "Une assistance continue quand vous en avez besoin."
         },
-        "lead": "From strategy formulation to operational excellence, we offer end-to-end consulting across your most critical priorities.",
-        "cta": {
-            "title": "Ready to discuss your challenges?",
-            "button": "Contact Our Team"
-        },
+        "lead": "From strategic planning to hands-on implementation, we offer a comprehensive suite of consulting services designed to deliver measurable results.",
+        "cta": "Get Started →",
         "strategy": {
-            "title": "企業戦略",
-            "short": "データドリブンな戦略で組織の長期的成功へのポジションを確立します。",
-            "desc": "明確な目標の定義、成長機会の特定、組織全体を共通のビジョンに向けて整合させる実行可能なロードマップの作成を支援します。"
+            "title": "Corporate Strategy",
+            "short": "Develop bold, data-driven strategies that position your organization for long-term success.",
+            "desc": "We work alongside your leadership team to define clear goals, identify growth opportunities, and create actionable roadmaps that align your entire organization toward a common vision."
         },
         "transformation": {
-            "title": "ビジネス変革",
-            "short": "急速に変化する市場で成長するための業務と文化を再構築します。",
-            "desc": "変革の専門家がプロセスの再設計、テクノロジーの近代化、長期的なパフォーマンスを維持するための組織能力の強化を支援します。"
+            "title": "Business Transformation",
+            "short": "Reimagine operations and culture to thrive in a rapidly changing market landscape.",
+            "desc": "Our transformation experts guide organizations through complex change — redesigning processes, modernizing technology stacks, and building the organizational capabilities needed to sustain long-term performance."
         },
         "innovation": {
-            "title": "イノベーション＆R&D",
-            "short": "体系的なイノベーションを通じて新たな収益源と競争優位を生み出します。",
-            "desc": "アイデア創出フレームワーク、デザイン思考ワークショップから新しいビジネスモデルの孵化まで、イノベーションエンジンの構築を支援します。"
+            "title": "Innovation & R&D",
+            "short": "Unlock new revenue streams and competitive advantages through structured innovation.",
+            "desc": "We help companies build innovation engines — from ideation frameworks and design thinking workshops to incubating new business models and go-to-market strategies for emerging products."
         },
         "finance": {
-            "title": "財務アドバイザリー",
-            "short": "財務パフォーマンスを強化し、複雑なトランザクションを自信を持って乗り越えます。",
-            "desc": "資本配分、M&Aデューデリジェンス、コスト最適化、財務再構築に関する専門的な指針を提供します。"
+            "title": "Financial Advisory",
+            "short": "Strengthen financial performance and navigate complex transactions with confidence.",
+            "desc": "Our financial experts provide expert guidance on capital allocation, M&A due diligence, cost optimization, and financial restructuring to ensure your business remains robust and resilient."
         },
         "global": {
-            "title": "グローバル展開",
-            "short": "明確でローカライズされた戦略で新市場に参入し、国際的に拡大します。",
-            "desc": "市場参入、国際パートナーシップ、クロスボーダー業務のエンドツーエンドサポートを提供します。"
+            "title": "Global Expansion",
+            "short": "Enter new markets and scale internationally with a clear, localized strategy.",
+            "desc": "Expanding globally requires nuanced understanding of local markets, regulations, and cultures. We provide end-to-end support for market entry, international partnerships, and cross-border operations."
         },
         "hr": {
-            "title": "タレント＆HR コンサルティング",
-            "short": "組織を前進させるタレントを惹きつけ、育成し、維持します。",
-            "desc": "競争力のある報酬体系の設計、リーダーシップパイプラインの構築、インクルーシブな文化の促進を支援します。"
+            "title": "Talent & HR Consulting",
+            "short": "Attract, develop, and retain the talent that will drive your organization forward.",
+            "desc": "We help organizations design competitive compensation structures, build leadership pipelines, foster inclusive cultures, and implement performance management systems that motivate and retain top talent."
         },
         "process": {
-            "title": "私たちのエンゲージメントプロセス",
+            "title": "Our Engagement Process",
             "step1": {
                 "number": "01",
-                "title": "ディスカバリー",
-                "desc": "ステークホルダーへのインタビューと徹底的な分析を通じて、お客様のビジネス・課題・目標を深く理解します。"
+                "title": "Discovery",
+                "desc": "We begin by deeply understanding your business, challenges, and goals through stakeholder interviews and thorough analysis."
             },
             "step2": {
                 "number": "02",
-                "title": "診断",
-                "desc": "根本原因を特定し、機会をマッピングし、業界のベストプラクティスとベンチマーキングを行います。"
+                "title": "Diagnosis",
+                "desc": "Our team identifies root causes, maps opportunities, and benchmarks against industry best practices."
             },
             "step3": {
                 "number": "03",
-                "title": "戦略設計",
-                "desc": "お客様のチームとともにオーダーメイドのソリューションを共同創造し、整合性と実現可能性を確保します。"
+                "title": "Strategy Design",
+                "desc": "We co-create tailored solutions with your team, ensuring alignment and practical feasibility."
             },
             "step4": {
                 "number": "04",
-                "title": "実装",
-                "desc": "実行段階でお客様と並走し、進捗を監視しながら継続的な成果を確保するために適応します。"
+                "title": "Implementation",
+                "desc": "We work side-by-side with you during execution, monitoring progress and adapting as needed to ensure lasting results."
             }
         },
         "item1": {
             "icon": "⚖️",
-            "title": "Strategy & Transformation",
-            "short": "Develop bold strategies and execute transformations that create lasting value.",
-            "desc": "We partner with executive teams to define strategic direction, assess competitive positioning, and build the organizational capabilities required to win in tomorrow's markets.",
-            "f1": "Corporate & business unit strategy",
-            "f2": "Mergers, acquisitions & integration",
-            "f3": "Business model transformation"
+            "title": "戦略・変革",
+            "short": "大胆な戦略を策定し、永続的な価値を生み出す変革を実行します。",
+            "desc": "経営チームと共に戦略的方向性を定め、競争ポジショニングを評価し、将来の市場で勝つために必要な組織能力を構築します。",
+            "f1": "コーポレート・事業戦略",
+            "f2": "M&A・統合",
+            "f3": "ビジネスモデル変革"
         },
         "item2": {
             "icon": "📊",
-            "title": "Financial Performance",
-            "short": "Optimize financial structures and unlock value across your organization.",
-            "desc": "Our financial advisory experts work with CFOs and boards to improve financial performance, manage risk, and allocate capital more effectively.",
-            "f1": "Cost transformation & efficiency",
-            "f2": "Financial modeling & forecasting",
-            "f3": "Working capital optimization"
+            "title": "財務パフォーマンス",
+            "short": "財務構造を最適化し、組織全体の価値を引き出します。",
+            "desc": "財務アドバイザリーの専門家がCFOや取締役会と協力し、財務パフォーマンスの改善、リスク管理、資本配分の効率化を実現します。",
+            "f1": "コスト変革と効率化",
+            "f2": "財務モデリングと予測",
+            "f3": "運転資本の最適化"
         },
         "item3": {
             "icon": "🌍",
-            "title": "Digital & Technology",
-            "short": "Harness digital capabilities to accelerate growth and modernize operations.",
-            "desc": "We help organizations develop technology strategies, manage large-scale digital programs, and build the data and analytics capabilities needed to compete in a digital world.",
-            "f1": "Digital strategy & roadmapping",
-            "f2": "Data, AI & analytics",
-            "f3": "Technology program governance"
+            "title": "デジタル・テクノロジー",
+            "short": "デジタル能力を活用して成長を加速し、業務を近代化します。",
+            "desc": "テクノロジー戦略の策定、大規模デジタルプログラムの管理、データ・アナリティクス能力の構築を支援します。",
+            "f1": "デジタル戦略・ロードマップ",
+            "f2": "データ・AI・アナリティクス",
+            "f3": "テクノロジープログラムガバナンス"
         },
         "item4": {
             "icon": "🏗️",
-            "title": "Operations & Supply Chain",
-            "short": "Build resilient, efficient operations that deliver on your strategic ambitions.",
-            "desc": "From lean operations to global supply chain redesign, we help clients achieve operational excellence while building agility and resilience.",
-            "f1": "Operational excellence & lean",
-            "f2": "Supply chain design & optimization",
-            "f3": "Procurement & sourcing strategy"
+            "title": "オペレーション・サプライチェーン",
+            "short": "戦略的野心を実現するレジリエントで効率的な業務体制を構築します。",
+            "desc": "リーン経営からグローバルサプライチェーンの再設計まで、俊敏性と耐性を構築しながら卓越した業務を実現します。",
+            "f1": "業務効率化・リーン",
+            "f2": "サプライチェーン設計・最適化",
+            "f3": "調達・ソーシング戦略"
         }
     },
     "contact": {
-        "title": "Get in Touch",
+        "title": "Contact Us",
         "subtitle": "Prenez contact",
         "email": {
             "label": "Email",
@@ -319,31 +316,31 @@
             "label": "Adresse",
             "value": "123 Rue des Affaires, Ville, France"
         },
-        "lead": "Whether you have a specific challenge or want to explore how we can help, we would be glad to have a conversation.",
+        "lead": "Have a challenge you'd like to discuss? Our team is ready to help. Reach out and let's start a conversation.",
         "info": {
-            "title": "Our Offices",
+            "title": "Get in Touch",
             "address": {
                 "icon": "📍",
-                "label": "Address",
-                "value": "14 Avenue de l'Opéra, 75001 Paris"
+                "label": "Office Address",
+                "value": "1200 Avenue of the Americas, New York, NY 10036, USA"
             },
             "email": {
                 "icon": "✉️",
                 "label": "Email",
-                "value": "contact@apex-conseil.fr"
+                "value": "hello@apexconsulting.com"
             },
             "phone": {
                 "icon": "📞",
                 "label": "Phone",
-                "value": "+33 1 42 60 00 00"
+                "value": "+1 (212) 555-0190"
             },
             "hours": {
-                "label": "Office Hours",
-                "value": "Monday – Friday, 9:00 – 18:30"
+                "label": "営業時間",
+                "value": "月曜〜金曜 9:00〜18:30"
             }
         },
         "form": {
-            "title": "Send a Message",
+            "title": "Send Us a Message",
             "name": "Full Name",
             "email": "Email Address",
             "subject": "Subject",
@@ -352,7 +349,7 @@
         }
     },
     "menu": {
-        "logo": "APEX CONSEIL",
+        "logo": "Apex Consulting",
         "home": "Home",
         "about": "About",
         "services": "Services",
@@ -361,44 +358,44 @@
     },
     "team": {
         "title": "Meet Our Team",
-        "lead": "Our consultants combine deep functional expertise with industry knowledge — and a genuine commitment to your success.",
+        "lead": "Our strength lies in our people — a diverse group of seasoned professionals united by a passion for client success.",
         "leadership": {
-            "title": "リーダーシップチーム"
+            "title": "Leadership Team"
         },
         "member1": {
-            "name": "Sophie Martin",
-            "role": "Managing Partner",
-            "bio": "Former McKinsey partner with 20 years of experience in strategy and corporate transformation across financial services and retail."
+            "name": "James Mitchell",
+            "role": "Managing Partner & CEO",
+            "bio": "20+ years leading large-scale transformations for Fortune 500 companies across North America and Europe."
         },
         "member2": {
-            "name": "Antoine Bernard",
-            "role": "Partner, Financial Performance",
-            "bio": "CPA and former CFO with expertise in financial restructuring, M&A, and value creation programs for mid-cap companies."
+            "name": "Sofia Reyes",
+            "role": "Partner, Corporate Strategy",
+            "bio": "Former McKinsey strategist with deep expertise in market entry, M&A, and competitive positioning."
         },
         "member3": {
-            "name": "Lucie Charpentier",
-            "role": "Partner, Digital & Technology",
-            "bio": "Technology strategist and former CTO with a track record of leading complex digital transformations in healthcare and logistics."
+            "name": "Elena Kovacs",
+            "role": "Partner, Digital Transformation",
+            "bio": "Technology leader who has guided over 60 digital transformation programs across manufacturing, retail, and finance."
         },
         "member4": {
-            "name": "Pierre Dubois",
-            "role": "Senior Manager, Strategy",
-            "bio": "HEC Paris alumnus specializing in market entry, growth strategy, and competitive intelligence across European markets."
+            "name": "David Liang",
+            "role": "Partner, Financial Advisory",
+            "bio": "CFA and former investment banker specializing in complex restructurings and cross-border transactions."
         },
         "member5": {
-            "name": "Mélanie Rousseau",
-            "role": "Senior Manager, Operations",
-            "bio": "Industrial engineer and lean expert who has driven operational improvements generating over €50M in savings for clients."
+            "name": "Amara Mensah",
+            "role": "Director, Innovation Practice",
+            "bio": "Design thinking expert and innovation coach, helping organizations build cultures of continuous improvement."
         },
         "member6": {
-            "name": "François Nguyen",
-            "role": "Manager, Data & Analytics",
-            "bio": "Data scientist and consultant bridging advanced analytics with practical business applications in manufacturing and consumer goods."
+            "name": "Thomas Berger",
+            "role": "Director, Talent & HR",
+            "bio": "Organizational psychologist and HR veteran with expertise in leadership development and workforce planning."
         },
         "join": {
-            "title": "チームに参加する",
-            "text": "私たちは常に優れた人材を求めています。複雑なビジネス課題の解決に情熱を持っている方は、ぜひご連絡ください。",
-            "cta": "お問い合わせ"
+            "title": "Join Our Team",
+            "text": "We are always looking for exceptional talent to join our growing team. If you are passionate about solving complex business challenges, we would love to hear from you.",
+            "cta": "Get in Touch"
         }
     }
 }
