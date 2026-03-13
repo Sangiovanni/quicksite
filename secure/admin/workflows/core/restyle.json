@@ -11,23 +11,6 @@
         "difficulty": "intermediate"
     },
     "parameters": [],
-    "examples": [
-        {
-            "id": "minimalist",
-            "titleKey": "ai.specs.restyle.examples.minimalist.title",
-            "promptKey": "ai.specs.restyle.examples.minimalist.prompt"
-        },
-        {
-            "id": "boldColorful",
-            "titleKey": "ai.specs.restyle.examples.boldColorful.title",
-            "promptKey": "ai.specs.restyle.examples.boldColorful.prompt"
-        },
-        {
-            "id": "glassmorphism",
-            "titleKey": "ai.specs.restyle.examples.glassmorphism.title",
-            "promptKey": "ai.specs.restyle.examples.glassmorphism.prompt"
-        }
-    ],
     "dataRequirements": [
         {
             "id": "rootVariables",

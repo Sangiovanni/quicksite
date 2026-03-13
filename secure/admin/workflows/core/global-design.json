@@ -11,23 +11,6 @@
         "difficulty": "beginner"
     },
     "parameters": [],
-    "examples": [
-        {
-            "id": "darkMode",
-            "titleKey": "ai.specs.globalDesign.examples.darkMode.title",
-            "promptKey": "ai.specs.globalDesign.examples.darkMode.prompt"
-        },
-        {
-            "id": "warmPalette",
-            "titleKey": "ai.specs.globalDesign.examples.warmPalette.title",
-            "promptKey": "ai.specs.globalDesign.examples.warmPalette.prompt"
-        },
-        {
-            "id": "corporateBlue",
-            "titleKey": "ai.specs.globalDesign.examples.corporateBlue.title",
-            "promptKey": "ai.specs.globalDesign.examples.corporateBlue.prompt"
-        }
-    ],
     "dataRequirements": [
         {
             "id": "rootVariables",

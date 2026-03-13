@@ -112,7 +112,13 @@
       "description": "User-configurable parameters shown in the UI",
       "items": {
         "type": "object",
-        "required": ["id", "type", "labelKey"],
+        "required": ["id", "type"],
+        "if": {
+          "not": { "properties": { "type": { "const": "hidden" } } }
+        },
+        "then": {
+          "required": ["labelKey"]
+        },
         "properties": {
           "id": {
             "type": "string",
@@ -120,7 +126,7 @@
           },
           "type": {
             "type": "string",
-            "enum": ["text", "textarea", "select", "multiselect", "checkbox", "number", "nodeSelector"],
+            "enum": ["text", "textarea", "select", "multiselect", "checkbox", "number", "nodeSelector", "hidden"],
             "description": "Input type for the parameter"
           },
           "labelKey": {
@@ -195,32 +201,6 @@
         }
       }
     },
-    "examples": {
-      "type": "array",
-      "description": "Pre-defined example prompts",
-      "items": {
-        "type": "object",
-        "required": ["id", "titleKey", "promptKey"],
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Example identifier"
-          },
-          "titleKey": {
-            "type": "string",
-            "description": "Translation key for example title"
-          },
-          "promptKey": {
-            "type": "string",
-            "description": "Translation key for the example prompt text"
-          },
-          "params": {
-            "type": "object",
-            "description": "Pre-filled parameter values for this example"
-          }
-        }
-      }
-    },
     "dataRequirements": {
       "type": "array",
       "description": "List of data needed from the system via CommandRunner",
@@ -260,36 +240,6 @@
       "type": "array",
       "items": { "type": "string" },
       "description": "API commands that will be used in the generated output"
-    },
-    "recommendedModels": {
-      "type": "object",
-      "description": "Recommended AI models per provider for this spec",
-      "additionalProperties": {
-        "type": "array",
-        "items": { "type": "string" },
-        "description": "List of recommended model IDs for a provider"
-      },
-      "examples": [
-        {
-          "openai": ["gpt-4o", "gpt-4-turbo"],
-          "anthropic": ["claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022"],
-          "google": ["gemini-1.5-pro", "gemini-2.0-flash"]
-        }
-      ]
-    },
-    "providerNotes": {
-      "type": "object",
-      "description": "Provider-specific notes or warnings for this spec",
-      "additionalProperties": {
-        "type": "string",
-        "description": "Note text for a specific provider"
-      },
-      "examples": [
-        {
-          "openai": "Works best with GPT-4o for complex website creation",
-          "anthropic": "Claude models excel at following structured JSON output format"
-        }
-      ]
     },
     "promptTemplate": {
       "type": "string",

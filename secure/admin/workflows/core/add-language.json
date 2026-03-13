@@ -33,35 +33,6 @@
       "required": true
     }
   ],
-  "examples": [
-    {
-      "id": "add-spanish",
-      "titleKey": "ai.specs.addLanguage.examples.spanish.title",
-      "promptKey": "ai.specs.addLanguage.examples.spanish.prompt",
-      "params": {
-        "targetLanguage": "es",
-        "languageName": "Español"
-      }
-    },
-    {
-      "id": "add-german",
-      "titleKey": "ai.specs.addLanguage.examples.german.title",
-      "promptKey": "ai.specs.addLanguage.examples.german.prompt",
-      "params": {
-        "targetLanguage": "de",
-        "languageName": "Deutsch"
-      }
-    },
-    {
-      "id": "add-japanese",
-      "titleKey": "ai.specs.addLanguage.examples.japanese.title",
-      "promptKey": "ai.specs.addLanguage.examples.japanese.prompt",
-      "params": {
-        "targetLanguage": "ja",
-        "languageName": "日本語"
-      }
-    }
-  ],
   "dataRequirements": [
     {
       "id": "languages",

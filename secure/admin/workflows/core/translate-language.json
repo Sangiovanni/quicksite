@@ -20,23 +20,6 @@
             "required": true
         }
     ],
-    "examples": [
-        {
-            "id": "french",
-            "titleKey": "ai.specs.translateLanguage.examples.french.title",
-            "promptKey": "ai.specs.translateLanguage.examples.french.prompt"
-        },
-        {
-            "id": "spanish",
-            "titleKey": "ai.specs.translateLanguage.examples.spanish.title",
-            "promptKey": "ai.specs.translateLanguage.examples.spanish.prompt"
-        },
-        {
-            "id": "improve",
-            "titleKey": "ai.specs.translateLanguage.examples.improve.title",
-            "promptKey": "ai.specs.translateLanguage.examples.improve.prompt"
-        }
-    ],
     "dataRequirements": [
         {
             "id": "languages",

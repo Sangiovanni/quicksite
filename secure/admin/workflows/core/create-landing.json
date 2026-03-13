@@ -28,23 +28,6 @@
             "condition": "multilingual === true"
         }
     ],
-    "examples": [
-        {
-            "id": "coffee-shop",
-            "titleKey": "ai.specs.createLanding.examples.coffeeShop.title",
-            "promptKey": "ai.specs.createLanding.examples.coffeeShop.prompt"
-        },
-        {
-            "id": "saas-product",
-            "titleKey": "ai.specs.createLanding.examples.saas.title",
-            "promptKey": "ai.specs.createLanding.examples.saas.prompt"
-        },
-        {
-            "id": "portfolio",
-            "titleKey": "ai.specs.createLanding.examples.portfolio.title",
-            "promptKey": "ai.specs.createLanding.examples.portfolio.prompt"
-        }
-    ],
     "dataRequirements": [
         {
             "id": "helpSetMultilingual",
