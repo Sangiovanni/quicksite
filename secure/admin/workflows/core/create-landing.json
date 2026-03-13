@@ -69,6 +69,13 @@
         }
     ],
     "relatedCommands": ["setMultilingual", "addLang", "editStructure", "setTranslationKeys", "editStyles", "setRootVariables"],
+    "preWorkflows": ["fresh-start"],
+    "postWorkflows": [
+        {
+            "id": "update-lang-switch",
+            "condition": "param.multilingual === true"
+        }
+    ],
     "postCommands": [
         {
             "condition": "param.multilingual === true",

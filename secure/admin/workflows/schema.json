@@ -55,7 +55,7 @@
     },
     "preWorkflows": {
       "type": "array",
-      "description": "Workflows to run BEFORE this workflow's steps. Each can optionally specify params to pass.",
+      "description": "Workflows to run BEFORE this workflow's steps. Each can optionally specify params and a condition.",
       "items": {
         "oneOf": [
           {
@@ -74,6 +74,10 @@
                 "type": "object",
                 "description": "Parameters to pass to the sub-workflow. Can use {{param.x}} to forward values.",
                 "additionalProperties": true
+              },
+              "condition": {
+                "type": "string",
+                "description": "Condition to evaluate. Sub-workflow is skipped if false. Supports param.x, data.x, operators."
               }
             }
           }
@@ -101,6 +105,10 @@
                 "type": "object",
                 "description": "Parameters to pass to the sub-workflow. Can use {{param.x}} to forward values.",
                 "additionalProperties": true
+              },
+              "condition": {
+                "type": "string",
+                "description": "Condition to evaluate. Sub-workflow is skipped if false. Supports param.x, data.x, operators."
               }
             }
           }

@@ -330,10 +330,18 @@ class WorkflowManager {
             } else {
                 $workflowId = $subWorkflow['id'] ?? null;
                 $subParams = $subWorkflow['params'] ?? [];
+                $condition = $subWorkflow['condition'] ?? null;
             }
             
             if (!$workflowId) {
                 continue;
+            }
+            
+            // Evaluate condition if present (uses parent context)
+            if ($condition !== null) {
+                if (!$this->evaluateStepCondition($condition, $parentContext)) {
+                    continue;
+                }
             }
             
             // Load the sub-workflow
@@ -591,50 +599,63 @@ class WorkflowManager {
                 '$item' => $value
             ]);
             
-            // Parse the filter expression
-            // Examples: "$key != 'home'", "$value.type == 'image'"
+            // Support && (AND) operator — split into sub-expressions, all must pass
+            $subExpressions = array_map('trim', explode('&&', $normalizedFilter));
+            $allPass = true;
             
-            if (preg_match('/^(\$\w+(?:\.\w+)?)\s*(===?|!==?|!=)\s*(.+)$/', $normalizedFilter, $matches)) {
-                $leftPath = $matches[1];
-                $operator = $matches[2];
-                $rightValue = trim($matches[3]);
-                
-                // Resolve left side (handle $key, $value, $value.field)
-                if ($leftPath === '$key') {
-                    $leftResolved = $key;
-                } elseif ($leftPath === '$value' || $leftPath === '$item') {
-                    $leftResolved = $value;
-                } elseif (str_starts_with($leftPath, '$value.') || str_starts_with($leftPath, '$item.')) {
-                    $fieldPath = substr($leftPath, strpos($leftPath, '.') + 1);
-                    $leftResolved = is_array($value) ? ($value[$fieldPath] ?? null) : null;
-                } else {
-                    $leftResolved = $this->resolveDataPath(ltrim($leftPath, '$'), $itemContext);
+            foreach ($subExpressions as $expr) {
+                if (!$this->evaluateSingleFilterExpr($expr, $key, $value, $itemContext)) {
+                    $allPass = false;
+                    break;
                 }
-                
-                // Parse right value - also handle {{dataPath}} references
-                if (preg_match('/^\{\{(.+)\}\}$/', $rightValue, $dataMatch)) {
-                    $rightParsed = $this->resolveDataPath($dataMatch[1], $itemContext);
-                } else {
-                    $rightParsed = $this->parseFilterValue($rightValue);
-                }
-                
-                $result = match($operator) {
-                    '=', '==' => $leftResolved == $rightParsed,
-                    '===' => $leftResolved === $rightParsed,
-                    '!=', '!==' => $leftResolved !== $rightParsed,
-                    default => false
-                };
-                
-                if ($result) {
-                    $filtered[$key] = $value;
-                }
-            } else {
-                // No operator - truthy check
+            }
+            
+            if ($allPass) {
                 $filtered[$key] = $value;
             }
         }
         
         return $filtered;
+    }
+    
+    /**
+     * Evaluate a single filter comparison expression
+     */
+    private function evaluateSingleFilterExpr(string $expr, $key, $value, array $itemContext): bool {
+        if (preg_match('/^(\$\w+(?:\.\w+)?)\s*(===?|!==?|!=)\s*(.+)$/', $expr, $matches)) {
+            $leftPath = $matches[1];
+            $operator = $matches[2];
+            $rightValue = trim($matches[3]);
+            
+            // Resolve left side (handle $key, $value, $value.field)
+            if ($leftPath === '$key') {
+                $leftResolved = $key;
+            } elseif ($leftPath === '$value' || $leftPath === '$item') {
+                $leftResolved = $value;
+            } elseif (str_starts_with($leftPath, '$value.') || str_starts_with($leftPath, '$item.')) {
+                $fieldPath = substr($leftPath, strpos($leftPath, '.') + 1);
+                $leftResolved = is_array($value) ? ($value[$fieldPath] ?? null) : null;
+            } else {
+                $leftResolved = $this->resolveDataPath(ltrim($leftPath, '$'), $itemContext);
+            }
+            
+            // Parse right value - also handle {{dataPath}} references
+            if (preg_match('/^\{\{(.+)\}\}$/', $rightValue, $dataMatch)) {
+                $rightParsed = $this->resolveDataPath($dataMatch[1], $itemContext);
+            } else {
+                $rightParsed = $this->parseFilterValue($rightValue);
+            }
+            
+            return match($operator) {
+                '=', '==' => $leftResolved == $rightParsed,
+                '===' => $leftResolved === $rightParsed,
+                '!=', '!==' => $leftResolved !== $rightParsed,
+                default => false
+            };
+        }
+        
+        // No operator - truthy check
+        return true;
     }
     
     /**

@@ -35,7 +35,7 @@
         {
             "id": "assetsData",
             "command": "listAssets",
-            "extract": "data"
+            "extract": "data.assets"
         },
         {
             "id": "langData",
@@ -43,16 +43,16 @@
             "extract": "data"
         },
         {
-            "id": "structureData",
-            "command": "getStructure",
+            "id": "componentsData",
+            "command": "listComponents",
             "extract": "data"
         }
     ],
     "steps": [
         {
-            "comment": "=== PHASE 1: DELETE ROUTES (except home) ===",
+            "comment": "=== PHASE 1: DELETE ROUTES (except home and 404) ===",
             "forEach": "routes",
-            "filter": "{{$value}} !== 'home'",
+            "filter": "{{$value}} !== 'home' && {{$value}} !== '404'",
             "command": "deleteRoute",
             "params": {
                 "route": "{{$value}}"
@@ -114,12 +114,12 @@
             }
         },
         {
-            "comment": "=== PHASE 3: DELETE ALL COMPONENTS (force) ===",
-            "forEach": "structureData.components",
+            "comment": "=== PHASE 3: DELETE ALL COMPONENTS ===",
+            "forEach": "componentsData.components",
             "command": "editStructure",
             "params": {
                 "type": "component",
-                "name": "{{$key}}",
+                "name": "{{$value.name}}",
                 "action": "delete",
                 "force": true
             }
@@ -170,6 +170,22 @@
             }
         },
         {
+            "comment": "=== PHASE 5b: MINIMIZE 404 PAGE ===",
+            "command": "editStructure",
+            "params": {
+                "type": "page",
+                "name": "404",
+                "structure": {
+                    "tag": "section",
+                    "params": { "class": "error-page" },
+                    "children": [
+                        { "tag": "h1", "children": [{ "textKey": "404.pageNotFound" }] },
+                        { "tag": "p", "children": [{ "textKey": "404.message" }] }
+                    ]
+                }
+            }
+        },
+        {
             "comment": "=== PHASE 6: SET MINIMAL TRANSLATIONS (default language - REPLACE) ===",
             "command": "setTranslationKeys",
             "params": {
@@ -181,11 +197,12 @@
                     },
                     "page": {
                         "titles": {
-                            "home": "Home"
+                            "home": "Home",
+                            "404": "Not Found"
                         }
                     },
                     "404": {
-                        "title": "Page Not Found",
+                        "pageNotFound": "Page Not Found",
                         "message": "The page you are looking for does not exist.",
                         "backHome": "Back to Home"
                     }
@@ -204,11 +221,12 @@
                     },
                     "page": {
                         "titles": {
-                            "home": "Home"
+                            "home": "Home",
+                            "404": "Not Found"
                         }
                     },
                     "404": {
-                        "title": "Page Not Found",
+                        "pageNotFound": "Page Not Found",
                         "message": "The page you are looking for does not exist.",
                         "backHome": "Back to Home"
                     }
