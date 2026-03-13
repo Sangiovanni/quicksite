@@ -604,6 +604,9 @@ switch ($action) {
         // So we pass the raw definition for late resolution
         $postCommands = $manager->generateSpecCommands($spec, $userParams, 'postCommands');
         
+        // Get execution phases for phase-based execution (Phase 3+4)
+        $phases = $manager->getWorkflowPhases($spec, $userParams);
+        
         echo json_encode([
             'success' => true,
             'data' => [
@@ -615,6 +618,7 @@ switch ($action) {
                 'postCommands' => $postCommands,
                 // Pass raw postCommands definition for late resolution (after AI commands run)
                 'postCommandsRaw' => $spec['postCommands'] ?? [],
+                'phases' => $phases,
                 'dataFetched' => array_keys($data),
                 'userParams' => $userParams
             ]
@@ -868,6 +872,75 @@ switch ($action) {
                 'steps' => $steps,
                 'count' => count($steps)
             ]
+        ]);
+        break;
+    
+    case 'workflow-phases':
+        // Get execution phases for a workflow (metadata only)
+        if (empty($params[0])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Missing workflow ID']);
+            break;
+        }
+        
+        require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
+        $manager = new WorkflowManager();
+        
+        $workflow = $manager->loadWorkflow($params[0]);
+        if (!$workflow) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Workflow not found: ' . $params[0]]);
+            break;
+        }
+        
+        // Get user params from query string
+        $userParams = [];
+        foreach ($_GET as $key => $value) {
+            if (!in_array($key, ['action'])) {
+                $userParams[$key] = $value;
+            }
+        }
+        
+        $phases = $manager->getWorkflowPhases($workflow, $userParams);
+        
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'workflowId' => $params[0],
+                'phases' => $phases
+            ]
+        ]);
+        break;
+    
+    case 'workflow-resolve-phase':
+        // Resolve a single sub-workflow phase with fresh data
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+            break;
+        }
+        
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input || !isset($input['workflowId'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Missing workflowId']);
+            break;
+        }
+        
+        require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
+        $manager = new WorkflowManager();
+        
+        $result = $manager->resolveSubWorkflow($input['workflowId'], $input['params'] ?? []);
+        
+        if (isset($result['error'])) {
+            http_response_code(404);
+            echo json_encode(['error' => $result['error']]);
+            break;
+        }
+        
+        echo json_encode([
+            'success' => true,
+            'data' => $result
         ]);
         break;
         

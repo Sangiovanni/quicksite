@@ -313,6 +313,100 @@ class WorkflowManager {
     }
     
     /**
+     * Get the execution phases for a workflow (metadata only, no resolution).
+     * Used by the client to build a phase-by-phase execution plan.
+     * 
+     * @param array $workflow The workflow definition
+     * @param array $userParams User params (for condition evaluation on sub-workflows)
+     * @return array List of phases: [{type, workflowId?}, ...]
+     */
+    public function getWorkflowPhases(array $workflow, array $userParams = []): array {
+        $phases = [];
+        $context = ['param' => $userParams];
+        
+        // Pre-workflows
+        if (!empty($workflow['preWorkflows'])) {
+            foreach ($workflow['preWorkflows'] as $sub) {
+                if (is_string($sub)) {
+                    $phases[] = ['type' => 'preWorkflow', 'workflowId' => $sub];
+                } else {
+                    $id = $sub['id'] ?? null;
+                    if (!$id) continue;
+                    
+                    $condition = $sub['condition'] ?? null;
+                    if ($condition !== null && !$this->evaluateStepCondition($condition, $context)) {
+                        continue;
+                    }
+                    
+                    $phases[] = ['type' => 'preWorkflow', 'workflowId' => $id];
+                }
+            }
+        }
+        
+        // Main workflow
+        $phases[] = ['type' => 'main'];
+        
+        // Post-workflows
+        if (!empty($workflow['postWorkflows'])) {
+            foreach ($workflow['postWorkflows'] as $sub) {
+                if (is_string($sub)) {
+                    $phases[] = ['type' => 'postWorkflow', 'workflowId' => $sub];
+                } else {
+                    $id = $sub['id'] ?? null;
+                    if (!$id) continue;
+                    
+                    $condition = $sub['condition'] ?? null;
+                    if ($condition !== null && !$this->evaluateStepCondition($condition, $context)) {
+                        continue;
+                    }
+                    
+                    $phases[] = ['type' => 'postWorkflow', 'workflowId' => $id];
+                }
+            }
+        }
+        
+        return $phases;
+    }
+    
+    /**
+     * Resolve a single sub-workflow with fresh data.
+     * Loads the workflow, fetches its dataRequirements, generates expanded steps.
+     * Used by the API for phase-by-phase execution.
+     * 
+     * @param string $workflowId The workflow ID to resolve
+     * @param array $userParams User-provided parameters
+     * @return array {workflowId, steps, count} or {error}
+     */
+    public function resolveSubWorkflow(string $workflowId, array $userParams = []): array {
+        $workflow = $this->loadWorkflow($workflowId);
+        if (!$workflow) {
+            return ['error' => 'Workflow not found: ' . $workflowId];
+        }
+        
+        // Merge with workflow parameter defaults
+        if (!empty($workflow['parameters'])) {
+            foreach ($workflow['parameters'] as $param) {
+                $paramId = $param['id'];
+                if (!isset($userParams[$paramId]) && isset($param['default'])) {
+                    $userParams[$paramId] = $param['default'];
+                }
+            }
+        }
+        
+        // Fetch fresh data requirements
+        $data = $this->fetchDataRequirements($workflow, $userParams);
+        
+        // Generate steps (handles forEach, conditions, nested sub-workflows)
+        $steps = $this->generateSteps($workflow, $userParams, $data, []);
+        
+        return [
+            'workflowId' => $workflowId,
+            'steps' => $steps,
+            'count' => count($steps)
+        ];
+    }
+    
+    /**
      * Expand sub-workflows (preWorkflows or postWorkflows) into steps
      * 
      * @param array $subWorkflows Array of workflow IDs or {id, params} objects
