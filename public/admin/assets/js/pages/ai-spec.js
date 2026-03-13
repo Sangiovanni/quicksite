@@ -423,6 +423,7 @@
         const _stateTarget = {
             postCommandsRaw: [],
             userParams: {},
+            phases: [],
             preCommandsExecuted: false,
             parsedCommands: [],
             pendingExecution: false,
@@ -693,9 +694,10 @@
                     await new Promise(resolve => setTimeout(resolve, 1500));
                 }
 
-                // Store post-commands for later execution
+                // Store post-commands and phases for later execution
                 state.postCommandsRaw = data.data.postCommandsRaw || [];
                 state.userParams = data.data.userParams || {};
+                state.phases = data.data.phases || [];
                 console.warn('[ai-spec] generatePrompt: stored postCommandsRaw, count:', state.postCommandsRaw.length, state.postCommandsRaw);
 
                 const userPrompt = els.userPromptTextarea ? els.userPromptTextarea.value.trim() : '';
@@ -857,8 +859,17 @@
             els.commandList.appendChild(item);
         });
 
-        // Post-command placeholders
-        if (state.postCommandsRaw.length > 0) {
+        // Post-workflow / post-command placeholders
+        const postPhases = (state.phases || []).filter(p => p.type === 'postWorkflow');
+        if (postPhases.length > 0) {
+            els.commandList.appendChild(htmlSeparator('— Post-Workflows (resolved with fresh data after execution) —'));
+            postPhases.forEach((phase, index) => {
+                const item = document.createElement('div');
+                item.className = 'command-item command-item--post';
+                item.innerHTML = htmlPostCommandPreview(index + 1, phase.workflowId, null);
+                els.commandList.appendChild(item);
+            });
+        } else if (state.postCommandsRaw.length > 0) {
             els.commandList.appendChild(htmlSeparator('— Post-Commands (resolved after execution) —'));
             state.postCommandsRaw.forEach((cmdDef, index) => {
                 const item = document.createElement('div');
@@ -870,7 +881,8 @@
 
         if (els.commandCount) {
             let text = state.parsedCommands.length + ' command' + (state.parsedCommands.length > 1 ? 's' : '');
-            if (state.postCommandsRaw.length > 0) text += ` (+${state.postCommandsRaw.length} auto)`;
+            if (postPhases.length > 0) text += ` (+${postPhases.length} post-workflow${postPhases.length > 1 ? 's' : ''})`;
+            else if (state.postCommandsRaw.length > 0) text += ` (+${state.postCommandsRaw.length} auto)`;
             els.commandCount.textContent = text;
         }
 
@@ -1027,7 +1039,75 @@
         resultItem.innerHTML = htmlResultItem(opts);
     }
 
-    // -- Execute Commands (main AI workflow) --
+    // -- Resolve and execute a sub-workflow phase via API --
+
+    async function resolveAndExecutePhase(config, els, workflowId, params, globalIndex, options) {
+        const prefix = options.prefix || '';
+        const acceptableFailure = options.acceptableFailureStatus || null;
+
+        const resolveResp = await fetch(config.adminBase + '/api/workflow-resolve-phase', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + config.token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ workflowId, params })
+        });
+        const resolveData = await resolveResp.json();
+
+        if (!resolveData.success || !resolveData.data?.steps?.length) {
+            const noItems = document.createElement('div');
+            noItems.style.cssText = 'padding: 8px; color: var(--admin-text-muted); font-size: 12px; text-align: center;';
+            noItems.textContent = 'No commands from ' + workflowId;
+            if (els.executionResults) els.executionResults.appendChild(noItems);
+            return 0;
+        }
+
+        const steps = resolveData.data.steps;
+
+        // Create pending items
+        steps.forEach((cmd, idx) => {
+            const el = document.createElement('div');
+            el.innerHTML = htmlPendingItem('result-' + (globalIndex + idx), cmd.command, 'Pending...', prefix);
+            if (els.executionResults) els.executionResults.appendChild(el.firstElementChild);
+        });
+
+        // Execute each step
+        for (let i = 0; i < steps.length; i++) {
+            const cmd = steps[i];
+            const resultItem = document.getElementById('result-' + (globalIndex + i));
+            if (els.progressText) {
+                els.progressText.textContent = prefix + workflowId + ': ' + cmd.command + ' (' + (i + 1) + '/' + steps.length + ')';
+            }
+            const detailsId = 'details-' + (globalIndex + i);
+            try {
+                const { data, isSuccess, errorMsg } = await executeOneCommand(config, cmd);
+                const isAcceptable = acceptableFailure && data.status === acceptableFailure;
+                updateResultItem(resultItem, {
+                    isSuccess: isSuccess || isAcceptable, isError: !(isSuccess || isAcceptable),
+                    icon: isAcceptable ? '⏭️' : (isSuccess ? '✅' : '❌'),
+                    prefix, command: cmd.command,
+                    statusMessage: isAcceptable ? 'Skipped (not found)' : (isSuccess ? (data.message || 'Success') : errorMsg),
+                    detailsId,
+                    sections: [
+                        { label: 'Parameters:', value: formatParamsDisplay(cmd.params) },
+                        { label: 'Response:', value: formatResponseDisplay(data) }
+                    ]
+                });
+            } catch (error) {
+                updateResultItem(resultItem, {
+                    isSuccess: false, isError: true,
+                    icon: '❌', prefix, command: cmd.command,
+                    statusMessage: error.message, detailsId,
+                    sections: [
+                        { label: 'Parameters:', value: formatParamsDisplay(cmd.params) },
+                        { label: 'Error:', value: error.stack || error.message }
+                    ]
+                });
+            }
+        }
+
+        return steps.length;
+    }
+
+    // -- Execute Commands (main AI workflow — phase-based) --
 
     async function executeCommands(config, els, state, withFreshStart) {
         if (els.commandPreviewSection) els.commandPreviewSection.style.display = 'none';
@@ -1035,103 +1115,120 @@
         if (els.executionProgress) els.executionProgress.style.display = 'flex';
         if (els.executionResults) els.executionResults.innerHTML = '';
 
-        let allCommands = [...state.parsedCommands];
-        let freshStartCount = 0;
-        console.warn('[ai-spec] executeCommands: state.postCommandsRaw count:', state.postCommandsRaw.length);
-        // Fresh Start
-        if (withFreshStart) {
-            if (els.progressText) els.progressText.textContent = 'Analyzing project for Fresh Start...';
-            const freshStartCommands = await generateFreshStartCommands(config);
-            freshStartCount = freshStartCommands.length;
-            allCommands = [...freshStartCommands, ...state.parsedCommands];
-        }
+        const phases = state.phases || [];
+        const hasPostWorkflowPhases = phases.some(p => p.type === 'postWorkflow');
+        let globalIndex = 0;
 
-        // Create pending items
-        allCommands.forEach((cmd, index) => {
-            const isFreshStart = index < freshStartCount;
-            const el = document.createElement('div');
-            el.innerHTML = htmlPendingItem(
-                'result-' + index,
-                cmd.command,
-                (isFreshStart ? 'Fresh Start: ' : '') + 'Pending...',
-                isFreshStart ? '🧹 ' : ''
-            );
-            if (els.executionResults) els.executionResults.appendChild(el.firstElementChild);
-        });
+        for (const phase of phases) {
+            if (phase.type === 'preWorkflow') {
+                if (!withFreshStart) continue;
 
-        // Separator after fresh start
-        if (freshStartCount > 0 && els.executionResults) {
-            els.executionResults.insertBefore(
-                htmlSeparator('— AI Commands —'),
-                els.executionResults.children[freshStartCount]
-            );
-        }
-
-        // Execute loop
-        for (let i = 0; i < allCommands.length; i++) {
-            const cmd = allCommands[i];
-            const isFreshStart = i < freshStartCount;
-
-            // Delay after Fresh Start completes for config sync
-            if (freshStartCount > 0 && i === freshStartCount) {
-                if (els.progressText) els.progressText.textContent = '⏳ Waiting for config sync...';
-                await new Promise(resolve => setTimeout(resolve, 1500));
-            }
-
-            if (els.progressText) {
-                els.progressText.textContent = `${isFreshStart ? '🧹 Fresh Start: ' : ''}Executing command ${i + 1} of ${allCommands.length}: ${cmd.command}`;
-            }
-
-            const resultItem = document.getElementById('result-' + i);
-            const prefix = isFreshStart ? '🧹 ' : '';
-            const detailsId = `details-${i}`;
-
-            try {
-                const { data, isSuccess, errorMsg } = await executeOneCommand(config, cmd);
-                const isAcceptableFailure = isFreshStart && data.status === 404;
-                const paramsDisplay = formatParamsDisplay(cmd.params);
-                const responseDisplay = formatResponseDisplay(data);
-
-                if (isSuccess || isAcceptableFailure) {
-                    updateResultItem(resultItem, {
-                        isSuccess: true, isError: false,
-                        icon: isAcceptableFailure ? '⏭️' : '✅',
-                        prefix, command: cmd.command,
-                        statusMessage: isAcceptableFailure ? 'Skipped (not found)' : (data.message || 'Success'),
-                        detailsId,
-                        sections: [
-                            { label: 'Parameters:', value: paramsDisplay },
-                            { label: 'Response:', value: responseDisplay }
-                        ]
-                    });
-                } else {
-                    updateResultItem(resultItem, {
-                        isSuccess: false, isError: true,
-                        icon: '❌', prefix, command: cmd.command,
-                        statusMessage: errorMsg,
-                        detailsId,
-                        sections: [
-                            { label: 'Parameters:', value: paramsDisplay },
-                            { label: 'Response:', value: responseDisplay }
-                        ]
-                    });
+                if (els.executionResults) {
+                    els.executionResults.appendChild(htmlSeparator('— Pre-Workflow: ' + phase.workflowId + ' —'));
                 }
-            } catch (error) {
-                updateResultItem(resultItem, {
-                    isSuccess: false, isError: true,
-                    icon: '❌', prefix, command: cmd.command,
-                    statusMessage: error.message,
-                    detailsId,
-                    sections: [
-                        { label: 'Parameters:', value: formatParamsDisplay(cmd.params) },
-                        { label: 'Error Stack:', value: error.stack || error.message }
-                    ]
+                if (els.progressText) els.progressText.textContent = 'Resolving ' + phase.workflowId + '...';
+
+                try {
+                    const count = await resolveAndExecutePhase(config, els, phase.workflowId, state.userParams || {}, globalIndex, {
+                        prefix: '🧹 ', acceptableFailureStatus: 404
+                    });
+                    globalIndex += count;
+                } catch (error) {
+                    console.error('Pre-workflow resolution failed:', error);
+                    if (els.executionResults) {
+                        const errEl = document.createElement('div');
+                        errEl.className = 'result-item result-item--error';
+                        errEl.innerHTML = htmlResultItem({ icon: '❌', command: phase.workflowId, statusMessage: error.message, isError: true });
+                        els.executionResults.appendChild(errEl);
+                    }
+                }
+
+                // Wait for filesystem to settle
+                if (els.progressText) els.progressText.textContent = '⏳ Waiting for sync...';
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+            } else if (phase.type === 'main') {
+                // Show separator only if there are other phases
+                if (phases.length > 1 && els.executionResults) {
+                    els.executionResults.appendChild(htmlSeparator('— AI Commands —'));
+                }
+
+                const mainCommands = state.parsedCommands || [];
+
+                // Create pending items
+                mainCommands.forEach((cmd) => {
+                    const el = document.createElement('div');
+                    el.innerHTML = htmlPendingItem('result-' + globalIndex, cmd.command, 'Pending...', '');
+                    if (els.executionResults) els.executionResults.appendChild(el.firstElementChild);
+                    globalIndex++;
                 });
+
+                // Execute each AI command
+                const startIdx = globalIndex - mainCommands.length;
+                for (let i = 0; i < mainCommands.length; i++) {
+                    const cmd = mainCommands[i];
+                    const resultItem = document.getElementById('result-' + (startIdx + i));
+                    if (els.progressText) {
+                        els.progressText.textContent = 'Executing command ' + (i + 1) + ' of ' + mainCommands.length + ': ' + cmd.command;
+                    }
+                    const detailsId = 'details-' + (startIdx + i);
+                    try {
+                        const { data, isSuccess, errorMsg } = await executeOneCommand(config, cmd);
+                        updateResultItem(resultItem, {
+                            isSuccess, isError: !isSuccess,
+                            icon: isSuccess ? '✅' : '❌',
+                            prefix: '', command: cmd.command,
+                            statusMessage: isSuccess ? (data.message || 'Success') : errorMsg,
+                            detailsId,
+                            sections: [
+                                { label: 'Parameters:', value: formatParamsDisplay(cmd.params) },
+                                { label: 'Response:', value: formatResponseDisplay(data) }
+                            ]
+                        });
+                    } catch (error) {
+                        updateResultItem(resultItem, {
+                            isSuccess: false, isError: true,
+                            icon: '❌', prefix: '', command: cmd.command,
+                            statusMessage: error.message, detailsId,
+                            sections: [
+                                { label: 'Parameters:', value: formatParamsDisplay(cmd.params) },
+                                { label: 'Error:', value: error.stack || error.message }
+                            ]
+                        });
+                    }
+                }
+
+            } else if (phase.type === 'postWorkflow') {
+                // Wait for filesystem to settle before resolving with fresh data
+                if (els.progressText) els.progressText.textContent = '⏳ Waiting for sync...';
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+                if (els.executionResults) {
+                    els.executionResults.appendChild(htmlSeparator('— Post-Workflow: ' + phase.workflowId + ' —'));
+                }
+                if (els.progressText) els.progressText.textContent = 'Resolving ' + phase.workflowId + ' with fresh data...';
+
+                try {
+                    const count = await resolveAndExecutePhase(config, els, phase.workflowId, state.userParams || {}, globalIndex, {
+                        prefix: '🔧 '
+                    });
+                    globalIndex += count;
+                } catch (error) {
+                    console.error('Post-workflow resolution failed:', error);
+                    if (els.executionResults) {
+                        const errEl = document.createElement('div');
+                        errEl.className = 'result-item result-item--error';
+                        errEl.innerHTML = htmlResultItem({ icon: '❌', command: phase.workflowId, statusMessage: error.message, isError: true });
+                        els.executionResults.appendChild(errEl);
+                    }
+                }
             }
         }
 
-        // -- Post-Commands --
-        await executePostCommands(config, els, state);
+        // Legacy fallback: if no postWorkflow phases, use old executePostCommands
+        if (!hasPostWorkflowPhases) {
+            await executePostCommands(config, els, state);
+        }
 
         if (els.executionProgress) els.executionProgress.style.display = 'none';
     }
