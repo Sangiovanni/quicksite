@@ -713,6 +713,13 @@ class WorkflowManager {
         }
         
         if (is_array($value)) {
+            // Don't resolve $each templates prematurely — the $item template
+            // contains {{$value}} references that need loop context from resolveEachLoops.
+            // Only resolve the $each source here; leave $item intact.
+            if (isset($value['$each'])) {
+                $value['$each'] = $this->resolveStepParamValue($value['$each'], $context);
+                return $value;
+            }
             return $this->resolveStepParams($value, $context);
         }
         
