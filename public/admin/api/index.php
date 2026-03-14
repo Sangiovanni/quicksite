@@ -536,7 +536,7 @@ switch ($action) {
         // List all available AI specs
         require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
         $manager = new WorkflowManager();
-        $specs = $manager->listSpecs();
+        $specs = $manager->listWorkflows();
         
         // Return just the metadata for listing
         $specList = array_map(function($spec) {
@@ -566,7 +566,7 @@ switch ($action) {
         $specId = $params[0];
         
         // Load the spec
-        $spec = $manager->loadSpec($specId);
+        $spec = $manager->loadWorkflow($specId);
         if (!$spec) {
             http_response_code(404);
             echo json_encode(['error' => 'Spec not found: ' . $specId]);
@@ -574,7 +574,7 @@ switch ($action) {
         }
         
         // Validate the spec
-        $validation = $manager->validateSpec($spec);
+        $validation = $manager->validateWorkflow($spec);
         if (!$validation['valid']) {
             http_response_code(500);
             echo json_encode([
@@ -598,13 +598,7 @@ switch ($action) {
         // Render the prompt (signature: workflow, userParams, fetchedData)
         $prompt = $manager->renderPrompt($spec, $userParams, $data);
         
-        // Generate pre/post commands
-        $preCommands = $manager->generateSpecCommands($spec, $userParams, 'preCommands');
-        // Note: postCommands use config.LANGUAGES_NAME which won't exist until AI commands run
-        // So we pass the raw definition for late resolution
-        $postCommands = $manager->generateSpecCommands($spec, $userParams, 'postCommands');
-        
-        // Get execution phases for phase-based execution (Phase 3+4)
+        // Get execution phases for phase-based execution
         $phases = $manager->getWorkflowPhases($spec, $userParams);
         
         echo json_encode([
@@ -614,39 +608,10 @@ switch ($action) {
                 'version' => $spec['version'],
                 'meta' => $spec['meta'],
                 'prompt' => $prompt,
-                'preCommands' => $preCommands,
-                'postCommands' => $postCommands,
-                // Pass raw postCommands definition for late resolution (after AI commands run)
-                'postCommandsRaw' => $spec['postCommands'] ?? [],
                 'phases' => $phases,
                 'dataFetched' => array_keys($data),
                 'userParams' => $userParams
             ]
-        ]);
-        break;
-    
-    case 'ai-spec-resolve-post':
-        // Resolve postCommands with FRESH config (called after AI commands execute)
-        // This allows postCommands to use config values that were set by AI commands
-        $body = json_decode(file_get_contents('php://input'), true) ?? [];
-        $rawPostCommands = $body['postCommandsRaw'] ?? [];
-        $userParams = $body['userParams'] ?? [];
-        
-        if (empty($rawPostCommands)) {
-            echo json_encode(['success' => true, 'data' => ['commands' => []]]);
-            break;
-        }
-        
-        require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
-        $manager = new WorkflowManager();
-        
-        // Create a mock spec with just the postCommands to reuse generateSpecCommands
-        $mockSpec = ['postCommands' => $rawPostCommands];
-        $resolvedCommands = $manager->generateSpecCommands($mockSpec, $userParams, 'postCommands');
-        
-        echo json_encode([
-            'success' => true,
-            'data' => ['commands' => $resolvedCommands]
         ]);
         break;
     
@@ -660,7 +625,7 @@ switch ($action) {
         
         require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
         $manager = new WorkflowManager();
-        $spec = $manager->loadSpec($params[0]);
+        $spec = $manager->loadWorkflow($params[0]);
         
         if (!$spec) {
             http_response_code(404);
@@ -678,7 +643,7 @@ switch ($action) {
             'data' => [
                 'spec' => $spec,
                 'template' => $templateContent,
-                'validation' => $manager->validateSpec($spec)
+                'validation' => $manager->validateWorkflow($spec)
             ]
         ]);
         break;
@@ -705,7 +670,7 @@ switch ($action) {
         $template = $input['template'];
         
         // Validate the spec
-        $validation = $manager->validateSpec($spec);
+        $validation = $manager->validateWorkflow($spec);
         if (!$validation['valid']) {
             http_response_code(400);
             echo json_encode([
@@ -761,7 +726,7 @@ switch ($action) {
         $originalSpecId = $input['originalSpecId'] ?? '';
         
         // Validate the spec
-        $validation = $manager->validateSpec($spec);
+        $validation = $manager->validateWorkflow($spec);
         if (!$validation['valid']) {
             http_response_code(400);
             echo json_encode([

@@ -259,20 +259,6 @@
       "default": "json-commands",
       "description": "Expected output format from AI"
     },
-    "preCommands": {
-      "type": "array",
-      "description": "Commands to execute BEFORE the AI-generated output (e.g., fresh start)",
-      "items": {
-        "$ref": "#/definitions/specCommand"
-      }
-    },
-    "postCommands": {
-      "type": "array",
-      "description": "Commands to execute AFTER the AI-generated output (e.g., lang-switch component)",
-      "items": {
-        "$ref": "#/definitions/specCommand"
-      }
-    },
     "steps": {
       "type": "array",
       "description": "For manual workflows: commands to execute directly (no AI). Presence of steps without promptTemplate makes this a manual workflow.",

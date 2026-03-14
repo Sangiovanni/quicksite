@@ -420,26 +420,13 @@
         };
 
         // --- 4c. Shared state (single object = no closure split-brain) ---
-        // DEBUG: Proxy to trace postCommandsRaw mutations
-        const _stateTarget = {
-            postCommandsRaw: [],
+        const state = {
             userParams: {},
             phases: [],
-            preCommandsExecuted: false,
             parsedCommands: [],
             pendingExecution: false,
             autoValidateTimeout: null
         };
-        const state = new Proxy(_stateTarget, {
-            set(target, prop, value) {
-                if (prop === 'postCommandsRaw') {
-                    const caller = new Error().stack.split('\n').slice(1, 4).join(' <- ');
-                    console.log('[TRACE postCommandsRaw] SET to:', JSON.stringify(value), '\nCaller:', caller);
-                }
-                target[prop] = value;
-                return true;
-            }
-        });
 
         // --- 4d. AI Provider ---
         const aiProvider = new AiProviderManager();
@@ -657,7 +644,6 @@
         if (els.copyBtn) els.copyBtn.disabled = true;
         if (els.sendToAiBtn) els.sendToAiBtn.disabled = true;
         if (els.promptNextStep) els.promptNextStep.style.display = 'none';
-        state.preCommandsExecuted = false;
 
         try {
             const queryString = new URLSearchParams(params).toString();
@@ -667,39 +653,11 @@
                 headers: { 'Authorization': 'Bearer ' + config.token }
             });
             const data = await response.json();
-            console.log('[TRACE postCommandsRaw] API response keys:', Object.keys(data.data || {}), 'postCommandsRaw:', JSON.stringify(data.data?.postCommandsRaw));
 
             if (data.success && data.data?.prompt) {
-                // Execute preCommands if any
-                const preCommands = data.data.preCommands || [];
-                if (preCommands.length > 0) {
-                    const loadingText = els.promptLoading?.querySelector('span');
-                    if (loadingText) loadingText.textContent = 'Executing pre-commands...';
-
-                    const preResult = await executePreCommands(config, preCommands);
-
-                    if (!preResult.success) {
-                        let errorMessage = '❌ Pre-command failed: ' + preResult.error;
-                        if (preResult.failedCommand?.command === 'addRoute' &&
-                            preResult.errorData?.message?.includes('already exists')) {
-                            errorMessage += '\n\n💡 This route already exists. Use the Edit Page spec to modify an existing page.';
-                        }
-                        if (els.promptOutput) els.promptOutput.value = errorMessage;
-                        if (els.promptLoading) els.promptLoading.style.display = 'none';
-                        if (els.promptOutput) els.promptOutput.style.display = 'block';
-                        updateStats(els, '');
-                        return;
-                    }
-
-                    state.preCommandsExecuted = true;
-                    await new Promise(resolve => setTimeout(resolve, 1500));
-                }
-
-                // Store post-commands and phases for later execution
-                state.postCommandsRaw = data.data.postCommandsRaw || [];
+                // Store phases and params for later execution
                 state.userParams = data.data.userParams || {};
                 state.phases = data.data.phases || [];
-                console.warn('[ai-spec] generatePrompt: stored postCommandsRaw, count:', state.postCommandsRaw.length, state.postCommandsRaw);
 
                 const userPrompt = els.userPromptTextarea ? els.userPromptTextarea.value.trim() : '';
                 let finalPrompt = data.data.prompt;
@@ -736,45 +694,6 @@
 
         if (els.promptLoading) els.promptLoading.style.display = 'none';
         if (els.promptOutput) els.promptOutput.style.display = 'block';
-    }
-
-    // -- Execute PreCommands --
-
-    async function executePreCommands(config, preCommands) {
-        if (!preCommands || preCommands.length === 0) return { success: true, results: [] };
-        const results = [];
-
-        for (const cmd of preCommands) {
-            try {
-                const cmdUrl = config.managementUrl + cmd.command + (cmd.urlParams?.length ? '/' + cmd.urlParams.join('/') : '');
-                const response = await fetch(cmdUrl, {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + config.token, 'Content-Type': 'application/json' },
-                    body: JSON.stringify(cmd.params || {})
-                });
-                const data = await response.json();
-
-                results.push({
-                    command: cmd.command,
-                    success: response.ok && data.status < 400,
-                    data: data,
-                    abortOnFail: cmd.abortOnFail !== false
-                });
-
-                if (!response.ok || data.status >= 400) {
-                    if (cmd.abortOnFail !== false) {
-                        return { success: false, error: data.message || `Command ${cmd.command} failed`, errorData: data, failedCommand: cmd, results };
-                    }
-                }
-            } catch (error) {
-                results.push({ command: cmd.command, success: false, error: error.message });
-                if (cmd.abortOnFail !== false) {
-                    return { success: false, error: error.message, failedCommand: cmd, results };
-                }
-            }
-        }
-
-        return { success: true, results };
     }
 
     // -- Validate JSON response --
@@ -873,7 +792,7 @@
             els.commandList.appendChild(item);
         });
 
-        // Post-workflow / post-command placeholders
+        // Post-workflow placeholders
         const postPhases = (state.phases || []).filter(p => p.type === 'postWorkflow');
         if (postPhases.length > 0) {
             els.commandList.appendChild(htmlSeparator('— Post-Workflows (resolved with fresh data after execution) —'));
@@ -883,20 +802,11 @@
                 item.innerHTML = htmlPostCommandPreview(index + 1, phase.workflowId, null);
                 els.commandList.appendChild(item);
             });
-        } else if (state.postCommandsRaw.length > 0) {
-            els.commandList.appendChild(htmlSeparator('— Post-Commands (resolved after execution) —'));
-            state.postCommandsRaw.forEach((cmdDef, index) => {
-                const item = document.createElement('div');
-                item.className = 'command-item command-item--post';
-                item.innerHTML = htmlPostCommandPreview(index + 1, cmdDef.command || cmdDef.template || 'auto', cmdDef.condition);
-                els.commandList.appendChild(item);
-            });
         }
 
         if (els.commandCount) {
             let text = state.parsedCommands.length + ' command' + (state.parsedCommands.length > 1 ? 's' : '');
             if (postPhases.length > 0) text += ` (+${postPhases.length} post-workflow${postPhases.length > 1 ? 's' : ''})`;
-            else if (state.postCommandsRaw.length > 0) text += ` (+${state.postCommandsRaw.length} auto)`;
             els.commandCount.textContent = text;
         }
 
@@ -1151,7 +1061,6 @@
             }
         }
 
-        const hasPostWorkflowPhases = phases.some(p => p.type === 'postWorkflow');
         let globalIndex = 0;
 
         for (const phase of phases) {
@@ -1260,182 +1169,10 @@
             }
         }
 
-        // Legacy fallback: if no postWorkflow phases, use old executePostCommands
-        if (!hasPostWorkflowPhases) {
-            await executePostCommands(config, els, state);
-        }
-
         if (els.executionProgress) els.executionProgress.style.display = 'none';
     }
 
     // -- Post-Commands execution (after AI commands) --
-
-    /**
-     * Extract language info from the AI commands that were just executed.
-     * Scans for addLang commands and setMultilingual to infer multilingual + languages.
-     * Also fetches the current default language from the server.
-     */
-    async function extractLangsFromCommands(config, commands) {
-        const addedLangs = [];
-        let multilingual = false;
-
-        for (const cmd of commands) {
-            if (cmd.command === 'addLang' && cmd.params?.code) {
-                addedLangs.push(cmd.params.code.toLowerCase());
-            }
-            if (cmd.command === 'setMultilingual' && cmd.params?.enabled) {
-                multilingual = true;
-            }
-        }
-
-        if (addedLangs.length === 0) return null;
-
-        // Fetch default language from server (it's not in addLang commands)
-        let defaultLang = 'en';
-        try {
-            const resp = await fetch(config.managementUrl + 'getLangList', {
-                headers: { 'Authorization': 'Bearer ' + config.token }
-            });
-            const data = await resp.json();
-            if (data.data?.default_language) {
-                defaultLang = data.data.default_language;
-            }
-        } catch (e) { /* use fallback 'en' */ }
-
-        // Build full language list: default + added
-        const allLangs = [defaultLang, ...addedLangs.filter(l => l !== defaultLang)];
-
-        return {
-            multilingual: multilingual || addedLangs.length > 0,
-            languages: allLangs.join(',')
-        };
-    }
-
-    async function executePostCommands(config, els, state) {
-        // Always collect current form params as fallback
-        const formParams = els.form ? collectFormParams(els.form) : {};
-
-        // FAILSAFE: if postCommandsRaw is empty, re-fetch from API
-        if (state.postCommandsRaw.length === 0) {
-            console.warn('[ai-spec] postCommandsRaw is empty — recovering from API...');
-            try {
-                const container = document.querySelector('.ai-spec');
-                const specId = container?.dataset.specId;
-                if (specId && config.adminBase && config.token) {
-                    const queryString = new URLSearchParams(formParams).toString();
-                    const recoveryUrl = config.adminBase + '/api/ai-spec/' + specId + (queryString ? '?' + queryString : '');
-                    const recoveryResp = await fetch(recoveryUrl, {
-                        headers: { 'Authorization': 'Bearer ' + config.token }
-                    });
-                    const recoveryData = await recoveryResp.json();
-                    if (recoveryData.success && recoveryData.data?.postCommandsRaw) {
-                        state.postCommandsRaw = recoveryData.data.postCommandsRaw;
-                        state.userParams = recoveryData.data.userParams || formParams;
-                        console.warn('[ai-spec] RECOVERED postCommandsRaw from API, count:', state.postCommandsRaw.length);
-                    }
-                }
-            } catch (e) {
-                console.error('[ai-spec] Recovery fetch failed:', e);
-            }
-        }
-
-        if (state.postCommandsRaw.length === 0) return;
-
-        // Extract language info from executed AI commands (best source of truth)
-        const extractedLangs = await extractLangsFromCommands(config, state.parsedCommands);
-
-        // Build final params: state.userParams > extracted from AI commands > form params
-        const baseParams = Object.keys(state.userParams).length > 0 ? { ...state.userParams } : { ...formParams };
-        if (extractedLangs) {
-            // Override with extracted values — these reflect what the AI actually did
-            if (extractedLangs.multilingual) baseParams.multilingual = 'true';
-            if (extractedLangs.languages) baseParams.languages = extractedLangs.languages;
-        }
-        const finalUserParams = baseParams;
-        console.warn('[ai-spec] executePostCommands: postCommandsRaw count:', state.postCommandsRaw.length, 'finalUserParams:', finalUserParams);
-
-        if (els.progressText) els.progressText.textContent = 'Waiting for filesystem to settle...';
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        if (els.progressText) els.progressText.textContent = 'Resolving post-commands with fresh config...';
-
-        // Add separator
-        if (els.executionResults) {
-            els.executionResults.appendChild(htmlSeparator('— Post-Commands (Auto-Generated) —'));
-        }
-
-        try {
-            const resolveResponse = await fetch(config.adminBase + '/api/ai-spec-resolve-post', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + config.token, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    postCommandsRaw: state.postCommandsRaw,
-                    userParams: finalUserParams
-                })
-            });
-
-            const resolveData = await resolveResponse.json();
-            const resolvedPostCommands = resolveData.success ? (resolveData.data?.commands || []) : [];
-
-            if (resolvedPostCommands.length === 0) {
-                const noPostItem = document.createElement('div');
-                noPostItem.style.cssText = 'padding: 8px; color: var(--admin-text-muted); font-size: 12px; text-align: center;';
-                noPostItem.textContent = 'No post-commands to execute (conditions not met)';
-                if (els.executionResults) els.executionResults.appendChild(noPostItem);
-                return;
-            }
-
-            // Create pending items
-            resolvedPostCommands.forEach((cmd, idx) => {
-                const el = document.createElement('div');
-                el.innerHTML = htmlPendingItem('result-post-' + idx, cmd.command, 'Post-Command: Pending...', '🔧 ');
-                if (els.executionResults) els.executionResults.appendChild(el.firstElementChild);
-            });
-
-            // Execute
-            for (let j = 0; j < resolvedPostCommands.length; j++) {
-                const cmd = resolvedPostCommands[j];
-                const resultItem = document.getElementById('result-post-' + j);
-                if (els.progressText) els.progressText.textContent = `Executing post-command ${j + 1}/${resolvedPostCommands.length}...`;
-
-                const detailsId = `details-post-${j}`;
-                try {
-                    const { data, isSuccess, errorMsg } = await executeOneCommand(config, cmd);
-                    const paramsDisplay = formatParamsDisplay(cmd.params);
-                    const responseDisplay = formatResponseDisplay(data);
-
-                    updateResultItem(resultItem, {
-                        isSuccess, isError: !isSuccess,
-                        icon: isSuccess ? '✅' : '❌',
-                        prefix: '🔧 ', command: cmd.command,
-                        statusMessage: isSuccess ? (data.message || 'Success') : errorMsg,
-                        detailsId,
-                        sections: [
-                            { label: 'Parameters:', value: paramsDisplay },
-                            { label: 'Response:', value: responseDisplay }
-                        ]
-                    });
-                } catch (error) {
-                    if (resultItem) {
-                        resultItem.className = 'result-item result-item--error';
-                        resultItem.innerHTML = htmlResultItem({
-                            icon: '❌', prefix: '🔧 ', command: cmd.command,
-                            statusMessage: error.message, isError: true
-                        });
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Error resolving post-commands:', error);
-            const errorItem = document.createElement('div');
-            errorItem.className = 'result-item result-item--error';
-            errorItem.innerHTML = htmlResultItem({
-                icon: '❌', command: 'Post-Commands Resolution',
-                statusMessage: error.message, isError: true
-            });
-            if (els.executionResults) els.executionResults.appendChild(errorItem);
-        }
-    }
 
     // -- Send to AI --
 

@@ -76,32 +76,6 @@
             "condition": "param.multilingual === true"
         }
     ],
-    "postCommands": [
-        {
-            "condition": "param.multilingual === true",
-            "command": "editStructure",
-            "params": {
-                "type": "component",
-                "name": "lang-switch",
-                "structure": {
-                    "tag": "div",
-                    "params": { "class": "lang-switch" },
-                    "children": {
-                        "$each": "{{param.languages}}",
-                        "$item": {
-                            "tag": "a",
-                            "params": {
-                                "href": "{{__current_page;lang={{$value}}}}",
-                                "class": "lang-btn",
-                                "data-lang": "{{$value}}"
-                            },
-                            "children": [{ "textKey": "__RAW__{{$value | langname}}" }]
-                        }
-                    }
-                }
-            }
-        }
-    ],
     "promptTemplate": "create-landing.md",
     "outputFormat": "json-commands"
 }
