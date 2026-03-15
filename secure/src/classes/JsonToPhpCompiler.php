@@ -32,6 +32,10 @@ class JsonToPhpCompiler {
         $output .= "// Get page title from translation\n";
         $output .= "\$pageTitle = \$translator->translate('page.titles.{$pageTitle}');\n\n";
         $output .= "\$content = '';\n";
+        // Normalize: if structure is a single node (associative array), wrap in array
+        if (!empty($structure) && !array_is_list($structure)) {
+            $structure = [$structure];
+        }
         $output .= $this->compileNodes($structure);
         
         // Compile page-level events (onload, onresize, onscroll) into a script tag
