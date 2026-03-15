@@ -298,6 +298,24 @@ GET /management/help/addRoute
 
 Step-by-step tutorials for the admin panel, visual editor, and API workflows are planned.
 
+## Troubleshooting
+
+**Styles not updating after changes?**
+
+Browsers and CDNs cache CSS aggressively. After changing styles (via API, visual editor, or AI workflows), you may need to hard-refresh:
+
+| Browser | Shortcut |
+|---------|----------|
+| Chrome / Edge / Firefox | `Ctrl + Shift + R` (Windows/Linux) or `Cmd + Shift + R` (Mac) |
+| Safari | `Cmd + Option + R` |
+
+**Using Cloudflare or another CDN?**
+- Enable **Development Mode** in Cloudflare dashboard (pauses caching for 3 hours)
+- Or use **Purge Cache** → "Purge Everything" after deploying style changes
+- Other CDNs: check their cache purge/invalidation settings
+
+This affects the **deployed/built site only** — the admin panel preview and visual editor always load fresh styles.
+
 ## Vision
 
 QuickSite is built on a **file-based, zero-database philosophy**. It targets a specific niche: sites that don't need a database — landing pages, portfolios, documentation sites, microsites — but still deserve proper tooling for content management, translations, and deployment.

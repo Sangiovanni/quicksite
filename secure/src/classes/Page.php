@@ -24,6 +24,9 @@ class Page {
         $showMenu = $this->showMenu;
         $showFooter = $this->showFooter;
         $pageEventsScript = $this->pageEventsScript;
+        $spacePrefix = PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '';
+        $stylePath = (defined('PUBLIC_CONTENT_PATH') ? PUBLIC_CONTENT_PATH : dirname(__DIR__, 3) . '/' . (defined('PUBLIC_FOLDER_NAME') ? PUBLIC_FOLDER_NAME : 'public')) . '/style/style.css';
+        $cssVersion = file_exists($stylePath) ? filemtime($stylePath) : time();
         ?>
 <!DOCTYPE html>
 <html lang="<?= htmlspecialchars($lang, ENT_QUOTES | ENT_HTML5, 'UTF-8') ?>">
@@ -31,8 +34,8 @@ class Page {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($title, ENT_QUOTES | ENT_HTML5, 'UTF-8') ?></title>
-    <link rel="icon" type="image/png" href="/<?= PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '' ?>assets/favicon.png">
-    <link rel="stylesheet" href="/<?= PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '' ?>style/style.css">
+    <link rel="icon" type="image/png" href="/<?= $spacePrefix ?>assets/favicon.png">
+    <link rel="stylesheet" href="/<?= $spacePrefix ?>style/style.css?v=<?= $cssVersion ?>">
 </head>
 <body>
     <?php if ($showMenu): ?>

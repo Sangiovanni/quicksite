@@ -30,7 +30,8 @@ if (isset($_GET['_component']) && isset($_GET['_editor']) && $_GET['_editor'] ==
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Component: <?= htmlspecialchars($componentName) ?></title>
-    <link rel="stylesheet" href="<?= BASE_URL ?>/style/style.css">
+    <?php $cssVersion = file_exists(PUBLIC_CONTENT_PATH . '/style/style.css') ? filemtime(PUBLIC_CONTENT_PATH . '/style/style.css') : time(); ?>
+    <link rel="stylesheet" href="<?= BASE_URL ?>/style/style.css?v=<?= $cssVersion ?>">
     <style>
         /* Component preview container */
         body {
