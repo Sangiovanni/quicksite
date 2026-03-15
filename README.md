@@ -2,7 +2,7 @@
 
 A file-based PHP CMS with a built-in visual admin panel. Define page structures in JSON, manage everything through a REST API or the admin UI, and deploy production builds — no database required.
 
-> **Current version: `1.0.0-beta.1`** — Actively developed.
+> **Current version: `1.0.0-beta.2`** — Actively developed.
 
 ![QuickSite Admin Panel](docs/screenshot-admin.jpg)
 
