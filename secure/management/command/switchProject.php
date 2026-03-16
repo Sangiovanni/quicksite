@@ -276,6 +276,10 @@ function copyDirectoryContents(string $source, string $destination): bool {
                 mkdir($destPath, 0755, true);
             }
         } else {
+            // Skip backup files (e.g. favicon.png~)
+            if (str_ends_with($item->getFilename(), '~')) {
+                continue;
+            }
             if (!copy($item->getPathname(), $destPath)) {
                 return false;
             }

@@ -78,6 +78,27 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
             ->withData(['hint' => 'Install php-zip extension']);
     }
     
+    // If exporting the active project, sync live public files to project folder first
+    // This ensures CSS/asset edits made via editStyles/AI workflows are captured
+    $isActiveProject = (defined('PROJECT_NAME') && PROJECT_NAME === $projectName);
+    if ($isActiveProject && defined('PUBLIC_CONTENT_PATH')) {
+        $projectPublicPath = $projectPath . '/public';
+        if (!is_dir($projectPublicPath)) {
+            mkdir($projectPublicPath, 0755, true);
+        }
+        foreach (['assets', 'style'] as $folder) {
+            $liveSrc = PUBLIC_CONTENT_PATH . '/' . $folder;
+            $projDst = $projectPublicPath . '/' . $folder;
+            if (is_dir($liveSrc)) {
+                // Clear stale project copy and replace with live version
+                if (is_dir($projDst)) {
+                    exportDeleteDirectory($projDst);
+                }
+                exportCopyDirectory($liveSrc, $projDst);
+            }
+        }
+    }
+
     // Create temp directory for export
     $tempDir = sys_get_temp_dir();
     $zipFileName = $projectName . '_export_' . date('Ymd_His') . '.zip';
@@ -322,6 +343,11 @@ function addSafeFilesToZip(ZipArchive $zip, string $dir, string $zipBase, array 
                 continue;
             }
             
+            // Skip editor/system backup files (e.g. favicon.png~)
+            if (str_ends_with($item, '~')) {
+                continue;
+            }
+            
             $zip->addFile($path, $zipPath);
             $stats['files']++;
             $stats['total_size'] += filesize($path);
@@ -475,6 +501,57 @@ function formatExportBytes(int $bytes): string {
     $exp = min($exp, count($units) - 1);
     
     return round($bytes / pow(1024, $exp), 2) . ' ' . $units[$exp];
+}
+
+/**
+ * Recursively copy a directory (used for syncing live public to project)
+ */
+function exportCopyDirectory(string $source, string $destination): bool {
+    if (!is_dir($destination)) {
+        mkdir($destination, 0755, true);
+    }
+    
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($source, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST
+    );
+    
+    foreach ($iterator as $item) {
+        $destPath = $destination . '/' . $iterator->getSubPathname();
+        if ($item->isDir()) {
+            if (!is_dir($destPath)) {
+                mkdir($destPath, 0755, true);
+            }
+        } else {
+            // Skip backup files (e.g. favicon.png~)
+            if (str_ends_with($item->getFilename(), '~')) {
+                continue;
+            }
+            copy($item->getPathname(), $destPath);
+        }
+    }
+    return true;
+}
+
+/**
+ * Recursively delete a directory (used for clearing stale project public copy)
+ */
+function exportDeleteDirectory(string $dir): bool {
+    if (!is_dir($dir)) {
+        return true;
+    }
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+    );
+    foreach ($iterator as $file) {
+        if ($file->isDir()) {
+            rmdir($file->getRealPath());
+        } else {
+            unlink($file->getRealPath());
+        }
+    }
+    return rmdir($dir);
 }
 
 // Execute command if called directly via API (not internal call)
