@@ -6,7 +6,9 @@ A file-based PHP CMS with a built-in visual admin panel. Define page structures 
 
 ![QuickSite Admin Panel](docs/screenshot-admin.jpg)
 
-<!-- [![Watch the demo](docs/video-thumbnail.png)](https://youtube.com/watch?v=XXXX) -->
+[![Watch the demo](https://img.youtube.com/vi/LHheKkI1rLw/maxresdefault.jpg)](https://www.youtube.com/watch?v=LHheKkI1rLw)
+
+> **▶ [Watch the demo video](https://www.youtube.com/watch?v=LHheKkI1rLw)** — Build websites with structured AI workflows in under 5 minutes.
 
 ## What is QuickSite?
 
