@@ -4,9 +4,9 @@ A file-based PHP CMS with a built-in visual admin panel. Define page structures 
 
 > **Current version: `1.0.0-beta.2`** — Actively developed.
 
-![QuickSite Admin Panel](docs/screenshot-admin.jpg)
-
-[![Watch the demo](https://img.youtube.com/vi/LHheKkI1rLw/maxresdefault.jpg)](https://www.youtube.com/watch?v=LHheKkI1rLw)
+<a href="https://www.youtube.com/watch?v=LHheKkI1rLw">
+  <img src="https://img.youtube.com/vi/LHheKkI1rLw/maxresdefault.jpg" alt="Watch the demo" width="50%">
+</a>
 
 > **▶ [Watch the demo video](https://www.youtube.com/watch?v=LHheKkI1rLw)** — Build websites with structured AI workflows in under 5 minutes.
 
