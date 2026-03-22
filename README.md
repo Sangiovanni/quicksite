@@ -76,6 +76,11 @@ All three are optional — press Enter to skip any step. The scripts update `ini
 
 The scripts are **re-runnable** — they save their state to `.quicksite.conf` and detect current folder names on restart, even after a partial run or crash.
 
+> **Security tip (Linux):** After running setup.sh, remove execute and write permissions:  
+> `chmod -x -w setup.sh`  
+> This prevents accidental re-runs and unauthorized modifications. To reconfigure later, restore permissions first:  
+> `chmod +x +w setup.sh`
+
 > **Linux servers (recommended workflow):** Clone as `root`, then run `chmod +x setup.sh && ./setup.sh`. The script detects `root` and automatically fixes file ownership to your web server user (CloudPanel site user, `www-data`, `nginx`, or `apache`). If auto-detection fails, run manually:  
 > `chown -R YOUR_WEB_USER:YOUR_WEB_USER /path/to/quicksite`  
 > Replace `YOUR_WEB_USER` with your php-fpm user.
