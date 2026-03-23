@@ -207,17 +207,17 @@ switch ($action) {
         break;
         
     case 'asset-categories':
-        // Return asset categories
-        echo json_encode([
-            'success' => true,
-            'data' => [
-                ['value' => 'images', 'label' => 'Images'],
-                ['value' => 'scripts', 'label' => 'Scripts'],
-                ['value' => 'font', 'label' => 'Fonts'],
-                ['value' => 'audio', 'label' => 'Audio'],
-                ['value' => 'videos', 'label' => 'Videos']
-            ]
-        ]);
+        // Return asset categories from config (single source of truth)
+        $categories = require SECURE_FOLDER_PATH . '/management/config/assetCategories.php';
+        $labels = ['images' => 'Images', 'font' => 'Fonts', 'audio' => 'Audio', 'videos' => 'Videos'];
+        $data = array_map(fn($cat) => ['value' => $cat, 'label' => $labels[$cat] ?? ucfirst($cat)], $categories);
+        echo json_encode(['success' => true, 'data' => $data]);
+        break;
+
+    case 'asset-extensions':
+        // Return allowed extensions per category
+        $extensions = require SECURE_FOLDER_PATH . '/management/config/assetExtensions.php';
+        echo json_encode(['success' => true, 'data' => $extensions]);
         break;
         
     case 'builds':

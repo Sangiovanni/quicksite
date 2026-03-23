@@ -4153,6 +4153,14 @@
         if (addComponentVars) addComponentVars.style.display = (isComponent && sidebarAddSelectedComponentData) ? 'block' : 'none';
     }
     
+    // Tags that support asset browsing for their src param
+    const ASSET_BROWSABLE_TAGS = {
+        'img': 'images',
+        'video': 'videos',
+        'audio': 'audio',
+        'source': null  // any category
+    };
+    
     // Update mandatory params based on selected tag
     function updateSidebarAddMandatoryParams() {
         if (!addMandatoryParams || !addMandatoryParamsContainer) return;
@@ -4171,15 +4179,162 @@
         mandatoryParams.forEach(param => {
             const row = document.createElement('div');
             row.className = 'preview-contextual-form__param-row';
+            
+            const showBrowse = param === 'src' && tag in ASSET_BROWSABLE_TAGS;
+            
             row.innerHTML = `
                 <label class="preview-contextual-form__param-label">${param}:</label>
-                <input type="text" 
-                       id="add-mandatory-${param}"
-                       class="admin-input admin-input--sm preview-contextual-form__param-input" 
-                       placeholder="${PreviewConfig.i18n.required || 'Required'}">
+                <div class="preview-contextual-form__param-input-group">
+                    <input type="text" 
+                           id="add-mandatory-${param}"
+                           class="admin-input admin-input--sm preview-contextual-form__param-input" 
+                           placeholder="${PreviewConfig.i18n.required || 'Required'}">
+                    ${showBrowse ? `<button type="button" class="admin-btn admin-btn--sm admin-btn--outline preview-asset-browse-btn" data-category="${ASSET_BROWSABLE_TAGS[tag] || ''}" title="Browse assets">📁</button>` : ''}
+                </div>
             `;
             addMandatoryParamsContainer.appendChild(row);
+            
+            if (showBrowse) {
+                row.querySelector('.preview-asset-browse-btn').addEventListener('click', () => {
+                    openAssetPicker(row.querySelector(`#add-mandatory-${param}`), ASSET_BROWSABLE_TAGS[tag]);
+                });
+            }
         });
+    }
+    
+    // Asset picker: opens a dropdown/modal to browse and select an asset
+    async function openAssetPicker(targetInput, category) {
+        // Remove any existing picker
+        document.querySelector('.preview-asset-picker')?.remove();
+        
+        const picker = document.createElement('div');
+        picker.className = 'preview-asset-picker';
+        picker.innerHTML = `<div class="preview-asset-picker__loading">${PreviewConfig.i18n.loading || 'Loading...'}</div>`;
+        
+        // Position near the input, clamped to viewport
+        const rect = targetInput.getBoundingClientRect();
+        const pickerMaxH = 280;
+        const spaceBelow = window.innerHeight - rect.bottom - 8;
+        const spaceAbove = rect.top - 8;
+        
+        if (spaceBelow >= pickerMaxH || spaceBelow >= spaceAbove) {
+            // Open below
+            const availH = Math.min(pickerMaxH, spaceBelow);
+            picker.style.top = (rect.bottom + 4) + 'px';
+            picker.style.maxHeight = availH + 'px';
+        } else {
+            // Open above
+            const availH = Math.min(pickerMaxH, spaceAbove);
+            picker.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+            picker.style.maxHeight = availH + 'px';
+        }
+        picker.style.left = rect.left + 'px';
+        picker.style.width = Math.max(rect.width + 50, 320) + 'px';
+        document.body.appendChild(picker);
+
+        // Close on click outside
+        const closeHandler = (e) => {
+            if (!picker.contains(e.target) && e.target !== targetInput) {
+                picker.remove();
+                document.removeEventListener('mousedown', closeHandler);
+            }
+        };
+        setTimeout(() => document.addEventListener('mousedown', closeHandler), 0);
+        
+        try {
+            const urlParams = category ? [category] : [];
+            const response = await QuickSiteAdmin.apiRequest('listAssets', 'GET', null, urlParams);
+            
+            if (!response.ok || !response.data?.data) {
+                picker.innerHTML = '<div class="preview-asset-picker__empty">Could not load assets</div>';
+                return;
+            }
+            
+            const assetsMap = response.data.data.assets || {};
+            // Flatten category map into a single array
+            let assets = [];
+            for (const [cat, files] of Object.entries(assetsMap)) {
+                if (Array.isArray(files)) {
+                    files.forEach(f => { f.category = f.category || cat; });
+                    assets = assets.concat(files);
+                }
+            }
+            if (assets.length === 0) {
+                picker.innerHTML = '<div class="preview-asset-picker__empty">No assets found</div>';
+                return;
+            }
+            
+            picker.innerHTML = '';
+            const list = document.createElement('div');
+            list.className = 'preview-asset-picker__list';
+            
+            assets.forEach(asset => {
+                const item = document.createElement('div');
+                item.className = 'preview-asset-picker__item';
+                const path = asset.path || `/assets/${asset.category}/${asset.filename}`;
+                const isImage = asset.mime_type?.startsWith('image/');
+                const displayPath = baseUrl + path;
+                
+                item.innerHTML = `
+                    ${isImage ? `<img class="preview-asset-picker__thumb" src="${displayPath}" alt="" loading="lazy">` : `<span class="preview-asset-picker__icon">📄</span>`}
+                    <span class="preview-asset-picker__name" title="${path}">${asset.filename || path.split('/').pop()}</span>
+                `;
+                
+                item.addEventListener('click', () => {
+                    targetInput.value = path;
+                    targetInput.dispatchEvent(new Event('input'));
+                    picker.remove();
+                    document.removeEventListener('mousedown', closeHandler);
+                    
+                    // Show inline media preview below the input group
+                    showAssetPreview(targetInput, path, asset.mime_type);
+                });
+                
+                list.appendChild(item);
+            });
+            
+            picker.appendChild(list);
+        } catch (err) {
+            picker.innerHTML = '<div class="preview-asset-picker__empty">Error loading assets</div>';
+            console.error('[Preview] Asset picker error:', err);
+        }
+    }
+    
+    /**
+     * Show an inline media preview below the src input after asset selection
+     */
+    function showAssetPreview(targetInput, path, mimeType) {
+        const row = targetInput.closest('.preview-contextual-form__param-row');
+        if (!row) return;
+        
+        // Remove existing preview
+        row.querySelector('.preview-asset-inline')?.remove();
+        
+        if (!path) return;
+        
+        const container = document.createElement('div');
+        container.className = 'preview-asset-inline';
+        
+        // Determine media type from mime or file extension
+        const ext = path.split('.').pop().toLowerCase();
+        const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+        const videoExts = ['mp4', 'webm', 'ogv'];
+        const audioExts = ['mp3', 'wav', 'ogg'];
+        const displayPath = baseUrl + path;
+        
+        const mime = (mimeType || '').split('/')[0];
+        
+        if (mime === 'image' || imageExts.includes(ext)) {
+            container.innerHTML = `<img src="${displayPath}" alt="Preview" class="preview-asset-inline__media">`;
+        } else if (mime === 'video' || videoExts.includes(ext)) {
+            container.innerHTML = `<video src="${displayPath}" controls class="preview-asset-inline__media"></video>`;
+        } else if (mime === 'audio' || audioExts.includes(ext)) {
+            container.innerHTML = `<audio src="${displayPath}" controls class="preview-asset-inline__audio"></audio>`;
+        } else {
+            container.innerHTML = `<span class="preview-asset-inline__file">📄 ${path.split('/').pop()}</span>`;
+        }
+        
+        row.appendChild(container);
     }
     
     // Update text key preview
@@ -4834,6 +4989,20 @@
     addTagSelect?.addEventListener('change', function() {
         updateSidebarAddMandatoryParams();
         updateSidebarAddTextKeyPreview();
+        
+        // Show info message for iframe tag
+        let iframeInfo = addMandatoryParamsContainer?.parentElement?.querySelector('.preview-iframe-info');
+        if (this.value === 'iframe') {
+            if (!iframeInfo) {
+                iframeInfo = document.createElement('div');
+                iframeInfo.className = 'preview-iframe-info';
+                iframeInfo.innerHTML = `<small>ℹ️ Iframes load external content. Only use trusted HTTPS sources. The iframe is sandboxed within your page's same-origin policy.</small>`;
+                addMandatoryParamsContainer?.parentElement?.appendChild(iframeInfo);
+            }
+            iframeInfo.style.display = 'block';
+        } else if (iframeInfo) {
+            iframeInfo.style.display = 'none';
+        }
     });
     
     // Expand params handler

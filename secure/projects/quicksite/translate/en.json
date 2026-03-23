@@ -212,10 +212,11 @@
                 }
             },
             "uploadAsset": {
-                "desc": "Uploads a file to the assets folder with validation and automatic naming",
+                "desc": "Uploads a file to the assets folder. Supports multipart upload or HTTPS URL download.",
                 "params": {
-                    "category": "images, scripts, font, audio, or videos",
-                    "file": "File upload (multipart/form-data)"
+                    "category": "images, font, audio, or videos",
+                    "file": "File upload (multipart/form-data)",
+                    "url": "HTTPS URL to download (alternative to file upload)"
                 }
             },
             "deleteAsset": {
@@ -227,7 +228,7 @@
             "updateAssetMeta": {
                 "desc": "Updates metadata (description, alt text) for an existing asset. Useful for AI context and accessibility.",
                 "params": {
-                    "category": "Asset category (images, scripts, font, audio, videos)",
+                    "category": "Asset category (images, font, audio, videos)",
                     "filename": "Name of the file to update metadata for",
                     "description": "Description for AI context (max 500 chars)",
                     "alt": "Alt text for images/accessibility (max 200 chars)"
@@ -695,7 +696,7 @@
                 "desc": "Set the site favicon from an uploaded image. The image should be square (ideally 32x32 or larger)."
             },
             "upload": {
-                "desc": "Upload files to categorized folders. Supports images, scripts, fonts, audio, and video files."
+                "desc": "Upload files to categorized folders. Supports images, fonts, audio, and video files."
             },
             "pagetitle": {
                 "desc": "Update page titles per language. Titles appear in the browser tab and search results."

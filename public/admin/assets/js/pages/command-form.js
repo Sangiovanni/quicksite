@@ -587,8 +587,92 @@ async function initUploadAssetForm() {
         await QuickSiteAdmin.populateSelect(categorySelect, 'asset-categories', [], 'Select category...');
     }
     
+    // Fetch allowed extensions per category
+    let extensionsMap = {};
+    try {
+        extensionsMap = await QuickSiteAdmin.fetchHelperData('asset-extensions');
+    } catch (e) { /* extensions hint is non-critical */ }
+    
     // Initialize multi-file upload instead of single file
     initMultiFileUploadForm();
+    
+    // Remove auto-generated url input (created by form renderer from help.php schema)
+    const autoUrlInput = form.querySelector('input[name="url"]');
+    if (autoUrlInput) {
+        const autoGroup = autoUrlInput.closest('.admin-form-group') || autoUrlInput.parentElement;
+        if (autoGroup) autoGroup.remove();
+    }
+
+    // Add URL input as alternative to file upload
+    const fileWrapper = form.querySelector('.admin-file-input--multi');
+    if (fileWrapper) {
+        const urlSection = document.createElement('div');
+        urlSection.className = 'admin-url-upload';
+        urlSection.innerHTML = `
+            <div class="admin-url-upload__divider">
+                <span>or</span>
+            </div>
+            <label class="admin-label" for="url-input">Paste a URL (HTTPS only)</label>
+            <input type="text" name="url" id="url-input" class="admin-input" 
+                   placeholder="https://example.com/image.png"
+                   autocomplete="off">
+            <small class="admin-url-upload__hint"></small>
+        `;
+        fileWrapper.after(urlSection);
+        
+        const urlInput = urlSection.querySelector('#url-input');
+        const fileInput = form.querySelector('input[type="file"]');
+        
+        // Mutual visual disable: file ↔ URL
+        if (urlInput && fileInput) {
+            urlInput.addEventListener('input', () => {
+                if (urlInput.value.trim()) {
+                    fileWrapper.classList.add('admin-file-input--dimmed');
+                } else {
+                    fileWrapper.classList.remove('admin-file-input--dimmed');
+                }
+            });
+            
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length > 0) {
+                    urlSection.classList.add('admin-url-upload--dimmed');
+                    urlInput.value = '';
+                } else {
+                    urlSection.classList.remove('admin-url-upload--dimmed');
+                }
+            });
+        }
+    }
+    
+    // Update file input accept attribute when category changes
+    const categorySelect = form.querySelector('[name="category"]');
+    const fileInput = form.querySelector('input[type="file"]');
+    if (categorySelect && fileInput) {
+        const hintEl = form.querySelector('.admin-file-input__hint');
+        const urlHintEl = form.querySelector('.admin-url-upload__hint');
+        
+        categorySelect.addEventListener('change', () => {
+            const exts = extensionsMap[categorySelect.value];
+            if (exts) {
+                const extList = exts.join(', ');
+                fileInput.setAttribute('accept', exts.map(e => '.' + e).join(','));
+                if (hintEl) {
+                    hintEl.textContent = `Allowed: ${extList}`;
+                }
+                if (urlHintEl) {
+                    urlHintEl.textContent = `Allowed extensions: ${extList}`;
+                }
+            } else {
+                fileInput.removeAttribute('accept');
+                if (hintEl) {
+                    hintEl.textContent = 'You can select multiple files • Max 10MB per file';
+                }
+                if (urlHintEl) {
+                    urlHintEl.textContent = '';
+                }
+            }
+        });
+    }
 }
 
 /**

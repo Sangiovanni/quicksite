@@ -1362,39 +1362,45 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'uploadAsset' => [
-        'description' => 'Uploads a file to the assets folder with validation and automatic naming',
+        'description' => 'Uploads a file to the assets folder with validation and automatic naming. Supports multipart file upload or HTTPS URL download.',
         'method' => 'POST',
-        'content_type' => 'multipart/form-data',
+        'content_type' => 'multipart/form-data or application/json',
         'parameters' => [
             'category' => [
                 'required' => true,
                 'type' => 'query_string',
                 'description' => 'Asset category (in URL query string)',
                 'example' => 'images',
-                'validation' => 'Must be one of: images, scripts, font, audio, videos'
+                'validation' => 'Must be one of: images, font, audio, videos'
             ],
             'file' => [
-                'required' => true,
+                'required' => false,
                 'type' => 'file',
-                'description' => 'File to upload (in multipart form data)',
+                'description' => 'File to upload (in multipart form data). Takes priority over url.',
                 'validation' => 'See size and type limits below'
+            ],
+            'url' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'HTTPS URL to download the file from. Used if no file is uploaded.',
+                'example' => 'https://example.com/image.png',
+                'validation' => 'Must be HTTPS. Max 2048 characters.'
             ]
         ],
         'size_limits' => [
             'images' => '5MB',
-            'scripts' => '1MB',
             'font' => '2MB',
             'audio' => '10MB',
             'videos' => '50MB'
         ],
         'allowed_types' => [
             'images' => 'JPEG, PNG, GIF, WebP, SVG',
-            'scripts' => 'JavaScript (.js)',
             'font' => 'TTF, OTF, WOFF, WOFF2',
             'audio' => 'MP3, WAV, OGG',
             'videos' => 'MP4, WebM, OGV'
         ],
         'example_curl' => 'curl -F "file=@logo.png" "http://yoursite.com/management?command=uploadAsset&category=images"',
+        'example_curl_url' => 'curl -X POST -H "Content-Type: application/json" -d \'{"url":"https://example.com/photo.jpg"}\' "http://yoursite.com/management?command=uploadAsset&category=images"',
         'success_response' => [
             'status' => 201,
             'code' => 'operation.success',
@@ -1410,12 +1416,13 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.asset.invalid_category' => 'Invalid category',
             '400.asset.upload_failed' => 'File upload error',
+            '400.asset.url_download_failed' => 'URL download failed (invalid URL, SSRF blocked, or HTTP error)',
             '400.asset.file_too_large' => 'File exceeds size limit',
             '400.asset.invalid_file_type' => 'MIME type not allowed',
             '400.asset.invalid_extension' => 'File extension not allowed',
             '500.asset.move_failed' => 'Failed to save file'
         ],
-        'notes' => 'Validates MIME type (actual content, not just extension). Sanitizes filename. Auto-renames if file exists (adds _1, _2, etc.). Use multipart/form-data encoding.'
+        'notes' => 'Validates MIME type (actual content, not just extension). Sanitizes filename. Auto-renames if file exists (adds _1, _2, etc.). SVG files are sanitized to remove scripts. URL downloads require HTTPS and block private IPs. Either file or url must be provided.'
     ],
     
     'deleteAsset' => [
@@ -1427,7 +1434,7 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Asset category',
                 'example' => 'images',
-                'validation' => 'Must be one of: images, scripts, font, audio, videos'
+                'validation' => 'Must be one of: images, font, audio, videos'
             ],
             'filename' => [
                 'required' => true,
@@ -1467,7 +1474,7 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Filter by category (URL segment, optional)',
                 'example' => 'images',
-                'validation' => 'If provided, must be one of: images, scripts, font, audio, videos'
+                'validation' => 'If provided, must be one of: images, font, audio, videos'
             ]
         ],
         'example_get' => 'GET /management/listAssets (all) or GET /management/listAssets/images (filtered)',
@@ -1511,7 +1518,7 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Asset category',
                 'example' => 'images',
-                'validation' => 'Must be one of: images, scripts, font, audio, videos'
+                'validation' => 'Must be one of: images, font, audio, videos'
             ],
             'filename' => [
                 'required' => true,

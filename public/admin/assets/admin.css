@@ -5373,6 +5373,41 @@ kbd {
     background: var(--admin-accent-bg);
 }
 
+.admin-file-input--dimmed {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+/* URL upload alternative */
+.admin-url-upload__divider {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin: var(--space-lg) 0 var(--space-md);
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.admin-url-upload__divider::before,
+.admin-url-upload__divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--admin-border);
+}
+
+.admin-url-upload--dimmed {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.admin-url-upload__hint {
+    display: block;
+    margin-top: var(--space-xs);
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+}
+
 /* Multi-file list */
 .admin-file-list {
     margin-top: var(--space-md);
@@ -12331,6 +12366,7 @@ code.preview-node-panel__value {
     display: flex;
     align-items: center;
     gap: var(--space-xs);
+    flex-wrap: wrap;
 }
 
 .preview-contextual-form__param-label {
@@ -12342,6 +12378,133 @@ code.preview-node-panel__value {
 
 .preview-contextual-form__param-input {
     flex: 1;
+}
+
+.preview-contextual-form__param-input-group {
+    display: flex;
+    flex: 1;
+    gap: var(--space-xs);
+    align-items: center;
+}
+
+.preview-contextual-form__param-input-group .preview-contextual-form__param-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.preview-asset-browse-btn {
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    padding: 4px 8px;
+}
+
+/* Asset Picker dropdown */
+.preview-asset-picker {
+    position: fixed;
+    z-index: 10000;
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    max-height: 280px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.preview-asset-picker__loading,
+.preview-asset-picker__empty {
+    padding: var(--space-md);
+    text-align: center;
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.preview-asset-picker__list {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.preview-asset-picker__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    cursor: pointer;
+    border-bottom: 1px solid var(--admin-border);
+    transition: background 0.15s;
+}
+
+.preview-asset-picker__item:last-child {
+    border-bottom: none;
+}
+
+.preview-asset-picker__item:hover {
+    background: var(--admin-accent-bg);
+}
+
+.preview-asset-picker__thumb {
+    width: 36px;
+    height: 36px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+    background: var(--admin-bg-secondary);
+}
+
+.preview-asset-picker__icon {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 1.2rem;
+}
+
+.preview-asset-picker__name {
+    flex: 1;
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Inline media preview after asset selection */
+.preview-asset-inline {
+    width: 100%;
+    margin-top: var(--space-xs);
+}
+
+.preview-asset-inline__media {
+    max-width: 100%;
+    max-height: 160px;
+    border-radius: var(--radius-sm);
+    object-fit: contain;
+    background: var(--admin-bg-secondary);
+}
+
+.preview-asset-inline__audio {
+    width: 100%;
+    max-width: 100%;
+}
+
+.preview-asset-inline__file {
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+}
+
+/* Iframe info message */
+.preview-iframe-info {
+    margin-top: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--admin-accent-bg);
+    border-left: 3px solid var(--admin-accent);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+    line-height: 1.4;
 }
 
 /* Custom param row */

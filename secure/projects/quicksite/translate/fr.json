@@ -229,10 +229,11 @@
                 }
             },
             "uploadAsset": {
-                "desc": "Upload un fichier vers le dossier assets avec validation et nommage automatique",
+                "desc": "Upload un fichier vers le dossier assets. Supporte l'upload multipart ou le téléchargement par URL HTTPS.",
                 "params": {
-                    "category": "images, scripts, font, audio, ou videos",
-                    "file": "Upload de fichier (multipart/form-data)"
+                    "category": "images, font, audio, ou videos",
+                    "file": "Upload de fichier (multipart/form-data)",
+                    "url": "URL HTTPS à télécharger (alternative à l'upload de fichier)"
                 }
             },
             "deleteAsset": {
@@ -244,7 +245,7 @@
             "updateAssetMeta": {
                 "desc": "Met à jour les métadonnées (description, texte alternatif) d'un asset existant. Utile pour le contexte IA et l'accessibilité.",
                 "params": {
-                    "category": "Catégorie d'asset (images, scripts, font, audio, videos)",
+                    "category": "Catégorie d'asset (images, font, audio, videos)",
                     "filename": "Nom du fichier à mettre à jour",
                     "description": "Description pour contexte IA (max 500 caractères)",
                     "alt": "Texte alternatif pour images/accessibilité (max 200 caractères)"
@@ -705,7 +706,7 @@
             "title": "Assets & Branding",
             "intro": "Gérez les fichiers média et éléments de marque. Uploadez des images, polices et autres assets via l'API.",
             "upload": {
-                "desc": "Uploadez des fichiers vers des dossiers catégorisés. Supporte les images, scripts, polices, audio et fichiers vidéo."
+                "desc": "Uploadez des fichiers vers des dossiers catégorisés. Supporte les images, polices, audio et fichiers vidéo."
             },
             "favicon": {
                 "desc": "Définissez le favicon du site depuis une image uploadée. L'image devrait être carrée (idéalement 32x32 ou plus)."

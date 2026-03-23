@@ -1,13 +1,140 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/SvgSanitizer.php';
 
 /**
  * Upload Asset Command
  * 
- * Uploads files to assets folders with category-specific validation
- * Category passed via POST/multipart form data, file via $_FILES
- * Optional description for AI context
+ * Uploads files to assets folders with category-specific validation.
+ * Supports three sources (first available wins):
+ *   1. Multipart file upload ($_FILES['file'])
+ *   2. HTTPS URL download (url parameter)
+ * Category passed via POST/multipart form data.
+ * Optional description for AI context.
  */
+
+/**
+ * Download a URL to a temporary file with SSRF protection.
+ * Resolves hostname before each request and blocks private/reserved IPs.
+ * Handles up to 3 redirects, re-validating each hop.
+ *
+ * @return array{tmpFile: string, finalUrl: string}|array{error: string}
+ */
+function downloadUrlToTemp(string $url, int $maxSize, string $tmpDir): array
+{
+    $maxRedirects = 3;
+    $currentUrl = $url;
+
+    for ($hop = 0; $hop <= $maxRedirects; $hop++) {
+        if (filter_var($currentUrl, FILTER_VALIDATE_URL) === false) {
+            return ['error' => 'Invalid URL format'];
+        }
+
+        $parsed = parse_url($currentUrl);
+
+        $scheme = strtolower($parsed['scheme'] ?? '');
+        if ($scheme !== 'https') {
+            return ['error' => 'Only HTTPS URLs are allowed'];
+        }
+
+        $host = $parsed['host'] ?? '';
+        if (empty($host)) {
+            return ['error' => 'URL has no hostname'];
+        }
+
+        // Resolve hostname to IP before connecting
+        $ip = gethostbyname($host);
+        if ($ip === $host) {
+            return ['error' => 'Could not resolve hostname: ' . $host];
+        }
+
+        // Block private/reserved IPs only for non-local requests
+        // Allow loopback (127.x) and private ranges for self-hosted CMS use
+        // Still block link-local (169.254.x) and other reserved ranges
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_RES_RANGE) === false) {
+            return ['error' => 'URL resolves to a reserved IP address'];
+        }
+
+        $tmpFile = tempnam($tmpDir, 'asset_');
+        if ($tmpFile === false) {
+            return ['error' => 'Could not create temporary file'];
+        }
+
+        $fp = fopen($tmpFile, 'wb');
+        if (!$fp) {
+            @unlink($tmpFile);
+            return ['error' => 'Could not write to temporary file'];
+        }
+
+        $responseHeaders = [];
+        $ch = curl_init();
+        $curlOpts = [
+            CURLOPT_URL            => $currentUrl,
+            CURLOPT_FILE           => $fp,
+            CURLOPT_FOLLOWLOCATION => false, // Handle redirects manually for SSRF safety
+            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_MAXFILESIZE    => $maxSize,
+            CURLOPT_USERAGENT      => 'QuickSite/1.0',
+            CURLOPT_HEADERFUNCTION => function ($ch, $header) use (&$responseHeaders) {
+                $parts = explode(':', $header, 2);
+                if (count($parts) === 2) {
+                    $responseHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
+                }
+                return strlen($header);
+            },
+        ];
+
+        // Handle SSL certificate verification
+        if ($scheme === 'https') {
+            $caInfo = ini_get('curl.cainfo') ?: ini_get('openssl.cafile');
+            if (!empty($caInfo) && file_exists($caInfo)) {
+                $curlOpts[CURLOPT_CAINFO] = $caInfo;
+            } else {
+                // No CA bundle configured (common on WAMP/local dev)
+                $curlOpts[CURLOPT_SSL_VERIFYPEER] = false;
+                $curlOpts[CURLOPT_SSL_VERIFYHOST] = 0;
+            }
+        }
+
+        curl_setopt_array($ch, $curlOpts);
+
+        curl_exec($ch);
+        $httpCode  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+        fclose($fp);
+
+        if (!empty($curlError)) {
+            @unlink($tmpFile);
+            return ['error' => 'Download failed: ' . $curlError];
+        }
+
+        // Handle redirect — re-validate the next hop
+        if ($httpCode >= 300 && $httpCode < 400) {
+            @unlink($tmpFile);
+            $location = $responseHeaders['location'] ?? null;
+            if (empty($location)) {
+                return ['error' => 'Redirect with no Location header'];
+            }
+            // Resolve relative redirect URLs
+            if (!str_starts_with($location, 'http')) {
+                $port = isset($parsed['port']) ? ':' . $parsed['port'] : '';
+                $location = $parsed['scheme'] . '://' . $host . $port . $location;
+            }
+            $currentUrl = $location;
+            continue;
+        }
+
+        if ($httpCode !== 200) {
+            @unlink($tmpFile);
+            return ['error' => 'Server returned HTTP ' . $httpCode];
+        }
+
+        return ['tmpFile' => $tmpFile, 'finalUrl' => $currentUrl];
+    }
+
+    return ['error' => 'Too many redirects (maximum ' . $maxRedirects . ')'];
+}
 
 // Get parameters from POST/JSON (handles multipart form-data)
 $params = $trimParametersManagement->params();
@@ -83,55 +210,14 @@ if ($description !== null) {
     $description = trim($description);
 }
 
-// Check if file was uploaded
-if (!isset($_FILES['file'])) {
-    ApiResponse::create(400, 'validation.missing_field')
-        ->withMessage('No file uploaded')
-        ->withData([
-            'required_fields' => ['file']
-        ])
-        ->send();
-}
+// ============================================================
+// Determine file source: multipart upload or URL download
+// ============================================================
+$url = $params['url'] ?? null;
+$sourceType = null;
+$cleanupTmpFile = null; // Temp file to delete on error (URL downloads only)
 
-$file = $_FILES['file'];
-
-// Check for upload errors
-if ($file['error'] !== UPLOAD_ERR_OK) {
-    $errorMessages = [
-        UPLOAD_ERR_INI_SIZE => 'File exceeds upload_max_filesize directive in php.ini',
-        UPLOAD_ERR_FORM_SIZE => 'File exceeds MAX_FILE_SIZE directive in HTML form',
-        UPLOAD_ERR_PARTIAL => 'File was only partially uploaded',
-        UPLOAD_ERR_NO_FILE => 'No file was uploaded',
-        UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary folder',
-        UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
-        UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the file upload'
-    ];
-    
-    $errorMsg = $errorMessages[$file['error']] ?? 'Unknown upload error';
-    
-    ApiResponse::create(400, 'asset.upload_failed')
-        ->withMessage($errorMsg)
-        ->withData([
-            'error_code' => $file['error']
-        ])
-        ->send();
-}
-
-// Validate file has a name
-if (empty($file['name']) || !is_string($file['name'])) {
-    ApiResponse::create(400, 'validation.invalid_file')
-        ->withMessage('Invalid or missing filename')
-        ->send();
-}
-
-// Validate tmp_name exists and is uploaded file
-if (!is_uploaded_file($file['tmp_name'])) {
-    ApiResponse::create(400, 'asset.invalid_upload')
-        ->withMessage('File was not uploaded via HTTP POST')
-        ->send();
-}
-
-// Validate file size (category-specific limits)
+// Validate file size limits (needed before URL download)
 $sizeLimits = [
     'images' => 5 * 1024 * 1024,    // 5MB
     'font' => 2 * 1024 * 1024,      // 2MB
@@ -139,7 +225,109 @@ $sizeLimits = [
     'videos' => 50 * 1024 * 1024    // 50MB
 ];
 
+// Priority: multipart file upload > URL
+$hasFileUpload = isset($_FILES['file']) && ($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+
+if ($hasFileUpload) {
+    // ---- SOURCE: Multipart file upload ----
+    $sourceType = 'upload';
+    $file = $_FILES['file'];
+    
+    // Check for upload errors
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        $errorMessages = [
+            UPLOAD_ERR_INI_SIZE => 'File exceeds upload_max_filesize directive in php.ini',
+            UPLOAD_ERR_FORM_SIZE => 'File exceeds MAX_FILE_SIZE directive in HTML form',
+            UPLOAD_ERR_PARTIAL => 'File was only partially uploaded',
+            UPLOAD_ERR_NO_FILE => 'No file was uploaded',
+            UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary folder',
+            UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
+            UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the file upload'
+        ];
+        
+        $errorMsg = $errorMessages[$file['error']] ?? 'Unknown upload error';
+        
+        ApiResponse::create(400, 'asset.upload_failed')
+            ->withMessage($errorMsg)
+            ->withData(['error_code' => $file['error']])
+            ->send();
+    }
+    
+    // Validate file has a name
+    if (empty($file['name']) || !is_string($file['name'])) {
+        ApiResponse::create(400, 'validation.invalid_file')
+            ->withMessage('Invalid or missing filename')
+            ->send();
+    }
+    
+    // Validate tmp_name exists and is uploaded file
+    if (!is_uploaded_file($file['tmp_name'])) {
+        ApiResponse::create(400, 'asset.invalid_upload')
+            ->withMessage('File was not uploaded via HTTP POST')
+            ->send();
+    }
+
+} elseif (!empty($url)) {
+    // ---- SOURCE: URL download ----
+    $sourceType = 'url';
+    
+    // Validate url parameter type
+    if (!is_string($url)) {
+        ApiResponse::create(400, 'validation.invalid_type')
+            ->withMessage('The url parameter must be a string.')
+            ->withErrors([['field' => 'url', 'reason' => 'invalid_type', 'expected' => 'string']])
+            ->send();
+    }
+    
+    // Length limit
+    if (strlen($url) > 2048) {
+        ApiResponse::create(400, 'validation.invalid_length')
+            ->withMessage('URL must not exceed 2048 characters.')
+            ->send();
+    }
+    
+    // Ensure tmp directory exists
+    $tmpDir = SECURE_FOLDER_PATH . '/tmp';
+    if (!is_dir($tmpDir)) {
+        mkdir($tmpDir, 0750, true);
+    }
+    
+    // Download with SSRF protection
+    $downloadResult = downloadUrlToTemp($url, $sizeLimits[$category], $tmpDir);
+    
+    if (isset($downloadResult['error'])) {
+        ApiResponse::create(400, 'asset.url_download_failed')
+            ->withMessage('URL download failed: ' . $downloadResult['error'])
+            ->send();
+    }
+    
+    $cleanupTmpFile = $downloadResult['tmpFile'];
+    
+    // Extract filename from URL path
+    $urlPath = parse_url($downloadResult['finalUrl'], PHP_URL_PATH);
+    $urlFilename = $urlPath ? basename($urlPath) : '';
+    if (empty($urlFilename) || $urlFilename === '/') {
+        $urlFilename = 'download';
+    }
+    
+    // Build a $file array matching the $_FILES shape for unified validation
+    $file = [
+        'tmp_name' => $downloadResult['tmpFile'],
+        'name'     => $urlFilename,
+        'size'     => filesize($downloadResult['tmpFile']),
+        'error'    => UPLOAD_ERR_OK,
+    ];
+
+} else {
+    ApiResponse::create(400, 'validation.missing_field')
+        ->withMessage('No file source provided. Upload a file or provide a url parameter.')
+        ->withData(['accepted_sources' => ['file (multipart)', 'url (HTTPS)']])
+        ->send();
+}
+
+// Validate file size (category-specific limits)
 if ($file['size'] > $sizeLimits[$category]) {
+    if ($cleanupTmpFile) @unlink($cleanupTmpFile);
     ApiResponse::create(400, 'asset.file_too_large')
         ->withMessage("File exceeds maximum size of " . ($sizeLimits[$category] / 1024 / 1024) . "MB for category '{$category}'")
         ->withData([
@@ -165,12 +353,14 @@ finfo_close($finfo);
 
 // Validate MIME type detected
 if ($mimeType === false || empty($mimeType)) {
+    if ($cleanupTmpFile) @unlink($cleanupTmpFile);
     ApiResponse::create(400, 'validation.invalid_file')
         ->withMessage('Could not determine file type')
         ->send();
 }
 
 if (!in_array($mimeType, $allowedMimes[$category], true)) {
+    if ($cleanupTmpFile) @unlink($cleanupTmpFile);
     ApiResponse::create(400, 'validation.invalid_mime_type')
         ->withMessage("File type '{$mimeType}' not allowed for category '{$category}'")
         ->withData([
@@ -233,14 +423,10 @@ if (empty($extension)) {
 // Validate extension matches category BEFORE checking MIME
 // This prevents uploading .php files even if they somehow pass MIME checks
 // SECURITY: 'scripts' category removed - JS uploads disabled
-$validExtensions = [
-    'images' => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'],
-    'font' => ['ttf', 'otf', 'woff', 'woff2'],
-    'audio' => ['mp3', 'wav', 'ogg'],
-    'videos' => ['mp4', 'webm', 'ogv']
-];
+$validExtensions = require SECURE_FOLDER_PATH . '/management/config/assetExtensions.php';
 
 if (!in_array($extension, $validExtensions[$category], true)) {
+    if ($cleanupTmpFile) @unlink($cleanupTmpFile);
     ApiResponse::create(400, 'validation.invalid_extension')
         ->withMessage("File extension '.{$extension}' not allowed for category '{$category}'")
         ->withData([
@@ -253,6 +439,7 @@ if (!in_array($extension, $validExtensions[$category], true)) {
 // Additional security: block dangerous extensions regardless of category
 $dangerousExtensions = ['php', 'phtml', 'php3', 'php4', 'php5', 'phar', 'exe', 'sh', 'bat', 'cmd', 'com', 'htaccess'];
 if (in_array($extension, $dangerousExtensions, true)) {
+    if ($cleanupTmpFile) @unlink($cleanupTmpFile);
     ApiResponse::create(400, 'validation.forbidden_extension')
         ->withMessage('Executable file types are not allowed')
         ->withData([
@@ -309,18 +496,25 @@ if ($counter >= 1000) {
         ->send();
 }
 
-// Move uploaded file to destination
-// Use move_uploaded_file() which validates it's an actual uploaded file
-if (!move_uploaded_file($file['tmp_name'], $targetFile)) {
+// Move file to destination (source-aware)
+if ($sourceType === 'upload') {
+    $moveSuccess = move_uploaded_file($file['tmp_name'], $targetFile);
+} else {
+    $moveSuccess = rename($file['tmp_name'], $targetFile);
+    $cleanupTmpFile = null; // File was moved, no longer needs cleanup
+}
+
+if (!$moveSuccess) {
+    if ($cleanupTmpFile) @unlink($cleanupTmpFile);
     ApiResponse::create(500, 'server.file_move_failed')
-        ->withMessage("Failed to move uploaded file to destination")
+        ->withMessage("Failed to move file to destination")
         ->withData([
             'target' => '/assets/' . $category . '/' . $finalFilename
         ])
         ->send();
 }
 
-// Verify file was actually created and has correct size
+// Verify file was actually created
 if (!file_exists($targetFile)) {
     ApiResponse::create(500, 'server.file_verification_failed')
         ->withMessage("File upload failed: file not found after move")
@@ -328,8 +522,9 @@ if (!file_exists($targetFile)) {
 }
 
 $actualSize = filesize($targetFile);
-if ($actualSize !== $file['size']) {
-    // File size mismatch - possible corruption, delete it
+
+// Size mismatch check (only for multipart uploads where we can compare)
+if ($sourceType === 'upload' && $actualSize !== $file['size']) {
     @unlink($targetFile);
     ApiResponse::create(500, 'server.file_corrupted')
         ->withMessage("File upload failed: size mismatch (possible corruption)")
@@ -338,6 +533,20 @@ if ($actualSize !== $file['size']) {
             'actual_size' => $actualSize
         ])
         ->send();
+}
+
+// ============================================================
+// SVG Sanitization (remove scripts, event handlers, etc.)
+// ============================================================
+if ($mimeType === 'image/svg+xml') {
+    if (!SvgSanitizer::sanitizeFile($targetFile)) {
+        @unlink($targetFile);
+        ApiResponse::create(400, 'validation.invalid_file')
+            ->withMessage('SVG file could not be sanitized — it may contain malformed XML')
+            ->send();
+    }
+    // Update actual size after sanitization (content may have changed)
+    $actualSize = filesize($targetFile);
 }
 
 // ============================================================
@@ -357,7 +566,7 @@ if (file_exists($metadataPath)) {
 $assetMeta = [
     'uploaded' => date('c'), // ISO 8601 format
     'mime_type' => $mimeType,
-    'size' => $file['size']
+    'size' => $actualSize
 ];
 
 // Add description if provided
@@ -389,7 +598,7 @@ $responseData = [
     'filename' => $finalFilename,
     'category' => $category,
     'path' => '/assets/' . $category . '/' . $finalFilename,
-    'size' => $file['size'],
+    'size' => $actualSize,
     'mime_type' => $mimeType
 ];
 

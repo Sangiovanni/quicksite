@@ -53,7 +53,7 @@ function sanitizeLogBody(string $command, array $body): ?array {
             return [
                 'filename' => $body['filename'] ?? null,
                 'category' => $body['category'] ?? null,
-                'size_logged' => isset($body['file']) ? strlen($body['file']) : null,
+                'size_logged' => isset($body['file']) ? (is_string($body['file']) ? strlen($body['file']) : 'file_upload') : null,
                 '_note' => 'File content omitted from log'
             ];
             
