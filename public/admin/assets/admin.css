@@ -36,6 +36,7 @@
     --radius-sm: 0.25rem;
     --radius-md: 0.5rem;
     --radius-lg: 0.75rem;
+    --radius-full: 9999px;
 }
 
 /* =============================================================================
@@ -5408,6 +5409,18 @@ kbd {
     color: var(--admin-text-muted);
 }
 
+.admin-url-upload__meta {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+}
+
+.admin-url-upload__meta .admin-input--sm {
+    flex: 1;
+    font-size: var(--font-size-xs);
+    padding: var(--space-xs) var(--space-sm);
+}
+
 /* Multi-file list */
 .admin-file-list {
     margin-top: var(--space-md);
@@ -5436,14 +5449,33 @@ kbd {
 
 .admin-file-list__item {
     display: flex;
-    align-items: center;
-    gap: var(--space-sm);
+    flex-direction: column;
+    gap: var(--space-xs);
     padding: var(--space-sm) var(--space-md);
     border-bottom: 1px solid var(--admin-border);
 }
 
 .admin-file-list__item:last-child {
     border-bottom: none;
+}
+
+.admin-file-list__row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    width: 100%;
+}
+
+.admin-file-list__meta {
+    display: flex;
+    gap: var(--space-sm);
+    padding-left: calc(1.25rem + var(--space-sm));
+}
+
+.admin-file-list__meta .admin-input--sm {
+    flex: 1;
+    font-size: var(--font-size-xs);
+    padding: var(--space-xs) var(--space-sm);
 }
 
 .admin-file-list__icon {

@@ -660,10 +660,15 @@ const QuickSiteAdmin = {
                 if (input?.dataset.urlParam !== undefined) {
                     if (value) urlParams.push(value);
                 } else if (value) {
-                    // Try to parse JSON values
-                    try {
-                        data[key] = JSON.parse(value);
-                    } catch {
+                    // Only JSON-parse for JSON editor fields and selects (e.g. booleans)
+                    // Plain text inputs/textareas stay as strings to avoid type coercion bugs
+                    if (input?.hasAttribute('data-json-editor') || input?.tagName === 'SELECT') {
+                        try {
+                            data[key] = JSON.parse(value);
+                        } catch {
+                            data[key] = value;
+                        }
+                    } else {
                         data[key] = value;
                     }
                 }

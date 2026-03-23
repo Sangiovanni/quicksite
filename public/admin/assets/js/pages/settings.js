@@ -43,9 +43,6 @@
      */
     function init() {
         loadSystemInfo();
-        loadConfigInfo();
-        loadRoutes();
-        loadLanguages();
         loadPreferences();
         loadPermissionsInfo();
         loadAiConfigStatus();
@@ -143,7 +140,7 @@
                 container.innerHTML = renderDefinitionList([
                     ['Your Role', `<span class="admin-badge admin-badge--${badgeClass}">${isSuperAdmin ? '⭐ Superadmin' : role}</span>`],
                     ['Access Level', roleDescriptions[role] || 'Custom role'],
-                    ['Available Commands', isSuperAdmin ? 'All (77 commands)' : commandCount + ' commands']
+                    ['Available Commands', isSuperAdmin ? `All (${commandCount} commands)` : commandCount + ' commands']
                 ]) + (!isSuperAdmin ? `
                     <details style="margin-top: var(--space-md);">
                         <summary class="admin-text-muted" style="cursor: pointer;">View your accessible commands</summary>
@@ -174,12 +171,13 @@
             
             if (result.ok && result.data.data) {
                 const info = result.data.data;
-                const version = config.quicksiteVersion || info.version || '1.6.0';
-                const realBaseUrl = info.base_url ? info.base_url.replace(/\/+/g, '/').replace(':/', '://') : baseUrl;
+                const version = config.quicksiteVersion || 'unknown';
+                const totalCommands = info.total || Object.keys(info.commands || {}).length || 0;
+                const realBaseUrl = info.base_url || baseUrl;
                 
                 container.innerHTML = renderDefinitionList([
-                    ['API Version', `<code>${version}</code>`],
-                    ['Total Commands', info.total || Object.keys(info.commands || {}).length || 0],
+                    ['Version', `<code>${version}</code>`],
+                    ['Total Commands', totalCommands],
                     ['Base URL', `<code>${realBaseUrl}</code>`],
                     ['Server Time', new Date().toLocaleString()]
                 ]);
@@ -190,165 +188,6 @@
             showError(container, error);
         }
     }
-    
-    /**
-     * Load config info
-     */
-    async function loadConfigInfo() {
-        const container = document.getElementById('config-info');
-        if (!container) return;
-        
-        try {
-            const stylesResult = await QuickSiteAdmin.apiRequest('getStyles');
-            const langResult = await QuickSiteAdmin.apiRequest('getLangList');
-            const routesResult = await QuickSiteAdmin.apiRequest('getRoutes');
-            
-            const langCount = langResult.ok ? (langResult.data.data?.languages?.length || 0) : 0;
-            const routeCount = routesResult.ok ? (routesResult.data.data?.routes?.length || 0) : 0;
-            const isMultilingual = langCount > 1;
-            
-            container.innerHTML = `
-                <dl class="admin-definition-list">
-                    <dt>Multilingual Mode</dt>
-                    <dd>
-                        <span class="admin-badge admin-badge--${isMultilingual ? 'success' : 'info'}">
-                            ${isMultilingual ? 'Enabled' : 'Single Language'}
-                        </span>
-                    </dd>
-                    
-                    <dt>Languages</dt>
-                    <dd>${langCount} configured</dd>
-                    
-                    <dt>Routes</dt>
-                    <dd>${routeCount} active</dd>
-                    
-                    <dt>Styles Status</dt>
-                    <dd>
-                        <span class="admin-badge admin-badge--${stylesResult.ok ? 'success' : 'error'}">
-                            ${stylesResult.ok ? 'Loaded' : 'Error'}
-                        </span>
-                    </dd>
-                </dl>
-            `;
-        } catch (error) {
-            showError(container, error);
-        }
-    }
-    
-    /**
-     * Load routes list
-     */
-    async function loadRoutes() {
-        const container = document.getElementById('routes-list');
-        if (!container) return;
-        
-        try {
-            const result = await QuickSiteAdmin.apiRequest('getRoutes');
-            
-            if (result.ok && result.data.data?.flat_routes) {
-                const routes = result.data.data.flat_routes;
-                
-                if (routes.length === 0) {
-                    showMuted(container, 'No routes configured');
-                    return;
-                }
-                
-                let html = '<div class="admin-tag-list">';
-                routes.forEach(route => {
-                    html += `
-                        <span class="admin-tag admin-tag--route">
-                            <code>/${route}</code>
-                            <a href="${commandUrl}/deleteRoute?route=${encodeURIComponent(route)}" 
-                               class="admin-tag__action" title="Delete route">×</a>
-                        </span>
-                    `;
-                });
-                html += '</div>';
-                
-                container.innerHTML = html;
-            } else {
-                showMuted(container, 'Could not load routes');
-            }
-        } catch (error) {
-            showError(container, error);
-        }
-    }
-    
-    /**
-     * Load languages list
-     */
-    async function loadLanguages() {
-        const container = document.getElementById('languages-list');
-        if (!container) return;
-        
-        try {
-            const result = await QuickSiteAdmin.apiRequest('getLangList');
-            
-            if (result.ok && result.data.data?.languages) {
-                const data = result.data.data;
-                const langs = data.languages;
-                const defaultLang = data.default_language;
-                const langNames = data.language_names || {};
-                
-                if (langs.length === 0) {
-                    showMuted(container, 'No languages configured');
-                    return;
-                }
-                
-                let html = '<div class="admin-lang-list">';
-                langs.forEach(lang => {
-                    const isDefault = lang === defaultLang;
-                    const name = langNames[lang] || lang;
-                    html += `
-                        <div class="admin-lang-item ${isDefault ? 'admin-lang-item--default' : ''}">
-                            <div class="admin-lang-info">
-                                <code class="admin-lang-code">${lang.toUpperCase()}</code>
-                                <span class="admin-lang-name">${QuickSiteAdmin.escapeHtml(name)}</span>
-                                ${isDefault ? '<span class="admin-badge admin-badge--success">Default</span>' : ''}
-                            </div>
-                            ${!isDefault ? `
-                                <button class="admin-btn admin-btn--small admin-btn--ghost" 
-                                        onclick="setDefaultLang('${lang}')" 
-                                        title="Set as default language">
-                                    Set Default
-                                </button>
-                            ` : ''}
-                        </div>
-                    `;
-                });
-                html += '</div>';
-                
-                container.innerHTML = html;
-            } else {
-                showMuted(container, 'Could not load languages');
-            }
-        } catch (error) {
-            showError(container, error);
-        }
-    }
-    
-    /**
-     * Set default language
-     */
-    window.setDefaultLang = async function(langCode) {
-        if (!confirm(`Set "${langCode.toUpperCase()}" as the default language?`)) {
-            return;
-        }
-        
-        try {
-            const result = await QuickSiteAdmin.apiRequest('setDefaultLang', 'PATCH', { lang: langCode });
-            
-            if (result.ok) {
-                QuickSiteAdmin.showToast(result.data.message || 'Default language updated', 'success');
-                loadLanguages();
-                loadSystemInfo();
-            } else {
-                QuickSiteAdmin.showToast(result.data.message || 'Failed to update default language', 'error');
-            }
-        } catch (error) {
-            QuickSiteAdmin.showToast(`Error: ${error.message}`, 'error');
-        }
-    };
     
     /**
      * Load user preferences

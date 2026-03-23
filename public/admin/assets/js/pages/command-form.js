@@ -528,6 +528,16 @@ async function initAssetSelectForm() {
                     filenameSelect.disabled = true;
                 }
             });
+            
+            // After a successful delete, remove the filename from the select
+            form.addEventListener('command-success', (e) => {
+                const { command, data } = e.detail || {};
+                if (command === 'deleteAsset' && data?.filename) {
+                    const option = filenameSelect.querySelector(`option[value="${CSS.escape(data.filename)}"]`);
+                    if (option) option.remove();
+                    filenameSelect.value = '';
+                }
+            });
         }
     }
 }
@@ -596,15 +606,19 @@ async function initUploadAssetForm() {
     // Initialize multi-file upload instead of single file
     initMultiFileUploadForm();
     
-    // Remove auto-generated url input (created by form renderer from help.php schema)
-    const autoUrlInput = form.querySelector('input[name="url"]');
-    if (autoUrlInput) {
-        const autoGroup = autoUrlInput.closest('.admin-form-group') || autoUrlInput.parentElement;
-        if (autoGroup) autoGroup.remove();
-    }
+    // Remove auto-generated url, description, and alt inputs 
+    // (we provide custom UI for these: URL section + per-file metadata)
+    ['url', 'description', 'alt'].forEach(fieldName => {
+        const autoInput = form.querySelector(`[name="${fieldName}"]`);
+        if (autoInput && autoInput.id !== 'url-input') {
+            const autoGroup = autoInput.closest('.admin-form-group') || autoInput.parentElement;
+            if (autoGroup) autoGroup.remove();
+        }
+    });
 
     // Add URL input as alternative to file upload
     const fileWrapper = form.querySelector('.admin-file-input--multi');
+    const fileListEl = document.getElementById('multi-file-list');
     if (fileWrapper) {
         const urlSection = document.createElement('div');
         urlSection.className = 'admin-url-upload';
@@ -617,19 +631,29 @@ async function initUploadAssetForm() {
                    placeholder="https://example.com/image.png"
                    autocomplete="off">
             <small class="admin-url-upload__hint"></small>
+            <div class="admin-url-upload__meta" style="display:none">
+                <input type="text" name="alt" class="admin-input admin-input--sm" 
+                       placeholder="Alt text (accessibility)" autocomplete="off">
+                <input type="text" name="description" class="admin-input admin-input--sm" 
+                       placeholder="Description (optional)" autocomplete="off">
+            </div>
         `;
-        fileWrapper.after(urlSection);
+        // Insert URL section after file list (which sits after the drop zone wrapper)
+        (fileListEl || fileWrapper).after(urlSection);
         
         const urlInput = urlSection.querySelector('#url-input');
         const fileInput = form.querySelector('input[type="file"]');
         
         // Mutual visual disable: file ↔ URL
         if (urlInput && fileInput) {
+            const urlMeta = urlSection.querySelector('.admin-url-upload__meta');
             urlInput.addEventListener('input', () => {
                 if (urlInput.value.trim()) {
                     fileWrapper.classList.add('admin-file-input--dimmed');
+                    if (urlMeta) urlMeta.style.display = '';
                 } else {
                     fileWrapper.classList.remove('admin-file-input--dimmed');
+                    if (urlMeta) urlMeta.style.display = 'none';
                 }
             });
             
@@ -704,11 +728,11 @@ function initMultiFileUploadForm() {
     `;
     wrapper.appendChild(label);
     
-    // File list container
+    // File list container — placed AFTER wrapper so clicks don't trigger file picker
     const fileList = document.createElement('div');
     fileList.className = 'admin-file-list';
     fileList.id = 'multi-file-list';
-    wrapper.appendChild(fileList);
+    wrapper.after(fileList);
     
     // Store selected files
     let selectedFiles = [];
@@ -772,13 +796,23 @@ function initMultiFileUploadForm() {
             <ul class="admin-file-list__items">
                 ${selectedFiles.map((file, index) => `
                     <li class="admin-file-list__item" data-index="${index}">
-                        <span class="admin-file-list__icon">${getFileIcon(file.type)}</span>
-                        <span class="admin-file-list__name">${file.name}</span>
-                        <span class="admin-file-list__size">${formatFileSize(file.size)}</span>
-                        <span class="admin-file-list__status" id="file-status-${index}"></span>
-                        <button type="button" class="admin-file-list__remove" onclick="removeFile(${index})" title="Remove">
-                            ${QuickSiteUtils.iconClose(16)}
-                        </button>
+                        <div class="admin-file-list__row">
+                            <span class="admin-file-list__icon">${getFileIcon(file.type)}</span>
+                            <span class="admin-file-list__name">${file.name}</span>
+                            <span class="admin-file-list__size">${formatFileSize(file.size)}</span>
+                            <span class="admin-file-list__status" id="file-status-${index}"></span>
+                            <button type="button" class="admin-file-list__remove" onclick="removeFile(${index})" title="Remove">
+                                ${QuickSiteUtils.iconClose(16)}
+                            </button>
+                        </div>
+                        <div class="admin-file-list__meta">
+                            <input type="text" class="admin-input admin-input--sm" 
+                                data-file-meta="alt" data-file-index="${index}"
+                                placeholder="Alt text (accessibility)" autocomplete="off">
+                            <input type="text" class="admin-input admin-input--sm" 
+                                data-file-meta="description" data-file-index="${index}"
+                                placeholder="Description (optional)" autocomplete="off">
+                        </div>
                     </li>
                 `).join('')}
             </ul>
@@ -818,9 +852,9 @@ function initMultiFileUploadForm() {
     const originalSubmitHandler = form.onsubmit;
     
     form.addEventListener('submit', async function(e) {
-        // Check if we have multiple files to upload
-        if (selectedFiles.length <= 1) {
-            // Single file or no file - let the normal handler work
+        // Check if we have files to upload (use multi handler for per-file metadata)
+        if (selectedFiles.length === 0) {
+            // No files - let the normal handler work (URL upload path)
             return;
         }
         
@@ -878,6 +912,12 @@ function initMultiFileUploadForm() {
                 const formData = new FormData();
                 formData.append('category', category);
                 formData.append('file', file);
+                
+                // Include per-file metadata (alt, description)
+                const altInput = form.querySelector(`[data-file-meta="alt"][data-file-index="${i}"]`);
+                const descInput = form.querySelector(`[data-file-meta="description"][data-file-index="${i}"]`);
+                if (altInput?.value.trim()) formData.append('alt', altInput.value.trim());
+                if (descInput?.value.trim()) formData.append('description', descInput.value.trim());
                 
                 const result = await QuickSiteAdmin.apiUpload('uploadAsset', formData);
                 results.push({ file: file.name, success: result.ok, data: result.data });
@@ -3350,6 +3390,20 @@ function renderFormField(rawName, param, required) {
         `;
     }
     
+    // Explicit ui_type overrides type heuristics
+    if (uiType === 'textarea') {
+        inputHtml = `
+            <textarea name="${name}" id="${inputId}" class="admin-textarea" rows="4"
+                placeholder="${QuickSiteAdmin.escapeHtml(example || '')}" 
+                ${required ? 'required' : ''} ${urlParamAttr}></textarea>
+        `;
+    } else if (uiType === 'text') {
+        inputHtml = `
+            <input type="text" name="${name}" id="${inputId}" class="admin-input" 
+                placeholder="${QuickSiteAdmin.escapeHtml(example || '')}" 
+                ${required ? 'required' : ''} ${urlParamAttr}>
+        `;
+    } else {
     switch (type) {
         case 'boolean':
             inputHtml = `
@@ -3417,6 +3471,7 @@ function renderFormField(rawName, param, required) {
                     ${required ? 'required' : ''} ${urlParamAttr}>
             `;
     }
+    } // end ui_type else
     
     return `
         <div class="admin-form-group">

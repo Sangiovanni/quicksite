@@ -1385,6 +1385,22 @@ $GLOBALS['__help_commands'] = [
                 'description' => 'HTTPS URL to download the file from. Used if no file is uploaded.',
                 'example' => 'https://example.com/image.png',
                 'validation' => 'Must be HTTPS. Max 2048 characters.'
+            ],
+            'description' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Description of the asset for AI context',
+                'example' => 'Main company logo',
+                'validation' => 'Max 500 characters',
+                'ui_type' => 'textarea'
+            ],
+            'alt' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Alt text for images (accessibility)',
+                'example' => 'Company logo',
+                'validation' => 'Max 250 characters',
+                'ui_type' => 'text'
             ]
         ],
         'size_limits' => [
@@ -1532,14 +1548,16 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Description of the asset for AI context and documentation',
                 'example' => 'Company logo displayed in header',
-                'validation' => 'Max 500 characters'
+                'validation' => 'Max 500 characters',
+                'ui_type' => 'textarea'
             ],
             'alt' => [
                 'required' => false,
                 'type' => 'string',
                 'description' => 'Alt text for images (accessibility)',
-                'example' => 'Acme Corp logo - blue mountains on white background',
-                'validation' => 'Max 200 characters'
+                'example' => 'Company logo',
+                'validation' => 'Max 250 characters',
+                'ui_type' => 'text'
             ]
         ],
         'example_request' => 'POST /management/updateAssetMeta {"category": "images", "filename": "logo.png", "description": "Main company logo", "alt": "Company logo"}',

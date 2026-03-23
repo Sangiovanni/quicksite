@@ -8,6 +8,8 @@
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
+$versionFile = dirname(PUBLIC_CONTENT_PATH) . '/VERSION';
+$version = file_exists($versionFile) ? trim(file_get_contents($versionFile)) : 'unknown';
 ?>
 
 <script>
@@ -16,7 +18,7 @@ window.QUICKSITE_CONFIG = window.QUICKSITE_CONFIG || {};
 window.QUICKSITE_CONFIG.baseUrl = '<?= $baseUrl ?>/management';
 window.QUICKSITE_CONFIG.commandUrl = '<?= $router->getBaseUrl() ?>/command';
 window.QUICKSITE_CONFIG.aiSettingsUrl = '<?= $router->url('ai-settings') ?>';
-window.QUICKSITE_CONFIG.quicksiteVersion = '<?= defined('QUICKSITE_VERSION') ? QUICKSITE_VERSION : '1.6.0' ?>';
+window.QUICKSITE_CONFIG.quicksiteVersion = '<?= htmlspecialchars($version, ENT_QUOTES) ?>';
 </script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/settings.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/settings.js') ?>"></script>
 
@@ -45,82 +47,21 @@ window.QUICKSITE_CONFIG.quicksiteVersion = '<?= defined('QUICKSITE_VERSION') ? Q
         </div>
     </div>
 
-    <!-- Current Configuration -->
+    <!-- Your Permissions -->
     <div class="admin-card">
         <div class="admin-card__header">
             <h2 class="admin-card__title">
                 <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                    <line x1="16" y1="13" x2="8" y2="13"/>
-                    <line x1="16" y1="17" x2="8" y2="17"/>
-                    <polyline points="10 9 9 9 8 9"/>
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                 </svg>
-                <?= __admin('settings.configuration') ?>
+                Your Permissions
             </h2>
         </div>
         <div class="admin-card__body">
-            <div id="config-info" class="admin-loading">
+            <div id="permissions-info" class="admin-loading">
                 <span class="admin-spinner"></span>
-                <?= __admin('common.loading') ?>
+                Loading permissions...
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- Routes Overview -->
-<div class="admin-card" style="margin-top: var(--space-lg);">
-    <div class="admin-card__header">
-        <h2 class="admin-card__title">
-            <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="2" y1="12" x2="22" y2="12"/>
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-            </svg>
-            <?= __admin('settings.routes') ?>
-        </h2>
-        <a href="<?= $router->url('command', 'addRoute') ?>" class="admin-btn admin-btn--small admin-btn--primary">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <line x1="12" y1="5" x2="12" y2="19"/>
-                <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            <?= __admin('settings.addRoute') ?>
-        </a>
-    </div>
-    <div class="admin-card__body">
-        <div id="routes-list" class="admin-loading">
-            <span class="admin-spinner"></span>
-            <?= __admin('settings.loadingRoutes') ?>
-        </div>
-    </div>
-</div>
-
-<!-- Languages Overview -->
-<div class="admin-card" style="margin-top: var(--space-lg);">
-    <div class="admin-card__header">
-        <h2 class="admin-card__title">
-            <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M5 8l6 6"/>
-                <path d="M4 14l6-6 2-3"/>
-                <path d="M2 5h12"/>
-                <path d="M7 2h1"/>
-                <path d="M22 22l-5-10-5 10"/>
-                <path d="M14 18h6"/>
-            </svg>
-            <?= __admin('settings.languages') ?>
-        </h2>
-        <a href="<?= $router->url('command', 'addLang') ?>" class="admin-btn admin-btn--small admin-btn--primary">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <line x1="12" y1="5" x2="12" y2="19"/>
-                <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            <?= __admin('settings.addLanguage') ?>
-        </a>
-    </div>
-    <div class="admin-card__body">
-        <div id="languages-list" class="admin-loading">
-            <span class="admin-spinner"></span>
-            <?= __admin('settings.loadingLanguages') ?>
         </div>
     </div>
 </div>
@@ -176,25 +117,7 @@ window.QUICKSITE_CONFIG.quicksiteVersion = '<?= defined('QUICKSITE_VERSION') ? Q
     </div>
 </div>
 
-<!-- Your Permissions -->
-<div class="admin-card" style="margin-top: var(--space-lg);">
-    <div class="admin-card__header">
-        <h2 class="admin-card__title">
-            <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-            Your Permissions
-        </h2>
-    </div>
-    <div class="admin-card__body">
-        <div id="permissions-info" class="admin-loading">
-            <span class="admin-spinner"></span>
-            Loading permissions...
-        </div>
-    </div>
-</div>
 
-<!-- AI Configuration Quick Access -->
 <div class="admin-card" style="margin-top: var(--space-lg);">
     <div class="admin-card__header">
         <h2 class="admin-card__title">

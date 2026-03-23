@@ -140,6 +140,7 @@ function downloadUrlToTemp(string $url, int $maxSize, string $tmpDir): array
 $params = $trimParametersManagement->params();
 $category = $params['category'] ?? null;
 $description = $params['description'] ?? null;
+$alt = $params['alt'] ?? null;
 
 // Validate category is provided
 if (empty($category)) {
@@ -208,6 +209,29 @@ if ($description !== null) {
     
     // Trim the description
     $description = trim($description);
+}
+
+// Validate alt if provided (optional parameter)
+if ($alt !== null) {
+    if (!is_string($alt)) {
+        ApiResponse::create(400, 'validation.invalid_type')
+            ->withMessage('The alt parameter must be a string.')
+            ->withErrors([
+                ['field' => 'alt', 'reason' => 'invalid_type', 'expected' => 'string']
+            ])
+            ->send();
+    }
+    
+    if (strlen($alt) > 250) {
+        ApiResponse::create(400, 'validation.invalid_length')
+            ->withMessage('The alt parameter must not exceed 250 characters.')
+            ->withErrors([
+                ['field' => 'alt', 'max_length' => 250, 'actual_length' => strlen($alt)]
+            ])
+            ->send();
+    }
+    
+    $alt = trim($alt);
 }
 
 // ============================================================
@@ -574,6 +598,11 @@ if (!empty($description)) {
     $assetMeta['description'] = $description;
 }
 
+// Add alt if provided
+if (!empty($alt)) {
+    $assetMeta['alt'] = $alt;
+}
+
 // Auto-detect dimensions for images
 if ($category === 'images') {
     $imageInfo = @getimagesize($targetFile);
@@ -610,6 +639,11 @@ if (isset($assetMeta['dimensions'])) {
 // Include description if provided
 if (!empty($description)) {
     $responseData['description'] = $description;
+}
+
+// Include alt if provided
+if (!empty($alt)) {
+    $responseData['alt'] = $alt;
 }
 
 // Success response
