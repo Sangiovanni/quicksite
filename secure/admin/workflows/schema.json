@@ -22,7 +22,7 @@
     },
     "meta": {
       "type": "object",
-      "required": ["icon", "titleKey", "descriptionKey", "category"],
+      "required": ["icon", "category"],
       "properties": {
         "icon": {
           "type": "string",
@@ -30,11 +30,19 @@
         },
         "titleKey": {
           "type": "string",
-          "description": "Translation key for the workflow title"
+          "description": "Translation key for the workflow title (core workflows)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Direct display name (custom workflows without i18n)"
         },
         "descriptionKey": {
           "type": "string",
-          "description": "Translation key for the workflow description"
+          "description": "Translation key for the workflow description (core workflows)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Direct description text (custom workflows without i18n)"
         },
         "category": {
           "type": "string",
@@ -51,7 +59,16 @@
           "enum": ["beginner", "intermediate", "advanced"],
           "description": "Complexity level for user guidance"
         }
-      }
+      },
+      "anyOf": [
+        { "required": ["titleKey"] },
+        { "required": ["name"] }
+      ]
+    },
+    "staticData": {
+      "type": "object",
+      "description": "Static data available in steps via forEach or template placeholders. Keys become data paths (e.g., 'assets' is referenced as forEach: 'assets').",
+      "additionalProperties": true
     },
     "preWorkflows": {
       "type": "array",

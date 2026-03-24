@@ -98,13 +98,26 @@
         try {
             const spec = JSON.parse(jsonEditor.value);
             
-            // Basic validation
+            // Basic validation - only id, version, meta are required
             const errors = [];
             if (!spec.id) errors.push('Missing required field: id');
             if (!spec.version) errors.push('Missing required field: version');
             if (!spec.meta) errors.push('Missing required field: meta');
-            if (!spec.dataRequirements) errors.push('Missing required field: dataRequirements');
-            if (!spec.relatedCommands) errors.push('Missing required field: relatedCommands');
+            
+            // Meta content validation
+            if (spec.meta) {
+                if (!spec.meta.titleKey && !spec.meta.name) {
+                    errors.push('Missing meta.name (or meta.titleKey for i18n workflows)');
+                }
+                if (!spec.meta.category) {
+                    errors.push('Missing meta.category');
+                }
+            }
+            
+            // Must have either promptTemplate or steps
+            if (!spec.promptTemplate && (!spec.steps || !Array.isArray(spec.steps))) {
+                errors.push('Workflow must have either "promptTemplate" or "steps"');
+            }
             
             if (spec.id && !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(spec.id)) {
                 errors.push('Invalid ID format: must be kebab-case');
@@ -199,8 +212,8 @@
             return;
         }
         
-        if (!templateEditor.value.trim()) {
-            showMessage('error', t('templateRequired', 'Prompt template is required'));
+        if (!templateEditor.value.trim() && validation.spec.promptTemplate) {
+            showMessage('error', t('templateRequired', 'Prompt template is required for AI workflows'));
             return;
         }
         

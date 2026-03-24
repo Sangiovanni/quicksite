@@ -105,6 +105,11 @@ function __command_listAssets(array $params = [], array $urlParams = []): ApiRes
                     $fileInfo['description'] = $meta['description'];
                 }
                 
+                // Add alt text if available
+                if (!empty($meta['alt'])) {
+                    $fileInfo['alt'] = $meta['alt'];
+                }
+                
                 // Add dimensions for images
                 if (isset($meta['dimensions'])) {
                     $fileInfo['dimensions'] = $meta['dimensions'];

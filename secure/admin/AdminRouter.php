@@ -23,6 +23,7 @@ class AdminRouter {
         'ai-settings', // AI Provider Settings (BYOK)
         'preview',     // Visual Editor (route kept as 'preview' for URL compatibility)
         'apis',        // External API Registry
+        'assets',      // Asset Management page
         'logout'       // Logout action
     ];
 

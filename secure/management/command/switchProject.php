@@ -199,7 +199,7 @@ function copyProjectPublicFiles(string $source, string $destination): array {
         'errors' => []
     ];
     
-    // Folders to copy (not overwrite entirely - merge)
+    // Folders to replace (clean destination first, then copy fresh from project)
     $foldersToSync = ['assets', 'style', 'build'];
     
     foreach ($foldersToSync as $folder) {
@@ -210,9 +210,9 @@ function copyProjectPublicFiles(string $source, string $destination): array {
             continue;
         }
         
-        // Create destination if needed
-        if (!is_dir($destFolder)) {
-            mkdir($destFolder, 0755, true);
+        // Clean destination first to avoid stale files from previous project
+        if (is_dir($destFolder)) {
+            deleteDirectoryRecursive($destFolder);
         }
         
         // Copy folder contents recursively

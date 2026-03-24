@@ -1,12 +1,14 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/SvgSanitizer.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/AssetMetadataManager.php';
 
 /**
  * Upload Asset Command
  * 
- * Uploads files to assets folders with category-specific validation.
- * Supports three sources (first available wins):
+ * Uploads files to assets folders with auto-detected category.
+ * Category is resolved from the file extension using assetExtensions.php.
+ * Supports two sources (first available wins):
  *   1. Multipart file upload ($_FILES['file'])
  *   2. HTTPS URL download (url parameter)
  * Category passed via POST/multipart form data.
@@ -138,53 +140,14 @@ function downloadUrlToTemp(string $url, int $maxSize, string $tmpDir): array
 
 // Get parameters from POST/JSON (handles multipart form-data)
 $params = $trimParametersManagement->params();
-$category = $params['category'] ?? null;
 $description = $params['description'] ?? null;
 $alt = $params['alt'] ?? null;
 
-// Validate category is provided
-if (empty($category)) {
-    ApiResponse::create(400, 'validation.missing_field')
-        ->withMessage('category parameter is required')
-        ->withData([
-            'required_fields' => ['category']
-        ])
-        ->send();
-}
-
-// Type validation - category must be string
-if (!is_string($category)) {
-    ApiResponse::create(400, 'validation.invalid_type')
-        ->withMessage('The category parameter must be a string.')
-        ->withErrors([
-            ['field' => 'category', 'reason' => 'invalid_type', 'expected' => 'string']
-        ])
-        ->send();
-}
-
-// Validate category against whitelist
-$validCategories = require SECURE_FOLDER_PATH . '/management/config/assetCategories.php';
-
-// Dynamic length validation based on longest valid category
-$maxCategoryLength = max(array_map('strlen', $validCategories));
-if (strlen($category) > $maxCategoryLength) {
-    ApiResponse::create(400, 'validation.invalid_length')
-        ->withMessage("The category parameter must not exceed {$maxCategoryLength} characters.")
-        ->withErrors([
-            ['field' => 'category', 'value' => $category, 'max_length' => $maxCategoryLength]
-        ])
-        ->send();
-}
-
-// Check if category is in whitelist
-if (!in_array($category, $validCategories, true)) {
-    ApiResponse::create(400, 'validation.invalid_value')
-        ->withMessage("Category must be one of: " . implode(', ', $validCategories))
-        ->withErrors([
-            ['field' => 'category', 'value' => $category, 'allowed' => $validCategories]
-        ])
-        ->send();
-}
+// Initialize AssetMetadataManager for category resolution and metadata storage
+$metaManager = new AssetMetadataManager(
+    PROJECT_PATH . '/data',
+    SECURE_FOLDER_PATH . '/management/config/assetExtensions.php'
+);
 
 // Validate description if provided (optional parameter)
 if ($description !== null) {
@@ -310,14 +273,33 @@ if ($hasFileUpload) {
             ->send();
     }
     
+    // Pre-extract filename from URL to resolve category and size limit before downloading
+    $urlPath = parse_url($url, PHP_URL_PATH);
+    $urlFilename = $urlPath ? basename($urlPath) : '';
+    if (empty($urlFilename) || $urlFilename === '/') {
+        ApiResponse::create(400, 'validation.invalid_file')
+            ->withMessage('Could not determine filename from URL. URL must point to a file with a recognized extension.')
+            ->send();
+    }
+    
+    // Resolve category from URL filename extension
+    $urlCategory = $metaManager->resolveCategory($urlFilename);
+    if ($urlCategory === null) {
+        $urlExt = strtolower(pathinfo($urlFilename, PATHINFO_EXTENSION));
+        ApiResponse::create(400, 'validation.invalid_extension')
+            ->withMessage("Unrecognized file extension '.{$urlExt}' in URL — cannot determine asset category")
+            ->withErrors([['field' => 'url', 'reason' => 'unknown_extension', 'extension' => $urlExt]])
+            ->send();
+    }
+    
     // Ensure tmp directory exists
     $tmpDir = SECURE_FOLDER_PATH . '/tmp';
     if (!is_dir($tmpDir)) {
         mkdir($tmpDir, 0750, true);
     }
     
-    // Download with SSRF protection
-    $downloadResult = downloadUrlToTemp($url, $sizeLimits[$category], $tmpDir);
+    // Download with SSRF protection (use category-specific size limit)
+    $downloadResult = downloadUrlToTemp($url, $sizeLimits[$urlCategory], $tmpDir);
     
     if (isset($downloadResult['error'])) {
         ApiResponse::create(400, 'asset.url_download_failed')
@@ -327,17 +309,17 @@ if ($hasFileUpload) {
     
     $cleanupTmpFile = $downloadResult['tmpFile'];
     
-    // Extract filename from URL path
-    $urlPath = parse_url($downloadResult['finalUrl'], PHP_URL_PATH);
-    $urlFilename = $urlPath ? basename($urlPath) : '';
-    if (empty($urlFilename) || $urlFilename === '/') {
-        $urlFilename = 'download';
+    // Use final URL filename (may differ after redirects)
+    $finalUrlPath = parse_url($downloadResult['finalUrl'], PHP_URL_PATH);
+    $finalUrlFilename = $finalUrlPath ? basename($finalUrlPath) : $urlFilename;
+    if (empty($finalUrlFilename) || $finalUrlFilename === '/') {
+        $finalUrlFilename = $urlFilename;
     }
     
     // Build a $file array matching the $_FILES shape for unified validation
     $file = [
         'tmp_name' => $downloadResult['tmpFile'],
-        'name'     => $urlFilename,
+        'name'     => $finalUrlFilename,
         'size'     => filesize($downloadResult['tmpFile']),
         'error'    => UPLOAD_ERR_OK,
     ];
@@ -346,6 +328,54 @@ if ($hasFileUpload) {
     ApiResponse::create(400, 'validation.missing_field')
         ->withMessage('No file source provided. Upload a file or provide a url parameter.')
         ->withData(['accepted_sources' => ['file (multipart)', 'url (HTTPS)']])
+        ->send();
+}
+
+// ============================================================
+// Resolve category from file extension (auto-detect)
+// ============================================================
+
+// Sanitize and validate filename
+$originalName = basename($file['name']); // Remove any path components
+
+// Additional security: check for empty filename after basename
+if (empty($originalName)) {
+    if ($cleanupTmpFile) @unlink($cleanupTmpFile);
+    ApiResponse::create(400, 'validation.invalid_file')
+        ->withMessage('Invalid filename provided')
+        ->send();
+}
+
+// Extract filename components safely
+$pathInfo = pathinfo($originalName);
+$extension = isset($pathInfo['extension']) ? strtolower($pathInfo['extension']) : '';
+$filenameOnly = $pathInfo['filename'] ?? '';
+
+// Validate extension exists and is not empty
+if (empty($extension)) {
+    if ($cleanupTmpFile) @unlink($cleanupTmpFile);
+    ApiResponse::create(400, 'validation.invalid_file')
+        ->withMessage('File must have a valid extension')
+        ->send();
+}
+
+// Additional security: block dangerous extensions regardless of category
+$dangerousExtensions = ['php', 'phtml', 'php3', 'php4', 'php5', 'phar', 'exe', 'sh', 'bat', 'cmd', 'com', 'htaccess'];
+if (in_array($extension, $dangerousExtensions, true)) {
+    if ($cleanupTmpFile) @unlink($cleanupTmpFile);
+    ApiResponse::create(400, 'validation.forbidden_extension')
+        ->withMessage('Executable file types are not allowed')
+        ->withData(['extension' => $extension])
+        ->send();
+}
+
+// Auto-detect category from file extension
+$category = $metaManager->resolveCategory($originalName);
+if ($category === null) {
+    if ($cleanupTmpFile) @unlink($cleanupTmpFile);
+    ApiResponse::create(400, 'validation.invalid_extension')
+        ->withMessage("Unrecognized file extension '.{$extension}' — cannot determine asset category")
+        ->withErrors([['field' => 'file', 'reason' => 'unknown_extension', 'extension' => $extension, 'allowed' => $metaManager->getAllExtensions()]])
         ->send();
 }
 
@@ -361,8 +391,7 @@ if ($file['size'] > $sizeLimits[$category]) {
         ->send();
 }
 
-// Validate MIME type based on category (detect actual content, not just extension)
-// SECURITY: 'scripts' category removed - JS uploads could enable XSS attacks
+// Validate MIME type based on resolved category
 $allowedMimes = [
     'images' => ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
     'font' => ['font/ttf', 'font/otf', 'font/woff', 'font/woff2', 'application/x-font-ttf', 'application/x-font-otf', 'application/font-woff', 'application/font-woff2', 'application/octet-stream'], // fonts often detected as octet-stream
@@ -394,23 +423,9 @@ if (!in_array($mimeType, $allowedMimes[$category], true)) {
         ->send();
 }
 
-// Sanitize and validate filename
-$originalName = basename($file['name']); // Remove any path components
-
-// Additional security: check for empty filename after basename
-if (empty($originalName)) {
-    ApiResponse::create(400, 'validation.invalid_file')
-        ->withMessage('Invalid filename provided')
-        ->send();
-}
-
-// Extract filename components safely
-$pathInfo = pathinfo($originalName);
-$extension = isset($pathInfo['extension']) ? strtolower($pathInfo['extension']) : '';
-$filenameOnly = $pathInfo['filename'] ?? '';
-
 // Validate filename is not empty
 if (empty($filenameOnly)) {
+    if ($cleanupTmpFile) @unlink($cleanupTmpFile);
     ApiResponse::create(400, 'validation.invalid_file')
         ->withMessage('Filename cannot be empty')
         ->send();
@@ -422,6 +437,7 @@ $basename = preg_replace('/[^a-zA-Z0-9_-]/', '_', $filenameOnly);
 
 // Check if sanitization resulted in empty string
 if (empty($basename)) {
+    if ($cleanupTmpFile) @unlink($cleanupTmpFile);
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage('Filename contains only invalid characters')
         ->send();
@@ -429,45 +445,11 @@ if (empty($basename)) {
 
 // Enforce 100 character limit for filename (consistent with other commands)
 if (strlen($basename . '.' . $extension) > 100) {
+    if ($cleanupTmpFile) @unlink($cleanupTmpFile);
     ApiResponse::create(400, 'validation.invalid_length')
         ->withMessage('Filename must not exceed 100 characters.')
         ->withErrors([
             ['field' => 'filename', 'max_length' => 100, 'actual_length' => strlen($basename . '.' . $extension)]
-        ])
-        ->send();
-}
-
-// Validate extension exists and is not empty
-if (empty($extension)) {
-    ApiResponse::create(400, 'validation.invalid_file')
-        ->withMessage('File must have a valid extension')
-        ->send();
-}
-
-// Validate extension matches category BEFORE checking MIME
-// This prevents uploading .php files even if they somehow pass MIME checks
-// SECURITY: 'scripts' category removed - JS uploads disabled
-$validExtensions = require SECURE_FOLDER_PATH . '/management/config/assetExtensions.php';
-
-if (!in_array($extension, $validExtensions[$category], true)) {
-    if ($cleanupTmpFile) @unlink($cleanupTmpFile);
-    ApiResponse::create(400, 'validation.invalid_extension')
-        ->withMessage("File extension '.{$extension}' not allowed for category '{$category}'")
-        ->withData([
-            'extension' => $extension,
-            'allowed_extensions' => $validExtensions[$category]
-        ])
-        ->send();
-}
-
-// Additional security: block dangerous extensions regardless of category
-$dangerousExtensions = ['php', 'phtml', 'php3', 'php4', 'php5', 'phar', 'exe', 'sh', 'bat', 'cmd', 'com', 'htaccess'];
-if (in_array($extension, $dangerousExtensions, true)) {
-    if ($cleanupTmpFile) @unlink($cleanupTmpFile);
-    ApiResponse::create(400, 'validation.forbidden_extension')
-        ->withMessage('Executable file types are not allowed')
-        ->withData([
-            'extension' => $extension
         ])
         ->send();
 }
@@ -574,17 +556,8 @@ if ($mimeType === 'image/svg+xml') {
 }
 
 // ============================================================
-// Store Asset Metadata
+// Store Asset Metadata (via AssetMetadataManager)
 // ============================================================
-$metadataPath = PROJECT_PATH . '/data/assets_metadata.json';
-$assetKey = $category . '/' . $finalFilename;
-$metadata = [];
-
-// Load existing metadata
-if (file_exists($metadataPath)) {
-    $metadataContent = file_get_contents($metadataPath);
-    $metadata = json_decode($metadataContent, true) ?: [];
-}
 
 // Build metadata for this asset
 $assetMeta = [
@@ -604,23 +577,16 @@ if (!empty($alt)) {
 }
 
 // Auto-detect dimensions for images
-if ($category === 'images') {
-    $imageInfo = @getimagesize($targetFile);
-    if ($imageInfo !== false) {
-        $assetMeta['width'] = $imageInfo[0];
-        $assetMeta['height'] = $imageInfo[1];
-        $assetMeta['dimensions'] = $imageInfo[0] . 'x' . $imageInfo[1];
-    }
+$fileInfo = $metaManager->detectFileInfo($targetFile);
+if (isset($fileInfo['width'])) {
+    $assetMeta['width'] = $fileInfo['width'];
+    $assetMeta['height'] = $fileInfo['height'];
+    $assetMeta['dimensions'] = $fileInfo['dimensions'];
 }
 
-// Auto-detect duration for audio/video (if possible)
-// Note: This requires additional libraries, so we'll skip for now
-
 // Store metadata
-$metadata[$assetKey] = $assetMeta;
-
-// Save metadata file
-file_put_contents($metadataPath, json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+$metaManager->set($category, $finalFilename, $assetMeta);
+$metaManager->save();
 
 // Build response data
 $responseData = [

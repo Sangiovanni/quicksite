@@ -63,7 +63,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
     <nav class="ai-spec__breadcrumb">
         <a href="<?= $router->url('workflows') ?>"><?= __admin('workflows.browser.title', 'Workflows') ?></a>
         <span>›</span>
-        <span><?= __admin($meta['titleKey'] ?? '', $specId) ?></span>
+        <span><?= htmlspecialchars($meta['name'] ?? __admin($meta['titleKey'] ?? '', $specId)) ?></span>
     </nav>
     
     <?php if (!$validation['valid']): ?>
@@ -81,8 +81,8 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
     <header class="ai-spec__header">
         <span class="ai-spec__icon"><?= htmlspecialchars($meta['icon'] ?? '📋') ?></span>
         <div class="ai-spec__title-group">
-            <h1 class="ai-spec__title"><?= __admin($meta['titleKey'] ?? '', $specId) ?></h1>
-            <p class="ai-spec__desc"><?= __admin($meta['descriptionKey'] ?? '', '') ?></p>
+            <h1 class="ai-spec__title"><?= htmlspecialchars($meta['name'] ?? __admin($meta['titleKey'] ?? '', $specId)) ?></h1>
+            <p class="ai-spec__desc"><?= htmlspecialchars($meta['description'] ?? __admin($meta['descriptionKey'] ?? '', '')) ?></p>
             <div class="ai-spec__meta">
                 <?php if (!empty($meta['tags'])): ?>
                     <?php foreach ($meta['tags'] as $tag): ?>

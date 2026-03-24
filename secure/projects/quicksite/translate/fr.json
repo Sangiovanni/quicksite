@@ -251,6 +251,15 @@
                     "alt": "Texte alternatif pour images/accessibilité (max 200 caractères)"
                 }
             },
+            "editAsset": {
+                "desc": "Modifie un asset existant : renommer, mettre à jour la description ou le texte alternatif. Catégorie auto-détectée.",
+                "params": {
+                    "filename": "Nom de fichier actuel de l'asset à modifier",
+                    "newFilename": "Nouveau nom de fichier (doit garder la même extension)",
+                    "description": "Description pour contexte IA (max 500 caractères)",
+                    "alt": "Texte alternatif pour images/accessibilité (max 250 caractères)"
+                }
+            },
             "getStyles": {
                 "desc": "Récupère le contenu du fichier SCSS/CSS principal"
             },

@@ -81,9 +81,12 @@ async function initEnhancedFeatures() {
             await initEditStructureForm();
             break;
         case 'deleteAsset':
+            await initDeleteAssetForm();
+            break;
         case 'downloadAsset':
-        case 'updateAssetMeta':
+        case 'editAsset':
             await initAssetSelectForm();
+            if (COMMAND_NAME === 'editAsset') initEditAssetExtensionHint();
             break;
         case 'listAssets':
             await initListAssetsForm();
@@ -491,55 +494,274 @@ async function initGetStructureForm() {
 }
 
 /**
- * Initialize asset-related commands with category and file selection
+ * Initialize asset-related commands with category filter and file selection.
+ * Category is no longer a form param (auto-detected from extension).
+ * A category filter dropdown is added for UX convenience.
  */
 async function initAssetSelectForm() {
     const form = document.getElementById('command-form');
     
-    // Convert category to select
-    const categoryInput = form.querySelector('[name="category"]');
-    if (categoryInput && categoryInput.tagName !== 'SELECT') {
-        const categorySelect = document.createElement('select');
-        categorySelect.name = 'category';
-        categorySelect.className = 'admin-select';
-        categorySelect.required = categoryInput.required;
-        categoryInput.replaceWith(categorySelect);
-        await QuickSiteAdmin.populateSelect(categorySelect, 'asset-categories', [], 'Select category...');
+    // Convert filename input to a select
+    const filenameInput = form.querySelector('[name="filename"]');
+    if (filenameInput && filenameInput.tagName !== 'SELECT') {
+        // Add a category filter (not a form param, just for UX)
+        const filterGroup = document.createElement('div');
+        filterGroup.className = 'admin-form-group';
+        filterGroup.innerHTML = `
+            <label class="admin-label">Filter by category</label>
+            <select class="admin-select" id="asset-category-filter">
+                <option value="">All categories</option>
+            </select>
+        `;
+        filenameInput.closest('.admin-form-group')?.before(filterGroup);
         
-        // Convert filename to select
-        const filenameInput = form.querySelector('[name="filename"]');
-        if (filenameInput && filenameInput.tagName !== 'SELECT') {
-            const filenameSelect = document.createElement('select');
-            filenameSelect.name = 'filename';
-            filenameSelect.className = 'admin-select';
-            filenameSelect.required = filenameInput.required;
-            filenameSelect.innerHTML = '<option value="">Select category first...</option>';
-            filenameSelect.disabled = true;
-            filenameInput.replaceWith(filenameSelect);
-            
-            // Update filenames when category changes
-            categorySelect.addEventListener('change', async () => {
-                const category = categorySelect.value;
-                if (category) {
-                    filenameSelect.disabled = false;
-                    await QuickSiteAdmin.populateSelect(filenameSelect, 'assets', [category], 'Select file...');
-                } else {
-                    filenameSelect.innerHTML = '<option value="">Select category first...</option>';
-                    filenameSelect.disabled = true;
-                }
+        const categoryFilter = document.getElementById('asset-category-filter');
+        
+        // Populate category filter options
+        try {
+            const categories = await QuickSiteAdmin.fetchHelperData('asset-categories', []);
+            categories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.value;
+                option.textContent = cat.label;
+                categoryFilter.appendChild(option);
             });
-            
-            // After a successful delete, remove the filename from the select
-            form.addEventListener('command-success', (e) => {
-                const { command, data } = e.detail || {};
-                if (command === 'deleteAsset' && data?.filename) {
+        } catch (e) { /* non-critical */ }
+        
+        const filenameSelect = document.createElement('select');
+        filenameSelect.name = 'filename';
+        filenameSelect.className = 'admin-select';
+        filenameSelect.required = filenameInput.required;
+        filenameSelect.innerHTML = '<option value="">Loading files...</option>';
+        filenameInput.replaceWith(filenameSelect);
+        
+        // Load all assets initially (no category filter)
+        await populateAssetFilenames(filenameSelect, '');
+        
+        // Re-populate when category filter changes
+        categoryFilter.addEventListener('change', async () => {
+            await populateAssetFilenames(filenameSelect, categoryFilter.value);
+        });
+        
+        // Refresh select after successful asset operations
+        form.addEventListener('command-success', (e) => {
+            const { command, data, result } = e.detail || {};
+            if (command === 'deleteAsset') {
+                // Single delete: remove filename from select
+                if (data?.filename) {
                     const option = filenameSelect.querySelector(`option[value="${CSS.escape(data.filename)}"]`);
                     if (option) option.remove();
-                    filenameSelect.value = '';
                 }
-            });
+                // Batch delete: remove all deleted filenames
+                if (result?.deleted) {
+                    result.deleted.forEach(d => {
+                        const option = filenameSelect.querySelector(`option[value="${CSS.escape(d.filename)}"]`);
+                        if (option) option.remove();
+                    });
+                }
+                filenameSelect.value = '';
+            }
+            if (command === 'editAsset' && result?.oldFilename) {
+                // Rename: update the option value and text
+                const option = filenameSelect.querySelector(`option[value="${CSS.escape(result.oldFilename)}"]`);
+                if (option) {
+                    option.value = result.filename;
+                    option.textContent = result.filename;
+                    filenameSelect.value = result.filename;
+                }
+            }
+        });
+    }
+}
+
+/**
+ * Populate a select with asset filenames, optionally filtered by category.
+ */
+async function populateAssetFilenames(selectEl, category) {
+    try {
+        const args = category ? [category] : [];
+        await QuickSiteAdmin.populateSelect(selectEl, 'assets', args, 'Select file...');
+    } catch (e) {
+        selectEl.innerHTML = '<option value="">Failed to load files</option>';
+    }
+}
+
+/**
+ * For editAsset: show the file extension as a read-only suffix next to newFilename input.
+ * Updates when the filename select changes.
+ */
+function initEditAssetExtensionHint() {
+    const form = document.getElementById('command-form');
+    const filenameSelect = form.querySelector('[name="filename"]');
+    const newFilenameInput = form.querySelector('[name="newFilename"]');
+    if (!filenameSelect || !newFilenameInput) return;
+
+    // Create suffix element
+    const wrapper = document.createElement('div');
+    wrapper.className = 'admin-input-group';
+    wrapper.style.display = 'flex';
+    wrapper.style.alignItems = 'center';
+    wrapper.style.gap = '0';
+    newFilenameInput.parentNode.insertBefore(wrapper, newFilenameInput);
+    wrapper.appendChild(newFilenameInput);
+    newFilenameInput.style.borderTopRightRadius = '0';
+    newFilenameInput.style.borderBottomRightRadius = '0';
+    newFilenameInput.style.borderRight = 'none';
+
+    const suffix = document.createElement('span');
+    suffix.className = 'admin-input-suffix';
+    suffix.style.cssText = 'padding:0.5rem 0.75rem;background:var(--admin-bg-tertiary,#374151);border:1px solid var(--admin-border,#4b5563);border-top-right-radius:0.375rem;border-bottom-right-radius:0.375rem;color:var(--admin-text-secondary,#9ca3af);font-family:monospace;white-space:nowrap;';
+    suffix.textContent = '';
+    wrapper.appendChild(suffix);
+
+    // Hint below the input
+    const hint = document.createElement('small');
+    hint.style.cssText = 'display:block;margin-top:0.25rem;color:var(--admin-text-tertiary,#6b7280);font-size:0.75rem;';
+    hint.textContent = 'Enter new name without extension — it is preserved automatically';
+    wrapper.parentNode.insertBefore(hint, wrapper.nextSibling);
+
+    // Update suffix when filename changes
+    function updateSuffix() {
+        const selected = filenameSelect.value;
+        if (selected) {
+            const ext = selected.includes('.') ? '.' + selected.split('.').pop() : '';
+            suffix.textContent = ext;
+        } else {
+            suffix.textContent = '';
         }
     }
+
+    filenameSelect.addEventListener('change', updateSuffix);
+    updateSuffix();
+
+    // Update placeholder based on selection
+    newFilenameInput.setAttribute('placeholder', 'new-name (without extension)');
+}
+
+/**
+ * Initialize deleteAsset form with checkbox-based multi-select.
+ */
+async function initDeleteAssetForm() {
+    const form = document.getElementById('command-form');
+
+    // Remove the auto-generated filename input
+    const filenameInput = form.querySelector('[name="filename"]');
+    const filenameGroup = filenameInput?.closest('.admin-form-group');
+    if (!filenameGroup) return;
+
+    // Build the container
+    const container = document.createElement('div');
+    container.className = 'admin-form-group';
+    container.innerHTML = `
+        <label class="admin-label">Files to delete</label>
+        <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;">
+            <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.8rem;color:var(--admin-text-secondary,#9ca3af);white-space:nowrap;cursor:pointer;">
+                <input type="checkbox" id="delete-select-all"> Select all
+            </label>
+        </div>
+        <div id="delete-file-list" class="admin-checkbox-list" style="max-height:320px;overflow-y:auto;border:1px solid var(--admin-border,#4b5563);border-radius:0.375rem;padding:0.25rem 0;">
+            <div style="padding:0.75rem;color:var(--admin-text-secondary)">Loading files...</div>
+        </div>
+        <small id="delete-count-hint" style="display:block;margin-top:0.25rem;color:var(--admin-text-tertiary,#6b7280);font-size:0.75rem;"></small>
+    `;
+    filenameGroup.replaceWith(container);
+
+    const selectAllCheckbox = document.getElementById('delete-select-all');
+    const fileListEl = document.getElementById('delete-file-list');
+    const countHint = document.getElementById('delete-count-hint');
+
+    // Load and render file checkboxes
+    async function loadFiles() {
+        fileListEl.innerHTML = '<div style="padding:0.75rem;color:var(--admin-text-secondary)">Loading...</div>';
+        try {
+            const files = await QuickSiteAdmin.fetchHelperData('assets', []);
+            if (!files || files.length === 0) {
+                fileListEl.innerHTML = '<div style="padding:0.75rem;color:var(--admin-text-secondary)">No files found</div>';
+                updateCount();
+                return;
+            }
+
+            fileListEl.innerHTML = files.map(f => `
+                <label class="admin-checkbox-list__item" style="display:flex;align-items:center;gap:0.5rem;padding:0.375rem 0.75rem;cursor:pointer;" title="${QuickSiteAdmin.escapeHtml(f.value)}">
+                    <input type="checkbox" class="delete-file-cb" value="${QuickSiteAdmin.escapeHtml(f.value)}">
+                    <span style="flex:1;font-size:0.875rem;">${QuickSiteAdmin.escapeHtml(f.label)}</span>
+                </label>
+            `).join('');
+            updateCount();
+        } catch (e) {
+            fileListEl.innerHTML = '<div style="padding:0.75rem;color:var(--admin-error)">Failed to load files</div>';
+        }
+    }
+
+    function getChecked() {
+        return Array.from(fileListEl.querySelectorAll('.delete-file-cb:checked')).map(cb => cb.value);
+    }
+
+    function updateCount() {
+        const checked = getChecked();
+        countHint.textContent = checked.length > 0 ? `${checked.length} file${checked.length > 1 ? 's' : ''} selected for deletion` : '';
+        selectAllCheckbox.checked = fileListEl.querySelectorAll('.delete-file-cb').length > 0 &&
+            fileListEl.querySelectorAll('.delete-file-cb:not(:checked)').length === 0;
+    }
+
+    selectAllCheckbox.addEventListener('change', () => {
+        fileListEl.querySelectorAll('.delete-file-cb').forEach(cb => {
+            cb.checked = selectAllCheckbox.checked;
+        });
+        updateCount();
+    });
+
+    fileListEl.addEventListener('change', updateCount);
+
+    await loadFiles();
+
+    // Override form submission: send batch or single delete
+    form.addEventListener('submit', async function(e) {
+        const checked = getChecked();
+        if (checked.length === 0) return; // let normal validation handle it
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const submitBtn = document.getElementById('submit-btn');
+        submitBtn.disabled = true;
+        const originalBtnText = submitBtn.innerHTML;
+        submitBtn.innerHTML = `${QuickSiteUtils.htmlSpinner()} Deleting ${checked.length} file${checked.length > 1 ? 's' : ''}...`;
+
+        const responseDiv = document.getElementById('command-response');
+
+        try {
+            let result;
+            if (checked.length === 1) {
+                result = await QuickSiteAdmin.apiRequest('deleteAsset', 'DELETE', { filename: checked[0] });
+            } else {
+                result = await QuickSiteAdmin.apiRequest('deleteAsset', 'DELETE', { filenames: checked });
+            }
+
+            QuickSiteAdmin.displayResponse(responseDiv, result);
+
+            if (result.ok) {
+                // Remove deleted files from the checkbox list using the checked array
+                // (204 responses have no body, so we rely on what we sent)
+                checked.forEach(fname => {
+                    const cb = fileListEl.querySelector(`.delete-file-cb[value="${CSS.escape(fname)}"]`);
+                    if (cb) cb.closest('.admin-checkbox-list__item')?.remove();
+                });
+                updateCount();
+
+                const msg = checked.length === 1 ? 'File deleted!' : `${checked.length} files deleted!`;
+                QuickSiteAdmin.showToast(msg, 'success');
+            } else {
+                QuickSiteAdmin.showToast(result.data?.message || 'Delete failed', 'error');
+            }
+        } catch (error) {
+            QuickSiteAdmin.displayResponse(responseDiv, { ok: false, status: 0, data: { error: error.message } });
+            QuickSiteAdmin.showToast('Delete failed: ' + error.message, 'error');
+        }
+
+        submitBtn.innerHTML = originalBtnText;
+        submitBtn.disabled = false;
+    }, true);
 }
 
 /**
@@ -581,393 +803,81 @@ async function initListAssetsForm() {
 }
 
 /**
- * Initialize uploadAsset form with category select and multi-file upload
+ * Initialize uploadAsset form — single file upload (atomic command).
+ * For multi-file upload, use the dedicated Asset Management page (/admin/assets).
+ * Category is auto-detected from file extension (no category select needed).
  */
 async function initUploadAssetForm() {
     const form = document.getElementById('command-form');
     
-    // Convert category to select
-    const categoryInput = form.querySelector('[name="category"]');
-    if (categoryInput && categoryInput.tagName !== 'SELECT') {
-        const categorySelect = document.createElement('select');
-        categorySelect.name = 'category';
-        categorySelect.className = 'admin-select';
-        categorySelect.required = categoryInput.required;
-        categoryInput.replaceWith(categorySelect);
-        await QuickSiteAdmin.populateSelect(categorySelect, 'asset-categories', [], 'Select category...');
-    }
-    
-    // Fetch allowed extensions per category
-    let extensionsMap = {};
+    // Fetch allowed extensions for hint display
+    let allExtensions = [];
     try {
-        extensionsMap = await QuickSiteAdmin.fetchHelperData('asset-extensions');
+        const extensionsMap = await QuickSiteAdmin.fetchHelperData('asset-extensions');
+        allExtensions = Object.values(extensionsMap).flat();
     } catch (e) { /* extensions hint is non-critical */ }
     
-    // Initialize multi-file upload instead of single file
-    initMultiFileUploadForm();
+    // Set file accept attribute to all allowed extensions
+    const fileInput = form.querySelector('input[type="file"]');
+    if (fileInput && allExtensions.length) {
+        fileInput.setAttribute('accept', allExtensions.map(e => '.' + e).join(','));
+    }
     
-    // Remove auto-generated url, description, and alt inputs 
-    // (we provide custom UI for these: URL section + per-file metadata)
-    ['url', 'description', 'alt'].forEach(fieldName => {
-        const autoInput = form.querySelector(`[name="${fieldName}"]`);
-        if (autoInput && autoInput.id !== 'url-input') {
-            const autoGroup = autoInput.closest('.admin-form-group') || autoInput.parentElement;
-            if (autoGroup) autoGroup.remove();
+    // Show allowed extensions hint below file input
+    if (fileInput && allExtensions.length) {
+        const hint = document.createElement('small');
+        hint.className = 'admin-form-hint';
+        hint.textContent = `Allowed: ${allExtensions.join(', ')} · Category auto-detected from extension`;
+        const group = fileInput.closest('.admin-form-group');
+        if (group) group.appendChild(hint);
+    }
+    
+    // Add "or" divider + URL field after file input group
+    const fileGroup = fileInput?.closest('.admin-form-group');
+    const urlInput = form.querySelector('[name="url"]');
+    if (fileGroup && urlInput) {
+        const urlGroup = urlInput.closest('.admin-form-group');
+        if (urlGroup) {
+            const divider = document.createElement('div');
+            divider.className = 'admin-url-upload__divider';
+            divider.innerHTML = '<span>or</span>';
+            fileGroup.after(divider);
+            divider.after(urlGroup);
         }
-    });
-
-    // Add URL input as alternative to file upload
-    const fileWrapper = form.querySelector('.admin-file-input--multi');
-    const fileListEl = document.getElementById('multi-file-list');
-    if (fileWrapper) {
-        const urlSection = document.createElement('div');
-        urlSection.className = 'admin-url-upload';
-        urlSection.innerHTML = `
-            <div class="admin-url-upload__divider">
-                <span>or</span>
-            </div>
-            <label class="admin-label" for="url-input">Paste a URL (HTTPS only)</label>
-            <input type="text" name="url" id="url-input" class="admin-input" 
-                   placeholder="https://example.com/image.png"
-                   autocomplete="off">
-            <small class="admin-url-upload__hint"></small>
-            <div class="admin-url-upload__meta" style="display:none">
-                <input type="text" name="alt" class="admin-input admin-input--sm" 
-                       placeholder="Alt text (accessibility)" autocomplete="off">
-                <input type="text" name="description" class="admin-input admin-input--sm" 
-                       placeholder="Description (optional)" autocomplete="off">
-            </div>
-        `;
-        // Insert URL section after file list (which sits after the drop zone wrapper)
-        (fileListEl || fileWrapper).after(urlSection);
         
-        const urlInput = urlSection.querySelector('#url-input');
-        const fileInput = form.querySelector('input[type="file"]');
+        // Mutual visual disable: selecting a file dims the URL, typing a URL dims the file
+        urlInput.addEventListener('input', () => {
+            if (urlInput.value.trim()) {
+                fileGroup.classList.add('admin-file-input--dimmed');
+            } else {
+                fileGroup.classList.remove('admin-file-input--dimmed');
+            }
+        });
         
-        // Mutual visual disable: file ↔ URL
-        if (urlInput && fileInput) {
-            const urlMeta = urlSection.querySelector('.admin-url-upload__meta');
-            urlInput.addEventListener('input', () => {
-                if (urlInput.value.trim()) {
-                    fileWrapper.classList.add('admin-file-input--dimmed');
-                    if (urlMeta) urlMeta.style.display = '';
-                } else {
-                    fileWrapper.classList.remove('admin-file-input--dimmed');
-                    if (urlMeta) urlMeta.style.display = 'none';
-                }
-            });
-            
+        if (fileInput) {
             fileInput.addEventListener('change', () => {
                 if (fileInput.files.length > 0) {
-                    urlSection.classList.add('admin-url-upload--dimmed');
+                    const urlGroup = urlInput.closest('.admin-form-group');
+                    if (urlGroup) urlGroup.classList.add('admin-url-upload--dimmed');
                     urlInput.value = '';
                 } else {
-                    urlSection.classList.remove('admin-url-upload--dimmed');
+                    const urlGroup = urlInput.closest('.admin-form-group');
+                    if (urlGroup) urlGroup.classList.remove('admin-url-upload--dimmed');
                 }
             });
         }
     }
     
-    // Update file input accept attribute when category changes
-    const categorySelect = form.querySelector('[name="category"]');
-    const fileInput = form.querySelector('input[type="file"]');
-    if (categorySelect && fileInput) {
-        const hintEl = form.querySelector('.admin-file-input__hint');
-        const urlHintEl = form.querySelector('.admin-url-upload__hint');
-        
-        categorySelect.addEventListener('change', () => {
-            const exts = extensionsMap[categorySelect.value];
-            if (exts) {
-                const extList = exts.join(', ');
-                fileInput.setAttribute('accept', exts.map(e => '.' + e).join(','));
-                if (hintEl) {
-                    hintEl.textContent = `Allowed: ${extList}`;
-                }
-                if (urlHintEl) {
-                    urlHintEl.textContent = `Allowed extensions: ${extList}`;
-                }
-            } else {
-                fileInput.removeAttribute('accept');
-                if (hintEl) {
-                    hintEl.textContent = 'You can select multiple files • Max 10MB per file';
-                }
-                if (urlHintEl) {
-                    urlHintEl.textContent = '';
-                }
-            }
-        });
+    // Add link to Asset Management page for multi-file uploads
+    const pageHeader = document.querySelector('.admin-page-header');
+    if (pageHeader) {
+        const tip = document.createElement('p');
+        tip.className = 'admin-form-hint';
+        tip.style.marginTop = 'var(--space-sm)';
+        tip.innerHTML = 'Need to upload multiple files? Use the <a href="' + 
+            (window.QUICKSITE_CONFIG?.adminBase || '/admin') + '/assets">Asset Management</a> page.';
+        pageHeader.appendChild(tip);
     }
-}
-
-/**
- * Initialize multi-file upload with progress tracking
- */
-function initMultiFileUploadForm() {
-    const form = document.getElementById('command-form');
-    const fileInput = form.querySelector('input[type="file"]');
-    if (!fileInput) return;
-    
-    // Enable multiple file selection
-    fileInput.setAttribute('multiple', 'multiple');
-    
-    // Create wrapper structure
-    const wrapper = document.createElement('div');
-    wrapper.className = 'admin-file-input admin-file-input--multi';
-    fileInput.parentNode.insertBefore(wrapper, fileInput);
-    wrapper.appendChild(fileInput);
-    
-    // Add label
-    const label = document.createElement('div');
-    label.className = 'admin-file-input__label';
-    label.innerHTML = `
-        ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.upload, null, 'admin-file-input__icon')}
-        <div class="admin-file-input__text">
-            <span>Click to select files or drag and drop</span>
-            <span class="admin-file-input__hint">You can select multiple files • Max 10MB per file</span>
-        </div>
-    `;
-    wrapper.appendChild(label);
-    
-    // File list container — placed AFTER wrapper so clicks don't trigger file picker
-    const fileList = document.createElement('div');
-    fileList.className = 'admin-file-list';
-    fileList.id = 'multi-file-list';
-    wrapper.after(fileList);
-    
-    // Store selected files
-    let selectedFiles = [];
-    
-    // Handle file selection
-    fileInput.addEventListener('change', () => {
-        const newFiles = Array.from(fileInput.files);
-        
-        // Add new files to the list (avoid duplicates)
-        newFiles.forEach(file => {
-            const exists = selectedFiles.some(f => f.name === file.name && f.size === file.size);
-            if (!exists) {
-                selectedFiles.push(file);
-            }
-        });
-        
-        renderFileList();
-    });
-    
-    // Drag and drop handling
-    wrapper.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        wrapper.classList.add('admin-file-input--dragover');
-    });
-    
-    wrapper.addEventListener('dragleave', () => {
-        wrapper.classList.remove('admin-file-input--dragover');
-    });
-    
-    wrapper.addEventListener('drop', (e) => {
-        e.preventDefault();
-        wrapper.classList.remove('admin-file-input--dragover');
-        
-        const droppedFiles = Array.from(e.dataTransfer.files);
-        droppedFiles.forEach(file => {
-            const exists = selectedFiles.some(f => f.name === file.name && f.size === file.size);
-            if (!exists) {
-                selectedFiles.push(file);
-            }
-        });
-        
-        renderFileList();
-    });
-    
-    // Render file list
-    function renderFileList() {
-        if (selectedFiles.length === 0) {
-            fileList.innerHTML = '';
-            fileList.style.display = 'none';
-            return;
-        }
-        
-        fileList.style.display = 'block';
-        fileList.innerHTML = `
-            <div class="admin-file-list__header">
-                <span>${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected</span>
-                <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="clearAllFiles()">
-                    Clear All
-                </button>
-            </div>
-            <ul class="admin-file-list__items">
-                ${selectedFiles.map((file, index) => `
-                    <li class="admin-file-list__item" data-index="${index}">
-                        <div class="admin-file-list__row">
-                            <span class="admin-file-list__icon">${getFileIcon(file.type)}</span>
-                            <span class="admin-file-list__name">${file.name}</span>
-                            <span class="admin-file-list__size">${formatFileSize(file.size)}</span>
-                            <span class="admin-file-list__status" id="file-status-${index}"></span>
-                            <button type="button" class="admin-file-list__remove" onclick="removeFile(${index})" title="Remove">
-                                ${QuickSiteUtils.iconClose(16)}
-                            </button>
-                        </div>
-                        <div class="admin-file-list__meta">
-                            <input type="text" class="admin-input admin-input--sm" 
-                                data-file-meta="alt" data-file-index="${index}"
-                                placeholder="Alt text (accessibility)" autocomplete="off">
-                            <input type="text" class="admin-input admin-input--sm" 
-                                data-file-meta="description" data-file-index="${index}"
-                                placeholder="Description (optional)" autocomplete="off">
-                        </div>
-                    </li>
-                `).join('')}
-            </ul>
-        `;
-    }
-    
-    // Get icon based on file type
-    function getFileIcon(type) {
-        if (type.startsWith('image/')) return '🖼️';
-        if (type.startsWith('video/')) return '🎬';
-        if (type.startsWith('audio/')) return '🎵';
-        if (type === 'application/pdf') return '📄';
-        if (type.includes('javascript') || type.includes('css')) return '📝';
-        return '📁';
-    }
-    
-    // Remove file from list
-    window.removeFile = function(index) {
-        selectedFiles.splice(index, 1);
-        renderFileList();
-    };
-    
-    // Clear all files
-    window.clearAllFiles = function() {
-        selectedFiles = [];
-        fileInput.value = '';
-        renderFileList();
-    };
-    
-    // Store reference for form submission
-    window.getSelectedFiles = function() {
-        return selectedFiles;
-    };
-    
-    // Override form submission for multi-file upload
-    const submitBtn = document.getElementById('submit-btn');
-    const originalSubmitHandler = form.onsubmit;
-    
-    form.addEventListener('submit', async function(e) {
-        // Check if we have files to upload (use multi handler for per-file metadata)
-        if (selectedFiles.length === 0) {
-            // No files - let the normal handler work (URL upload path)
-            return;
-        }
-        
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // Get category
-        const categorySelect = form.querySelector('[name="category"]');
-        const category = categorySelect?.value;
-        
-        if (!category) {
-            QuickSiteAdmin.showToast('Please select a category first', 'error');
-            return;
-        }
-        
-        submitBtn.disabled = true;
-        const originalBtnText = submitBtn.innerHTML;
-        
-        const responseDiv = document.getElementById('command-response');
-        responseDiv.innerHTML = `
-            <div class="admin-upload-progress">
-                <h4>Uploading ${selectedFiles.length} files...</h4>
-                <div id="upload-progress-list"></div>
-            </div>
-        `;
-        
-        const progressList = document.getElementById('upload-progress-list');
-        const results = [];
-        
-        // Upload files sequentially
-        for (let i = 0; i < selectedFiles.length; i++) {
-            const file = selectedFiles[i];
-            const statusEl = document.getElementById(`file-status-${i}`);
-            
-            // Update button
-            submitBtn.innerHTML = `${QuickSiteUtils.htmlSpinner()} Uploading ${i + 1}/${selectedFiles.length}...`;
-            
-            // Update status in file list
-            if (statusEl) {
-                statusEl.innerHTML = QuickSiteUtils.htmlSpinner(16);
-            }
-            
-            // Add progress item
-            progressList.innerHTML += `
-                <div class="admin-upload-progress__item" id="progress-item-${i}">
-                    <span class="admin-upload-progress__name">${file.name}</span>
-                    <span class="admin-upload-progress__status" id="progress-status-${i}">
-                        ${QuickSiteUtils.htmlSpinner(14)} Uploading...
-                    </span>
-                </div>
-            `;
-            
-            try {
-                // Create FormData for this file
-                const formData = new FormData();
-                formData.append('category', category);
-                formData.append('file', file);
-                
-                // Include per-file metadata (alt, description)
-                const altInput = form.querySelector(`[data-file-meta="alt"][data-file-index="${i}"]`);
-                const descInput = form.querySelector(`[data-file-meta="description"][data-file-index="${i}"]`);
-                if (altInput?.value.trim()) formData.append('alt', altInput.value.trim());
-                if (descInput?.value.trim()) formData.append('description', descInput.value.trim());
-                
-                const result = await QuickSiteAdmin.apiUpload('uploadAsset', formData);
-                results.push({ file: file.name, success: result.ok, data: result.data });
-                
-                // Update status
-                const progressStatus = document.getElementById(`progress-status-${i}`);
-                if (result.ok) {
-                    if (statusEl) statusEl.innerHTML = '<span style="color:var(--admin-success)">✓</span>';
-                    if (progressStatus) progressStatus.innerHTML = '<span style="color:var(--admin-success)">✓ Uploaded</span>';
-                } else {
-                    if (statusEl) statusEl.innerHTML = '<span style="color:var(--admin-error)">✗</span>';
-                    if (progressStatus) progressStatus.innerHTML = `<span style="color:var(--admin-error)">✗ ${result.data?.message || 'Failed'}</span>`;
-                }
-            } catch (error) {
-                results.push({ file: file.name, success: false, error: error.message });
-                
-                const progressStatus = document.getElementById(`progress-status-${i}`);
-                if (statusEl) statusEl.innerHTML = '<span style="color:var(--admin-error)">✗</span>';
-                if (progressStatus) progressStatus.innerHTML = `<span style="color:var(--admin-error)">✗ ${error.message}</span>`;
-            }
-        }
-        
-        // Summary
-        const successCount = results.filter(r => r.success).length;
-        const failCount = results.filter(r => !r.success).length;
-        
-        submitBtn.innerHTML = originalBtnText;
-        submitBtn.disabled = false;
-        
-        // Show summary
-        if (failCount === 0) {
-            QuickSiteAdmin.showToast(`All ${successCount} files uploaded successfully!`, 'success');
-            // Clear the file list
-            selectedFiles = [];
-            fileInput.value = '';
-            renderFileList();
-        } else if (successCount === 0) {
-            QuickSiteAdmin.showToast(`All ${failCount} uploads failed`, 'error');
-        } else {
-            QuickSiteAdmin.showToast(`${successCount} uploaded, ${failCount} failed`, 'warning');
-        }
-        
-        // Trigger success event for successful uploads
-        if (successCount > 0) {
-            form.dispatchEvent(new CustomEvent('command-success', { 
-                detail: { results, successCount, failCount } 
-            }));
-        }
-        
-    }, true); // Use capture to run before other handlers
 }
 
 /**

@@ -238,8 +238,8 @@ window.QUICKSITE_CONFIG.translations = {
                 $meta = $spec['meta'] ?? [];
                 $difficulty = $meta['difficulty'] ?? 'intermediate';
                 $specTags = implode(',', $meta['tags'] ?? []);
-                $specTitle = __admin($meta['titleKey'] ?? '', $spec['id']);
-                $specDesc = __admin($meta['descriptionKey'] ?? '', '');
+                $specTitle = $meta['name'] ?? __admin($meta['titleKey'] ?? '', $spec['id']);
+                $specDesc = $meta['description'] ?? __admin($meta['descriptionKey'] ?? '', '');
                 $isManual = isset($spec['steps']) && !isset($spec['promptTemplate']);
             ?>
             <a href="<?= $router->url('workflows', $spec['id']) ?>" 
@@ -250,7 +250,7 @@ window.QUICKSITE_CONFIG.translations = {
                data-id="<?= htmlspecialchars($spec['id']) ?>">
                 <div class="ai-spec-card__header">
                     <span class="ai-spec-card__icon"><?= htmlspecialchars($meta['icon'] ?? '📋') ?></span>
-                    <span class="ai-spec-card__title"><?= __admin($meta['titleKey'] ?? '', $spec['id']) ?></span>
+                    <span class="ai-spec-card__title"><?= htmlspecialchars($meta['name'] ?? __admin($meta['titleKey'] ?? '', $spec['id'])) ?></span>
                     <?php if ($isManual): ?>
                     <span class="ai-spec-card__badge ai-spec-card__badge--manual" title="<?= __admin('workflows.spec.manualHint', 'Executes predefined commands without AI') ?>">
                         📦
@@ -262,7 +262,7 @@ window.QUICKSITE_CONFIG.translations = {
                     <?php endif; ?>
                 </div>
                 <p class="ai-spec-card__desc">
-                    <?= __admin($meta['descriptionKey'] ?? '', 'No description available') ?>
+                    <?= htmlspecialchars($meta['description'] ?? __admin($meta['descriptionKey'] ?? '', 'No description available')) ?>
                 </p>
                 <div class="ai-spec-card__tags">
                     <span class="ai-spec-card__difficulty ai-spec-card__difficulty--<?= $difficulty ?>">

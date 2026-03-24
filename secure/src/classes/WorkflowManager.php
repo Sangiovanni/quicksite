@@ -249,6 +249,12 @@ class WorkflowManager {
      */
     public function generateSteps(array $workflow, array $userParams = [], array $fetchedData = [], array $configData = []): array {
         $expandedSteps = [];
+        
+        // Merge static data defined in the workflow itself
+        if (!empty($workflow['staticData']) && is_array($workflow['staticData'])) {
+            $fetchedData = array_merge($workflow['staticData'], $fetchedData);
+        }
+        
         $context = [
             'param' => $userParams,
             'data' => $fetchedData,
@@ -1377,14 +1383,15 @@ class WorkflowManager {
         if (isset($workflow['meta'])) {
             $meta = $workflow['meta'];
             
-            if (!isset($meta['titleKey'])) {
-                $errors[] = "Missing required meta field: titleKey";
+            // Must have either titleKey (core/i18n) or name (custom/direct)
+            if (!isset($meta['titleKey']) && !isset($meta['name'])) {
+                $errors[] = "Missing required meta field: titleKey or name";
             }
             if (!isset($meta['category'])) {
                 $errors[] = "Missing required meta field: category";
             } else {
                 // Validate category value
-                $validCategories = ['creation', 'modification', 'advanced', 'style', 'template'];
+                $validCategories = ['creation', 'modification', 'advanced', 'style', 'template', 'content', 'wip'];
                 if (!in_array($meta['category'], $validCategories)) {
                     $errors[] = "Invalid category: {$meta['category']}. Must be one of: " . implode(', ', $validCategories);
                 }
@@ -1418,8 +1425,8 @@ class WorkflowManager {
         // Validate steps if present
         if (isset($workflow['steps'])) {
             foreach ($workflow['steps'] as $index => $step) {
-                if (!isset($step['command'])) {
-                    $errors[] = "Step at index {$index} missing required field: command";
+                if (!isset($step['command']) && !isset($step['template'])) {
+                    $errors[] = "Step at index {$index} missing required field: command or template";
                 }
             }
         }

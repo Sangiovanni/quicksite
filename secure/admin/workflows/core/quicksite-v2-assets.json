@@ -1,0 +1,61 @@
+{
+    "$schema": "../schema.json",
+    "id": "quicksite-v2-assets",
+    "version": "1.1.0",
+    "meta": {
+        "icon": "🖼️",
+        "name": "QuickSite v2 Assets",
+        "description": "Upload the default QuickSite template images from the GitHub repository.",
+        "category": "template",
+        "difficulty": "beginner",
+        "tags": ["assets", "images", "template", "setup"]
+    },
+    "relatedCommands": ["uploadAsset"],
+    "staticData": {
+        "assets": [
+            {
+                "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/404.png",
+                "alt": "404 page illustration",
+                "description": "Image displayed on the 404 error page"
+            },
+            {
+                "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/documentation.png",
+                "alt": "Documentation illustration",
+                "description": "Image used on the documentation page"
+            },
+            {
+                "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/favicon.png",
+                "alt": "QuickSite favicon",
+                "description": "Default QuickSite favicon image"
+            },
+            {
+                "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/git-hub-logo-white.png",
+                "alt": "GitHub logo white",
+                "description": "White GitHub logo for dark backgrounds"
+            },
+            {
+                "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/home.png",
+                "alt": "Home page illustration",
+                "description": "Image displayed on the home page"
+            },
+            {
+                "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/logo.png",
+                "alt": "QuickSite logo",
+                "description": "Default QuickSite template logo"
+            }
+        ]
+    },
+    "steps": [
+        {
+            "comment": "Upload all v2 template images from GitHub",
+            "forEach": "assets",
+            "command": "uploadAsset",
+            "params": {
+                "url": "{{$value.url}}",
+                "alt": "{{$value.alt}}",
+                "description": "{{$value.description}}"
+            }
+        }
+    ]
+}
+

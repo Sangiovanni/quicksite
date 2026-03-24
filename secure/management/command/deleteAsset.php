@@ -1,173 +1,210 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/AssetMetadataManager.php';
 
 /**
  * Delete Asset Command
  * 
- * Deletes a file from assets folders
- * Parameters: category (string), filename (string)
+ * Deletes one or more files from assets folders.
+ * Category is auto-detected from the file extension.
+ * 
+ * Parameters:
+ * - filename (string): Single filename to delete
+ * - filenames (array of strings): Multiple filenames to delete (batch mode)
+ * 
+ * Provide either filename or filenames, not both.
+ * Batch mode (filenames) max 50 files per request.
  */
 
 // Get parameters from POST/JSON
 $params = $trimParametersManagement->params();
-$category = $params['category'] ?? null;
-$filename = $params['filename'] ?? null;
+$singleFilename = $params['filename'] ?? null;
+$batchFilenames = $params['filenames'] ?? null;
 
-// Validate category is provided
-if (empty($category)) {
+// Initialize AssetMetadataManager for category resolution and metadata cleanup
+$metaManager = new AssetMetadataManager(
+    PROJECT_PATH . '/data',
+    SECURE_FOLDER_PATH . '/management/config/assetExtensions.php'
+);
+
+// Determine mode: single or batch
+if ($singleFilename !== null && $batchFilenames !== null) {
+    ApiResponse::create(400, 'validation.invalid_params')
+        ->withMessage('Provide either filename or filenames, not both')
+        ->send();
+}
+
+if ($singleFilename === null && $batchFilenames === null) {
     ApiResponse::create(400, 'validation.missing_field')
-        ->withMessage('category parameter is required')
+        ->withMessage('filename or filenames parameter is required')
+        ->withData(['required_fields' => ['filename or filenames']])
+        ->send();
+}
+
+// Build the list of filenames to process
+$filenamesToDelete = [];
+
+if ($batchFilenames !== null) {
+    if (!is_array($batchFilenames)) {
+        ApiResponse::create(400, 'validation.invalid_type')
+            ->withMessage('The filenames parameter must be an array of strings.')
+            ->withErrors([['field' => 'filenames', 'reason' => 'invalid_type', 'expected' => 'array']])
+            ->send();
+    }
+
+    if (empty($batchFilenames)) {
+        ApiResponse::create(400, 'validation.invalid_value')
+            ->withMessage('The filenames array must not be empty.')
+            ->withErrors([['field' => 'filenames', 'reason' => 'empty_array']])
+            ->send();
+    }
+
+    if (count($batchFilenames) > 50) {
+        ApiResponse::create(400, 'validation.invalid_length')
+            ->withMessage('Maximum 50 files per batch delete request.')
+            ->withErrors([['field' => 'filenames', 'reason' => 'too_many', 'max' => 50, 'actual' => count($batchFilenames)]])
+            ->send();
+    }
+
+    $filenamesToDelete = $batchFilenames;
+} else {
+    $filenamesToDelete = [$singleFilename];
+}
+
+/**
+ * Validate and delete a single asset file.
+ * Returns ['success' => true/false, ...] result array.
+ */
+function validateAndDeleteAsset(string $filename, AssetMetadataManager $metaManager): array {
+    // Type check
+    if (!is_string($filename)) {
+        return ['success' => false, 'filename' => (string)$filename, 'error' => 'Filename must be a string'];
+    }
+
+    // Path traversal check
+    if (strpos($filename, '..') !== false || strpos($filename, '/') !== false ||
+        strpos($filename, '\\') !== false || strpos($filename, "\0") !== false) {
+        return ['success' => false, 'filename' => $filename, 'error' => 'Invalid path characters'];
+    }
+
+    $filename = basename($filename);
+
+    if (empty($filename)) {
+        return ['success' => false, 'filename' => $filename, 'error' => 'Empty filename'];
+    }
+
+    if (strlen($filename) > 100) {
+        return ['success' => false, 'filename' => $filename, 'error' => 'Filename exceeds 100 characters'];
+    }
+
+    if (!RegexPatterns::match('file_name_with_ext', $filename)) {
+        return ['success' => false, 'filename' => $filename, 'error' => 'Invalid filename format'];
+    }
+
+    // Auto-detect category
+    $category = $metaManager->resolveCategory($filename);
+    if ($category === null) {
+        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        return ['success' => false, 'filename' => $filename, 'error' => "Unrecognized extension '.{$ext}'"];
+    }
+
+    // Build path and check existence
+    $filePath = PUBLIC_CONTENT_PATH . '/assets/' . $category . '/' . $filename;
+
+    if (!file_exists($filePath) || !is_file($filePath)) {
+        return ['success' => false, 'filename' => $filename, 'category' => $category, 'error' => 'File not found'];
+    }
+
+    // Delete the file
+    if (!unlink($filePath)) {
+        return ['success' => false, 'filename' => $filename, 'category' => $category, 'error' => 'Failed to delete file'];
+    }
+
+    // Remove metadata
+    $metaManager->remove($category, $filename);
+
+    return ['success' => true, 'filename' => $filename, 'category' => $category];
+}
+
+// === Single file mode ===
+if ($singleFilename !== null) {
+    // Validate type upfront for single mode (better error messages)
+    if (!is_string($singleFilename)) {
+        ApiResponse::create(400, 'validation.invalid_type')
+            ->withMessage('The filename parameter must be a string.')
+            ->withErrors([['field' => 'filename', 'reason' => 'invalid_type', 'expected' => 'string']])
+            ->send();
+    }
+
+    if (empty($singleFilename)) {
+        ApiResponse::create(400, 'validation.missing_field')
+            ->withMessage('filename parameter is required')
+            ->withData(['required_fields' => ['filename']])
+            ->send();
+    }
+
+    $result = validateAndDeleteAsset($singleFilename, $metaManager);
+
+    if (!$result['success']) {
+        $status = str_contains($result['error'], 'not found') ? 404 : 400;
+        $code = str_contains($result['error'], 'not found') ? 'asset.not_found' : 'validation.invalid_format';
+        ApiResponse::create($status, $code)
+            ->withMessage($result['error'])
+            ->withData(['filename' => $result['filename'], 'category' => $result['category'] ?? null])
+            ->send();
+    }
+
+    $metaManager->save();
+
+    ApiResponse::create(204, 'operation.success')
+        ->withMessage("File deleted successfully")
         ->withData([
-            'required_fields' => ['category']
+            'filename' => $result['filename'],
+            'category' => $result['category']
         ])
         ->send();
 }
 
-// Type validation - category must be string
-if (!is_string($category)) {
-    ApiResponse::create(400, 'validation.invalid_type')
-        ->withMessage('The category parameter must be a string.')
-        ->withErrors([
-            ['field' => 'category', 'reason' => 'invalid_type', 'expected' => 'string']
-        ])
-        ->send();
-}
+// === Batch mode ===
+$deleted = [];
+$failed = [];
 
-// Validate category against whitelist
-$validCategories = require SECURE_FOLDER_PATH . '/management/config/assetCategories.php';
-
-// Dynamic length validation based on longest valid category
-$maxCategoryLength = max(array_map('strlen', $validCategories));
-if (strlen($category) > $maxCategoryLength) {
-    ApiResponse::create(400, 'validation.invalid_length')
-        ->withMessage("The category parameter must not exceed {$maxCategoryLength} characters.")
-        ->withErrors([
-            ['field' => 'category', 'value' => $category, 'max_length' => $maxCategoryLength]
-        ])
-        ->send();
-}
-
-// Check if category is in whitelist
-if (!in_array($category, $validCategories, true)) {
-    ApiResponse::create(400, 'validation.invalid_value')
-        ->withMessage("Category must be one of: " . implode(', ', $validCategories))
-        ->withErrors([
-            ['field' => 'category', 'value' => $category, 'allowed' => $validCategories]
-        ])
-        ->send();
-}
-
-// Validate filename is provided
-if (empty($filename)) {
-    ApiResponse::create(400, 'validation.missing_field')
-        ->withMessage('filename parameter is required')
-        ->withData([
-            'required_fields' => ['filename']
-        ])
-        ->send();
-}
-
-// Type validation - filename must be string
-if (!is_string($filename)) {
-    ApiResponse::create(400, 'validation.invalid_type')
-        ->withMessage('The filename parameter must be a string.')
-        ->withErrors([
-            ['field' => 'filename', 'reason' => 'invalid_type', 'expected' => 'string']
-        ])
-        ->send();
-}
-
-// Check for path traversal attempts BEFORE sanitization
-if (strpos($filename, '..') !== false || 
-    strpos($filename, '/') !== false || 
-    strpos($filename, '\\') !== false ||
-    strpos($filename, "\0") !== false) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage('Filename contains invalid path characters')
-        ->withErrors([
-            ['field' => 'filename', 'reason' => 'path_traversal_attempt']
-        ])
-        ->send();
-}
-
-// Sanitize filename - basename removes any path components
-$filename = basename($filename);
-
-// After sanitization, check if filename is empty or became empty
-if (empty($filename)) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage('Invalid filename format (empty after sanitization)')
-        ->withErrors([
-            ['field' => 'filename', 'reason' => 'empty_after_sanitization']
-        ])
-        ->send();
-}
-
-// Filename length validation - max 100 characters (including extension)
-if (strlen($filename) > 100) {
-    ApiResponse::create(400, 'validation.invalid_length')
-        ->withMessage("The filename must not exceed 100 characters.")
-        ->withErrors([
-            ['field' => 'filename', 'value' => $filename, 'max_length' => 100]
-        ])
-        ->send();
-}
-
-// Format validation - only alphanumeric, hyphens, underscores, and dots for extension
-if (!RegexPatterns::match('file_name_with_ext', $filename)) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage('Filename must contain only letters, numbers, hyphens, and underscores, with a valid extension')
-        ->withErrors([RegexPatterns::validationError('file_name_with_ext', 'filename', $filename)])
-        ->send();
-}
-
-// Build file path
-$filePath = PUBLIC_CONTENT_PATH . '/assets/' . $category . '/' . $filename;
-
-// Check if file exists
-if (!file_exists($filePath)) {
-    ApiResponse::create(404, 'asset.not_found')
-        ->withMessage("File '{$filename}' not found in category '{$category}'")
-        ->withData([
-            'filename' => $filename,
-            'category' => $category
-        ])
-        ->send();
-}
-
-// Check if it's actually a file (not a directory)
-if (!is_file($filePath)) {
-    ApiResponse::create(400, 'asset.invalid_filename')
-        ->withMessage("Path is not a file")
-        ->send();
-}
-
-// Delete the file
-if (!unlink($filePath)) {
-    ApiResponse::create(500, 'asset.delete_failed')
-        ->withMessage("Failed to delete file")
-        ->send();
-}
-
-// Remove metadata for this asset if exists
-$metadataPath = PROJECT_PATH . '/data/assets_metadata.json';
-if (file_exists($metadataPath)) {
-    $metadataContent = file_get_contents($metadataPath);
-    $metadata = json_decode($metadataContent, true) ?: [];
-    
-    $assetKey = $category . '/' . $filename;
-    if (isset($metadata[$assetKey])) {
-        unset($metadata[$assetKey]);
-        file_put_contents($metadataPath, json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+foreach ($filenamesToDelete as $fname) {
+    $result = validateAndDeleteAsset($fname, $metaManager);
+    if ($result['success']) {
+        $deleted[] = ['filename' => $result['filename'], 'category' => $result['category']];
+    } else {
+        $failed[] = ['filename' => $result['filename'], 'error' => $result['error']];
     }
 }
 
-// Success response
+// Save metadata once for all deletions
+if (!empty($deleted)) {
+    $metaManager->save();
+}
+
+$totalDeleted = count($deleted);
+$totalFailed = count($failed);
+
+if ($totalDeleted === 0) {
+    ApiResponse::create(400, 'operation.failed')
+        ->withMessage("No files were deleted ({$totalFailed} failed)")
+        ->withData(['deleted' => [], 'failed' => $failed])
+        ->send();
+}
+
+$message = "{$totalDeleted} file" . ($totalDeleted > 1 ? 's' : '') . " deleted successfully";
+if ($totalFailed > 0) {
+    $message .= " ({$totalFailed} failed)";
+}
+
 ApiResponse::create(204, 'operation.success')
-    ->withMessage("File deleted successfully")
+    ->withMessage($message)
     ->withData([
-        'filename' => $filename,
-        'category' => $category
+        'deleted' => $deleted,
+        'failed' => $failed,
+        'total_deleted' => $totalDeleted,
+        'total_failed' => $totalFailed
     ])
     ->send();

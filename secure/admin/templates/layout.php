@@ -105,6 +105,7 @@ $langNames = [
             $settingsPages = ['settings', 'apis', 'ai-settings'];
             $isBuildActive = in_array($currentPage, $buildPages);
             $isSettingsActive = in_array($currentPage, $settingsPages);
+            $isAssetsActive = ($currentPage === 'assets');
         ?>
         <nav class="admin-nav">
             <a href="<?= $router->url('dashboard') ?>" 
@@ -158,6 +159,15 @@ $langNames = [
                     </a>
                 </div>
             </div>
+            
+            <!-- Assets - Top-level tab -->
+            <a href="<?= $router->url('assets') ?>" 
+               class="admin-nav__link<?= $isAssetsActive ? ' admin-nav__link--active' : '' ?>">
+                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+                <span>Assets</span>
+            </a>
             
             <!-- Settings Group - Click goes to Project Settings -->
             <div class="admin-nav__group<?= $isSettingsActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="settings">

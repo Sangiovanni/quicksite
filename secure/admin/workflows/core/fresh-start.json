@@ -64,16 +64,6 @@
             "forEach": "assetsData.images",
             "command": "deleteAsset",
             "params": {
-                "category": "images",
-                "filename": "{{$value.filename}}"
-            }
-        },
-        {
-            "condition": "param.keepAssets !== true",
-            "forEach": "assetsData.documents",
-            "command": "deleteAsset",
-            "params": {
-                "category": "documents",
                 "filename": "{{$value.filename}}"
             }
         },
@@ -82,7 +72,6 @@
             "forEach": "assetsData.videos",
             "command": "deleteAsset",
             "params": {
-                "category": "videos",
                 "filename": "{{$value.filename}}"
             }
         },
@@ -91,28 +80,18 @@
             "forEach": "assetsData.audio",
             "command": "deleteAsset",
             "params": {
-                "category": "audio",
                 "filename": "{{$value.filename}}"
             }
         },
         {
             "condition": "param.keepAssets !== true",
-            "forEach": "assetsData.fonts",
+            "forEach": "assetsData.font",
             "command": "deleteAsset",
             "params": {
-                "category": "fonts",
                 "filename": "{{$value.filename}}"
             }
         },
-        {
-            "condition": "param.keepAssets !== true",
-            "forEach": "assetsData.other",
-            "command": "deleteAsset",
-            "params": {
-                "category": "other",
-                "filename": "{{$value.filename}}"
-            }
-        },
+
         {
             "comment": "=== PHASE 3: DELETE ALL COMPONENTS ===",
             "forEach": "componentsData.components",

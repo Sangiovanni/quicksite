@@ -3,7 +3,7 @@
  * Valid Asset Categories Configuration
  * 
  * Defines the allowed asset categories for the management system.
- * Used by: uploadAsset, deleteAsset, listAssets
+ * Used by: uploadAsset, deleteAsset, listAssets, editAsset
  * 
  * To add a new category:
  * 1. Add the category name to this array

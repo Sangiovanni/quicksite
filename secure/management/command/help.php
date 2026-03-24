@@ -1362,17 +1362,10 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'uploadAsset' => [
-        'description' => 'Uploads a file to the assets folder with validation and automatic naming. Supports multipart file upload or HTTPS URL download.',
+        'description' => 'Uploads a file to the assets folder with validation and automatic naming. Category is auto-detected from file extension. Supports multipart file upload or HTTPS URL download.',
         'method' => 'POST',
         'content_type' => 'multipart/form-data or application/json',
         'parameters' => [
-            'category' => [
-                'required' => true,
-                'type' => 'query_string',
-                'description' => 'Asset category (in URL query string)',
-                'example' => 'images',
-                'validation' => 'Must be one of: images, font, audio, videos'
-            ],
             'file' => [
                 'required' => false,
                 'type' => 'file',
@@ -1415,8 +1408,8 @@ $GLOBALS['__help_commands'] = [
             'audio' => 'MP3, WAV, OGG',
             'videos' => 'MP4, WebM, OGV'
         ],
-        'example_curl' => 'curl -F "file=@logo.png" "http://yoursite.com/management?command=uploadAsset&category=images"',
-        'example_curl_url' => 'curl -X POST -H "Content-Type: application/json" -d \'{"url":"https://example.com/photo.jpg"}\' "http://yoursite.com/management?command=uploadAsset&category=images"',
+        'example_curl' => 'curl -F "file=@logo.png" "http://yoursite.com/management?command=uploadAsset"',
+        'example_curl_url' => 'curl -X POST -H "Content-Type: application/json" -d \'{"url":"https://example.com/photo.jpg"}\' "http://yoursite.com/management?command=uploadAsset"',
         'success_response' => [
             'status' => 201,
             'code' => 'operation.success',
@@ -1430,54 +1423,56 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '400.asset.invalid_category' => 'Invalid category',
             '400.asset.upload_failed' => 'File upload error',
             '400.asset.url_download_failed' => 'URL download failed (invalid URL, SSRF blocked, or HTTP error)',
             '400.asset.file_too_large' => 'File exceeds size limit',
             '400.asset.invalid_file_type' => 'MIME type not allowed',
-            '400.asset.invalid_extension' => 'File extension not allowed',
+            '400.asset.invalid_extension' => 'Unrecognized file extension',
             '500.asset.move_failed' => 'Failed to save file'
         ],
-        'notes' => 'Validates MIME type (actual content, not just extension). Sanitizes filename. Auto-renames if file exists (adds _1, _2, etc.). SVG files are sanitized to remove scripts. URL downloads require HTTPS and block private IPs. Either file or url must be provided.'
+        'notes' => 'Category is auto-detected from file extension (no category parameter needed). Validates MIME type (actual content, not just extension). Sanitizes filename. Auto-renames if file exists (adds _1, _2, etc.). SVG files are sanitized to remove scripts. URL downloads require HTTPS and block private IPs. Either file or url must be provided.'
     ],
     
     'deleteAsset' => [
-        'description' => 'Deletes a file from the assets folder',
+        'description' => 'Deletes one or more files from the assets folder. Category is auto-detected from file extension. Supports single or batch deletion.',
         'method' => 'DELETE',
         'parameters' => [
-            'category' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Asset category',
-                'example' => 'images',
-                'validation' => 'Must be one of: images, font, audio, videos'
-            ],
             'filename' => [
-                'required' => true,
+                'required' => false,
                 'type' => 'string',
-                'description' => 'Filename to delete',
+                'description' => 'Single filename to delete (use filename OR filenames, not both)',
                 'example' => 'logo.png',
-                'validation' => 'Must exist in specified category'
+                'validation' => 'Must exist in auto-detected category folder'
+            ],
+            'filenames' => [
+                'required' => false,
+                'type' => 'array',
+                'description' => 'Array of filenames to delete in batch (max 50)',
+                'example' => '["logo.png", "banner.jpg", "icon.svg"]',
+                'validation' => 'Each filename validated individually'
             ]
         ],
-        'example_delete' => 'DELETE /management/deleteAsset {"category": "images", "filename": "logo.png"}',
+        'example_delete' => 'DELETE /management/deleteAsset {"filename": "logo.png"}',
+        'example_batch' => 'DELETE /management/deleteAsset {"filenames": ["logo.png", "banner.jpg"]}',
         'success_response' => [
             'status' => 204,
             'code' => 'operation.success',
             'message' => 'File deleted successfully',
             'data' => [
-                'filename' => 'logo.png',
-                'category' => 'images'
+                'filename' => 'logo.png (single mode)',
+                'deleted' => '[{filename, category}, ...] (batch mode)',
+                'failed' => '[{filename, error}, ...] (batch mode)'
             ]
         ],
         'error_responses' => [
-            '400.asset.invalid_category' => 'Invalid category',
-            '400.validation.required' => 'Missing filename',
+            '400.validation.required' => 'Missing filename or filenames',
+            '400.validation.invalid_extension' => 'Unrecognized file extension',
+            '400.validation.invalid_params' => 'Both filename and filenames provided',
             '400.asset.invalid_filename' => 'Invalid filename (path traversal blocked)',
             '404.asset.not_found' => 'File not found',
             '500.asset.delete_failed' => 'Failed to delete file'
         ],
-        'notes' => 'Includes path traversal protection. Only deletes files, not directories. Returns 204 on success.'
+        'notes' => 'Category is auto-detected from file extension. Supports batch deletion with filenames array (max 50). In batch mode, partial success is possible — check deleted and failed arrays in the response.'
     ],
     
     'listAssets' => [
@@ -1525,28 +1520,28 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Returns files sorted alphabetically. Excludes index.php files. Shows size in bytes and last modified timestamp. Includes metadata (description, alt, dimensions) when available.'
     ],
     
-    'updateAssetMeta' => [
-        'description' => 'Updates metadata (description, alt text) for an existing asset. Useful for AI context and accessibility.',
+    'editAsset' => [
+        'description' => 'Edit an existing asset: rename it, update its metadata (description, alt text), or both. Category is auto-detected from file extension.',
         'method' => 'POST',
         'parameters' => [
-            'category' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Asset category',
-                'example' => 'images',
-                'validation' => 'Must be one of: images, font, audio, videos'
-            ],
             'filename' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Name of the file to update metadata for',
+                'description' => 'Current filename of the asset to edit',
                 'example' => 'logo.png',
-                'validation' => 'Must exist in specified category'
+                'validation' => 'Must exist in auto-detected category folder'
+            ],
+            'newFilename' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'New filename (extension auto-appended if omitted, must match original if provided)',
+                'example' => 'company-logo',
+                'validation' => 'Max 100 chars, must not already exist'
             ],
             'description' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Description of the asset for AI context and documentation',
+                'description' => 'Description of the asset for AI context. Send empty string to remove.',
                 'example' => 'Company logo displayed in header',
                 'validation' => 'Max 500 characters',
                 'ui_type' => 'textarea'
@@ -1554,36 +1549,40 @@ $GLOBALS['__help_commands'] = [
             'alt' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Alt text for images (accessibility)',
+                'description' => 'Alt text for images (accessibility). Send empty string to remove.',
                 'example' => 'Company logo',
                 'validation' => 'Max 250 characters',
                 'ui_type' => 'text'
             ]
         ],
-        'example_request' => 'POST /management/updateAssetMeta {"category": "images", "filename": "logo.png", "description": "Main company logo", "alt": "Company logo"}',
+        'example_request' => 'POST /management/editAsset {"filename": "old-logo.png", "newFilename": "company-logo", "description": "Main company logo", "alt": "Company logo"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => 'Asset metadata updated successfully',
+            'message' => 'Asset updated successfully',
             'data' => [
                 'category' => 'images',
-                'filename' => 'logo.png',
+                'filename' => 'company-logo.png',
+                'path' => '/assets/images/company-logo.png',
                 'metadata' => [
                     'description' => 'Main company logo',
-                    'alt' => 'Company logo',
-                    'dimensions' => ['width' => 200, 'height' => 50]
-                ]
+                    'alt' => 'Company logo'
+                ],
+                'changes' => ['renamed', 'description', 'alt']
             ]
         ],
         'error_responses' => [
-            '400.validation.missing_field' => 'Missing required parameter (category or filename)',
+            '400.validation.missing_field' => 'Missing filename or no updates specified',
             '400.validation.invalid_type' => 'Parameter must be a string',
-            '400.validation.invalid_value' => 'Invalid category',
-            '400.validation.invalid_length' => 'Description or alt text too long',
-            '400.validation.no_updates' => 'At least one metadata field required',
-            '404.asset.not_found' => 'Asset file not found'
+            '400.validation.invalid_extension' => 'Unrecognized file extension',
+            '400.validation.invalid_value' => 'Extension mismatch or same name',
+            '400.validation.invalid_format' => 'Invalid filename format or path traversal',
+            '400.validation.invalid_length' => 'Filename, description, or alt text too long',
+            '404.asset.not_found' => 'Asset file not found',
+            '409.asset.already_exists' => 'Target filename already exists',
+            '500.asset.rename_failed' => 'File system rename failed'
         ],
-        'notes' => 'Metadata is stored in secure/config/assets_metadata.json. At least one of description or alt must be provided. Image dimensions are auto-detected if not already stored.'
+        'notes' => 'Category is auto-detected from file extension. At least one of newFilename, description, or alt must be provided. If newFilename omits the extension, the original extension is auto-appended. If an extension is provided, it must match the original. Metadata is preserved when renaming. Send empty string for description/alt to remove that field.'
     ],
     
     'getStyles' => [
@@ -4916,7 +4915,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'alias_management' => ['createAlias', 'deleteAlias', 'listAliases'],
                 'translation_management' => ['getTranslation', 'getTranslations', 'setTranslationKeys', 'deleteTranslationKeys', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations'],
                 'language_management' => ['getLangList', 'setMultilingual', 'checkStructureMulti', 'addLang', 'deleteLang', 'setDefaultLang'],
-                'asset_management' => ['uploadAsset', 'deleteAsset', 'listAssets', 'updateAssetMeta'],
+                'asset_management' => ['uploadAsset', 'deleteAsset', 'listAssets', 'editAsset'],
                 'style_management' => ['getStyles', 'editStyles'],
                 'css_variables_rules' => ['getRootVariables', 'setRootVariables', 'listStyleRules', 'getStyleRule', 'setStyleRule', 'deleteStyleRule'],
                 'css_animations' => ['getKeyframes', 'setKeyframes', 'deleteKeyframes'],
@@ -4966,7 +4965,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
             'note' => 'For GET commands with URL parameters, use URL segments (e.g., /getStructure/menu, /validateTranslations/en, /getStyleRule/.btn-primary, /getSiteMap/text). For POST commands, send parameters as JSON in request body. For file uploads, use multipart/form-data encoding.',
             'workflows' => [
                 'translation_workflow' => '1) analyzeTranslations for full health check, OR 2) validateTranslations to find missing, 3) getUnusedTranslationKeys to find orphans, 4) setTranslationKeys to add/update, 5) deleteTranslationKeys to clean up.',
-                'asset_workflow' => '1) listAssets to see existing files with metadata, 2) uploadAsset to add new files (with optional description), 3) updateAssetMeta to add/update descriptions and alt text, 4) deleteAsset to remove files.',
+                'asset_workflow' => '1) listAssets to see existing files with metadata, 2) uploadAsset to add new files (with optional description), 3) editAsset to rename files or update descriptions and alt text, 4) deleteAsset to remove files.',
                 'style_workflow' => '1) getStyles to retrieve current CSS, 2) editStyles to update (response includes backup for rollback).',
                 'css_granular_workflow' => '1) getRootVariables to see all CSS variables, 2) setRootVariables to update colors/spacing/etc, 3) listStyleRules to see all selectors, 4) getStyleRule to inspect specific rules, 5) setStyleRule to add/update rules, 6) deleteStyleRule to remove rules.',
                 'animation_workflow' => '1) getKeyframes to list all animations, 2) setKeyframes to add/update animations, 3) deleteKeyframes to remove animations.',

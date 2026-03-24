@@ -49,85 +49,24 @@ if ($isEdit) {
     unset($spec['_source']);
     $specJson = json_encode($spec, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 } else {
-    // New spec - provide starter template
-    $editSpecId = '';
+    // New spec - provide clean starter template
+    $editWorkflowId = '';
     $specJson = json_encode([
-        'id' => 'my-custom-spec',
+        'id' => '',
         'version' => '1.0.0',
         'meta' => [
             'icon' => '🎯',
-            'titleKey' => 'ai.specs.myCustomSpec.title',
-            'descriptionKey' => 'ai.specs.myCustomSpec.description',
+            'name' => '',
+            'description' => '',
             'category' => 'advanced',
             'difficulty' => 'intermediate',
-            'tags' => ['custom']
+            'tags' => []
         ],
-        'parameters' => [
-            [
-                'id' => 'userGoal',
-                'type' => 'textarea',
-                'required' => true,
-                'labelKey' => 'ai.specs.myCustomSpec.params.userGoal.label',
-                'placeholderKey' => 'ai.specs.myCustomSpec.params.userGoal.placeholder',
-                'helpKey' => 'ai.specs.myCustomSpec.params.userGoal.help'
-            ]
-        ],
-        'examples' => [
-            [
-                'id' => 'example1',
-                'titleKey' => 'ai.specs.myCustomSpec.examples.example1.title',
-                'promptKey' => 'ai.specs.myCustomSpec.examples.example1.prompt',
-                'params' => [
-                    'userGoal' => 'Example goal description'
-                ]
-            ]
-        ],
-        'dataRequirements' => [
-            [
-                'id' => 'structure',
-                'extract' => 'components'
-            ]
-        ],
-        'relatedCommands' => [
-            'editStructure'
-        ],
-        'promptTemplate' => 'my-custom-spec.md'
+        'parameters' => [],
+        'steps' => []
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     
-    $templateContent = <<<'TEMPLATE'
-# My Custom Spec
-
-You are helping with a custom QuickSite task.
-
-## User's Goal
-
-{{userGoal}}
-
-## Current Structure
-
-```json
-{{json structure}}
-```
-
-## Output Format
-
-```json
-[
-  { "command": "commandName", "param": "value" }
-]
-```
-
-## Instructions
-
-1. Analyze the user's goal
-2. Generate appropriate QuickSite commands
-3. Return valid JSON array of commands
-
-{{#if notes}}
-## Additional Notes
-{{notes}}
-{{/if}}
-TEMPLATE;
+    $templateContent = '';
 }
 
 // Load the JSON schema for reference
@@ -169,7 +108,7 @@ window.QUICKSITE_CONFIG.translations = {
     <div class="ai-editor-info">
         <div class="ai-editor-info__title">💡 <?= __admin('workflows.editor.info.title', 'Creating a Custom Workflow') ?></div>
         <div class="ai-editor-info__text">
-            <?= __admin('workflows.editor.info.text', 'Custom workflows are saved to the secure/admin/workflows/custom/ folder. They will appear alongside core workflows in the browser. Make sure to add translation keys to your locale files for labels and descriptions.') ?>
+            <?= __admin('workflows.editor.info.text', 'Custom workflows are saved locally. Use meta.name and meta.description for display text. For manual workflows, define steps with commands. For AI workflows, write a prompt template in the right panel and set promptTemplate in the JSON.') ?>
         </div>
     </div>
     <?php endif; ?>

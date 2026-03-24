@@ -874,7 +874,7 @@
             if ((assetsResponse.status === 200 || assetsResponse.success) && assetsResponse.data?.assets) {
                 for (const [category, files] of Object.entries(assetsResponse.data.assets)) {
                     for (const file of files) {
-                        commands.push({ command: 'deleteAsset', params: { category, filename: file.filename } });
+                        commands.push({ command: 'deleteAsset', params: { filename: file.filename } });
                     }
                 }
             }

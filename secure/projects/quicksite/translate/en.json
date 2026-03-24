@@ -234,6 +234,15 @@
                     "alt": "Alt text for images/accessibility (max 200 chars)"
                 }
             },
+            "editAsset": {
+                "desc": "Edit an existing asset: rename, update description or alt text. Category is auto-detected.",
+                "params": {
+                    "filename": "Current filename of the asset to edit",
+                    "newFilename": "New filename (must keep same extension)",
+                    "description": "Description for AI context (max 500 chars)",
+                    "alt": "Alt text for images/accessibility (max 250 chars)"
+                }
+            },
             "getStyles": {
                 "desc": "Retrieves the content of the main SCSS/CSS file"
             },

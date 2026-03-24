@@ -711,9 +711,9 @@ switch ($action) {
         }
         
         $input = json_decode(file_get_contents('php://input'), true);
-        if (!$input || !isset($input['spec']) || !isset($input['template'])) {
+        if (!$input || !isset($input['spec'])) {
             http_response_code(400);
-            echo json_encode(['error' => 'Missing spec or template data']);
+            echo json_encode(['error' => 'Missing spec data']);
             break;
         }
         
@@ -721,9 +721,10 @@ switch ($action) {
         $manager = new WorkflowManager();
         
         $spec = $input['spec'];
-        $template = $input['template'];
+        $template = $input['template'] ?? '';
         $isNew = $input['isNew'] ?? true;
         $originalSpecId = $input['originalSpecId'] ?? '';
+        $hasTemplate = !empty(trim($template));
         
         // Validate the spec
         $validation = $manager->validateWorkflow($spec);
@@ -760,8 +761,12 @@ switch ($action) {
             if (file_exists($oldMdPath)) unlink($oldMdPath);
         }
         
-        // Set the promptTemplate reference
-        $spec['promptTemplate'] = $specId . '.md';
+        // Set the promptTemplate reference only for AI workflows with template content
+        if ($hasTemplate) {
+            $spec['promptTemplate'] = $specId . '.md';
+        } else {
+            unset($spec['promptTemplate']);
+        }
         
         // Write JSON file
         $jsonPath = $customFolder . '/' . $specId . '.json';
@@ -772,14 +777,19 @@ switch ($action) {
             break;
         }
         
-        // Write MD file
+        // Write MD file (only for AI workflows with template content)
         $mdPath = $customFolder . '/' . $specId . '.md';
-        if (file_put_contents($mdPath, $template) === false) {
-            // Clean up JSON if MD write failed
-            unlink($jsonPath);
-            http_response_code(500);
-            echo json_encode(['error' => 'Failed to write template MD file']);
-            break;
+        if ($hasTemplate) {
+            if (file_put_contents($mdPath, $template) === false) {
+                // Clean up JSON if MD write failed
+                unlink($jsonPath);
+                http_response_code(500);
+                echo json_encode(['error' => 'Failed to write template MD file']);
+                break;
+            }
+        } elseif (file_exists($mdPath)) {
+            // Clean up orphan .md from a previous version that had a template
+            unlink($mdPath);
         }
         
         echo json_encode([
