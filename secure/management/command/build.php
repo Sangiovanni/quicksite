@@ -583,17 +583,6 @@ if (file_exists($qsJsSource)) {
     }
 }
 
-// Copy qs-custom.js (user-defined custom functions)
-$qsCustomJsSource = PUBLIC_CONTENT_PATH . '/scripts/qs-custom.js';
-if (file_exists($qsCustomJsSource) && filesize($qsCustomJsSource) > 500) {
-    if (!copy($qsCustomJsSource, $scriptsDir . '/qs-custom.js')) {
-        release_build_lock();
-        ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage("Failed to copy qs-custom.js")
-            ->send();
-    }
-}
-
 // Load page-level events for compilation into pages
 $pageEventsFile = PROJECT_PATH . '/data/page-events.json';
 $allPageEvents = [];

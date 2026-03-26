@@ -3,7 +3,7 @@
  * listJsFunctions Command
  * 
  * Returns available QS.* JavaScript functions that can be used with {{call:...}} syntax.
- * Includes both core functions (from qs.js) and custom functions (from qs-custom.js).
+ * Returns core functions from qs.js.
  * 
  * @method GET
  * @route /management/listJsFunctions
@@ -13,7 +13,6 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/JsFunctionManager.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -191,43 +190,12 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
     }
     unset($func);
     
-    // Get custom functions
-    $manager = new JsFunctionManager();
-    $customFuncs = $manager->getCustomFunctions();
-    
-    // Format custom functions to match core function structure
-    $customFunctions = [];
-    foreach ($customFuncs as $func) {
-        $args = [];
-        foreach (($func['args'] ?? []) as $argName) {
-            $args[] = [
-                'name' => $argName,
-                'type' => 'any',
-                'required' => true,
-                'description' => ''
-            ];
-        }
-        
-        $customFunctions[] = [
-            'name' => $func['name'],
-            'signature' => 'QS.' . $func['name'] . '(' . implode(', ', $func['args'] ?? []) . ')',
-            'args' => $args,
-            'description' => $func['description'] ?? '',
-            'example' => '{{call:' . $func['name'] . ':' . implode(',', $func['args'] ?? []) . '}}',
-            'events' => ['onclick', 'onchange', 'oninput'],
-            'type' => 'custom',
-            'created' => $func['created'] ?? null,
-            'modified' => $func['modified'] ?? null
-        ];
-    }
-    
     // Merge core and custom functions
-    $allFunctions = array_merge($coreFunctions, $customFunctions);
+    $allFunctions = $coreFunctions;
     
     // Build function names lists
     $coreNames = array_map(fn($f) => $f['name'], $coreFunctions);
-    $customNames = array_map(fn($f) => $f['name'], $customFunctions);
-    $allNames = array_merge($coreNames, $customNames);
+    $allNames = $coreNames;
     
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('Available QS.* functions for {{call:...}} syntax')
@@ -235,15 +203,14 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
             'functions' => $allFunctions,
             'count' => count($allFunctions),
             'core_count' => count($coreFunctions),
-            'custom_count' => count($customFunctions),
+            'custom_count' => 0,
             'names' => $allNames,
             'core_names' => $coreNames,
-            'custom_names' => $customNames,
+            'custom_names' => [],
             'syntax' => '{{call:functionName:arg1,arg2,...}}',
             'special_keywords' => ['event', 'this'],
             'library_paths' => [
-                'core' => '/scripts/qs.js',
-                'custom' => '/scripts/qs-custom.js'
+                'core' => '/scripts/qs.js'
             ]
         ]);
 }

@@ -166,13 +166,6 @@ function __command_switchProject(array $params = [], array $urlParams = []): Api
         }
     }
     
-    // Regenerate qs-custom.js with new project's custom functions
-    require_once SECURE_FOLDER_PATH . '/src/classes/JsFunctionManager.php';
-    $jsManager = new JsFunctionManager($projectPath);
-    $regenerateResult = $jsManager->regenerateJsFile();
-    $result['custom_js_regenerated'] = $regenerateResult['success'];
-    $result['custom_functions_count'] = count($jsManager->getCustomFunctions());
-    
     // Regenerate qs-api-config.js with project's API configurations
     require_once SECURE_FOLDER_PATH . '/src/classes/ApiEndpointManager.php';
     $apiManager = new ApiEndpointManager($projectPath);

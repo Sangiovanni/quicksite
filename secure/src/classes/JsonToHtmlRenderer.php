@@ -629,29 +629,12 @@ class JsonToHtmlRenderer {
      * @return array
      */
     private function getAllowedJsFunctions(): array {
-        static $allowedFunctions = null;
-        
-        if ($allowedFunctions === null) {
-            // Core functions (always available)
-            $allowedFunctions = [
-                'show', 'hide', 'toggle', 'toggleHide', 'addClass', 'removeClass',
-                'setValue', 'redirect', 'filter', 'scrollTo', 'focus', 'blur', 'fetch',
-                'renderList', 'toast'
-            ];
-            
-            // Add custom functions if JsFunctionManager is available
-            $managerPath = SECURE_FOLDER_PATH . '/src/classes/JsFunctionManager.php';
-            if (file_exists($managerPath)) {
-                require_once $managerPath;
-                $manager = new \JsFunctionManager();
-                $customFuncs = $manager->getCustomFunctions();
-                foreach ($customFuncs as $func) {
-                    $allowedFunctions[] = $func['name'];
-                }
-            }
-        }
-        
-        return $allowedFunctions;
+        // Core functions from qs.js (always available)
+        return [
+            'show', 'hide', 'toggle', 'toggleHide', 'addClass', 'removeClass',
+            'setValue', 'redirect', 'filter', 'scrollTo', 'focus', 'blur', 'fetch',
+            'renderList', 'toast'
+        ];
     }
 
     /**

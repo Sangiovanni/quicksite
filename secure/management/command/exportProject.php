@@ -8,7 +8,7 @@
  * Export format v2.0:
  * - config.json (sanitized from config.php)
  * - routes.json (from routes.php)
- * - config/*.json (project settings: route-layout, custom-js-functions, etc.)
+ * - config/*.json (project settings: route-layout, etc.)
  * - templates/model/json/ (JSON structures only)
  * - translate/*.json
  * - data/*.json

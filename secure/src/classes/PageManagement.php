@@ -86,11 +86,6 @@ class PageManagement {
 
         // Always include QuickSite core library for {{call:...}} interactions
         $body .= '<script src="' . BASE_URL . '/scripts/qs.js"></script>';
-        // Include custom functions if file exists and is not empty
-        $customJsPath = PUBLIC_CONTENT_PATH . '/scripts/qs-custom.js';
-        if (file_exists($customJsPath) && filesize($customJsPath) > 500) {
-            $body .= '<script src="' . BASE_URL . '/scripts/qs-custom.js"></script>';
-        }
         // Include API endpoint config if file exists and has real content
         $apiConfigPath = PUBLIC_CONTENT_PATH . '/scripts/qs-api-config.js';
         if (file_exists($apiConfigPath) && filesize($apiConfigPath) > 100) {

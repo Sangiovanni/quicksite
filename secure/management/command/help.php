@@ -3793,7 +3793,7 @@ $GLOBALS['__help_commands'] = [
     // ==========================================
     
     'listJsFunctions' => [
-        'description' => 'Lists all available QS.* JavaScript functions that can be used in {{call:...}} syntax for page interactions. Returns both core built-in functions and custom project-specific functions.',
+        'description' => 'Lists all available QS.* JavaScript functions that can be used in {{call:...}} syntax for page interactions. Returns core built-in functions from qs.js.',
         'method' => 'GET',
         'parameters' => [],
         'example_get' => 'GET /management/listJsFunctions',
@@ -3812,165 +3812,17 @@ $GLOBALS['__help_commands'] = [
                         ],
                         'description' => 'Shows element(s) by removing the hide class',
                         'example' => '{{call:show:#modal}} or {{call:show:.cards,invisible}}'
-                    ],
-                    [
-                        'name' => 'customFunc',
-                        'type' => 'custom',
-                        'args' => [['name' => 'param1', 'type' => 'string', 'required' => true]],
-                        'description' => 'A custom function added via addJsFunction',
-                        'example' => '{{call:customFunc:value}}'
                     ]
                 ],
-                'total' => 14,
-                'core_count' => 12,
-                'custom_count' => 2
+                'total' => 15,
+                'core_count' => 15,
+                'custom_count' => 0
             ]
         ],
         'error_responses' => [
             '500.server.error' => 'Failed to load JavaScript functions'
         ],
-        'notes' => 'Core functions (12) are built into QS namespace and cannot be modified. Custom functions are project-specific and stored in secure/projects/{project}/config/custom-js-functions.json. Use {{call:functionName:arg1,arg2}} syntax in structure params like onclick, oninput.'
-    ],
-    
-    'addJsFunction' => [
-        'description' => 'Adds a custom JavaScript function to the QS namespace. Function becomes available in {{call:...}} syntax. Auto-regenerates qs-custom.js.',
-        'method' => 'POST',
-        'parameters' => [
-            'name' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Function name (alphanumeric + underscore, cannot start with number, cannot match core function names)',
-                'example' => 'myCustomToggle'
-            ],
-            'args' => [
-                'required' => false,
-                'type' => 'array',
-                'description' => 'Function arguments array with name, type, required, default, description',
-                'example' => '[{"name": "target", "type": "string", "required": true}, {"name": "duration", "type": "number", "default": 300}]'
-            ],
-            'body' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'JavaScript function body (without function wrapper). Must be valid JS.',
-                'example' => 'const el = document.querySelector(target); el.style.transition = `opacity ${duration}ms`; el.style.opacity = el.style.opacity === "0" ? "1" : "0";'
-            ],
-            'description' => [
-                'required' => false,
-                'type' => 'string',
-                'description' => 'Human-readable description of what the function does',
-                'example' => 'Toggles element opacity with custom duration'
-            ]
-        ],
-        'example_post' => 'POST /management/addJsFunction with body: {"name": "fadeToggle", "args": [{"name": "target", "type": "string", "required": true}], "body": "const el = document.querySelector(target); el.classList.toggle(\"faded\");", "description": "Toggles faded class"}',
-        'success_response' => [
-            'status' => 201,
-            'code' => 'js_function.created',
-            'message' => 'JavaScript function "fadeToggle" created successfully',
-            'data' => [
-                'name' => 'fadeToggle',
-                'type' => 'custom',
-                'args' => [['name' => 'target', 'type' => 'string', 'required' => true]],
-                'description' => 'Toggles faded class',
-                'usage' => '{{call:fadeToggle:#myElement}}'
-            ]
-        ],
-        'error_responses' => [
-            '400.validation.required' => 'name and body parameters are required',
-            '400.validation.invalid_name' => 'Invalid function name format',
-            '400.validation.reserved_name' => 'Cannot use reserved core function name',
-            '400.validation.duplicate_name' => 'Function with this name already exists',
-            '400.validation.invalid_body' => 'JavaScript body contains syntax errors or dangerous patterns',
-            '403.forbidden' => 'Insufficient permissions (admin required)'
-        ],
-        'notes' => 'Custom functions are stored per-project. The body is validated for balanced brackets and dangerous patterns (eval, Function constructor, etc.). Functions are immediately available after creation via qs-custom.js regeneration.'
-    ],
-    
-    'editJsFunction' => [
-        'description' => 'Edits an existing custom JavaScript function. Can update name, args, body, and description. Core functions cannot be edited.',
-        'method' => 'POST',
-        'parameters' => [
-            'name' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Current name of the function to edit',
-                'example' => 'fadeToggle'
-            ],
-            'newName' => [
-                'required' => false,
-                'type' => 'string',
-                'description' => 'New name for the function (if renaming)',
-                'example' => 'opacityToggle'
-            ],
-            'args' => [
-                'required' => false,
-                'type' => 'array',
-                'description' => 'Updated function arguments',
-                'example' => '[{"name": "target", "type": "string", "required": true}, {"name": "speed", "type": "number", "default": 500}]'
-            ],
-            'body' => [
-                'required' => false,
-                'type' => 'string',
-                'description' => 'Updated JavaScript function body',
-                'example' => 'document.querySelector(target).classList.toggle("visible");'
-            ],
-            'description' => [
-                'required' => false,
-                'type' => 'string',
-                'description' => 'Updated description',
-                'example' => 'Toggles visible class with optional speed'
-            ]
-        ],
-        'example_post' => 'POST /management/editJsFunction with body: {"name": "fadeToggle", "newName": "opacityToggle", "description": "Improved toggle function"}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'js_function.updated',
-            'message' => 'JavaScript function "opacityToggle" updated successfully',
-            'data' => [
-                'name' => 'opacityToggle',
-                'previous_name' => 'fadeToggle',
-                'type' => 'custom',
-                'updated_fields' => ['name', 'description']
-            ]
-        ],
-        'error_responses' => [
-            '400.validation.required' => 'name parameter is required',
-            '400.validation.no_changes' => 'No fields provided to update',
-            '400.validation.invalid_name' => 'Invalid new function name format',
-            '400.validation.duplicate_name' => 'A function with the new name already exists',
-            '400.validation.invalid_body' => 'JavaScript body contains syntax errors',
-            '403.forbidden' => 'Cannot edit core functions',
-            '404.not_found' => 'Function not found'
-        ],
-        'notes' => 'Only custom functions can be edited. Core functions (show, hide, toggle, etc.) are protected. Provide only the fields you want to update. Regenerates qs-custom.js on success.'
-    ],
-    
-    'deleteJsFunction' => [
-        'description' => 'Deletes a custom JavaScript function. Core functions cannot be deleted. Removes from qs-custom.js.',
-        'method' => 'POST',
-        'parameters' => [
-            'name' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Name of the custom function to delete',
-                'example' => 'fadeToggle'
-            ]
-        ],
-        'example_post' => 'POST /management/deleteJsFunction with body: {"name": "fadeToggle"}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'js_function.deleted',
-            'message' => 'JavaScript function "fadeToggle" deleted successfully',
-            'data' => [
-                'deleted_function' => 'fadeToggle',
-                'remaining_custom_functions' => 3
-            ]
-        ],
-        'error_responses' => [
-            '400.validation.required' => 'name parameter is required',
-            '403.forbidden' => 'Cannot delete core functions',
-            '404.not_found' => 'Custom function not found'
-        ],
-        'notes' => 'WARNING: Deleting a function that is used in page structures will cause JavaScript errors at runtime. Check usage before deleting. Core functions (12) are protected and cannot be deleted.'
+        'notes' => 'Returns 15 core functions built into the QS namespace (show, hide, toggle, toggleHide, addClass, removeClass, setValue, redirect, filter, scrollTo, focus, blur, fetch, renderList, toast). Use {{call:functionName:arg1,arg2}} syntax in structure params like onclick, oninput.'
     ],
     
     // ==========================================

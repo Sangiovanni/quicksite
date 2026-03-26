@@ -214,7 +214,6 @@ quicksite/
 │   │   └── videos/               # Video files
 │   ├── scripts/                  # Core front-end JS
 │   │   ├── qs.js                 # QuickSite runtime (show/hide, sort, routing)
-│   │   ├── qs-custom.js          # User-defined JS functions (managed via API)
 │   │   └── qs-api-config.js      # Client-side API endpoint configuration
 │   ├── style/                    # Site styles
 │   │   ├── style.css             # Main stylesheet (editable via API)
@@ -267,7 +266,7 @@ quicksite/
 **Key concepts:**
 - **`public/`** is the only folder exposed to the web. Everything else is behind the firewall.
 - **`public/management/`** is the API gateway. Any client (admin panel, curl, Flutter app, custom UI) talks to QuickSite through this endpoint.
-- **`public/scripts/`** contains the core JS runtime. `qs.js` handles front-end features like show/hide triggers, sorting, and dynamic behavior. `qs-custom.js` holds user-defined JS functions managed via the `addJsFunction` / `editJsFunction` API commands.
+- **`public/scripts/`** contains the core JS runtime. `qs.js` handles front-end features like show/hide triggers, sorting, and dynamic behavior.
 - **`secure/management/config/`** holds sensitive files (tokens, auth) that are gitignored. They are auto-created from `.example` templates on first load.
 - **Projects** are fully isolated in `secure/projects/`. Each has its own pages, translations, routes, and assets. Switch between them with `switchProject`.
 

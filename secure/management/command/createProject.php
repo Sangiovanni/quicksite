@@ -130,9 +130,6 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     // Create empty assets_metadata.json
     file_put_contents($projectPath . '/data/assets_metadata.json', '{}', LOCK_EX);
     
-    // Create empty custom-js-functions.json for project-specific JS functions
-    file_put_contents($projectPath . '/config/custom-js-functions.json', json_encode(['functions' => []], JSON_PRETTY_PRINT), LOCK_EX);
-    
     // Create default translation file
     $defaultTranslations = createDefaultTranslations($siteName);
     file_put_contents($projectPath . '/translate/default.json', json_encode($defaultTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);

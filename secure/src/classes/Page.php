@@ -53,12 +53,6 @@ class Page {
     <?php endif; ?>
     <script src="/<?= PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '' ?>scripts/qs.js"></script>
     <?php 
-    // Include custom functions if file exists and has content
-    $customJsPath = PUBLIC_CONTENT_PATH . '/scripts/qs-custom.js';
-    if (file_exists($customJsPath) && filesize($customJsPath) > 500): ?>
-    <script src="/<?= PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '' ?>scripts/qs-custom.js"></script>
-    <?php endif; ?>
-    <?php 
     // Include API endpoint config if file exists and has real content
     $apiConfigPath = PUBLIC_CONTENT_PATH . '/scripts/qs-api-config.js';
     if (file_exists($apiConfigPath) && filesize($apiConfigPath) > 100): ?>

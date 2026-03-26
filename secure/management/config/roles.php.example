@@ -155,7 +155,7 @@ return [
             'listAiProviders', 'detectProvider', 'testAiKey', 'callAi',
             'moveNode', 'deleteNode', 'duplicateNode', 'addNode', 'editNode',
             'addComponentToNode', 'editComponentToNode', 'renameComponent', 'duplicateComponent',
-            'listJsFunctions', 'addJsFunction', 'editJsFunction', 'deleteJsFunction',
+            'listJsFunctions',
             'listInteractions', 'addInteraction', 'editInteraction', 'deleteInteraction',
             'listApiEndpoints', 'getApiEndpoint', 'addApi', 'editApi', 'deleteApi', 'testApiEndpoint',
             'listSnippets', 'getSnippet', 'createSnippet', 'deleteSnippet', 'duplicateSnippet', 'insertSnippet',
