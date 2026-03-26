@@ -36,6 +36,5 @@
         }
     ],
     "relatedCommands": ["editStyles", "setRootVariables"],
-    "promptTemplate": "restyle.md",
-    "outputFormat": "json-commands"
+    "promptTemplate": "restyle.md"
 }

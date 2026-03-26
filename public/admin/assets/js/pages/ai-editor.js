@@ -25,6 +25,7 @@
     // DOM elements
     let jsonEditor;
     let templateEditor;
+    let translationsEditor;
     let jsonValidation;
     let templatePreview;
     let previewBtn;
@@ -39,6 +40,7 @@
         // Get DOM elements
         jsonEditor = document.getElementById('spec-json');
         templateEditor = document.getElementById('spec-template');
+        translationsEditor = document.getElementById('spec-translations');
         jsonValidation = document.getElementById('json-validation');
         templatePreview = document.getElementById('template-preview');
         previewBtn = document.getElementById('preview-btn');
@@ -77,9 +79,10 @@
      */
     function handleTabClick(tab) {
         const tabId = tab.dataset.tab;
+        const panel = tab.closest('.ai-editor-panel');
         
-        document.querySelectorAll('.ai-editor-tab').forEach(t => t.classList.remove('ai-editor-tab--active'));
-        document.querySelectorAll('.ai-editor-tab-content').forEach(c => c.classList.remove('ai-editor-tab-content--active'));
+        panel.querySelectorAll('.ai-editor-tab').forEach(t => t.classList.remove('ai-editor-tab--active'));
+        panel.querySelectorAll('.ai-editor-tab-content').forEach(c => c.classList.remove('ai-editor-tab-content--active'));
         
         tab.classList.add('ai-editor-tab--active');
         const tabContent = document.getElementById('tab-' + tabId);
@@ -231,6 +234,7 @@
                 body: JSON.stringify({
                     spec: validation.spec,
                     template: templateEditor.value,
+                    translations: parseTranslationsField(),
                     isNew: isNew,
                     originalSpecId: originalSpecId
                 })
@@ -257,6 +261,22 @@
         saveBtn.innerHTML = originalHtml;
     }
     
+    /**
+     * Parse the translations textarea content.
+     * Returns parsed object, null (if empty/unchanged), or empty object (if cleared).
+     */
+    function parseTranslationsField() {
+        if (!translationsEditor) return null;
+        const raw = translationsEditor.value.trim();
+        if (!raw) return null; // No content — keep existing file on server
+        try {
+            return JSON.parse(raw);
+        } catch (e) {
+            // Invalid JSON — return null to preserve server state
+            return null;
+        }
+    }
+
     /**
      * Show a message notification
      * @param {string} type - 'success' or 'error'

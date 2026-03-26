@@ -63,7 +63,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
     <nav class="ai-spec__breadcrumb">
         <a href="<?= $router->url('workflows') ?>"><?= __admin('workflows.browser.title', 'Workflows') ?></a>
         <span>›</span>
-        <span><?= htmlspecialchars($meta['name'] ?? __admin($meta['titleKey'] ?? '', $specId)) ?></span>
+        <span><?= htmlspecialchars($meta['name'] ?? __workflow($spec, $meta['titleKey'] ?? '', $specId)) ?></span>
     </nav>
     
     <?php if (!$validation['valid']): ?>
@@ -81,8 +81,8 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
     <header class="ai-spec__header">
         <span class="ai-spec__icon"><?= htmlspecialchars($meta['icon'] ?? '📋') ?></span>
         <div class="ai-spec__title-group">
-            <h1 class="ai-spec__title"><?= htmlspecialchars($meta['name'] ?? __admin($meta['titleKey'] ?? '', $specId)) ?></h1>
-            <p class="ai-spec__desc"><?= htmlspecialchars($meta['description'] ?? __admin($meta['descriptionKey'] ?? '', '')) ?></p>
+            <h1 class="ai-spec__title"><?= htmlspecialchars($meta['name'] ?? __workflow($spec, $meta['titleKey'] ?? '', $specId)) ?></h1>
+            <p class="ai-spec__desc"><?= htmlspecialchars($meta['description'] ?? __workflow($spec, $meta['descriptionKey'] ?? '', '')) ?></p>
             <div class="ai-spec__meta">
                 <?php if (!empty($meta['tags'])): ?>
                     <?php foreach ($meta['tags'] as $tag): ?>
@@ -131,10 +131,10 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                     <?php foreach ($examples as $example): ?>
                     <div class="ai-spec-example" 
                          data-params='<?= htmlspecialchars(json_encode($example['params'] ?? [])) ?>'
-                         data-prompt="<?= htmlspecialchars(__admin($example['promptKey'] ?? '', '')) ?>">
-                        <div class="ai-spec-example__title"><?= __admin($example['titleKey'] ?? '', $example['id']) ?></div>
+                         data-prompt="<?= htmlspecialchars(__workflow($spec, $example['promptKey'] ?? '', '')) ?>">
+                        <div class="ai-spec-example__title"><?= __workflow($spec, $example['titleKey'] ?? '', $example['id'] ?? '') ?></div>
                         <?php if (isset($example['promptKey'])): ?>
-                        <div class="ai-spec-example__desc"><?= __admin($example['promptKey'], '') ?></div>
+                        <div class="ai-spec-example__desc"><?= __workflow($spec, $example['promptKey'], '') ?></div>
                         <?php endif; ?>
                     </div>
                     <?php endforeach; ?>
@@ -182,15 +182,27 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                         <?php if ($loadPreset): ?>
                         <div class="ai-spec-form__group ai-spec-preset">
                             <label class="ai-spec-form__label" for="preset-select">
-                                <?= __admin($loadPreset['labelKey'] ?? 'workflows.loadPreset.label', 'Load existing build') ?>
+                                <?= __workflow($spec, $loadPreset['labelKey'] ?? 'workflows.loadPreset.label', 'Load existing build') ?>
                             </label>
                             <select id="preset-select" class="ai-spec-form__input ai-spec-preset__select" disabled>
-                                <option value=""><?= __admin($loadPreset['placeholderKey'] ?? 'workflows.loadPreset.placeholder', '-- New build (default) --') ?></option>
+                                <option value=""><?= __workflow($spec, $loadPreset['placeholderKey'] ?? 'workflows.loadPreset.placeholder', '-- New build (default) --') ?></option>
                             </select>
                         </div>
                         <hr class="ai-spec-preset__divider">
                         <?php endif; ?>
                         <?php foreach ($parameters as $param): ?>
+                        <?php
+                        // Build validation HTML attributes from the validation object
+                        $validationAttrs = '';
+                        if (isset($param['validation'])) {
+                            $v = $param['validation'];
+                            if (isset($v['minLength'])) $validationAttrs .= ' minlength="' . (int)$v['minLength'] . '"';
+                            if (isset($v['maxLength'])) $validationAttrs .= ' maxlength="' . (int)$v['maxLength'] . '"';
+                            if (isset($v['pattern']))   $validationAttrs .= ' pattern="' . htmlspecialchars($v['pattern']) . '"';
+                            if (isset($v['min']))        $validationAttrs .= ' min="' . htmlspecialchars($v['min']) . '"';
+                            if (isset($v['max']))        $validationAttrs .= ' max="' . htmlspecialchars($v['max']) . '"';
+                        }
+                        ?>
                         <?php if (($param['type'] ?? 'text') === 'hidden'): ?>
                         <input type="hidden" id="param-<?= htmlspecialchars($param['id']) ?>" name="<?= htmlspecialchars($param['id']) ?>" value="<?= htmlspecialchars($param['default'] ?? '') ?>" />
                         <?php elseif (($param['type'] ?? 'text') === 'checkbox'): ?>
@@ -204,16 +216,16 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                                 <?= ($param['default'] ?? false) ? 'checked' : '' ?>
                             />
                             <label class="ai-spec-form__checkbox-label" for="param-<?= htmlspecialchars($param['id']) ?>">
-                                <?= __admin($param['labelKey'] ?? '', $param['id']) ?>
+                                <?= $param['label'] ?? __workflow($spec, $param['labelKey'] ?? '', $param['id']) ?>
                             </label>
                             <?php if (isset($param['helpKey'])): ?>
-                            <span class="ai-spec-form__help" style="margin-left: auto;"><?= __admin($param['helpKey'], '') ?></span>
+                            <span class="ai-spec-form__help" style="margin-left: auto;"><?= __workflow($spec, $param['helpKey'], '') ?></span>
                             <?php endif; ?>
                         </div>
                         <?php else: ?>
                         <div class="ai-spec-form__group"<?php if (isset($param['condition'])): ?> data-condition="<?= htmlspecialchars($param['condition']) ?>"<?php endif; ?>>
                             <label class="ai-spec-form__label" for="param-<?= htmlspecialchars($param['id']) ?>">
-                                <?= __admin($param['labelKey'] ?? '', $param['id']) ?>
+                                <?= $param['label'] ?? __workflow($spec, $param['labelKey'] ?? '', $param['id']) ?>
                                 <?php if ($param['required'] ?? false): ?>
                                 <span class="ai-spec-form__required">*</span>
                                 <?php endif; ?>
@@ -223,8 +235,9 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                                 id="param-<?= htmlspecialchars($param['id']) ?>"
                                 name="<?= htmlspecialchars($param['id']) ?>"
                                 class="ai-spec-form__input ai-spec-form__textarea"
-                                placeholder="<?= __admin($param['placeholderKey'] ?? '', '') ?>"
+                                placeholder="<?= __workflow($spec, $param['placeholderKey'] ?? '', '') ?>"
                                 <?= ($param['required'] ?? false) ? 'required' : '' ?>
+                                <?= $validationAttrs ?>
                             ></textarea>
                             <?php elseif (($param['type'] ?? 'text') === 'select' && (isset($param['options']) || isset($param['optionsFrom']))): ?>
                             <?php
@@ -274,13 +287,13 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                                 class="ai-spec-form__input"
                                 <?= ($param['required'] ?? false) ? 'required' : '' ?>
                             >
-                                <option value=""><?= __admin($param['placeholderKey'] ?? '', '-- Select --') ?></option>
+                                <option value=""><?= __workflow($spec, $param['placeholderKey'] ?? '', '-- Select --') ?></option>
                                 <?php foreach ($selectOptions as $opt): ?>
                                 <?php 
                                     // Handle both simple strings and objects with value/label or value/labelKey
                                     if (is_array($opt)) {
                                         $optValue = $opt['value'] ?? '';
-                                        $optLabel = isset($opt['labelKey']) ? __admin($opt['labelKey'], $opt['value'] ?? '') : ($opt['label'] ?? $optValue);
+                                        $optLabel = isset($opt['labelKey']) ? __workflow($spec, $opt['labelKey'], $opt['value'] ?? '') : ($opt['label'] ?? $optValue);
                                     } else {
                                         $optValue = $opt;
                                         $optLabel = $opt;
@@ -372,16 +385,17 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                             </div>
                             <?php else: ?>
                             <input 
-                                type="text"
+                                type="<?= ($param['type'] ?? 'text') === 'number' ? 'number' : 'text' ?>"
                                 id="param-<?= htmlspecialchars($param['id']) ?>"
                                 name="<?= htmlspecialchars($param['id']) ?>"
                                 class="ai-spec-form__input"
-                                placeholder="<?= __admin($param['placeholderKey'] ?? '', '') ?>"
+                                placeholder="<?= __workflow($spec, $param['placeholderKey'] ?? '', '') ?>"
                                 <?= ($param['required'] ?? false) ? 'required' : '' ?>
+                                <?= $validationAttrs ?>
                             />
                             <?php endif; ?>
                             <?php if (isset($param['helpKey'])): ?>
-                            <span class="ai-spec-form__help"><?= __admin($param['helpKey'], '') ?></span>
+                            <span class="ai-spec-form__help"><?= __workflow($spec, $param['helpKey'], '') ?></span>
                             <?php endif; ?>
                         </div>
                         <?php endif; ?>

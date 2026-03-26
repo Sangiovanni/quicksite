@@ -142,7 +142,10 @@
           "not": { "properties": { "type": { "const": "hidden" } } }
         },
         "then": {
-          "required": ["labelKey"]
+          "anyOf": [
+            { "required": ["labelKey"] },
+            { "required": ["label"] }
+          ]
         },
         "properties": {
           "id": {
@@ -151,7 +154,7 @@
           },
           "type": {
             "type": "string",
-            "enum": ["text", "textarea", "select", "multiselect", "checkbox", "number", "nodeSelector", "hidden"],
+            "enum": ["text", "textarea", "select", "checkbox", "number", "nodeSelector", "hidden"],
             "description": "Input type for the parameter"
           },
           "labelKey": {
@@ -173,23 +176,49 @@
           "default": {
             "description": "Default value for the parameter"
           },
+          "label": {
+            "type": "string",
+            "description": "Direct display label (custom workflows without i18n). Alternative to labelKey."
+          },
           "options": {
+            "type": "array",
+            "description": "Static options for select type. Each item has a value and either label (direct text) or labelKey (translation key).",
+            "items": {
+              "type": "object",
+              "required": ["value"],
+              "properties": {
+                "value": { "type": "string" },
+                "label": { "type": "string", "description": "Direct display label" },
+                "labelKey": { "type": "string", "description": "Translation key for the label" }
+              }
+            }
+          },
+          "optionsFrom": {
+            "description": "Dynamic options populated from dataRequirements at render time.",
             "oneOf": [
               {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": ["value", "labelKey"],
-                  "properties": {
-                    "value": { "type": "string" },
-                    "labelKey": { "type": "string" }
-                  }
-                }
+                "type": "string",
+                "description": "dataRequirements ID — simple array items become both value and label"
               },
               {
-                "type": "string",
-                "pattern": "^dynamic:",
-                "description": "Dynamic options from a command, e.g., 'dynamic:getLangList.data.languages'"
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                  "data": { "type": "string", "description": "dataRequirements ID to pull options from" },
+                  "value": { "type": "string", "description": "Field name to use as option value" },
+                  "label": { "type": "string", "description": "Field name to use as option label" },
+                  "prepend": {
+                    "type": "array",
+                    "description": "Options to add before dynamic ones (e.g., a 'None' option)",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "value": { "type": "string" },
+                        "label": { "type": "string" }
+                      }
+                    }
+                  }
+                }
               }
             ]
           },
@@ -205,7 +234,7 @@
           },
           "condition": {
             "type": "string",
-            "description": "Conditional expression to show/hide this parameter. Supports: paramId === value, paramId !== value, paramId (truthy). Example: 'multilingual === true'"
+            "description": "Conditional expression to show/hide this parameter. Supports: ==, ===, !=, !==, >, <, >=, <=, &&, ||, ! (negation), and truthy checks. Example: 'multilingual === true', 'pages > 1 && multilingual !== false'"
           },
           "structures": {
             "type": "array",
@@ -269,12 +298,6 @@
     "promptTemplate": {
       "type": "string",
       "description": "Filename of the .md prompt template (same folder as spec)"
-    },
-    "outputFormat": {
-      "type": "string",
-      "enum": ["json-commands", "json-structure", "text"],
-      "default": "json-commands",
-      "description": "Expected output format from AI"
     },
     "steps": {
       "type": "array",

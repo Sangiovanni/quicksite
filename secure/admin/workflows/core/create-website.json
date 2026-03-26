@@ -90,6 +90,5 @@
             "condition": "param.multilingual === true"
         }
     ],
-    "promptTemplate": "create-website.md",
-    "outputFormat": "json-commands"
+    "promptTemplate": "create-website.md"
 }

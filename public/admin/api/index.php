@@ -34,6 +34,11 @@ if (!$token) {
     exit;
 }
 
+// Resolve token to tokenInfo for role-based permission checks
+require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+$tokenValidation = validateBearerToken('Bearer ' . $token);
+$tokenInfo = $tokenValidation['valid'] ? $tokenValidation['token_info'] : null;
+
 // Get the action from URL
 $requestUri = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
 $parts = explode('/', $requestUri);
@@ -722,6 +727,7 @@ switch ($action) {
         
         $spec = $input['spec'];
         $template = $input['template'] ?? '';
+        $translations = $input['translations'] ?? null;
         $isNew = $input['isNew'] ?? true;
         $originalSpecId = $input['originalSpecId'] ?? '';
         $hasTemplate = !empty(trim($template));
@@ -753,12 +759,23 @@ switch ($action) {
             break;
         }
         
+        // Check for duplicate custom workflow ID
+        $customJsonPath = $customFolder . '/' . $specId . '.json';
+        $isEditingSameId = !$isNew && $originalSpecId === $specId;
+        if (file_exists($customJsonPath) && !$isEditingSameId) {
+            http_response_code(409);
+            echo json_encode(['error' => 'A custom workflow with ID "' . $specId . '" already exists']);
+            break;
+        }
+        
         // If editing and ID changed, delete old files
         if (!$isNew && $originalSpecId && $originalSpecId !== $specId) {
             $oldJsonPath = $customFolder . '/' . $originalSpecId . '.json';
             $oldMdPath = $customFolder . '/' . $originalSpecId . '.md';
+            $oldTransPath = $customFolder . '/' . $originalSpecId . '.translations.json';
             if (file_exists($oldJsonPath)) unlink($oldJsonPath);
             if (file_exists($oldMdPath)) unlink($oldMdPath);
+            if (file_exists($oldTransPath)) unlink($oldTransPath);
         }
         
         // Set the promptTemplate reference only for AI workflows with template content
@@ -792,12 +809,25 @@ switch ($action) {
             unlink($mdPath);
         }
         
+        // Write translations sidecar file
+        $transPath = $customFolder . '/' . $specId . '.translations.json';
+        if ($translations && is_array($translations) && !empty($translations)) {
+            $transContent = json_encode($translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            file_put_contents($transPath, $transContent);
+        } elseif ($translations === null && file_exists($transPath)) {
+            // Keep existing translations file if not provided in payload
+        } elseif (is_array($translations) && empty($translations) && file_exists($transPath)) {
+            // Empty object sent explicitly — remove the file
+            unlink($transPath);
+        }
+        
         echo json_encode([
             'success' => true,
             'data' => [
                 'id' => $specId,
                 'jsonPath' => $jsonPath,
-                'mdPath' => $mdPath
+                'mdPath' => $mdPath,
+                'translationsPath' => $transPath
             ]
         ]);
         break;
@@ -886,6 +916,7 @@ switch ($action) {
         
         require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
         $manager = new WorkflowManager();
+        if ($tokenInfo) $manager->setTokenInfo($tokenInfo);
         
         $workflow = $manager->loadWorkflow($params[0]);
         if (!$workflow) {
@@ -930,6 +961,7 @@ switch ($action) {
         
         require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
         $manager = new WorkflowManager();
+        if ($tokenInfo) $manager->setTokenInfo($tokenInfo);
         
         $result = $manager->resolveSubWorkflow($input['workflowId'], $input['params'] ?? []);
         

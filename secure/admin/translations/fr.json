@@ -703,7 +703,7 @@
             },
             "info": {
                 "title": "Création d'une Spec Personnalisée",
-                "text": "Les workflows personnalisés sont enregistrés dans le dossier secure/admin/workflows/custom/. Ils apparaîtront aux côtés des workflows principaux dans le navigateur. N'oubliez pas d'ajouter les clés de traduction dans vos fichiers de langue pour les libellés et descriptions."
+                "text": "Les workflows personnalisés sont enregistrés dans le dossier secure/admin/workflows/custom/. Ils apparaîtront aux côtés des workflows principaux dans le navigateur. Utilisez l'onglet Traductions pour fournir les libellés et descriptions multilingues — ils sont sauvegardés dans un fichier compagnon à côté de votre spec."
             },
             "notFound": {
                 "title": "Spec Introuvable",

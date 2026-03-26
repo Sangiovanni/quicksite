@@ -76,6 +76,5 @@
             "condition": "param.multilingual === true"
         }
     ],
-    "promptTemplate": "create-landing.md",
-    "outputFormat": "json-commands"
+    "promptTemplate": "create-landing.md"
 }

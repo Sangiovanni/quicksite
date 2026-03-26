@@ -25,6 +25,9 @@ class WorkflowManager {
     /** @var string Project ID */
     private string $projectId;
     
+    /** @var array|null Token info for role-based permission checks (optional) */
+    private ?array $tokenInfo = null;
+    
     /** @var array Language name mappings */
     private static array $languageNames = [
         'en' => 'English',
@@ -76,6 +79,17 @@ class WorkflowManager {
     public function __construct(string $projectId = '') {
         $this->projectId = $projectId;
         $this->workflowsBasePath = SECURE_FOLDER_PATH . '/admin/workflows';
+    }
+    
+    /**
+     * Set the token info for role-based permission checking.
+     * When set, fetchDataRequirements will verify each command is allowed
+     * for the user's role before executing via CommandRunner.
+     * 
+     * @param array $tokenInfo Token info from validateBearerToken() — must have 'role' key
+     */
+    public function setTokenInfo(array $tokenInfo): void {
+        $this->tokenInfo = $tokenInfo;
     }
     
     /**
@@ -166,6 +180,14 @@ class WorkflowManager {
                 if ($workflow && isset($workflow['id'])) {
                     $workflow['_filePath'] = $path;
                     $workflow['_folder'] = dirname($path);
+                    $source = str_contains($path, '/custom/') ? 'custom' : 'core';
+                    $workflow['_source'] = $source;
+                    
+                    // Load sidecar translations for custom workflows
+                    if ($source === 'custom' && class_exists('AdminTranslation')) {
+                        AdminTranslation::getInstance()->loadWorkflowTranslations($workflowId, $source);
+                    }
+                    
                     $this->workflowsCache[$workflowId] = $workflow;
                     return $workflow;
                 }
@@ -208,6 +230,18 @@ class WorkflowManager {
             $params = $req['params'] ?? [];
             $urlParams = $req['urlParams'] ?? [];
             $extract = $req['extract'] ?? null;
+            
+            // Role-based permission check: if tokenInfo is set, verify the user can run this command
+            if ($this->tokenInfo !== null && function_exists('hasPermission')) {
+                if (!hasPermission($this->tokenInfo, $command)) {
+                    $data[$id] = [
+                        '_error' => true,
+                        '_message' => "Permission denied for command: {$command}",
+                        '_command' => $command
+                    ];
+                    continue;
+                }
+            }
             
             // Replace placeholders in urlParams with actual user param values
             $urlParams = array_map(function($param) use ($userParams) {
@@ -929,6 +963,28 @@ class WorkflowManager {
      * @return bool Whether condition is met
      */
     private function evaluateDataCondition(string $condition, array $userParams): bool {
+        // Handle AND (&&) conditions
+        if (strpos($condition, '&&') !== false) {
+            $parts = array_map('trim', explode('&&', $condition));
+            foreach ($parts as $part) {
+                if (!$this->evaluateDataCondition($part, $userParams)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
+        // Handle OR (||) conditions
+        if (strpos($condition, '||') !== false) {
+            $parts = array_map('trim', explode('||', $condition));
+            foreach ($parts as $part) {
+                if ($this->evaluateDataCondition($part, $userParams)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
         // Handle negation
         $negate = false;
         if (str_starts_with($condition, '!') && !str_starts_with($condition, '!=')) {
@@ -936,8 +992,8 @@ class WorkflowManager {
             $condition = ltrim(substr($condition, 1));
         }
         
-        // Handle comparison operators (e.g., "multilingual === true")
-        if (preg_match('/^([\w.]+)\s*(===?|!==?)\s*(.+)$/', $condition, $matches)) {
+        // Handle comparison operators (e.g., "multilingual === true", "pages > 1")
+        if (preg_match('/^([\w.]+)\s*(===?|!==?|>=?|<=?)\s*(.+)$/', $condition, $matches)) {
             $paramName = trim($matches[1]);
             $operator = $matches[2];
             $rightRaw = trim($matches[3]);
@@ -961,6 +1017,10 @@ class WorkflowManager {
                 '===' => $left === $right,
                 '!=' => $left != $right,
                 '!==' => $left !== $right,
+                '>' => $left > $right,
+                '>=' => $left >= $right,
+                '<' => $left < $right,
+                '<=' => $left <= $right,
                 default => false
             };
             

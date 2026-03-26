@@ -14,51 +14,53 @@ require_once __DIR__ . '/ApiResponse.php';
 class CommandRunner {
     
     /**
-     * Whitelist of commands allowed for internal execution
-     * This prevents arbitrary code execution from untrusted sources
+     * Whitelist of commands allowed for internal execution (e.g. workflow dataRequirements).
+     * 
+     * SECURITY: This list is intentionally hardcoded and READ-ONLY.
+     * CommandRunner bypasses role-based permission checks (hasPermission),
+     * so only safe, non-destructive commands belong here.
+     * 
+     * Destructive commands (deleteProject, deleteBackup, restoreBackup, etc.)
+     * are NOT allowed — they must go through the Management API which enforces
+     * per-user role permissions via the Bearer token.
+     * 
+     * If you need to add a command, verify it cannot cause data loss or side effects.
      */
     private static array $allowedCommands = [
-        // Read-only commands (safe for AI specs)
+        // Read-only: translations
         'getTranslations',
         'getTranslation',
         'getTranslationKeys',
         'getUnusedTranslationKeys',
         'getLangList',
+        'validateTranslations',
+        'analyzeTranslations',
+        // Read-only: structure & content
         'getStructure',
         'getRoutes',
         'getSiteMap',
+        'listComponents',
+        'listPages',
+        'checkStructureMulti',
+        // Read-only: styles
         'getStyles',
         'getRootVariables',
         'getStyleRule',
         'getKeyframes',
-        'getBuild',
-        'getCommandHistory',
-        'help',
-        'listComponents',
-        'listPages',
+        'listStyleRules',
+        // Read-only: assets & builds
         'listAssets',
         'listBuilds',
-        'listStyleRules',
+        'getBuild',
+        // Read-only: system info
+        'help',
+        'getCommandHistory',
         'listTokens',
         'listAliases',
-        'validateTranslations',
-        'analyzeTranslations',
-        'checkStructureMulti',
-        // Project management commands
+        // Read-only: project info (no mutations)
         'listProjects',
         'getActiveProject',
-        'switchProject',
-        'createProject',
-        'deleteProject',
-        'exportProject',
-        'importProject',
-        'downloadExport',
-        'clearExports',
-        // Backup commands
-        'backupProject',
         'listBackups',
-        'restoreBackup',
-        'deleteBackup',
     ];
     
     /**

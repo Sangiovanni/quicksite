@@ -689,7 +689,7 @@
             },
             "info": {
                 "title": "Creating a Custom Spec",
-                "text": "Custom workflows are saved to the secure/admin/workflows/custom/ folder. They will appear alongside core workflows in the browser. Make sure to add translation keys to your locale files for labels and descriptions."
+                "text": "Custom workflows are saved to the secure/admin/workflows/custom/ folder. They will appear alongside core workflows in the browser. Use the Translations tab to provide multilingual labels and descriptions for your workflow — they are saved as a sidecar file alongside your spec."
             },
             "notFound": {
                 "title": "Workflow Not Found",

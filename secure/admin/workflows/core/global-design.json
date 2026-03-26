@@ -25,6 +25,5 @@
         }
     ],
     "relatedCommands": ["setRootVariables"],
-    "promptTemplate": "global-design.md",
-    "outputFormat": "json-commands"
+    "promptTemplate": "global-design.md"
 }

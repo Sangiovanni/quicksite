@@ -7,7 +7,7 @@
  * DO NOT EDIT MANUALLY - This file is regenerated when custom functions are modified.
  * 
  * @version 1.0.0
- * @generated 2026-03-24 20:42:21
+ * @generated 2026-03-26 15:53:32
  */
 
 (function(window) {

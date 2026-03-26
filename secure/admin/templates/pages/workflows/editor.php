@@ -45,6 +45,10 @@ if ($isEdit) {
     $templatePath = SECURE_FOLDER_PATH . '/admin/workflows/' . ($spec['_source'] ?? 'core') . '/' . $editWorkflowId . '.md';
     $templateContent = file_exists($templatePath) ? file_get_contents($templatePath) : '';
     
+    // Load translations sidecar
+    $translationsPath = SECURE_FOLDER_PATH . '/admin/workflows/' . ($spec['_source'] ?? 'core') . '/' . $editWorkflowId . '.translations.json';
+    $translationsContent = file_exists($translationsPath) ? file_get_contents($translationsPath) : '';
+    
     // Remove internal fields for editing
     unset($spec['_source']);
     $specJson = json_encode($spec, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
@@ -52,12 +56,12 @@ if ($isEdit) {
     // New spec - provide clean starter template
     $editWorkflowId = '';
     $specJson = json_encode([
-        'id' => '',
+        'id' => 'my-workflow',
         'version' => '1.0.0',
         'meta' => [
             'icon' => '🎯',
-            'name' => '',
-            'description' => '',
+            'name' => 'My Workflow',
+            'description' => 'Describe what this workflow does',
             'category' => 'advanced',
             'difficulty' => 'intermediate',
             'tags' => []
@@ -67,6 +71,7 @@ if ($isEdit) {
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     
     $templateContent = '';
+    $translationsContent = '';
 }
 
 // Load the JSON schema for reference
@@ -154,8 +159,27 @@ window.QUICKSITE_CONFIG.translations = {
                     <?= __admin('ai.editor.definition', 'Spec Definition (JSON)') ?>
                 </span>
             </div>
+            <div class="ai-editor-tabs">
+                <button class="ai-editor-tab ai-editor-tab--active" data-tab="definition">
+                    <?= __admin('ai.editor.tab.definition', 'Definition') ?>
+                </button>
+                <button class="ai-editor-tab" data-tab="translations">
+                    <?= __admin('ai.editor.tab.translations', 'Translations') ?>
+                </button>
+                <button class="ai-editor-tab" data-tab="schema">
+                    <?= __admin('ai.editor.tab.schema', 'Schema Reference') ?>
+                </button>
+            </div>
             <div class="ai-editor-panel__body">
-                <textarea id="spec-json" class="ai-editor-textarea" spellcheck="false"><?= htmlspecialchars($specJson) ?></textarea>
+                <div id="tab-definition" class="ai-editor-tab-content ai-editor-tab-content--active">
+                    <textarea id="spec-json" class="ai-editor-textarea" spellcheck="false"><?= htmlspecialchars($specJson) ?></textarea>
+                </div>
+                <div id="tab-translations" class="ai-editor-tab-content">
+                    <textarea id="spec-translations" class="ai-editor-textarea" spellcheck="false" placeholder='<?= htmlspecialchars(json_encode(["en" => ["title" => "My Workflow", "description" => "...", "params.myParam.label" => "..."], "fr" => ["title" => "Mon workflow"]], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) ?>'><?= htmlspecialchars($translationsContent) ?></textarea>
+                </div>
+                <div id="tab-schema" class="ai-editor-tab-content">
+                    <textarea class="ai-editor-textarea" readonly spellcheck="false"><?= htmlspecialchars($schema) ?></textarea>
+                </div>
             </div>
             <div id="json-validation" class="ai-editor-validation ai-editor-validation--valid">
                 <div class="ai-editor-validation__title">✓ <?= __admin('ai.editor.valid', 'Valid JSON') ?></div>
@@ -180,9 +204,6 @@ window.QUICKSITE_CONFIG.translations = {
                 <button class="ai-editor-tab" data-tab="preview">
                     <?= __admin('ai.editor.tab.preview', 'Preview') ?>
                 </button>
-                <button class="ai-editor-tab" data-tab="schema">
-                    <?= __admin('ai.editor.tab.schema', 'Schema Reference') ?>
-                </button>
             </div>
             <div class="ai-editor-panel__body">
                 <div id="tab-template" class="ai-editor-tab-content ai-editor-tab-content--active">
@@ -192,9 +213,6 @@ window.QUICKSITE_CONFIG.translations = {
                     <div id="template-preview" class="ai-editor-preview ai-editor-preview--empty">
                         <?= __admin('ai.editor.previewEmpty', 'Click "Preview" to see the rendered prompt') ?>
                     </div>
-                </div>
-                <div id="tab-schema" class="ai-editor-tab-content">
-                    <textarea class="ai-editor-textarea" readonly spellcheck="false"><?= htmlspecialchars($schema) ?></textarea>
                 </div>
             </div>
         </div>
