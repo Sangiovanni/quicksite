@@ -449,6 +449,37 @@
         window.AiSpec = {
             generatePrompt: (params) => generatePrompt(config, els, state, params || {})
         };
+
+        // --- 4g. Delete workflow button ---
+        const deleteBtn = document.getElementById('delete-workflow-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', async () => {
+                const id = deleteBtn.dataset.id;
+                if (!confirm('Delete workflow "' + id + '"? This cannot be undone.')) return;
+                
+                deleteBtn.disabled = true;
+                try {
+                    const resp = await fetch(config.adminBase + '/api/workflow-delete', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + config.token
+                        },
+                        body: JSON.stringify({ id })
+                    });
+                    const result = await resp.json();
+                    if (result.success) {
+                        window.location.href = config.adminBase + '/workflows';
+                    } else {
+                        alert(result.error || 'Delete failed');
+                        deleteBtn.disabled = false;
+                    }
+                } catch (err) {
+                    alert('Delete failed: ' + err.message);
+                    deleteBtn.disabled = false;
+                }
+            });
+        }
     }
 
     // ========================================================================

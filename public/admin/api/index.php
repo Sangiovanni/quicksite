@@ -832,6 +832,66 @@ switch ($action) {
         ]);
         break;
     
+    case 'workflow-delete':
+        // Delete a custom workflow
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+            break;
+        }
+        
+        $input = json_decode(file_get_contents('php://input'), true);
+        $deleteId = $input['id'] ?? '';
+        
+        if (!$deleteId || !preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/', $deleteId)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid workflow ID']);
+            break;
+        }
+        
+        // Only custom workflows can be deleted
+        $customFolder = SECURE_FOLDER_PATH . '/admin/workflows/custom';
+        $jsonPath = $customFolder . '/' . $deleteId . '.json';
+        
+        if (!file_exists($jsonPath)) {
+            // Check if it's a core workflow
+            $coreFolder = SECURE_FOLDER_PATH . '/admin/workflows/core';
+            if (file_exists($coreFolder . '/' . $deleteId . '.json')) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Cannot delete core workflows']);
+            } else {
+                http_response_code(404);
+                echo json_encode(['error' => 'Workflow not found']);
+            }
+            break;
+        }
+        
+        // Delete all associated files
+        $deleted = [];
+        unlink($jsonPath);
+        $deleted[] = $deleteId . '.json';
+        
+        $mdPath = $customFolder . '/' . $deleteId . '.md';
+        if (file_exists($mdPath)) {
+            unlink($mdPath);
+            $deleted[] = $deleteId . '.md';
+        }
+        
+        $transPath = $customFolder . '/' . $deleteId . '.translations.json';
+        if (file_exists($transPath)) {
+            unlink($transPath);
+            $deleted[] = $deleteId . '.translations.json';
+        }
+        
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'id' => $deleteId,
+                'deletedFiles' => $deleted
+            ]
+        ]);
+        break;
+    
     case 'workflow-generate-steps':
         // Generate steps for a manual workflow
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

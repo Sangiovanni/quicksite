@@ -203,13 +203,26 @@ window.QUICKSITE_CONFIG.translations = {
                 }
             }
             arsort($allTags); // Sort by frequency
-            $topTags = array_slice(array_keys($allTags), 0, 8); // Show top 8 tags
-            foreach ($topTags as $tag):
+            $tagKeys = array_keys($allTags);
+            $visibleCount = 10;
+            $visibleTags = array_slice($tagKeys, 0, $visibleCount);
+            $hiddenTags = array_slice($tagKeys, $visibleCount);
+            foreach ($visibleTags as $tag):
             ?>
             <button type="button" class="ai-browser__tag-btn" data-tag="<?= htmlspecialchars($tag) ?>">
                 <?= htmlspecialchars($tag) ?>
             </button>
             <?php endforeach; ?>
+            <?php if (!empty($hiddenTags)): ?>
+            <?php foreach ($hiddenTags as $tag): ?>
+            <button type="button" class="ai-browser__tag-btn ai-browser__tag-btn--hidden" data-tag="<?= htmlspecialchars($tag) ?>">
+                <?= htmlspecialchars($tag) ?>
+            </button>
+            <?php endforeach; ?>
+            <button type="button" class="ai-browser__tag-toggle" id="toggle-tags">
+                +<?= count($hiddenTags) ?> <?= __admin('ai.browser.moreTags', 'more') ?>
+            </button>
+            <?php endif; ?>
         </div>
     </div>
     
@@ -247,7 +260,8 @@ window.QUICKSITE_CONFIG.translations = {
                data-tags="<?= htmlspecialchars($specTags) ?>"
                data-title="<?= htmlspecialchars(strtolower($specTitle)) ?>"
                data-desc="<?= htmlspecialchars(strtolower($specDesc)) ?>"
-               data-id="<?= htmlspecialchars($spec['id']) ?>">
+               data-id="<?= htmlspecialchars($spec['id']) ?>"
+               data-source="<?= htmlspecialchars($spec['_source'] ?? 'core') ?>">
                 <div class="ai-spec-card__header">
                     <span class="ai-spec-card__icon"><?= htmlspecialchars($meta['icon'] ?? '📋') ?></span>
                     <span class="ai-spec-card__title"><?= htmlspecialchars($specTitle) ?></span>
@@ -268,10 +282,16 @@ window.QUICKSITE_CONFIG.translations = {
                     <span class="ai-spec-card__difficulty ai-spec-card__difficulty--<?= $difficulty ?>">
                         <?= __admin('ai.difficulty.' . $difficulty, ucfirst($difficulty)) ?>
                     </span>
+                    <?php if (($spec['_source'] ?? 'core') === 'custom'): ?>
+                    <span class="ai-spec-card__tag ai-spec-card__tag--custom"><?= __admin('workflows.tag.custom', 'custom') ?></span>
+                    <?php endif; ?>
                     <?php if (!empty($meta['tags'])): ?>
-                        <?php foreach (array_slice($meta['tags'], 0, 2) as $tag): ?>
+                        <?php foreach (array_slice($meta['tags'], 0, 4) as $tag): ?>
                         <span class="ai-spec-card__tag"><?= htmlspecialchars($tag) ?></span>
                         <?php endforeach; ?>
+                        <?php if (count($meta['tags']) > 4): ?>
+                        <span class="ai-spec-card__tag ai-spec-card__tag--more">+<?= count($meta['tags']) - 4 ?></span>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </a>

@@ -62,6 +62,20 @@
         if (fileInput) {
             fileInput.addEventListener('change', handleImport);
         }
+
+        // Tag toggle (show more / show less)
+        const toggleBtn = document.getElementById('toggle-tags');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function() {
+                const wrapper = this.closest('.ai-browser__tags');
+                if (!wrapper) return;
+                const expanded = wrapper.classList.toggle('ai-browser__tags--expanded');
+                const hiddenCount = wrapper.querySelectorAll('.ai-browser__tag-btn--hidden').length;
+                this.textContent = expanded
+                    ? (translations['ai.browser.lessTags'] || 'show less')
+                    : '+' + hiddenCount + ' ' + (translations['ai.browser.moreTags'] || 'more');
+            });
+        }
     }
     
     /**
