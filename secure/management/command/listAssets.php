@@ -20,6 +20,13 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
  */
 function __command_listAssets(array $params = [], array $urlParams = []): ApiResponse {
     $category = $urlParams[0] ?? null;
+    $starredOnly = false;
+
+    // Handle "starred" as a virtual filter segment
+    if ($category === 'starred') {
+        $starredOnly = true;
+        $category = null;
+    }
 
     // Validate category if provided
     $validCategories = require SECURE_FOLDER_PATH . '/management/config/assetCategories.php';
@@ -126,6 +133,16 @@ function __command_listAssets(array $params = [], array $urlParams = []): ApiRes
                 if (isset($meta['uploaded'])) {
                     $fileInfo['uploaded'] = $meta['uploaded'];
                 }
+
+                // Add starred flag if set
+                if (!empty($meta['starred'])) {
+                    $fileInfo['starred'] = true;
+                }
+            }
+
+            // If starred filter is active, skip non-starred assets
+            if ($starredOnly && empty($fileInfo['starred'])) {
+                continue;
             }
             
             $fileList[] = $fileInfo;
@@ -139,11 +156,35 @@ function __command_listAssets(array $params = [], array $urlParams = []): ApiRes
         $result[$cat] = $fileList;
     }
 
+    // Cap starred results at 15 to keep AI prompts concise
+    if ($starredOnly) {
+        $allStarred = [];
+        foreach ($result as $cat => $files) {
+            foreach ($files as $file) {
+                $allStarred[] = $file;
+            }
+        }
+        if (count($allStarred) > 15) {
+            $allStarred = array_slice($allStarred, 0, 15);
+            // Rebuild result from capped list
+            $result = [];
+            foreach ($allStarred as $file) {
+                $cat = pathinfo($file['path'], PATHINFO_DIRNAME);
+                $cat = basename($cat);
+                $result[$cat][] = $file;
+            }
+        }
+    }
+
     // Success response
-    return ApiResponse::create(200, 'operation.success')
-        ->withMessage($category !== null 
+    $message = $starredOnly
+        ? "Starred assets retrieved"
+        : ($category !== null 
             ? "Assets retrieved for category '{$category}'" 
-            : "All assets retrieved")
+            : "All assets retrieved");
+
+    return ApiResponse::create(200, 'operation.success')
+        ->withMessage($message)
         ->withData([
             'assets' => $result,
             'total_categories' => count($result),

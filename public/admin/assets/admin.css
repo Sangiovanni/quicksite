@@ -2498,7 +2498,6 @@ kbd {
 }
 
 .project-manager__info,
-.ai-spec-form__group,
 .ai-spec-node-selector__select-ui,
 .admin-datetime-picker,
 .preview-sidebar__tools-buttons,
@@ -2513,6 +2512,11 @@ kbd {
 .admin-data-input,
 .admin-textkey-selector {
     display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.ai-spec-form__group{
     flex-direction: column;
     gap: var(--space-xs);
 }
@@ -12682,6 +12686,32 @@ code.preview-node-panel__value {
     justify-content: center;
     overflow: hidden;
     background: var(--admin-bg-secondary);
+    position: relative;
+}
+
+.asset-card__star {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 1;
+    filter: grayscale(0.3);
+}
+
+.asset-card__star--active {
+    opacity: 1;
+    filter: none;
+}
+
+.asset-card:hover .asset-card__star {
+    opacity: 1;
 }
 
 .asset-card__image {

@@ -1553,6 +1553,12 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'Company logo',
                 'validation' => 'Max 250 characters',
                 'ui_type' => 'text'
+            ],
+            'starred' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Mark asset as starred/favorite for AI prompt inclusion. Accepts true/false or "true"/"false".',
+                'example' => true
             ]
         ],
         'example_request' => 'POST /management/editAsset {"filename": "old-logo.png", "newFilename": "company-logo", "description": "Main company logo", "alt": "Company logo"}',
@@ -1582,7 +1588,7 @@ $GLOBALS['__help_commands'] = [
             '409.asset.already_exists' => 'Target filename already exists',
             '500.asset.rename_failed' => 'File system rename failed'
         ],
-        'notes' => 'Category is auto-detected from file extension. At least one of newFilename, description, or alt must be provided. If newFilename omits the extension, the original extension is auto-appended. If an extension is provided, it must match the original. Metadata is preserved when renaming. Send empty string for description/alt to remove that field.'
+        'notes' => 'Category is auto-detected from file extension. At least one of newFilename, description, alt, or starred must be provided. If newFilename omits the extension, the original extension is auto-appended. If an extension is provided, it must match the original. Metadata is preserved when renaming. Send empty string for description/alt to remove that field. Starred assets are included in AI workflow prompts when the user enables the option.'
     ],
     
     'getStyles' => [

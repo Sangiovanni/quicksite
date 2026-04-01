@@ -512,6 +512,7 @@
 
         const actionsHtml = selectMode ? '' : `
                     <button type="button" class="asset-card__action asset-card__rename" data-rename="${escapeHtml(asset.filename)}" title="Rename">✏️</button>`;
+        const starHtml = selectMode ? '' : `<button type="button" class="asset-card__star${asset.starred ? ' asset-card__star--active' : ''}" data-star="${escapeHtml(asset.filename)}" title="${asset.starred ? 'Unstar' : 'Star'}">${asset.starred ? '⭐' : '☆'}</button>`;
         const infoActionsHtml = selectMode ? '' : `
                     <div class="asset-card__actions">
                         <button type="button" class="asset-card__action" data-edit="${escapeHtml(asset.filename)}" title="Edit alt/description">✏️</button>
@@ -521,7 +522,7 @@
         return `
         <div class="asset-card${isSelected ? ' asset-card--selected' : ''}${selectMode ? ' asset-card--selectable' : ''}" data-filename="${escapeHtml(asset.filename)}" data-category="${asset.category}">
             ${checkboxHtml}
-            <div class="asset-card__thumb">${thumb}</div>
+            <div class="asset-card__thumb">${thumb}${starHtml}</div>
             <div class="asset-card__footer">
                 <div class="asset-card__name">
                     <span class="asset-card__name-text" title="${escapeHtml(asset.filename)}">${escapeHtml(stripExtension(asset.filename))}</span>${actionsHtml}
@@ -627,6 +628,13 @@
         const renameBtn = e.target.closest('[data-rename]');
         if (renameBtn) {
             startInlineRename(renameBtn.dataset.rename);
+            return;
+        }
+
+        // Star toggle button
+        const starBtn = e.target.closest('[data-star]');
+        if (starBtn) {
+            toggleStar(starBtn.dataset.star);
             return;
         }
 
@@ -916,6 +924,38 @@
             }
         } catch (error) {
             QuickSiteAdmin.showToast('Delete failed: ' + error.message, 'error');
+        }
+    }
+
+    // ─── Star Toggle ───────────────────────────────────────────────────────
+    async function toggleStar(filename) {
+        const asset = flatAssets.find(a => a.filename === filename);
+        if (!asset) return;
+
+        const newStarred = !asset.starred;
+
+        // Cap at 15 starred assets
+        if (newStarred) {
+            const starredCount = flatAssets.filter(a => a.starred).length;
+            if (starredCount >= 15) {
+                QuickSiteAdmin.showToast('Maximum 15 starred assets. Unstar one first.', 'warning');
+                return;
+            }
+        }
+
+        try {
+            const result = await QuickSiteAdmin.apiRequest('editAsset', 'POST', {
+                filename,
+                starred: newStarred
+            });
+            if (result.ok) {
+                asset.starred = newStarred;
+                renderGrid();
+            } else {
+                QuickSiteAdmin.showToast(result.data?.message || 'Star toggle failed', 'error');
+            }
+        } catch (error) {
+            QuickSiteAdmin.showToast('Star toggle failed: ' + error.message, 'error');
         }
     }
 

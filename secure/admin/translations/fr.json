@@ -765,6 +765,18 @@
             "advanced": "Avancé"
         },
         "specs": {
+            "shared": {
+                "params": {
+                    "includeAssets": {
+                        "label": "Inclure mes assets favoris dans le prompt",
+                        "help": "L'IA utilisera vos assets favoris (images, polices, etc.) au lieu de placeholders. Ajoutez des étoiles aux assets dans la page Gestion des Assets d'abord."
+                    },
+                    "includeFavicon": {
+                        "label": "Inclure la documentation favicon",
+                        "help": "L'IA recevra aussi la documentation de la commande editFavicon et pourra définir un favicon à partir de vos assets."
+                    }
+                }
+            },
             "addLanguage": {
                 "title": "Ajouter une langue",
                 "description": "Ajouter une nouvelle langue à votre site multilingue avec les traductions et la mise à jour du sélecteur de langue.",

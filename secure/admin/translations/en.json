@@ -751,6 +751,18 @@
             "advanced": "Advanced"
         },
         "specs": {
+            "shared": {
+                "params": {
+                    "includeAssets": {
+                        "label": "Include my starred assets in the prompt",
+                        "help": "The AI will use your starred assets (images, fonts, etc.) instead of placeholders. Star assets in the Asset Management page first."
+                    },
+                    "includeFavicon": {
+                        "label": "Include favicon documentation",
+                        "help": "The AI will also receive editFavicon command docs and may set a favicon from your assets."
+                    }
+                }
+            },
             "addLanguage": {
                 "title": "Add Language",
                 "description": "Add a new language to your multilingual website with translations and language switcher updates.",

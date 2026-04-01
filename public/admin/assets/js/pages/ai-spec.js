@@ -500,6 +500,27 @@
                     generatePrompt(config, els, state, params);
                 }
             });
+
+            // -- includeAssets lazy validation --
+            const includeAssetsCheckbox = els.form.querySelector('input[name="includeAssets"]');
+            if (includeAssetsCheckbox) {
+                includeAssetsCheckbox.addEventListener('change', async function() {
+                    if (!this.checked) return;
+                    try {
+                        const result = await QuickSiteAdmin.apiRequest('listAssets/starred', 'GET');
+                        const totalFiles = result.data?.data?.total_files ?? 0;
+                        if (totalFiles === 0) {
+                            QuickSiteAdmin.showToast('No starred assets found. Star assets in Asset Management first.', 'warning');
+                            this.checked = false;
+                            updateConditionalFields(els);
+                        } else if (totalFiles > 15) {
+                            QuickSiteAdmin.showToast('Only the first 15 starred assets will be included.', 'info');
+                        }
+                    } catch (e) {
+                        // Non-critical — let the workflow proceed
+                    }
+                });
+            }
         }
 
         // -- Manual workflow --

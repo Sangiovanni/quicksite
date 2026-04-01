@@ -26,6 +26,21 @@
             "helpKey": "ai.specs.createLanding.params.languages.help",
             "default": "en",
             "condition": "multilingual === true"
+        },
+        {
+            "id": "includeAssets",
+            "type": "checkbox",
+            "labelKey": "ai.specs.shared.params.includeAssets.label",
+            "helpKey": "ai.specs.shared.params.includeAssets.help",
+            "default": false
+        },
+        {
+            "id": "includeFavicon",
+            "type": "checkbox",
+            "labelKey": "ai.specs.shared.params.includeFavicon.label",
+            "helpKey": "ai.specs.shared.params.includeFavicon.help",
+            "default": false,
+            "condition": "includeAssets === true"
         }
     ],
     "dataRequirements": [
@@ -66,9 +81,23 @@
             "command": "help",
             "urlParams": ["setRootVariables"],
             "extract": "data"
+        },
+        {
+            "id": "assetList",
+            "command": "listAssets",
+            "urlParams": ["starred"],
+            "extract": "data",
+            "condition": "includeAssets === true"
+        },
+        {
+            "id": "helpEditFavicon",
+            "command": "help",
+            "urlParams": ["editFavicon"],
+            "extract": "data",
+            "condition": "includeAssets === true && includeFavicon === true"
         }
     ],
-    "relatedCommands": ["setMultilingual", "addLang", "editStructure", "setTranslationKeys", "editStyles", "setRootVariables"],
+    "relatedCommands": ["setMultilingual", "addLang", "editStructure", "setTranslationKeys", "editStyles", "setRootVariables", "editFavicon"],
     "preWorkflows": ["fresh-start"],
     "postWorkflows": [
         {

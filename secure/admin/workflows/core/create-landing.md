@@ -322,6 +322,32 @@ The component will be auto-generated with this structure (for styling reference)
 
 ---
 
+{{#if param.includeAssets === true}}
+## Available Assets
+
+The user has provided assets for this project. **Use these real assets where appropriate** — don't invent placeholder filenames.
+
+Path format: `/assets/{category}/{filename}` (leading slash required).
+
+### Starred Assets:
+{{json assetList}}
+
+**Instructions:**
+- Use these assets in `img`, `video`, `audio` tag `params.src` values
+- Match assets to sections by their description (e.g., a "logo" asset belongs in the header/nav, a "hero" image belongs in the hero section)
+- Do NOT force every asset into the page — only use what fits naturally
+- If no asset matches a section, use a solid background color or gradient instead of inventing a filename
+- For fonts: reference font files in editStyles @font-face declarations
+{{#if param.includeFavicon === true}}
+
+### Favicon
+If an image asset looks suitable as a favicon (square/small, or has "favicon", "icon", or "logo" in its name), add an `editFavicon` command at the end of your response:
+{{json helpEditFavicon}}
+{{/if}}
+{{/if}}
+
+---
+
 ## 🚀 NOW GENERATE
 
 Create a landing page based on the user's requirements.

@@ -24,6 +24,7 @@ $filename = $params['filename'] ?? null;
 $newFilename = $params['newFilename'] ?? null;
 $alt = $params['alt'] ?? null;
 $description = $params['description'] ?? null;
+$starred = $params['starred'] ?? null;
 
 // --- Validate filename (required) ---
 if (empty($filename)) {
@@ -92,10 +93,10 @@ if (!file_exists($sourcePath) || !is_file($sourcePath)) {
 }
 
 // --- Validate at least one edit parameter ---
-if ($newFilename === null && $alt === null && $description === null) {
+if ($newFilename === null && $alt === null && $description === null && $starred === null) {
     ApiResponse::create(400, 'validation.missing_field')
-        ->withMessage('At least one of newFilename, alt, or description must be provided')
-        ->withData(['optional_fields' => ['newFilename', 'alt', 'description']])
+        ->withMessage('At least one of newFilename, alt, description, or starred must be provided')
+        ->withData(['optional_fields' => ['newFilename', 'alt', 'description', 'starred']])
         ->send();
 }
 
@@ -206,6 +207,15 @@ if ($alt !== null) {
     $alt = trim($alt);
 }
 
+// --- Validate starred if provided ---
+if ($starred !== null) {
+    if (is_string($starred)) {
+        $starred = in_array(strtolower($starred), ['true', '1'], true);
+    } else {
+        $starred = (bool) $starred;
+    }
+}
+
 // ============================================================
 // Apply changes
 // ============================================================
@@ -256,6 +266,17 @@ if ($alt !== null) {
         $metaUpdates['alt'] = $alt;
         $updated[] = 'alt';
     }
+}
+
+if ($starred !== null) {
+    $metaUpdates['starred'] = $starred;
+    if (!$starred) {
+        // Remove the key entirely when unstarring
+        $existing = $metaManager->get($category, $currentFilename) ?? [];
+        unset($existing['starred']);
+        $metaUpdates = array_merge($existing, $metaUpdates);
+    }
+    $updated[] = $starred ? 'starred' : 'unstarred';
 }
 
 if (!empty($metaUpdates)) {

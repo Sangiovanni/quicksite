@@ -34,6 +34,21 @@
             "placeholderKey": "ai.specs.createWebsite.params.pages.placeholder",
             "helpKey": "ai.specs.createWebsite.params.pages.help",
             "default": "home, about, services, contact"
+        },
+        {
+            "id": "includeAssets",
+            "type": "checkbox",
+            "labelKey": "ai.specs.shared.params.includeAssets.label",
+            "helpKey": "ai.specs.shared.params.includeAssets.help",
+            "default": false
+        },
+        {
+            "id": "includeFavicon",
+            "type": "checkbox",
+            "labelKey": "ai.specs.shared.params.includeFavicon.label",
+            "helpKey": "ai.specs.shared.params.includeFavicon.help",
+            "default": false,
+            "condition": "includeAssets === true"
         }
     ],
     "dataRequirements": [
@@ -80,9 +95,23 @@
             "command": "help",
             "urlParams": ["setRootVariables"],
             "extract": "data"
+        },
+        {
+            "id": "assetList",
+            "command": "listAssets",
+            "urlParams": ["starred"],
+            "extract": "data",
+            "condition": "includeAssets === true"
+        },
+        {
+            "id": "helpEditFavicon",
+            "command": "help",
+            "urlParams": ["editFavicon"],
+            "extract": "data",
+            "condition": "includeAssets === true && includeFavicon === true"
         }
     ],
-    "relatedCommands": ["setMultilingual", "addLang", "addRoute", "editStructure", "setTranslationKeys", "editStyles", "setRootVariables"],
+    "relatedCommands": ["setMultilingual", "addLang", "addRoute", "editStructure", "setTranslationKeys", "editStyles", "setRootVariables", "editFavicon"],
     "preWorkflows": ["fresh-start"],
     "postWorkflows": [
         {
