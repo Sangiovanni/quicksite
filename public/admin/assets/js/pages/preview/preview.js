@@ -951,21 +951,38 @@
                 unitSelect.appendChild(opt);
             }
             
+            const keywords = ['auto', 'none', 'normal', 'inherit', 'initial', 'unset'];
+            
             const emitChange = () => {
                 const num = numInput.value.trim();
                 const unit = unitSelect.value;
-                // Handle special values like 'auto', 'none', 'normal'
-                if (unit === 'auto' || unit === 'none' || unit === 'normal') {
+                
+                if (keywords.includes(num.toLowerCase())) {
+                    // User typed a keyword in the text input — use it directly
+                    this.currentValue = num.toLowerCase();
+                } else if (keywords.includes(unit)) {
+                    // Keyword selected as unit — use the unit as the value
                     this.currentValue = unit;
                 } else {
-                    this.currentValue = num + unit;
+                    this.currentValue = num ? num + unit : '';
                 }
                 this.onChange(this.currentValue);
             };
             
+            // Disable number input when a keyword unit is selected
+            if (keywords.includes(parsed.unit)) {
+                numInput.disabled = true;
+            }
+            
             numInput.addEventListener('input', emitChange);
             numInput.addEventListener('blur', () => this.onBlur(this.currentValue));
-            unitSelect.addEventListener('change', emitChange);
+            unitSelect.addEventListener('change', () => {
+                const isKeyword = keywords.includes(unitSelect.value);
+                numInput.disabled = isKeyword;
+                if (isKeyword) numInput.value = '';
+                emitChange();
+                this.onBlur(this.currentValue);
+            });
             
             this.inputEl = numInput;
             this.unitSelectEl = unitSelect;
