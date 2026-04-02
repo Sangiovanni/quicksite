@@ -49,6 +49,7 @@ $relatedCommands = $spec['relatedCommands'] ?? [];
 // Check workflow type
 $isManualWorkflow = $workflowManager->isManualWorkflow($spec);
 $isAiWorkflow = $workflowManager->isAiWorkflow($spec);
+$isPasteOnly = !empty($spec['pasteOnly']);
 
 // Get initial data for display
 $specData = $workflowManager->fetchDataRequirements($spec);
@@ -58,7 +59,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
 ?>
 
 
-<div class="ai-spec" data-spec-id="<?= htmlspecialchars($specId) ?>" data-is-create-spec="<?= $hasCreateTag ? 'true' : 'false' ?>" data-has-no-params="<?= empty($parameters) ? 'true' : 'false' ?>" data-is-manual="<?= $isManualWorkflow ? 'true' : 'false' ?>">
+<div class="ai-spec" data-spec-id="<?= htmlspecialchars($specId) ?>" data-is-create-spec="<?= $hasCreateTag ? 'true' : 'false' ?>" data-has-no-params="<?= empty($parameters) ? 'true' : 'false' ?>" data-is-manual="<?= $isManualWorkflow ? 'true' : 'false' ?>" data-is-paste-only="<?= $isPasteOnly ? 'true' : 'false' ?>">
     <!-- Breadcrumb -->
     <nav class="ai-spec__breadcrumb">
         <a href="<?= $router->url('workflows') ?>"><?= __admin('workflows.browser.title', 'Workflows') ?></a>
@@ -123,7 +124,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
         <?php endif; ?>
     </header>
     
-    <?php if ($isAiWorkflow): ?>
+    <?php if ($isAiWorkflow && !$isPasteOnly): ?>
     <!-- Examples + User Prompt Section (AI workflows only) -->
     <div class="ai-spec-user-prompt<?= empty($examples) ? ' ai-spec-user-prompt--single' : '' ?>">
         <?php if (!empty($examples)): ?>
@@ -451,7 +452,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                     </button>
                 </div>
             </div>
-            <?php elseif ($isAiWorkflow): ?>
+            <?php elseif ($isAiWorkflow && !$isPasteOnly): ?>
             <!-- Generate Prompt button for AI workflows without parameters -->
             <div class="ai-spec-card">
                 <div class="ai-spec-card__header">
@@ -467,6 +468,23 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                     <button type="button" id="generate-prompt-btn" class="admin-btn admin-btn--primary" style="width: 100%;">
                         <?= __admin('ai.spec.generatePrompt', 'Generate Prompt') ?>
                     </button>
+                </div>
+            </div>
+            <?php elseif ($isPasteOnly): ?>
+            <!-- Hint for paste-only workflows -->
+            <div class="ai-spec-card">
+                <div class="ai-spec-card__header">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 16v-4"/>
+                        <path d="M12 8h.01"/>
+                    </svg>
+                    <?= __admin('workflows.spec.actions', 'Actions') ?>
+                </div>
+                <div class="ai-spec-card__body">
+                    <p class="ai-spec-form__help">
+                        <?= __admin('ai.spec.pasteOnlyHint', 'Paste a JSON command batch in the text area and execute it directly.') ?>
+                    </p>
                 </div>
             </div>
             <?php endif; ?>
@@ -501,7 +519,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
         
         <!-- Main Content -->
         <main class="ai-spec__main">
-            <?php if ($isAiWorkflow): ?>
+            <?php if ($isAiWorkflow && !$isPasteOnly): ?>
             <!-- Prompt Output (AI workflows only) -->
             <div class="ai-spec-card">
                 <div class="ai-spec-card__header">
@@ -571,7 +589,9 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                     </div>
                 </div>
             </div>
+            <?php endif; ?>
             
+            <?php if ($isAiWorkflow): ?>
             <!-- AI Response Section -->
             <div class="ai-spec-card ai-response-section">
                 <div class="ai-spec-card__header">

@@ -774,6 +774,14 @@
                     "includeFavicon": {
                         "label": "Inclure la documentation favicon",
                         "help": "L'IA recevra aussi la documentation de la commande editFavicon et pourra définir un favicon à partir de vos assets."
+                    },
+                    "keepAssets": {
+                        "label": "Conserver les assets existants lors du fresh start",
+                        "help": "Préserver vos assets téléchargés (images, polices, etc.) lors de la réinitialisation du projet avant la création."
+                    },
+                    "keepLanguages": {
+                        "label": "Conserver les langues existantes lors du fresh start",
+                        "help": "Préserver vos langues supplémentaires lors de la réinitialisation du projet avant la création."
                     }
                 }
             },
@@ -911,6 +919,10 @@
                     "boldColorful": { "title": "Audacieux & Coloré", "prompt": "Rendre audacieux et vibrant avec couleurs vives, grande typographie, éléments dynamiques" },
                     "glassmorphism": { "title": "Glassmorphism", "prompt": "Appliquer le glassmorphism avec effets verre dépoli, arrière-plans flous, dégradés" }
                 }
+            },
+            "runBatch": {
+                "title": "Exécuter un lot de commandes",
+                "description": "Collez et exécutez un lot de commandes JSON directement — aucune génération de prompt nécessaire."
             },
             "starterBusiness": {
                 "title": "Starter Business",

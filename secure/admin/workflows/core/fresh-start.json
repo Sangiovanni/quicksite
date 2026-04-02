@@ -16,14 +16,14 @@
             "type": "checkbox",
             "labelKey": "workflows.specs.freshStart.params.keepAssets.label",
             "helpKey": "workflows.specs.freshStart.params.keepAssets.help",
-            "default": false
+            "default": true
         },
         {
             "id": "keepLanguages",
             "type": "checkbox",
             "labelKey": "workflows.specs.freshStart.params.keepLanguages.label",
             "helpKey": "workflows.specs.freshStart.params.keepLanguages.help",
-            "default": false
+            "default": true
         }
     ],
     "dataRequirements": [

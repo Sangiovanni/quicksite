@@ -760,6 +760,14 @@
                     "includeFavicon": {
                         "label": "Include favicon documentation",
                         "help": "The AI will also receive editFavicon command docs and may set a favicon from your assets."
+                    },
+                    "keepAssets": {
+                        "label": "Keep existing assets during fresh start",
+                        "help": "Preserve your uploaded assets (images, fonts, etc.) when the project is reset before creation."
+                    },
+                    "keepLanguages": {
+                        "label": "Keep existing languages during fresh start",
+                        "help": "Preserve your additional languages when the project is reset before creation."
                     }
                 }
             },
@@ -897,6 +905,10 @@
                     "boldColorful": { "title": "Bold & Colorful", "prompt": "Make bold and vibrant with bright colors, large typography, dynamic elements" },
                     "glassmorphism": { "title": "Glassmorphism", "prompt": "Apply glassmorphism with frosted glass effects, blur backgrounds, gradients" }
                 }
+            },
+            "runBatch": {
+                "title": "Run Command Batch",
+                "description": "Paste and execute a JSON command batch directly — no prompt generation needed."
             },
             "starterBusiness": {
                 "title": "Starter Business",

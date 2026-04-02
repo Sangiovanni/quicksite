@@ -1,0 +1,18 @@
+{
+    "$schema": "../schema.json",
+    "id": "run-batch",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "📦",
+        "titleKey": "ai.specs.runBatch.title",
+        "descriptionKey": "ai.specs.runBatch.description",
+        "category": "advanced",
+        "tags": ["batch", "commands", "paste", "advanced"],
+        "difficulty": "advanced"
+    },
+    "parameters": [],
+    "dataRequirements": [],
+    "relatedCommands": [],
+    "pasteOnly": true,
+    "promptTemplate": "run-batch.md"
+}

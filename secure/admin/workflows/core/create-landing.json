@@ -41,6 +41,20 @@
             "helpKey": "ai.specs.shared.params.includeFavicon.help",
             "default": false,
             "condition": "includeAssets === true"
+        },
+        {
+            "id": "keepAssets",
+            "type": "checkbox",
+            "labelKey": "ai.specs.shared.params.keepAssets.label",
+            "helpKey": "ai.specs.shared.params.keepAssets.help",
+            "default": true
+        },
+        {
+            "id": "keepLanguages",
+            "type": "checkbox",
+            "labelKey": "ai.specs.shared.params.keepLanguages.label",
+            "helpKey": "ai.specs.shared.params.keepLanguages.help",
+            "default": true
         }
     ],
     "dataRequirements": [
@@ -98,7 +112,15 @@
         }
     ],
     "relatedCommands": ["setMultilingual", "addLang", "editStructure", "setTranslationKeys", "editStyles", "setRootVariables", "editFavicon"],
-    "preWorkflows": ["fresh-start"],
+    "preWorkflows": [
+        {
+            "id": "fresh-start",
+            "params": {
+                "keepAssets": "{{param.keepAssets}}",
+                "keepLanguages": "{{param.keepLanguages}}"
+            }
+        }
+    ],
     "postWorkflows": [
         {
             "id": "update-lang-switch",

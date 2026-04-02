@@ -1015,6 +1015,14 @@ async function initBuildSelectForm() {
         }
         nameInput.replaceWith(nameSelect);
         await QuickSiteAdmin.populateSelect(nameSelect, 'builds', [], 'Select build...');
+
+        // Refresh build list after successful delete
+        form.addEventListener('command-success', async (e) => {
+            if (e.detail.command === 'deleteBuild') {
+                await QuickSiteAdmin.populateSelect(nameSelect, 'builds', [], 'Select build...');
+                nameSelect.selectedIndex = 0;
+            }
+        });
     }
 }
 
@@ -1153,7 +1161,7 @@ async function initRevokeTokenForm() {
     tokenSelect.innerHTML = '<option value="">Loading tokens...</option>';
     tokenInput.replaceWith(tokenSelect);
     
-    try {
+    async function loadTokenOptions() {
         const result = await QuickSiteAdmin.apiRequest('listTokens', 'GET');
         if (result.ok && result.data.data) {
             const tokens = result.data.data.tokens || [];
@@ -1167,14 +1175,32 @@ async function initRevokeTokenForm() {
                     `${QuickSiteAdmin.escapeHtml(preview)} - ${QuickSiteAdmin.escapeHtml(name)} [${QuickSiteAdmin.escapeHtml(role)}]${isCurrent}</option>`;
             });
             tokenSelect.innerHTML = html;
-        } else {
-            // Fallback to text input if API fails
+            return true;
+        }
+        return false;
+    }
+
+    try {
+        const loaded = await loadTokenOptions();
+        if (!loaded) {
             tokenSelect.replaceWith(tokenInput);
         }
     } catch (e) {
         console.error('Failed to load tokens:', e);
         tokenSelect.replaceWith(tokenInput);
     }
+
+    // Refresh token list after successful revoke
+    form.addEventListener('command-success', async (e) => {
+        if (e.detail.command === 'revokeToken') {
+            try {
+                await loadTokenOptions();
+                tokenSelect.selectedIndex = 0;
+            } catch (err) {
+                console.error('Failed to refresh tokens:', err);
+            }
+        }
+    });
 }
 
 /**
@@ -1773,6 +1799,14 @@ async function initRouteSelectForm() {
         routeInput.replaceWith(routeSelect);
         
         await QuickSiteAdmin.populateSelect(routeSelect, 'routes', [], 'Select route...');
+
+        // Refresh route list after successful delete
+        form.addEventListener('command-success', async (e) => {
+            if (e.detail.command === 'deleteRoute') {
+                await QuickSiteAdmin.populateSelect(routeSelect, 'routes', [], 'Select route...');
+                routeSelect.selectedIndex = 0;
+            }
+        });
     }
 }
 
@@ -1812,6 +1846,14 @@ async function initRenameComponentForm() {
         oldNameSelect.required = oldNameInput.required;
         oldNameInput.replaceWith(oldNameSelect);
         await QuickSiteAdmin.populateSelect(oldNameSelect, 'components', [], 'Select component to rename...');
+
+        // Refresh component list after successful rename
+        form.addEventListener('command-success', async (e) => {
+            if (e.detail.command === 'renameComponent') {
+                await QuickSiteAdmin.populateSelect(oldNameSelect, 'components', [], 'Select component to rename...');
+                oldNameSelect.selectedIndex = 0;
+            }
+        });
     }
 }
 
@@ -1829,6 +1871,14 @@ async function initDuplicateComponentForm() {
         sourceSelect.required = sourceInput.required;
         sourceInput.replaceWith(sourceSelect);
         await QuickSiteAdmin.populateSelect(sourceSelect, 'components', [], 'Select component to duplicate...');
+
+        // Refresh component list after successful duplicate
+        form.addEventListener('command-success', async (e) => {
+            if (e.detail.command === 'duplicateComponent') {
+                await QuickSiteAdmin.populateSelect(sourceSelect, 'components', [], 'Select component to duplicate...');
+                sourceSelect.selectedIndex = 0;
+            }
+        });
     }
 }
 
@@ -2520,6 +2570,14 @@ async function initLanguageSelectForm() {
         langInput.replaceWith(langSelect);
         
         await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], 'Select language...');
+
+        // Refresh language list after successful removal
+        form.addEventListener('command-success', async (e) => {
+            if (e.detail.command === 'removeLang') {
+                await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], 'Select language...');
+                langSelect.selectedIndex = 0;
+            }
+        });
     }
 }
 

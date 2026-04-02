@@ -501,10 +501,16 @@
                 }
             });
 
-            // -- includeAssets lazy validation --
+            // -- includeAssets lazy validation + auto-check keepAssets --
             const includeAssetsCheckbox = els.form.querySelector('input[name="includeAssets"]');
             if (includeAssetsCheckbox) {
                 includeAssetsCheckbox.addEventListener('change', async function() {
+                    // Auto-check keepAssets when includeAssets is checked
+                    const keepAssetsCheckbox = els.form.querySelector('input[name="keepAssets"]');
+                    if (keepAssetsCheckbox && this.checked && !keepAssetsCheckbox.checked) {
+                        keepAssetsCheckbox.checked = true;
+                        updateConditionalFields(els);
+                    }
                     if (!this.checked) return;
                     try {
                         const result = await QuickSiteAdmin.apiRequest('listAssets/starred', 'GET');
