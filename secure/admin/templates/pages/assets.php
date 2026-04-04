@@ -139,7 +139,10 @@ $baseUrl = rtrim(BASE_URL, '/');
         <!-- Batch action bar -->
         <div class="asset-batch-bar" id="asset-batch-bar" style="display:none">
             <span id="asset-batch-count">0 selected</span>
-            <button type="button" class="admin-btn admin-btn--small admin-btn--danger" id="asset-batch-delete">Delete Selected</button>
+            <div>
+                <button type="button" class="admin-btn admin-btn--small" id="asset-batch-select-all">Select All</button>
+                <button type="button" class="admin-btn admin-btn--small admin-btn--danger" id="asset-batch-delete">Delete Selected</button>
+            </div>
         </div>
     </section>
 

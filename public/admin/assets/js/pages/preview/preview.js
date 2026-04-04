@@ -3924,10 +3924,6 @@
                     showToast(PreviewConfig.i18n.selectNodeFirst, 'warning');
                     return;
                 }
-                if (selectedNode === '' && currentEditType !== 'component') {
-                    showToast(PreviewConfig.i18n?.selectChildElement || 'This is the component root. Select a child element to use actions.', 'info');
-                    return;
-                }
                 setMode('add');
                 showSidebarAddForm();
             });
@@ -4055,10 +4051,6 @@
                     showToast(PreviewConfig.i18n.selectNodeFirst, 'warning');
                     return;
                 }
-                if (selectedNode === '' && currentEditType !== 'component') {
-                    showToast(PreviewConfig.i18n?.selectChildElement || 'This is the component root. Select a child element to use actions.', 'info');
-                    return;
-                }
                 setMode('add');
                 showSidebarAddForm();
             });
@@ -4123,6 +4115,20 @@
         if (addCustomParamsContainer) addCustomParamsContainer.style.display = 'none';
         if (addExpandParamsBtn) addExpandParamsBtn.querySelector('svg').style.transform = '';
         if (addComponentSelect) addComponentSelect.value = '';
+
+        // When at root, force "inside" and hide before/after options
+        const isAtRoot = selectedNode === '' && currentEditType !== 'component';
+        if (isAtRoot) {
+            setAddPosition('inside');
+        }
+        if (addPositionPicker) {
+            addPositionPicker.querySelectorAll('input[name="add-position"]').forEach(radio => {
+                const wrapper = radio.closest('label') || radio.parentElement;
+                if (radio.value === 'before' || radio.value === 'after') {
+                    wrapper.style.display = isAtRoot ? 'none' : '';
+                }
+            });
+        }
 
         
         // Update tabs UI

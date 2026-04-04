@@ -962,6 +962,7 @@
     // ─── Batch Delete (Select Mode) ──────────────────────────────────────────
     function initBatchDelete() {
         document.getElementById('asset-batch-delete')?.addEventListener('click', deleteSelected);
+        document.getElementById('asset-batch-select-all')?.addEventListener('click', toggleSelectAll);
     }
 
     function toggleSelectMode() {
@@ -979,14 +980,35 @@
     function updateBatchBar() {
         const bar = document.getElementById('asset-batch-bar');
         const count = document.getElementById('asset-batch-count');
+        const selectAllBtn = document.getElementById('asset-batch-select-all');
+        const deleteBtn = document.getElementById('asset-batch-delete');
         if (!bar) return;
 
-        if (selectMode && selectedFiles.size > 0) {
+        if (selectMode) {
             bar.style.display = '';
-            count.textContent = `${selectedFiles.size} selected`;
+            count.textContent = selectedFiles.size > 0 ? `${selectedFiles.size} selected` : 'None selected';
+            if (deleteBtn) deleteBtn.disabled = selectedFiles.size === 0;
+            // Toggle button label
+            const visibleAssets = getFilteredAssets();
+            const allSelected = visibleAssets.length > 0 && visibleAssets.every(a => selectedFiles.has(a.filename));
+            if (selectAllBtn) selectAllBtn.textContent = allSelected ? 'Deselect All' : 'Select All';
         } else {
             bar.style.display = 'none';
         }
+    }
+
+    function toggleSelectAll() {
+        const visibleAssets = getFilteredAssets();
+        const allSelected = visibleAssets.length > 0 && visibleAssets.every(a => selectedFiles.has(a.filename));
+        if (allSelected) {
+            // Deselect all visible
+            visibleAssets.forEach(a => selectedFiles.delete(a.filename));
+        } else {
+            // Select all visible
+            visibleAssets.forEach(a => selectedFiles.add(a.filename));
+        }
+        updateBatchBar();
+        renderGrid();
     }
 
     async function deleteSelected() {
