@@ -1,5 +1,14 @@
 {
     "version": "1.0",
-    "description": "Per-route layout settings (menu/footer visibility). Routes without entries inherit from nearest ancestor or default (both true).",
-    "routes": {}
+    "description": "Per-route layout settings (menu\/footer visibility). Routes without entries inherit from nearest ancestor or default (both true).",
+    "routes": {
+        "home": {
+            "menu": true,
+            "footer": true
+        },
+        "get-started": {
+            "menu": true,
+            "footer": true
+        }
+    }
 }

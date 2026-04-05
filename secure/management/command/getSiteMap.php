@@ -17,6 +17,32 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 /**
+ * Load sitemap config (custom URLs + excluded routes)
+ */
+function loadSitemapConfig(): array {
+    $configPath = PROJECT_PATH . '/config/sitemap-config.json';
+    $default = ['excludedRoutes' => [], 'customUrls' => []];
+    if (!file_exists($configPath)) return $default;
+    $data = json_decode(file_get_contents($configPath), true);
+    return is_array($data) ? array_merge($default, $data) : $default;
+}
+
+/**
+ * Save sitemap config
+ */
+function saveSitemapConfig(array $config): bool {
+    $configDir = PROJECT_PATH . '/config';
+    if (!is_dir($configDir)) mkdir($configDir, 0755, true);
+    $data = [
+        'excludedRoutes' => array_values(array_unique($config['excludedRoutes'] ?? [])),
+        'customUrls' => array_values(array_filter(array_unique($config['customUrls'] ?? []), function($u) {
+            return is_string($u) && trim($u) !== '';
+        }))
+    ];
+    return file_put_contents($configDir . '/sitemap-config.json', json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) !== false;
+}
+
+/**
  * Recursively count non-empty translation values
  */
 function countNonEmptyTranslations(array $arr): int {
@@ -51,6 +77,13 @@ function __command_getSiteMap(array $params = [], array $urlParams = []): ApiRes
 
     // Get configuration
     $baseUrl = rtrim(BASE_URL, '/');
+    // Allow custom base URL override (for sitemap.txt generation with production domain)
+    if (!empty($params['baseUrl'])) {
+        $customBase = filter_var($params['baseUrl'], FILTER_VALIDATE_URL);
+        if ($customBase) {
+            $baseUrl = rtrim($customBase, '/');
+        }
+    }
     $multilingual = CONFIG['MULTILINGUAL_SUPPORT'] ?? false;
     $languages = CONFIG['LANGUAGES_SUPPORTED'] ?? ['en'];
     $defaultLang = CONFIG['LANGUAGE_DEFAULT'] ?? 'en';
@@ -134,13 +167,89 @@ function __command_getSiteMap(array $params = [], array $urlParams = []): ApiRes
         }
     }
 
+    // Include per-route layout settings (menu/footer visibility)
+    require_once SECURE_FOLDER_PATH . '/src/classes/RouteLayoutManager.php';
+    $layoutManager = new RouteLayoutManager();
+    $routeLayouts = [];
+    foreach ($routes as $route) {
+        $routeLayouts[$route] = $layoutManager->getEffectiveLayout($route);
+    }
+    $sitemapData['routeLayouts'] = $routeLayouts;
+
+    // Load sitemap config (exclusions + custom URLs)
+    $sitemapConfig = loadSitemapConfig();
+    $sitemapData['sitemapConfig'] = $sitemapConfig;
+
+    // Handle saveConfig action (persist custom URLs / exclusions)
+    if (isset($params['saveConfig']) && is_array($params['saveConfig'])) {
+        $sitemapConfig = $params['saveConfig'];
+        saveSitemapConfig($sitemapConfig);
+        $sitemapData['sitemapConfig'] = loadSitemapConfig(); // re-read to return clean data
+        $sitemapConfig = $sitemapData['sitemapConfig'];
+    }
+
+    // Apply exclusions and custom URLs only for text format (save/download)
+    // JSON format returns all routes so the UI can show toggles
+    if ($format === 'text') {
+        $excludedRoutes = $sitemapConfig['excludedRoutes'] ?? [];
+        if (!empty($excludedRoutes)) {
+            // Remove URLs belonging to excluded routes
+            $filteredRoutes = [];
+            $filteredUrls = [];
+            foreach ($sitemapData['routes'] as $routeData) {
+                if (in_array($routeData['name'], $excludedRoutes)) continue;
+                $filteredRoutes[] = $routeData;
+                foreach ($routeData['urls'] as $url) {
+                    $filteredUrls[] = $url;
+                }
+            }
+            $sitemapData['routes'] = $filteredRoutes;
+            $sitemapData['urls'] = $filteredUrls;
+        }
+
+        // Append custom URLs
+        $customUrls = $sitemapConfig['customUrls'] ?? [];
+        foreach ($customUrls as $customUrl) {
+            if (filter_var($customUrl, FILTER_VALIDATE_URL)) {
+                $sitemapData['urls'][] = $customUrl;
+            }
+        }
+        $sitemapData['totalUrls'] = count($sitemapData['urls']);
+    }
+
     // For internal calls and JSON format, return ApiResponse
     // Note: text format requires direct output, handled only via HTTP
     if ($format === 'text' && !defined('COMMAND_INTERNAL_CALL')) {
+        $content = implode("\n", $sitemapData['urls']) . "\n";
+
+        // If save=true, write sitemap.txt to project/public + live PUBLIC_CONTENT_PATH
+        if (!empty($params['save'])) {
+            // 1. Save to project's public folder (synced by switchProject)
+            $projectPublicDir = PROJECT_PATH . '/public';
+            if (!is_dir($projectPublicDir)) mkdir($projectPublicDir, 0755, true);
+            $projectSitemapPath = $projectPublicDir . '/sitemap.txt';
+            if (file_put_contents($projectSitemapPath, $content) === false) {
+                return ApiResponse::create(500, 'operation.write_failed')
+                    ->withMessage('Failed to write sitemap.txt to project');
+            }
+
+            // 2. Also deploy to live public root
+            $publicSitemapPath = PUBLIC_CONTENT_PATH . '/sitemap.txt';
+            file_put_contents($publicSitemapPath, $content);
+
+            return ApiResponse::create(200, 'operation.success')
+                ->withMessage('sitemap.txt saved successfully')
+                ->withData([
+                    'path' => $projectSitemapPath,
+                    'urlCount' => count($sitemapData['urls']),
+                    'content' => $content
+                ]);
+        }
+
         // Return plain text sitemap (HTTP only)
         header('Content-Type: text/plain; charset=utf-8');
         header('Content-Disposition: inline; filename="sitemap.txt"');
-        echo implode("\n", $sitemapData['urls']);
+        echo $content;
         exit;
     }
     
@@ -164,5 +273,6 @@ function __command_getSiteMap(array $params = [], array $urlParams = []): ApiRes
 if (!defined('COMMAND_INTERNAL_CALL')) {
     // Get format from URL parameter for HTTP requests
     $urlSegments = $trimParametersManagement->additionalParams();
-    __command_getSiteMap([], $urlSegments)->send();
+    $bodyParams = json_decode(defined('REQUEST_BODY_RAW') ? REQUEST_BODY_RAW : file_get_contents('php://input'), true) ?: [];
+    __command_getSiteMap($bodyParams, $urlSegments)->send();
 }

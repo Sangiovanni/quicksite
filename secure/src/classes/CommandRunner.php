@@ -39,6 +39,7 @@ class CommandRunner {
         'getStructure',
         'getRoutes',
         'getSiteMap',
+        'analyzeReachability',
         'listComponents',
         'listPages',
         'checkStructureMulti',

@@ -84,5 +84,9 @@ secure/admin/workflows/custom/*
 # Build output
 public/build/
 
+# Generated sitemap files (per-project, regenerated via admin)
+public/sitemap.txt
+secure/projects/quicksite/public/sitemap.txt
+
 # Logs
 secure/logs/

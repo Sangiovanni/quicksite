@@ -78,7 +78,7 @@ function getCommandCategories(): array {
         'route_management' => [
             'label' => 'Route Management',
             'icon' => 'route',
-            'commands' => ['addRoute', 'deleteRoute', 'setRouteLayout', 'getRoutes', 'getSiteMap']
+            'commands' => ['addRoute', 'deleteRoute', 'setRouteLayout', 'getRoutes', 'getSiteMap', 'analyzeReachability']
         ],
         'structure_management' => [
             'label' => 'Structure Management',

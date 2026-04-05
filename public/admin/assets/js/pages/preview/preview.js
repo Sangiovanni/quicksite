@@ -6390,6 +6390,23 @@
     startLoadingTimeout();
     loadMiniplayerState();
     
+    // Check for deep-link target from URL parameter (e.g., ?target=page-home)
+    const urlTarget = new URLSearchParams(window.location.search).get('target');
+    if (urlTarget && targetSelect) {
+        // Parse target format: "page-home", "component-card", "menu", "footer"
+        const parsed = parseStruct(urlTarget);
+        if (parsed) {
+            const selectValue = parsed.name ? `${parsed.type}:${parsed.name}` : `layout:${parsed.type}`;
+            const option = targetSelect.querySelector(`option[value="${CSS.escape(selectValue)}"]`);
+            if (option) {
+                targetSelect.value = selectValue;
+            }
+        }
+        // Clean URL without reloading
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, '', cleanUrl);
+    }
+
     // Initialize edit target state from dropdown
     // Default to first page option (skip layout options which are just for switching to)
     if (targetSelect && targetSelect.value) {

@@ -98,6 +98,9 @@ async function initEnhancedFeatures() {
         case 'setRouteLayout':
             await initRouteSelectForm();
             break;
+        case 'addRoute':
+            await initAddRouteParentSelect();
+            break;
         case 'removeLang':
         case 'getTranslation':
         case 'getTranslationKeys':
@@ -1811,6 +1814,42 @@ async function initRouteSelectForm() {
 }
 
 /**
+ * Initialize addRoute form: convert parent field to route select dropdown
+ */
+async function initAddRouteParentSelect() {
+    const form = document.getElementById('command-form');
+    const parentInput = form.querySelector('[name="parent"]');
+    
+    if (parentInput && parentInput.tagName !== 'SELECT') {
+        const parentSelect = document.createElement('select');
+        parentSelect.name = 'parent';
+        parentSelect.className = 'admin-select';
+        // parent is optional — no required attribute
+        
+        if (parentInput.dataset.urlParam !== undefined) {
+            parentSelect.dataset.urlParam = '';
+        }
+        
+        parentInput.replaceWith(parentSelect);
+        
+        // Add "None (root level)" as first option
+        const noneOption = document.createElement('option');
+        noneOption.value = '';
+        noneOption.textContent = 'None (root level)';
+        parentSelect.appendChild(noneOption);
+        
+        await QuickSiteAdmin.populateSelect(parentSelect, 'routes', [], 'None (root level)');
+
+        // Refresh route list after successful add
+        form.addEventListener('command-success', async (e) => {
+            if (e.detail.command === 'addRoute') {
+                await QuickSiteAdmin.populateSelect(parentSelect, 'routes', [], 'None (root level)');
+            }
+        });
+    }
+}
+
+/**
  * Initialize findComponentUsages form with component select
  */
 async function initFindComponentUsagesForm() {
@@ -3370,6 +3409,13 @@ function renderFormField(rawName, param, required) {
             <input type="text" name="${name}" id="${inputId}" class="admin-input" 
                 placeholder="${QuickSiteAdmin.escapeHtml(example || '')}" 
                 ${required ? 'required' : ''} ${urlParamAttr}>
+        `;
+    } else if (uiType === 'checkbox') {
+        inputHtml = `
+            <label class="admin-checkbox" style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                <input type="checkbox" name="${name}" id="${inputId}" value="true" ${urlParamAttr}>
+                <span>${QuickSiteAdmin.escapeHtml(description)}</span>
+            </label>
         `;
     } else {
     switch (type) {

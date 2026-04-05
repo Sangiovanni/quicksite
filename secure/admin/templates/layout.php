@@ -169,6 +169,15 @@ $langNames = [
                 <span>Assets</span>
             </a>
             
+            <!-- Sitemap - Top-level tab -->
+            <a href="<?= $router->url('sitemap') ?>" 
+               class="admin-nav__link<?= $currentPage === 'sitemap' ? ' admin-nav__link--active' : '' ?>">
+                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+                <span><?= __admin('nav.sitemap') ?></span>
+            </a>
+            
             <!-- Settings Group - Click goes to Project Settings -->
             <div class="admin-nav__group<?= $isSettingsActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="settings">
                 <a href="<?= $router->url('settings') ?>" class="admin-nav__group-toggle">

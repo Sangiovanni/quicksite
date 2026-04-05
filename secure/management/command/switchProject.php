@@ -219,6 +219,23 @@ function copyProjectPublicFiles(string $source, string $destination): array {
         }
     }
     
+    // Copy individual files (sitemap.txt)
+    $filesToCopy = ['sitemap.txt'];
+    foreach ($filesToCopy as $file) {
+        $srcFile = $source . '/' . $file;
+        if (file_exists($srcFile)) {
+            if (copy($srcFile, $destination . '/' . $file)) {
+                $result['copied'][] = $file;
+            }
+        } else {
+            // Remove stale file from previous project
+            $destFile = $destination . '/' . $file;
+            if (file_exists($destFile)) {
+                unlink($destFile);
+            }
+        }
+    }
+
     // Copy .htaccess if exists
     $htaccessSrc = $source . '/.htaccess';
     if (file_exists($htaccessSrc)) {
@@ -317,6 +334,15 @@ function syncLiveToProject(string $projectPath): bool {
         
         if (!copyDirectoryContents($src, $dst)) {
             $success = false;
+        }
+    }
+
+    // Sync individual files (sitemap.txt)
+    $filesToSync = ['sitemap.txt'];
+    foreach ($filesToSync as $file) {
+        $src = $livePublicPath . '/' . $file;
+        if (file_exists($src)) {
+            copy($src, $projectPublicPath . '/' . $file);
         }
     }
     

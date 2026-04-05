@@ -417,6 +417,12 @@ if (file_exists(SERVER_ROOT . '/LICENSE')) {
     }
 }
 
+// Copy sitemap.txt from project public folder (if generated)
+$projectSitemapPath = PROJECT_PATH . '/public/sitemap.txt';
+if (file_exists($projectSitemapPath)) {
+    copy($projectSitemapPath, $publicContentPath . '/sitemap.txt');
+}
+
 // Step 3: Copy secure folder files (selective)
 
 // Copy routes.php

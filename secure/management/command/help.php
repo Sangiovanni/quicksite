@@ -23,13 +23,20 @@ $GLOBALS['__help_commands'] = [
             'route' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Route path (will be used in URL). Can use "name" as alias for simple routes.',
+                'description' => 'Route path (will be used in URL). Use slashes for nested routes. Can use "name" as alias for simple routes.',
                 'example' => 'about-us',
                 'validation' => 'Lowercase letters, numbers, and hyphens only. Max depth: 5 levels.',
                 'alias' => 'name'
+            ],
+            'parent' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Parent route to prepend. Alternative to using slashes in route param (e.g., parent="documentation", route="commands" is equivalent to route="documentation/commands").',
+                'example' => 'documentation',
+                'validation' => 'Must be an existing route if provided'
             ]
         ],
-        'example_post' => 'POST /management/addRoute with body: {"route": "about-us"} or {"name": "about-us"}',
+        'example_post' => 'POST /management/addRoute with body: {"route": "documentation/commands"} or {"route": "commands", "parent": "documentation"}',
         'success_response' => [
             'status' => 201,
             'code' => 'route.created',
@@ -52,24 +59,33 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'deleteRoute' => [
-        'description' => 'Deletes an existing route and its associated files (PHP and JSON). Also removes any URL aliases pointing to this route.',
+        'description' => 'Deletes an existing route and its associated files (PHP and JSON). Also removes any URL aliases pointing to this route. For routes with children, requires force=true to cascade delete.',
         'method' => 'DELETE',
         'parameters' => [
             'route' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Route name to delete',
+                'description' => 'Route path to delete',
                 'example' => 'about-us',
                 'validation' => 'Must be an existing route'
+            ],
+            'force' => [
+                'required' => false,
+                'type' => 'boolean',
+                'ui_type' => 'checkbox',
+                'description' => 'Force cascade deletion of route and all its children. Required when deleting a route that has nested child routes.',
+                'example' => 'true',
+                'default' => false
             ]
         ],
-        'example_delete' => 'DELETE /management/deleteRoute with body: {"route": "about-us"}',
+        'example_delete' => 'DELETE /management/deleteRoute with body: {"route": "about-us"} or {"route": "guides", "force": true}',
         'success_response' => [
             'status' => 200,
             'code' => 'route.deleted',
             'message' => 'Route successfully deleted',
             'data' => [
                 'route' => 'about-us',
+                'deleted_routes' => ['about-us'],
                 'deleted_files' => [
                     'php' => '/path/to/about-us.php',
                     'json' => '/path/to/about-us.json'
@@ -84,11 +100,12 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'Missing route parameter',
             '400.route.invalid_name' => 'Invalid route name format',
+            '400.route.has_children' => 'Route has child routes. Use force=true to cascade delete.',
             '404.route.not_found' => 'Route does not exist',
             '404.file.not_found' => 'Page template file not found',
             '500.server.file_write_failed' => 'Failed to delete files or update routes'
         ],
-        'notes' => 'Deletes both PHP template and JSON page structure. Updates routes.php automatically. Also automatically removes any URL aliases that were pointing to this route to prevent ghost redirects.'
+        'notes' => 'Deletes both PHP template and JSON page structure. Updates routes.php automatically. Also removes URL aliases, page events, and route layout config. When force=true, deletes all descendant routes recursively.'
     ],
     
     'setRouteLayout' => [
@@ -655,7 +672,7 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'getRoutes' => [
-        'description' => 'Returns list of all available routes in the system',
+        'description' => 'Returns all routes as both a nested structure and a flat list',
         'method' => 'GET',
         'parameters' => [],
         'example_get' => 'GET /management/getRoutes',
@@ -664,12 +681,13 @@ $GLOBALS['__help_commands'] = [
             'code' => 'operation.success',
             'message' => 'Routes retrieved successfully',
             'data' => [
-                'routes' => ['home', 'privacy', 'terms'],
+                'routes' => ['home' => [], 'guides' => ['getting-started' => []]],
+                'flat_routes' => ['home', 'guides', 'guides/getting-started'],
                 'count' => 3
             ]
         ],
         'error_responses' => [],
-        'notes' => 'Returns the current list of registered routes. Useful for validation before creating menu/footer links.'
+        'notes' => 'Returns both the nested route structure (routes) and a flat list of all route paths (flat_routes). Useful for validation before creating menu/footer links.'
     ],
     
     'getSiteMap' => [
@@ -714,6 +732,36 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'Invalid format parameter (must be text or json)'
         ],
         'notes' => 'Use format=json (default) for programmatic access and Dashboard. Use format=text to generate sitemap.txt for SEO. Coverage data includes translation key counts per language to help identify incomplete translations.'
+    ],
+    
+    'analyzeReachability' => [
+        'description' => 'Analyzes route reachability via BFS from the home page. Follows internal links in page structures, menu, and footer to find orphan routes that are not reachable through any navigation path.',
+        'method' => 'GET',
+        'url_structure' => '/management/analyzeReachability',
+        'parameters' => [],
+        'example_get' => 'GET /management/analyzeReachability',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'All routes are reachable from home | N orphan route(s) found',
+            'data' => [
+                'total_routes' => 6,
+                'reachable_count' => 5,
+                'orphan_count' => 1,
+                'reachable' => ['docs', 'get-started', 'guides', 'home', 'terms'],
+                'orphans' => ['privacy'],
+                'graph' => [
+                    'home' => ['docs', 'get-started', 'guides', 'terms'],
+                    'privacy' => ['home', 'terms']
+                ],
+                'global_links' => [
+                    'menu' => ['home', 'docs', 'get-started', 'guides'],
+                    'footer' => ['terms', 'privacy']
+                ]
+            ]
+        ],
+        'error_responses' => [],
+        'notes' => 'Performs a BFS (breadth-first search) starting from the home route. Each route\'s outgoing links are computed from: (1) internal hrefs in the page JSON structure, (2) menu links (if menu is visible on that route per route-layout.json), (3) footer links (if footer is visible). The graph field shows the full adjacency list. Routes in orphans[] have no navigation path from home.'
     ],
     
     'getStructure' => [
@@ -2068,11 +2116,11 @@ $GLOBALS['__help_commands'] = [
                 'description' => 'Role to assign to the token',
                 'valid_values' => [
                     '*' => 'Superadmin - full access to all 104 commands including token/role management',
-                    'viewer' => 'Read-only access (30 commands)',
-                    'editor' => 'Content editing - structure, translations, assets, APIs (65 commands)',
-                    'designer' => 'Style editing - CSS, animations, visual elements, APIs (72 commands)',
-                    'developer' => 'Build and deploy access (79 commands)',
-                    'admin' => 'Full access except token/role management (97 commands)',
+                    'viewer' => 'Read-only access (31 commands)',
+                    'editor' => 'Content editing - structure, translations, assets, APIs (66 commands)',
+                    'designer' => 'Style editing - CSS, animations, visual elements, APIs (73 commands)',
+                    'developer' => 'Build and deploy access (80 commands)',
+                    'admin' => 'Full access except token/role management (98 commands)',
                     '<custom>' => 'Any custom role name created via createRole'
                 ],
                 'example' => 'editor or designer or admin'
@@ -4767,7 +4815,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
             'total' => count($commands),
             'base_url' => rtrim(BASE_URL, '/') . '/management',
             'command_categories' => [
-                'route_management' => ['addRoute', 'deleteRoute', 'setRouteLayout', 'getRoutes', 'getSiteMap'],
+                'route_management' => ['addRoute', 'deleteRoute', 'setRouteLayout', 'getRoutes', 'getSiteMap', 'analyzeReachability'],
                 'structure_management' => ['getStructure', 'editStructure', 'listComponents', 'findComponentUsages', 'renameComponent', 'duplicateComponent', 'listPages'],
                 'node_management' => ['moveNode', 'deleteNode', 'addNode', 'editNode', 'addComponentToNode', 'editComponentToNode'],
                 'alias_management' => ['createAlias', 'deleteAlias', 'listAliases'],
@@ -4798,11 +4846,11 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'default_token' => 'tvt_dev_default_change_me_in_production (CHANGE IN PRODUCTION!)',
                 'role_system' => [
                     '*' => 'Superadmin - full access to all 111 commands including token/role management',
-                    'viewer' => 'Read-only access (32 commands) - get*, list*, validate*, help, listAiProviders, listJsFunctions, listInteractions, listApiEndpoints, listSnippets, getSnippet',
-                    'editor' => 'Content editing (71 commands) - viewer + structure, translations, assets, interactions, APIs, snippets',
-                    'designer' => 'Style editing (78 commands) - editor + CSS, animations, visual elements',
-                    'developer' => 'Build access (85 commands) - designer + build, deploy, projects, AI, listJsFunctions',
-                    'admin' => 'Full except tokens (104 commands) - developer + all except token/role management + JS functions'
+                    'viewer' => 'Read-only access (33 commands) - get*, list*, validate*, analyze*, help, listAiProviders, listJsFunctions, listInteractions, listApiEndpoints, listSnippets, getSnippet',
+                    'editor' => 'Content editing (72 commands) - viewer + structure, translations, assets, interactions, APIs, snippets',
+                    'designer' => 'Style editing (79 commands) - editor + CSS, animations, visual elements',
+                    'developer' => 'Build access (86 commands) - designer + build, deploy, projects, AI, listJsFunctions',
+                    'admin' => 'Full except tokens (105 commands) - developer + all except token/role management + JS functions'
                 ],
                 'endpoints' => [
                     'listRoles' => 'View available roles (* sees commands, others see names only)',
@@ -4819,7 +4867,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'config_file' => 'secure/management/config/auth.php',
                 'allowed_methods' => ['GET', 'POST', 'OPTIONS']
             ],
-            'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getSiteMap, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listTokens, listComponents, listPages, listAliases, listAiProviders. POST commands: all others.',
+            'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getSiteMap, analyzeReachability, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listTokens, listComponents, listPages, listAliases, listAiProviders. POST commands: all others.',
             'note' => 'For GET commands with URL parameters, use URL segments (e.g., /getStructure/menu, /validateTranslations/en, /getStyleRule/.btn-primary, /getSiteMap/text). For POST commands, send parameters as JSON in request body. For file uploads, use multipart/form-data encoding.',
             'workflows' => [
                 'translation_workflow' => '1) analyzeTranslations for full health check, OR 2) validateTranslations to find missing, 3) getUnusedTranslationKeys to find orphans, 4) setTranslationKeys to add/update, 5) deleteTranslationKeys to clean up.',

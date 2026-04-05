@@ -1,22 +1,22 @@
 [
-  {
-    "tag": "h1",
-    "params": {},
-    "children": [
-      {
-        "textKey": "termOfUse.title"
-      }
-    ]
-  },
-  {
-    "tag": "div",
-    "params": {
-      "class": "center"
+    {
+        "tag": "h1",
+        "params": [],
+        "children": [
+            {
+                "textKey": "termOfUse.title"
+            }
+        ]
     },
-    "children": [
-      {
-        "textKey": "termOfUse.content"
-      }
-    ]
-  }
+    {
+        "tag": "div",
+        "params": {
+            "class": "center"
+        },
+        "children": [
+            {
+                "textKey": "termOfUse.content"
+            }
+        ]
+    }
 ]
