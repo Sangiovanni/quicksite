@@ -1,0 +1,121 @@
+{
+    "$schema": "../schema.json",
+    "id": "setup-languages",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "🌐",
+        "titleKey": "workflows.specs.setupLanguages.title",
+        "descriptionKey": "workflows.specs.setupLanguages.description",
+        "category": "modification",
+        "tags": ["language", "multilingual", "i18n", "setup"],
+        "difficulty": "beginner"
+    },
+    "parameters": [
+        {
+            "id": "multilingual",
+            "type": "checkbox",
+            "labelKey": "workflows.specs.setupLanguages.params.multilingual.label",
+            "helpKey": "workflows.specs.setupLanguages.params.multilingual.help",
+            "default": false
+        },
+        {
+            "id": "languages",
+            "type": "tag-select",
+            "labelKey": "workflows.specs.setupLanguages.params.languages.label",
+            "helpKey": "workflows.specs.setupLanguages.params.languages.help",
+            "optionsFrom": {
+                "data": "allLanguages",
+                "value": "code",
+                "label": "name"
+            },
+            "default": "en",
+            "condition": "multilingual === true"
+        },
+        {
+            "id": "defaultLanguage",
+            "type": "select",
+            "labelKey": "workflows.specs.setupLanguages.params.defaultLanguage.label",
+            "helpKey": "workflows.specs.setupLanguages.params.defaultLanguage.help",
+            "optionsFrom": {
+                "data": "allLanguages",
+                "value": "code",
+                "label": "name"
+            },
+            "default": "en"
+        }
+    ],
+    "dataRequirements": [
+        {
+            "id": "allLanguages",
+            "command": "getLanguageList",
+            "extract": "data.languages"
+        },
+        {
+            "id": "langData",
+            "command": "getLangList",
+            "extract": "data"
+        }
+    ],
+    "relatedCommands": ["addLang", "deleteLang", "setDefaultLang", "setMultilingual"],
+    "steps": [
+        {
+            "comment": "=== PHASE 1a: Add all selected languages (multilingual mode) ===",
+            "condition": "param.multilingual === true",
+            "forEach": "param.languages",
+            "command": "addLang",
+            "params": {
+                "code": "{{$value}}"
+            }
+        },
+        {
+            "comment": "=== PHASE 1b: Add the chosen base language (single-language mode) ===",
+            "condition": "param.multilingual !== true",
+            "command": "addLang",
+            "params": {
+                "code": "{{param.defaultLanguage}}"
+            }
+        },
+        {
+            "comment": "=== PHASE 2a: Enable multilingual support (user wants it) ===",
+            "condition": "param.multilingual === true",
+            "command": "setMultilingual",
+            "params": {
+                "enabled": true
+            }
+        },
+        {
+            "comment": "=== PHASE 2b: Temporarily enable multilingual to change default (single-language mode) ===",
+            "condition": "param.multilingual !== true && param.defaultLanguage !== langData.default_language",
+            "command": "setMultilingual",
+            "params": {
+                "enabled": true
+            }
+        },
+        {
+            "comment": "=== PHASE 3: Set default language (only if different from current) ===",
+            "condition": "param.defaultLanguage !== langData.default_language",
+            "command": "setDefaultLang",
+            "params": {
+                "lang": "{{param.defaultLanguage}}"
+            }
+        },
+        {
+            "comment": "=== PHASE 4a: Delete old languages (single-language mode, after changing default) ===",
+            "condition": "param.multilingual !== true && param.defaultLanguage !== langData.default_language",
+            "forEach": "langData.languages",
+            "filter": "{{$value}} !== {{param.defaultLanguage}}",
+            "command": "deleteLang",
+            "params": {
+                "code": "{{$value}}"
+            }
+        },
+        {
+            "comment": "=== PHASE 4b: Disable multilingual (single-language mode, after cleanup) ===",
+            "condition": "param.multilingual !== true && param.defaultLanguage !== langData.default_language",
+            "command": "setMultilingual",
+            "params": {
+                "enabled": false
+            }
+        }
+    ]
+}

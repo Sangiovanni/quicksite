@@ -338,7 +338,8 @@
         "create": "Créer",
         "cancel": "Annuler",
         "newChildOf": "Nouvel enfant de",
-        "newRootRoute": "Nouvelle route racine",
+        "newRoute": "Nouvelle route",
+        "routeNameNested": "nom-route ou parent/enfant",
         "deleteRoute": "Supprimer la route",
         "deleteConfirm": "Supprimer la route /{route} ?",
         "deleteConfirmChildren": "La route /{route} a {count} enfants. Tout supprimer ?",
@@ -751,6 +752,9 @@
             "chars": "caractères",
             "words": "mots"
         },
+        "tagSelect": {
+            "searchPlaceholder": "Tapez pour rechercher..."
+        },
         "editor": {
             "new": "Nouvelle Spec",
             "edit": "Modifier la Spec",
@@ -1055,6 +1059,25 @@
                     "keepLanguages": {
                         "label": "Conserver les langues",
                         "help": "Si coché, les langues supplémentaires ne seront PAS supprimées"
+                    }
+                }
+            },
+            "setupLanguages": {
+                "title": "Configurer les langues",
+                "description": "Configurer les langues du projet et le support multilingue. Ajouter des langues, définir la langue par défaut et activer/désactiver le mode multilingue.",
+                "params": {
+                    "multilingual": {
+                        "label": "🌐 Activer le support multilingue",
+                        "help": "Activer pour supporter plusieurs langues avec un sélecteur de langue"
+                    },
+                    "languages": {
+                        "label": "Langues",
+                        "help": "Sélectionnez toutes les langues que votre site supportera",
+                        "placeholder": "Rechercher des langues..."
+                    },
+                    "defaultLanguage": {
+                        "label": "Langue par défaut",
+                        "help": "La langue principale de votre site"
                     }
                 }
             },

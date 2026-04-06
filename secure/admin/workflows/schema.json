@@ -154,7 +154,7 @@
           },
           "type": {
             "type": "string",
-            "enum": ["text", "textarea", "select", "checkbox", "number", "nodeSelector", "hidden"],
+            "enum": ["text", "textarea", "select", "tag-select", "checkbox", "number", "nodeSelector", "hidden"],
             "description": "Input type for the parameter"
           },
           "labelKey": {

@@ -340,12 +340,12 @@
         hideInlineAddForm();
 
         const isRoot = !parentRoute;
-        const label = isRoot ? t('newRootRoute', 'New root route') : `${t('newChildOf', 'New child of')} "${parentRoute}"`;
+        const label = isRoot ? t('newRoute', 'New route') : `${t('newChildOf', 'New child of')} "${parentRoute}"`;
 
         const formHtml = `<div class="sitemap-inline-form" id="sitemap-add-form">
             <span class="sitemap-inline-form__label">${esc(label)}:</span>
             <input type="text" class="admin-input admin-input--sm" id="sitemap-new-route-name"
-                   placeholder="${t('routeName', 'route-name')}" pattern="[a-z0-9\\-]+" autofocus />
+                   placeholder="${isRoot ? t('routeNameNested', 'route-name or parent/child') : t('routeName', 'route-name')}" pattern="[a-z0-9\\-/]+" autofocus />
             <button type="button" class="admin-btn admin-btn--primary admin-btn--sm" id="sitemap-create-btn">${t('create', 'Create')}</button>
             <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" id="sitemap-cancel-btn">${t('cancel', 'Cancel')}</button>
             <span class="sitemap-inline-form__error" id="sitemap-add-error"></span>
@@ -382,23 +382,19 @@
             createBtn.innerHTML = `${QuickSiteUtils.htmlSpinner()} ${t('create')}`;
 
             try {
-                // If name contains slashes and no explicit parent, split into parent + child
-                let routeName = name;
-                let routeParent = parentRoute;
-                if (!routeParent && name.includes('/')) {
-                    const parts = name.split('/');
-                    routeName = parts.pop();
-                    routeParent = parts.join('/');
-                }
-
-                const body = { route: routeName };
-                if (routeParent) body.parent = routeParent;
+                // Build full route path — addRoute handles cascade parent creation
+                const fullRoute = parentRoute ? parentRoute + '/' + name : name;
+                const body = { route: fullRoute };
 
                 const result = await QuickSiteAdmin.apiRequest('addRoute', 'POST', body);
                 if (result.ok) {
                     // Remember expanded state + expand parent
                     saveExpandedState();
                     if (parentRoute) expandedNodes.add(parentRoute);
+                    // Also expand any cascade-created parents
+                    if (result.data?.cascade_created) {
+                        result.data.cascade_created.forEach(r => expandedNodes.add(r));
+                    }
                     QuickSiteAdmin.showToast(t('routeCreated', 'Route created successfully'), 'success');
                     await refreshAll();
                 } else {

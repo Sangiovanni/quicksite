@@ -33,6 +33,7 @@ class CommandRunner {
         'getTranslationKeys',
         'getUnusedTranslationKeys',
         'getLangList',
+        'getLanguageList',
         'validateTranslations',
         'analyzeTranslations',
         // Read-only: structure & content

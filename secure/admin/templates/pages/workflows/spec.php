@@ -215,11 +215,41 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                             if (isset($v['min']))        $validationAttrs .= ' min="' . htmlspecialchars($v['min']) . '"';
                             if (isset($v['max']))        $validationAttrs .= ' max="' . htmlspecialchars($v['max']) . '"';
                         }
+                        // Evaluate condition against defaults to determine initial visibility
+                        $conditionHidden = false;
+                        if (isset($param['condition'])) {
+                            $condExpr = $param['condition'];
+                            // Build defaults map from all parameters
+                            $defaults = [];
+                            foreach ($parameters as $p) {
+                                if (($p['type'] ?? 'text') === 'checkbox') {
+                                    $defaults[$p['id']] = ($p['default'] ?? false) ? 'true' : 'false';
+                                } else {
+                                    $defaults[$p['id']] = (string)($p['default'] ?? '');
+                                }
+                            }
+                            // Simple evaluation: replace param names with their default values
+                            $evalExpr = $condExpr;
+                            foreach ($defaults as $pid => $pval) {
+                                if ($pval === 'true') $repl = 'true';
+                                elseif ($pval === 'false' || $pval === '') $repl = 'false';
+                                else $repl = json_encode($pval);
+                                $evalExpr = preg_replace('/\b' . preg_quote($pid, '/') . '\b/', $repl, $evalExpr);
+                            }
+                            // Replace any remaining identifiers with false (but not boolean/null keywords)
+                            $evalExpr = preg_replace('/\b(?!true\b|false\b|null\b)[a-zA-Z_]\w*\b(?!\s*:)/', 'false', $evalExpr);
+                            try {
+                                $conditionHidden = !eval("return ($evalExpr);");
+                            } catch (\Throwable $e) {
+                                $conditionHidden = false;
+                            }
+                        }
+                        $hiddenClass = $conditionHidden ? ' ai-spec-form__group--hidden' : '';
                         ?>
                         <?php if (($param['type'] ?? 'text') === 'hidden'): ?>
                         <input type="hidden" id="param-<?= htmlspecialchars($param['id']) ?>" name="<?= htmlspecialchars($param['id']) ?>" value="<?= htmlspecialchars($param['default'] ?? '') ?>" />
                         <?php elseif (($param['type'] ?? 'text') === 'checkbox'): ?>
-                        <div class="ai-spec-form__group ai-spec-form__checkbox-group"<?php if (isset($param['condition'])): ?> data-condition="<?= htmlspecialchars($param['condition']) ?>"<?php endif; ?>>
+                        <div class="ai-spec-form__group ai-spec-form__checkbox-group<?= $hiddenClass ?>"<?php if (isset($param['condition'])): ?> data-condition="<?= htmlspecialchars($param['condition']) ?>"<?php endif; ?>>
                             <input 
                                 type="checkbox"
                                 id="param-<?= htmlspecialchars($param['id']) ?>"
@@ -236,7 +266,7 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                             <?php endif; ?>
                         </div>
                         <?php else: ?>
-                        <div class="ai-spec-form__group"<?php if (isset($param['condition'])): ?> data-condition="<?= htmlspecialchars($param['condition']) ?>"<?php endif; ?>>
+                        <div class="ai-spec-form__group<?= $hiddenClass ?>"<?php if (isset($param['condition'])): ?> data-condition="<?= htmlspecialchars($param['condition']) ?>"<?php endif; ?>>
                             <label class="ai-spec-form__label" for="param-<?= htmlspecialchars($param['id']) ?>">
                                 <?= $param['label'] ?? __workflow($spec, $param['labelKey'] ?? '', $param['id']) ?>
                                 <?php if ($param['required'] ?? false): ?>
@@ -317,6 +347,50 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                                 </option>
                                 <?php endforeach; ?>
                             </select>
+                            <?php elseif (($param['type'] ?? 'text') === 'tag-select' && isset($param['optionsFrom'])): ?>
+                            <?php
+                            // Tag-select: multi-select with tag chips and searchable dropdown
+                            $tsDataKey = $param['optionsFrom']['data'] ?? $param['optionsFrom'];
+                            $tsValueField = $param['optionsFrom']['value'] ?? null;
+                            $tsLabelField = $param['optionsFrom']['label'] ?? null;
+                            $tsDynamicData = $specData[$tsDataKey] ?? [];
+                            $tsOptions = [];
+                            if (is_array($tsDynamicData)) {
+                                foreach ($tsDynamicData as $key => $item) {
+                                    if (is_array($item) && $tsValueField) {
+                                        $tsOptions[] = [
+                                            'value' => $item[$tsValueField] ?? $key,
+                                            'label' => $tsLabelField ? ($item[$tsLabelField] ?? $item[$tsValueField] ?? $key) : ($item[$tsValueField] ?? $key)
+                                        ];
+                                    } else {
+                                        $tsOptions[] = ['value' => is_string($item) ? $item : (string)$key, 'label' => is_string($item) ? $item : (string)$key];
+                                    }
+                                }
+                            }
+                            $tsDefault = $param['default'] ?? '';
+                            ?>
+                            <div class="ai-spec-tag-select" data-param-id="<?= htmlspecialchars($param['id']) ?>">
+                                <div class="ai-spec-tag-select__container">
+                                    <div class="ai-spec-tag-select__tags"></div>
+                                    <input type="text" 
+                                        class="ai-spec-tag-select__search" 
+                                        placeholder="<?= __workflow($spec, $param['placeholderKey'] ?? '', __admin('workflows.tagSelect.searchPlaceholder', 'Type to search...')) ?>"
+                                        autocomplete="off">
+                                </div>
+                                <div class="ai-spec-tag-select__dropdown"></div>
+                                <input type="hidden" 
+                                    name="<?= htmlspecialchars($param['id']) ?>" 
+                                    id="param-<?= htmlspecialchars($param['id']) ?>" 
+                                    value="<?= htmlspecialchars($tsDefault) ?>">
+                                <script>
+                                (function() {
+                                    const options = <?= json_encode($tsOptions, JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+                                    const el = document.querySelector('.ai-spec-tag-select[data-param-id="<?= htmlspecialchars($param['id']) ?>"]');
+                                    if (el && window.initTagSelect) window.initTagSelect(el, options);
+                                    else if (el) el.dataset.options = JSON.stringify(options);
+                                })();
+                                </script>
+                            </div>
                             <?php elseif (($param['type'] ?? 'text') === 'nodeSelector'): ?>
                             <?php
                             // Node selector: allows selecting from page/menu/footer structures OR using text hint

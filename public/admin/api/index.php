@@ -79,8 +79,9 @@ switch ($action) {
             }, $result['data']['pages'] ?? []);
             
             // Check if 404 page exists and add it (it's not a route but has a structure file)
-            $page404File = SECURE_FOLDER_PATH . '/templates/model/json/pages/404.json';
-            if (file_exists($page404File)) {
+            $page404Folder = PROJECT_PATH . '/templates/model/json/pages/404/404.json';
+            $page404Flat = PROJECT_PATH . '/templates/model/json/pages/404.json';
+            if (file_exists($page404Folder) || file_exists($page404Flat)) {
                 // Only add if not already in the list
                 $has404 = false;
                 foreach ($pages as $p) {

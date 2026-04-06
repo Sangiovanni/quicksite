@@ -30,7 +30,7 @@
         {
             "id": "routes",
             "command": "getRoutes",
-            "extract": "data.flat_routes"
+            "extract": "data.root_routes"
         },
         {
             "id": "assetsData",
@@ -55,7 +55,8 @@
             "filter": "{{$value}} !== 'home' && {{$value}} !== '404'",
             "command": "deleteRoute",
             "params": {
-                "route": "{{$value}}"
+                "route": "{{$value}}",
+                "force": true
             }
         },
         {

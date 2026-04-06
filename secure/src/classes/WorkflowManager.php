@@ -537,6 +537,11 @@ class WorkflowManager {
         // Get the data to iterate over
         $items = $this->resolveDataPath($forEachPath, $context);
         
+        // Support comma-separated strings (e.g., from user params like "en,fr,es")
+        if (is_string($items) && !empty($items)) {
+            $items = array_map('trim', explode(',', $items));
+        }
+        
         if (!is_array($items)) {
             return [];
         }

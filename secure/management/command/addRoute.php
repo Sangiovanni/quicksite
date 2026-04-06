@@ -127,26 +127,44 @@ if (routePathExists($segments, $currentRoutes)) {
         ->send();
 }
 
-// Check parent routes exist (for nested routes)
-if (count($segments) > 1) {
-    $parentSegments = array_slice($segments, 0, -1);
-    if (!routePathExists($parentSegments, $currentRoutes)) {
-        ApiResponse::create(400, 'route.parent_not_found')
-            ->withMessage("Parent route '" . implode('/', $parentSegments) . "' does not exist. Create it first.")
-            ->withData([
-                'route' => $routePath,
-                'missing_parent' => implode('/', $parentSegments)
-            ])
-            ->send();
-    }
-}
-
 // ============================================================================
 // FILE PATH RESOLUTION
 // ============================================================================
 
 $pagesDir = PROJECT_PATH . '/templates/pages';
 $jsonDir = PROJECT_PATH . '/templates/model/json/pages';
+
+// Cascade-create missing parent routes (for nested routes)
+$cascadeCreated = [];
+if (count($segments) > 1) {
+    for ($i = 1; $i < count($segments); $i++) {
+        $parentSegments = array_slice($segments, 0, $i);
+        if (!routePathExists($parentSegments, $currentRoutes)) {
+            $parentPath = implode('/', $parentSegments);
+            $parentName = end($parentSegments);
+
+            // Create parent PHP file
+            $parentPhpPath = resolveNewRoutePhpPath($parentSegments, $currentRoutes, $pagesDir);
+            $parentPhpDir = dirname($parentPhpPath);
+            if (!is_dir($parentPhpDir)) {
+                mkdir($parentPhpDir, 0755, true);
+            }
+            file_put_contents($parentPhpPath, generate_page_template($parentPath), LOCK_EX);
+
+            // Create parent JSON file
+            $parentJsonPath = resolveNewRouteJsonPath($parentSegments, $jsonDir);
+            $parentJsonDir = dirname($parentJsonPath);
+            if (!is_dir($parentJsonDir)) {
+                mkdir($parentJsonDir, 0755, true);
+            }
+            file_put_contents($parentJsonPath, generate_page_json($parentName), LOCK_EX);
+
+            // Add parent to routes structure
+            $currentRoutes = addRouteToStructure($parentSegments, $currentRoutes);
+            $cascadeCreated[] = $parentPath;
+        }
+    }
+}
 
 // Determine PHP file path based on convention
 // If parent route gains its first child, we need to move parent's file
@@ -241,6 +259,10 @@ $responseData = [
     'php_file' => str_replace(PROJECT_PATH, '', $phpFilePath),
     'json_file' => str_replace(PROJECT_PATH, '', $jsonFilePath),
 ];
+
+if (!empty($cascadeCreated)) {
+    $responseData['cascade_created'] = $cascadeCreated;
+}
 
 ApiResponse::create(201, 'route.created')
     ->withMessage("Route '$routePath' created successfully")

@@ -437,6 +437,7 @@
 
         // --- 4f. Initialization ---
         initNodeSelectors();
+        initTagSelects();
         updateConditionalFields(els);
         loadAutoOptions(els);
         initPresetLoader(config, els);
@@ -919,12 +920,11 @@
 
             // 2. Delete routes (except 404 and home)
             const routesResponse = await apiCall('getRoutes');
-            if ((routesResponse.status === 200 || routesResponse.success) && routesResponse.data?.flat_routes) {
+            if ((routesResponse.status === 200 || routesResponse.success) && routesResponse.data?.root_routes) {
                 const protectedRoutes = ['404', 'home'];
-                routesResponse.data.flat_routes
+                routesResponse.data.root_routes
                     .filter(r => !protectedRoutes.includes(r))
-                    .sort((a, b) => b.length - a.length)
-                    .forEach(r => commands.push({ command: 'deleteRoute', params: { route: r } }));
+                    .forEach(r => commands.push({ command: 'deleteRoute', params: { route: r, force: true } }));
             }
 
             // 3. Delete all assets
@@ -1551,6 +1551,7 @@
         if (!els.form) return;
         const formData = {};
         els.form.querySelectorAll('input, select, textarea').forEach(input => {
+            if (!input.name) return;
             if (input.type === 'checkbox') formData[input.name] = input.checked ? 'true' : 'false';
             else formData[input.name] = input.value;
         });
@@ -1673,6 +1674,129 @@
                     } else {
                         hiddenInput.value = '';
                     }
+                }
+            }
+        });
+    }
+
+    // ---- Tag-Select Component ----
+
+    function initTagSelect(el, options) {
+        const search = el.querySelector('.ai-spec-tag-select__search');
+        const tagsContainer = el.querySelector('.ai-spec-tag-select__tags');
+        const dropdown = el.querySelector('.ai-spec-tag-select__dropdown');
+        const hidden = el.querySelector('input[type="hidden"]');
+        const container = el.querySelector('.ai-spec-tag-select__container');
+
+        let selected = hidden.value ? hidden.value.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+        function render() {
+            // Update hidden value
+            hidden.value = selected.join(',');
+            hidden.dispatchEvent(new Event('change', { bubbles: true }));
+
+            // Render tags
+            tagsContainer.innerHTML = '';
+            selected.forEach(val => {
+                const opt = options.find(o => o.value === val);
+                const tag = document.createElement('span');
+                tag.className = 'ai-spec-tag-select__tag';
+                tag.innerHTML = escapeHtml(opt ? opt.label : val) +
+                    ' <button type="button" class="ai-spec-tag-select__tag-remove" data-val="' + escapeHtml(val) + '">&times;</button>';
+                tagsContainer.appendChild(tag);
+            });
+        }
+
+        function showDropdown(filter) {
+            const q = (filter || '').toLowerCase();
+            const filtered = options.filter(o =>
+                o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q)
+            );
+            if (!filtered.length) {
+                dropdown.innerHTML = '<div class="ai-spec-tag-select__empty">No results</div>';
+            } else {
+                dropdown.innerHTML = filtered.map(o => {
+                    const isSel = selected.includes(o.value);
+                    return '<div class="ai-spec-tag-select__option' + (isSel ? ' ai-spec-tag-select__option--selected' : '') +
+                        '" data-val="' + escapeHtml(o.value) + '">' +
+                        '<span>' + escapeHtml(o.label) + '</span>' +
+                        '<span class="ai-spec-tag-select__option-code">' + escapeHtml(o.value) + '</span>' +
+                        '</div>';
+                }).join('');
+            }
+            dropdown.classList.add('ai-spec-tag-select__dropdown--open');
+        }
+
+        function hideDropdown() {
+            dropdown.classList.remove('ai-spec-tag-select__dropdown--open');
+        }
+
+        function addValue(val) {
+            if (!selected.includes(val)) {
+                selected.push(val);
+                render();
+            }
+            search.value = '';
+            showDropdown('');
+            search.focus();
+        }
+
+        function removeValue(val) {
+            selected = selected.filter(v => v !== val);
+            render();
+            if (dropdown.classList.contains('ai-spec-tag-select__dropdown--open')) {
+                showDropdown(search.value);
+            }
+        }
+
+        // Events
+        search.addEventListener('focus', () => showDropdown(search.value));
+        search.addEventListener('input', () => showDropdown(search.value));
+        container.addEventListener('click', () => search.focus());
+
+        search.addEventListener('keydown', e => {
+            if (e.key === 'Backspace' && !search.value && selected.length) {
+                removeValue(selected[selected.length - 1]);
+            }
+        });
+
+        dropdown.addEventListener('mousedown', e => {
+            e.preventDefault(); // Prevent blur on search
+            const opt = e.target.closest('.ai-spec-tag-select__option');
+            if (opt && !opt.classList.contains('ai-spec-tag-select__option--selected')) {
+                addValue(opt.dataset.val);
+            }
+        });
+
+        tagsContainer.addEventListener('click', e => {
+            const btn = e.target.closest('.ai-spec-tag-select__tag-remove');
+            if (btn) {
+                e.stopPropagation();
+                removeValue(btn.dataset.val);
+            }
+        });
+
+        // Close dropdown on outside click
+        document.addEventListener('click', e => {
+            if (!el.contains(e.target)) hideDropdown();
+        });
+
+        render();
+    }
+
+    // Expose globally for inline script init, then init any that loaded before us
+    window.initTagSelect = initTagSelect;
+
+    function initTagSelects() {
+        document.querySelectorAll('.ai-spec-tag-select').forEach(el => {
+            if (el._tagSelectInit) return;
+            const optionsJson = el.dataset.options;
+            if (optionsJson) {
+                try {
+                    initTagSelect(el, JSON.parse(optionsJson));
+                    el._tagSelectInit = true;
+                } catch (e) {
+                    console.error('[tag-select] Failed to init:', e);
                 }
             }
         });

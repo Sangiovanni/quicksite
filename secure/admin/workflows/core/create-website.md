@@ -23,29 +23,18 @@ You are creating a complete multi-page website from a blank QuickSite project.
 **⚠️ MANDATORY ORDER:**
 
 {{#if param.multilingual === true}}
-1. **Languages FIRST** (required for multilingual):
-   - `addLang` → add each additional language BEFORE enabling multilingual
-   - Language codes MUST be valid **ISO 639-1** two-letter codes (e.g. `fr`, `es`, `ja`, `de`). If the user provided an incorrect code (e.g. `jp` instead of `ja`), use the correct ISO 639-1 code.
-   - `setMultilingual` → enable multi-language mode AFTER having 2+ languages
-   - Languages: {{param.languages}}
-   - **⚠️ The default language already exists, so you MUST produce exactly one `addLang` command for EACH language in the list above EXCEPT the default. Count them — every language must be present. Do NOT skip any.**
+**Note: Languages are already configured.** The project has multilingual mode enabled with these languages: {{param.languages}} (default: {{param.defaultLanguage}}).
 
-   **⚠️ CRITICAL: setMultilingual EXACT syntax:**
-   ```json
-   { "command": "setMultilingual", "params": { "enabled": true } }
-   ```
-   **DO NOT use:** `{}`, `{"defaultLang": "en"}`, or any other format. ONLY `{"enabled": true}`.
-
-2. **Routes**:
+1. **Routes**:
    - `addRoute` → creates new pages (home exists by default)
    - Note: "home" route exists by default (accessible as "/" or "/home")
 
-3. **Structures** (in this order):
+2. **Structures** (in this order):
    - `editStructure` type="menu" → navigation (shared across all pages)
    - `editStructure` type="footer" → footer (shared across all pages) **⚠️ MUST include `{ "component": "lang-switch", "data": {} }`**
    - `editStructure` type="page", name="$routeName" → each page content
 
-4. **Translations**:
+3. **Translations**:
    - `setTranslationKeys` → MUST cover ALL textKeys used in structures
    - **Repeat for each language:** {{param.languages}}
    - Note: `addRoute` auto-creates `page.titles.$routeName` - set this too!
@@ -59,7 +48,7 @@ You are creating a complete multi-page website from a blank QuickSite project.
    }
    ```
 
-5. **Styles LAST** (order matters!):
+4. **Styles LAST** (order matters!):
    - `editStyles` → MUST come BEFORE setRootVariables
    - `setRootVariables` → AFTER editStyles (optional)
 {{else}}
@@ -74,6 +63,7 @@ You are creating a complete multi-page website from a blank QuickSite project.
 
 3. **Translations**:
    - `setTranslationKeys` → MUST cover ALL textKeys used in structures
+   - Language: {{param.defaultLanguage}}
    - Note: `addRoute` auto-creates `page.titles.$routeName` - set this too!
 
 4. **Styles LAST** (order matters!):
@@ -408,7 +398,7 @@ The component will be auto-generated with this structure (for styling reference)
 - [ ] All links use `/route-name` format (no `?`, `&`, `=`)
 - [ ] External links have `target="_blank"`
 - [ ] All text uses `textKey`, never hardcoded strings
-- [ ] Translations provided for ALL languages: {{param.languages}}
+- [ ] Translations provided for ALL languages: {{param.languages}} (default: {{param.defaultLanguage}})
 {{/if}}
 
 ---

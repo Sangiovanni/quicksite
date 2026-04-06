@@ -47,6 +47,16 @@ if (file_exists($routesFile)) {
     $routes = $flattenRoutes($routesData);
 }
 
+// Add special pages that exist as structure files but are not in routes (e.g. 404)
+$specialPages = ['404'];
+foreach ($specialPages as $sp) {
+    $spFolder = PROJECT_PATH . '/templates/model/json/pages/' . $sp . '/' . $sp . '.json';
+    $spFlat = PROJECT_PATH . '/templates/model/json/pages/' . $sp . '.json';
+    if (file_exists($spFolder) || file_exists($spFlat)) {
+        $routes[] = $sp;
+    }
+}
+
 // Get available components
 $components = [];
 $componentsDir = PROJECT_PATH . '/templates/model/json/components';

@@ -27,6 +27,7 @@ function __command_getRoutes(array $params = [], array $urlParams = []): ApiResp
         ->withData([
             'routes' => ROUTES,           // Nested structure
             'flat_routes' => $flatRoutes, // Flat list of all route paths
+            'root_routes' => array_keys(ROUTES), // Top-level routes only
             'count' => count($flatRoutes)
         ]);
 }
