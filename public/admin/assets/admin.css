@@ -5852,8 +5852,7 @@ kbd {
    PERMISSION-BASED VISIBILITY
    ============================================================================= */
 /* Hidden by default when user lacks permission */
-.admin-hidden-permission,
-body[data-page="preview"] .global-miniplayer {
+.admin-hidden-permission {
     display: none !important;
 }
 
@@ -6428,6 +6427,14 @@ body[data-page="preview"] .global-miniplayer {
     gap: var(--space-xs);
 }
 
+.preview-sidebar-tool--action {
+    opacity: 0.7;
+}
+
+.preview-sidebar-tool--action:hover {
+    opacity: 1;
+}
+
 .preview-sidebar__tools--icons-only .preview-sidebar-tool {
     width: 36px;
     height: 36px;
@@ -6652,8 +6659,7 @@ body[data-page="preview"] .global-miniplayer {
 .transition-editor__property:hover .transition-editor__property-actions,
 .preview-contextual-js-page-events__actions,
 .preview-add-node-modal__context--expanded .preview-add-node-modal__context-details,
-.preview-page--miniplayer .preview-miniplayer-controls,
-.global-miniplayer--active {
+.preview-page--miniplayer .preview-miniplayer-controls {
     display: flex;
 }
 
@@ -11278,6 +11284,478 @@ code.preview-node-panel__value {
     margin-top: var(--space-sm);
 }
 
+/* Top action bar (full-width Add Element button) */
+.preview-contextual-form__actions--top {
+    padding: var(--space-sm) 0;
+}
+
+.admin-btn--full {
+    width: 100%;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+}
+
+.admin-btn--full .admin-btn__icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+/* Bottom action bar */
+.preview-contextual-form__actions--bottom {
+    border-top: 1px solid var(--admin-border);
+    margin-top: var(--space-sm);
+    padding-top: var(--space-sm);
+    display: flex;
+    gap: var(--space-sm);
+    justify-content: flex-end;
+}
+
+/* Collapsible sections */
+.preview-contextual-form__collapsible {
+    border-top: 1px solid var(--admin-border);
+    margin-top: var(--space-sm);
+}
+
+.preview-contextual-form__collapsible-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: var(--space-xs) 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--admin-text);
+    font-family: inherit;
+}
+
+.preview-contextual-form__collapsible-header:hover {
+    color: var(--admin-primary);
+}
+
+.preview-contextual-form__collapsible-title {
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.preview-contextual-form__collapsible-chevron {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.preview-contextual-form__collapsible.collapsed .preview-contextual-form__collapsible-chevron {
+    transform: rotate(-90deg);
+}
+
+.preview-contextual-form__collapsible-body {
+    padding-bottom: var(--space-sm);
+}
+
+.preview-contextual-form__collapsible.collapsed .preview-contextual-form__collapsible-body {
+    display: none;
+}
+
+/* ==================== Unified Tag Dropdown ==================== */
+
+.tag-dropdown {
+    position: relative;
+}
+
+.tag-dropdown__trigger {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    width: 100%;
+    padding: 0.45rem 0.6rem;
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.85rem;
+    color: var(--admin-text);
+    transition: border-color 0.15s;
+}
+
+.tag-dropdown__trigger:hover {
+    border-color: var(--admin-primary);
+}
+
+.tag-dropdown__trigger.open {
+    border-color: var(--admin-primary);
+    box-shadow: 0 0 0 2px rgba(var(--admin-primary-rgb, 59, 130, 246), 0.15);
+}
+
+.tag-dropdown__value {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.tag-dropdown__desc {
+    flex: 1;
+    color: var(--admin-text-muted);
+    font-size: 0.78rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tag-dropdown__arrow {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    color: var(--admin-text-muted);
+    transition: transform 0.2s;
+}
+
+.tag-dropdown__trigger.open .tag-dropdown__arrow {
+    transform: rotate(180deg);
+}
+
+.tag-dropdown__panel {
+    position: absolute;
+    z-index: 100;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+}
+
+.tag-dropdown__search {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm);
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.tag-dropdown__search-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: var(--admin-text-muted);
+}
+
+.tag-dropdown__search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: none;
+    font-size: 0.85rem;
+    color: var(--admin-text);
+    padding: 0;
+}
+
+.tag-dropdown__options {
+    max-height: 280px;
+    overflow-y: auto;
+    padding: var(--space-xs) 0;
+}
+
+.tag-dropdown__group-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    width: 100%;
+    padding: 0.35rem var(--space-sm);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--admin-text-muted);
+    font-family: inherit;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.tag-dropdown__group-header:hover {
+    background: var(--admin-bg-alt);
+    color: var(--admin-text);
+}
+
+.tag-dropdown__group-icon {
+    display: flex;
+    align-items: center;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.tag-dropdown__group-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.tag-dropdown__group-label {
+    flex: 1;
+    text-align: left;
+}
+
+.tag-dropdown__group-chevron {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    transition: transform 0.15s;
+}
+
+.tag-dropdown__group.collapsed .tag-dropdown__group-chevron {
+    transform: rotate(-90deg);
+}
+
+.tag-dropdown__group.collapsed .tag-dropdown__group-items {
+    display: none;
+}
+
+.tag-dropdown__option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    width: 100%;
+    padding: 0.3rem var(--space-sm) 0.3rem calc(var(--space-sm) + 16px + var(--space-xs));
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.82rem;
+    color: var(--admin-text);
+    text-align: left;
+    transition: background 0.1s;
+}
+
+.tag-dropdown__option:hover {
+    background: var(--admin-bg-alt);
+}
+
+.tag-dropdown__option.selected {
+    background: rgba(var(--admin-primary-rgb, 59, 130, 246), 0.08);
+    color: var(--admin-primary);
+}
+
+.tag-dropdown__option-tag {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 0.78rem;
+    white-space: nowrap;
+    min-width: 80px;
+}
+
+.tag-dropdown__option-desc {
+    flex: 1;
+    color: var(--admin-text-muted);
+    font-size: 0.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tag-dropdown__option.selected .tag-dropdown__option-desc {
+    color: var(--admin-primary);
+    opacity: 0.7;
+}
+
+.tag-dropdown__option-required {
+    color: var(--admin-warning);
+    font-weight: 700;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
+.tag-dropdown__no-results {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-md);
+    color: var(--admin-text-muted);
+    font-size: 0.82rem;
+}
+
+.tag-dropdown__no-results svg {
+    width: 20px;
+    height: 20px;
+    opacity: 0.5;
+}
+
+/* Star (favorites) button */
+.tag-dropdown__star-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-top: var(--space-xs);
+    padding: 0.2rem 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.75rem;
+    color: var(--admin-text-muted);
+    transition: color 0.15s;
+}
+
+.tag-dropdown__star-btn:hover {
+    color: var(--admin-warning);
+}
+
+.tag-dropdown__star-btn.active {
+    color: var(--admin-warning);
+}
+
+.tag-dropdown__star-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Favorites group styling */
+.tag-dropdown__group--favorites .tag-dropdown__group-icon,
+.tag-dropdown__group--suggested .tag-dropdown__group-icon {
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.tag-dropdown__group--favorites {
+    border-bottom: 1px solid var(--admin-border);
+    padding-bottom: var(--space-xs);
+    margin-bottom: var(--space-xs);
+}
+
+.tag-dropdown__group--suggested {
+    border-bottom: 1px solid var(--admin-border);
+    padding-bottom: var(--space-xs);
+    margin-bottom: var(--space-xs);
+}
+
+/* ==================== CSS Class Combobox ==================== */
+
+.class-combobox {
+    position: relative;
+}
+
+.class-combobox__input-area {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding: 0.3rem 0.5rem;
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    cursor: text;
+    min-height: 32px;
+    transition: border-color 0.15s;
+}
+
+.class-combobox__input-area:focus-within {
+    border-color: var(--admin-primary);
+    box-shadow: 0 0 0 2px rgba(var(--admin-primary-rgb, 59, 130, 246), 0.15);
+}
+
+.class-combobox__chips {
+    display: contents;
+}
+
+.class-combobox__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0.1rem 0.2rem 0.1rem 0.4rem;
+    background: var(--admin-bg-alt);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-xs, 3px);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.3;
+    color: var(--admin-text);
+}
+
+.class-combobox__chip-text {
+    white-space: nowrap;
+}
+
+.class-combobox__chip-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+    line-height: 1;
+    color: var(--admin-text-muted);
+    border-radius: 50%;
+    transition: background 0.1s, color 0.1s;
+}
+
+.class-combobox__chip-remove:hover {
+    background: var(--admin-danger, #ef4444);
+    color: #fff;
+}
+
+.class-combobox__input {
+    flex: 1;
+    min-width: 80px;
+    border: none;
+    outline: none;
+    background: none;
+    font-size: 0.82rem;
+    color: var(--admin-text);
+    padding: 0;
+}
+
+.class-combobox__dropdown {
+    position: absolute;
+    z-index: 100;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.class-combobox__suggestion {
+    display: block;
+    width: 100%;
+    padding: 0.3rem 0.6rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--admin-text);
+    text-align: left;
+    transition: background 0.1s;
+}
+
+.class-combobox__suggestion:hover {
+    background: var(--admin-bg-alt);
+}
+
+.class-combobox__hint {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+    color: var(--admin-text-muted);
+    font-style: italic;
+}
+
 /* ==================== Save as Snippet Form ==================== */
 /* Form panel in select mode for saving elements as snippets */
 
@@ -12379,8 +12857,7 @@ code.preview-node-panel__value {
 }
 
 /* Dragging state */
-.preview-container.preview-container--dragging,
-.global-miniplayer--dragging {
+.preview-container.preview-container--dragging {
     opacity: 0.9;
     cursor: move;
 }
@@ -12491,13 +12968,21 @@ code.preview-node-panel__value {
     pointer-events: none;
 }
 
-/* Dragging state */
+/* Active state - must come AFTER base .global-miniplayer { display: none } */
+.global-miniplayer.global-miniplayer--active {
+    display: flex;
+}
 
-/* Body class when miniplayer is active - can be used to adjust layout */
+/* Dragging state */
+.global-miniplayer.global-miniplayer--dragging {
+    opacity: 0.9;
+    cursor: move;
+}
 
 /* Hide global miniplayer on preview page (preview page has its own) */
-
-/* Responsive global miniplayer */
+body[data-page="preview"] .global-miniplayer {
+    display: none !important;
+}
 
 /* =============================================================================
    COMPONENT DATA BUILDER (addComponentToNode, editComponentToNode)

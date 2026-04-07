@@ -51,12 +51,22 @@
             </div>
             <input type="hidden" id="add-type-input" value="snippet">
         </div>
+
+        <!-- TOP Action Button (quick add with defaults) -->
+        <div class="preview-contextual-form__actions preview-contextual-form__actions--top">
+            <button type="button" class="admin-btn admin-btn--success admin-btn--full" id="add-confirm-top">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <?= __admin('preview.addElement') ?? 'Add Element' ?>
+            </button>
+        </div>
         
         <!-- Tag Selection (for HTML Tag type) -->
         <div class="preview-contextual-form__field" id="add-tag-field" style="display: none;">
             <label><?= __admin('preview.selectTag') ?? 'Tag' ?>:</label>
             <?php $selectorId = 'add'; include '_tag-selector.php'; ?>
-            <small class="preview-contextual-form__hint">* <?= __admin('preview.requiresParams') ?? 'Requires additional parameters' ?></small>
         </div>
         
         <!-- Component Selection (for Component type) -->
@@ -108,52 +118,66 @@
             
             <input type="hidden" id="add-snippet" value="">
         </div>
+
+        <!-- COLLAPSIBLE: Preview (for HTML Tag type) -->
+        <div class="preview-contextual-form__collapsible" id="add-preview-section" style="display: none;">
+            <button type="button" class="preview-contextual-form__collapsible-header" data-storage-key="qs-add-preview-expanded">
+                <span class="preview-contextual-form__collapsible-title"><?= __admin('preview.tagPreview') ?? 'Tag Preview' ?></span>
+                <svg class="preview-contextual-form__collapsible-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </button>
+            <div class="preview-contextual-form__collapsible-body" id="add-preview-body">
+                <!-- The tag-selector preview is moved here via JS -->
+            </div>
+        </div>
         
-        <!-- Position Selection - Visual Picker -->
-        <div class="preview-contextual-form__field">
-            <label><?= __admin('preview.position') ?? 'Position' ?>:</label>
-            <div class="position-picker" id="add-position-picker">
-                <!-- Before -->
-                <label class="position-picker__option">
-                    <input type="radio" name="add-position" value="before">
-                    <div class="position-picker__visual">
-                        <svg viewBox="0 0 60 50" class="position-picker__diagram">
-                            <!-- New element (solid) -->
-                            <rect x="5" y="5" width="50" height="16" rx="2" class="position-picker__new"/>
-                            <!-- Selected element (dashed) -->
-                            <rect x="5" y="29" width="50" height="16" rx="2" class="position-picker__selected"/>
-                        </svg>
-                        <span class="position-picker__label"><?= __admin('preview.positionBefore') ?? 'Before' ?></span>
-                    </div>
-                </label>
-                
-                <!-- After (default) -->
-                <label class="position-picker__option">
-                    <input type="radio" name="add-position" value="after" checked>
-                    <div class="position-picker__visual">
-                        <svg viewBox="0 0 60 50" class="position-picker__diagram">
-                            <!-- Selected element (dashed) -->
-                            <rect x="5" y="5" width="50" height="16" rx="2" class="position-picker__selected"/>
-                            <!-- New element (solid) -->
-                            <rect x="5" y="29" width="50" height="16" rx="2" class="position-picker__new"/>
-                        </svg>
-                        <span class="position-picker__label"><?= __admin('preview.positionAfter') ?? 'After' ?></span>
-                    </div>
-                </label>
-                
-                <!-- Inside -->
-                <label class="position-picker__option">
-                    <input type="radio" name="add-position" value="inside">
-                    <div class="position-picker__visual">
-                        <svg viewBox="0 0 60 50" class="position-picker__diagram">
-                            <!-- Parent/Selected element (dashed, larger) -->
-                            <rect x="3" y="3" width="54" height="44" rx="3" class="position-picker__selected"/>
-                            <!-- New element inside (solid, smaller) -->
-                            <rect x="10" y="10" width="40" height="14" rx="2" class="position-picker__new"/>
-                        </svg>
-                        <span class="position-picker__label"><?= __admin('preview.positionInside') ?? 'Inside' ?></span>
-                    </div>
-                </label>
+        <!-- COLLAPSIBLE: Position Selection -->
+        <div class="preview-contextual-form__collapsible" id="add-position-section">
+            <button type="button" class="preview-contextual-form__collapsible-header" data-storage-key="qs-add-position-expanded">
+                <span class="preview-contextual-form__collapsible-title"><?= __admin('preview.position') ?? 'Position' ?></span>
+                <svg class="preview-contextual-form__collapsible-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </button>
+            <div class="preview-contextual-form__collapsible-body" id="add-position-body">
+                <div class="position-picker" id="add-position-picker">
+                    <!-- Before -->
+                    <label class="position-picker__option">
+                        <input type="radio" name="add-position" value="before">
+                        <div class="position-picker__visual">
+                            <svg viewBox="0 0 60 50" class="position-picker__diagram">
+                                <rect x="5" y="5" width="50" height="16" rx="2" class="position-picker__new"/>
+                                <rect x="5" y="29" width="50" height="16" rx="2" class="position-picker__selected"/>
+                            </svg>
+                            <span class="position-picker__label"><?= __admin('preview.positionBefore') ?? 'Before' ?></span>
+                        </div>
+                    </label>
+                    
+                    <!-- After (default) -->
+                    <label class="position-picker__option">
+                        <input type="radio" name="add-position" value="after" checked>
+                        <div class="position-picker__visual">
+                            <svg viewBox="0 0 60 50" class="position-picker__diagram">
+                                <rect x="5" y="5" width="50" height="16" rx="2" class="position-picker__selected"/>
+                                <rect x="5" y="29" width="50" height="16" rx="2" class="position-picker__new"/>
+                            </svg>
+                            <span class="position-picker__label"><?= __admin('preview.positionAfter') ?? 'After' ?></span>
+                        </div>
+                    </label>
+                    
+                    <!-- Inside -->
+                    <label class="position-picker__option">
+                        <input type="radio" name="add-position" value="inside">
+                        <div class="position-picker__visual">
+                            <svg viewBox="0 0 60 50" class="position-picker__diagram">
+                                <rect x="3" y="3" width="54" height="44" rx="3" class="position-picker__selected"/>
+                                <rect x="10" y="10" width="40" height="14" rx="2" class="position-picker__new"/>
+                            </svg>
+                            <span class="position-picker__label"><?= __admin('preview.positionInside') ?? 'Inside' ?></span>
+                        </div>
+                    </label>
+                </div>
             </div>
         </div>
         
@@ -167,30 +191,40 @@
             </div>
         </div>
         
-        <!-- CSS Class Input -->
+        <!-- CSS Class Combobox -->
         <div class="preview-contextual-form__field" id="add-class-field" style="display: none;">
-            <label for="add-class"><?= __admin('preview.cssClass') ?? 'CSS Class' ?> <small>(<?= __admin('common.optional') ?? 'optional' ?>)</small>:</label>
-            <input type="text" id="add-class" class="admin-input admin-input--sm" placeholder="my-class another-class">
+            <label><?= __admin('preview.cssClass') ?? 'CSS Class' ?> <small>(<?= __admin('common.optional') ?? 'optional' ?>)</small>:</label>
+            <div class="class-combobox" id="add-class-combobox">
+                <div class="class-combobox__input-area">
+                    <div class="class-combobox__chips" id="add-class-chips"></div>
+                    <input type="text" class="class-combobox__input" id="add-class-input"
+                           placeholder="<?= __admin('preview.typeClassName') ?? 'Type a class name…' ?>"
+                           autocomplete="off" spellcheck="false">
+                </div>
+                <div class="class-combobox__dropdown" id="add-class-dropdown" style="display: none;">
+                    <div class="class-combobox__suggestions" id="add-class-suggestions"></div>
+                </div>
+            </div>
+            <input type="hidden" id="add-class" value="">
         </div>
         
-
-        
-        <!-- Custom Parameters Section (expandable) - only for tags -->
-        <div class="preview-contextual-form__section" id="add-custom-params-section" style="display: none;">
-            <button type="button" class="preview-contextual-form__expand-btn" id="add-expand-params">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" y1="5" x2="12" y2="19"/>
-                    <line x1="5" y1="12" x2="19" y2="12"/>
+        <!-- COLLAPSIBLE: Advanced / Custom Parameters (for tags only) -->
+        <div class="preview-contextual-form__collapsible" id="add-advanced-section" style="display: none;">
+            <button type="button" class="preview-contextual-form__collapsible-header" data-storage-key="qs-add-advanced-expanded">
+                <span class="preview-contextual-form__collapsible-title"><?= __admin('preview.advanced') ?? 'Advanced' ?></span>
+                <svg class="preview-contextual-form__collapsible-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
                 </svg>
-                <?= __admin('preview.addCustomParam') ?? 'Add custom parameter' ?>
             </button>
-            <div class="preview-contextual-form__custom-params" id="add-custom-params-container" style="display: none;">
-                <div class="preview-contextual-form__param-list" id="add-custom-params-list">
-                    <!-- Dynamically added param rows -->
+            <div class="preview-contextual-form__collapsible-body" id="add-advanced-body">
+                <div class="preview-contextual-form__custom-params" id="add-custom-params-container">
+                    <div class="preview-contextual-form__param-list" id="add-custom-params-list">
+                        <!-- Dynamically added param rows -->
+                    </div>
+                    <button type="button" class="preview-contextual-form__add-param-btn" id="add-another-param">
+                        + <?= __admin('preview.addAnother') ?? 'Add another' ?>
+                    </button>
                 </div>
-                <button type="button" class="preview-contextual-form__add-param-btn" id="add-another-param">
-                    + <?= __admin('preview.addAnother') ?? 'Add another' ?>
-                </button>
             </div>
         </div>
         
@@ -232,10 +266,16 @@
             </div>
         </div>
         
-        <!-- Action Buttons -->
-        <div class="preview-contextual-form__actions">
-            <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="add-cancel"><?= __admin('common.cancel') ?></button>
-            <button type="button" class="admin-btn admin-btn--sm admin-btn--success" id="add-confirm"><?= __admin('preview.addElement') ?? 'Add Element' ?></button>
+        <!-- BOTTOM Action Buttons -->
+        <div class="preview-contextual-form__actions preview-contextual-form__actions--bottom">
+            <button type="button" class="admin-btn admin-btn--ghost" id="add-cancel"><?= __admin('common.cancel') ?></button>
+            <button type="button" class="admin-btn admin-btn--success" id="add-confirm">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <?= __admin('preview.addElement') ?? 'Add Element' ?>
+            </button>
         </div>
     </div>
 </div>

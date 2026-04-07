@@ -470,7 +470,7 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
     try {
         // Build structure name for data-qs-struct attribute
         if ($type === 'page') {
-            $structureName = 'page-' . str_replace('/', '-', $name);
+            $structureName = 'page-' . $name;
         } elseif ($type === 'component' && $name) {
             $structureName = 'component-' . $name;
         } else {

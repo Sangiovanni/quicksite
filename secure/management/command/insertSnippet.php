@@ -553,7 +553,7 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
     $renderedHtml = '';
     try {
         if ($type === 'page') {
-            $structureName = 'page-' . str_replace('/', '-', $name);
+            $structureName = 'page-' . $name;
         } elseif ($type === 'component' && $name) {
             $structureName = 'component-' . $name;
         } else {

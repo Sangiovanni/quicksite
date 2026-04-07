@@ -46,6 +46,11 @@
     // Elements to ignore
     const ignoreTags = ['SCRIPT', 'STYLE', 'META', 'LINK', 'NOSCRIPT', 'BR', 'HR', 'HTML', 'HEAD'];
     
+    // Inject CSS for empty-element hints
+    var emptyHintStyle = document.createElement('style');
+    emptyHintStyle.textContent = '.qs-empty-hint { outline: 1px dashed rgba(128,128,128,0.5); }';
+    document.head.appendChild(emptyHintStyle);
+    
     // Listen for messages from admin
     window.addEventListener('message', function(e) {
         if (e.data && e.data.source === 'quicksite-admin') {
@@ -517,7 +522,10 @@
         
         rootNodes.forEach(function(el, index) {
             const oldId = el.getAttribute('data-qs-node');
-            const newId = String(index);
+            // Preserve empty-string root IDs (single-object structures like {tag:"main",...})
+            // These use "" for the root and "0","1" for children, unlike array roots
+            // which use "0" for root and "0.0","0.1" for children.
+            const newId = (oldId === '' && rootNodes.length === 1) ? '' : String(index);
             if (oldId !== newId) {
                 el.setAttribute('data-qs-node', newId);
                 // Update component-node if it matches
@@ -545,7 +553,8 @@
         
         directChildren.forEach(function(child, index) {
             const oldId = child.getAttribute('data-qs-node');
-            const newId = parentId + '.' + index;
+            // When parentId is empty (single-object root), children are "0","1",etc.
+            const newId = parentId === '' ? String(index) : parentId + '.' + index;
             if (oldId !== newId) {
                 child.setAttribute('data-qs-node', newId);
                 if (child.getAttribute('data-qs-component-node') === oldId) {
@@ -700,6 +709,37 @@
         console.log('[QuickSite] ' + (show ? 'Showing' : 'Hiding') + ' struct:', struct, '(' + elements.length + ' elements)');
     }
     
+    /**
+     * Scan all data-qs-node elements and apply min-height/min-width
+     * on axes where the element has zero computed dimension.
+     */
+    function scanEmptyElements() {
+        clearEmptyHints();
+        var nodes = document.querySelectorAll('[data-qs-node]');
+        nodes.forEach(function(el) {
+            var rect = el.getBoundingClientRect();
+            var needH = rect.height < 1;
+            var needW = rect.width < 1;
+            if (needH || needW) {
+                if (needH) el.style.minHeight = '24px';
+                if (needW) el.style.minWidth = '24px';
+                el.classList.add('qs-empty-hint');
+            }
+        });
+    }
+    
+    /**
+     * Remove all empty-element hints previously applied by scanEmptyElements.
+     */
+    function clearEmptyHints() {
+        var hinted = document.querySelectorAll('.qs-empty-hint');
+        hinted.forEach(function(el) {
+            el.style.minHeight = '';
+            el.style.minWidth = '';
+            el.classList.remove('qs-empty-hint');
+        });
+    }
+    
     function setMode(mode) {
         // Clean up previous mode
         if (currentMode === 'drag') {
@@ -732,6 +772,13 @@
         }
         if (mode === 'js') {
             enableJsMode();
+        }
+        
+        // Show empty-element hints in select and drag modes
+        if (mode === 'select' || mode === 'drag') {
+            scanEmptyElements();
+        } else {
+            clearEmptyHints();
         }
     }
     
@@ -1889,4 +1936,16 @@
         source: 'quicksite-preview', 
         action: 'overlayReady'
     }, '*');
+    
+    // Initial scan for empty elements (default mode is select)
+    scanEmptyElements();
+    
+    // Re-scan empty elements after DOM mutations (insert, delete, duplicate, drag)
+    var emptyHintTimer = null;
+    var emptyHintObserver = new MutationObserver(function() {
+        if (currentMode !== 'select' && currentMode !== 'drag') return;
+        if (emptyHintTimer) clearTimeout(emptyHintTimer);
+        emptyHintTimer = setTimeout(scanEmptyElements, 80);
+    });
+    emptyHintObserver.observe(document.body, { childList: true, subtree: true });
 })();

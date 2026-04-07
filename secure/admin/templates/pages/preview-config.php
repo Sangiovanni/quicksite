@@ -240,7 +240,11 @@ window.PreviewConfig = {
         emptyText: <?= json_encode(__admin('preview.emptyText') ?? 'Empty text:') ?>,
         emptyTextPlaceholder: <?= json_encode(__admin('preview.emptyTextPlaceholder') ?? 'e.g. No items found  (optional)') ?>,
         emptyTextHint: <?= json_encode(__admin('preview.emptyTextHint') ?? 'Text shown when the array is empty') ?>,
-        listModeHint: <?= json_encode(__admin('preview.listModeHint') ?? "Uses data-bind attributes inside the container's first child as item template.") ?>
+        listModeHint: <?= json_encode(__admin('preview.listModeHint') ?? "Uses data-bind attributes inside the container's first child as item template.") ?>,
+        // Tag dropdown (add element)
+        starTag: <?= json_encode(__admin('preview.starTag') ?? 'Add to favorites') ?>,
+        unstarTag: <?= json_encode(__admin('preview.unstarTag') ?? 'Remove from favorites') ?>,
+        requiresParams: <?= json_encode(__admin('preview.requiresParams') ?? 'Requires additional parameters') ?>
     }
 };
 </script>

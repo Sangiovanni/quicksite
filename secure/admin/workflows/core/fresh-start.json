@@ -120,33 +120,21 @@
             "params": {
                 "type": "page",
                 "name": "home",
-                "structure": {
-                    "tag": "main",
-                    "params": { "class": "container" },
-                    "children": []
-                }
+                "structure": []
             }
         },
         {
             "command": "editStructure",
             "params": {
                 "type": "menu",
-                "structure": {
-                    "tag": "nav",
-                    "params": { "class": "main-nav" },
-                    "children": []
-                }
+                "structure": []
             }
         },
         {
             "command": "editStructure",
             "params": {
                 "type": "footer",
-                "structure": {
-                    "tag": "footer",
-                    "params": { "class": "main-footer" },
-                    "children": []
-                }
+                "structure": []
             }
         },
         {

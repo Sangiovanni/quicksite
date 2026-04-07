@@ -1231,6 +1231,10 @@
         "noVisualPreview": "Pas d'aperçu visuel",
         "showHtml": "Afficher le code HTML",
         "requiresParams": "Nécessite des paramètres supplémentaires",
+        "tagPreview": "Aperçu de la balise",
+        "typeClassName": "Saisir un nom de classe…",
+        "starTag": "Ajouter aux favoris",
+        "unstarTag": "Retirer des favoris",
         "example": {
             "container": "Contenu dans le conteneur",
             "textBefore": "Texte avec",

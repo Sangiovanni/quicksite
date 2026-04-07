@@ -337,48 +337,26 @@ $page->render();
 PHP;
     file_put_contents($projectPath . '/templates/pages/404/404.php', $notFoundPhp, LOCK_EX);
     
-    // home.json
-    $homeJson = [
-        ['tag' => 'section', 'params' => ['class' => 'hero'], 'children' => [
-            ['tag' => 'h1', 'children' => [['textKey' => 'site.name']]],
-            ['tag' => 'p', 'children' => [['textKey' => 'site.tagline']]]
-        ]]
-    ];
-    file_put_contents($projectPath . '/templates/model/json/pages/home/home.json', json_encode($homeJson, JSON_PRETTY_PRINT), LOCK_EX);
+    // home.json — use generate_page_json for consistent minimal root
+    file_put_contents($projectPath . '/templates/model/json/pages/home/home.json', generate_page_json('home'), LOCK_EX);
     
-    // 404.json
-    $notFoundJson = [
-        ['tag' => 'section', 'params' => ['class' => 'error-page'], 'children' => [
-            ['tag' => 'h1', 'children' => [['textKey' => '404.title']]],
-            ['tag' => 'p', 'children' => [['textKey' => '404.message']]],
-            ['tag' => 'a', 'params' => ['href' => '/'], 'children' => [['textKey' => '404.backHome']]]
-        ]]
-    ];
-    file_put_contents($projectPath . '/templates/model/json/pages/404/404.json', json_encode($notFoundJson, JSON_PRETTY_PRINT), LOCK_EX);
+    // 404.json — use generate_page_json for consistent minimal root
+    file_put_contents($projectPath . '/templates/model/json/pages/404/404.json', generate_page_json('404'), LOCK_EX);
 }
 
 /**
  * Create menu.json and footer.json
  */
 function createMenuAndFooter(string $projectPath, string $siteName): void {
-    // menu.json - JSON structure rendered by PageManagement
+    // menu.json — minimal root, content added by user/workflows
     $menuJson = [
-        ['tag' => 'nav', 'params' => ['class' => 'main-nav'], 'children' => [
-            ['tag' => 'a', 'params' => ['href' => '/', 'class' => 'logo'], 'children' => [['textKey' => 'site.name']]],
-            ['tag' => 'ul', 'params' => ['class' => 'nav-links'], 'children' => [
-                ['tag' => 'li', 'children' => [
-                    ['tag' => 'a', 'params' => ['href' => '/'], 'children' => [['textKey' => 'menu.home']]]
-                ]]
-            ]]
-        ]]
+        ['tag' => 'nav', 'params' => ['class' => 'main-nav'], 'children' => []]
     ];
     file_put_contents($projectPath . '/templates/model/json/menu.json', json_encode($menuJson, JSON_PRETTY_PRINT), LOCK_EX);
     
-    // footer.json - JSON structure rendered by PageManagement
+    // footer.json — minimal root, content added by user/workflows
     $footerJson = [
-        ['tag' => 'div', 'params' => ['class' => 'footer-content'], 'children' => [
-            ['tag' => 'p', 'children' => [['textKey' => 'footer.copyright']]]
-        ]]
+        ['tag' => 'footer', 'params' => ['class' => 'main-footer'], 'children' => []]
     ];
     file_put_contents($projectPath . '/templates/model/json/footer.json', json_encode($footerJson, JSON_PRETTY_PRINT), LOCK_EX);
     

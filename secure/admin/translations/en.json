@@ -1217,6 +1217,10 @@
         "noVisualPreview": "No visual preview",
         "showHtml": "Show HTML code",
         "requiresParams": "Requires additional parameters",
+        "tagPreview": "Tag Preview",
+        "typeClassName": "Type a class name…",
+        "starTag": "Add to favorites",
+        "unstarTag": "Remove from favorites",
         "example": {
             "container": "Content in container",
             "textBefore": "Text with",

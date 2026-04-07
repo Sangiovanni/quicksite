@@ -372,7 +372,7 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
     try {
         // Build structure name for data-qs-struct attribute
         if ($type === 'page') {
-            $structureName = 'page-' . str_replace('/', '-', $name);
+            $structureName = 'page-' . $name;
         } elseif ($type === 'component' && $name) {
             $structureName = 'component-' . $name;
         } else {

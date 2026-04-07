@@ -1,19 +1,19 @@
 <?php
 /**
- * Visual Tag Selector Component
+ * Unified Tag Selector Component
  * 
- * A two-tier visual selector for HTML tags with category buttons and tag cards.
- * Used by contextual-add.php and contextual-edit.php
+ * A searchable dropdown with optgroups for HTML tag selection.
+ * Replaces the old 3-tier selector (search → categories → card grid).
+ * Includes favorites (★) and contextual suggestions (✦).
  * 
  * Usage: include with $selectorId parameter to set unique IDs
  *   <?php $selectorId = 'add'; include '_tag-selector.php'; ?>
- *   <?php $selectorId = 'edit'; include '_tag-selector.php'; ?>
  */
 
 // Include tag examples for preview panel
 require_once __DIR__ . '/_tag-examples.php';
 
-// Ensure $selectorId is set (default to 'add' for backwards compatibility)
+// Ensure $selectorId is set
 $selectorId = $selectorId ?? 'add';
 
 // Tag definitions with categories, icons, and descriptions
@@ -145,80 +145,122 @@ $tagCategories = [
         ]
     ],
 ];
+
+// Build flat tag data for JS (category, desc, required)
+$tagDataForJs = [];
+foreach ($tagCategories as $catId => $category) {
+    foreach ($category['tags'] as $tagName => $tagInfo) {
+        $tagDataForJs[$tagName] = [
+            'category' => $catId,
+            'desc' => $tagInfo['desc'],
+            'required' => !empty($tagInfo['required']),
+        ];
+    }
+}
 ?>
 
 <div class="tag-selector" id="<?= $selectorId ?>-tag-selector">
-    <!-- Search Input -->
-    <div class="tag-selector__search">
-        <svg class="tag-selector__search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <input type="text" 
-               class="tag-selector__search-input admin-input admin-input--sm" 
-               id="<?= $selectorId ?>-tag-search"
-               placeholder="<?= __admin('preview.searchTags') ?? 'Search tags...' ?>">
-        <button type="button" class="tag-selector__search-clear" id="<?= $selectorId ?>-tag-search-clear" style="display: none;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    <!-- Unified Searchable Dropdown -->
+    <div class="tag-dropdown" id="<?= $selectorId ?>-tag-dropdown">
+        <!-- Trigger button (shows current selection) -->
+        <button type="button" class="tag-dropdown__trigger" id="<?= $selectorId ?>-tag-trigger">
+            <span class="tag-dropdown__value" id="<?= $selectorId ?>-tag-display">&lt;div&gt;</span>
+            <span class="tag-dropdown__desc" id="<?= $selectorId ?>-tag-display-desc"><?= __admin('preview.tagDesc.div') ?? 'Generic container' ?></span>
+            <svg class="tag-dropdown__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"/>
             </svg>
         </button>
-    </div>
-    
-    <!-- Category Buttons -->
-    <div class="tag-selector__categories" id="<?= $selectorId ?>-tag-categories">
-        <?php foreach ($tagCategories as $catId => $category): ?>
-        <button type="button" 
-                class="tag-selector__category<?= $catId === 'layout' ? ' active' : '' ?>" 
-                data-category="<?= $catId ?>"
-                title="<?= htmlspecialchars($category['label']) ?>">
-            <?= $category['icon'] ?>
-            <span class="tag-selector__category-label"><?= htmlspecialchars($category['label']) ?></span>
-        </button>
-        <?php endforeach; ?>
-    </div>
-    
-    <!-- Tag Panels (one per category) -->
-    <div class="tag-selector__panels" id="<?= $selectorId ?>-tag-panels">
-        <?php foreach ($tagCategories as $catId => $category): ?>
-        <div class="tag-selector__panel<?= $catId === 'layout' ? ' active' : '' ?>" data-category-panel="<?= $catId ?>">
-            <div class="tag-selector__cards">
-                <?php foreach ($category['tags'] as $tagName => $tagInfo): ?>
-                <div class="tag-selector__card-wrapper">
-                    <button type="button" 
-                            class="tag-selector__card" 
-                            data-tag="<?= $tagName ?>"
-                            data-category="<?= $catId ?>"
-                            data-desc="<?= htmlspecialchars($tagInfo['desc']) ?>"
-                            <?= !empty($tagInfo['required']) ? 'data-required="true"' : '' ?>>
-                        <span class="tag-selector__card-tag">&lt;<?= $tagName ?>&gt;</span>
-                        <?php if (!empty($tagInfo['required'])): ?>
-                        <span class="tag-selector__card-required" title="<?= __admin('preview.requiresParams') ?? 'Requires parameters' ?>">*</span>
-                        <?php endif; ?>
+        
+        <!-- Dropdown panel -->
+        <div class="tag-dropdown__panel" id="<?= $selectorId ?>-tag-panel" style="display: none;">
+            <!-- Search input -->
+            <div class="tag-dropdown__search">
+                <svg class="tag-dropdown__search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input type="text" 
+                       class="tag-dropdown__search-input admin-input" 
+                       id="<?= $selectorId ?>-tag-search"
+                       placeholder="<?= __admin('preview.searchTags') ?? 'Search tags... (Enter = quick add)' ?>"
+                       autocomplete="off">
+            </div>
+            
+            <!-- Scrollable options list -->
+            <div class="tag-dropdown__options" id="<?= $selectorId ?>-tag-options">
+                <!-- ★ Favorites optgroup (populated by JS from localStorage) -->
+                <div class="tag-dropdown__group tag-dropdown__group--favorites" id="<?= $selectorId ?>-tag-favorites-group" style="display: none;">
+                    <button type="button" class="tag-dropdown__group-header" data-group="favorites">
+                        <span class="tag-dropdown__group-icon">★</span>
+                        <span class="tag-dropdown__group-label"><?= __admin('preview.favorites') ?? 'Favorites' ?></span>
+                        <svg class="tag-dropdown__group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                     </button>
+                    <div class="tag-dropdown__group-items" id="<?= $selectorId ?>-tag-favorites-items">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+                
+                <!-- ✦ Suggested optgroup (populated by JS based on parent tag) -->
+                <div class="tag-dropdown__group tag-dropdown__group--suggested" id="<?= $selectorId ?>-tag-suggested-group" style="display: none;">
+                    <button type="button" class="tag-dropdown__group-header" data-group="suggested">
+                        <span class="tag-dropdown__group-icon">✦</span>
+                        <span class="tag-dropdown__group-label"><?= __admin('preview.suggested') ?? 'Suggested' ?></span>
+                        <svg class="tag-dropdown__group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="tag-dropdown__group-items" id="<?= $selectorId ?>-tag-suggested-items">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+                
+                <!-- Standard category optgroups -->
+                <?php foreach ($tagCategories as $catId => $category): ?>
+                <div class="tag-dropdown__group" data-category="<?= $catId ?>">
+                    <button type="button" class="tag-dropdown__group-header" data-group="<?= $catId ?>">
+                        <span class="tag-dropdown__group-icon"><?= $category['icon'] ?></span>
+                        <span class="tag-dropdown__group-label"><?= htmlspecialchars($category['label']) ?></span>
+                        <svg class="tag-dropdown__group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="tag-dropdown__group-items">
+                        <?php foreach ($category['tags'] as $tagName => $tagInfo): ?>
+                        <button type="button" 
+                                class="tag-dropdown__option" 
+                                data-tag="<?= $tagName ?>"
+                                data-category="<?= $catId ?>"
+                                data-desc="<?= htmlspecialchars($tagInfo['desc']) ?>"
+                                <?= !empty($tagInfo['required']) ? 'data-required="true"' : '' ?>>
+                            <code class="tag-dropdown__option-tag">&lt;<?= $tagName ?>&gt;</code>
+                            <span class="tag-dropdown__option-desc"><?= htmlspecialchars($tagInfo['desc']) ?></span>
+                            <?php if (!empty($tagInfo['required'])): ?>
+                            <span class="tag-dropdown__option-required" title="<?= __admin('preview.requiresParams') ?? 'Requires parameters' ?>">*</span>
+                            <?php endif; ?>
+                        </button>
+                        <?php endforeach; ?>
+                    </div>
                 </div>
                 <?php endforeach; ?>
-            </div>
-        </div>
-        <?php endforeach; ?>
-        
-        <!-- Search Results Panel (shown when searching) -->
-        <div class="tag-selector__panel tag-selector__panel--search" data-category-panel="search" style="display: none;">
-            <div class="tag-selector__cards" id="<?= $selectorId ?>-tag-search-results">
-                <!-- Populated by JS when searching -->
-            </div>
-            <div class="tag-selector__no-results" id="<?= $selectorId ?>-tag-no-results" style="display: none;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="8" x2="14" y2="14"/><line x1="14" y1="8" x2="8" y2="14"/>
-                </svg>
-                <span><?= __admin('preview.noTagsFound') ?? 'No tags found' ?></span>
+                
+                <!-- No results message -->
+                <div class="tag-dropdown__no-results" id="<?= $selectorId ?>-tag-no-results" style="display: none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <span><?= __admin('preview.noTagsFound') ?? 'No tags found' ?></span>
+                </div>
             </div>
         </div>
     </div>
+    
+    <!-- Star button (below dropdown) -->
+    <button type="button" class="tag-dropdown__star-btn" id="<?= $selectorId ?>-tag-star" title="<?= __admin('preview.starTag') ?? 'Add to favorites' ?>">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+        <span id="<?= $selectorId ?>-tag-star-label"><?= __admin('preview.starTag') ?? 'Add to favorites' ?></span>
+    </button>
     
     <!-- Hidden input to store selected tag value -->
     <input type="hidden" id="<?= $selectorId ?>-tag" value="div">
     
-    <!-- Preview Panel -->
+    <!-- Preview Panel (moved to collapsible body by JS) -->
     <div class="tag-selector__preview" id="<?= $selectorId ?>-tag-preview">
         <div class="tag-selector__preview-header">
             <code class="tag-selector__preview-tag" id="<?= $selectorId ?>-tag-preview-name">&lt;div&gt;</code>
@@ -246,15 +288,19 @@ $tagCategories = [
         </div>
     </div>
     
-    <!-- Tag examples data for JS -->
-    <script type="application/json" id="<?= $selectorId ?>-tag-examples-data">
+    <!-- Tag data for JS (categories, examples, suggestions) -->
+    <script type="application/json" id="<?= $selectorId ?>-tag-data">
     <?php 
     $examples = getTagExamples();
     $examplesMap = [];
     foreach ($examples as $tag => $html) {
         $examplesMap[$tag] = $html === false ? null : $html;
     }
-    echo json_encode($examplesMap, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+    echo json_encode([
+        'tags' => $tagDataForJs,
+        'examples' => $examplesMap,
+        'categories' => array_map(fn($c) => ['label' => $c['label']], $tagCategories),
+    ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     ?>
     </script>
 </div>

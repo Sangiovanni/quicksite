@@ -9,5 +9,65 @@
         "description": "an image describing a crying robot use for 404 error on website",
         "alt": "an image describing a crying robot",
         "meta_updated": "2025-12-25T15:49:11+00:00"
+    },
+    "images/documentation.png": {
+        "size": 154290,
+        "mime_type": "image/png",
+        "width": 393,
+        "height": 430,
+        "dimensions": "393x430",
+        "uploaded": "2026-04-06T17:20:38+00:00",
+        "starred": true,
+        "meta_updated": "2026-04-07T00:38:38+00:00"
+    },
+    "images/favicon.png": {
+        "size": 44311,
+        "mime_type": "image/png",
+        "width": 247,
+        "height": 229,
+        "dimensions": "247x229",
+        "uploaded": "2026-04-06T17:20:38+00:00",
+        "starred": true,
+        "meta_updated": "2026-04-07T00:38:39+00:00"
+    },
+    "images/get_started.png": {
+        "size": 88408,
+        "mime_type": "image/png",
+        "width": 368,
+        "height": 380,
+        "dimensions": "368x380",
+        "uploaded": "2026-04-06T17:20:38+00:00",
+        "starred": true,
+        "meta_updated": "2026-04-07T00:38:40+00:00"
+    },
+    "images/git-hub-logo-white.png": {
+        "size": 3354,
+        "mime_type": "image/png",
+        "width": 150,
+        "height": 153,
+        "dimensions": "150x153",
+        "uploaded": "2026-04-06T17:20:38+00:00",
+        "starred": true,
+        "meta_updated": "2026-04-07T00:38:41+00:00"
+    },
+    "images/home.png": {
+        "size": 211785,
+        "mime_type": "image/png",
+        "width": 578,
+        "height": 538,
+        "dimensions": "578x538",
+        "uploaded": "2026-04-06T17:20:38+00:00",
+        "starred": true,
+        "meta_updated": "2026-04-07T00:38:42+00:00"
+    },
+    "images/logo.png": {
+        "size": 162056,
+        "mime_type": "image/png",
+        "width": 1392,
+        "height": 752,
+        "dimensions": "1392x752",
+        "uploaded": "2026-04-06T17:20:38+00:00",
+        "starred": true,
+        "meta_updated": "2026-04-07T00:38:43+00:00"
     }
 }

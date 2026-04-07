@@ -564,6 +564,15 @@ if ($nodeId !== null) {
     // Use the modified structure
     $structure = $result['structure'];
     
+    // Empty structure guard: ensure page/menu/footer always has a minimal root
+    if (is_array($structure) && empty($structure) && $type !== 'component') {
+        $structure = match($type) {
+            'menu'   => [['tag' => 'nav', 'params' => ['class' => 'main-nav'], 'children' => []]],
+            'footer' => [['tag' => 'footer', 'params' => ['class' => 'main-footer'], 'children' => []]],
+            default  => [['tag' => 'main', 'params' => ['class' => 'container'], 'children' => []]],
+        };
+    }
+    
     // Normalize "text" -> "textKey" in structure (AI models sometimes output wrong key)
     if (is_array($structure)) {
         if (isset($structure[0]) || empty($structure)) {
@@ -603,6 +612,15 @@ if ($nodeId !== null) {
 }
 
 // ===== Full structure replacement mode =====
+
+// Empty structure guard: ensure page/menu/footer always has a minimal root
+if (is_array($structure) && empty($structure) && $type !== 'component') {
+    $structure = match($type) {
+        'menu'   => [['tag' => 'nav', 'params' => ['class' => 'main-nav'], 'children' => []]],
+        'footer' => [['tag' => 'footer', 'params' => ['class' => 'main-footer'], 'children' => []]],
+        default  => [['tag' => 'main', 'params' => ['class' => 'container'], 'children' => []]],
+    };
+}
 
 // Normalize "text" -> "textKey" in structure (AI models sometimes output wrong key)
 if (is_array($structure)) {

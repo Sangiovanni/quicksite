@@ -40,7 +40,13 @@ PHP;
  * @return string JSON content for the page
  */
 function generate_page_json(string $route_name): string {
-    $json_structure = [];
+    $json_structure = [
+        [
+            'tag' => 'main',
+            'params' => ['class' => 'container'],
+            'children' => []
+        ]
+    ];
     
     return json_encode($json_structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 }

@@ -239,9 +239,11 @@
     const addMandatoryParamsContainer = document.getElementById('add-mandatory-params-container');
     const addClassField = document.getElementById('add-class-field');
     const addClassInput = document.getElementById('add-class');
-    const addExpandParamsBtn = document.getElementById('add-expand-params');
     const addCustomParamsContainer = document.getElementById('add-custom-params-container');
-    const addCustomParamsSection = document.getElementById('add-custom-params-section');
+    const addAdvancedSection = document.getElementById('add-advanced-section');
+    const addPreviewSection = document.getElementById('add-preview-section');
+    const addPositionSection = document.getElementById('add-position-section');
+    const addConfirmTopBtn = document.getElementById('add-confirm-top');
     
     // Helper to get position from radio picker
     function getAddPosition() {
@@ -2175,6 +2177,12 @@
         currentEditName = editName;
         iframe.src = buildUrl(editType, editName);
         
+        // Reset tool state: switch back to select mode and clear selection
+        if (currentMode !== 'select') {
+            setMode('select');
+        }
+        hideNodePanel();
+        
         // Hide Variables panel when navigating away
         if (variablesPanel && variablesPanel.style.display !== 'none') {
             hideVariablesPanel();
@@ -3028,6 +3036,18 @@
             }
         }
         
+        // Reverse: user is editing layout (menu/footer) but clicked a page element
+        if (clickedStruct && currentEditType === 'layout' && clickedStruct.startsWith('page-')) {
+            const routeName = clickedStruct.substring(5);
+            const msg = `This element belongs to the page "${routeName}". Switch to page editing?`;
+            if (confirm(msg)) {
+                const pageValue = 'page:' + routeName;
+                if (targetSelect) targetSelect.value = pageValue;
+                navigateTo('page', routeName);
+            }
+            return;
+        }
+        
         // Store selection info for edit/copy actions
         selectedStruct = data.struct || null;
         selectedNode = data.isComponent ? data.componentNode : data.node;
@@ -3671,6 +3691,12 @@
             });
         });
         
+        // Sidebar refresh/eye button
+        const toolRefreshBtn = document.getElementById('preview-tool-refresh');
+        if (toolRefreshBtn) {
+            toolRefreshBtn.addEventListener('click', reloadPreview);
+        }
+        
         // Mobile tool buttons (bottom toolbar on small screens)
         const mobileBtns = document.querySelectorAll('.preview-mobile-tool');
         mobileBtns.forEach(btn => {
@@ -4081,6 +4107,35 @@
     let sidebarAddCustomParamsCount = 0;
     let sidebarAddSelectedComponentData = null;
     
+    // Initialize collapsible sections (read stored state from localStorage)
+    function initCollapsibleSections() {
+        document.querySelectorAll('.preview-contextual-form__collapsible-header[data-storage-key]').forEach(header => {
+            const key = header.dataset.storageKey;
+            const section = header.closest('.preview-contextual-form__collapsible');
+            if (!section) return;
+            
+            // Read stored state (default: expanded for position, collapsed for others)
+            const defaultCollapsed = key !== 'qs-add-position-expanded';
+            const stored = localStorage.getItem(key);
+            const isCollapsed = stored !== null ? stored === '0' : defaultCollapsed;
+            section.classList.toggle('collapsed', isCollapsed);
+            
+            // Toggle on click
+            header.addEventListener('click', function() {
+                const nowCollapsed = section.classList.toggle('collapsed');
+                localStorage.setItem(key, nowCollapsed ? '0' : '1');
+            });
+        });
+    }
+    initCollapsibleSections();
+    
+    // Move tag-selector preview panel into the collapsible preview section
+    const tagPreviewEl = document.getElementById('add-tag-preview');
+    const previewBody = document.getElementById('add-preview-body');
+    if (tagPreviewEl && previewBody) {
+        previewBody.appendChild(tagPreviewEl);
+    }
+    
     // Show sidebar add form with selection context
     function showSidebarAddForm() {
         if (!contextualAddForm || !contextualAddDefault) return;
@@ -4096,13 +4151,14 @@
         contextualAddDefault.style.display = 'none';
         contextualAddForm.style.display = '';
         
-        // Reset form state
-        sidebarAddNodeType = 'snippet';
+        // Reset form state — use remembered tab or default to 'snippet'
+        const rememberedTab = localStorage.getItem('qs-add-last-tab');
+        sidebarAddNodeType = (rememberedTab === 'tag' || rememberedTab === 'component' || rememberedTab === 'snippet') ? rememberedTab : 'snippet';
         sidebarAddCustomParamsCount = 0;
         sidebarAddSelectedComponentData = null;
         
         // Reset UI elements
-        if (addTypeInput) addTypeInput.value = 'snippet';
+        if (addTypeInput) addTypeInput.value = sidebarAddNodeType;
         // Use visual tag selector if available, fallback to direct value set
         if (addTagSelector) {
             addTagSelector.selectTag('div');
@@ -4110,10 +4166,9 @@
             addTagSelect.value = 'div';
         }
         setAddPosition('after');
-        if (addClassInput) addClassInput.value = '';
+        if (classCombobox) classCombobox.reset();
+        else if (addClassInput) addClassInput.value = '';
         if (addCustomParamsList) addCustomParamsList.innerHTML = '';
-        if (addCustomParamsContainer) addCustomParamsContainer.style.display = 'none';
-        if (addExpandParamsBtn) addExpandParamsBtn.querySelector('svg').style.transform = '';
         if (addComponentSelect) addComponentSelect.value = '';
 
         // When at root, force "inside" and hide before/after options
@@ -4132,13 +4187,20 @@
 
         
         // Update tabs UI
-        updateSidebarAddTypeTabs('snippet');
+        updateSidebarAddTypeTabs(sidebarAddNodeType);
         updateSidebarAddNodeTypeUI();
         updateSidebarAddMandatoryParams();
         updateSidebarAddTextKeyPreview();
         
-        // Load snippets since it's the default tab
-        loadSidebarSnippetsList();
+        // Refresh contextual suggestions for new selection context
+        if (addTagSelector) addTagSelector.refreshSuggestions();
+        
+        // Load list for the active tab
+        if (sidebarAddNodeType === 'component') {
+            loadSidebarComponentsList();
+        } else if (sidebarAddNodeType === 'snippet') {
+            loadSidebarSnippetsList();
+        }
     }
     
     // Hide sidebar add form (go back to select)
@@ -4167,7 +4229,8 @@
         if (addComponentField) addComponentField.style.display = isComponent ? 'block' : 'none';
         if (addSnippetField) addSnippetField.style.display = isSnippet ? 'block' : 'none';
         if (addClassField) addClassField.style.display = isTag ? 'block' : 'none';
-        if (addCustomParamsSection) addCustomParamsSection.style.display = isTag ? 'block' : 'none';
+        if (addAdvancedSection) addAdvancedSection.style.display = isTag ? '' : 'none';
+        if (addPreviewSection) addPreviewSection.style.display = isTag ? '' : 'none';
         
         // Update mandatory params visibility
         updateSidebarAddMandatoryParams();
@@ -4383,6 +4446,7 @@
         tab.addEventListener('click', function() {
             sidebarAddNodeType = this.dataset.type;
             if (addTypeInput) addTypeInput.value = sidebarAddNodeType;
+            localStorage.setItem('qs-add-last-tab', sidebarAddNodeType);
             updateSidebarAddTypeTabs(sidebarAddNodeType);
             updateSidebarAddNodeTypeUI();
             if (sidebarAddNodeType === 'component') {
@@ -4727,22 +4791,46 @@
         return `<${tag}${attrs.length ? ' ' + attrs.join(' ') : ''}>${textContent}${children}</${tag}>`;
     }
     
-    // ==================== Visual Tag Selector ====================
-    // Initialize visual tag selector for both add and edit modes
+    // ==================== Unified Tag Dropdown ====================
+    // Replaces the old 3-tier tag selector with a searchable dropdown
+    // Includes: favorites (★), contextual suggestions (✦), quick-add (Enter)
+    
+    // Contextual suggestion rules: parent tag → recommended children
+    const TAG_SUGGESTIONS = {
+        'ul': ['li'],
+        'ol': ['li'],
+        'nav': ['a', 'ul'],
+        'table': ['thead', 'tbody', 'tfoot', 'tr'],
+        'thead': ['tr'],
+        'tbody': ['tr'],
+        'tfoot': ['tr'],
+        'tr': ['td', 'th'],
+        'dl': ['dt', 'dd'],
+        'select': ['option', 'optgroup'],
+        'figure': ['img', 'figcaption'],
+        'details': ['summary'],
+        'fieldset': ['legend', 'input', 'label'],
+        'picture': ['source', 'img'],
+    };
     
     function initTagSelector(selectorId) {
         const selector = document.getElementById(`${selectorId}-tag-selector`);
         if (!selector) return;
         
-        const categories = selector.querySelector(`#${selectorId}-tag-categories`);
-        const panels = selector.querySelector(`#${selectorId}-tag-panels`);
-        const searchInput = selector.querySelector(`#${selectorId}-tag-search`);
-        const searchClear = selector.querySelector(`#${selectorId}-tag-search-clear`);
-        const searchResults = selector.querySelector(`#${selectorId}-tag-search-results`);
-        const searchPanel = selector.querySelector('[data-category-panel="search"]');
-        const noResults = selector.querySelector(`#${selectorId}-tag-no-results`);
+        const trigger = document.getElementById(`${selectorId}-tag-trigger`);
+        const displayValue = document.getElementById(`${selectorId}-tag-display`);
+        const displayDesc = document.getElementById(`${selectorId}-tag-display-desc`);
+        const panel = document.getElementById(`${selectorId}-tag-panel`);
+        const searchInput = document.getElementById(`${selectorId}-tag-search`);
+        const optionsContainer = document.getElementById(`${selectorId}-tag-options`);
+        const noResults = document.getElementById(`${selectorId}-tag-no-results`);
         const hiddenInput = document.getElementById(`${selectorId}-tag`);
-        const selectedValueEl = selector.querySelector(`#${selectorId}-tag-selected-value`);
+        const starBtn = document.getElementById(`${selectorId}-tag-star`);
+        const starLabel = document.getElementById(`${selectorId}-tag-star-label`);
+        const favoritesGroup = document.getElementById(`${selectorId}-tag-favorites-group`);
+        const favoritesItems = document.getElementById(`${selectorId}-tag-favorites-items`);
+        const suggestedGroup = document.getElementById(`${selectorId}-tag-suggested-group`);
+        const suggestedItems = document.getElementById(`${selectorId}-tag-suggested-items`);
         
         // Preview panel elements
         const previewPanel = selector.querySelector(`#${selectorId}-tag-preview`);
@@ -4754,260 +4842,552 @@
         const codeView = selector.querySelector(`#${selectorId}-tag-preview-code`);
         const codeContent = selector.querySelector(`#${selectorId}-tag-preview-code-content`);
         
-        // Code view toggle state (persisted in localStorage)
-        const CODE_VIEW_STORAGE_KEY = 'tagSelector_showHtmlCode';
-        let showHtmlCode = localStorage.getItem(CODE_VIEW_STORAGE_KEY) === 'true';
+        // Load tag data from embedded JSON
+        let tagData = {};
+        let tagExamples = {};
+        const dataEl = document.getElementById(`${selectorId}-tag-data`);
+        if (dataEl) {
+            try {
+                const parsed = JSON.parse(dataEl.textContent);
+                tagData = parsed.tags || {};
+                tagExamples = parsed.examples || {};
+            } catch (e) {
+                console.error('Failed to parse tag data:', e);
+            }
+        }
         
-        // Initialize code view state
+        // Code view toggle (persisted in localStorage)
+        const CODE_VIEW_KEY = 'tagSelector_showHtmlCode';
+        let showHtmlCode = localStorage.getItem(CODE_VIEW_KEY) === 'true';
         if (codeToggle && codeView) {
             if (showHtmlCode) {
                 codeToggle.classList.add('active');
                 codeView.style.display = '';
             }
-            
             codeToggle.addEventListener('click', function() {
                 showHtmlCode = !showHtmlCode;
-                localStorage.setItem(CODE_VIEW_STORAGE_KEY, showHtmlCode);
-                
+                localStorage.setItem(CODE_VIEW_KEY, showHtmlCode);
                 this.classList.toggle('active', showHtmlCode);
                 codeView.style.display = showHtmlCode ? '' : 'none';
             });
         }
         
-        // Load tag examples from embedded JSON
-        let tagExamples = {};
-        const examplesDataEl = document.getElementById(`${selectorId}-tag-examples-data`);
-        if (examplesDataEl) {
-            try {
-                tagExamples = JSON.parse(examplesDataEl.textContent);
-            } catch (e) {
-                console.error('Failed to parse tag examples data:', e);
-            }
+        // Favorites from localStorage
+        const FAVORITES_KEY = 'qs-add-favorite-tags';
+        const MAX_FAVORITES = 10;
+        
+        function getFavorites() {
+            try { return JSON.parse(localStorage.getItem(FAVORITES_KEY)) || []; }
+            catch { return []; }
         }
         
-        // Get all tags data from all panels
-        const allTags = [];
-        selector.querySelectorAll('.tag-selector__card').forEach(card => {
-            allTags.push({
-                tag: card.dataset.tag,
-                category: card.dataset.category,
-                desc: card.dataset.desc || '',
-                required: card.dataset.required === 'true',
-                element: card
+        function saveFavorites(favs) {
+            localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs.slice(0, MAX_FAVORITES)));
+        }
+        
+        function isFavorite(tag) {
+            return getFavorites().includes(tag);
+        }
+        
+        function toggleFavorite(tag) {
+            const favs = getFavorites();
+            const idx = favs.indexOf(tag);
+            if (idx >= 0) {
+                favs.splice(idx, 1);
+            } else {
+                favs.unshift(tag);
+            }
+            saveFavorites(favs);
+            updateStarButton(tag);
+            renderFavorites();
+        }
+        
+        function updateStarButton(tag) {
+            if (!starBtn) return;
+            const isFav = isFavorite(tag);
+            starBtn.classList.toggle('active', isFav);
+            const svg = starBtn.querySelector('svg');
+            if (svg) svg.setAttribute('fill', isFav ? 'currentColor' : 'none');
+            if (starLabel) starLabel.textContent = isFav ? 
+                (PreviewConfig?.i18n?.unstarTag || 'Remove from favorites') : 
+                (PreviewConfig?.i18n?.starTag || 'Add to favorites');
+        }
+        
+        function renderFavorites() {
+            if (!favoritesGroup || !favoritesItems) return;
+            const favs = getFavorites();
+            if (favs.length === 0) {
+                favoritesGroup.style.display = 'none';
+                return;
+            }
+            favoritesGroup.style.display = '';
+            favoritesItems.innerHTML = '';
+            favs.forEach(tag => {
+                const info = tagData[tag];
+                if (!info) return;
+                const btn = createOptionButton(tag, info);
+                favoritesItems.appendChild(btn);
+            });
+        }
+        
+        // Contextual suggestions based on parent tag
+        function renderSuggestions() {
+            if (!suggestedGroup || !suggestedItems) return;
+            
+            // Get the parent tag of current selection
+            let parentTag = null;
+            if (selectedNode && currentStructure) {
+                const parts = selectedNode.split('.');
+                // Find the tag of the currently selected node
+                let node = currentStructure;
+                if (Array.isArray(node)) {
+                    for (const idx of parts) {
+                        if (Array.isArray(node)) {
+                            node = node[parseInt(idx)];
+                        } else if (node?.children) {
+                            node = node.children[parseInt(idx)];
+                        }
+                        if (!node) break;
+                    }
+                }
+                if (node?.tag) parentTag = node.tag;
+            }
+            
+            const suggestions = parentTag ? (TAG_SUGGESTIONS[parentTag] || []) : [];
+            if (suggestions.length === 0) {
+                suggestedGroup.style.display = 'none';
+                return;
+            }
+            
+            suggestedGroup.style.display = '';
+            suggestedItems.innerHTML = '';
+            suggestions.forEach(tag => {
+                const info = tagData[tag];
+                if (!info) return;
+                const btn = createOptionButton(tag, info);
+                suggestedItems.appendChild(btn);
+            });
+        }
+        
+        // Create an option button for the dropdown
+        function createOptionButton(tag, info) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'tag-dropdown__option';
+            btn.dataset.tag = tag;
+            btn.dataset.category = info.category;
+            btn.dataset.desc = info.desc;
+            if (info.required) btn.dataset.required = 'true';
+            if (hiddenInput?.value === tag) btn.classList.add('selected');
+            btn.innerHTML = `
+                <code class="tag-dropdown__option-tag">&lt;${tag}&gt;</code>
+                <span class="tag-dropdown__option-desc">${info.desc}</span>
+                ${info.required ? `<span class="tag-dropdown__option-required" title="${PreviewConfig?.i18n?.requiresParams || 'Requires additional parameters'}">*</span>` : ''}
+            `;
+            btn.addEventListener('click', () => selectTag(tag));
+            return btn;
+        }
+        
+        // Dropdown open/close
+        let isOpen = false;
+        
+        function openDropdown() {
+            if (!panel) return;
+            isOpen = true;
+            panel.style.display = '';
+            trigger?.classList.add('open');
+            renderFavorites();
+            renderSuggestions();
+            // Focus search
+            setTimeout(() => searchInput?.focus(), 50);
+        }
+        
+        function closeDropdown() {
+            if (!panel) return;
+            isOpen = false;
+            panel.style.display = 'none';
+            trigger?.classList.remove('open');
+            // Clear search
+            if (searchInput) searchInput.value = '';
+            resetSearch();
+        }
+        
+        function toggleDropdown() {
+            isOpen ? closeDropdown() : openDropdown();
+        }
+        
+        // Trigger click
+        trigger?.addEventListener('click', toggleDropdown);
+        
+        // Close on click outside
+        document.addEventListener('click', function(e) {
+            if (isOpen && !selector.contains(e.target)) {
+                closeDropdown();
+            }
+        });
+        
+        // Close on Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && isOpen) {
+                closeDropdown();
+                e.stopPropagation();
+            }
+        });
+        
+        // Optgroup expand/collapse
+        optionsContainer?.querySelectorAll('.tag-dropdown__group-header').forEach(header => {
+            header.addEventListener('click', function() {
+                const group = this.closest('.tag-dropdown__group');
+                if (group) group.classList.toggle('collapsed');
             });
         });
         
-        // Category switching
-        if (categories) {
-            categories.querySelectorAll('.tag-selector__category').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    // Clear search first
-                    if (searchInput) {
-                        searchInput.value = '';
-                        updateSearchVisibility(false);
-                    }
-                    
-                    // Update active category
-                    categories.querySelectorAll('.tag-selector__category').forEach(b => b.classList.remove('active'));
-                    this.classList.add('active');
-                    
-                    // Show corresponding panel
-                    const catId = this.dataset.category;
-                    panels.querySelectorAll('.tag-selector__panel').forEach(p => p.classList.remove('active'));
-                    panels.querySelector(`[data-category-panel="${catId}"]`)?.classList.add('active');
-                });
-            });
-        }
-        
-        // Tag card clicks
-        selector.querySelectorAll('.tag-selector__card').forEach(card => {
-            card.addEventListener('click', function() {
+        // Tag option clicks (for static PHP-rendered options)
+        optionsContainer?.querySelectorAll('.tag-dropdown__option').forEach(opt => {
+            opt.addEventListener('click', function() {
                 selectTag(this.dataset.tag);
             });
         });
         
+        // Star button
+        starBtn?.addEventListener('click', function() {
+            const currentTag = hiddenInput?.value || 'div';
+            toggleFavorite(currentTag);
+        });
+        
         // Select a tag
         function selectTag(tagName) {
-            // Update hidden input
             if (hiddenInput) {
                 hiddenInput.value = tagName;
                 hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
             }
             
+            // Update trigger display
+            if (displayValue) displayValue.textContent = `<${tagName}>`;
+            const info = tagData[tagName];
+            if (displayDesc && info) displayDesc.textContent = info.desc;
+            
             // Update visual selection
-            selector.querySelectorAll('.tag-selector__card').forEach(c => c.classList.remove('selected'));
-            selector.querySelectorAll(`.tag-selector__card[data-tag="${tagName}"]`).forEach(c => c.classList.add('selected'));
+            optionsContainer?.querySelectorAll('.tag-dropdown__option').forEach(o => {
+                o.classList.toggle('selected', o.dataset.tag === tagName);
+            });
             
-            // Update selected indicator
-            if (selectedValueEl) {
-                selectedValueEl.textContent = `<${tagName}>`;
-            }
-            
-            // Update preview panel
+            // Update preview
             updatePreview(tagName);
+            
+            // Update star button
+            updateStarButton(tagName);
+            
+            // Close dropdown
+            closeDropdown();
         }
         
-        // Update the preview panel for a tag
+        // Update preview panel
         function updatePreview(tagName) {
             if (!previewPanel) return;
             
-            // Update tag name
-            if (previewName) {
-                previewName.textContent = `<${tagName}>`;
-            }
+            if (previewName) previewName.textContent = `<${tagName}>`;
             
-            // Get tag description from allTags data
-            const tagData = allTags.find(t => t.tag === tagName);
-            if (previewDesc && tagData) {
-                previewDesc.textContent = tagData.desc;
-            }
+            const info = tagData[tagName];
+            if (previewDesc && info) previewDesc.textContent = info.desc;
             
-            // Get example HTML from tagExamples
             const exampleHtml = tagExamples[tagName];
-            
             if (exampleHtml === null || exampleHtml === undefined) {
-                // Non-renderable tag
                 if (previewRender) previewRender.style.display = 'none';
                 if (previewNoRender) previewNoRender.style.display = 'flex';
                 if (codeView) codeView.style.display = 'none';
             } else {
-                // Has visual example
                 if (previewRender) {
                     previewRender.style.display = '';
                     previewRender.innerHTML = exampleHtml;
                 }
                 if (previewNoRender) previewNoRender.style.display = 'none';
-                
-                // Update code view with formatted HTML
                 if (codeContent) {
-                    // Format the HTML for display (escape and prettify)
-                    const formattedHtml = formatHtmlForDisplay(exampleHtml);
-                    codeContent.textContent = formattedHtml;
+                    codeContent.textContent = formatHtmlForDisplay(exampleHtml);
                 }
-                if (codeView && showHtmlCode) {
-                    codeView.style.display = '';
-                }
+                if (codeView && showHtmlCode) codeView.style.display = '';
             }
         }
         
-        // Format HTML for display in code view
         function formatHtmlForDisplay(html) {
-            // Simple HTML prettifier
             let formatted = html;
-            
-            // Remove tag-ex-* classes for cleaner display
             formatted = formatted.replace(/\s*class="[^"]*tag-ex[^"]*"/g, '');
-            
-            // Add newlines after closing tags for readability  
             formatted = formatted.replace(/><(?!\/)/g, '>\n<');
             formatted = formatted.replace(/<\/(div|section|article|header|footer|main|aside|nav|figure|form|fieldset|ul|ol|dl|table|thead|tbody|tfoot|tr|menu|details|blockquote|pre|video|audio)>/g, '</$1>\n');
-            
-            // Trim extra whitespace
-            formatted = formatted.trim();
-            
-            return formatted;
+            return formatted.trim();
         }
         
         // Search functionality
-        if (searchInput) {
-            searchInput.addEventListener('input', function() {
-                const query = this.value.trim().toLowerCase();
-                updateSearchVisibility(query.length > 0);
-                
-                if (query.length === 0) {
-                    return;
-                }
-                
-                // Filter tags
-                const matches = allTags.filter(t => 
-                    t.tag.toLowerCase().includes(query) || 
-                    t.desc.toLowerCase().includes(query)
-                );
-                
-                // Render search results
-                if (searchResults) {
-                    searchResults.innerHTML = '';
-                    
-                    if (matches.length === 0) {
-                        if (noResults) noResults.style.display = 'flex';
-                    } else {
-                        if (noResults) noResults.style.display = 'none';
-                        
-                        // Get category labels
-                        const categoryLabels = {};
-                        categories.querySelectorAll('.tag-selector__category').forEach(btn => {
-                            categoryLabels[btn.dataset.category] = btn.querySelector('.tag-selector__category-label')?.textContent || btn.dataset.category;
-                        });
-                        
-                        matches.forEach(match => {
-                            const card = document.createElement('button');
-                            card.type = 'button';
-                            card.className = 'tag-selector__card tag-selector__card--search';
-                            card.dataset.tag = match.tag;
-                            if (hiddenInput?.value === match.tag) card.classList.add('selected');
-                            card.innerHTML = `
-                                <span class="tag-selector__card-tag">&lt;${match.tag}&gt;</span>
-                                <span class="tag-selector__card-category">${categoryLabels[match.category] || match.category}</span>
-                                ${match.required ? '<span class="tag-selector__card-required" title="Requires parameters">*</span>' : ''}
-                            `;
-                            card.addEventListener('click', function() {
-                                selectTag(match.tag);
-                            });
-                            searchResults.appendChild(card);
-                        });
-                    }
-                }
+        function resetSearch() {
+            // Show all groups, hide no-results
+            optionsContainer?.querySelectorAll('.tag-dropdown__group').forEach(g => {
+                g.style.display = '';
+                g.querySelectorAll('.tag-dropdown__option').forEach(o => o.style.display = '');
             });
+            if (noResults) noResults.style.display = 'none';
         }
         
-        // Clear search
-        if (searchClear) {
-            searchClear.addEventListener('click', function() {
-                if (searchInput) {
-                    searchInput.value = '';
-                    updateSearchVisibility(false);
-                    searchInput.focus();
-                }
-            });
-        }
-        
-        // Toggle search mode visibility
-        function updateSearchVisibility(isSearching) {
-            if (searchClear) searchClear.style.display = isSearching ? 'block' : 'none';
-            if (searchPanel) searchPanel.style.display = isSearching ? 'block' : 'none';
-            
-            // Hide/show category panels
-            panels.querySelectorAll('.tag-selector__panel:not([data-category-panel="search"])').forEach(p => {
-                p.classList.toggle('active', !isSearching && p.dataset.categoryPanel === getActiveCategory());
-            });
-            
-            // Dim category buttons during search
-            if (categories) {
-                categories.style.opacity = isSearching ? '0.5' : '1';
-                categories.style.pointerEvents = isSearching ? 'none' : 'auto';
+        searchInput?.addEventListener('input', function() {
+            const query = this.value.trim().toLowerCase();
+            if (!query) {
+                resetSearch();
+                renderFavorites();
+                renderSuggestions();
+                return;
             }
-        }
+            
+            // Hide favorites and suggested during search
+            if (favoritesGroup) favoritesGroup.style.display = 'none';
+            if (suggestedGroup) suggestedGroup.style.display = 'none';
+            
+            let totalMatches = 0;
+            
+            // Filter options in each group
+            optionsContainer?.querySelectorAll('.tag-dropdown__group:not(.tag-dropdown__group--favorites):not(.tag-dropdown__group--suggested)').forEach(group => {
+                let groupMatches = 0;
+                group.querySelectorAll('.tag-dropdown__option').forEach(opt => {
+                    const tag = opt.dataset.tag || '';
+                    const desc = opt.dataset.desc || '';
+                    const matches = tag.includes(query) || desc.toLowerCase().includes(query);
+                    opt.style.display = matches ? '' : 'none';
+                    if (matches) groupMatches++;
+                });
+                group.style.display = groupMatches > 0 ? '' : 'none';
+                // Auto-expand groups with matches
+                if (groupMatches > 0) group.classList.remove('collapsed');
+                totalMatches += groupMatches;
+            });
+            
+            if (noResults) noResults.style.display = totalMatches === 0 ? 'flex' : 'none';
+        });
         
-        // Get currently active category
-        function getActiveCategory() {
-            return categories?.querySelector('.tag-selector__category.active')?.dataset.category || 'layout';
-        }
+        // Quick-add: Enter in search field
+        searchInput?.addEventListener('keydown', function(e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            
+            const query = this.value.trim().toLowerCase();
+            if (!query) return;
+            
+            // Find visible matches
+            const visibleOptions = [];
+            optionsContainer?.querySelectorAll('.tag-dropdown__group:not(.tag-dropdown__group--favorites):not(.tag-dropdown__group--suggested)').forEach(group => {
+                if (group.style.display === 'none') return;
+                group.querySelectorAll('.tag-dropdown__option').forEach(opt => {
+                    if (opt.style.display !== 'none') visibleOptions.push(opt);
+                });
+            });
+            
+            // Exact match takes priority
+            const exactMatch = visibleOptions.find(o => o.dataset.tag === query);
+            if (exactMatch) {
+                selectTag(exactMatch.dataset.tag);
+                // Trigger quick-add: click the confirm button
+                addConfirmBtn?.click();
+                return;
+            }
+            
+            // Single match → quick add
+            if (visibleOptions.length === 1) {
+                selectTag(visibleOptions[0].dataset.tag);
+                addConfirmBtn?.click();
+                return;
+            }
+            
+            // Multiple matches → select first but don't auto-add
+            if (visibleOptions.length > 0) {
+                selectTag(visibleOptions[0].dataset.tag);
+            }
+        });
         
-        // Initialize code view for default tag
+        // Initialize
         const initialTag = hiddenInput?.value || 'div';
         updatePreview(initialTag);
+        updateStarButton(initialTag);
         
-        // Public API for programmatic tag selection
         return {
             selectTag,
             getValue: () => hiddenInput?.value,
-            reset: () => selectTag('div')
+            reset: () => selectTag('div'),
+            refreshSuggestions: renderSuggestions,
         };
     }
     
     // Initialize tag selector for add mode
     const addTagSelector = initTagSelector('add');
     
+    // ==================== CSS Class Combobox ====================
+    const classCombobox = (function initClassCombobox() {
+        const container = document.getElementById('add-class-combobox');
+        const chipsEl = document.getElementById('add-class-chips');
+        const input = document.getElementById('add-class-input');
+        const dropdown = document.getElementById('add-class-dropdown');
+        const suggestionsEl = document.getElementById('add-class-suggestions');
+        const hiddenInput = document.getElementById('add-class');
+        
+        if (!container || !input || !hiddenInput) return null;
+        
+        let selectedClasses = [];
+        let allClasses = [];
+        let classesLoaded = false;
+        
+        function loadClasses() {
+            if (classesLoaded) return;
+            const classes = new Set();
+            
+            // Source 1: page DOM classes
+            if (typeof pageStructureClasses !== 'undefined' && Array.isArray(pageStructureClasses)) {
+                pageStructureClasses.forEach(c => classes.add(c));
+            }
+            
+            // Source 2: CSS-defined class selectors
+            try {
+                let categorized = null;
+                if (window.PreviewSelectorBrowser) {
+                    categorized = PreviewSelectorBrowser.getCategorizedSelectors();
+                }
+                if (categorized?.classes) {
+                    categorized.classes.forEach(item => {
+                        const name = (typeof item === 'string' ? item : item.selector || '').replace(/^\./, '');
+                        if (name && !name.startsWith('qs-')) classes.add(name);
+                    });
+                }
+            } catch (e) { /* selectors not loaded yet */ }
+            
+            allClasses = [...classes].sort((a, b) => a.localeCompare(b));
+            classesLoaded = true;
+        }
+        
+        function syncHiddenInput() {
+            hiddenInput.value = selectedClasses.join(' ');
+        }
+        
+        function renderChips() {
+            chipsEl.innerHTML = '';
+            selectedClasses.forEach(cls => {
+                const chip = document.createElement('span');
+                chip.className = 'class-combobox__chip';
+                chip.innerHTML = `<span class="class-combobox__chip-text">${cls}</span><button type="button" class="class-combobox__chip-remove" data-class="${cls}" title="Remove">&times;</button>`;
+                chipsEl.appendChild(chip);
+            });
+        }
+        
+        function addClass(name) {
+            name = name.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+            if (!name || selectedClasses.includes(name)) return;
+            selectedClasses.push(name);
+            syncHiddenInput();
+            renderChips();
+            input.value = '';
+            closeDropdown();
+        }
+        
+        function removeClass(name) {
+            selectedClasses = selectedClasses.filter(c => c !== name);
+            syncHiddenInput();
+            renderChips();
+        }
+        
+        function showDropdown(filter) {
+            if (!classesLoaded) loadClasses();
+            const q = (filter || '').toLowerCase();
+            const matches = q
+                ? allClasses.filter(c => c.toLowerCase().includes(q) && !selectedClasses.includes(c))
+                : allClasses.filter(c => !selectedClasses.includes(c));
+            
+            if (matches.length === 0 && !q) {
+                closeDropdown();
+                return;
+            }
+            
+            suggestionsEl.innerHTML = '';
+            const maxShow = 30;
+            const displayed = matches.slice(0, maxShow);
+            
+            if (displayed.length === 0 && q) {
+                const hint = document.createElement('div');
+                hint.className = 'class-combobox__hint';
+                hint.textContent = `Press Enter to add "${q}"`;
+                suggestionsEl.appendChild(hint);
+            }
+            
+            displayed.forEach(cls => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'class-combobox__suggestion';
+                btn.textContent = cls;
+                btn.addEventListener('click', () => addClass(cls));
+                suggestionsEl.appendChild(btn);
+            });
+            
+            if (matches.length > maxShow) {
+                const more = document.createElement('div');
+                more.className = 'class-combobox__hint';
+                more.textContent = `+${matches.length - maxShow} more…`;
+                suggestionsEl.appendChild(more);
+            }
+            
+            dropdown.style.display = '';
+        }
+        
+        function closeDropdown() {
+            dropdown.style.display = 'none';
+        }
+        
+        // Events
+        input.addEventListener('focus', function() {
+            if (!classesLoaded) loadClasses();
+            showDropdown(this.value);
+        });
+        
+        input.addEventListener('input', function() {
+            showDropdown(this.value);
+        });
+        
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                const val = this.value.trim();
+                if (val) addClass(val);
+            }
+            if (e.key === 'Backspace' && !this.value && selectedClasses.length > 0) {
+                removeClass(selectedClasses[selectedClasses.length - 1]);
+            }
+            if (e.key === 'Escape') {
+                closeDropdown();
+                this.blur();
+            }
+        });
+        
+        // Chip remove buttons
+        chipsEl.addEventListener('click', function(e) {
+            const btn = e.target.closest('.class-combobox__chip-remove');
+            if (btn) removeClass(btn.dataset.class);
+        });
+        
+        // Click outside to close
+        document.addEventListener('click', function(e) {
+            if (!container.contains(e.target)) closeDropdown();
+        });
+        
+        return {
+            reset() {
+                selectedClasses = [];
+                syncHiddenInput();
+                renderChips();
+                input.value = '';
+                closeDropdown();
+                classesLoaded = false;
+            },
+            getValue() {
+                return hiddenInput.value;
+            },
+            refreshClasses() {
+                classesLoaded = false;
+            },
+        };
+    })();
+
     // Tag select change handler
     addTagSelect?.addEventListener('change', function() {
         updateSidebarAddMandatoryParams();
@@ -5028,14 +5408,9 @@
         }
     });
     
-    // Expand params handler
-    addExpandParamsBtn?.addEventListener('click', function() {
-        const isExpanded = addCustomParamsContainer?.style.display !== 'none';
-        if (addCustomParamsContainer) {
-            addCustomParamsContainer.style.display = isExpanded ? 'none' : 'block';
-        }
-        const svg = this.querySelector('svg');
-        if (svg) svg.style.transform = isExpanded ? '' : 'rotate(45deg)';
+    // Top confirm button — same as bottom confirm
+    addConfirmTopBtn?.addEventListener('click', function() {
+        addConfirmBtn?.click();
     });
     
     // Add another param

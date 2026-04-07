@@ -369,7 +369,7 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
     try {
         // Determine structure name for editor mode
         if ($type === 'page') {
-            $structureName = 'page-' . str_replace('/', '-', $name);
+            $structureName = 'page-' . $name;
         } elseif ($type === 'component' && $name) {
             $structureName = 'component-' . $name;
         } else {

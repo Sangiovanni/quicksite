@@ -66,7 +66,7 @@ class JsonToHtmlRenderer {
      */
     public function renderPage(string $pageName): string {
         // Set structure context for editor mode
-        $this->currentStructure = 'page-' . str_replace('/', '-', $pageName);
+        $this->currentStructure = 'page-' . $pageName;
         $this->currentNodePath = [];
         $this->inComponent = false;
         

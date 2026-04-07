@@ -4,6 +4,13 @@
         <span><?= __admin('preview.showToolNames') ?? 'Show names' ?></span>
     </label>
     <div class="preview-sidebar__tools-buttons">
+        <button type="button" class="preview-sidebar-tool preview-sidebar-tool--action" id="preview-tool-refresh" title="<?= __admin('preview.reload') ?? 'Refresh preview' ?>">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <span><?= __admin('preview.reload') ?? 'Refresh' ?></span>
+        </button>
         <button type="button" class="preview-sidebar-tool preview-sidebar-tool--active" data-mode="select" title="<?= __admin('preview.toolSelect') ?? 'Select' ?>">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
