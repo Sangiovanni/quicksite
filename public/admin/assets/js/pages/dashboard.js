@@ -770,6 +770,59 @@
             document.getElementById('create-project-name').focus();
         });
         
+        // Clone project modal
+        document.getElementById('btn-clone-project').addEventListener('click', function() {
+            document.getElementById('clone-source-name').textContent = currentProject;
+            document.getElementById('clone-project-name').value = currentProject + '-copy';
+            document.getElementById('modal-clone-project').style.display = 'flex';
+            document.getElementById('clone-project-name').focus();
+            document.getElementById('clone-project-name').select();
+        });
+        
+        // Confirm clone project
+        document.getElementById('btn-confirm-clone').addEventListener('click', async function() {
+            const nameInput = document.getElementById('clone-project-name');
+            const activateCheckbox = document.getElementById('clone-project-activate');
+            const name = nameInput.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+            
+            if (!name) {
+                QuickSiteAdmin.showToast(proj.nameRequired || 'Project name is required', 'error');
+                return;
+            }
+            
+            this.disabled = true;
+            this.innerHTML = QuickSiteUtils.htmlSpinner() + ' ' + (proj.cloning || 'Cloning...');
+            try {
+                const result = await QuickSiteAdmin.apiRequest('cloneProject', 'POST', {
+                    source: currentProject,
+                    name: name,
+                    switch_to: activateCheckbox.checked
+                });
+                
+                if (result.ok) {
+                    const filesCopied = result.data?.data?.files_copied || '';
+                    const msg = (proj.cloned || 'Project cloned') + ': ' + name + (filesCopied ? ' (' + filesCopied + ' files)' : '');
+                    QuickSiteAdmin.showToast(msg, 'success');
+                    closeAllModals();
+                    if (activateCheckbox.checked) {
+                        window.location.href = window.location.pathname + '?t=' + Date.now();
+                    } else {
+                        loadProjectManager();
+                        this.disabled = false;
+                        this.textContent = proj.cloneBtn || 'Clone Project';
+                    }
+                } else {
+                    QuickSiteAdmin.showToast(result.data?.message || 'Failed to clone project', 'error');
+                    this.disabled = false;
+                    this.textContent = proj.cloneBtn || 'Clone Project';
+                }
+            } catch (error) {
+                QuickSiteAdmin.showToast('Failed to clone project', 'error');
+                this.disabled = false;
+                this.textContent = proj.cloneBtn || 'Clone Project';
+            }
+        });
+        
         // Confirm create project
         document.getElementById('btn-confirm-create').addEventListener('click', async function() {
             const nameInput = document.getElementById('create-project-name');

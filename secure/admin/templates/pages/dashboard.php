@@ -164,6 +164,15 @@ $baseUrl = rtrim(BASE_URL, '/');
                             <?= __admin('dashboard.projects.create') ?>
                         </button>
                         
+                        <!-- Clone Project -->
+                        <button type="button" id="btn-clone-project" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.cloneTooltip') ?>">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                            </svg>
+                            <?= __admin('dashboard.projects.clone') ?>
+                        </button>
+                        
                         <!-- Backup/Restore Group -->
                         <div class="project-manager__action-divider"></div>
                         
@@ -314,6 +323,43 @@ $baseUrl = rtrim(BASE_URL, '/');
         <div class="admin-modal__footer">
             <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>
             <button type="button" id="btn-confirm-create" class="admin-btn admin-btn--primary"><?= __admin('dashboard.projects.createBtn') ?></button>
+        </div>
+    </div>
+</div>
+
+<!-- Clone Project Modal -->
+<div id="modal-clone-project" class="admin-modal" style="display: none;">
+    <div class="admin-modal__backdrop"></div>
+    <div class="admin-modal__content">
+        <div class="admin-modal__header">
+            <h3 class="admin-modal__title"><?= __admin('dashboard.projects.cloneTitle') ?></h3>
+            <button type="button" class="admin-modal__close" data-close-modal>×</button>
+        </div>
+        <div class="admin-modal__body">
+            <p style="margin-bottom: var(--space-md);">
+                <?= __admin('dashboard.projects.cloneFrom') ?>: <strong id="clone-source-name"></strong>
+            </p>
+            <div class="admin-form-group">
+                <label class="admin-label"><?= __admin('dashboard.projects.cloneNameLabel') ?></label>
+                <input type="text" id="clone-project-name" class="admin-input" placeholder="my-project-copy" pattern="[a-z0-9_\-]+" />
+                <small class="admin-help"><?= __admin('dashboard.projects.nameHelp') ?></small>
+            </div>
+            <div class="admin-form-group">
+                <label class="admin-checkbox">
+                    <input type="checkbox" id="clone-project-activate" checked />
+                    <span><?= __admin('dashboard.projects.activateAfterClone') ?></span>
+                </label>
+            </div>
+        </div>
+        <div class="admin-modal__footer">
+            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>
+            <button type="button" id="btn-confirm-clone" class="admin-btn admin-btn--primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+                <?= __admin('dashboard.projects.cloneBtn') ?>
+            </button>
         </div>
     </div>
 </div>
