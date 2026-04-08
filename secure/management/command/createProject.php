@@ -130,6 +130,10 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     // Create empty assets_metadata.json
     file_put_contents($projectPath . '/data/assets_metadata.json', '{}', LOCK_EX);
     
+    // Create default iframe sandbox config (empty = strictest)
+    $defaultSandbox = json_encode(['tags' => ['iframe' => (object)[]], 'default' => ''], JSON_PRETTY_PRINT);
+    file_put_contents($projectPath . '/data/iframe_sandbox.json', $defaultSandbox, LOCK_EX);
+    
     // Create default translation file
     $defaultTranslations = createDefaultTranslations($siteName);
     file_put_contents($projectPath . '/translate/default.json', json_encode($defaultTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
@@ -141,9 +145,20 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     // Create menu.json and footer.json
     createMenuAndFooter($projectPath, $siteName);
     
-    // Create .htaccess with space-aware FallbackResource
+    // Create .htaccess with space-aware FallbackResource + security headers
     $fallbackPath = PUBLIC_FOLDER_SPACE !== '' ? '/' . trim(PUBLIC_FOLDER_SPACE, '/') . '/index.php' : '/index.php';
-    file_put_contents($projectPath . '/public/.htaccess', "RewriteEngine On\nFallbackResource $fallbackPath\n", LOCK_EX);
+    $htaccess = <<<HTACCESS
+RewriteEngine On
+FallbackResource $fallbackPath
+
+# Security headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+HTACCESS;
+    file_put_contents($projectPath . '/public/.htaccess', $htaccess . "\n", LOCK_EX);
     
     // Create basic style.css
     createBasicStyles($projectPath);

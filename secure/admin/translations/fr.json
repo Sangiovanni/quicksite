@@ -328,6 +328,7 @@
         "projectSettings": "Paramètres du projet",
         "apiEndpoints": "Points d'accès API",
         "aiApiKeys": "Clés API IA",
+        "embedSecurity": "Sécurité d'intégration",
         "structure": "Structure",
         "workflows": "Workflows",
         "visualEditor": "Éditeur visuel",
@@ -478,6 +479,10 @@
             "schemaMessage": "Êtes-vous sûr de vouloir supprimer le schéma '{id}' ? Cette action est irréversible.",
             "interactionMessage": "Êtes-vous sûr de vouloir supprimer l'interaction '{id}' ? Cette action est irréversible."
         }
+    },
+    "embedSecurity": {
+        "title": "S\u00e9curit\u00e9 d'int\u00e9gration",
+        "subtitle": "G\u00e9rer les r\u00e8gles de sandbox iframe et les permissions d'int\u00e9gration"
     },
     "settings": {
         "title": "Paramètres",
@@ -1238,6 +1243,8 @@
         "selectedTag": "Sélectionné",
         "noTagsFound": "Aucune balise trouvée",
         "noVisualPreview": "Pas d'aperçu visuel",
+        "favorites": "Favoris",
+        "suggested": "Suggérés",
         "showHtml": "Afficher le code HTML",
         "requiresParams": "Nécessite des paramètres supplémentaires",
         "tagPreview": "Aperçu de la balise",

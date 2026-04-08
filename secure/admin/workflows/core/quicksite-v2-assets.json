@@ -15,32 +15,32 @@
         "assets": [
             {
                 "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/404.png",
-                "alt": "404 page illustration",
+                "alt": "404",
                 "description": "Image displayed on the 404 error page"
             },
             {
                 "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/documentation.png",
-                "alt": "Documentation illustration",
-                "description": "Image used on the documentation page"
+                "alt": "Documentation-logo",
+                "description": "Image as the documentation logo in the menu or footer"
             },
             {
                 "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/favicon.png",
-                "alt": "QuickSite favicon",
+                "alt": "QuickSite-favicon",
                 "description": "Default QuickSite favicon image"
             },
             {
                 "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/git-hub-logo-white.png",
-                "alt": "GitHub logo white",
-                "description": "White GitHub logo for dark backgrounds"
+                "alt": "GitHub-logo-white",
+                "description": "White GitHub logo for dark backgrounds use a logo in the menu or footer"
             },
             {
                 "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/home.png",
-                "alt": "Home page illustration",
-                "description": "Image displayed on the home page"
+                "alt": "Home-logo",
+                "description": "Image displayed in the menu or footer as the home logo"
             },
             {
                 "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/logo.png",
-                "alt": "QuickSite logo",
+                "alt": "QuickSite-logo",
                 "description": "Default QuickSite template logo"
             }
         ]

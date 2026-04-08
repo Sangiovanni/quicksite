@@ -282,3 +282,9 @@ if (!defined('BASE_URL')) {
     }
     define('BASE_URL', $protocol . $host);
 }
+
+// ============================================================================
+// SECURITY HEADERS - Applied to all PHP-served responses
+// ============================================================================
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');

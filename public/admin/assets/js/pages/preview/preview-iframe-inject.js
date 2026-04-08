@@ -881,8 +881,22 @@
         clearSelectorSelection();
     }
     
+    // Find an embed child of `container` whose bounding rect contains (mx, my)
+    function findEmbedAtPoint(container, mx, my) {
+        var embeds = container.querySelectorAll(
+            'iframe[data-qs-struct], video[data-qs-struct], audio[data-qs-struct], embed[data-qs-struct], object[data-qs-struct]'
+        );
+        for (var i = 0; i < embeds.length; i++) {
+            var rect = embeds[i].getBoundingClientRect();
+            if (mx >= rect.left && mx <= rect.right && my >= rect.top && my <= rect.bottom) {
+                return embeds[i];
+            }
+        }
+        return null;
+    }
+    
     // Find the selectable target (bubble up to component if inside one)
-    function getSelectableTarget(el) {
+    function getSelectableTarget(el, mouseX, mouseY) {
         if (!el || el === document.body || el === document.documentElement) return null;
         if (ignoreTags.includes(el.tagName)) return null;
         
@@ -891,6 +905,14 @@
             // No editor attributes, find closest parent with them
             el = el.closest('[data-qs-struct]');
             if (!el) return null;
+        }
+        
+        // If mouse coords provided, check if an embed child is under the cursor
+        if (mouseX !== undefined && mouseY !== undefined) {
+            var embedHit = findEmbedAtPoint(el, mouseX, mouseY);
+            if (embedHit) {
+                el = embedHit;
+            }
         }
         
         // If inside a component, bubble up to component root
@@ -905,7 +927,7 @@
     }
     
     // Get draggable elements (only direct children of the body struct or component children)
-    function getDraggableTarget(el) {
+    function getDraggableTarget(el, mouseX, mouseY) {
         if (!el || el === document.body || el === document.documentElement) return null;
         if (ignoreTags.includes(el.tagName)) return null;
         
@@ -913,6 +935,14 @@
         if (!el.hasAttribute('data-qs-struct')) {
             el = el.closest('[data-qs-struct]');
             if (!el) return null;
+        }
+        
+        // If mouse coords provided, check if an embed child is under the cursor
+        if (mouseX !== undefined && mouseY !== undefined) {
+            var embedHit = findEmbedAtPoint(el, mouseX, mouseY);
+            if (embedHit) {
+                el = embedHit;
+            }
         }
         
         // For components, treat the whole component as one draggable unit
@@ -1742,7 +1772,7 @@
     document.addEventListener('mouseover', function(e) {
         if (currentMode !== 'select') return;
         
-        const target = getSelectableTarget(e.target);
+        const target = getSelectableTarget(e.target, e.clientX, e.clientY);
         if (!target || target === hoveredElement || target === selectedElement) return;
         
         clearHover();
@@ -1752,7 +1782,7 @@
     
     document.addEventListener('mouseout', function(e) {
         if (currentMode !== 'select') return;
-        const target = getSelectableTarget(e.target);
+        const target = getSelectableTarget(e.target, e.clientX, e.clientY);
         if (target && target === hoveredElement) {
             clearHover();
         }
@@ -1769,7 +1799,7 @@
         if (currentMode === 'select') {
             e.stopImmediatePropagation();
             
-            const target = getSelectableTarget(e.target);
+            const target = getSelectableTarget(e.target, e.clientX, e.clientY);
             if (target) {
                 clearSelection();
                 clearHover();
@@ -1801,7 +1831,7 @@
         if (currentMode === 'style') {
             e.stopImmediatePropagation();
             
-            const target = getSelectableTarget(e.target);
+            const target = getSelectableTarget(e.target, e.clientX, e.clientY);
             if (target) {
                 // Remove previous selection
                 document.querySelectorAll('.qs-style-selected').forEach(el => {
@@ -1830,7 +1860,7 @@
         if (currentMode === 'js') {
             e.stopImmediatePropagation();
             
-            const target = getSelectableTarget(e.target);
+            const target = getSelectableTarget(e.target, e.clientX, e.clientY);
             if (target) {
                 // Remove previous selection
                 document.querySelectorAll('.qs-js-selected').forEach(el => {
@@ -1909,7 +1939,7 @@
         }
         
         if (currentMode === 'drag') {
-            const target = getDraggableTarget(e.target);
+            const target = getDraggableTarget(e.target, e.clientX, e.clientY);
             if (target && target.classList.contains('qs-draggable')) {
                 e.preventDefault();
                 handleDragStart(e, target);

@@ -7,6 +7,15 @@
  * This file is loaded dynamically by preview.js when the iframe loads.
  */
 
+/* ===== EMBED ELEMENTS: Disable pointer capture in editor ===== */
+/* Prevents iframes/video/audio from swallowing clicks so nodes stay selectable.
+   Coordinate-based hit detection in inject.js resolves clicks on the parent
+   container to the correct embed child underneath the cursor. */
+iframe[data-qs-struct], video[data-qs-struct], audio[data-qs-struct],
+embed[data-qs-struct], object[data-qs-struct] {
+    pointer-events: none !important;
+}
+
 /* ===== SELECT MODE STYLES ===== */
 .qs-hover {
     outline: 2px dashed #d97706 !important;

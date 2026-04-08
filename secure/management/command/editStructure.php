@@ -1,11 +1,12 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/IframeSandbox.php';
 
-// SECURITY: Blocked tags that could execute scripts or inject styles
-const BLOCKED_TAGS = ['script', 'noscript', 'style', 'template', 'slot'];
+// SECURITY: Blocked tags are defined in TagRegistry::BLOCKED_TAGS
 
 /**
  * Internal function to find component usages (for delete safety check)
@@ -112,7 +113,7 @@ function validateStructureTags($node): ?string {
     
     // Check if this node has a blocked tag
     if (isset($node['tag']) && is_string($node['tag'])) {
-        if (in_array(strtolower($node['tag']), BLOCKED_TAGS, true)) {
+        if (TagRegistry::isBlocked($node['tag'])) {
             return "Blocked tag '{$node['tag']}' not allowed (security restriction)";
         }
     }
@@ -316,6 +317,11 @@ if ($structure !== null && is_array($structure)) {
                 ->send();
         }
     }
+}
+
+// SECURITY: Strip sandbox attributes on embed tags — system enforces its own at render time
+if ($structure !== null && is_array($structure)) {
+    IframeSandbox::sanitizeStructure($structure);
 }
 
 // For pages and components, name is required

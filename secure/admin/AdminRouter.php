@@ -21,6 +21,7 @@ class AdminRouter {
         'settings',    // Settings and configuration
         'workflows',   // Workflows (AI and manual)
         'ai-settings', // AI Provider Settings (BYOK)
+        'embed-security', // Embed Security (iframe sandbox)
         'preview',     // Visual Editor (route kept as 'preview' for URL compatibility)
         'apis',        // External API Registry
         'assets',      // Asset Management page

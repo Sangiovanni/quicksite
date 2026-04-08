@@ -214,6 +214,11 @@
     const componentWarningText = document.getElementById('preview-component-warning-text');
     const deleteComponentBtn = document.getElementById('preview-delete-component');
     
+    // Iframe Warning Banner
+    const iframeWarning = document.getElementById('preview-iframe-warning');
+    const iframeWarningClose = document.getElementById('preview-iframe-warning-close');
+    let iframeWarningDismissed = false;
+
     // Sidebar Add Form Elements (Phase 8 - Add Mode)
     const contextualAddDefault = document.getElementById('contextual-add-default');
     const contextualAddForm = document.getElementById('contextual-add-form');
@@ -2191,6 +2196,9 @@
         // Update component warning banner
         updateComponentWarning(editType, editName);
         
+        // Update iframe warning banner
+        updateIframeWarning(editType, editName);
+        
         // Update layout toggles visibility (show only for pages)
         updateLayoutToggles(editType, editName);
         
@@ -2267,6 +2275,46 @@
         if (isComponent && currentMode === 'text') {
             setMode('select');
         }
+    }
+    
+    // ==================== Iframe Warning Banner ====================
+    
+    /**
+     * Check if the page structure contains iframe nodes and show/hide banner
+     */
+    async function updateIframeWarning(editType, editName) {
+        if (!iframeWarning || iframeWarningDismissed) return;
+        
+        // Only show for pages, not components/layouts
+        if (editType !== 'page') {
+            iframeWarning.style.display = 'none';
+            return;
+        }
+        
+        try {
+            const result = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, [editName]);
+            if (result.ok && result.data?.data?.structure) {
+                const hasIframe = (function check(node) {
+                    if (!node) return false;
+                    if (node.tag === 'iframe') return true;
+                    if (Array.isArray(node.children)) return node.children.some(check);
+                    return false;
+                })(result.data.data.structure);
+                
+                iframeWarning.style.display = hasIframe ? 'flex' : 'none';
+            } else {
+                iframeWarning.style.display = 'none';
+            }
+        } catch (e) {
+            iframeWarning.style.display = 'none';
+        }
+    }
+    
+    if (iframeWarningClose) {
+        iframeWarningClose.addEventListener('click', function() {
+            iframeWarningDismissed = true;
+            iframeWarning.style.display = 'none';
+        });
     }
     
     // ==================== Delete Component ====================
@@ -4832,15 +4880,16 @@
         const suggestedGroup = document.getElementById(`${selectorId}-tag-suggested-group`);
         const suggestedItems = document.getElementById(`${selectorId}-tag-suggested-items`);
         
-        // Preview panel elements
-        const previewPanel = selector.querySelector(`#${selectorId}-tag-preview`);
-        const previewName = selector.querySelector(`#${selectorId}-tag-preview-name`);
-        const previewDesc = selector.querySelector(`#${selectorId}-tag-preview-desc`);
-        const previewRender = selector.querySelector(`#${selectorId}-tag-preview-render`);
-        const previewNoRender = selector.querySelector(`#${selectorId}-tag-preview-norender`);
-        const codeToggle = selector.querySelector(`#${selectorId}-tag-code-toggle`);
-        const codeView = selector.querySelector(`#${selectorId}-tag-preview-code`);
-        const codeContent = selector.querySelector(`#${selectorId}-tag-preview-code-content`);
+        // Preview panel elements (use document.getElementById because the preview
+        // panel is relocated to a collapsible section before initTagSelector runs)
+        const previewPanel = document.getElementById(`${selectorId}-tag-preview`);
+        const previewName = document.getElementById(`${selectorId}-tag-preview-name`);
+        const previewDesc = document.getElementById(`${selectorId}-tag-preview-desc`);
+        const previewRender = document.getElementById(`${selectorId}-tag-preview-render`);
+        const previewNoRender = document.getElementById(`${selectorId}-tag-preview-norender`);
+        const codeToggle = document.getElementById(`${selectorId}-tag-code-toggle`);
+        const codeView = document.getElementById(`${selectorId}-tag-preview-code`);
+        const codeContent = document.getElementById(`${selectorId}-tag-preview-code-content`);
         
         // Load tag data from embedded JSON
         let tagData = {};

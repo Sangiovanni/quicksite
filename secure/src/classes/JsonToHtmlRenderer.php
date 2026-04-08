@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/TagRegistry.php';
+require_once __DIR__ . '/IframeSandbox.php';
 
 /**
  * JsonToHtmlRenderer
@@ -395,8 +397,7 @@ class JsonToHtmlRenderer {
         }
         
         // SECURITY: Block dangerous tags that could execute scripts or inject styles
-        $blockedTags = ['script', 'noscript', 'style', 'template', 'slot'];
-        if (in_array(strtolower($tag), $blockedTags, true)) {
+        if (TagRegistry::isBlocked($tag)) {
             error_log("Blocked dangerous tag: {$tag}");
             return "<!-- Blocked tag -->";
         }
@@ -405,9 +406,7 @@ class JsonToHtmlRenderer {
         $children = $node['children'] ?? null;
 
         // Check if it's a void/self-closing element
-        $voidElements = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 
-                         'link', 'meta', 'param', 'source', 'track', 'wbr'];
-        $isVoid = in_array(strtolower($tag), $voidElements);
+        $isVoid = TagRegistry::isVoidElement($tag);
 
         $html = '<' . htmlspecialchars($tag, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
@@ -419,8 +418,18 @@ class JsonToHtmlRenderer {
         // Render attributes
         if (is_array($params) && !empty($params)) {
             foreach ($params as $attrName => $attrValue) {
+                // SECURITY: Strip user-provided sandbox on iframes — system enforces its own
+                if (strtolower($tag) === 'iframe' && strtolower($attrName) === 'sandbox') {
+                    continue;
+                }
                 $html .= $this->renderAttribute($attrName, $attrValue);
             }
+        }
+
+        // SECURITY: Enforce iframe sandbox attribute
+        if (strtolower($tag) === 'iframe') {
+            $iframeSrc = $params['src'] ?? '';
+            $html .= ' ' . IframeSandbox::getSandboxAttribute($iframeSrc);
         }
 
         if ($isVoid) {

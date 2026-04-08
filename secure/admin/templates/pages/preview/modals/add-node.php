@@ -60,101 +60,18 @@
             <!-- Tag Selection (for HTML Tag type) -->
             <div class="preview-add-node-modal__field" id="add-node-tag-field">
                 <label for="add-node-tag"><?= __admin('preview.selectTag') ?? 'Tag' ?>:</label>
+                <?php
+                require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
+                $uiCategories = TagRegistry::getUICategories();
+                ?>
                 <select id="add-node-tag" class="admin-input">
-                    <optgroup label="<?= __admin('preview.layoutTags') ?? 'Layout' ?>">
-                        <option value="div">div</option>
-                        <option value="section">section</option>
-                        <option value="article">article</option>
-                        <option value="header">header</option>
-                        <option value="footer">footer</option>
-                        <option value="nav">nav</option>
-                        <option value="main">main</option>
-                        <option value="aside">aside</option>
-                        <option value="figure">figure</option>
-                        <option value="figcaption">figcaption</option>
+                    <?php foreach ($uiCategories as $catId => $category): ?>
+                    <optgroup label="<?= htmlspecialchars($category['label']) ?>">
+                        <?php foreach ($category['tags'] as $tagName => $tagInfo): ?>
+                        <option value="<?= $tagName ?>"><?= $tagName ?><?= !empty($tagInfo['required']) ? ' *' : '' ?></option>
+                        <?php endforeach; ?>
                     </optgroup>
-                    <optgroup label="<?= __admin('preview.textTags') ?? 'Text' ?>">
-                        <option value="p">p (paragraph)</option>
-                        <option value="h1">h1</option>
-                        <option value="h2">h2</option>
-                        <option value="h3">h3</option>
-                        <option value="h4">h4</option>
-                        <option value="h5">h5</option>
-                        <option value="h6">h6</option>
-                        <option value="span">span</option>
-                        <option value="strong">strong</option>
-                        <option value="em">em</option>
-                        <option value="small">small</option>
-                        <option value="mark">mark</option>
-                        <option value="blockquote">blockquote</option>
-                        <option value="pre">pre</option>
-                        <option value="code">code</option>
-                        <option value="q">q (quote)</option>
-                        <option value="cite">cite</option>
-                        <option value="abbr">abbr</option>
-                        <option value="time">time</option>
-                        <option value="address">address</option>
-                    </optgroup>
-                    <optgroup label="<?= __admin('preview.interactiveTags') ?? 'Interactive' ?>">
-                        <option value="a">a (link) *</option>
-                        <option value="button">button</option>
-                        <option value="details">details</option>
-                        <option value="summary">summary</option>
-                        <option value="dialog">dialog</option>
-                    </optgroup>
-                    <optgroup label="<?= __admin('preview.listTags') ?? 'Lists' ?>">
-                        <option value="ul">ul (unordered list)</option>
-                        <option value="ol">ol (ordered list)</option>
-                        <option value="li">li (list item)</option>
-                        <option value="dl">dl (description list)</option>
-                        <option value="dt">dt (term)</option>
-                        <option value="dd">dd (description)</option>
-                    </optgroup>
-                    <optgroup label="<?= __admin('preview.mediaTags') ?? 'Media' ?>">
-                        <option value="img">img * (image)</option>
-                        <option value="picture">picture</option>
-                        <option value="video">video *</option>
-                        <option value="audio">audio *</option>
-                        <option value="iframe">iframe *</option>
-                        <option value="embed">embed *</option>
-                        <option value="object">object *</option>
-                        <option value="source">source *</option>
-                        <option value="track">track *</option>
-                        <option value="canvas">canvas</option>
-                        <option value="svg">svg</option>
-                    </optgroup>
-                    <optgroup label="<?= __admin('preview.formTags') ?? 'Form' ?>">
-                        <option value="form">form *</option>
-                        <option value="input">input *</option>
-                        <option value="textarea">textarea *</option>
-                        <option value="label">label *</option>
-                        <option value="select">select *</option>
-                        <option value="option">option</option>
-                        <option value="optgroup">optgroup</option>
-                        <option value="fieldset">fieldset</option>
-                        <option value="legend">legend</option>
-                        <option value="datalist">datalist</option>
-                        <option value="output">output</option>
-                        <option value="progress">progress</option>
-                        <option value="meter">meter</option>
-                    </optgroup>
-                    <optgroup label="<?= __admin('preview.tableTags') ?? 'Table' ?>">
-                        <option value="table">table</option>
-                        <option value="thead">thead</option>
-                        <option value="tbody">tbody</option>
-                        <option value="tfoot">tfoot</option>
-                        <option value="tr">tr</option>
-                        <option value="th">th</option>
-                        <option value="td">td</option>
-                        <option value="caption">caption</option>
-                        <option value="colgroup">colgroup</option>
-                        <option value="col">col</option>
-                    </optgroup>
-                    <optgroup label="<?= __admin('preview.otherTags') ?? 'Other' ?>">
-                        <option value="br">br (line break)</option>
-                        <option value="hr">hr (horizontal rule)</option>
-                        <option value="wbr">wbr (word break)</option>
-                    </optgroup>
+                    <?php endforeach; ?>
                 </select>
                 <small class="preview-add-node-modal__hint">* <?= __admin('preview.requiresParams') ?? 'Requires additional parameters' ?></small>
             </div>

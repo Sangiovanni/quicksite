@@ -33,6 +33,18 @@
         <span class="preview-component-warning__text" id="preview-component-warning-text"></span>
     </div>
 
+    <!-- Iframe Warning Banner (shown when page contains iframe nodes) -->
+    <div class="preview-iframe-warning" id="preview-iframe-warning" style="display: none;">
+        <svg class="preview-iframe-warning__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <span class="preview-iframe-warning__text">
+            This page contains embedded iframes. If an embed appears empty, its domain may need to be allowed in Embed Security settings.
+        </span>
+        <a href="<?= $router->url('embed-security') ?>" class="preview-iframe-warning__link">Configure &rarr;</a>
+        <button type="button" class="preview-iframe-warning__close" id="preview-iframe-warning-close" title="Dismiss">&times;</button>
+    </div>
+
     <!-- Mobile Context Sections (info + actions, shown when element selected on mobile) -->
     <!-- Each section is independently collapsible -->
     <div class="preview-mobile-sections" id="preview-mobile-sections">

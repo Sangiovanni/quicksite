@@ -1,2 +1,7 @@
 RewriteEngine On
 FallbackResource /index.php
+
+# Security headers for static assets (CSS, JS, images, fonts, etc.)
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+</IfModule>

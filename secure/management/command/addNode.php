@@ -4,6 +4,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 /**
@@ -23,111 +24,15 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
  */
 
 // =============================================================================
-// TAG CLASSIFICATION CONSTANTS
+// TAG CLASSIFICATION CONSTANTS — sourced from TagRegistry
 // =============================================================================
-
-/**
- * Block-level tags: textKey OPTIONAL if class is provided, REQUIRED if no class
- */
-const BLOCK_TAGS = [
-    'div', 'section', 'article', 'header', 'footer', 'nav', 'main', 'aside', 
-    'figure', 'figcaption', 'blockquote', 'pre', 'form', 'fieldset',
-    'ul', 'ol', 'table', 'thead', 'tbody', 'tfoot', 'tr'
-];
-
-/**
- * Inline tags: textKey ALWAYS required (they display text)
- */
-const INLINE_TAGS = [
-    'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 
-    'a', 'button', 'label', 'strong', 'em', 'b', 'i', 'u', 'small', 'mark',
-    'li', 'td', 'th', 'dt', 'dd', 'caption', 'legend',
-    'code', 'kbd', 'samp', 'var', 'cite', 'q', 'abbr', 'time', 'address'
-];
-
-/**
- * Self-closing tags: NO textKey needed (no text content)
- */
-const SELF_CLOSING_TAGS = [
-    'img', 'input', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col', 
-    'embed', 'source', 'track', 'wbr'
-];
-
-/**
- * Tags that can have children
- */
-const CONTAINER_TAGS = [
-    'div', 'section', 'article', 'header', 'footer', 'nav', 'main', 'aside',
-    'ul', 'ol', 'li', 'form', 'table', 'tr', 'thead', 'tbody', 'tfoot', 'figure',
-    'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'a', 'button',
-    'blockquote', 'pre', 'label', 'td', 'th', 'figcaption', 'strong', 'em',
-    'fieldset', 'legend', 'details', 'summary', 'dialog', 'dt', 'dd',
-    'code', 'kbd', 'samp', 'var', 'cite', 'q', 'abbr', 'time', 'address',
-    'b', 'i', 'u', 'small', 'mark', 'caption', 'select', 'optgroup', 'datalist'
-];
-
-/**
- * Mandatory parameters per tag type
- * NOTE: 'alt' is handled separately - auto-generated as translation key like textKey
- * Format: {prefix}.item{N}.alt
- */
-const MANDATORY_PARAMS = [
-    'a' => ['href'],
-    'img' => ['src'],  // alt is auto-generated as translation key
-    'input' => ['type'],
-    'form' => ['action'],
-    'iframe' => ['src'],
-    'video' => ['src'],
-    'audio' => ['src'],
-    'source' => ['src'],
-    'label' => ['for'],
-    'select' => ['name'],
-    'textarea' => ['name'],
-    'area' => ['href'],  // alt is auto-generated as translation key
-    'embed' => ['src'],
-    'object' => ['data'],
-    'track' => ['src'],
-    'link' => ['href', 'rel'],
-];
-
-/**
- * Tags that require auto-generated alt translation key
- */
-const TAGS_WITH_ALT = ['img', 'area'];
-
-/**
- * Reserved params that are auto-managed and cannot be set manually
- * These are translatable attributes handled by the translation system
- */
-const RESERVED_PARAMS = ['alt', 'placeholder', 'title', 'aria-label', 'aria-placeholder', 'aria-description'];
-
-/**
- * All allowed tags
- */
-const ALLOWED_TAGS = [
-    'div', 'section', 'article', 'header', 'footer', 'nav', 'main', 'aside',
-    'figure', 'figcaption', 'blockquote', 'pre', 'form', 'fieldset',
-    'ul', 'ol', 'table', 'thead', 'tbody', 'tfoot', 'tr',
-    'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'a', 'button', 'label', 'strong', 'em', 'b', 'i', 'u', 'small', 'mark',
-    'li', 'td', 'th', 'dt', 'dd', 'caption', 'legend',
-    'code', 'kbd', 'samp', 'var', 'cite', 'q', 'abbr', 'time', 'address',
-    'img', 'input', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col',
-    'embed', 'source', 'track', 'wbr',
-    'details', 'summary', 'dialog', 'select', 'option', 'optgroup', 'textarea',
-    'iframe', 'video', 'audio', 'canvas', 'svg', 'picture', 'object',
-    'progress', 'meter', 'output', 'datalist', 'colgroup'
-];
 
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
 
 function getTagCategory(string $tag): string {
-    if (in_array($tag, SELF_CLOSING_TAGS, true)) return 'self-closing';
-    if (in_array($tag, INLINE_TAGS, true)) return 'inline';
-    if (in_array($tag, BLOCK_TAGS, true)) return 'block';
-    return 'block';
+    return TagRegistry::getCategory($tag);
 }
 
 function tagRequiresTextKey(string $tag, array $params): bool {
@@ -255,7 +160,7 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
     
     // Filter out reserved params (translatable attributes) from nodeParams
     // These are auto-managed and cannot be set manually
-    foreach (RESERVED_PARAMS as $reserved) {
+    foreach (TagRegistry::RESERVED_PARAMS as $reserved) {
         unset($nodeParams[$reserved]);
     }
     
@@ -267,6 +172,9 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
             ->withMessage("Cannot use reserved attribute '{$reservedQsParam}'. Attributes starting with 'data-qs-' are reserved for QuickSite. Use a different prefix like 'data-custom-' or 'data-app-'.")
             ->withErrors([['field' => 'params.' . $reservedQsParam, 'reason' => 'reserved_attribute']]);
     }
+    
+    // SECURITY: Strip sandbox attribute on embed tags — system enforces its own at render time
+    IframeSandbox::sanitizeNodeParams($tag, $nodeParams);
     
     // Validate structure type
     $allowed_types = ['menu', 'footer', 'page', 'component'];
@@ -300,31 +208,36 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
             ->withErrors([['field' => 'position', 'value' => $position]]);
     }
     
-    // Validate tag
-    if (!in_array($tag, ALLOWED_TAGS, true)) {
+    // Validate tag — security check first
+    if (TagRegistry::isBlocked($tag)) {
+        return ApiResponse::create(400, 'validation.blocked_tag')
+            ->withMessage("Tag '{$tag}' is blocked for security reasons.")
+            ->withErrors([['field' => 'tag', 'value' => $tag]]);
+    }
+    if (!TagRegistry::isAllowed($tag)) {
         return ApiResponse::create(400, 'validation.invalid_value')
             ->withMessage("Invalid tag '{$tag}'.")
             ->withErrors([['field' => 'tag', 'value' => $tag]]);
     }
     
     // Validate mandatory params for tag
-    if (isset(MANDATORY_PARAMS[$tag])) {
+    if (isset(TagRegistry::MANDATORY_PARAMS[$tag])) {
         $missing = [];
-        foreach (MANDATORY_PARAMS[$tag] as $requiredParam) {
+        foreach (TagRegistry::MANDATORY_PARAMS[$tag] as $requiredParam) {
             if (!isset($nodeParams[$requiredParam]) || $nodeParams[$requiredParam] === '') {
                 $missing[] = $requiredParam;
             }
         }
         if (!empty($missing)) {
             return ApiResponse::create(400, 'validation.required')
-                ->withMessage("Tag <{$tag}> requires params: " . implode(', ', MANDATORY_PARAMS[$tag]))
+                ->withMessage("Tag <{$tag}> requires params: " . implode(', ', TagRegistry::MANDATORY_PARAMS[$tag]))
                 ->withErrors([['field' => 'params', 'missing' => $missing, 'tag' => $tag]]);
         }
     }
     
     // Auto-generate alt key for tags that require it (img, area)
     $autoGeneratedAltKey = null;
-    if (in_array($tag, TAGS_WITH_ALT, true) && empty($nodeParams['alt'])) {
+    if (in_array($tag, TagRegistry::TAGS_WITH_ALT, true) && empty($nodeParams['alt'])) {
         $autoGeneratedAltKey = generateAutoTextKey($type, $name) . '.alt';
         $nodeParams['alt'] = $autoGeneratedAltKey;
         // Create empty translation entry for alt
@@ -407,7 +320,7 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
     // For container tags, initialize children array
     // If textKey is set, add it as a child node (NOT at same level as tag)
     // BUT: Don't add auto-generated textKey if we're moving existing textKey children
-    if (in_array($tag, CONTAINER_TAGS, true)) {
+    if (TagRegistry::isContainer($tag)) {
         $newNode['children'] = [];
         if (!empty($textKey) && !$willMoveTextKeys) {
             // textKey goes INSIDE children as a separate node

@@ -1,5 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
@@ -25,72 +26,8 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
  */
 
 // =============================================================================
-// TAG CONSTANTS (shared with addNode.php)
+// TAG CONSTANTS — now centralized in TagRegistry.php
 // =============================================================================
-
-/**
- * Mandatory parameters per tag type
- * NOTE: 'alt' is handled separately - auto-generated as translation key
- */
-const EDIT_NODE_MANDATORY_PARAMS = [
-    'a' => ['href'],
-    'img' => ['src'],  // alt is auto-generated as translation key
-    'input' => ['type'],
-    'form' => ['action'],
-    'iframe' => ['src'],
-    'video' => ['src'],
-    'audio' => ['src'],
-    'source' => ['src'],
-    'label' => ['for'],
-    'select' => ['name'],
-    'textarea' => ['name'],
-    'area' => ['href'],  // alt is auto-generated as translation key
-    'embed' => ['src'],
-    'object' => ['data'],
-    'track' => ['src'],
-    'link' => ['href', 'rel'],
-];
-
-/**
- * Tags that require auto-generated alt translation key
- */
-const EDIT_NODE_TAGS_WITH_ALT = ['img', 'area'];
-
-/**
- * Reserved params that are auto-managed and cannot be set/modified manually
- * These are translatable attributes handled by the translation system
- */
-const EDIT_NODE_RESERVED_PARAMS = ['alt', 'placeholder', 'title', 'aria-label', 'aria-placeholder', 'aria-description'];
-
-const EDIT_NODE_ALLOWED_TAGS = [
-    'div', 'section', 'article', 'header', 'footer', 'nav', 'main', 'aside',
-    'figure', 'figcaption', 'blockquote', 'pre', 'form', 'fieldset',
-    'ul', 'ol', 'table', 'thead', 'tbody', 'tfoot', 'tr',
-    'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'a', 'button', 'label', 'strong', 'em', 'b', 'i', 'u', 'small', 'mark',
-    'li', 'td', 'th', 'dt', 'dd', 'caption', 'legend',
-    'code', 'kbd', 'samp', 'var', 'cite', 'q', 'abbr', 'time', 'address',
-    'img', 'input', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col',
-    'embed', 'source', 'track', 'wbr',
-    'details', 'summary', 'dialog', 'select', 'option', 'optgroup', 'textarea',
-    'iframe', 'video', 'audio', 'canvas', 'svg', 'picture', 'object',
-    'progress', 'meter', 'output', 'datalist', 'colgroup'
-];
-
-const EDIT_NODE_SELF_CLOSING_TAGS = [
-    'img', 'input', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col', 
-    'embed', 'source', 'track', 'wbr'
-];
-
-const EDIT_NODE_CONTAINER_TAGS = [
-    'div', 'section', 'article', 'header', 'footer', 'nav', 'main', 'aside',
-    'ul', 'ol', 'li', 'form', 'table', 'tr', 'thead', 'tbody', 'tfoot', 'figure',
-    'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'a', 'button',
-    'blockquote', 'pre', 'label', 'td', 'th', 'figcaption', 'strong', 'em',
-    'fieldset', 'legend', 'details', 'summary', 'dialog', 'dt', 'dd',
-    'code', 'kbd', 'samp', 'var', 'cite', 'q', 'abbr', 'time', 'address',
-    'b', 'i', 'u', 'small', 'mark', 'caption', 'select', 'optgroup', 'datalist'
-];
 
 // =============================================================================
 // HELPER FUNCTIONS (for auto textKey generation)
@@ -187,7 +124,7 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
     
     // Filter out reserved params (translatable attributes) from addParams
     // These are auto-managed and cannot be set manually
-    foreach (EDIT_NODE_RESERVED_PARAMS as $reserved) {
+    foreach (TagRegistry::RESERVED_PARAMS as $reserved) {
         unset($addParams[$reserved]);
     }
     
@@ -221,7 +158,12 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
     }
     
     // Validate new tag if provided
-    if ($newTag !== null && !in_array($newTag, EDIT_NODE_ALLOWED_TAGS, true)) {
+    if ($newTag !== null && TagRegistry::isBlocked($newTag)) {
+        return ApiResponse::create(400, 'validation.blocked_tag')
+            ->withMessage("Tag '{$newTag}' is blocked for security reasons.")
+            ->withErrors([['field' => 'tag', 'value' => $newTag]]);
+    }
+    if ($newTag !== null && !TagRegistry::isAllowed($newTag)) {
         return ApiResponse::create(400, 'validation.invalid_value')
             ->withMessage("Invalid tag '{$newTag}'.")
             ->withErrors([['field' => 'tag', 'value' => $newTag]]);
@@ -292,8 +234,8 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
     // If changing tag, auto-remove params that were mandatory for the OLD tag
     // but are not relevant to the NEW tag (e.g., src/alt when changing img→div)
     if ($newTag !== null && $newTag !== $currentTag) {
-        $oldMandatory = EDIT_NODE_MANDATORY_PARAMS[$currentTag] ?? [];
-        $newMandatory = EDIT_NODE_MANDATORY_PARAMS[$newTag] ?? [];
+        $oldMandatory = TagRegistry::MANDATORY_PARAMS[$currentTag] ?? [];
+        $newMandatory = TagRegistry::MANDATORY_PARAMS[$newTag] ?? [];
         foreach ($oldMandatory as $oldParam) {
             // Remove old mandatory params if they're not mandatory for new tag
             // and were not explicitly added by the user
@@ -308,8 +250,11 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
         $finalParams[$key] = $value;
     }
     
+    // SECURITY: Strip sandbox attribute on embed tags — system enforces its own at render time
+    IframeSandbox::sanitizeNodeParams($finalTag, $finalParams);
+    
     // Remove params (but validate mandatory ones first)
-    $mandatoryForTag = EDIT_NODE_MANDATORY_PARAMS[$finalTag] ?? [];
+    $mandatoryForTag = TagRegistry::MANDATORY_PARAMS[$finalTag] ?? [];
     $cannotRemove = [];
     foreach ($removeParams as $param) {
         if (in_array($param, $mandatoryForTag, true)) {
@@ -341,7 +286,7 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
     
     // Auto-generate alt key if changing to img/area and no alt provided
     $autoGeneratedAltKey = null;
-    if (in_array($finalTag, EDIT_NODE_TAGS_WITH_ALT, true) && empty($finalParams['alt'])) {
+    if (in_array($finalTag, TagRegistry::TAGS_WITH_ALT, true) && empty($finalParams['alt'])) {
         $prefix = $name ?: $type;
         $autoGeneratedAltKey = generateUniqueTextKey($structure, $prefix) . '.alt';
         $finalParams['alt'] = $autoGeneratedAltKey;
@@ -512,22 +457,22 @@ function editNodeInStructure(array $structure, array $nodeIndices, string $tag, 
                 }
             }
             // If no textKey child found and tag is a container, add one
-            if (!$found && in_array($tag, EDIT_NODE_CONTAINER_TAGS, true)) {
+            if (!$found && TagRegistry::isContainer($tag)) {
                 array_unshift($ref['children'], ['textKey' => $textKey]);
             }
-        } elseif (in_array($tag, EDIT_NODE_CONTAINER_TAGS, true)) {
+        } elseif (TagRegistry::isContainer($tag)) {
             // No children array, create one with textKey
             $ref['children'] = [['textKey' => $textKey]];
         }
     }
     
     // If changing to self-closing tag, remove children
-    if (in_array($tag, EDIT_NODE_SELF_CLOSING_TAGS, true)) {
+    if (TagRegistry::isSelfClosing($tag)) {
         unset($ref['children']);
     }
     // If changing FROM self-closing TO container tag, auto-generate textKey
-    elseif (in_array($currentTag, EDIT_NODE_SELF_CLOSING_TAGS, true) && 
-            in_array($tag, EDIT_NODE_CONTAINER_TAGS, true) && 
+    elseif (TagRegistry::isSelfClosing($currentTag) && 
+            TagRegistry::isContainer($tag) && 
             !isset($ref['children'])) {
         // Generate a textKey like addNode does
         $prefix = $name ?: $type;

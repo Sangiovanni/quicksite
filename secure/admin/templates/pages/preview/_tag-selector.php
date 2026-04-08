@@ -12,139 +12,30 @@
 
 // Include tag examples for preview panel
 require_once __DIR__ . '/_tag-examples.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 
 // Ensure $selectorId is set
 $selectorId = $selectorId ?? 'add';
 
-// Tag definitions with categories, icons, and descriptions
-$tagCategories = [
-    'layout' => [
-        'label' => __admin('preview.layoutTags') ?? 'Layout',
-        'icon' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>',
-        'tags' => [
-            'div' => ['desc' => __admin('preview.tagDesc.div') ?? 'Generic container'],
-            'section' => ['desc' => __admin('preview.tagDesc.section') ?? 'Thematic grouping'],
-            'article' => ['desc' => __admin('preview.tagDesc.article') ?? 'Self-contained content'],
-            'header' => ['desc' => __admin('preview.tagDesc.header') ?? 'Introductory content'],
-            'footer' => ['desc' => __admin('preview.tagDesc.footer') ?? 'Footer content'],
-            'nav' => ['desc' => __admin('preview.tagDesc.nav') ?? 'Navigation links'],
-            'main' => ['desc' => __admin('preview.tagDesc.main') ?? 'Main content'],
-            'aside' => ['desc' => __admin('preview.tagDesc.aside') ?? 'Side content'],
-            'figure' => ['desc' => __admin('preview.tagDesc.figure') ?? 'Figure with caption'],
-            'figcaption' => ['desc' => __admin('preview.tagDesc.figcaption') ?? 'Figure caption'],
-        ]
-    ],
-    'text' => [
-        'label' => __admin('preview.textTags') ?? 'Text',
-        'icon' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>',
-        'tags' => [
-            'p' => ['desc' => __admin('preview.tagDesc.p') ?? 'Paragraph'],
-            'h1' => ['desc' => __admin('preview.tagDesc.h1') ?? 'Heading level 1'],
-            'h2' => ['desc' => __admin('preview.tagDesc.h2') ?? 'Heading level 2'],
-            'h3' => ['desc' => __admin('preview.tagDesc.h3') ?? 'Heading level 3'],
-            'h4' => ['desc' => __admin('preview.tagDesc.h4') ?? 'Heading level 4'],
-            'h5' => ['desc' => __admin('preview.tagDesc.h5') ?? 'Heading level 5'],
-            'h6' => ['desc' => __admin('preview.tagDesc.h6') ?? 'Heading level 6'],
-            'span' => ['desc' => __admin('preview.tagDesc.span') ?? 'Inline container'],
-            'strong' => ['desc' => __admin('preview.tagDesc.strong') ?? 'Strong importance'],
-            'em' => ['desc' => __admin('preview.tagDesc.em') ?? 'Emphasis'],
-            'small' => ['desc' => __admin('preview.tagDesc.small') ?? 'Side comments'],
-            'mark' => ['desc' => __admin('preview.tagDesc.mark') ?? 'Highlighted text'],
-            'blockquote' => ['desc' => __admin('preview.tagDesc.blockquote') ?? 'Block quotation'],
-            'pre' => ['desc' => __admin('preview.tagDesc.pre') ?? 'Preformatted text'],
-            'code' => ['desc' => __admin('preview.tagDesc.code') ?? 'Code snippet'],
-            'q' => ['desc' => __admin('preview.tagDesc.q') ?? 'Inline quotation'],
-            'cite' => ['desc' => __admin('preview.tagDesc.cite') ?? 'Citation'],
-            'abbr' => ['desc' => __admin('preview.tagDesc.abbr') ?? 'Abbreviation'],
-            'time' => ['desc' => __admin('preview.tagDesc.time') ?? 'Date/time'],
-            'address' => ['desc' => __admin('preview.tagDesc.address') ?? 'Contact info'],
-        ]
-    ],
-    'interactive' => [
-        'label' => __admin('preview.interactiveTags') ?? 'Interactive',
-        'icon' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
-        'tags' => [
-            'a' => ['desc' => __admin('preview.tagDesc.a') ?? 'Hyperlink', 'required' => true],
-            'button' => ['desc' => __admin('preview.tagDesc.button') ?? 'Clickable button'],
-            'details' => ['desc' => __admin('preview.tagDesc.details') ?? 'Disclosure widget'],
-            'summary' => ['desc' => __admin('preview.tagDesc.summary') ?? 'Details summary'],
-            'dialog' => ['desc' => __admin('preview.tagDesc.dialog') ?? 'Dialog box'],
-        ]
-    ],
-    'list' => [
-        'label' => __admin('preview.listTags') ?? 'Lists',
-        'icon' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
-        'tags' => [
-            'ul' => ['desc' => __admin('preview.tagDesc.ul') ?? 'Unordered list'],
-            'ol' => ['desc' => __admin('preview.tagDesc.ol') ?? 'Ordered list'],
-            'li' => ['desc' => __admin('preview.tagDesc.li') ?? 'List item'],
-            'dl' => ['desc' => __admin('preview.tagDesc.dl') ?? 'Description list'],
-            'dt' => ['desc' => __admin('preview.tagDesc.dt') ?? 'Description term'],
-            'dd' => ['desc' => __admin('preview.tagDesc.dd') ?? 'Description detail'],
-        ]
-    ],
-    'media' => [
-        'label' => __admin('preview.mediaTags') ?? 'Media',
-        'icon' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
-        'tags' => [
-            'img' => ['desc' => __admin('preview.tagDesc.img') ?? 'Image', 'required' => true],
-            'picture' => ['desc' => __admin('preview.tagDesc.picture') ?? 'Responsive images'],
-            'video' => ['desc' => __admin('preview.tagDesc.video') ?? 'Video player', 'required' => true],
-            'audio' => ['desc' => __admin('preview.tagDesc.audio') ?? 'Audio player', 'required' => true],
-            'iframe' => ['desc' => __admin('preview.tagDesc.iframe') ?? 'Embedded frame', 'required' => true],
-            'embed' => ['desc' => __admin('preview.tagDesc.embed') ?? 'External content', 'required' => true],
-            'object' => ['desc' => __admin('preview.tagDesc.object') ?? 'External resource', 'required' => true],
-            'source' => ['desc' => __admin('preview.tagDesc.source') ?? 'Media source', 'required' => true],
-            'track' => ['desc' => __admin('preview.tagDesc.track') ?? 'Text tracks', 'required' => true],
-            'canvas' => ['desc' => __admin('preview.tagDesc.canvas') ?? 'Drawing canvas'],
-            'svg' => ['desc' => __admin('preview.tagDesc.svg') ?? 'SVG graphics'],
-        ]
-    ],
-    'form' => [
-        'label' => __admin('preview.formTags') ?? 'Form',
-        'icon' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>',
-        'tags' => [
-            'form' => ['desc' => __admin('preview.tagDesc.form') ?? 'Form container', 'required' => true],
-            'input' => ['desc' => __admin('preview.tagDesc.input') ?? 'Input field', 'required' => true],
-            'textarea' => ['desc' => __admin('preview.tagDesc.textarea') ?? 'Text area', 'required' => true],
-            'label' => ['desc' => __admin('preview.tagDesc.label') ?? 'Form label', 'required' => true],
-            'select' => ['desc' => __admin('preview.tagDesc.select') ?? 'Dropdown', 'required' => true],
-            'option' => ['desc' => __admin('preview.tagDesc.option') ?? 'Select option'],
-            'optgroup' => ['desc' => __admin('preview.tagDesc.optgroup') ?? 'Option group'],
-            'fieldset' => ['desc' => __admin('preview.tagDesc.fieldset') ?? 'Field group'],
-            'legend' => ['desc' => __admin('preview.tagDesc.legend') ?? 'Fieldset caption'],
-            'datalist' => ['desc' => __admin('preview.tagDesc.datalist') ?? 'Autocomplete list'],
-            'output' => ['desc' => __admin('preview.tagDesc.output') ?? 'Calculation result'],
-            'progress' => ['desc' => __admin('preview.tagDesc.progress') ?? 'Progress bar'],
-            'meter' => ['desc' => __admin('preview.tagDesc.meter') ?? 'Scalar measurement'],
-        ]
-    ],
-    'table' => [
-        'label' => __admin('preview.tableTags') ?? 'Table',
-        'icon' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>',
-        'tags' => [
-            'table' => ['desc' => __admin('preview.tagDesc.table') ?? 'Table container'],
-            'thead' => ['desc' => __admin('preview.tagDesc.thead') ?? 'Table header'],
-            'tbody' => ['desc' => __admin('preview.tagDesc.tbody') ?? 'Table body'],
-            'tfoot' => ['desc' => __admin('preview.tagDesc.tfoot') ?? 'Table footer'],
-            'tr' => ['desc' => __admin('preview.tagDesc.tr') ?? 'Table row'],
-            'th' => ['desc' => __admin('preview.tagDesc.th') ?? 'Header cell'],
-            'td' => ['desc' => __admin('preview.tagDesc.td') ?? 'Data cell'],
-            'caption' => ['desc' => __admin('preview.tagDesc.caption') ?? 'Table caption'],
-            'colgroup' => ['desc' => __admin('preview.tagDesc.colgroup') ?? 'Column group'],
-            'col' => ['desc' => __admin('preview.tagDesc.col') ?? 'Column'],
-        ]
-    ],
-    'other' => [
-        'label' => __admin('preview.otherTags') ?? 'Other',
-        'icon' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>',
-        'tags' => [
-            'br' => ['desc' => __admin('preview.tagDesc.br') ?? 'Line break'],
-            'hr' => ['desc' => __admin('preview.tagDesc.hr') ?? 'Horizontal rule'],
-            'wbr' => ['desc' => __admin('preview.tagDesc.wbr') ?? 'Word break opportunity'],
-        ]
-    ],
+// Tag definitions from centralized TagRegistry (single source of truth)
+$tagCategories = TagRegistry::getUICategories();
+
+// Category icons (UI-only, kept here not in TagRegistry)
+$categoryIcons = [
+    'layout' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>',
+    'text' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>',
+    'interactive' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+    'list' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
+    'media' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
+    'form' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>',
+    'table' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>',
+    'other' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>',
 ];
+// Merge icons into categories
+foreach ($tagCategories as $catId => &$category) {
+    $category['icon'] = $categoryIcons[$catId] ?? '';
+}
+unset($category);
 
 // Build flat tag data for JS (category, desc, required)
 $tagDataForJs = [];

@@ -314,6 +314,7 @@
         "projectSettings": "Project Settings",
         "apiEndpoints": "API Endpoints",
         "aiApiKeys": "AI API Keys",
+        "embedSecurity": "Embed Security",
         "structure": "Structure",
         "workflows": "Workflows",
         "visualEditor": "Visual Editor",
@@ -465,8 +466,11 @@
             "interactionMessage": "Are you sure you want to delete interaction '{id}'? This cannot be undone."
         }
     },
+    "embedSecurity": {
+        "title": "Embed Security",
+        "subtitle": "Manage iframe sandbox rules and embed permissions"
+    },
     "settings": {
-        "title": "Settings",
         "subtitle": "View configuration and manage preferences",
         "systemInfo": "System Information",
         "configuration": "Configuration",
@@ -1224,6 +1228,8 @@
         "selectedTag": "Selected",
         "noTagsFound": "No tags found",
         "noVisualPreview": "No visual preview",
+        "favorites": "Favorites",
+        "suggested": "Suggested",
         "showHtml": "Show HTML code",
         "requiresParams": "Requires additional parameters",
         "tagPreview": "Tag Preview",

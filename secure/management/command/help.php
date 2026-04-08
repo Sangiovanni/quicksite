@@ -4775,6 +4775,87 @@ $GLOBALS['__help_commands'] = [
             '502.update.github_unreachable' => 'Cannot reach GitHub API'
         ],
         'notes' => 'Superadmin only. For git installs: requires clean working directory (no uncommitted changes), runs git fetch + git pull. For ZIP installs: downloads source archive, extracts and copies files while preserving user config files (target.php, auth.php, roles.php) and project data (secure/projects/). Always re-reads VERSION after update to confirm success.'
+    ],
+    
+    'getIframeSandbox' => [
+        'description' => 'Returns the embed sandbox configuration for the active project. Shows tag-based rules (tag → domain → sandbox permissions) and the default sandbox policy.',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/getIframeSandbox',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'data' => [
+                'tags' => [
+                    'iframe' => [
+                        'youtube.com' => 'allow-scripts allow-same-origin',
+                        'youtu.be' => 'allow-scripts allow-same-origin'
+                    ],
+                    'video' => (object)[],
+                    'audio' => (object)[]
+                ],
+                'default' => '',
+                'valid_permissions' => ['allow-scripts', 'allow-same-origin', 'allow-forms', '...'],
+                'never_allowed' => ['allow-top-navigation', 'allow-top-navigation-by-user-activation', 'allow-popups-to-escape-sandbox'],
+                'valid_tags' => ['iframe', 'video', 'audio']
+            ]
+        ],
+        'error_responses' => [],
+        'notes' => 'Empty default ("") means bare sandbox — blocks everything. Rules are organized by tag (iframe, video, audio) then by domain. Domain matching is CSP-style: hostname must equal the domain or end with .{domain}.'
+    ],
+    
+    'setIframeSandbox' => [
+        'description' => 'Add or update an embed sandbox rule for a tag + domain, or change the default sandbox policy. Admin only.',
+        'method' => 'POST',
+        'parameters' => [
+            'tag' => '(string, required for rules) The embed tag: "iframe", "video", or "audio".',
+            'domain' => '(string, required for rules) The domain to add/update, e.g. "youtube.com". Duplicate tag+domain combos overwrite the existing rule.',
+            'sandbox' => '(string) Space-separated sandbox permissions, e.g. "allow-scripts allow-same-origin". Empty string = block all.',
+            'default' => '(string, alternative) If provided without tag/domain, updates the default sandbox policy instead.'
+        ],
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Sandbox rule added',
+            'data' => [
+                'tag' => 'iframe',
+                'domain' => 'youtube.com',
+                'sandbox' => 'allow-scripts allow-same-origin',
+                'action' => 'added',
+                'never_allowed_stripped' => null
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing tag or domain',
+            '400.validation.invalid_value' => 'Invalid tag, domain, or unknown permission'
+        ],
+        'notes' => 'Valid embed tags: iframe, video, audio. Never-allowed permissions are always stripped silently. Subdomains are automatically covered: "youtube.com" matches www.youtube.com, m.youtube.com, etc.'
+    ],
+    
+    'removeIframeSandbox' => [
+        'description' => 'Remove an embed sandbox rule by tag + domain. Admin only.',
+        'method' => 'POST',
+        'parameters' => [
+            'tag' => '(string) The embed tag: "iframe", "video", or "audio".',
+            'domain' => '(string) The domain to remove from the tag\'s rules.'
+        ],
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Sandbox rule removed',
+            'data' => [
+                'tag' => 'iframe',
+                'domain' => 'youtube.com',
+                'removed_sandbox' => 'allow-scripts allow-same-origin',
+                'remaining_rules' => 2
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Must provide tag and domain',
+            '400.validation.invalid_value' => 'Invalid embed tag',
+            '404.operation.not_found' => 'No rule found for tag+domain'
+        ],
+        'notes' => 'Removes the sandbox rule for the specified tag and domain.'
     ]
 ];
 
@@ -4837,6 +4918,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'ai_integration' => ['listAiProviders', 'detectProvider', 'testAiKey', 'callAi'],
                 'snippet_management' => ['listSnippets', 'getSnippet', 'createSnippet', 'deleteSnippet', 'duplicateSnippet', 'insertSnippet'],
                 'system_updates' => ['checkForUpdates', 'applyUpdate'],
+                'embed_security' => ['getIframeSandbox', 'setIframeSandbox', 'removeIframeSandbox'],
                 'documentation' => ['help']
             ],
             'authentication' => [
