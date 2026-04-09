@@ -220,9 +220,18 @@
         });
         resizeObserver.observe(miniplayer);
         
+        let reloadTimer = null;
         window.addEventListener('quicksite:command-executed', function() {
             if (isActive && iframeLoaded) {
-                setTimeout(reload, 500);
+                clearTimeout(reloadTimer);
+                reloadTimer = setTimeout(reload, 500);
+            }
+        });
+        
+        window.addEventListener('quicksite:workflow-complete', function() {
+            if (isActive) {
+                clearTimeout(reloadTimer);
+                setTimeout(reload, 300);
             }
         });
         

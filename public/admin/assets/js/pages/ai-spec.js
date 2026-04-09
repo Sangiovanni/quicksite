@@ -219,6 +219,20 @@
         return el;
     }
 
+    /** Status bar shown at top/bottom of execution results */
+    function htmlStatusBar(text, status) {
+        const el = document.createElement('div');
+        const colors = {
+            running: 'background: var(--admin-warning-bg, #fff3cd); color: var(--admin-warning-text, #856404); border-color: var(--admin-warning-border, #ffc107);',
+            success: 'background: var(--admin-success-bg, #d4edda); color: var(--admin-success-text, #155724); border-color: var(--admin-success-border, #28a745);',
+            error: 'background: var(--admin-error-bg, #f8d7da); color: var(--admin-error-text, #721c24); border-color: var(--admin-error-border, #dc3545);'
+        };
+        el.className = 'execution-status-bar execution-status-bar--' + status;
+        el.style.cssText = 'text-align: center; padding: 10px 16px; font-weight: 600; border: 1px solid; border-radius: 6px; margin: 8px 0; ' + (colors[status] || '');
+        el.textContent = text;
+        return el;
+    }
+
     // ========================================================================
     // 3. AI PROVIDER MANAGER
     // ========================================================================
@@ -1097,6 +1111,12 @@
         if (els.executionProgress) els.executionProgress.style.display = 'flex';
         if (els.executionResults) els.executionResults.innerHTML = '';
 
+        // Top status bar
+        const topStatusBar = htmlStatusBar('⏳ Workflow running...', 'running');
+        if (els.executionResults) els.executionResults.appendChild(topStatusBar);
+
+        let successCount = 0;
+        let failCount = 0;
         let phases = state.phases || [];
 
         // FAILSAFE: if phases is empty, recover from API
@@ -1176,6 +1196,7 @@
                     const detailsId = 'details-' + (startIdx + i);
                     try {
                         const { data, isSuccess, errorMsg } = await executeOneCommand(config, cmd);
+                        if (isSuccess) successCount++; else failCount++;
                         updateResultItem(resultItem, {
                             isSuccess, isError: !isSuccess,
                             icon: isSuccess ? '✅' : '❌',
@@ -1188,6 +1209,7 @@
                             ]
                         });
                     } catch (error) {
+                        failCount++;
                         updateResultItem(resultItem, {
                             isSuccess: false, isError: true,
                             icon: '❌', prefix: '', command: cmd.command,
@@ -1227,7 +1249,22 @@
             }
         }
 
+        // Update top status bar and add bottom summary
+        const isDone = failCount === 0 ? 'success' : 'error';
+        const doneText = `✅ ${successCount} succeeded` + (failCount > 0 ? ` | ❌ ${failCount} failed` : '') + ' — Workflow complete';
+        topStatusBar.textContent = doneText;
+        topStatusBar.className = 'execution-status-bar execution-status-bar--' + isDone;
+        topStatusBar.style.cssText = topStatusBar.style.cssText.replace(/background:.*?;|color:.*?;|border-color:.*?;/g, '');
+        Object.assign(topStatusBar.style, isDone === 'success'
+            ? { background: 'var(--admin-success-bg, #d4edda)', color: 'var(--admin-success-text, #155724)', borderColor: 'var(--admin-success-border, #28a745)' }
+            : { background: 'var(--admin-error-bg, #f8d7da)', color: 'var(--admin-error-text, #721c24)', borderColor: 'var(--admin-error-border, #dc3545)' }
+        );
+        if (els.executionResults) els.executionResults.appendChild(htmlSummary(successCount, failCount));
+
         if (els.executionProgress) els.executionProgress.style.display = 'none';
+
+        // Notify miniplayer to reload now that workflow is complete
+        window.dispatchEvent(new CustomEvent('quicksite:workflow-complete'));
     }
 
     // -- Post-Commands execution (after AI commands) --
@@ -1444,6 +1481,10 @@
         if (els.executionProgress) els.executionProgress.style.display = 'flex';
         if (els.executionResults) els.executionResults.innerHTML = '';
 
+        // Top status bar
+        const topStatusBar = htmlStatusBar('⏳ Workflow running...', 'running');
+        if (els.executionResults) els.executionResults.appendChild(topStatusBar);
+
         // Pending items
         commands.forEach((cmd, index) => {
             const el = document.createElement('div');
@@ -1531,16 +1572,35 @@
                         lastError ? lastError.message : (lastResult?.message || lastResult?.data?.message || 'Failed');
                 }
                 if (cmd.abortOnFail) {
+                    topStatusBar.textContent = `✅ ${successCount} succeeded | ❌ ${failCount} failed | ⛔ Aborted at: ${cmd.command}`;
+                    topStatusBar.className = 'execution-status-bar execution-status-bar--error';
+                    topStatusBar.style.cssText = topStatusBar.style.cssText.replace(/background:.*?;|color:.*?;|border-color:.*?;/g, '');
+                    Object.assign(topStatusBar.style, { background: 'var(--admin-error-bg, #f8d7da)', color: 'var(--admin-error-text, #721c24)', borderColor: 'var(--admin-error-border, #dc3545)' });
                     if (els.executionProgress) els.executionProgress.style.display = 'none';
                     if (els.executionResults) els.executionResults.appendChild(htmlSummary(successCount, failCount, cmd.command));
+                    window.dispatchEvent(new CustomEvent('quicksite:workflow-complete'));
                     return;
                 }
             }
             await new Promise(resolve => setTimeout(resolve, 100));
         }
 
+        // Update top status bar
+        const isDone = failCount === 0 ? 'success' : 'error';
+        const doneText = `✅ ${successCount} succeeded` + (failCount > 0 ? ` | ❌ ${failCount} failed` : '') + ' — Workflow complete';
+        topStatusBar.textContent = doneText;
+        topStatusBar.className = 'execution-status-bar execution-status-bar--' + isDone;
+        topStatusBar.style.cssText = topStatusBar.style.cssText.replace(/background:.*?;|color:.*?;|border-color:.*?;/g, '');
+        Object.assign(topStatusBar.style, isDone === 'success'
+            ? { background: 'var(--admin-success-bg, #d4edda)', color: 'var(--admin-success-text, #155724)', borderColor: 'var(--admin-success-border, #28a745)' }
+            : { background: 'var(--admin-error-bg, #f8d7da)', color: 'var(--admin-error-text, #721c24)', borderColor: 'var(--admin-error-border, #dc3545)' }
+        );
+
         if (els.executionProgress) els.executionProgress.style.display = 'none';
         if (els.executionResults) els.executionResults.appendChild(htmlSummary(successCount, failCount));
+
+        // Notify miniplayer to reload now that workflow is complete
+        window.dispatchEvent(new CustomEvent('quicksite:workflow-complete'));
     }
 
     // ========================================================================
