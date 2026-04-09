@@ -381,15 +381,12 @@ if ($type === 'page' || $type === 'component') {
             ->send();
     }
     
-    // Special pages that exist but are not in ROUTES (error pages, etc.)
-    $specialPages = ['404', '500', '403', '401'];
-    
     // Validate page exists (only for pages, not components - components can be created)
     // Allow special pages (404, 500, etc.) even if not in ROUTES
-    if ($type === 'page' && !routeExists($name, ROUTES) && !in_array($name, $specialPages, true)) {
+    if ($type === 'page' && !routeExists($name, ROUTES) && !in_array($name, SPECIAL_PAGES, true)) {
         ApiResponse::create(404, 'route.not_found')
             ->withMessage("Page '{$name}' does not exist")
-            ->withData(['available_routes' => flattenRoutes(ROUTES), 'special_pages' => $specialPages])
+            ->withData(['available_routes' => flattenRoutes(ROUTES), 'special_pages' => SPECIAL_PAGES])
             ->send();
     }
     

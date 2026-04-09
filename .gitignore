@@ -27,6 +27,9 @@ ENV/
 *.swo
 *~
 
+# AI agent instructions (local only)
+.github/copilot-instructions.md
+
 # OS files
 .DS_Store
 Thumbs.db

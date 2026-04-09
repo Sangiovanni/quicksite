@@ -55,7 +55,7 @@
     function buildRouteTree(routes) {
         const tree = {};
         routes.forEach(route => {
-            const parts = route.name.split('/');
+            const parts = String(route.name).split('/');
             let current = tree;
             parts.forEach((part, index) => {
                 if (!current[part]) current[part] = {};
@@ -83,7 +83,7 @@
      * Get the depth of a route path (segments count - 1)
      */
     function getRouteDepth(routePath) {
-        return routePath.split('/').length - 1;
+        return String(routePath).split('/').length - 1;
     }
 
     // ========================================================================

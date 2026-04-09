@@ -20,6 +20,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/String.php';
 
 // ============================================================================
@@ -347,26 +348,4 @@ function removeRouteFromStructure(array $segments, array $routes): array {
     }
     
     return $routes;
-}
-
-/**
- * Export array with proper formatting
- */
-function varExportNested(array $array, int $indent = 0): string {
-    if (empty($array)) {
-        return '[]';
-    }
-    
-    $spaces = str_repeat('    ', $indent);
-    $innerSpaces = str_repeat('    ', $indent + 1);
-    
-    $lines = ["["];
-    foreach ($array as $key => $value) {
-        $exportedKey = var_export($key, true);
-        $exportedValue = is_array($value) ? varExportNested($value, $indent + 1) : var_export($value, true);
-        $lines[] = "{$innerSpaces}{$exportedKey} => {$exportedValue},";
-    }
-    $lines[] = "{$spaces}]";
-    
-    return implode("\n", $lines);
 }

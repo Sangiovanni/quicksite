@@ -85,7 +85,7 @@
         const tree = {};
         
         routes.forEach(route => {
-            const parts = route.name.split('/');
+            const parts = String(route.name).split('/');
             let current = tree;
             
             parts.forEach((part, index) => {

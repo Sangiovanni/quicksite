@@ -1,5 +1,41 @@
 <?php
 
+/**
+ * Special pages that exist as templates but are NOT managed as routes.
+ * Used in addRoute (guard) and editStructure (validation bypass).
+ */
+const SPECIAL_PAGES = ['404', '500', '403', '401'];
+
+/**
+ * Export array with proper formatting for nested routes.
+ * Forces all keys to strings — PHP auto-casts numeric string keys to int.
+ */
+function varExportNested(array $array, int $indent = 0): string {
+    if (empty($array)) {
+        return '[]';
+    }
+
+    $isAssoc = array_keys($array) !== range(0, count($array) - 1);
+
+    if (!$isAssoc) {
+        // Simple indexed array - shouldn't happen for routes but handle it
+        return var_export($array, true);
+    }
+
+    $spaces = str_repeat('    ', $indent);
+    $innerSpaces = str_repeat('    ', $indent + 1);
+
+    $lines = ["["];
+    foreach ($array as $key => $value) {
+        // Force string keys — PHP auto-casts numeric strings to int in arrays
+        $exportedKey = var_export((string) $key, true);
+        $exportedValue = is_array($value) ? varExportNested($value, $indent + 1) : var_export($value, true);
+        $lines[] = "{$innerSpaces}{$exportedKey} => {$exportedValue},";
+    }
+    $lines[] = "{$spaces}]";
+
+    return implode("\n", $lines);
+}
 
 /**
  * Generate page template content for a new route

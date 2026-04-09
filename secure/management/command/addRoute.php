@@ -114,6 +114,17 @@ foreach ($segments as $index => $segment) {
 $routeName = end($segments); // The final segment name
 
 // ============================================================================
+// CHECK SPECIAL PAGES (404, 500, etc. — exist as templates, not routes)
+// ============================================================================
+
+if (count($segments) === 1 && in_array($segments[0], SPECIAL_PAGES, true)) {
+    ApiResponse::create(200, 'route.special_page')
+        ->withMessage("'{$segments[0]}' is a special page that already exists as a template — no route entry needed")
+        ->withData(['route' => $segments[0], 'special_page' => true])
+        ->send();
+}
+
+// ============================================================================
 // CHECK IF ROUTE EXISTS
 // ============================================================================
 
@@ -340,33 +351,4 @@ function resolveNewRouteJsonPath(array $segments, string $jsonDir): string {
     
     // All routes use folder structure: path/name/name.json
     return $jsonDir . '/' . $routePath . '/' . $routeName . '.json';
-}
-
-/**
- * Export array with proper formatting for nested routes
- */
-function varExportNested(array $array, int $indent = 0): string {
-    if (empty($array)) {
-        return '[]';
-    }
-    
-    $isAssoc = array_keys($array) !== range(0, count($array) - 1);
-    
-    if (!$isAssoc) {
-        // Simple indexed array - shouldn't happen for routes but handle it
-        return var_export($array, true);
-    }
-    
-    $spaces = str_repeat('    ', $indent);
-    $innerSpaces = str_repeat('    ', $indent + 1);
-    
-    $lines = ["["];
-    foreach ($array as $key => $value) {
-        $exportedKey = var_export($key, true);
-        $exportedValue = is_array($value) ? varExportNested($value, $indent + 1) : var_export($value, true);
-        $lines[] = "{$innerSpaces}{$exportedKey} => {$exportedValue},";
-    }
-    $lines[] = "{$spaces}]";
-    
-    return implode("\n", $lines);
 }

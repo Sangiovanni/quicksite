@@ -24,6 +24,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 // Allowed keys in config.json import (security: whitelist only)
 const IMPORT_ALLOWED_CONFIG_KEYS = [
@@ -457,7 +458,7 @@ function rebuildPhpFromJson(string $projectPath): array {
             return ['success' => false, 'error' => 'routes.json must be an array'];
         }
         
-        $routesPhp = "<?php\n/**\n * Route Definitions\n * Rebuilt from JSON on import: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($routesJson, true) . ";\n";
+        $routesPhp = "<?php\n/**\n * Route Definitions\n * Rebuilt from JSON on import: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . varExportNested($routesJson) . ";\n";
         
         if (file_put_contents($projectPath . '/routes.php', $routesPhp) === false) {
             return ['success' => false, 'error' => 'Failed to write routes.php'];
@@ -470,7 +471,7 @@ function rebuildPhpFromJson(string $projectPath): array {
     } else {
         // Create default routes if no routes.json
         $defaultRoutes = ['home' => []];
-        $routesPhp = "<?php\n/**\n * Route Definitions (default)\n * Created on import: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($defaultRoutes, true) . ";\n";
+        $routesPhp = "<?php\n/**\n * Route Definitions (default)\n * Created on import: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . varExportNested($defaultRoutes) . ";\n";
         file_put_contents($projectPath . '/routes.php', $routesPhp);
         $stats['routes_rebuilt'] = true;
     }
