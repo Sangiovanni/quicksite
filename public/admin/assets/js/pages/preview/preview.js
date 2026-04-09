@@ -4315,6 +4315,8 @@
             row.className = 'preview-contextual-form__param-row';
             
             const showBrowse = param === 'src' && tag in ASSET_BROWSABLE_TAGS;
+            const showRouteList = param === 'href' && tag === 'a';
+            const datalistId = showRouteList ? 'add-mandatory-href-routes' : '';
             
             row.innerHTML = `
                 <label class="preview-contextual-form__param-label">${param}:</label>
@@ -4322,9 +4324,11 @@
                     <input type="text" 
                            id="add-mandatory-${param}"
                            class="admin-input admin-input--sm preview-contextual-form__param-input" 
-                           placeholder="${PreviewConfig.i18n.required || 'Required'}">
+                           placeholder="${showRouteList ? (PreviewConfig.i18n.hrefPlaceholder || 'Select route or type URL') : (PreviewConfig.i18n.required || 'Required')}"
+                           ${showRouteList ? `list="${datalistId}"` : ''}>
                     ${showBrowse ? `<button type="button" class="admin-btn admin-btn--sm admin-btn--outline preview-asset-browse-btn" data-category="${ASSET_BROWSABLE_TAGS[tag] || ''}" title="Browse assets">📁</button>` : ''}
                 </div>
+                ${showRouteList ? `<datalist id="${datalistId}"></datalist>` : ''}
             `;
             addMandatoryParamsContainer.appendChild(row);
             
@@ -4333,7 +4337,29 @@
                     openAssetPicker(row.querySelector(`#add-mandatory-${param}`), ASSET_BROWSABLE_TAGS[tag]);
                 });
             }
+            
+            // Populate route datalist for href
+            if (showRouteList) {
+                populateRouteDatalist(datalistId);
+            }
         });
+    }
+    
+    // Fetch routes and populate a datalist for href suggestions
+    async function populateRouteDatalist(datalistId) {
+        const datalist = document.getElementById(datalistId);
+        if (!datalist) return;
+        try {
+            const routes = await QuickSiteAdmin.fetchHelperData('routes', []);
+            routes.forEach(route => {
+                const option = document.createElement('option');
+                option.value = '/' + route.value;
+                option.label = '/' + route.label;
+                datalist.appendChild(option);
+            });
+        } catch (e) {
+            // Silently fail — user can still type manually
+        }
     }
     
     // Asset picker: opens a dropdown/modal to browse and select an asset

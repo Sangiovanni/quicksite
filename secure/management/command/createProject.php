@@ -18,6 +18,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -300,57 +301,11 @@ function createBasicPageTemplates(string $projectPath): void {
     @mkdir($projectPath . '/templates/model/json/pages/home', 0755, true);
     @mkdir($projectPath . '/templates/model/json/pages/404', 0755, true);
     
-    // home.php - matches quicksite template structure
-    $homePhp = <<<'PHP'
-<?php
-
-require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';
-$trimParameters = new TrimParameters();
-require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
-$translator = new Translator($trimParameters->lang());
-$lang = $trimParameters->lang();
-
-require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
-$renderer = new JsonToHtmlRenderer($translator);
-
-$content = $renderer->renderPage('home');
-
-// Now use this constant to include files from your src folder
-require_once SECURE_FOLDER_PATH . '/src/classes/PageManagement.php';
-
-// Get page title from translation
-$pageTitle = $translator->translate('page.titles.home');
-
-$page = new PageManagement($pageTitle, $content, $lang);
-$page->render();
-PHP;
-    file_put_contents($projectPath . '/templates/pages/home/home.php', $homePhp, LOCK_EX);
+    // home.php - use centralized generate_page_template()
+    file_put_contents($projectPath . '/templates/pages/home/home.php', generate_page_template('home'), LOCK_EX);
     
-    // 404.php - matches quicksite template structure
-    $notFoundPhp = <<<'PHP'
-<?php
-
-require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';
-$trimParameters = new TrimParameters();
-require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
-$translator = new Translator($trimParameters->lang());
-$lang = $trimParameters->lang();
-
-require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
-$renderer = new JsonToHtmlRenderer($translator);
-
-$content = $renderer->renderPage('404');
-
-// Now use this constant to include files from your src folder
-require_once SECURE_FOLDER_PATH . '/src/classes/PageManagement.php';
-
-// Get page title from translation
-$pageTitle = $translator->translate('page.titles.404');
-
-$page = new PageManagement($pageTitle, $content, $lang);
-$page->render();
-PHP;
-    file_put_contents($projectPath . '/templates/pages/404/404.php', $notFoundPhp, LOCK_EX);
+    // 404.php - use centralized generate_page_template()
+    file_put_contents($projectPath . '/templates/pages/404/404.php', generate_page_template('404'), LOCK_EX);
     
     // home.json — use generate_page_json for consistent minimal root
     file_put_contents($projectPath . '/templates/model/json/pages/home/home.json', generate_page_json('home'), LOCK_EX);

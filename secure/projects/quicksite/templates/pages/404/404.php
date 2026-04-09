@@ -9,7 +9,7 @@ $lang = $trimParameters->lang();
 
 
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
-$renderer = new JsonToHtmlRenderer($translator);
+$renderer = new JsonToHtmlRenderer($translator, ['lang' => $lang, 'page' => '404']);
 
 $content = $renderer->renderPage('404');
 

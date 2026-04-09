@@ -7,7 +7,7 @@ $translator = new Translator($trimParameters->lang());
 $lang = $trimParameters->lang();
 
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
-$renderer = new JsonToHtmlRenderer($translator);
+$renderer = new JsonToHtmlRenderer($translator, ['lang' => $lang, 'page' => 'home']);
 
 $content = $renderer->renderPage('home');
 

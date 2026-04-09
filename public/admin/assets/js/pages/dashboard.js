@@ -1011,6 +1011,7 @@
                     QuickSiteAdmin.showToast(proj.deleted || 'Project deleted', 'success');
                     closeAllModals();
                     loadProjectManager();
+                    loadStorageOverview();
                 } else {
                     QuickSiteAdmin.showToast(result.data?.message || 'Failed to delete project', 'error');
                 }
