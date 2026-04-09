@@ -84,6 +84,13 @@
     const variablesPanelFooter = document.getElementById('variables-panel-footer');
     const variablesPanelFooterText = document.getElementById('variables-panel-footer-text');
     
+    // Text mode contextual elements
+    const ctxTextDefault = document.getElementById('contextual-text-default');
+    const ctxTextInfo = document.getElementById('contextual-text-info');
+    const ctxTextKey = document.getElementById('ctx-text-key');
+    const ctxTextDelete = document.getElementById('ctx-text-delete');
+    const ctxTextKeepKeys = document.getElementById('ctx-text-keep-keys');
+
     // Route layout toggle elements
     const layoutTogglesContainer = document.getElementById('preview-layout-toggles');
     const toggleMenuCheckbox = document.getElementById('preview-toggle-menu');
@@ -2671,6 +2678,11 @@
             ctxSelectDefault.style.display = '';
         }
         
+        // Reset text mode info when switching away from text
+        if (mode !== 'text' && typeof resetTextModeInfo === 'function') {
+            resetTextModeInfo();
+        }
+        
         // Phase 8.3: Show/hide style tabs and content when in style mode
         if (mode === 'style') {
             if (styleTabs) styleTabs.style.display = '';
@@ -3333,6 +3345,7 @@
             }
             if (e.data.action === 'textElementInfo') {
                 updateGlobalElementInfo(e.data.element);
+                updateTextModeInfo(e.data.element);
             }
             if (e.data.action === 'pageClassesResult') {
                 pageStructureClasses = e.data.classes || [];
@@ -3804,6 +3817,79 @@
     }
     
     initKeyboardShortcuts();
+    
+    // ==================== Text Mode: Delete Text-Only Node ====================
+    
+    // Track current text-only selection
+    let textOnlySelection = null;
+    
+    function updateTextModeInfo(data) {
+        if (data && data.textOnly) {
+            textOnlySelection = data;
+            if (ctxTextKey) ctxTextKey.textContent = (data.textKeys && data.textKeys[0]) || '-';
+            if (ctxTextDefault) ctxTextDefault.style.display = 'none';
+            if (ctxTextInfo) ctxTextInfo.style.display = '';
+            if (contextualArea) contextualArea.classList.remove('preview-contextual-area--collapsed');
+        } else {
+            resetTextModeInfo();
+        }
+    }
+    
+    function resetTextModeInfo() {
+        textOnlySelection = null;
+        if (ctxTextDefault) ctxTextDefault.style.display = '';
+        if (ctxTextInfo) ctxTextInfo.style.display = 'none';
+    }
+    
+    async function deleteTextOnlyNode() {
+        if (!textOnlySelection) return;
+        
+        const { struct, node, textKeys } = textOnlySelection;
+        if (!struct || node == null) return;
+        
+        const confirmMsg = PreviewConfig.i18n.confirmDeleteTextNode || 'Delete this text node?';
+        if (!confirm(confirmMsg)) return;
+        
+        const structInfo = parseStruct(struct);
+        if (!structInfo || !structInfo.type) {
+            showToast(PreviewConfig.i18n.error + ': Invalid structure type', 'error');
+            return;
+        }
+        
+        const keepKeys = ctxTextKeepKeys ? ctxTextKeepKeys.checked : false;
+        
+        showToast(PreviewConfig.i18n.loading + '...', 'info');
+        
+        try {
+            const params = {
+                type: structInfo.type,
+                nodeId: node
+            };
+            if (structInfo.name) params.name = structInfo.name;
+            if (keepKeys) params.keepTranslationKeys = true;
+            
+            console.log('[Preview] Deleting text-only node:', params);
+            const result = await QuickSiteAdmin.apiRequest('deleteNode', 'DELETE', params);
+            
+            if (!result.ok) {
+                throw new Error(result.data?.message || result.data?.data?.message || 'Failed to delete text node');
+            }
+            
+            showToast(PreviewConfig.i18n.textNodeDeleted || 'Text node deleted', 'success');
+            
+            // Live DOM update — remove the node from iframe
+            sendToIframe('removeNode', { struct, nodeId: node });
+            
+            resetTextModeInfo();
+        } catch (error) {
+            console.error('[Preview] Text delete error:', error);
+            showToast(PreviewConfig.i18n.error + ': ' + error.message, 'error');
+        }
+    }
+    
+    if (ctxTextDelete) {
+        ctxTextDelete.addEventListener('click', deleteTextOnlyNode);
+    }
     
     if (nodeClose) {
         nodeClose.addEventListener('click', hideNodePanel);
@@ -4445,6 +4531,14 @@
                     targetInput.dispatchEvent(new Event('input'));
                     picker.remove();
                     document.removeEventListener('mousedown', closeHandler);
+                    
+                    // Auto-fill alt from asset metadata if available
+                    if (asset.alt) {
+                        const altInput = document.getElementById('add-mandatory-alt');
+                        if (altInput && !altInput.value) {
+                            altInput.value = asset.alt;
+                        }
+                    }
                     
                     // Show inline media preview below the input group
                     showAssetPreview(targetInput, path, asset.mime_type);
@@ -5454,6 +5548,11 @@
                 closeDropdown();
                 classesLoaded = false;
             },
+            flush() {
+                // Commit any text still in the visible input (user typed but didn't press Enter)
+                const val = input.value.trim();
+                if (val) addClass(val);
+            },
             getValue() {
                 return hiddenInput.value;
             },
@@ -5539,6 +5638,8 @@
     async function addTagNode() {
         const tag = addTagSelect?.value || 'div';
         const position = getAddPosition();
+        // Flush any uncommitted text from the class combobox before reading
+        if (classCombobox) classCombobox.flush();
         const classes = addClassInput?.value?.trim() || '';
         
         // Collect mandatory params
@@ -6534,7 +6635,7 @@
                             'embed', 'source', 'track', 'wbr'],
         MANDATORY_PARAMS: {
             'a': ['href'],
-            'img': ['src'],
+            'img': ['src', 'alt'],
             'input': ['type'],
             'form': ['action'],
             'iframe': ['src'],
@@ -6544,14 +6645,14 @@
             'label': ['for'],
             'select': ['name'],
             'textarea': ['name'],
-            'area': ['href'],
+            'area': ['href', 'alt'],
             'embed': ['src'],
             'object': ['data'],
             'track': ['src'],
             'link': ['href', 'rel']
         },
         TAGS_WITH_ALT: ['img', 'area'],
-        RESERVED_PARAMS: ['alt', 'placeholder', 'title', 'aria-label', 'aria-placeholder', 'aria-description']
+        RESERVED_PARAMS: ['placeholder', 'title', 'aria-label', 'aria-placeholder', 'aria-description']
     };
 
     // Navigate structure tree to find node by path

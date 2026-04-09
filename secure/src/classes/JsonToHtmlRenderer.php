@@ -358,7 +358,9 @@ class JsonToHtmlRenderer {
             // In editor mode, wrap with data attribute for visibility
             if ($this->editorMode) {
                 $escapedKey = htmlspecialchars($textKey, ENT_QUOTES);
-                return '<span data-qs-textkey="' . $escapedKey . '" data-qs-variable="true">' . $displayText . '</span>';
+                $nodePath = implode('.', $this->currentNodePath);
+                $struct = htmlspecialchars($this->currentStructure, ENT_QUOTES);
+                return '<span data-qs-textkey="' . $escapedKey . '" data-qs-variable="true" data-qs-node="' . $nodePath . '" data-qs-struct="' . $struct . '" data-qs-textonly="true">' . $displayText . '</span>';
             }
             return $displayText;
         }
@@ -369,7 +371,9 @@ class JsonToHtmlRenderer {
         // In editor mode, wrap in span with data-qs-textkey for inline editing
         if ($this->editorMode) {
             $escapedKey = htmlspecialchars($textKey, ENT_QUOTES);
-            return '<span data-qs-textkey="' . $escapedKey . '">' . $translatedText . '</span>';
+            $nodePath = implode('.', $this->currentNodePath);
+            $struct = htmlspecialchars($this->currentStructure, ENT_QUOTES);
+            return '<span data-qs-textkey="' . $escapedKey . '" data-qs-node="' . $nodePath . '" data-qs-struct="' . $struct . '" data-qs-textonly="true">' . $translatedText . '</span>';
         }
 
         return $translatedText;

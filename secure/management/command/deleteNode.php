@@ -173,6 +173,7 @@ function __command_deleteNode(array $params = [], array $urlParams = []): ApiRes
     $type = $params['type'];
     $name = $params['name'] ?? null;
     $nodeId = $params['nodeId'];
+    $keepTranslationKeys = !empty($params['keepTranslationKeys']);
     
     // Validate type
     $allowed_types = ['menu', 'footer', 'page', 'component'];
@@ -268,9 +269,9 @@ function __command_deleteNode(array $params = [], array $urlParams = []): ApiRes
             ->withMessage("Failed to write structure file");
     }
     
-    // Clean up translation keys from the deleted node
+    // Clean up translation keys from the deleted node (unless keepTranslationKeys is set)
     $translationCleanup = ['removed' => 0, 'errors' => []];
-    if (!empty($translationKeys)) {
+    if (!empty($translationKeys) && !$keepTranslationKeys) {
         $translationCleanup = removeTranslationKeysFromFiles($translationKeys);
     }
     

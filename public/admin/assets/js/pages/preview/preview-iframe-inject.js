@@ -1126,9 +1126,28 @@
         selection.addRange(range);
         
         // Send element info to parent for info bar display
-        const nodeEl = el.closest('[data-qs-node]');
+        // Text-only nodes have data-qs-node directly on the span
+        const isTextOnly = el.hasAttribute('data-qs-textonly');
+        const nodeEl = isTextOnly ? el : el.closest('[data-qs-node]');
         if (nodeEl) {
-            const elementInfo = getElementInfo(nodeEl);
+            const elementInfo = isTextOnly ? {
+                struct: el.getAttribute('data-qs-struct'),
+                node: el.getAttribute('data-qs-node'),
+                component: null,
+                componentNode: null,
+                isComponent: false,
+                tag: null,
+                id: null,
+                classes: null,
+                childCount: 0,
+                textContent: el.textContent.trim().substring(0, 100),
+                textKeys: [editingTextKey],
+                textOnly: true,
+                hasParent: true,
+                hasPrevSibling: false,
+                hasNextSibling: false,
+                hasChildren: false
+            } : getElementInfo(nodeEl);
             window.parent.postMessage({ 
                 source: 'quicksite-preview', 
                 action: 'textElementInfo',
@@ -1791,7 +1810,7 @@
     // Click handling
     document.addEventListener('click', function(e) {
         // Prevent link navigation in all editor modes
-        if (currentMode === 'select' || currentMode === 'drag' || currentMode === 'text' || currentMode === 'style' || currentMode === 'js') {
+        if (currentMode === 'select' || currentMode === 'drag' || currentMode === 'text' || currentMode === 'style' || currentMode === 'js' || currentMode === 'add') {
             e.preventDefault();
             e.stopPropagation();
         }

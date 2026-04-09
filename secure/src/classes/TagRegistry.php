@@ -126,7 +126,7 @@ class TagRegistry
      * Reserved params: auto-managed by the translation system, cannot be set manually.
      */
     const RESERVED_PARAMS = [
-        'alt', 'placeholder', 'title', 'aria-label',
+        'placeholder', 'title', 'aria-label',
         'aria-placeholder', 'aria-description'
     ];
 
