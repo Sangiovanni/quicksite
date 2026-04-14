@@ -1,0 +1,2381 @@
+{
+    "$schema": "../schema.json",
+    "id": "build-quicksite-v2",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "🚀",
+        "name": "Build QuickSite v2",
+        "description": "Rebuilds the full quicksite-v2 website from scratch: languages, routes, page structures, translations, styles, and favicon. Uses fresh-start as pre-workflow and update-lang-switch as post-workflow.",
+        "category": "template",
+        "tags": [
+            "quicksite",
+            "rebuild",
+            "template",
+            "demo"
+        ],
+        "difficulty": "beginner"
+    },
+    "parameters": [],
+    "staticData": {
+        "assets": [
+            {
+                "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/404.png",
+                "alt": "404",
+                "description": "Image displayed on the 404 error page"
+            },
+            {
+                "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/documentation.png",
+                "alt": "Documentation-logo",
+                "description": "Image as the documentation logo in the menu or footer"
+            },
+            {
+                "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/favicon.png",
+                "alt": "QuickSite-favicon",
+                "description": "Default QuickSite favicon image"
+            },
+            {
+                "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/git-hub-logo-white.png",
+                "alt": "GitHub-logo-white",
+                "description": "White GitHub logo for dark backgrounds use a logo in the menu or footer"
+            },
+            {
+                "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/home.png",
+                "alt": "Home-logo",
+                "description": "Image displayed in the menu or footer as the home logo"
+            },
+            {
+                "url": "https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/logo.png",
+                "alt": "QuickSite-logo",
+                "description": "Default QuickSite template logo"
+            }
+        ]
+    },
+    "preWorkflows": [
+        {
+            "id": "fresh-start",
+            "params": {
+                "keepAssets": false,
+                "keepLanguages": false
+            }
+        }
+    ],
+    "steps": [
+        {
+            "comment": "=== PHASE 1: LANGUAGE SETUP — Add English",
+            "command": "addLang",
+            "params": {
+                "code": "en"
+            }
+        },
+        {
+            "comment": "Add French",
+            "command": "addLang",
+            "params": {
+                "code": "fr"
+            }
+        },
+        {
+            "comment": "Enable multilingual support",
+            "command": "setMultilingual",
+            "params": {
+                "enabled": true
+            }
+        },
+        {
+            "comment": "Set English as default language",
+            "command": "setDefaultLang",
+            "params": {
+                "lang": "en"
+            }
+        },
+        {
+            "comment": "=== PHASE 1b: ASSETS — Upload all v2 template images from GitHub",
+            "forEach": "assets",
+            "command": "uploadAsset",
+            "params": {
+                "url": "{{$value.url}}",
+                "alt": "{{$value.alt}}",
+                "description": "{{$value.description}}"
+            }
+        },
+        {
+            "comment": "=== PHASE 2: ROUTES — Add documentation/commands (auto-creates documentation parent)",
+            "command": "addRoute",
+            "params": {
+                "name": "documentation/commands"
+            }
+        },
+        {
+            "comment": "=== PHASE 3: PAGE STRUCTURES — Home page",
+            "command": "editStructure",
+            "params": {
+                "type": "page",
+                "name": "home",
+                "structure": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "home-page"
+                        },
+                        "children": [
+                            {
+                                "tag": "section",
+                                "params": {
+                                    "class": "hero"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "img",
+                                        "params": {
+                                            "src": "/assets/images/logo.png",
+                                            "alt": "QuickSite-logo",
+                                            "class": "hero-logo"
+                                        }
+                                    },
+                                    {
+                                        "tag": "h1",
+                                        "children": [
+                                            {
+                                                "textKey": "home.hero.title"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "p",
+                                        "params": {
+                                            "class": "hero-subtitle"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "home.hero.subtitle"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "div",
+                                        "params": {
+                                            "class": "hero-cta"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "a",
+                                                "params": {
+                                                    "href": "/documentation",
+                                                    "class": "btn btn-primary"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "textKey": "home.hero.cta"
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "section",
+                                "params": {
+                                    "class": "stats-section"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "div",
+                                        "params": {
+                                            "class": "stats-grid"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "stat-card"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "span",
+                                                        "params": {
+                                                            "class": "stat-number"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.stats.commands.number"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "span",
+                                                        "params": {
+                                                            "class": "stat-label"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.stats.commands.label"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "stat-card"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "span",
+                                                        "params": {
+                                                            "class": "stat-number"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.stats.languages.number"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "span",
+                                                        "params": {
+                                                            "class": "stat-label"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.stats.languages.label"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "stat-card"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "span",
+                                                        "params": {
+                                                            "class": "stat-number"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.stats.setup.number"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "span",
+                                                        "params": {
+                                                            "class": "stat-label"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.stats.setup.label"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "section",
+                                "params": {
+                                    "class": "features-section"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h2",
+                                        "children": [
+                                            {
+                                                "textKey": "home.features.title"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "p",
+                                        "params": {
+                                            "class": "section-subtitle"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "home.features.subtitle"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "div",
+                                        "params": {
+                                            "class": "features-grid"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "feature-card"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "div",
+                                                        "params": {
+                                                            "class": "feature-icon"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.features.f1.icon"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "h3",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.features.f1.title"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "p",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.features.f1.desc"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "feature-card"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "div",
+                                                        "params": {
+                                                            "class": "feature-icon"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.features.f2.icon"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "h3",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.features.f2.title"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "p",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.features.f2.desc"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "feature-card"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "div",
+                                                        "params": {
+                                                            "class": "feature-icon"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.features.f3.icon"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "h3",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.features.f3.title"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "p",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.features.f3.desc"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "feature-card"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "div",
+                                                        "params": {
+                                                            "class": "feature-icon"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.features.f4.icon"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "h3",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.features.f4.title"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "p",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "home.features.f4.desc"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "section",
+                                "params": {
+                                    "class": "cta-section"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "h2",
+                                        "children": [
+                                            {
+                                                "textKey": "home.cta.title"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "p",
+                                        "children": [
+                                            {
+                                                "textKey": "home.cta.desc"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "a",
+                                        "params": {
+                                            "href": "/documentation",
+                                            "class": "btn btn-primary btn-large"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "home.cta.btn"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "comment": "404 page structure",
+            "command": "editStructure",
+            "params": {
+                "type": "page",
+                "name": "404",
+                "structure": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "page-404"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "error-container"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "img",
+                                        "params": {
+                                            "src": "/assets/images/404.png",
+                                            "alt": "404",
+                                            "class": "error-img"
+                                        }
+                                    },
+                                    {
+                                        "tag": "h1",
+                                        "params": {
+                                            "class": "error-code"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "404.title"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "p",
+                                        "params": {
+                                            "class": "error-message"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "404.message"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "a",
+                                        "params": {
+                                            "href": "/",
+                                            "class": "btn btn-primary"
+                                        },
+                                        "children": [
+                                            {
+                                                "textKey": "404.backHome"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "comment": "Documentation page structure",
+            "command": "editStructure",
+            "params": {
+                "type": "page",
+                "name": "documentation",
+                "structure": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "docs-page"
+                        },
+                        "children": [
+                            {
+                                "tag": "aside",
+                                "params": {
+                                    "class": "docs-sidebar"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "img",
+                                        "params": {
+                                            "src": "/assets/images/documentation.png",
+                                            "alt": "Documentation-logo",
+                                            "class": "docs-sidebar-logo"
+                                        }
+                                    },
+                                    {
+                                        "tag": "h3",
+                                        "children": [
+                                            {
+                                                "textKey": "docs.sidebar.title"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "nav",
+                                        "params": {
+                                            "class": "docs-nav"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "a",
+                                                "params": {
+                                                    "href": "/documentation",
+                                                    "class": "docs-nav-link active"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "textKey": "docs.sidebar.overview"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "a",
+                                                "params": {
+                                                    "href": "/documentation/commands",
+                                                    "class": "docs-nav-link"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "textKey": "docs.sidebar.commands"
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "main",
+                                "params": {
+                                    "class": "docs-content"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "div",
+                                        "params": {
+                                            "class": "docs-header"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "h1",
+                                                "children": [
+                                                    {
+                                                        "textKey": "docs.title"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "p",
+                                                "params": {
+                                                    "class": "docs-lead"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "textKey": "docs.lead"
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "section",
+                                        "params": {
+                                            "class": "docs-section"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "h2",
+                                                "children": [
+                                                    {
+                                                        "textKey": "docs.requirements.title"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "p",
+                                                "children": [
+                                                    {
+                                                        "textKey": "docs.requirements.desc"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "ul",
+                                                "params": {
+                                                    "class": "requirements-list"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "li",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.requirements.item1"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "li",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.requirements.item2"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "li",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.requirements.item3"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "section",
+                                        "params": {
+                                            "class": "docs-section"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "h2",
+                                                "children": [
+                                                    {
+                                                        "textKey": "docs.local.title"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "p",
+                                                "children": [
+                                                    {
+                                                        "textKey": "docs.local.desc"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "step-block"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "div",
+                                                        "params": {
+                                                            "class": "step-number"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.local.step1.num"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "div",
+                                                        "children": [
+                                                            {
+                                                                "tag": "h4",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "docs.local.step1.title"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "tag": "p",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "docs.local.step1.desc"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "tag": "pre",
+                                                                "params": {
+                                                                    "class": "code-block"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "tag": "code",
+                                                                        "children": [
+                                                                            {
+                                                                                "textKey": "docs.local.step1.code"
+                                                                            }
+                                                                        ]
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "step-block"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "div",
+                                                        "params": {
+                                                            "class": "step-number"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.local.step2.num"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "div",
+                                                        "children": [
+                                                            {
+                                                                "tag": "h4",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "docs.local.step2.title"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "tag": "p",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "docs.local.step2.desc"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "tag": "pre",
+                                                                "params": {
+                                                                    "class": "code-block"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "tag": "code",
+                                                                        "children": [
+                                                                            {
+                                                                                "textKey": "docs.local.step2.code"
+                                                                            }
+                                                                        ]
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "step-block"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "div",
+                                                        "params": {
+                                                            "class": "step-number"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.local.step3.num"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "div",
+                                                        "children": [
+                                                            {
+                                                                "tag": "h4",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "docs.local.step3.title"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "tag": "p",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "docs.local.step3.desc"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "tag": "pre",
+                                                                "params": {
+                                                                    "class": "code-block"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "tag": "code",
+                                                                        "children": [
+                                                                            {
+                                                                                "textKey": "docs.local.step3.code"
+                                                                            }
+                                                                        ]
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "section",
+                                        "params": {
+                                            "class": "docs-section"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "h2",
+                                                "children": [
+                                                    {
+                                                        "textKey": "docs.server.title"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "p",
+                                                "children": [
+                                                    {
+                                                        "textKey": "docs.server.desc"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "step-block"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "div",
+                                                        "params": {
+                                                            "class": "step-number"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.server.step1.num"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "div",
+                                                        "children": [
+                                                            {
+                                                                "tag": "h4",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "docs.server.step1.title"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "tag": "p",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "docs.server.step1.desc"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "tag": "pre",
+                                                                "params": {
+                                                                    "class": "code-block"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "tag": "code",
+                                                                        "children": [
+                                                                            {
+                                                                                "textKey": "docs.server.step1.code"
+                                                                            }
+                                                                        ]
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "step-block"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "div",
+                                                        "params": {
+                                                            "class": "step-number"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.server.step2.num"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "div",
+                                                        "children": [
+                                                            {
+                                                                "tag": "h4",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "docs.server.step2.title"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "tag": "p",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "docs.server.step2.desc"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "tag": "pre",
+                                                                "params": {
+                                                                    "class": "code-block"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "tag": "code",
+                                                                        "children": [
+                                                                            {
+                                                                                "textKey": "docs.server.step2.code"
+                                                                            }
+                                                                        ]
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "step-block"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "div",
+                                                        "params": {
+                                                            "class": "step-number"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "textKey": "docs.server.step3.num"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "div",
+                                                        "children": [
+                                                            {
+                                                                "tag": "h4",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "docs.server.step3.title"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "tag": "p",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "docs.server.step3.desc"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "div",
+                                        "params": {
+                                            "class": "docs-next"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "p",
+                                                "children": [
+                                                    {
+                                                        "textKey": "docs.next.text"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "a",
+                                                "params": {
+                                                    "href": "/documentation/commands",
+                                                    "class": "btn btn-primary"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "textKey": "docs.next.btn"
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "comment": "Documentation/commands page structure",
+            "command": "editStructure",
+            "params": {
+                "type": "page",
+                "name": "documentation/commands",
+                "structure": [
+                    {
+                        "tag": "div",
+                        "params": {
+                            "class": "docs-page"
+                        },
+                        "children": [
+                            {
+                                "tag": "aside",
+                                "params": {
+                                    "class": "docs-sidebar"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "img",
+                                        "params": {
+                                            "src": "/assets/images/documentation.png",
+                                            "alt": "Documentation-logo",
+                                            "class": "docs-sidebar-logo"
+                                        }
+                                    },
+                                    {
+                                        "tag": "h3",
+                                        "children": [
+                                            {
+                                                "textKey": "docs.sidebar.title"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "nav",
+                                        "params": {
+                                            "class": "docs-nav"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "a",
+                                                "params": {
+                                                    "href": "/documentation",
+                                                    "class": "docs-nav-link"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "textKey": "docs.sidebar.overview"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "a",
+                                                "params": {
+                                                    "href": "/documentation/commands",
+                                                    "class": "docs-nav-link active"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "textKey": "docs.sidebar.commands"
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "main",
+                                "params": {
+                                    "class": "docs-content"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "div",
+                                        "params": {
+                                            "class": "docs-header"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "h1",
+                                                "children": [
+                                                    {
+                                                        "textKey": "commands.title"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "p",
+                                                "params": {
+                                                    "class": "docs-lead"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "textKey": "commands.lead"
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "div",
+                                        "params": {
+                                            "class": "commands-intro"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "p",
+                                                "children": [
+                                                    {
+                                                        "textKey": "commands.intro"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "badge-count"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "textKey": "commands.badge"
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "section",
+                                        "params": {
+                                            "class": "cmd-section"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "h2",
+                                                "children": [
+                                                    {
+                                                        "textKey": "commands.routing.title"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "p",
+                                                "children": [
+                                                    {
+                                                        "textKey": "commands.routing.desc"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "cmd-card"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "div",
+                                                        "params": {
+                                                            "class": "cmd-header"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "tag": "code",
+                                                                "params": {
+                                                                    "class": "cmd-name"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.routing.addRoute.name"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "tag": "span",
+                                                                "params": {
+                                                                    "class": "cmd-method method-post"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.routing.addRoute.method"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "p",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "commands.routing.addRoute.desc"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "h5",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "commands.example_label"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "pre",
+                                                        "params": {
+                                                            "class": "code-block"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "tag": "code",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.routing.addRoute.example"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "section",
+                                        "params": {
+                                            "class": "cmd-section"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "h2",
+                                                "children": [
+                                                    {
+                                                        "textKey": "commands.structure.title"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "p",
+                                                "children": [
+                                                    {
+                                                        "textKey": "commands.structure.desc"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "cmd-card"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "div",
+                                                        "params": {
+                                                            "class": "cmd-header"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "tag": "code",
+                                                                "params": {
+                                                                    "class": "cmd-name"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.structure.editStructure.name"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "tag": "span",
+                                                                "params": {
+                                                                    "class": "cmd-method method-patch"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.structure.editStructure.method"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "p",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "commands.structure.editStructure.desc"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "h5",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "commands.example_label"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "pre",
+                                                        "params": {
+                                                            "class": "code-block"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "tag": "code",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.structure.editStructure.example"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "section",
+                                        "params": {
+                                            "class": "cmd-section"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "h2",
+                                                "children": [
+                                                    {
+                                                        "textKey": "commands.translations.title"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "p",
+                                                "children": [
+                                                    {
+                                                        "textKey": "commands.translations.desc"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "cmd-card"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "div",
+                                                        "params": {
+                                                            "class": "cmd-header"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "tag": "code",
+                                                                "params": {
+                                                                    "class": "cmd-name"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.translations.setKeys.name"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "tag": "span",
+                                                                "params": {
+                                                                    "class": "cmd-method method-patch"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.translations.setKeys.method"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "p",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "commands.translations.setKeys.desc"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "h5",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "commands.example_label"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "pre",
+                                                        "params": {
+                                                            "class": "code-block"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "tag": "code",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.translations.setKeys.example"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "section",
+                                        "params": {
+                                            "class": "cmd-section"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "h2",
+                                                "children": [
+                                                    {
+                                                        "textKey": "commands.styles.title"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "p",
+                                                "children": [
+                                                    {
+                                                        "textKey": "commands.styles.desc"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "cmd-card"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "div",
+                                                        "params": {
+                                                            "class": "cmd-header"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "tag": "code",
+                                                                "params": {
+                                                                    "class": "cmd-name"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.styles.editStyles.name"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "tag": "span",
+                                                                "params": {
+                                                                    "class": "cmd-method method-put"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.styles.editStyles.method"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "p",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "commands.styles.editStyles.desc"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "h5",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "commands.example_label"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "pre",
+                                                        "params": {
+                                                            "class": "code-block"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "tag": "code",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.styles.editStyles.example"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "cmd-card"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "div",
+                                                        "params": {
+                                                            "class": "cmd-header"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "tag": "code",
+                                                                "params": {
+                                                                    "class": "cmd-name"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.styles.setRootVars.name"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "tag": "span",
+                                                                "params": {
+                                                                    "class": "cmd-method method-patch"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.styles.setRootVars.method"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "p",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "commands.styles.setRootVars.desc"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "h5",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "commands.example_label"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "pre",
+                                                        "params": {
+                                                            "class": "code-block"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "tag": "code",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.styles.setRootVars.example"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "section",
+                                        "params": {
+                                            "class": "cmd-section"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "h2",
+                                                "children": [
+                                                    {
+                                                        "textKey": "commands.assets.title"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "p",
+                                                "children": [
+                                                    {
+                                                        "textKey": "commands.assets.desc"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "div",
+                                                "params": {
+                                                    "class": "cmd-card"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "tag": "div",
+                                                        "params": {
+                                                            "class": "cmd-header"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "tag": "code",
+                                                                "params": {
+                                                                    "class": "cmd-name"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.assets.editFavicon.name"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "tag": "span",
+                                                                "params": {
+                                                                    "class": "cmd-method method-patch"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.assets.editFavicon.method"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "p",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "commands.assets.editFavicon.desc"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "h5",
+                                                        "children": [
+                                                            {
+                                                                "textKey": "commands.example_label"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "tag": "pre",
+                                                        "params": {
+                                                            "class": "code-block"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "tag": "code",
+                                                                "children": [
+                                                                    {
+                                                                        "textKey": "commands.assets.editFavicon.example"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "comment": "Menu structure",
+            "command": "editStructure",
+            "params": {
+                "type": "menu",
+                "structure": [
+                    {
+                        "tag": "nav",
+                        "params": {
+                            "class": "main-nav"
+                        },
+                        "children": [
+                            {
+                                "tag": "a",
+                                "params": {
+                                    "href": "/",
+                                    "class": "nav-logo"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "img",
+                                        "params": {
+                                            "src": "/assets/images/logo.png",
+                                            "alt": "QuickSite-logo",
+                                            "class": "logo-img"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "nav-links"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "a",
+                                        "params": {
+                                            "href": "/",
+                                            "class": "nav-link"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "img",
+                                                "params": {
+                                                    "class": "nav-menu-images",
+                                                    "src": "/assets/images/home.png",
+                                                    "alt": "Home-logo"
+                                                }
+                                            },
+                                            {
+                                                "textKey": "menu.home"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "a",
+                                        "params": {
+                                            "href": "/documentation",
+                                            "class": "nav-link"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "img",
+                                                "params": {
+                                                    "class": "nav-menu-images",
+                                                    "src": "/assets/images/documentation.png",
+                                                    "alt": "Documentation-logo"
+                                                }
+                                            },
+                                            {
+                                                "textKey": "menu.documentation"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "comment": "Footer structure",
+            "command": "editStructure",
+            "params": {
+                "type": "footer",
+                "structure": [
+                    {
+                        "tag": "footer",
+                        "params": {
+                            "class": "site-footer"
+                        },
+                        "children": [
+                            {
+                                "tag": "div",
+                                "params": {
+                                    "class": "footer-inner"
+                                },
+                                "children": [
+                                    {
+                                        "tag": "div",
+                                        "params": {
+                                            "class": "footer-brand"
+                                        },
+                                        "children": [
+                                            {
+                                                "tag": "p",
+                                                "children": [
+                                                    {
+                                                        "textKey": "footer.tagline"
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "p",
+                                "params": {
+                                    "class": "footer-copy"
+                                },
+                                "children": [
+                                    {
+                                        "textKey": "footer.copyright"
+                                    }
+                                ]
+                            },
+                            {
+                                "component": "lang-switch",
+                                "data": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "comment": "=== PHASE 4: TRANSLATIONS — English (full replace)",
+            "command": "setTranslationKeys",
+            "params": {
+                "language": "en",
+                "replace": true,
+                "translations": {
+                    "404": {
+                        "pageNotFound": "Page Not Found",
+                        "message": "The page you are looking for does not exist.",
+                        "backHome": "Back to Home",
+                        "title": "Page Not Found"
+                    },
+                    "site": {
+                        "name": "My Website"
+                    },
+                    "page": {
+                        "titles": {
+                            "404": "404 Not Found — QuickSite",
+                            "home": "QuickSite — Build Websites Faster",
+                            "documentation": "Documentation — QuickSite",
+                            "documentation/commands": "Commands Reference — QuickSite"
+                        }
+                    },
+                    "menu": {
+                        "home": "Home",
+                        "documentation": "Documentation"
+                    },
+                    "footer": {
+                        "tagline": "The fast, command-driven website builder.",
+                        "copyright": "© 2026 QuickSite. All rights reserved."
+                    },
+                    "home": {
+                        "hero": {
+                            "title": "Build Beautiful Websites, Fast.",
+                            "subtitle": "QuickSite is a command-driven website framework for developers. 120+ built-in commands, multilingual support, and zero configuration needed.",
+                            "cta": "Read the Docs"
+                        },
+                        "stats": {
+                            "commands": {
+                                "number": "120+",
+                                "label": "Commands Available"
+                            },
+                            "languages": {
+                                "number": "25+",
+                                "label": "Languages Supported"
+                            },
+                            "setup": {
+                                "number": "5 min",
+                                "label": "To Get Started"
+                            }
+                        },
+                        "features": {
+                            "title": "Everything You Need",
+                            "subtitle": "QuickSite ships with a powerful set of tools to build, style, and translate your website with ease.",
+                            "f1": {
+                                "icon": "⚡",
+                                "title": "Command-Driven",
+                                "desc": "Create pages, menus, and components using a simple JSON command system. No boilerplate."
+                            },
+                            "f2": {
+                                "icon": "🌍",
+                                "title": "Multilingual",
+                                "desc": "Built-in multilingual support with a language switcher component included out of the box."
+                            },
+                            "f3": {
+                                "icon": "🎨",
+                                "title": "Fully Styleable",
+                                "desc": "Customize every pixel with editStyles and setRootVariables for a consistent design system."
+                            },
+                            "f4": {
+                                "icon": "📄",
+                                "title": "Reusable Components",
+                                "desc": "Define components once and reuse them across pages with template variables."
+                            }
+                        },
+                        "cta": {
+                            "title": "Ready to build something great?",
+                            "desc": "Check out the documentation to get QuickSite running locally or on your server in minutes.",
+                            "btn": "Get Started →"
+                        }
+                    },
+                    "docs": {
+                        "sidebar": {
+                            "title": "Documentation",
+                            "overview": "Overview & Installation",
+                            "commands": "Commands Reference"
+                        },
+                        "title": "Getting Started with QuickSite",
+                        "lead": "Learn how to install QuickSite locally or deploy it on any web server.",
+                        "requirements": {
+                            "title": "Requirements",
+                            "desc": "Before installing QuickSite, make sure your environment meets the following requirements:",
+                            "item1": "PHP 8.0 or higher",
+                            "item2": "Apache or Nginx web server (with mod_rewrite enabled for Apache)",
+                            "item3": "Git (optional, for cloning)"
+                        },
+                        "local": {
+                            "title": "Local Installation",
+                            "desc": "Follow these steps to run QuickSite on your local machine:",
+                            "step1": {
+                                "num": "1",
+                                "title": "Clone the Repository",
+                                "desc": "Download QuickSite from GitHub into your local projects folder.",
+                                "code": "git clone https://github.com/your-org/quicksite.git\ncd quicksite"
+                            },
+                            "step2": {
+                                "num": "2",
+                                "title": "Start a Local PHP Server",
+                                "desc": "Use the built-in PHP development server for quick local testing.",
+                                "code": "php -S localhost:8080"
+                            },
+                            "step3": {
+                                "num": "3",
+                                "title": "Open in Browser",
+                                "desc": "Visit your local instance in any browser.",
+                                "code": "http://localhost:8080"
+                            }
+                        },
+                        "server": {
+                            "title": "Server Deployment",
+                            "desc": "Deploying QuickSite on a shared host or VPS is straightforward:",
+                            "step1": {
+                                "num": "1",
+                                "title": "Upload Files",
+                                "desc": "Upload all QuickSite files to your web root (e.g., /var/www/html or public_html) via FTP or SSH.",
+                                "code": "scp -r ./quicksite user@yourserver.com:/var/www/html/"
+                            },
+                            "step2": {
+                                "num": "2",
+                                "title": "Enable mod_rewrite (Apache)",
+                                "desc": "Make sure the .htaccess file is present and mod_rewrite is enabled on Apache. For Nginx, configure try_files in your server block.",
+                                "code": "sudo a2enmod rewrite\nsudo service apache2 restart"
+                            },
+                            "step3": {
+                                "num": "3",
+                                "title": "Set Permissions",
+                                "desc": "Ensure the web server can write to the assets and data directories for management commands to work properly."
+                            }
+                        },
+                        "next": {
+                            "text": "Once QuickSite is installed, explore the full command reference to start building your site.",
+                            "btn": "Browse Commands →"
+                        }
+                    },
+                    "commands": {
+                        "title": "Commands Reference",
+                        "lead": "A complete reference for all 120+ QuickSite commands.",
+                        "intro": "QuickSite commands are sent as JSON payloads to the management API. Each command maps to an HTTP method and endpoint. Below is a guide to the core command categories.",
+                        "badge": "120+ Commands",
+                        "example_label": "Example:",
+                        "routing": {
+                            "title": "Routing Commands",
+                            "desc": "Manage URL routes and page creation.",
+                            "addRoute": {
+                                "name": "addRoute",
+                                "method": "POST",
+                                "desc": "Creates a new route with a PHP template and empty JSON structure. Supports nested routes using slashes.",
+                                "example": "{ \"command\": \"addRoute\", \"params\": { \"name\": \"blog\" } }\n// Creates /blog route\n\n{ \"command\": \"addRoute\", \"params\": { \"name\": \"blog/post\" } }\n// Creates nested /blog/post route"
+                            }
+                        },
+                        "structure": {
+                            "title": "Structure Commands",
+                            "desc": "Build and edit the HTML structure of pages, menus, footers, and reusable components.",
+                            "editStructure": {
+                                "name": "editStructure",
+                                "method": "PATCH",
+                                "desc": "Updates JSON structure for a page, menu, footer, or component. Supports full replacement or targeted node editing via nodeId.",
+                                "example": "{ \"command\": \"editStructure\", \"params\": {\n  \"type\": \"page\",\n  \"name\": \"home\",\n  \"structure\": [\n    { \"tag\": \"h1\", \"children\": [{ \"textKey\": \"home.title\" }] }\n  ]\n}}"
+                            }
+                        },
+                        "translations": {
+                            "title": "Translation Commands",
+                            "desc": "Manage multilingual content by setting or updating translation keys for any language.",
+                            "setKeys": {
+                                "name": "setTranslationKeys",
+                                "method": "PATCH",
+                                "desc": "Sets or merges translation keys for a given language. Safe by default — existing keys are preserved unless replace is set to true.",
+                                "example": "{ \"command\": \"setTranslationKeys\", \"params\": {\n  \"language\": \"en\",\n  \"translations\": {\n    \"home\": { \"title\": \"Welcome!\" },\n    \"menu\": { \"home\": \"Home\" }\n  }\n}}"
+                            }
+                        },
+                        "styles": {
+                            "title": "Style Commands",
+                            "desc": "Control the visual appearance of your site with full CSS/SCSS support and CSS variable management.",
+                            "editStyles": {
+                                "name": "editStyles",
+                                "method": "PUT",
+                                "desc": "Replaces the entire style.css file content. Use for full CSS rewrites or major redesigns.",
+                                "example": "{ \"command\": \"editStyles\", \"params\": {\n  \"css\": \":root { --color-primary: #6366f1; }\\nbody { font-family: sans-serif; margin: 0; }\"\n}}"
+                            },
+                            "setRootVars": {
+                                "name": "setRootVariables",
+                                "method": "PATCH",
+                                "desc": "Adds or updates CSS custom properties inside the :root selector without touching the rest of your stylesheet.",
+                                "example": "{ \"command\": \"setRootVariables\", \"params\": {\n  \"variables\": {\n    \"--color-primary\": \"#6366f1\",\n    \"--font-size-base\": \"16px\"\n  }\n}}"
+                            }
+                        },
+                        "assets": {
+                            "title": "Asset Commands",
+                            "desc": "Manage static assets such as the site favicon.",
+                            "editFavicon": {
+                                "name": "editFavicon",
+                                "method": "PATCH",
+                                "desc": "Replaces the site favicon with any PNG image from the assets/images folder. Automatically creates a timestamped backup.",
+                                "example": "{ \"command\": \"editFavicon\", \"params\": {\n  \"imageName\": \"logo.png\"\n}}"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "comment": "French translations (full replace)",
+            "command": "setTranslationKeys",
+            "params": {
+                "language": "fr",
+                "replace": true,
+                "translations": {
+                    "404": {
+                        "pageNotFound": "Page Not Found",
+                        "message": "La page que vous recherchez n'existe pas.",
+                        "backHome": "Retour à l'accueil",
+                        "title": "Page Introuvable"
+                    },
+                    "site": {
+                        "name": "My Website"
+                    },
+                    "page": {
+                        "titles": {
+                            "404": "404 Introuvable — QuickSite",
+                            "home": "QuickSite — Créez des sites plus vite",
+                            "documentation": "Documentation — QuickSite",
+                            "documentation/commands": "Référence des commandes — QuickSite"
+                        }
+                    },
+                    "menu": {
+                        "home": "Accueil",
+                        "documentation": "Documentation"
+                    },
+                    "footer": {
+                        "tagline": "Le générateur de sites web piloté par commandes.",
+                        "copyright": "© 2026 QuickSite. Tous droits réservés."
+                    },
+                    "home": {
+                        "hero": {
+                            "title": "Créez de beaux sites web, rapidement.",
+                            "subtitle": "QuickSite est un framework web piloté par commandes. Plus de 120 commandes intégrées, support multilingue et aucune configuration requise.",
+                            "cta": "Lire la doc"
+                        },
+                        "stats": {
+                            "commands": {
+                                "number": "120+",
+                                "label": "Commandes disponibles"
+                            },
+                            "languages": {
+                                "number": "∞",
+                                "label": "Langues supportées"
+                            },
+                            "setup": {
+                                "number": "5 min",
+                                "label": "Pour démarrer"
+                            }
+                        },
+                        "features": {
+                            "title": "Tout ce dont vous avez besoin",
+                            "subtitle": "QuickSite inclut tous les outils pour créer, styliser et traduire votre site facilement.",
+                            "f1": {
+                                "icon": "⚡",
+                                "title": "Piloté par commandes",
+                                "desc": "Créez des pages, menus et composants via un système de commandes JSON simple. Zéro boilerplate."
+                            },
+                            "f2": {
+                                "icon": "🌍",
+                                "title": "Multilingue",
+                                "desc": "Support multilingue natif avec un composant de sélection de langue inclus d'emblée."
+                            },
+                            "f3": {
+                                "icon": "🎨",
+                                "title": "Entièrement stylisable",
+                                "desc": "Personnalisez chaque pixel avec editStyles et setRootVariables pour un design cohérent."
+                            },
+                            "f4": {
+                                "icon": "📄",
+                                "title": "Composants réutilisables",
+                                "desc": "Définissez des composants une seule fois et réutilisez-les avec des variables de template."
+                            }
+                        },
+                        "cta": {
+                            "title": "Prêt à créer quelque chose de génial ?",
+                            "desc": "Consultez la documentation pour lancer QuickSite en local ou sur votre serveur en quelques minutes.",
+                            "btn": "Démarrer →"
+                        }
+                    },
+                    "docs": {
+                        "sidebar": {
+                            "title": "Documentation",
+                            "overview": "Présentation & Installation",
+                            "commands": "Référence des commandes"
+                        },
+                        "title": "Démarrer avec QuickSite",
+                        "lead": "Apprenez à installer QuickSite en local ou sur n'importe quel serveur web.",
+                        "requirements": {
+                            "title": "Prérequis",
+                            "desc": "Avant d'installer QuickSite, vérifiez que votre environnement respecte les exigences suivantes :",
+                            "item1": "PHP 8.0 ou supérieur",
+                            "item2": "Serveur web Apache ou Nginx (avec mod_rewrite activé pour Apache)",
+                            "item3": "Git (optionnel, pour cloner le dépôt)"
+                        },
+                        "local": {
+                            "title": "Installation locale",
+                            "desc": "Suivez ces étapes pour exécuter QuickSite sur votre machine locale :",
+                            "step1": {
+                                "num": "1",
+                                "title": "Cloner le dépôt",
+                                "desc": "Téléchargez QuickSite depuis GitHub dans votre dossier de projets.",
+                                "code": "git clone https://github.com/your-org/quicksite.git\ncd quicksite"
+                            },
+                            "step2": {
+                                "num": "2",
+                                "title": "Démarrer un serveur PHP local",
+                                "desc": "Utilisez le serveur de développement PHP intégré pour tester rapidement en local.",
+                                "code": "php -S localhost:8080"
+                            },
+                            "step3": {
+                                "num": "3",
+                                "title": "Ouvrir dans le navigateur",
+                                "desc": "Visitez votre instance locale dans n'importe quel navigateur.",
+                                "code": "http://localhost:8080"
+                            }
+                        },
+                        "server": {
+                            "title": "Déploiement sur serveur",
+                            "desc": "Déployer QuickSite sur un hébergement mutualisé ou un VPS est simple :",
+                            "step1": {
+                                "num": "1",
+                                "title": "Uploader les fichiers",
+                                "desc": "Envoyez tous les fichiers QuickSite dans la racine web (ex. /var/www/html) via FTP ou SSH.",
+                                "code": "scp -r ./quicksite user@votreserveur.com:/var/www/html/"
+                            },
+                            "step2": {
+                                "num": "2",
+                                "title": "Activer mod_rewrite (Apache)",
+                                "desc": "Assurez-vous que le fichier .htaccess est présent et que mod_rewrite est activé. Pour Nginx, configurez try_files dans votre bloc serveur.",
+                                "code": "sudo a2enmod rewrite\nsudo service apache2 restart"
+                            },
+                            "step3": {
+                                "num": "3",
+                                "title": "Définir les permissions",
+                                "desc": "Assurez-vous que le serveur web peut écrire dans les dossiers assets et data pour que les commandes de gestion fonctionnent correctement."
+                            }
+                        },
+                        "next": {
+                            "text": "Une fois QuickSite installé, explorez la référence complète des commandes pour commencer à construire votre site.",
+                            "btn": "Voir les commandes →"
+                        }
+                    },
+                    "commands": {
+                        "title": "Référence des commandes",
+                        "lead": "Référence complète des 120+ commandes QuickSite.",
+                        "intro": "Les commandes QuickSite sont envoyées sous forme de payloads JSON à l'API de gestion. Chaque commande correspond à une méthode HTTP et un endpoint. Voici un guide des principales catégories de commandes.",
+                        "badge": "120+ Commandes",
+                        "example_label": "Exemple :",
+                        "routing": {
+                            "title": "Commandes de routage",
+                            "desc": "Gérez les routes URL et la création de pages.",
+                            "addRoute": {
+                                "name": "addRoute",
+                                "method": "POST",
+                                "desc": "Crée une nouvelle route avec un template PHP et une structure JSON vide. Supporte les routes imbriquées via des slashes.",
+                                "example": "{ \"command\": \"addRoute\", \"params\": { \"name\": \"blog\" } }\n// Crée la route /blog\n\n{ \"command\": \"addRoute\", \"params\": { \"name\": \"blog/post\" } }\n// Crée la route imbriquée /blog/post"
+                            }
+                        },
+                        "structure": {
+                            "title": "Commandes de structure",
+                            "desc": "Construisez et éditez la structure HTML des pages, menus, footers et composants réutilisables.",
+                            "editStructure": {
+                                "name": "editStructure",
+                                "method": "PATCH",
+                                "desc": "Met à jour la structure JSON d'une page, d'un menu, d'un footer ou d'un composant. Supporte le remplacement total ou l'édition ciblée via nodeId.",
+                                "example": "{ \"command\": \"editStructure\", \"params\": {\n  \"type\": \"page\",\n  \"name\": \"home\",\n  \"structure\": [\n    { \"tag\": \"h1\", \"children\": [{ \"textKey\": \"home.title\" }] }\n  ]\n}}"
+                            }
+                        },
+                        "translations": {
+                            "title": "Commandes de traduction",
+                            "desc": "Gérez le contenu multilingue en définissant ou mettant à jour des clés de traduction pour n'importe quelle langue.",
+                            "setKeys": {
+                                "name": "setTranslationKeys",
+                                "method": "PATCH",
+                                "desc": "Définit ou fusionne des clés de traduction pour une langue donnée. Sécurisé par défaut — les clés existantes sont préservées sauf si replace est à true.",
+                                "example": "{ \"command\": \"setTranslationKeys\", \"params\": {\n  \"language\": \"fr\",\n  \"translations\": {\n    \"home\": { \"title\": \"Bienvenue !\" },\n    \"menu\": { \"home\": \"Accueil\" }\n  }\n}}"
+                            }
+                        },
+                        "styles": {
+                            "title": "Commandes de styles",
+                            "desc": "Contrôlez l'apparence visuelle de votre site avec le support CSS/SCSS complet et la gestion des variables CSS.",
+                            "editStyles": {
+                                "name": "editStyles",
+                                "method": "PUT",
+                                "desc": "Remplace l'intégralité du fichier style.css. À utiliser pour des refontions complètes ou des redesigns majeurs.",
+                                "example": "{ \"command\": \"editStyles\", \"params\": {\n  \"css\": \":root { --color-primary: #6366f1; }\\nbody { font-family: sans-serif; margin: 0; }\"\n}}"
+                            },
+                            "setRootVars": {
+                                "name": "setRootVariables",
+                                "method": "PATCH",
+                                "desc": "Ajoute ou met à jour des propriétés CSS personnalisées dans le sélecteur :root sans toucher au reste de la feuille de style.",
+                                "example": "{ \"command\": \"setRootVariables\", \"params\": {\n  \"variables\": {\n    \"--color-primary\": \"#6366f1\",\n    \"--font-size-base\": \"16px\"\n  }\n}}"
+                            }
+                        },
+                        "assets": {
+                            "title": "Commandes d'assets",
+                            "desc": "Gérez les ressources statiques comme le favicon du site.",
+                            "editFavicon": {
+                                "name": "editFavicon",
+                                "method": "PATCH",
+                                "desc": "Remplace le favicon du site par n'importe quelle image PNG du dossier assets/images. Crée automatiquement une sauvegarde horodatée.",
+                                "example": "{ \"command\": \"editFavicon\", \"params\": {\n  \"imageName\": \"logo.png\"\n}}"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "comment": "=== PHASE 5: STYLES — Set full CSS stylesheet",
+            "command": "editStyles",
+            "params": {
+                "css": ":root {\n  --color-primary: #6366f1;\n  --color-primary-dark: #4f46e5;\n  --color-accent: #a5b4fc;\n  --color-bg: #0f0f13;\n  --color-bg-2: #16161d;\n  --color-bg-card: #1c1c26;\n  --color-border: #2a2a3a;\n  --color-text: #e2e2f0;\n  --color-text-muted: #8888aa;\n  --color-code-bg: #12121a;\n  --radius: 10px;\n  --font: 'Segoe UI', system-ui, sans-serif;\n  --font-mono: 'Fira Mono', 'Courier New', monospace;\n}\n\n* { box-sizing: border-box; margin: 0; padding: 0; }\n\nbody {\n  font-family: var(--font);\n  background: var(--color-bg);\n  color: var(--color-text);\n  line-height: 1.65;\n  min-height: 100vh;\n}\n\na { color: var(--color-accent); text-decoration: none; }\na:hover { color: var(--color-primary); }\n\n/* NAV */\n.main-nav {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  padding: 0.9rem 2.5rem;\n  background: rgba(15,15,19,0.92);\n  backdrop-filter: blur(10px);\n  border-bottom: 1px solid var(--color-border);\n  position: sticky;\n  top: 0;\n  z-index: 100;\n}\n.nav-logo { display: flex; align-items: center; }\n.logo-img {\n    height: 75px;\n    width: auto;\n}\n.nav-links { display: flex; gap: 2rem; align-items: center; }\n.nav-link {\n  font-size: 0.95rem;\n  font-weight: 500;\n  color: var(--color-text-muted);\n  transition: color 0.2s;\n  padding: 0.25rem 0;\n  border-bottom: 2px solid transparent;\n}\n.nav-link:hover, .nav-link.active {\n  color: var(--color-text);\n  border-bottom-color: var(--color-primary);\n}\n\n/* BUTTONS */\n.btn {\n  display: inline-block;\n  padding: 0.65rem 1.4rem;\n  border-radius: var(--radius);\n  font-weight: 600;\n  font-size: 0.95rem;\n  transition: all 0.2s;\n  cursor: pointer;\n}\n.btn-primary {\n  background: var(--color-primary);\n  color: #fff;\n}\n.btn-primary:hover {\n  background: var(--color-primary-dark);\n  color: #fff;\n  transform: translateY(-1px);\n  box-shadow: 0 4px 20px rgba(99,102,241,0.35);\n}\n.btn-outline {\n  background: transparent;\n  color: var(--color-text);\n  border: 1px solid var(--color-border);\n}\n.btn-outline:hover {\n  border-color: var(--color-primary);\n  color: var(--color-accent);\n}\n.btn-large { padding: 0.85rem 2rem; font-size: 1rem; }\n\n/* HOME */\n.home-page {}\n\n.hero {\n  text-align: center;\n  padding: 6rem 2rem 5rem;\n  background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(99,102,241,0.18) 0%, transparent 70%);\n}\n.hero-logo {\n    height: 250px;\n    width: auto;\n    margin-bottom: 1.8rem;\n    filter: drop-shadow(0 0 18px rgba(99,102,241,0.5));\n}\n.hero h1 {\n  font-size: clamp(2rem, 5vw, 3.2rem);\n  font-weight: 800;\n  letter-spacing: -0.02em;\n  margin-bottom: 1.2rem;\n  background: linear-gradient(135deg, #fff 30%, var(--color-accent));\n  -webkit-background-clip: text;\n  -webkit-text-fill-color: transparent;\n  background-clip: text;\n}\n.hero-subtitle {\n  font-size: 1.15rem;\n  color: var(--color-text-muted);\n  max-width: 600px;\n  margin: 0 auto 2.2rem;\n}\n.hero-cta { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }\n\n.stats-section {\n  padding: 3rem 2rem;\n  background: var(--color-bg-2);\n  border-top: 1px solid var(--color-border);\n  border-bottom: 1px solid var(--color-border);\n}\n.stats-grid {\n  display: flex;\n  justify-content: center;\n  gap: 4rem;\n  flex-wrap: wrap;\n  max-width: 800px;\n  margin: 0 auto;\n}\n.stat-card { text-align: center; }\n.stat-number {\n  display: block;\n  font-size: 2.5rem;\n  font-weight: 800;\n  color: var(--color-primary);\n  line-height: 1;\n  margin-bottom: 0.4rem;\n}\n.stat-label {\n  font-size: 0.9rem;\n  color: var(--color-text-muted);\n  text-transform: uppercase;\n  letter-spacing: 0.05em;\n}\n\n.features-section {\n  padding: 5rem 2rem;\n  max-width: 1100px;\n  margin: 0 auto;\n  text-align: center;\n}\n.features-section h2 {\n  font-size: 2rem;\n  font-weight: 700;\n  margin-bottom: 0.75rem;\n}\n.section-subtitle {\n  color: var(--color-text-muted);\n  margin-bottom: 3rem;\n  font-size: 1.05rem;\n}\n.features-grid {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));\n  gap: 1.5rem;\n}\n.feature-card {\n  background: var(--color-bg-card);\n  border: 1px solid var(--color-border);\n  border-radius: var(--radius);\n  padding: 2rem 1.5rem;\n  text-align: left;\n  transition: border-color 0.2s, transform 0.2s;\n}\n.feature-card:hover {\n  border-color: var(--color-primary);\n  transform: translateY(-3px);\n}\n.feature-icon {\n  font-size: 1.8rem;\n  margin-bottom: 1rem;\n}\n.feature-card h3 {\n  font-size: 1.05rem;\n  font-weight: 700;\n  margin-bottom: 0.5rem;\n}\n.feature-card p { color: var(--color-text-muted); font-size: 0.92rem; }\n\n.cta-section {\n  background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(99,102,241,0.04));\n  border-top: 1px solid var(--color-border);\n  border-bottom: 1px solid var(--color-border);\n  text-align: center;\n  padding: 5rem 2rem;\n}\n.cta-section h2 { font-size: 1.9rem; font-weight: 700; margin-bottom: 1rem; }\n.cta-section p { color: var(--color-text-muted); margin-bottom: 2rem; max-width: 500px; margin-left: auto; margin-right: auto; }\n\n/* DOCS LAYOUT */\n.docs-page {\n  display: flex;\n  min-height: calc(100vh - 64px);\n}\n.docs-sidebar {\n  width: 260px;\n  flex-shrink: 0;\n  background: var(--color-bg-2);\n  border-right: 1px solid var(--color-border);\n  padding: 2rem 1.5rem;\n  position: sticky;\n  top: 64px;\n  height: calc(100vh - 64px);\n  overflow-y: auto;\n}\n.docs-sidebar-logo {\n  width: 60px;\n  height: auto;\n  margin-bottom: 1rem;\n}\n.docs-sidebar h3 {\n  font-size: 0.8rem;\n  text-transform: uppercase;\n  letter-spacing: 0.08em;\n  color: var(--color-text-muted);\n  margin-bottom: 1rem;\n}\n.docs-nav { display: flex; flex-direction: column; gap: 0.3rem; }\n.docs-nav-link {\n  display: block;\n  padding: 0.55rem 0.75rem;\n  border-radius: 6px;\n  font-size: 0.9rem;\n  color: var(--color-text-muted);\n  transition: all 0.15s;\n}\n.docs-nav-link:hover, .docs-nav-link.active {\n  background: rgba(99,102,241,0.15);\n  color: var(--color-text);\n}\n.docs-nav-link.active { color: var(--color-accent); font-weight: 600; }\n\n.docs-content {\n  flex: 1;\n  padding: 3rem 3.5rem;\n  max-width: 860px;\n}\n.docs-header { margin-bottom: 3rem; }\n.docs-header h1 { font-size: 2rem; font-weight: 800; margin-bottom: 0.75rem; }\n.docs-lead { font-size: 1.1rem; color: var(--color-text-muted); }\n\n.docs-section { margin-bottom: 3rem; }\n.docs-section h2 {\n  font-size: 1.35rem;\n  font-weight: 700;\n  margin-bottom: 0.75rem;\n  padding-bottom: 0.5rem;\n  border-bottom: 1px solid var(--color-border);\n}\n.docs-section p { color: var(--color-text-muted); margin-bottom: 1rem; }\n.requirements-list { color: var(--color-text-muted); padding-left: 1.4rem; }\n.requirements-list li { margin-bottom: 0.4rem; }\n\n.step-block {\n  display: flex;\n  gap: 1.2rem;\n  margin-bottom: 1.8rem;\n  align-items: flex-start;\n}\n.step-number {\n  flex-shrink: 0;\n  width: 32px;\n  height: 32px;\n  border-radius: 50%;\n  background: var(--color-primary);\n  color: #fff;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 0.85rem;\n  font-weight: 700;\n  margin-top: 2px;\n}\n.step-block h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem; }\n.step-block p { color: var(--color-text-muted); font-size: 0.92rem; }\n\n.code-block {\n  background: var(--color-code-bg);\n  border: 1px solid var(--color-border);\n  border-radius: 7px;\n  padding: 1rem 1.2rem;\n  margin-top: 0.75rem;\n  overflow-x: auto;\n  font-family: var(--font-mono);\n  font-size: 0.85rem;\n  color: #a5b4fc;\n  white-space: pre;\n}\n\n.docs-next {\n  background: rgba(99,102,241,0.08);\n  border: 1px solid rgba(99,102,241,0.25);\n  border-radius: var(--radius);\n  padding: 1.5rem 2rem;\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 1rem;\n  flex-wrap: wrap;\n}\n.docs-next p { color: var(--color-text-muted); }\n\n/* COMMANDS PAGE */\n.commands-intro {\n  display: flex;\n  align-items: center;\n  gap: 1.5rem;\n  margin-bottom: 2.5rem;\n  flex-wrap: wrap;\n}\n.commands-intro p { color: var(--color-text-muted); flex: 1; min-width: 200px; }\n.badge-count {\n  flex-shrink: 0;\n  background: linear-gradient(135deg, var(--color-primary), #a78bfa);\n  color: #fff;\n  padding: 0.4rem 1rem;\n  border-radius: 999px;\n  font-weight: 700;\n  font-size: 0.9rem;\n}\n\n.cmd-section { margin-bottom: 3rem; }\n.cmd-section h2 {\n  font-size: 1.35rem;\n  font-weight: 700;\n  margin-bottom: 0.75rem;\n  padding-bottom: 0.5rem;\n  border-bottom: 1px solid var(--color-border);\n}\n.cmd-section > p { color: var(--color-text-muted); margin-bottom: 1.2rem; }\n\n.cmd-card {\n  background: var(--color-bg-card);\n  border: 1px solid var(--color-border);\n  border-radius: var(--radius);\n  padding: 1.5rem;\n  margin-bottom: 1rem;\n}\n.cmd-header {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  margin-bottom: 0.75rem;\n}\n.cmd-name {\n  font-size: 1rem;\n  font-weight: 700;\n  font-family: var(--font-mono);\n  color: var(--color-accent);\n}\n.cmd-method {\n  font-size: 0.72rem;\n  font-weight: 700;\n  padding: 0.2rem 0.55rem;\n  border-radius: 4px;\n  letter-spacing: 0.06em;\n  text-transform: uppercase;\n}\n.method-post { background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }\n.method-patch { background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }\n.method-put { background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }\n.cmd-card > p { color: var(--color-text-muted); font-size: 0.92rem; margin-bottom: 1rem; }\n.cmd-card h5 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-text-muted); margin-bottom: 0.4rem; }\n\n/* 404 PAGE */\n.page-404 {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  min-height: calc(100vh - 130px);\n  padding: 3rem 2rem;\n}\n.error-container {\n  text-align: center;\n  max-width: 480px;\n}\n.error-img {\n  width: 220px;\n  height: auto;\n  margin-bottom: 2rem;\n  opacity: 0.9;\n}\n.error-code {\n  font-size: 2rem;\n  font-weight: 800;\n  margin-bottom: 0.75rem;\n}\n.error-message {\n  color: var(--color-text-muted);\n  margin-bottom: 2rem;\n  font-size: 1.05rem;\n}\n\n/* FOOTER */\n.site-footer {\n  background: var(--color-bg-2);\n  border-top: 1px solid var(--color-border);\n  padding: 2.5rem 2.5rem 1.5rem;\n}\n.footer-inner {\n  display: flex;\n  justify-content: space-between;\n  align-items: flex-start;\n  flex-wrap: wrap;\n  gap: 2rem;\n  max-width: 1100px;\n  margin: 0 auto 2rem;\n}\n.footer-brand {}\n.footer-logo { height: 32px; width: auto; margin-bottom: 0.5rem; }\n.footer-brand p { color: var(--color-text-muted); font-size: 0.88rem; }\n.footer-links { display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; }\n.footer-links a { color: var(--color-text-muted); font-size: 0.88rem; transition: color 0.2s; }\n.footer-links a:hover { color: var(--color-text); }\n.github-icon { height: 22px; width: auto; opacity: 0.7; transition: opacity 0.2s; }\n.github-icon:hover { opacity: 1; }\n.footer-copy {\n  text-align: center;\n  color: var(--color-text-muted);\n  font-size: 0.82rem;\n  border-top: 1px solid var(--color-border);\n  padding-top: 1.2rem;\n  max-width: 1100px;\n  margin: 0 auto;\n}\n\n/* LANG SWITCH */\n.lang-switch { display: flex; gap: 0.5rem; margin-top: 1rem; justify-content: center; }\n.lang-btn {\n  padding: 0.3rem 0.75rem;\n  border-radius: 5px;\n  font-size: 0.82rem;\n  background: var(--color-bg-card);\n  border: 1px solid var(--color-border);\n  color: var(--color-text-muted);\n  transition: all 0.2s;\n}\n.lang-btn:hover { border-color: var(--color-primary); color: var(--color-text); }\n\n@media (max-width: 768px) {\n  .docs-page { flex-direction: column; }\n  .docs-sidebar { width: 100%; height: auto; position: static; }\n  .docs-content { padding: 2rem 1.5rem; }\n  .stats-grid { gap: 2rem; }\n  .docs-next { flex-direction: column; }\n  .main-nav { padding: 0.9rem 1.2rem; }\n}\n\n.nav-menu-images {\n    height: 25px;\n    margin-top: 10px;\n}\n"
+            }
+        },
+        {
+            "comment": "=== PHASE 6: FAVICON — Set favicon to favicon.png",
+            "command": "editFavicon",
+            "params": {
+                "imageName": "favicon.png"
+            }
+        }
+    ],
+    "postWorkflows": [
+        "update-lang-switch"
+    ]
+}

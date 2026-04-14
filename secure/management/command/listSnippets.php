@@ -34,18 +34,22 @@ function __command_listSnippets(array $params = [], array $urlParams = []): ApiR
     }
     
     // Load core snippets
-    $coreSnippetsPath = getSnippetsPath(null);
-    $coreSnippets = listSnippetsFromPath($coreSnippetsPath, true);
+    $coreSnippetsPath = getCoreSnippetsPath();
+    $coreSnippets = listSnippetsFromPath($coreSnippetsPath, 'core');
+    
+    // Load global (custom) snippets
+    $globalSnippetsPath = getGlobalSnippetsPath();
+    $globalSnippets = listSnippetsFromPath($globalSnippetsPath, 'global');
     
     // Load project snippets
     $projectSnippets = [];
     if ($projectName) {
-        $projectSnippetsPath = getSnippetsPath($projectName);
-        $projectSnippets = listSnippetsFromPath($projectSnippetsPath, false);
+        $projectSnippetsPath = getProjectSnippetsPath($projectName);
+        $projectSnippets = listSnippetsFromPath($projectSnippetsPath, 'project');
     }
     
-    // Merge and organize by category
-    $allSnippets = array_merge($coreSnippets, $projectSnippets);
+    // Merge all sources
+    $allSnippets = array_merge($coreSnippets, $globalSnippets, $projectSnippets);
     
     // Group by category
     $byCategory = [];
@@ -80,6 +84,7 @@ function __command_listSnippets(array $params = [], array $urlParams = []): ApiR
             'counts' => [
                 'total' => count($allSnippets),
                 'core' => count($coreSnippets),
+                'global' => count($globalSnippets),
                 'project' => count($projectSnippets)
             ],
             'project' => $projectName

@@ -754,8 +754,9 @@ class CssParser {
     
     /**
      * Remove a rule from global scope (not inside @media)
+     * Returns updated CSS content string.
      */
-    private function removeGlobalRule(string $selector): string {
+    public function removeGlobalRule(string $selector): string {
         $escapedSelector = preg_quote($selector, '/');
         $result = '';
         $pos = 0;

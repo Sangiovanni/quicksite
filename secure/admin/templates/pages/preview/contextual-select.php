@@ -130,6 +130,14 @@
             </div>
         </div>
         
+        <!-- Global scope option -->
+        <div class="preview-contextual-form__field preview-contextual-form__field--inline">
+            <label class="admin-checkbox">
+                <input type="checkbox" id="save-snippet-global">
+                <span><?= __admin('preview.saveSnippetGlobal', 'Make available to all projects') ?></span>
+            </label>
+        </div>
+        
         <!-- Actions -->
         <div class="preview-contextual-form__actions">
             <button type="button" class="admin-btn admin-btn--sm admin-btn--secondary" id="save-snippet-cancel">

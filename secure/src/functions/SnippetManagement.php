@@ -2,23 +2,54 @@
 /**
  * Snippet Management Functions
  * 
- * Helper functions for managing snippets (core and project-specific).
+ * Helper functions for managing snippets (core, global, and project-specific).
  * Snippets are pre-built content structures users can insert into pages.
+ * 
+ * Three-tier snippet scope:
+ *   Core    = shipped, read-only (secure/snippets/core/)
+ *   Global  = user-created, shared across projects (secure/snippets/custom/)
+ *   Project = user-created, project-only (secure/projects/{proj}/snippets/)
  */
 
 /**
- * Get path to snippets directory
+ * Get path to core snippets directory
+ * 
+ * @return string Path to core snippets directory
+ */
+function getCoreSnippetsPath(): string {
+    return SECURE_FOLDER_PATH . '/snippets/core';
+}
+
+/**
+ * Get path to global (custom) snippets directory
+ * 
+ * @return string Path to global snippets directory
+ */
+function getGlobalSnippetsPath(): string {
+    return SECURE_FOLDER_PATH . '/snippets/custom';
+}
+
+/**
+ * Get path to project snippets directory
+ * 
+ * @param string $projectName Project name
+ * @return string Path to project snippets directory
+ */
+function getProjectSnippetsPath(string $projectName): string {
+    return SECURE_FOLDER_PATH . '/projects/' . $projectName . '/snippets';
+}
+
+/**
+ * Get path to snippets directory (legacy compatibility)
  * 
  * @param string|null $projectName Project name (null for core snippets)
  * @return string Path to snippets directory
  */
 function getSnippetsPath(?string $projectName = null): string {
     if ($projectName === null) {
-        // Core snippets
-        return SECURE_FOLDER_PATH . '/snippets';
+        return getCoreSnippetsPath();
     }
-    // Project-specific snippets
-    return SECURE_FOLDER_PATH . '/projects/' . $projectName . '/snippets';
+    return getProjectSnippetsPath($projectName);
 }
 
 /**
@@ -39,10 +70,10 @@ function ensureProjectSnippetsDir(string $projectName): bool {
  * List all snippets from a directory (single level or with categories)
  * 
  * @param string $basePath Base path to search
- * @param bool $isCore Whether these are core snippets
+ * @param string $source Source identifier: "core", "global", or "project"
  * @return array List of snippets with metadata
  */
-function listSnippetsFromPath(string $basePath, bool $isCore = false): array {
+function listSnippetsFromPath(string $basePath, string $source = 'core'): array {
     $snippets = [];
     
     if (!is_dir($basePath)) {
@@ -50,7 +81,7 @@ function listSnippetsFromPath(string $basePath, bool $isCore = false): array {
     }
     
     // Check for category subdirectories
-    $categories = ['nav', 'forms', 'cards', 'layouts', 'content', 'lists'];
+    $categories = ['nav', 'forms', 'cards', 'layouts', 'content', 'lists', 'other'];
     $hasCategories = false;
     
     foreach ($categories as $category) {
@@ -67,7 +98,7 @@ function listSnippetsFromPath(string $basePath, bool $isCore = false): array {
             if (is_dir($categoryPath)) {
                 $files = glob($categoryPath . '/*.json');
                 foreach ($files as $file) {
-                    $snippet = loadSnippetFile($file, $isCore);
+                    $snippet = loadSnippetFile($file, $source);
                     if ($snippet !== null) {
                         $snippets[] = $snippet;
                     }
@@ -82,7 +113,7 @@ function listSnippetsFromPath(string $basePath, bool $isCore = false): array {
             if (!in_array($dirName, $categories)) {
                 $files = glob($dir . '/*.json');
                 foreach ($files as $file) {
-                    $snippet = loadSnippetFile($file, $isCore);
+                    $snippet = loadSnippetFile($file, $source);
                     if ($snippet !== null) {
                         $snippets[] = $snippet;
                     }
@@ -94,7 +125,7 @@ function listSnippetsFromPath(string $basePath, bool $isCore = false): array {
     // Also check root level (for flat structure)
     $rootFiles = glob($basePath . '/*.json');
     foreach ($rootFiles as $file) {
-        $snippet = loadSnippetFile($file, $isCore);
+        $snippet = loadSnippetFile($file, $source);
         if ($snippet !== null) {
             $snippets[] = $snippet;
         }
@@ -107,10 +138,10 @@ function listSnippetsFromPath(string $basePath, bool $isCore = false): array {
  * Load a single snippet file and return metadata
  * 
  * @param string $filePath Path to snippet JSON file
- * @param bool $isCore Whether this is a core snippet
+ * @param string $source Source identifier: "core", "global", or "project"
  * @return array|null Snippet metadata or null if invalid
  */
-function loadSnippetFile(string $filePath, bool $isCore = false): ?array {
+function loadSnippetFile(string $filePath, string $source = 'core'): ?array {
     if (!file_exists($filePath)) {
         return null;
     }
@@ -128,7 +159,8 @@ function loadSnippetFile(string $filePath, bool $isCore = false): ?array {
         'name' => $data['name'],
         'category' => $data['category'] ?? 'other',
         'description' => $data['description'] ?? '',
-        'isCore' => $isCore,
+        'source' => $source,
+        'isCore' => $source === 'core',
         'hasTranslations' => isset($data['translations']) && !empty($data['translations']),
         'hasCss' => isset($data['css']) && !empty($data['css']),
         'file' => basename($filePath)
@@ -137,6 +169,7 @@ function loadSnippetFile(string $filePath, bool $isCore = false): ?array {
 
 /**
  * Get full snippet data by ID
+ * Searches: project → global → core (most specific first)
  * 
  * @param string $snippetId Snippet ID
  * @param string|null $projectName Project name (null for active project)
@@ -152,18 +185,25 @@ function getSnippetById(string $snippetId, ?string $projectName = null): ?array 
         }
     }
     
-    // First check project snippets
+    // 1. Check project snippets first
     if ($projectName) {
-        $projectSnippetsPath = getSnippetsPath($projectName);
-        $snippet = findSnippetInPath($snippetId, $projectSnippetsPath, false);
+        $projectSnippetsPath = getProjectSnippetsPath($projectName);
+        $snippet = findSnippetInPath($snippetId, $projectSnippetsPath, 'project');
         if ($snippet !== null) {
             return $snippet;
         }
     }
     
-    // Then check core snippets
-    $coreSnippetsPath = getSnippetsPath(null);
-    return findSnippetInPath($snippetId, $coreSnippetsPath, true);
+    // 2. Check global (custom) snippets
+    $globalSnippetsPath = getGlobalSnippetsPath();
+    $snippet = findSnippetInPath($snippetId, $globalSnippetsPath, 'global');
+    if ($snippet !== null) {
+        return $snippet;
+    }
+    
+    // 3. Check core snippets
+    $coreSnippetsPath = getCoreSnippetsPath();
+    return findSnippetInPath($snippetId, $coreSnippetsPath, 'core');
 }
 
 /**
@@ -171,10 +211,10 @@ function getSnippetById(string $snippetId, ?string $projectName = null): ?array 
  * 
  * @param string $snippetId Snippet ID to find
  * @param string $basePath Base path to search
- * @param bool $isCore Whether these are core snippets
+ * @param string $source Source identifier: "core", "global", or "project"
  * @return array|null Full snippet data or null if not found
  */
-function findSnippetInPath(string $snippetId, string $basePath, bool $isCore = false): ?array {
+function findSnippetInPath(string $snippetId, string $basePath, string $source = 'core'): ?array {
     if (!is_dir($basePath)) {
         return null;
     }
@@ -186,7 +226,7 @@ function findSnippetInPath(string $snippetId, string $basePath, bool $isCore = f
         if (is_dir($categoryPath)) {
             $files = glob($categoryPath . '/*.json');
             foreach ($files as $file) {
-                $snippet = loadFullSnippet($file, $snippetId, $isCore);
+                $snippet = loadFullSnippet($file, $snippetId, $source);
                 if ($snippet !== null) {
                     return $snippet;
                 }
@@ -201,7 +241,7 @@ function findSnippetInPath(string $snippetId, string $basePath, bool $isCore = f
         if (!in_array($dirName, $categories)) {
             $files = glob($dir . '/*.json');
             foreach ($files as $file) {
-                $snippet = loadFullSnippet($file, $snippetId, $isCore);
+                $snippet = loadFullSnippet($file, $snippetId, $source);
                 if ($snippet !== null) {
                     return $snippet;
                 }
@@ -212,7 +252,7 @@ function findSnippetInPath(string $snippetId, string $basePath, bool $isCore = f
     // Check root level
     $rootFiles = glob($basePath . '/*.json');
     foreach ($rootFiles as $file) {
-        $snippet = loadFullSnippet($file, $snippetId, $isCore);
+        $snippet = loadFullSnippet($file, $snippetId, $source);
         if ($snippet !== null) {
             return $snippet;
         }
@@ -226,10 +266,10 @@ function findSnippetInPath(string $snippetId, string $basePath, bool $isCore = f
  * 
  * @param string $filePath Path to snippet file
  * @param string $snippetId ID to match
- * @param bool $isCore Whether this is a core snippet
+ * @param string $source Source identifier: "core", "global", or "project"
  * @return array|null Full snippet data or null if ID doesn't match
  */
-function loadFullSnippet(string $filePath, string $snippetId, bool $isCore = false): ?array {
+function loadFullSnippet(string $filePath, string $snippetId, string $source = 'core'): ?array {
     $content = file_get_contents($filePath);
     $data = json_decode($content, true);
     
@@ -241,11 +281,65 @@ function loadFullSnippet(string $filePath, string $snippetId, bool $isCore = fal
         return null;
     }
     
-    // Add isCore flag
-    $data['isCore'] = $isCore;
+    // Add source and legacy isCore flag
+    $data['source'] = $source;
+    $data['isCore'] = $source === 'core';
     $data['_filePath'] = $filePath;
     
     return $data;
+}
+
+/**
+ * Extract CSS selectors and matching CSS rules from a snippet structure
+ * 
+ * Uses the same extraction logic as getCssForStructure: scans the structure
+ * tree for all classes and IDs, then queries the project stylesheet.
+ * Tags are intentionally excluded — they match too broadly and pull in
+ * unrelated rules (e.g. a bare `p` tag would match `.feature-card p`).
+ * 
+ * @param array $structure Snippet structure (single node or array of nodes)
+ * @param string $projectName Project name (for stylesheet path)
+ * @return array ['selectors' => ['classes' => [...], 'ids' => [...]], 'css' => string]
+ */
+function extractSnippetCss(array $structure, string $projectName): array {
+    require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
+    require_once SECURE_FOLDER_PATH . '/management/command/getCssForStructure.php';
+
+    // Normalize: extractCssSelectorsFromStructure expects an array of nodes
+    $nodes = isset($structure['tag']) || isset($structure['component']) || isset($structure['textKey'])
+        ? [$structure]
+        : $structure;
+
+    $components = [];
+    $allSelectors = extractCssSelectorsFromStructure($nodes, $components);
+
+    // Only keep classes and IDs for snippet CSS — tags are too broad
+    $selectors = [
+        'classes' => $allSelectors['classes'] ?? [],
+        'ids' => $allSelectors['ids'] ?? [],
+    ];
+
+    // Load project CSS
+    $stylesheetPath = SECURE_FOLDER_PATH . '/projects/' . $projectName . '/public/style/style.css';
+    if (!file_exists($stylesheetPath)) {
+        return ['selectors' => $selectors, 'css' => ''];
+    }
+
+    $cssContent = file_get_contents($stylesheetPath);
+    if (!$cssContent) {
+        return ['selectors' => $selectors, 'css' => ''];
+    }
+
+    $parser = new CssParser($cssContent);
+    $extracted = $parser->getCssForSelectors(
+        $selectors['classes'],
+        $selectors['ids'],
+        [] // No tags — intentionally excluded
+    );
+
+    $css = $parser->formatExtractedCss($extracted);
+
+    return ['selectors' => $selectors, 'css' => $css];
 }
 
 /**
@@ -297,18 +391,14 @@ function appendSnippetCss(string $css, string $stylesheetPath): bool {
 }
 
 /**
- * Save snippet to project snippets folder
+ * Save snippet to the appropriate directory based on scope
  * 
  * @param array $snippetData Snippet data to save
  * @param string $projectName Project name
+ * @param string $scope Save scope: "project" (default) or "global"
  * @return array ['success' => bool, 'path' => string, 'error' => string|null]
  */
-function saveProjectSnippet(array $snippetData, string $projectName): array {
-    // Ensure project snippets directory exists
-    if (!ensureProjectSnippetsDir($projectName)) {
-        return ['success' => false, 'path' => '', 'error' => 'Failed to create snippets directory'];
-    }
-    
+function saveProjectSnippet(array $snippetData, string $projectName, string $scope = 'project'): array {
     $category = $snippetData['category'] ?? 'other';
     $snippetId = $snippetData['id'] ?? null;
     
@@ -316,14 +406,26 @@ function saveProjectSnippet(array $snippetData, string $projectName): array {
         return ['success' => false, 'path' => '', 'error' => 'Snippet ID is required'];
     }
     
+    // Determine base path based on scope
+    if ($scope === 'global') {
+        $basePath = getGlobalSnippetsPath();
+    } else {
+        // Ensure project snippets directory exists
+        if (!ensureProjectSnippetsDir($projectName)) {
+            return ['success' => false, 'path' => '', 'error' => 'Failed to create snippets directory'];
+        }
+        $basePath = getProjectSnippetsPath($projectName);
+    }
+    
     // Create category directory if needed
-    $categoryPath = getSnippetsPath($projectName) . '/' . $category;
+    $categoryPath = $basePath . '/' . $category;
     if (!is_dir($categoryPath)) {
         mkdir($categoryPath, 0755, true);
     }
     
-    // Remove isCore flag if present (user snippets are never core)
+    // Remove internal flags
     unset($snippetData['isCore']);
+    unset($snippetData['source']);
     unset($snippetData['_filePath']);
     
     $filePath = $categoryPath . '/' . $snippetId . '.json';
@@ -337,29 +439,36 @@ function saveProjectSnippet(array $snippetData, string $projectName): array {
 }
 
 /**
- * Delete project snippet by ID
+ * Delete snippet by ID from project or global scope
  * 
  * @param string $snippetId Snippet ID
  * @param string $projectName Project name
- * @return array ['success' => bool, 'error' => string|null]
+ * @return array ['success' => bool, 'error' => string|null, 'source' => string|null]
  */
 function deleteProjectSnippet(string $snippetId, string $projectName): array {
-    $projectSnippetsPath = getSnippetsPath($projectName);
-    $snippet = findSnippetInPath($snippetId, $projectSnippetsPath, false);
+    // Try project snippets first
+    $projectSnippetsPath = getProjectSnippetsPath($projectName);
+    $snippet = findSnippetInPath($snippetId, $projectSnippetsPath, 'project');
     
     if ($snippet === null) {
-        return ['success' => false, 'error' => 'Snippet not found in project'];
+        // Try global snippets
+        $globalSnippetsPath = getGlobalSnippetsPath();
+        $snippet = findSnippetInPath($snippetId, $globalSnippetsPath, 'global');
+    }
+    
+    if ($snippet === null) {
+        return ['success' => false, 'error' => 'Snippet not found in project or global snippets', 'source' => null];
     }
     
     $filePath = $snippet['_filePath'] ?? null;
     
     if (!$filePath || !file_exists($filePath)) {
-        return ['success' => false, 'error' => 'Snippet file not found'];
+        return ['success' => false, 'error' => 'Snippet file not found', 'source' => null];
     }
     
     if (!unlink($filePath)) {
-        return ['success' => false, 'error' => 'Failed to delete snippet file'];
+        return ['success' => false, 'error' => 'Failed to delete snippet file', 'source' => null];
     }
     
-    return ['success' => true, 'error' => null];
+    return ['success' => true, 'error' => null, 'source' => $snippet['source'] ?? 'project'];
 }

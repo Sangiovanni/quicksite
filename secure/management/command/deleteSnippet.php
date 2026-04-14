@@ -47,15 +47,15 @@ function __command_deleteSnippet(array $params = [], array $urlParams = []): Api
     }
     
     // Check if this is a core snippet (cannot delete)
-    $coreSnippetsPath = getSnippetsPath(null);
-    $coreSnippet = findSnippetInPath($snippetId, $coreSnippetsPath, true);
+    $coreSnippetsPath = getCoreSnippetsPath();
+    $coreSnippet = findSnippetInPath($snippetId, $coreSnippetsPath, 'core');
     
     if ($coreSnippet !== null) {
         return ApiResponse::create(403, 'snippets.cannot_delete_core')
             ->withMessage('Cannot delete core snippets. Use duplicateSnippet to create an editable copy.');
     }
     
-    // Delete project snippet
+    // Delete project or global snippet
     $result = deleteProjectSnippet($snippetId, $projectName);
     
     if (!$result['success']) {

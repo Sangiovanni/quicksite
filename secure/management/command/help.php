@@ -2251,6 +2251,42 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Slots are {{placeholder}} names (backwards compatibility). Variables array includes type detection: textKey for translatable content, param for URL/attribute values. System placeholders (__ prefix) are filtered out. Use editStructure with type="component" to create/update/delete components.'
     ],
     
+    'getComponent' => [
+        'description' => 'Gets a single component by name with full structure, variables, and preview data. Expands nested component references for rendering.',
+        'method' => 'GET',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Component name (filename without .json extension)'
+            ]
+        ],
+        'example_get' => 'GET /management/getComponent?name=footer-link',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'components.get_success',
+            'message' => 'Component loaded: footer-link',
+            'data' => [
+                'name' => 'footer-link',
+                'structure' => ['tag' => 'a', 'params' => ['href' => '{{href}}'], 'textKey' => '{{label}}'],
+                'variables' => [
+                    ['name' => 'label', 'type' => 'textKey'],
+                    ['name' => 'href', 'type' => 'param']
+                ],
+                'uses_components' => [],
+                'previewStructure' => '(included when nested components are expanded)',
+                'translations' => ['en' => ['key' => 'value']]
+            ]
+        ],
+        'error_responses' => [
+            ['status' => 400, 'code' => 'components.name_required', 'when' => 'No name parameter provided'],
+            ['status' => 400, 'code' => 'components.invalid_name', 'when' => 'Name contains invalid characters'],
+            ['status' => 404, 'code' => 'components.not_found', 'when' => 'Component file does not exist'],
+            ['status' => 422, 'code' => 'components.invalid_json', 'when' => 'Component file contains invalid JSON']
+        ],
+        'notes' => 'Returns previewStructure only when nested component references exist. Translations are loaded from project translation files for all textKeys in the expanded structure.'
+    ],
+    
     'findComponentUsages' => [
         'description' => 'Finds all pages, menu, footer, and other components that use a specific component. Essential for safe delete/rename operations.',
         'method' => 'GET',
@@ -4721,6 +4757,51 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Each inserted node gets a unique textKey (e.g., text_abc12345) to prevent conflicts. Translations from the snippet are mapped to new keys and added to all project language files.'
     ],
 
+    'injectSnippetCss' => [
+        'description' => 'Injects a snippet\'s saved CSS into the active project stylesheet. Two modes: "missing" adds only rules for selectors not found in the current stylesheet; "replace" removes existing matching rules and re-adds the snippet\'s full CSS block.',
+        'method' => 'POST',
+        'parameters' => [
+            'id' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Snippet ID to read CSS from',
+                'example' => 'hero-centered'
+            ],
+            'mode' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Injection mode: "missing" (add only missing selectors) or "replace" (remove existing + re-add all)',
+                'example' => 'missing'
+            ],
+            'project' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Target project name. Defaults to the active project.',
+                'example' => 'my-project'
+            ]
+        ],
+        'example_post' => 'POST /management/injectSnippetCss with body: {"id": "hero-centered", "mode": "missing"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'snippets.css_injected',
+            'message' => 'CSS added successfully',
+            'data' => [
+                'injected' => ['.hero', '.hero-logo', '.hero-subtitle'],
+                'mode' => 'missing',
+                'snippetId' => 'hero-centered',
+                'project' => 'my-project'
+            ]
+        ],
+        'error_responses' => [
+            '400.snippets.id_required' => 'Snippet ID is required',
+            '400.snippets.invalid_mode' => 'Mode must be "missing" or "replace"',
+            '400.snippets.no_css' => 'This snippet has no saved CSS to inject',
+            '400.snippets.project_required' => 'No project specified and no active project found',
+            '404.snippets.not_found' => 'Snippet not found'
+        ],
+        'notes' => 'Writes to both the live public stylesheet and the project backup in secure/projects/. Includes :root variables referenced by injected rules. In "replace" mode, only global-scope rules are removed (media query rules are left untouched).'
+    ],
+
     'checkForUpdates' => [
         'description' => 'Checks if a newer version of QuickSite is available on GitHub. Compares the local VERSION file against the latest release/tag.',
         'method' => 'GET',
@@ -4897,7 +4978,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
             'base_url' => rtrim(BASE_URL, '/') . '/management',
             'command_categories' => [
                 'route_management' => ['addRoute', 'deleteRoute', 'setRouteLayout', 'getRoutes', 'getSiteMap', 'analyzeReachability'],
-                'structure_management' => ['getStructure', 'editStructure', 'listComponents', 'findComponentUsages', 'renameComponent', 'duplicateComponent', 'listPages'],
+                'structure_management' => ['getStructure', 'editStructure', 'listComponents', 'getComponent', 'findComponentUsages', 'renameComponent', 'duplicateComponent', 'listPages'],
                 'node_management' => ['moveNode', 'deleteNode', 'addNode', 'editNode', 'addComponentToNode', 'editComponentToNode'],
                 'alias_management' => ['createAlias', 'deleteAlias', 'listAliases'],
                 'translation_management' => ['getTranslation', 'getTranslations', 'setTranslationKeys', 'deleteTranslationKeys', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations'],
@@ -4949,7 +5030,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'config_file' => 'secure/management/config/auth.php',
                 'allowed_methods' => ['GET', 'POST', 'OPTIONS']
             ],
-            'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getSiteMap, analyzeReachability, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listTokens, listComponents, listPages, listAliases, listAiProviders. POST commands: all others.',
+            'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getSiteMap, analyzeReachability, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listTokens, listComponents, getComponent, listPages, listAliases, listAiProviders. POST commands: all others.',
             'note' => 'For GET commands with URL parameters, use URL segments (e.g., /getStructure/menu, /validateTranslations/en, /getStyleRule/.btn-primary, /getSiteMap/text). For POST commands, send parameters as JSON in request body. For file uploads, use multipart/form-data encoding.',
             'workflows' => [
                 'translation_workflow' => '1) analyzeTranslations for full health check, OR 2) validateTranslations to find missing, 3) getUnusedTranslationKeys to find orphans, 4) setTranslationKeys to add/update, 5) deleteTranslationKeys to clean up.',
@@ -4960,7 +5041,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'token_workflow' => '1) listTokens to see existing tokens, 2) generateToken to create new ones with role, 3) revokeToken to delete old tokens.',
                 'role_workflow' => '1) listRoles to see available roles and commands, 2) getMyPermissions to check current access, 3) createRole to add custom roles, 4) editRole to modify roles, 5) deleteRole to remove custom roles.',
                 'alias_workflow' => '1) listAliases to see existing redirects, 2) createAlias to add URL redirects, 3) deleteAlias to remove redirects.',
-                'component_workflow' => '1) listComponents to see available reusable components, 2) getStructure/component/{name} to view details, 3) editStructure with type="component" to create/update/delete.',
+                'component_workflow' => '1) listComponents to see available reusable components, 2) getComponent?name=... to view full details with preview, 3) editStructure with type="component" to create/update/delete.',
                 'sitemap_workflow' => '1) getSiteMap for JSON data with route details and coverage, 2) getSiteMap/text to generate plain text sitemap.txt for SEO crawlers.',
                 'project_workflow' => '1) listProjects to see all available projects, 2) getActiveProject to check current project, 3) createProject to start a new project, 4) switchProject to change active project, 5) deleteProject to remove (requires confirm=true).',
                 'backup_workflow' => '1) backupProject to create instant backup, 2) listBackups to see available backups with size/age info, 3) restoreBackup to restore from backup (optional pre-restore backup), 4) deleteBackup to free disk space.',

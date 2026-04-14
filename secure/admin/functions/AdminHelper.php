@@ -178,7 +178,7 @@ function getCommandCategories(): array {
         'snippet_management' => [
             'label' => 'Snippets',
             'icon' => 'puzzle',
-            'commands' => ['listSnippets', 'getSnippet', 'createSnippet', 'deleteSnippet', 'duplicateSnippet', 'insertSnippet']
+            'commands' => ['listSnippets', 'getSnippet', 'createSnippet', 'deleteSnippet', 'duplicateSnippet', 'insertSnippet', 'injectSnippetCss']
         ],
         'documentation' => [
             'label' => 'Documentation',

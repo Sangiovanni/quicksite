@@ -219,6 +219,47 @@ function __command_getSnippet(array $params = [], array $urlParams = []): ApiRes
         }
     }
     
+    // Check CSS selector availability in current project stylesheet
+    if (!empty($snippet['selectors']) && $projectName) {
+        require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
+        $stylesheetPath = SECURE_FOLDER_PATH . '/projects/' . $projectName . '/public/style/style.css';
+        $selectorStatus = [];
+        
+        if (file_exists($stylesheetPath)) {
+            $cssContent = file_get_contents($stylesheetPath);
+            $parser = new CssParser($cssContent);
+            $allSelectors = $parser->listSelectors();
+            $allSelectorNames = array_map(fn($s) => $s['selector'], $allSelectors);
+            
+            foreach ($snippet['selectors']['classes'] ?? [] as $class) {
+                $selector = '.' . $class;
+                $selectorStatus[] = [
+                    'selector' => $selector,
+                    'type' => 'class',
+                    'exists' => in_array($selector, $allSelectorNames, true)
+                ];
+            }
+            foreach ($snippet['selectors']['ids'] ?? [] as $id) {
+                $selector = '#' . $id;
+                $selectorStatus[] = [
+                    'selector' => $selector,
+                    'type' => 'id',
+                    'exists' => in_array($selector, $allSelectorNames, true)
+                ];
+            }
+        } else {
+            // No stylesheet — all missing
+            foreach ($snippet['selectors']['classes'] ?? [] as $class) {
+                $selectorStatus[] = ['selector' => '.' . $class, 'type' => 'class', 'exists' => false];
+            }
+            foreach ($snippet['selectors']['ids'] ?? [] as $id) {
+                $selectorStatus[] = ['selector' => '#' . $id, 'type' => 'id', 'exists' => false];
+            }
+        }
+        
+        $snippet['selectorStatus'] = $selectorStatus;
+    }
+    
     return ApiResponse::create(200, 'snippets.get_success')
         ->withMessage('Snippet loaded: ' . $snippet['name'])
         ->withData($snippet);

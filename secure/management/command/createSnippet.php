@@ -79,14 +79,17 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
             ->withMessage('No project specified and no active project found');
     }
     
-    // Check if snippet ID already exists in project
-    $existingSnippet = findSnippetInPath($snippetId, getSnippetsPath($projectName), false);
+    // Check if snippet ID already exists in project or global
+    $existingSnippet = findSnippetInPath($snippetId, getProjectSnippetsPath($projectName), 'project');
+    if ($existingSnippet === null) {
+        $existingSnippet = findSnippetInPath($snippetId, getGlobalSnippetsPath(), 'global');
+    }
     if ($existingSnippet !== null) {
         return ApiResponse::create(409, 'snippets.already_exists')
-            ->withMessage('A snippet with this ID already exists in the project');
+            ->withMessage('A snippet with this ID already exists' . ($existingSnippet['source'] === 'global' ? ' (global)' : ' in the project'));
     }
     
-    // Build snippet data (no CSS for user snippets)
+    // Build snippet data
     $snippetData = [
         'id' => $snippetId,
         'name' => $name,
@@ -99,8 +102,23 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
         $snippetData['translations'] = $translations;
     }
     
+    // Extract CSS selectors and matching rules from project stylesheet
+    $cssResult = extractSnippetCss($structure, $projectName);
+    if (!empty($cssResult['selectors']['classes']) || !empty($cssResult['selectors']['ids'])) {
+        $snippetData['selectors'] = $cssResult['selectors'];
+    }
+    if (!empty($cssResult['css'])) {
+        $snippetData['css'] = $cssResult['css'];
+    }
+    
+    // Determine save scope (project or global)
+    $scope = $params['scope'] ?? 'project';
+    if (!in_array($scope, ['project', 'global'], true)) {
+        $scope = 'project';
+    }
+    
     // Save snippet
-    $result = saveProjectSnippet($snippetData, $projectName);
+    $result = saveProjectSnippet($snippetData, $projectName, $scope);
     
     if (!$result['success']) {
         return ApiResponse::create(500, 'snippets.save_failed')

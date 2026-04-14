@@ -71,52 +71,14 @@
         
         <!-- Component Selection (for Component type) -->
         <div class="preview-contextual-form__field" id="add-component-field" style="display: none;">
-            <label for="add-component"><?= __admin('preview.selectComponent') ?? 'Select Component' ?>:</label>
-            <select id="add-component" class="admin-input admin-input--sm">
-                <option value=""><?= __admin('preview.selectComponentPlaceholder') ?? '-- Select a component --' ?></option>
-            </select>
+            <label><?= __admin('preview.selectComponent') ?? 'Select Component' ?>:</label>
+            <?php $selectorId = 'add'; include '_component-selector.php'; ?>
         </div>
         
         <!-- Snippet Selection (for Snippet type) -->
         <div class="preview-contextual-form__field" id="add-snippet-field">
             <label><?= __admin('preview.selectSnippet') ?? 'Select Snippet' ?>:</label>
-            
-            <!-- Snippet Category Tabs -->
-            <div class="snippet-selector__categories" id="add-snippet-categories">
-                <!-- Populated dynamically via JS -->
-            </div>
-            
-            <!-- Snippet Cards Grid -->
-            <div class="snippet-selector__cards" id="add-snippet-cards">
-                <div class="snippet-selector__loading">
-                    <div class="spinner"></div>
-                    <?= __admin('common.loading') ?? 'Loading...' ?>
-                </div>
-            </div>
-            
-            <!-- Snippet Preview Panel -->
-            <div class="snippet-selector__preview" id="add-snippet-preview" style="display: none;">
-                <div class="snippet-selector__preview-header">
-                    <span class="snippet-selector__preview-title" id="add-snippet-preview-title"></span>
-                    <span class="snippet-selector__preview-source" id="add-snippet-preview-source"></span>
-                </div>
-                <p class="snippet-selector__preview-desc" id="add-snippet-preview-desc"></p>
-                <div class="snippet-selector__preview-frame-container">
-                    <iframe class="snippet-selector__preview-frame" id="add-snippet-preview-frame" sandbox="allow-same-origin"></iframe>
-                </div>
-                <!-- Delete button for project snippets only -->
-                <div class="snippet-selector__preview-actions" id="add-snippet-preview-actions" style="display: none;">
-                    <button type="button" class="admin-btn admin-btn--sm admin-btn--danger" id="delete-snippet-btn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                            <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
-                        </svg>
-                        <?= __admin('preview.deleteSnippet') ?? 'Delete Snippet' ?>
-                    </button>
-                </div>
-            </div>
-            
-            <input type="hidden" id="add-snippet" value="">
+            <?php $selectorId = 'add'; include '_snippet-selector.php'; ?>
         </div>
 
         <!-- COLLAPSIBLE: Preview (for HTML Tag type) -->

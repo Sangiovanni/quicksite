@@ -7141,12 +7141,12 @@ code.preview-contextual-info__value {
     align-items: center;
     justify-content: center;
     gap: 4px;
-    padding: var(--space-xs) var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
     background: transparent;
     border: none;
     border-radius: var(--radius-sm);
-    font-size: 0.75rem;
-    font-weight: 500;
+    font-size: 0.875rem;
+    font-weight: 600;
     color: var(--admin-text-muted);
     cursor: pointer;
     transition: all 0.2s;
@@ -12416,6 +12416,32 @@ code.preview-node-panel__value {
     color: var(--admin-primary-dark);
 }
 
+.snippet-selector__preview-source--global {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+/* Source badges in dropdown options */
+.snippet-selector__option-source {
+    font-size: 0.6rem;
+    padding: 1px 5px;
+    border-radius: var(--radius-sm);
+    background: var(--admin-bg);
+    color: var(--admin-text-muted);
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.snippet-selector__option-source--core {
+    background: var(--admin-primary-light);
+    color: var(--admin-primary-dark);
+}
+
+.snippet-selector__option-source--global {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
 .snippet-selector__preview-desc {
     font-size: 0.75rem;
     color: var(--admin-text-muted);
@@ -12447,6 +12473,128 @@ code.preview-node-panel__value {
 
 .snippet-selector__preview-actions .admin-btn {
     gap: var(--space-xs);
+}
+
+/* Snippet CSS Status */
+.snippet-selector__css-status {
+    margin-top: var(--space-sm);
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--admin-border);
+}
+
+.snippet-selector__css-status-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--admin-text-muted);
+    margin-bottom: var(--space-xs);
+}
+
+.snippet-selector__css-toggle {
+    background: none;
+    border: none;
+    color: var(--admin-primary);
+    font-size: 0.7rem;
+    cursor: pointer;
+    padding: 2px 4px;
+}
+
+.snippet-selector__css-toggle:hover {
+    text-decoration: underline;
+}
+
+.snippet-selector__css-selectors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: var(--space-xs);
+}
+
+.snippet-selector__css-badge {
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+    font-family: monospace;
+}
+
+.snippet-selector__css-badge--found {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.snippet-selector__css-badge--missing {
+    background: #fff3e0;
+    color: #e65100;
+}
+
+.snippet-selector__css-actions {
+    margin-bottom: var(--space-xs);
+}
+
+.snippet-selector__css-options {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: var(--space-xs);
+}
+
+.snippet-selector__css-option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: 0.7rem;
+    color: var(--admin-text);
+    cursor: pointer;
+    padding: 2px 0;
+}
+
+.snippet-selector__css-option input[type="radio"] {
+    margin: 0;
+    accent-color: var(--admin-accent, #6366f1);
+}
+
+.snippet-selector__css-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    font-size: 0.65rem;
+    color: #e65100;
+    background: #fff3e0;
+    border: 1px solid #ffcc80;
+    border-radius: var(--radius-sm);
+    padding: 4px 8px;
+    margin-top: 4px;
+    line-height: 1.3;
+}
+
+.snippet-selector__style-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: 0.65rem;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+    margin-top: 4px;
+}
+
+.snippet-selector__style-toggle input[type="checkbox"] {
+    margin: 0;
+    accent-color: var(--admin-accent, #6366f1);
+}
+
+.snippet-selector__css-code {
+    font-size: 0.7rem;
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-xs);
+    margin: 0;
+    max-height: 150px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
 }
 
 /* Add Node Modal */

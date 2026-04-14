@@ -74,6 +74,7 @@
     const saveSnippetPreview = document.getElementById('save-snippet-structure-preview');
     const saveSnippetCancel = document.getElementById('save-snippet-cancel');
     const saveSnippetSubmit = document.getElementById('save-snippet-submit');
+    const saveSnippetGlobal = document.getElementById('save-snippet-global');
     
     // Variables panel elements (component-only)
     const variablesPanel = document.getElementById('contextual-variables-panel');
@@ -236,14 +237,22 @@
     const addComponentField = document.getElementById('add-component-field');
     const addComponentSelect = document.getElementById('add-component');
     const addSnippetField = document.getElementById('add-snippet-field');
-    const addSnippetCategories = document.getElementById('add-snippet-categories');
-    const addSnippetCards = document.getElementById('add-snippet-cards');
     const addSnippetInput = document.getElementById('add-snippet');
     const addSnippetPreview = document.getElementById('add-snippet-preview');
     const addSnippetPreviewTitle = document.getElementById('add-snippet-preview-title');
     const addSnippetPreviewSource = document.getElementById('add-snippet-preview-source');
     const addSnippetPreviewDesc = document.getElementById('add-snippet-preview-desc');
     const addSnippetPreviewFrame = document.getElementById('add-snippet-preview-frame');
+    const addSnippetCssStatus = document.getElementById('add-snippet-css-status');
+    const addSnippetCssSelectors = document.getElementById('add-snippet-css-selectors');
+    const addSnippetCssCode = document.getElementById('add-snippet-css-code');
+    const addSnippetCssToggle = document.getElementById('add-snippet-css-toggle');
+    const addSnippetCssActions = document.getElementById('add-snippet-css-actions');
+    const addSnippetCssOptions = document.getElementById('add-snippet-css-options');
+    const addSnippetCssOptionMissing = document.getElementById('add-snippet-css-option-missing');
+    const addSnippetCssWarning = document.getElementById('add-snippet-css-warning');
+    const addSnippetStyleToggle = document.getElementById('add-snippet-style-toggle');
+    const addSnippetStyleToggleInput = document.getElementById('add-snippet-style-toggle-input');
     const addSnippetPreviewActions = document.getElementById('add-snippet-preview-actions');
     const deleteSnippetBtn = document.getElementById('delete-snippet-btn');
     const addPositionPicker = document.getElementById('add-position-picker');
@@ -4303,7 +4312,8 @@
         if (classCombobox) classCombobox.reset();
         else if (addClassInput) addClassInput.value = '';
         if (addCustomParamsList) addCustomParamsList.innerHTML = '';
-        if (addComponentSelect) addComponentSelect.value = '';
+        if (addComponentSelector) addComponentSelector.reset();
+        else if (addComponentSelect) addComponentSelect.value = '';
 
         // When at root, force "inside" and hide before/after options
         const isAtRoot = selectedNode === '' && currentEditType !== 'component';
@@ -4627,150 +4637,489 @@
         });
     });
     
+    // ==================== Component Selector ====================
+    let componentsLoaded = false;
+    let componentsData = [];
+    
+    function initComponentSelector(selectorId) {
+        const selector = document.getElementById(`${selectorId}-component-selector`);
+        if (!selector) return null;
+        
+        const trigger = document.getElementById(`${selectorId}-component-trigger`);
+        const displayValue = document.getElementById(`${selectorId}-component-display`);
+        const displayDesc = document.getElementById(`${selectorId}-component-display-desc`);
+        const panel = document.getElementById(`${selectorId}-component-panel`);
+        const searchInput = document.getElementById(`${selectorId}-component-search`);
+        const optionsContainer = document.getElementById(`${selectorId}-component-options`);
+        const noResults = document.getElementById(`${selectorId}-component-no-results`);
+        const hiddenInput = document.getElementById(`${selectorId}-component`);
+        const previewPanel = document.getElementById(`${selectorId}-component-preview`);
+        const previewTitle = document.getElementById(`${selectorId}-component-preview-title`);
+        const previewFrame = document.getElementById(`${selectorId}-component-preview-frame`);
+        
+        let isOpen = false;
+        
+        function openDropdown() {
+            if (!panel) return;
+            isOpen = true;
+            panel.style.display = '';
+            trigger?.classList.add('open');
+            setTimeout(() => searchInput?.focus(), 50);
+        }
+        
+        function closeDropdown() {
+            if (!panel) return;
+            isOpen = false;
+            panel.style.display = 'none';
+            trigger?.classList.remove('open');
+            if (searchInput) searchInput.value = '';
+            resetSearch();
+        }
+        
+        function toggleDropdown() {
+            isOpen ? closeDropdown() : openDropdown();
+        }
+        
+        trigger?.addEventListener('click', toggleDropdown);
+        
+        document.addEventListener('click', function(e) {
+            if (isOpen && !selector.contains(e.target)) closeDropdown();
+        });
+        
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && isOpen) {
+                closeDropdown();
+                e.stopPropagation();
+            }
+        });
+        
+        function createOptionButton(comp) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'tag-dropdown__option';
+            btn.dataset.name = comp.name.toLowerCase();
+            btn.dataset.componentName = comp.name;
+            const varCount = (comp.variables || []).length;
+            if (hiddenInput?.value === comp.name) btn.classList.add('selected');
+            btn.innerHTML = `
+                <span class="tag-dropdown__option-tag">${escapeHTML(comp.name)}</span>
+                ${varCount > 0 ? `<span class="tag-dropdown__option-desc">${varCount} variable${varCount > 1 ? 's' : ''}</span>` : ''}
+            `;
+            btn.addEventListener('click', () => {
+                selectComponent(comp);
+                closeDropdown();
+            });
+            return btn;
+        }
+        
+        function renderOptions() {
+            if (!optionsContainer) return;
+            optionsContainer.innerHTML = '';
+            
+            const validComponents = componentsData.filter(c => c.valid);
+            if (validComponents.length === 0) {
+                optionsContainer.innerHTML = `<div class="snippet-selector__empty">
+                    ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.ban, null)}
+                    <span>${PreviewConfig.i18n.noComponentsFound || 'No components found'}</span>
+                </div>`;
+                return;
+            }
+            
+            validComponents.forEach(comp => {
+                optionsContainer.appendChild(createOptionButton(comp));
+            });
+        }
+        
+        function selectComponent(comp) {
+            sidebarAddSelectedComponentData = comp;
+            
+            if (hiddenInput) hiddenInput.value = comp.name;
+            if (displayValue) displayValue.textContent = comp.name;
+            
+            const varCount = (comp.variables || []).length;
+            if (displayDesc) displayDesc.textContent = varCount > 0 ? `${varCount} variable${varCount > 1 ? 's' : ''}` : '';
+            
+            optionsContainer?.querySelectorAll('.tag-dropdown__option').forEach(o => {
+                o.classList.toggle('selected', o.dataset.componentName === comp.name);
+            });
+            
+            // Populate component variables
+            renderComponentVars(comp);
+            
+            // Load full component data for preview
+            loadComponentPreview(comp.name);
+        }
+        
+        function loadComponentPreview(componentName) {
+            if (!previewFrame) return;
+            if (previewPanel) previewPanel.style.display = 'block';
+            if (previewTitle) previewTitle.textContent = componentName;
+            
+            // Reuse the server-side component renderer (same as main editor preview)
+            previewFrame.src = PreviewConfig.baseUrl + '/?_component=' + encodeURIComponent(componentName) + '&_editor=1';
+        }
+        
+        function renderComponentVars(comp) {
+            const vars = comp.variables || [];
+            
+            if (addComponentVars) addComponentVars.style.display = 'block';
+            
+            if (vars.length === 0) {
+                if (addComponentVarsContainer) addComponentVarsContainer.innerHTML = '';
+                if (addComponentNoVars) addComponentNoVars.style.display = 'flex';
+                return;
+            }
+            
+            if (addComponentNoVars) addComponentNoVars.style.display = 'none';
+            if (!addComponentVarsContainer) return;
+            
+            addComponentVarsContainer.innerHTML = '';
+            vars.forEach(v => {
+                const row = document.createElement('div');
+                row.className = 'preview-contextual-form__param-row';
+                
+                if (v.type === 'textKey') {
+                    row.innerHTML = `
+                        <label class="preview-contextual-form__param-label">${escapeHTML(v.name)}:</label>
+                        <div class="preview-contextual-form__info" style="margin:0;padding:2px 0;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                            </svg>
+                            <span style="font-size:0.75rem;">${PreviewConfig.i18n.textKeyAutoGenerated || 'Auto-generated text key'}</span>
+                        </div>
+                        <input type="hidden" data-var-name="${escapeHTML(v.name)}" value="">
+                    `;
+                } else {
+                    row.innerHTML = `
+                        <label class="preview-contextual-form__param-label">${escapeHTML(v.name)}:</label>
+                        <input type="text" 
+                               class="admin-input admin-input--sm preview-contextual-form__param-input" 
+                               data-var-name="${escapeHTML(v.name)}"
+                               placeholder="${PreviewConfig.i18n.optional || 'Optional'}">
+                    `;
+                }
+                addComponentVarsContainer.appendChild(row);
+            });
+        }
+        
+        // Search filtering
+        function resetSearch() {
+            optionsContainer?.querySelectorAll('.tag-dropdown__option').forEach(o => o.style.display = '');
+            if (noResults) noResults.style.display = 'none';
+        }
+        
+        searchInput?.addEventListener('input', function() {
+            const query = this.value.trim().toLowerCase();
+            if (!query) { resetSearch(); return; }
+            
+            let totalMatches = 0;
+            optionsContainer?.querySelectorAll('.tag-dropdown__option').forEach(opt => {
+                const name = opt.dataset.name || '';
+                const matches = name.includes(query);
+                opt.style.display = matches ? '' : 'none';
+                if (matches) totalMatches++;
+            });
+            
+            if (noResults) noResults.style.display = totalMatches === 0 ? 'flex' : 'none';
+        });
+        
+        searchInput?.addEventListener('keydown', function(e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            const visibleOpt = optionsContainer?.querySelector('.tag-dropdown__option:not([style*="display: none"])');
+            if (visibleOpt) visibleOpt.click();
+        });
+        
+        return {
+            renderOptions,
+            showLoading: function() {
+                if (optionsContainer) optionsContainer.innerHTML = `<div class="snippet-selector__loading"><div class="spinner"></div>${PreviewConfig.i18n.loading || 'Loading...'}</div>`;
+            },
+            showError: function() {
+                if (optionsContainer) optionsContainer.innerHTML = `<div class="snippet-selector__empty">
+                    ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.ban, null)}
+                    <span>${PreviewConfig.i18n.errorLoadingComponents || 'Error loading components'}</span>
+                </div>`;
+            },
+            reset: function() {
+                sidebarAddSelectedComponentData = null;
+                if (hiddenInput) hiddenInput.value = '';
+                if (displayValue) displayValue.textContent = PreviewConfig.i18n.selectComponent || 'Select a component';
+                if (displayDesc) displayDesc.textContent = '';
+                if (previewPanel) previewPanel.style.display = 'none';
+                if (addComponentVars) addComponentVars.style.display = 'none';
+                if (addComponentVarsContainer) addComponentVarsContainer.innerHTML = '';
+            },
+            getValue: () => hiddenInput?.value || ''
+        };
+    }
+    
+    const addComponentSelector = initComponentSelector('add');
+    
     // Load components for sidebar add form
     async function loadSidebarComponentsList() {
-        if (!addComponentSelect) return;
+        if (!addComponentSelector) return;
+        
+        if (componentsLoaded) return;
+        
+        addComponentSelector.showLoading();
         
         try {
             const response = await QuickSiteAdmin.apiRequest('listComponents', 'GET');
             if (response.ok && response.data?.data?.components) {
-                addComponentSelect.innerHTML = `<option value="">${PreviewConfig.i18n.selectComponentPlaceholder || '-- Select a component --'}</option>`;
-                response.data.data.components.forEach(comp => {
-                    if (!comp.valid) return; // Skip invalid components
-                    const option = document.createElement('option');
-                    option.value = comp.name;
-                    option.textContent = comp.name;
-                    addComponentSelect.appendChild(option);
-                });
+                componentsData = response.data.data.components;
+                componentsLoaded = true;
+                addComponentSelector.renderOptions();
+            } else {
+                addComponentSelector.showError();
             }
         } catch (error) {
             console.error('[Preview] Failed to load components:', error);
+            addComponentSelector.showError();
         }
     }
     
     // ==================== Snippet Selector ====================
-    // State for snippets
+    // State for snippets (module-level, shared with addSnippetNode/submitSaveSnippet)
     let snippetsLoaded = false;
-    let snippetsData = { core: {}, project: {} };
+    let snippetsData = { byCategory: {}, snippets: [] };
     let selectedSnippetId = null;
     let selectedSnippetData = null;
-    let currentSnippetCategory = 'all';
+    let snippetPreviewWithProjectStyle = true;
     
-    // Category icons for snippets
-    const snippetCategoryIcons = {
-        all: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
-        nav: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>',
-        forms: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>',
-        cards: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>',
-        layouts: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>',
-        content: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
-        lists: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>'
-    };
-    
-    // Load snippets for sidebar add form
-    async function loadSidebarSnippetsList() {
-        if (!addSnippetCards || !addSnippetCategories) return;
+    // Searchable snippet dropdown (tag-dropdown pattern)
+    function initSnippetSelector(selectorId) {
+        const selector = document.getElementById(`${selectorId}-snippet-selector`);
+        if (!selector) return null;
         
-        // Show loading
-        addSnippetCards.innerHTML = `<div class="snippet-selector__loading"><div class="spinner"></div>${PreviewConfig.i18n.loading || 'Loading...'}</div>`;
+        const trigger = document.getElementById(`${selectorId}-snippet-trigger`);
+        const displayValue = document.getElementById(`${selectorId}-snippet-display`);
+        const displayDesc = document.getElementById(`${selectorId}-snippet-display-desc`);
+        const panel = document.getElementById(`${selectorId}-snippet-panel`);
+        const searchInput = document.getElementById(`${selectorId}-snippet-search`);
+        const optionsContainer = document.getElementById(`${selectorId}-snippet-options`);
+        const noResults = document.getElementById(`${selectorId}-snippet-no-results`);
+        const hiddenInput = document.getElementById(`${selectorId}-snippet`);
+        const previewPanel = document.getElementById(`${selectorId}-snippet-preview`);
+        const previewTitle = document.getElementById(`${selectorId}-snippet-preview-title`);
+        const previewSource = document.getElementById(`${selectorId}-snippet-preview-source`);
+        const previewDesc = document.getElementById(`${selectorId}-snippet-preview-desc`);
+        const previewActions = document.getElementById(`${selectorId}-snippet-preview-actions`);
+        
+        let isOpen = false;
+        
+        // Source label helper
+        function sourceLabel(source) {
+            if (source === 'core') return 'Core';
+            if (source === 'global') return 'Global';
+            return 'Project';
+        }
+        
+        function sourceFromSnippet(snippet) {
+            return snippet.source || (snippet.isCore ? 'core' : 'project');
+        }
+        
+        // Dropdown open/close
+        function openDropdown() {
+            if (!panel) return;
+            isOpen = true;
+            panel.style.display = '';
+            trigger?.classList.add('open');
+            setTimeout(() => searchInput?.focus(), 50);
+        }
+        
+        function closeDropdown() {
+            if (!panel) return;
+            isOpen = false;
+            panel.style.display = 'none';
+            trigger?.classList.remove('open');
+            if (searchInput) searchInput.value = '';
+            resetSearch();
+        }
+        
+        function toggleDropdown() {
+            isOpen ? closeDropdown() : openDropdown();
+        }
+        
+        trigger?.addEventListener('click', toggleDropdown);
+        
+        document.addEventListener('click', function(e) {
+            if (isOpen && !selector.contains(e.target)) closeDropdown();
+        });
+        
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && isOpen) {
+                closeDropdown();
+                e.stopPropagation();
+            }
+        });
+        
+        // Create option button for a snippet
+        function createOptionButton(snippet) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'tag-dropdown__option';
+            btn.dataset.snippetId = snippet.id;
+            btn.dataset.name = (snippet.name || snippet.id).toLowerCase();
+            btn.dataset.desc = (snippet.description || '').toLowerCase();
+            if (snippet.id === selectedSnippetId) btn.classList.add('selected');
+            
+            const src = sourceFromSnippet(snippet);
+            const srcText = sourceLabel(src);
+            btn.innerHTML = `
+                <span class="tag-dropdown__option-tag">${escapeHTML(snippet.name || snippet.id)}</span>
+                <span class="tag-dropdown__option-desc">${escapeHTML(snippet.description || '')}</span>
+                <span class="snippet-selector__option-source snippet-selector__option-source--${src}">${srcText}</span>
+            `;
+            btn.addEventListener('click', () => {
+                selectSnippet(snippet);
+                closeDropdown();
+            });
+            return btn;
+        }
+        
+        // Render options grouped by category
+        function renderOptions() {
+            if (!optionsContainer) return;
+            optionsContainer.innerHTML = '';
+            
+            const categories = Object.keys(snippetsData.byCategory || {});
+            if (categories.length === 0) {
+                optionsContainer.innerHTML = `<div class="snippet-selector__empty">
+                    ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.ban, null)}
+                    <span>${PreviewConfig.i18n.noSnippetsFound || 'No snippets found'}</span>
+                </div>`;
+                return;
+            }
+            
+            categories.forEach(cat => {
+                const group = document.createElement('div');
+                group.className = 'tag-dropdown__group';
+                
+                const header = document.createElement('button');
+                header.type = 'button';
+                header.className = 'tag-dropdown__group-header';
+                header.innerHTML = `<span>${cat.charAt(0).toUpperCase() + cat.slice(1)}</span>
+                    <svg class="tag-dropdown__group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>`;
+                header.addEventListener('click', () => group.classList.toggle('collapsed'));
+                group.appendChild(header);
+                
+                const items = document.createElement('div');
+                items.className = 'tag-dropdown__group-items';
+                (snippetsData.byCategory[cat] || []).forEach(snippet => {
+                    items.appendChild(createOptionButton(snippet));
+                });
+                group.appendChild(items);
+                optionsContainer.appendChild(group);
+            });
+        }
+        
+        // Search filtering
+        function resetSearch() {
+            optionsContainer?.querySelectorAll('.tag-dropdown__group').forEach(g => {
+                g.style.display = '';
+                g.querySelectorAll('.tag-dropdown__option').forEach(o => o.style.display = '');
+            });
+            if (noResults) noResults.style.display = 'none';
+        }
+        
+        searchInput?.addEventListener('input', function() {
+            const query = this.value.trim().toLowerCase();
+            if (!query) { resetSearch(); return; }
+            
+            let totalMatches = 0;
+            optionsContainer?.querySelectorAll('.tag-dropdown__group').forEach(group => {
+                let groupMatches = 0;
+                group.querySelectorAll('.tag-dropdown__option').forEach(opt => {
+                    const name = opt.dataset.name || '';
+                    const desc = opt.dataset.desc || '';
+                    const matches = name.includes(query) || desc.includes(query);
+                    opt.style.display = matches ? '' : 'none';
+                    if (matches) groupMatches++;
+                });
+                group.style.display = groupMatches > 0 ? '' : 'none';
+                if (groupMatches > 0) group.classList.remove('collapsed');
+                totalMatches += groupMatches;
+            });
+            
+            if (noResults) noResults.style.display = totalMatches === 0 ? 'flex' : 'none';
+        });
+        
+        // Enter key: select first visible match
+        searchInput?.addEventListener('keydown', function(e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            const visibleOpt = optionsContainer?.querySelector('.tag-dropdown__option:not([style*="display: none"])');
+            if (visibleOpt) visibleOpt.click();
+        });
+        
+        // Update trigger display to reflect current selection
+        function updateTriggerDisplay(snippet) {
+            if (displayValue) displayValue.textContent = snippet ? (snippet.name || snippet.id) : (PreviewConfig.i18n.selectSnippet || 'Select a snippet');
+            if (displayDesc) displayDesc.textContent = snippet ? (snippet.description || '') : '';
+        }
+        
+        // Update option highlight
+        function updateOptionHighlight() {
+            optionsContainer?.querySelectorAll('.tag-dropdown__option').forEach(o => {
+                o.classList.toggle('selected', o.dataset.snippetId === selectedSnippetId);
+            });
+        }
+        
+        return {
+            renderOptions,
+            updateTriggerDisplay,
+            updateOptionHighlight,
+            showLoading: function() {
+                if (optionsContainer) optionsContainer.innerHTML = `<div class="snippet-selector__loading"><div class="spinner"></div>${PreviewConfig.i18n.loading || 'Loading...'}</div>`;
+            },
+            showError: function() {
+                if (optionsContainer) optionsContainer.innerHTML = `<div class="snippet-selector__empty">
+                    ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.ban, null)}
+                    <span>${PreviewConfig.i18n.errorLoadingSnippets || 'Error loading snippets'}</span>
+                </div>`;
+            },
+            reset: function() {
+                selectedSnippetId = null;
+                selectedSnippetData = null;
+                if (hiddenInput) hiddenInput.value = '';
+                updateTriggerDisplay(null);
+                if (previewPanel) previewPanel.style.display = 'none';
+                if (addSnippetCssStatus) addSnippetCssStatus.style.display = 'none';
+            }
+        };
+    }
+    
+    // Initialize snippet selector
+    const addSnippetSelector = initSnippetSelector('add');
+    
+    // Load snippets for sidebar add form (skips API call if already loaded)
+    async function loadSidebarSnippetsList(forceReload = false) {
+        if (!addSnippetSelector) return;
+        
+        // Skip reload if data is already cached and not invalidated
+        if (snippetsLoaded && !forceReload) return;
+        
+        // Show loading in dropdown
+        addSnippetSelector.showLoading();
         if (addSnippetPreview) addSnippetPreview.style.display = 'none';
         
         try {
             const response = await QuickSiteAdmin.apiRequest('listSnippets', 'GET');
             if (response.ok && response.data?.data) {
-                // API returns { snippets: [], byCategory: {}, counts: {} }
-                // Store the byCategory data for rendering
                 snippetsData = {
                     byCategory: response.data.data.byCategory || {},
                     snippets: response.data.data.snippets || []
                 };
                 snippetsLoaded = true;
-                
-                // Build category tabs
-                renderSnippetCategories();
-                
-                // Render snippet cards
-                renderSnippetCards();
+                addSnippetSelector.renderOptions();
             } else {
-                addSnippetCards.innerHTML = `<div class="snippet-selector__empty">
-                    ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.ban, null)}
-                    <span>${PreviewConfig.i18n.noSnippetsFound || 'No snippets found'}</span>
-                </div>`;
+                addSnippetSelector.showError();
             }
         } catch (error) {
             console.error('[Preview] Failed to load snippets:', error);
-            addSnippetCards.innerHTML = `<div class="snippet-selector__empty">
-                ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.ban, null)}
-                <span>${PreviewConfig.i18n.errorLoadingSnippets || 'Error loading snippets'}</span>
-            </div>`;
+            addSnippetSelector.showError();
         }
-    }
-    
-    // Render snippet category tabs
-    function renderSnippetCategories() {
-        if (!addSnippetCategories) return;
-        
-        // Collect all categories from byCategory
-        const categories = new Set(['all']);
-        Object.keys(snippetsData.byCategory || {}).forEach(cat => categories.add(cat));
-        
-        // Render category buttons
-        addSnippetCategories.innerHTML = '';
-        categories.forEach(cat => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = `snippet-selector__category${cat === currentSnippetCategory ? ' active' : ''}`;
-            btn.dataset.category = cat;
-            btn.innerHTML = `${snippetCategoryIcons[cat] || snippetCategoryIcons.content}
-                <span>${cat === 'all' ? (PreviewConfig.i18n.allSnippets || 'All') : cat.charAt(0).toUpperCase() + cat.slice(1)}</span>`;
-            btn.addEventListener('click', () => {
-                currentSnippetCategory = cat;
-                addSnippetCategories.querySelectorAll('.snippet-selector__category').forEach(b => {
-                    b.classList.toggle('active', b.dataset.category === cat);
-                });
-                renderSnippetCards();
-            });
-            addSnippetCategories.appendChild(btn);
-        });
-    }
-    
-    // Render snippet cards based on selected category
-    function renderSnippetCards() {
-        if (!addSnippetCards) return;
-        
-        // Collect snippets to display
-        let snippetsToShow = [];
-        
-        if (currentSnippetCategory === 'all') {
-            // Show all snippets from the flat list
-            snippetsToShow = snippetsData.snippets || [];
-        } else {
-            // Show snippets from specific category
-            snippetsToShow = (snippetsData.byCategory || {})[currentSnippetCategory] || [];
-        }
-        
-        if (snippetsToShow.length === 0) {
-            addSnippetCards.innerHTML = `<div class="snippet-selector__empty">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/></svg>
-                <span>${PreviewConfig.i18n.noSnippetsInCategory || 'No snippets in this category'}</span>
-            </div>`;
-            return;
-        }
-        
-        // Render cards
-        addSnippetCards.innerHTML = '';
-        snippetsToShow.forEach(snippet => {
-            const card = document.createElement('div');
-            card.className = `snippet-selector__card${snippet.id === selectedSnippetId ? ' selected' : ''}`;
-            card.dataset.snippetId = snippet.id;
-            card.innerHTML = `
-                <span class="snippet-selector__card-name">${snippet.name || snippet.id}</span>
-                <span class="snippet-selector__card-desc">${snippet.description || ''}</span>
-                <span class="snippet-selector__card-source ${snippet.isCore ? 'snippet-selector__card-source--core' : ''}">${snippet.isCore ? 'Core' : 'Project'}</span>
-            `;
-            card.addEventListener('click', () => selectSnippet(snippet));
-            addSnippetCards.appendChild(card);
-        });
     }
     
     // Select a snippet
@@ -4778,27 +5127,31 @@
         selectedSnippetId = snippet.id;
         selectedSnippetData = snippet;
         
-        // Update UI
-        addSnippetCards.querySelectorAll('.snippet-selector__card').forEach(card => {
-            card.classList.toggle('selected', card.dataset.snippetId === snippet.id);
-        });
+        // Update dropdown trigger display
+        if (addSnippetSelector) {
+            addSnippetSelector.updateTriggerDisplay(snippet);
+            addSnippetSelector.updateOptionHighlight();
+        }
         
         // Update hidden input
         if (addSnippetInput) addSnippetInput.value = snippet.id;
+        
+        const src = snippet.source || (snippet.isCore ? 'core' : 'project');
+        const srcLabel = src === 'core' ? 'Core' : (src === 'global' ? 'Global' : 'Project');
         
         // Show preview panel
         if (addSnippetPreview) {
             addSnippetPreview.style.display = 'block';
             if (addSnippetPreviewTitle) addSnippetPreviewTitle.textContent = snippet.name || snippet.id;
             if (addSnippetPreviewSource) {
-                addSnippetPreviewSource.textContent = snippet.isCore ? 'Core' : 'Project';
-                addSnippetPreviewSource.className = `snippet-selector__preview-source ${snippet.isCore ? 'snippet-selector__preview-source--core' : ''}`;
+                addSnippetPreviewSource.textContent = srcLabel;
+                addSnippetPreviewSource.className = `snippet-selector__preview-source snippet-selector__preview-source--${src}`;
             }
             if (addSnippetPreviewDesc) addSnippetPreviewDesc.textContent = snippet.description || '';
             
-            // Show delete button only for project snippets (not core)
+            // Show delete button only for non-core snippets
             if (addSnippetPreviewActions) {
-                addSnippetPreviewActions.style.display = snippet.isCore ? 'none' : 'flex';
+                addSnippetPreviewActions.style.display = src === 'core' ? 'none' : 'flex';
             }
         }
         
@@ -4808,20 +5161,22 @@
             if (response.ok && response.data?.data) {
                 selectedSnippetData = { ...snippet, ...response.data.data };
                 renderSnippetPreview(selectedSnippetData);
+                renderSnippetCssStatus(selectedSnippetData);
             }
         } catch (error) {
             console.error('[Preview] Failed to load snippet details:', error);
         }
     }
     
-    // Delete selected snippet (only for project snippets)
+    // Delete selected snippet (only for non-core snippets)
     async function deleteSelectedSnippet() {
         if (!selectedSnippetData || !selectedSnippetId) {
             showToast(PreviewConfig.i18n.noSnippetSelected || 'No snippet selected', 'warning');
             return;
         }
         
-        if (selectedSnippetData.isCore) {
+        const src = selectedSnippetData.source || (selectedSnippetData.isCore ? 'core' : 'project');
+        if (src === 'core') {
             showToast(PreviewConfig.i18n.cannotDeleteCore || 'Cannot delete core snippets', 'error');
             return;
         }
@@ -4837,13 +5192,8 @@
             if (response.ok) {
                 showToast(PreviewConfig.i18n.snippetDeleted || 'Snippet deleted successfully', 'success');
                 
-                // Hide preview panel
-                if (addSnippetPreview) addSnippetPreview.style.display = 'none';
-                
-                // Reset selection
-                selectedSnippetId = null;
-                selectedSnippetData = null;
-                if (addSnippetInput) addSnippetInput.value = '';
+                // Reset selection and trigger
+                if (addSnippetSelector) addSnippetSelector.reset();
                 
                 // Refresh snippets list
                 snippetsLoaded = false;
@@ -4857,6 +5207,145 @@
         }
     }
     
+    // Render CSS selector status panel
+    function renderSnippetCssStatus(snippetData) {
+        if (!addSnippetCssStatus) return;
+        
+        const selectors = snippetData.selectorStatus;
+        const css = snippetData.css || '';
+        
+        // Hide if no selectors tracked
+        if (!selectors || selectors.length === 0) {
+            addSnippetCssStatus.style.display = 'none';
+            if (addSnippetCssActions) addSnippetCssActions.style.display = 'none';
+            return;
+        }
+        
+        addSnippetCssStatus.style.display = 'block';
+        
+        const hasMissing = selectors.some(s => !s.exists);
+        
+        // Render selector badges
+        if (addSnippetCssSelectors) {
+            addSnippetCssSelectors.innerHTML = selectors.map(s => {
+                const icon = s.exists ? '✓' : '✗';
+                const cls = s.exists ? 'snippet-selector__css-badge--found' : 'snippet-selector__css-badge--missing';
+                return `<span class="snippet-selector__css-badge ${cls}">${icon} ${escapeHTML(s.selector)}</span>`;
+            }).join('');
+        }
+        
+        // Show/hide CSS action radio group
+        if (addSnippetCssOptions) {
+            addSnippetCssOptions.style.display = (selectors.length > 0 && css) ? 'block' : 'none';
+            // Show "Add only missing" option only when there are missing selectors
+            if (addSnippetCssOptionMissing) {
+                addSnippetCssOptionMissing.style.display = hasMissing ? '' : 'none';
+                // If "missing" was selected but no longer applicable, reset to "skip"
+                if (!hasMissing) {
+                    const missingRadio = addSnippetCssOptionMissing.querySelector('input[type="radio"]');
+                    if (missingRadio && missingRadio.checked) {
+                        const skipRadio = addSnippetCssOptions.querySelector('input[value="skip"]');
+                        if (skipRadio) skipRadio.checked = true;
+                    }
+                }
+            }
+        }
+        if (addSnippetCssActions) {
+            addSnippetCssActions.style.display = (selectors.length > 0 && css) ? 'block' : 'none';
+        }
+        
+        // Populate saved CSS code block
+        if (addSnippetCssCode) {
+            if (css) {
+                addSnippetCssCode.textContent = css;
+                if (addSnippetCssToggle) addSnippetCssToggle.style.display = '';
+            } else {
+                addSnippetCssCode.textContent = '';
+                addSnippetCssCode.style.display = 'none';
+                if (addSnippetCssToggle) addSnippetCssToggle.style.display = 'none';
+            }
+        }
+        
+        // Toggle handler
+        if (addSnippetCssToggle && !addSnippetCssToggle._bound) {
+            addSnippetCssToggle.addEventListener('click', function() {
+                const isHidden = addSnippetCssCode.style.display === 'none';
+                addSnippetCssCode.style.display = isHidden ? 'block' : 'none';
+            });
+            addSnippetCssToggle._bound = true;
+        }
+    }
+    
+    // Style toggle handler — re-render preview with/without project CSS
+    if (addSnippetStyleToggleInput && !addSnippetStyleToggleInput._bound) {
+        addSnippetStyleToggleInput.addEventListener('change', function() {
+            snippetPreviewWithProjectStyle = !this.checked;
+            if (selectedSnippetData) {
+                renderSnippetPreview(selectedSnippetData);
+            }
+        });
+        addSnippetStyleToggleInput._bound = true;
+    }
+    
+    // Inject snippet CSS into target project stylesheet
+    // Returns true on success, false on failure
+    async function injectSnippetCss(mode) {
+        if (!selectedSnippetId) return false;
+        
+        const label = mode === 'missing' ? 'Adding missing CSS...' : 'Replacing CSS...';
+        showToast(label, 'info');
+        
+        try {
+            const response = await QuickSiteAdmin.apiRequest('injectSnippetCss', 'POST', {
+                id: selectedSnippetId,
+                mode: mode
+            });
+            
+            if (response.ok) {
+                const count = response.data?.data?.injected?.length || 0;
+                showToast(
+                    mode === 'missing'
+                        ? (count > 0 ? `Added ${count} CSS rule(s)` : 'All selectors already present')
+                        : 'CSS replaced successfully',
+                    'success'
+                );
+                
+                // Re-fetch snippet to refresh selectorStatus
+                if (selectedSnippetData) {
+                    const refreshed = await QuickSiteAdmin.apiRequest('getSnippet', 'GET', null, [], { id: selectedSnippetId });
+                    if (refreshed.ok && refreshed.data?.data) {
+                        selectedSnippetData = { ...selectedSnippetData, ...refreshed.data.data };
+                        renderSnippetCssStatus(selectedSnippetData);
+                    }
+                }
+                return true;
+            } else {
+                throw new Error(response.data?.message || 'CSS injection failed');
+            }
+        } catch (error) {
+            console.error('[Preview] CSS inject error:', error);
+            showToast(error.message || 'Failed to inject CSS', 'error');
+            return false;
+        }
+    }
+    
+    // Helper: get selected CSS action from radio group
+    function getSelectedCssAction() {
+        if (!addSnippetCssOptions) return 'skip';
+        const checked = addSnippetCssOptions.querySelector('input[name="add-snippet-css-action"]:checked');
+        return checked ? checked.value : 'skip';
+    }
+
+    // Show/hide CSS warning based on radio selection
+    if (addSnippetCssOptions) {
+        addSnippetCssOptions.addEventListener('change', function() {
+            const action = getSelectedCssAction();
+            if (addSnippetCssWarning) {
+                addSnippetCssWarning.style.display = (action === 'missing' || action === 'replace') ? 'flex' : 'none';
+            }
+        });
+    }
+
     // Render snippet preview in iframe
     function renderSnippetPreview(snippetData) {
         if (!addSnippetPreviewFrame) return;
@@ -4867,8 +5356,14 @@
         // Build HTML from structure
         const html = buildSnippetHtml(structureToRender, snippetData);
         
-        // Get project CSS URL if available
+        // Get project CSS URL — include only when toggle is not active
         const projectStyleUrl = PreviewConfig.projectStyleUrl || '';
+        const includeProjectStyle = snippetPreviewWithProjectStyle && projectStyleUrl;
+        
+        // Show/hide the style toggle when snippet has its own CSS
+        if (addSnippetStyleToggle) {
+            addSnippetStyleToggle.style.display = snippetData.css ? '' : 'none';
+        }
         
         // Create preview document
         const previewDoc = `<!DOCTYPE html>
@@ -4876,7 +5371,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    ${projectStyleUrl ? `<link rel="stylesheet" href="${projectStyleUrl}">` : ''}
+    ${includeProjectStyle ? `<link rel="stylesheet" href="${projectStyleUrl}">` : ''}
     <style>
         body { margin: 8px; font-family: system-ui, -apple-system, sans-serif; }
         ${snippetData.css || ''}
@@ -5103,24 +5598,8 @@
         function renderSuggestions() {
             if (!suggestedGroup || !suggestedItems) return;
             
-            // Get the parent tag of current selection
-            let parentTag = null;
-            if (selectedNode && currentStructure) {
-                const parts = selectedNode.split('.');
-                // Find the tag of the currently selected node
-                let node = currentStructure;
-                if (Array.isArray(node)) {
-                    for (const idx of parts) {
-                        if (Array.isArray(node)) {
-                            node = node[parseInt(idx)];
-                        } else if (node?.children) {
-                            node = node.children[parseInt(idx)];
-                        }
-                        if (!node) break;
-                    }
-                }
-                if (node?.tag) parentTag = node.tag;
-            }
+            // Get the parent tag of current selection from iframe data
+            let parentTag = selectedElementTag || null;
             
             const suggestions = parentTag ? (TAG_SUGGESTIONS[parentTag] || []) : [];
             if (suggestions.length === 0) {
@@ -5777,6 +6256,21 @@
             showToast(PreviewConfig.i18n.selectSnippet || 'Please select a snippet', 'warning');
             return;
         }
+
+        // Check CSS action radio selection — inject CSS before inserting if needed
+        const cssAction = getSelectedCssAction();
+        let cssWasInjected = false;
+        if (cssAction === 'missing' || cssAction === 'replace') {
+            const confirmed = confirm(
+                'This will permanently modify the project\'s CSS stylesheet and may affect the style of all pages.\n\nThe page will reload after insertion to apply the new styles.\n\nContinue?'
+            );
+            if (!confirmed) return;
+
+            // Perform CSS injection first
+            const injected = await injectSnippetCss(cssAction);
+            if (!injected) return; // injection failed, abort
+            cssWasInjected = true;
+        }
         
         const position = getAddPosition();
         
@@ -5811,8 +6305,11 @@
             showToast((PreviewConfig.i18n.snippetAdded || 'Snippet added') + translationsMsg, 'success');
             hideSidebarAddForm();
             
-            // Live DOM update if HTML returned
-            if (data.html && targetNode) {
+            // If CSS was injected, force full reload so the iframe picks up the new stylesheet
+            if (cssWasInjected) {
+                console.log('[Preview] CSS was injected, forcing full reload.');
+                reloadPreview();
+            } else if (data.html && targetNode) {
                 console.log('[Preview] Live DOM insert snippet:', { struct: targetStruct, targetNode, position, newNodeId: data.newNodeId });
                 sendToIframe('insertNode', {
                     struct: targetStruct,
@@ -6587,13 +7084,16 @@
             const translations = await extractAndRemapTranslations(keyMapping);
             
             // Call createSnippet API
+            const scope = saveSnippetGlobal?.checked ? 'global' : 'project';
+            
             const requestData = {
                 id: id,
                 name: name,
                 category: category,
                 description: description,
                 structure: remappedStructure,
-                translations: translations
+                translations: translations,
+                scope: scope
             };
             
             console.log('[Preview] Creating snippet:', requestData);
@@ -6606,11 +7106,8 @@
                 // Close form
                 hideSaveSnippetForm();
                 
-                // Refresh snippets list if visible
+                // Invalidate snippet cache so next tab switch reloads
                 snippetsLoaded = false;
-                if (addSnippetCards && addSnippetCards.offsetParent !== null) {
-                    await loadSidebarSnippetsList();
-                }
             } else {
                 throw new Error(response.data?.message || 'Failed to save snippet');
             }

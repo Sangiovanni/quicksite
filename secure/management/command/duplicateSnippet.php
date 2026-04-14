@@ -64,7 +64,7 @@ function __command_duplicateSnippet(array $params = [], array $urlParams = []): 
         $newId = $sourceId . '-copy';
         // If that already exists, add number
         $counter = 2;
-        while (findSnippetInPath($newId, getSnippetsPath($projectName), false) !== null) {
+        while (findSnippetInPath($newId, getProjectSnippetsPath($projectName), 'project') !== null) {
             $newId = $sourceId . '-copy-' . $counter;
             $counter++;
         }
@@ -80,13 +80,17 @@ function __command_duplicateSnippet(array $params = [], array $urlParams = []): 
             ->withMessage('New ID must start with a letter and contain only letters, numbers, dashes, and underscores');
     }
     
-    // Check if new ID already exists
-    if (findSnippetInPath($newId, getSnippetsPath($projectName), false) !== null) {
+    // Check if new ID already exists in project or global
+    $existing = findSnippetInPath($newId, getProjectSnippetsPath($projectName), 'project');
+    if ($existing === null) {
+        $existing = findSnippetInPath($newId, getGlobalSnippetsPath(), 'global');
+    }
+    if ($existing !== null) {
         return ApiResponse::create(409, 'snippets.already_exists')
-            ->withMessage('A snippet with ID "' . $newId . '" already exists in the project');
+            ->withMessage('A snippet with ID "' . $newId . '" already exists');
     }
     
-    // Build new snippet (copy structure and translations, NOT css)
+    // Build new snippet (copy structure and translations, re-extract CSS)
     $newSnippet = [
         'id' => $newId,
         'name' => $newName,
@@ -97,13 +101,17 @@ function __command_duplicateSnippet(array $params = [], array $urlParams = []): 
     
     // Copy translations if present
     if (!empty($sourceSnippet['translations'])) {
-        // Optionally: rename translation keys to avoid conflicts
-        // For now, just copy as-is (user can edit)
         $newSnippet['translations'] = $sourceSnippet['translations'];
     }
     
-    // Note: CSS is intentionally NOT copied for user snippets
-    // They should adapt the structure to use project CSS classes
+    // Extract CSS selectors and matching rules from project stylesheet
+    $cssResult = extractSnippetCss($sourceSnippet['structure'], $projectName);
+    if (!empty($cssResult['selectors']['classes']) || !empty($cssResult['selectors']['ids'])) {
+        $newSnippet['selectors'] = $cssResult['selectors'];
+    }
+    if (!empty($cssResult['css'])) {
+        $newSnippet['css'] = $cssResult['css'];
+    }
     
     // Save new snippet
     $result = saveProjectSnippet($newSnippet, $projectName);
