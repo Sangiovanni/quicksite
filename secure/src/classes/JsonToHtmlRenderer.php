@@ -360,7 +360,8 @@ class JsonToHtmlRenderer {
                 $escapedKey = htmlspecialchars($textKey, ENT_QUOTES);
                 $nodePath = implode('.', $this->currentNodePath);
                 $struct = htmlspecialchars($this->currentStructure, ENT_QUOTES);
-                return '<span data-qs-textkey="' . $escapedKey . '" data-qs-variable="true" data-qs-node="' . $nodePath . '" data-qs-struct="' . $struct . '" data-qs-textonly="true">' . $displayText . '</span>';
+                $inComponent = $this->inComponent ? ' data-qs-in-component' : '';
+                return '<span data-qs-textkey="' . $escapedKey . '" data-qs-variable="true" data-qs-node="' . $nodePath . '" data-qs-struct="' . $struct . '" data-qs-textonly="true"' . $inComponent . '>' . $displayText . '</span>';
             }
             return $displayText;
         }
@@ -373,7 +374,8 @@ class JsonToHtmlRenderer {
             $escapedKey = htmlspecialchars($textKey, ENT_QUOTES);
             $nodePath = implode('.', $this->currentNodePath);
             $struct = htmlspecialchars($this->currentStructure, ENT_QUOTES);
-            return '<span data-qs-textkey="' . $escapedKey . '" data-qs-node="' . $nodePath . '" data-qs-struct="' . $struct . '" data-qs-textonly="true">' . $translatedText . '</span>';
+            $inComponent = $this->inComponent ? ' data-qs-in-component' : '';
+            return '<span data-qs-textkey="' . $escapedKey . '" data-qs-node="' . $nodePath . '" data-qs-struct="' . $struct . '" data-qs-textonly="true"' . $inComponent . '>' . $translatedText . '</span>';
         }
 
         return $translatedText;

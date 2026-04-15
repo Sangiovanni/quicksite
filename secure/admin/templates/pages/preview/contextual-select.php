@@ -10,7 +10,7 @@
     <div class="preview-contextual-info" id="contextual-select-info" style="display: none;">
         <!-- Element info now displayed in global info bar at bottom of workspace -->
         
-        <!-- Navigation Buttons -->
+        <!-- Navigation Buttons (visible in both select-info and variables modes) -->
         <div class="preview-contextual-info__nav" id="ctx-node-nav">
             <button type="button" class="preview-nav-btn" id="ctx-nav-parent" title="<?= __admin('preview.goToParent') ?? 'Go to Parent (↑)' ?>" disabled>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -34,7 +34,7 @@
             </button>
         </div>
         
-        <div class="preview-contextual-info__actions">
+        <div class="preview-contextual-info__actions" id="ctx-node-actions">
             <button type="button" class="admin-btn admin-btn--success" id="ctx-node-add" title="<?= __admin('preview.addNode') ?? 'Add Element' ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="12" y1="5" x2="12" y2="19"/>
@@ -56,6 +56,13 @@
                     <path d="M8 6l4-4 4 4"/>
                 </svg>
                 <span><?= __admin('preview.saveSnippet') ?? 'Save Snippet' ?></span>
+            </button>
+            <button type="button" class="admin-btn admin-btn--warning" id="ctx-node-save-component" title="<?= __admin('preview.saveAsComponent') ?? 'Save as Component' ?>">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                    <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                </svg>
+                <span><?= __admin('preview.saveComponent') ?? 'Save Component' ?></span>
             </button>
             <button type="button" class="admin-btn admin-btn--danger" id="ctx-node-delete" title="<?= __admin('common.delete') ?> (Del)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -150,6 +157,57 @@
                     <polyline points="7 3 7 8 15 8"/>
                 </svg>
                 <?= __admin('preview.saveSnippetBtn') ?? 'Save Snippet' ?>
+            </button>
+        </div>
+    </div>
+
+    <!-- Save as Component Form (shown when save-component clicked) -->
+    <div class="preview-contextual-form save-component-form" id="contextual-save-component-form" style="display: none;">
+        <div class="preview-contextual-form__header">
+            <h4><?= __admin('preview.saveAsComponent') ?? 'Save as Component' ?></h4>
+            <button type="button" class="preview-contextual-form__close" id="save-component-close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        
+        <!-- Component Name -->
+        <div class="preview-contextual-form__field">
+            <label for="save-component-name"><?= __admin('preview.componentName') ?? 'Name' ?> <span class="required">*</span></label>
+            <input type="text" id="save-component-name" class="admin-input admin-input--sm" placeholder="<?= __admin('preview.componentNamePlaceholder') ?? 'my-component' ?>" required pattern="[a-zA-Z0-9][a-zA-Z0-9_\-]*">
+            <small class="preview-contextual-form__hint"><?= __admin('preview.componentNameHint') ?? 'Letters, numbers, hyphens (used as identifier)' ?></small>
+        </div>
+        
+        <!-- Structure Preview (read-only) -->
+        <div class="preview-contextual-form__field">
+            <label><?= __admin('preview.componentStructure') ?? 'Structure Preview' ?></label>
+            <div class="save-component-form__preview" id="save-component-structure-preview">
+                <code>&lt;?&gt;</code>
+            </div>
+        </div>
+        
+        <!-- Info about placeholder conversion -->
+        <div class="preview-contextual-form__info">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0;">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            <span><?= __admin('preview.componentPlaceholderInfo') ?? 'Text keys will be converted to {{placeholder}} variables automatically.' ?></span>
+        </div>
+        
+        <!-- Actions -->
+        <div class="preview-contextual-form__actions">
+            <button type="button" class="admin-btn admin-btn--sm admin-btn--secondary" id="save-component-cancel">
+                <?= __admin('common.cancel') ?? 'Cancel' ?>
+            </button>
+            <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="save-component-submit">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                    <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                </svg>
+                <?= __admin('preview.saveComponentBtn') ?? 'Save Component' ?>
             </button>
         </div>
     </div>

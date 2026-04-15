@@ -5058,7 +5058,8 @@ kbd {
 }
 
 .admin-details > div,
-.save-snippet-form {
+.save-snippet-form,
+.save-component-form {
     padding: var(--space-sm);
 }
 
@@ -11850,6 +11851,26 @@ code.preview-node-panel__value {
     color: var(--admin-danger);
 }
 
+/* ==================== Save as Component Form ==================== */
+
+.save-component-form__preview {
+    background: var(--admin-bg-alt);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--admin-text-muted);
+    max-height: 80px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.save-component-form .preview-contextual-form__field .required {
+    color: var(--admin-danger);
+}
+
 /* ==================== Variables Panel (Component editing) ==================== */
 
 .preview-variables-panel {
@@ -11978,6 +11999,22 @@ code.preview-node-panel__value {
     border-top: 1px solid var(--admin-border);
     font-size: var(--font-size-xs);
     color: var(--admin-text-muted);
+}
+
+/* Variable sections (text / params) */
+.preview-variables-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.preview-variables-section__title {
+    margin: 0;
+    padding: var(--space-xs) 0;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--admin-text-muted);
+    border-bottom: 1px solid var(--admin-border);
 }
 
 /* ==================== Visual Tag Selector ==================== */

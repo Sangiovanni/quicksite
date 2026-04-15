@@ -76,6 +76,15 @@
     const saveSnippetSubmit = document.getElementById('save-snippet-submit');
     const saveSnippetGlobal = document.getElementById('save-snippet-global');
     
+    // Save as Component form elements
+    const ctxNodeSaveComponent = document.getElementById('ctx-node-save-component');
+    const saveComponentForm = document.getElementById('contextual-save-component-form');
+    const saveComponentClose = document.getElementById('save-component-close');
+    const saveComponentName = document.getElementById('save-component-name');
+    const saveComponentPreview = document.getElementById('save-component-structure-preview');
+    const saveComponentCancel = document.getElementById('save-component-cancel');
+    const saveComponentSubmit = document.getElementById('save-component-submit');
+    
     // Variables panel elements (component-only)
     const variablesPanel = document.getElementById('contextual-variables-panel');
     const variablesPanelClose = document.getElementById('variables-panel-close');
@@ -2961,6 +2970,12 @@
         if (ctxSelectDefault) ctxSelectDefault.style.display = '';
         if (ctxSelectInfo) ctxSelectInfo.style.display = 'none';
         
+        // Hide Variables panel if open
+        if (variablesPanel && variablesPanel.style.display !== 'none') {
+            variablesPanel.style.display = 'none';
+            variablesPanelStructure = null;
+        }
+        
         // Hide mobile sections
         hideMobileSections();
         
@@ -3124,9 +3139,23 @@
         selectedElementClasses = data.classes || null;  // Store classes for style mode
         selectedElementTag = data.tag || null;          // Store tag for style mode
         
-        // Hide Variables panel when selecting a different node
-        if (variablesPanel && variablesPanel.style.display !== 'none') {
-            hideVariablesPanel();
+        // If Variables panel is open, refresh it for the new node instead of hiding
+        const variablesPanelOpen = variablesPanel && variablesPanel.style.display !== 'none';
+        if (variablesPanelOpen) {
+            // Update state first, then refresh
+            if (window.PreviewState) {
+                PreviewState.set('selectedStruct', selectedStruct);
+                PreviewState.set('selectedNode', selectedNode);
+                PreviewState.set('navHasParent', data.hasParent || false);
+                PreviewState.set('navHasPrevSibling', data.hasPrevSibling || false);
+                PreviewState.set('navHasNextSibling', data.hasNextSibling || false);
+                PreviewState.set('navHasChildren', data.hasChildren || false);
+            }
+            if (window.PreviewNavigation) {
+                PreviewNavigation.updateButtons();
+            }
+            showVariablesPanel();
+            return;
         }
         
         // Update PreviewState with selection and navigation info
@@ -3792,7 +3821,7 @@
             }
             
             // Arrow keys - Navigate selection (only in select mode with a selection)
-            if (currentMode === 'select' && selectedStruct && selectedNode) {
+            if (currentMode === 'select' && selectedStruct && selectedNode != null) {
                 if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
                     if (window.PreviewNavigation && PreviewNavigation.handleArrowKey(e.key)) {
                         e.preventDefault();
@@ -3804,7 +3833,7 @@
             // Escape - Clear selection and hide info
             if (e.key === 'Escape') {
                 // Clear selection if we have one
-                if (selectedStruct && selectedNode) {
+                if (selectedStruct && selectedNode != null) {
                     hideNodePanel();
                     if (iframe.contentWindow) {
                         iframe.contentWindow.postMessage({ action: 'clearSelection' }, '*');
@@ -3816,7 +3845,7 @@
             // Delete or Backspace - Delete selected node
             if (e.key === 'Delete' || (e.key === 'Backspace' && e.metaKey)) {
                 // Only if we have a selected node
-                if (selectedStruct && selectedNode) {
+                if (selectedStruct && selectedNode != null) {
                     e.preventDefault();
                     deleteSelectedNode();
                 }
@@ -4161,6 +4190,20 @@
         }
         if (saveSnippetCancel) {
             saveSnippetCancel.addEventListener('click', hideSaveSnippetForm);
+        }
+        
+        // Save as Component
+        if (ctxNodeSaveComponent) {
+            ctxNodeSaveComponent.addEventListener('click', showSaveComponentForm);
+        }
+        if (saveComponentClose) {
+            saveComponentClose.addEventListener('click', hideSaveComponentForm);
+        }
+        if (saveComponentCancel) {
+            saveComponentCancel.addEventListener('click', hideSaveComponentForm);
+        }
+        if (saveComponentSubmit) {
+            saveComponentSubmit.addEventListener('click', submitSaveComponent);
         }
         
         // Variables panel button
@@ -6327,80 +6370,97 @@
         }
     }
     
-    // ========== Save as Snippet ==========
-    // Phase 5k: Save selected element as a reusable snippet
-    
+    // ========== Save as Snippet / Save as Component (shared) ==========
+
     // State for save snippet form
     let saveSnippetStructureData = null;
     let saveSnippetTranslationsData = null;
-    
+
+    // State for save component form
+    let saveComponentStructureData = null;
+
+    /**
+     * Extract the selected node's structure from the current selection.
+     * Shared helper for Save as Snippet and Save as Component.
+     * Returns { nodeData, structInfo } or throws on error.
+     */
+    async function extractSelectedNodeStructure() {
+        // Must have selection
+        if (selectedStruct == null || selectedNode == null) {
+            throw new Error(PreviewConfig.i18n.selectNodeFirst || 'Select an element first');
+        }
+        if (selectedNode === '' && currentEditType !== 'component') {
+            throw new Error(PreviewConfig.i18n?.cannotModifyRoot || 'Cannot save the root. Select a child element.');
+        }
+
+        const structInfo = parseStruct(selectedStruct);
+        if (!structInfo || !structInfo.type) {
+            throw new Error('Invalid structure type');
+        }
+
+        // Fetch full structure
+        const urlParams = [structInfo.type];
+        if (structInfo.name) {
+            urlParams.push(structInfo.name);
+        }
+        const response = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, urlParams);
+        if (!response.ok || !response.data?.data?.structure) {
+            throw new Error('Failed to get structure');
+        }
+
+        const structure = response.data.data.structure;
+        const nodeData = selectedNode === '' ? structure : navigateToNode(structure, selectedNode);
+        if (!nodeData) {
+            throw new Error('Node not found in structure');
+        }
+
+        return { nodeData: JSON.parse(JSON.stringify(nodeData)), structInfo };
+    }
+
+    /**
+     * Build a structure preview HTML string for a node.
+     */
+    function buildStructurePreviewHtml(nodeData) {
+        const tag = nodeData.tag || nodeData.component || '?';
+        const classes = nodeData.params?.class || '';
+        const childCount = (nodeData.children || []).length;
+        return `<code>&lt;${tag}${classes ? ' class="' + classes + '"' : ''}&gt;</code>` +
+            (childCount > 0 ? ` <small>(${childCount} children)</small>` : '');
+    }
+
     // Show save snippet form
     async function showSaveSnippetForm() {
         if (!saveSnippetForm) return;
-        
-        // Must have selection
-        if (selectedStruct == null || selectedNode == null) {
-            showToast(PreviewConfig.i18n.selectNodeFirst || 'Select an element first', 'warning');
-            return;
-        }
-        if (selectedNode === '' && currentEditType !== 'component') {
-            showToast(PreviewConfig.i18n?.cannotModifyRoot || 'Cannot save the root as snippet. Select a child element.', 'warning');
-            return;
-        }
-        
+
         try {
-            // Get structure data for the selected element
-            const structInfo = parseStruct(selectedStruct);
-            if (!structInfo || !structInfo.type) {
-                throw new Error('Invalid structure type');
-            }
-            
-            // Fetch full structure
-            const urlParams = [structInfo.type];
-            if (structInfo.name) {
-                urlParams.push(structInfo.name);
-            }
-            const response = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, urlParams);
-            if (!response.ok || !response.data?.data?.structure) {
-                throw new Error('Failed to get structure');
-            }
-            
-            const structure = response.data.data.structure;
-            // For root selection, use the entire structure; otherwise navigate to node
-            const nodeData = selectedNode === '' ? structure : navigateToNode(structure, selectedNode);
-            if (!nodeData) {
-                throw new Error('Node not found in structure');
-            }
-            
-            // Store original node data - will be cloned and remapped on submit
-            saveSnippetStructureData = JSON.parse(JSON.stringify(nodeData));
-            
+            const { nodeData } = await extractSelectedNodeStructure();
+
+            saveSnippetStructureData = nodeData;
+
+            // Hide other form if open
+            if (saveComponentForm) saveComponentForm.style.display = 'none';
+
             // Show the form
             const selectInfo = document.getElementById('contextual-select-info');
             if (selectInfo) selectInfo.style.display = 'none';
             saveSnippetForm.style.display = '';
-            
+
             // Reset form fields
             if (saveSnippetName) saveSnippetName.value = '';
             if (saveSnippetId) saveSnippetId.value = '';
             if (saveSnippetCategory) saveSnippetCategory.value = 'other';
             if (saveSnippetDesc) saveSnippetDesc.value = '';
-            
+
             // Show structure preview
             if (saveSnippetPreview) {
-                const tag = nodeData.tag || nodeData.component || '?';
-                const classes = nodeData.params?.class || '';
-                const childCount = (nodeData.children || []).length;
-                saveSnippetPreview.innerHTML = `<code>&lt;${tag}${classes ? ' class="' + classes + '"' : ''}&gt;</code>` +
-                    (childCount > 0 ? ` <small>(${childCount} children)</small>` : '');
+                saveSnippetPreview.innerHTML = buildStructurePreviewHtml(nodeData);
             }
-            
-            // Focus name input
+
             if (saveSnippetName) saveSnippetName.focus();
-            
+
         } catch (error) {
             console.error('[Preview] Save snippet form error:', error);
-            showToast(PreviewConfig.i18n.loadError || 'Failed to load element data', 'error');
+            showToast(error.message || PreviewConfig.i18n.loadError || 'Failed to load element data', 'error');
         }
     }
     
@@ -6415,6 +6475,213 @@
         // Clear state
         saveSnippetStructureData = null;
         saveSnippetTranslationsData = null;
+    }
+
+    // ========== Save as Component ==========
+
+    // Show save component form
+    async function showSaveComponentForm() {
+        if (!saveComponentForm) return;
+
+        try {
+            const { nodeData } = await extractSelectedNodeStructure();
+
+            saveComponentStructureData = nodeData;
+
+            // Hide other form if open
+            if (saveSnippetForm) saveSnippetForm.style.display = 'none';
+
+            // Show the form, hide the info panel
+            const selectInfo = document.getElementById('contextual-select-info');
+            if (selectInfo) selectInfo.style.display = 'none';
+            saveComponentForm.style.display = '';
+
+            // Reset form fields
+            if (saveComponentName) saveComponentName.value = '';
+
+            // Show structure preview
+            if (saveComponentPreview) {
+                saveComponentPreview.innerHTML = buildStructurePreviewHtml(nodeData);
+            }
+
+            if (saveComponentName) saveComponentName.focus();
+
+        } catch (error) {
+            console.error('[Preview] Save component form error:', error);
+            showToast(error.message || PreviewConfig.i18n.loadError || 'Failed to load element data', 'error');
+        }
+    }
+
+    // Hide save component form
+    function hideSaveComponentForm() {
+        if (!saveComponentForm) return;
+
+        saveComponentForm.style.display = 'none';
+        const selectInfo = document.getElementById('contextual-select-info');
+        if (selectInfo) selectInfo.style.display = '';
+
+        saveComponentStructureData = null;
+    }
+
+    /**
+     * Deep clone a node structure for component use.
+     * Converts real textKeys to {{placeholder}} variables.
+     * Keeps __RAW__ textKeys as-is, keeps component references as-is.
+     * Returns the cloned structure ready for editStructure API.
+     */
+    function deepCloneForComponent(node, usedNames = {}) {
+        if (!node || typeof node !== 'object') return node;
+
+        // Preserve component references as-is (nested components)
+        if (node.component) {
+            return JSON.parse(JSON.stringify(node));
+        }
+
+        const clone = {};
+
+        for (const key of Object.keys(node)) {
+            if (key.startsWith('data-qs-')) continue;
+
+            if (key === 'textKey') {
+                if (node.textKey && !node.textKey.startsWith('__RAW__')) {
+                    // Convert real textKey to {{placeholder}}
+                    const varName = deriveVarName(node.textKey, usedNames);
+                    clone.textKey = '{{' + varName + '}}';
+                } else {
+                    clone.textKey = node.textKey;
+                }
+            } else if (key === 'altKey') {
+                if (node.altKey && !node.altKey.startsWith('__RAW__')) {
+                    const varName = deriveVarName(node.altKey, usedNames, 'alt');
+                    clone.altKey = '{{' + varName + '}}';
+                } else {
+                    clone.altKey = node.altKey;
+                }
+            } else if (key === 'children' && Array.isArray(node.children)) {
+                clone.children = node.children.map(child => deepCloneForComponent(child, usedNames));
+            } else if (key === 'params' && typeof node.params === 'object') {
+                clone.params = {};
+                for (const [pKey, pVal] of Object.entries(node.params)) {
+                    if (pKey.startsWith('data-qs-')) continue;
+                    // Convert {{textKey:xxx}} param placeholders to {{varName}}
+                    if (typeof pVal === 'string' && pVal.includes('{{textKey:')) {
+                        const match = pVal.match(/\{\{textKey:([^}]+)\}\}/);
+                        if (match && match[1]) {
+                            const varName = deriveVarName(match[1], usedNames, pKey);
+                            clone.params[pKey] = pVal.replace(match[0], '{{' + varName + '}}');
+                        } else {
+                            clone.params[pKey] = pVal;
+                        }
+                    } else {
+                        clone.params[pKey] = pVal;
+                    }
+                }
+            } else if (typeof node[key] === 'object' && node[key] !== null) {
+                clone[key] = JSON.parse(JSON.stringify(node[key]));
+            } else {
+                clone[key] = node[key];
+            }
+        }
+
+        return clone;
+    }
+
+    /**
+     * Derive a variable name from a translation key path.
+     * e.g. "home.hero.title" → "title", "home.hero.title" (conflict) → "title2"
+     * hint param provides context when the key itself is not descriptive.
+     */
+    function deriveVarName(keyPath, usedNames, hint) {
+        // Take the last segment of the dot-path
+        const segments = keyPath.split('.');
+        let base = segments[segments.length - 1] || hint || 'var';
+
+        // Clean: keep only alphanumeric, hyphens, underscores
+        base = base.replace(/[^a-zA-Z0-9_-]/g, '').replace(/^[^a-zA-Z]/, 'v');
+        if (!base) base = hint || 'var';
+
+        let candidate = base;
+        let counter = 2;
+        while (usedNames[candidate]) {
+            candidate = base + counter++;
+        }
+        usedNames[candidate] = true;
+        return candidate;
+    }
+
+    // Submit save component form
+    async function submitSaveComponent() {
+        if (!saveComponentStructureData) {
+            showToast(PreviewConfig.i18n.noStructureData || 'No structure data available', 'error');
+            return;
+        }
+
+        const name = saveComponentName?.value?.trim();
+        if (!name) {
+            showToast(PreviewConfig.i18n.componentNameRequired || 'Component name is required', 'warning');
+            saveComponentName?.focus();
+            return;
+        }
+
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(name)) {
+            showToast(PreviewConfig.i18n.componentNameInvalid || 'Invalid name. Use only letters, numbers, hyphens, and underscores.', 'warning');
+            saveComponentName?.focus();
+            return;
+        }
+
+        showToast(PreviewConfig.i18n.saving || 'Saving...', 'info');
+
+        try {
+            // Clone structure and convert textKeys to {{placeholder}} variables
+            const componentStructure = deepCloneForComponent(saveComponentStructureData);
+
+            console.log('[Preview] Creating component:', { name, structure: componentStructure });
+
+            // Use editStructure API (same as "Create Component" button)
+            const response = await QuickSiteAdmin.apiRequest('editStructure', 'PUT', {
+                type: 'component',
+                name: name,
+                structure: componentStructure
+            });
+
+            if (response.ok) {
+                showToast(PreviewConfig.i18n.componentSaved || 'Component saved successfully!', 'success');
+
+                // Add to component dropdown in navigation if not already there
+                const tgtSelect = document.getElementById('preview-target');
+                if (tgtSelect) {
+                    const existingOption = tgtSelect.querySelector('option[value="component:' + name + '"]');
+                    if (!existingOption) {
+                        let componentsGroup = tgtSelect.querySelector('optgroup[label*="Components"], optgroup[label*="🧩"]');
+                        if (!componentsGroup) {
+                            componentsGroup = document.createElement('optgroup');
+                            componentsGroup.label = '🧩 ' + (PreviewConfig.i18n.components || 'Components');
+                            tgtSelect.appendChild(componentsGroup);
+                        }
+                        const newOption = document.createElement('option');
+                        newOption.value = 'component:' + name;
+                        newOption.textContent = name;
+                        componentsGroup.appendChild(newOption);
+                    }
+                }
+
+                // Also add to the component select in add-node modal if present
+                const addComponentSelect = document.getElementById('add-node-component');
+                if (addComponentSelect && !addComponentSelect.querySelector('option[value="' + name + '"]')) {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    addComponentSelect.appendChild(opt);
+                }
+
+                hideSaveComponentForm();
+            } else {
+                throw new Error(response.data?.message || 'Failed to save component');
+            }
+        } catch (error) {
+            console.error('[Preview] Save component error:', error);
+            showToast(error.message || PreviewConfig.i18n.saveFailed || 'Failed to save component', 'error');
+        }
     }
     
     // ==================== Variables Panel (Component-only) ====================
@@ -6474,24 +6741,62 @@
     }
     
     /**
-     * Recursively collect all nodes with textKey from a structure
-     * @returns Array of { nodeId, tag, textKey, path }
+     * Navigate a structure tree to find a node at a given dot-separated path
+     * @param {object} structure - root structure object
+     * @param {string} nodeId - dot-separated path like '0.1.2' or '' for root
+     * @returns {object|null} the node at that path
      */
-    function collectTextKeyNodes(node, nodeId, parentPath) {
+    function getNodeByPath(structure, nodeId) {
+        if (nodeId === '' || nodeId === null || nodeId === undefined) return structure;
+        
+        const parts = nodeId.split('.').map(Number);
+        let current = structure;
+        
+        for (let i = 0; i < parts.length; i++) {
+            if (i === 0) {
+                if (Array.isArray(current)) {
+                    current = current[parts[i]];
+                } else if (current.children && Array.isArray(current.children)) {
+                    current = current.children[parts[i]];
+                } else {
+                    return null;
+                }
+            } else {
+                if (current && current.children && Array.isArray(current.children)) {
+                    current = current.children[parts[i]];
+                } else {
+                    return null;
+                }
+            }
+            if (!current) return null;
+        }
+        
+        return current;
+    }
+    
+    /**
+     * Collect direct text key items from a node: its own textKey + immediate children's textKeys
+     * @returns Array of { nodeId, tag, textKey, path, isSelf }
+     */
+    function collectDirectTextKeys(node, baseNodeId) {
         const results = [];
         if (!node || typeof node !== 'object') return results;
         
         const tag = node.tag || node.component || '?';
-        const path = parentPath ? parentPath + ' > ' + tag : tag;
         
+        // Node's own textKey
         if (node.textKey) {
-            results.push({ nodeId, tag, textKey: node.textKey, path });
+            results.push({ nodeId: baseNodeId, tag, textKey: node.textKey, path: tag, isSelf: true });
         }
         
+        // Immediate children's textKeys (not recursive)
         if (node.children && Array.isArray(node.children)) {
             node.children.forEach((child, i) => {
-                const childId = nodeId ? nodeId + '.' + i : String(i);
-                results.push(...collectTextKeyNodes(child, childId, path));
+                if (child && child.textKey) {
+                    const childId = baseNodeId ? baseNodeId + '.' + i : String(i);
+                    const childTag = child.tag || child.component || '?';
+                    results.push({ nodeId: childId, tag: childTag, textKey: child.textKey, path: tag + ' > ' + childTag, isSelf: false });
+                }
             });
         }
         
@@ -6499,18 +6804,26 @@
     }
     
     /**
-     * Count nodes without textKey (containers)
+     * Collect params from a node, filtering out data-qs-* editor attributes
+     * @returns Array of { paramName, value, editValue, isVariable }
      */
-    function countContainerNodes(node) {
-        if (!node || typeof node !== 'object') return 0;
-        let count = 0;
-        if (!node.textKey && node.tag) count = 1;
-        if (node.children && Array.isArray(node.children)) {
-            node.children.forEach(child => {
-                count += countContainerNodes(child);
-            });
+    function collectNodeParams(node) {
+        const results = [];
+        if (!node || !node.params || typeof node.params !== 'object') return results;
+        
+        for (const [paramName, value] of Object.entries(node.params)) {
+            if (paramName.startsWith('data-qs-')) continue;
+            
+            const strValue = String(value);
+            // Check if the entire value is a single {{variable}}
+            const varMatch = strValue.match(/^\{\{([^}]+)\}\}$/);
+            const isVariable = !!varMatch;
+            const editValue = isVariable ? varMatch[1] : strValue;
+            
+            results.push({ paramName, value: strValue, editValue, isVariable });
         }
-        return count;
+        
+        return results;
     }
     
     /**
@@ -6552,16 +6865,17 @@
     }
     
     /**
-     * Show the Variables panel
+     * Show the Variables panel (context-sensitive to selected node)
      */
     async function showVariablesPanel() {
         if (!variablesPanel || currentEditType !== 'component') return;
         
-        // Hide select info, show variables panel
-        const selectInfo = document.getElementById('contextual-select-info');
-        if (selectInfo) selectInfo.style.display = 'none';
-        // Also hide snippet form if open
+        // Hide action buttons but keep nav arrows and select-info visible
+        const nodeActions = document.getElementById('ctx-node-actions');
+        if (nodeActions) nodeActions.style.display = 'none';
+        // Also hide snippet/component forms if open
         if (saveSnippetForm) saveSnippetForm.style.display = 'none';
+        if (saveComponentForm) saveComponentForm.style.display = 'none';
         
         variablesPanel.style.display = '';
         
@@ -6598,24 +6912,31 @@
                 }
             }
             
-            // Collect textKey nodes
-            const textKeyNodes = collectTextKeyNodes(variablesPanelStructure, '', '');
-            const containerCount = countContainerNodes(variablesPanelStructure);
+            // Navigate to the selected node (fallback to root)
+            const nodeId = (selectedNode != null) ? selectedNode : '';
+            const targetNode = getNodeByPath(variablesPanelStructure, nodeId);
+            if (!targetNode) throw new Error('Node not found: ' + nodeId);
+            
+            // Collect direct textKey items and params for this node
+            const textKeyNodes = collectDirectTextKeys(targetNode, nodeId);
+            const paramNodes = collectNodeParams(targetNode);
             
             // Hide loading
             if (variablesPanelLoading) variablesPanelLoading.style.display = 'none';
             
-            if (textKeyNodes.length === 0) {
+            if (textKeyNodes.length === 0 && paramNodes.length === 0) {
                 // Show empty state
                 if (variablesPanelEmpty) variablesPanelEmpty.style.display = '';
             } else {
-                // Render cards
-                renderVariableCards(textKeyNodes);
+                // Render sections
+                renderVariableSections(textKeyNodes, paramNodes);
             }
             
-            // Show footer info
-            if (containerCount > 0 && variablesPanelFooter && variablesPanelFooterText) {
-                variablesPanelFooterText.textContent = (PreviewConfig.i18n?.variablesContainerCount || '%d container node(s) without text binding').replace('%d', containerCount);
+            // Show footer with selected node info
+            if (variablesPanelFooter && variablesPanelFooterText) {
+                const tag = targetNode.tag || targetNode.component || '?';
+                const display = nodeId === '' ? tag + ' (root)' : tag + ' [' + nodeId + ']';
+                variablesPanelFooterText.textContent = (PreviewConfig.i18n?.variablesNodeInfo || 'Showing: %s').replace('%s', display);
                 variablesPanelFooter.style.display = '';
             }
             
@@ -6686,12 +7007,47 @@
     }
 
     /**
-     * Render variable cards for textKey nodes
+     * Render both text and param variable sections
      */
-    function renderVariableCards(textKeyNodes) {
+    function renderVariableSections(textKeyNodes, paramNodes) {
         if (!variablesPanelCards) return;
         variablesPanelCards.innerHTML = '';
         
+        // Text Variables section
+        if (textKeyNodes.length > 0) {
+            const section = document.createElement('div');
+            section.className = 'preview-variables-section';
+            
+            const title = document.createElement('h5');
+            title.className = 'preview-variables-section__title';
+            title.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>' +
+                (PreviewConfig.i18n?.variablesSectionText || 'Text Variables');
+            section.appendChild(title);
+            
+            renderVariableCards(textKeyNodes, section);
+            variablesPanelCards.appendChild(section);
+        }
+        
+        // Param Variables section
+        if (paramNodes.length > 0) {
+            const section = document.createElement('div');
+            section.className = 'preview-variables-section';
+            
+            const title = document.createElement('h5');
+            title.className = 'preview-variables-section__title';
+            title.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>' +
+                (PreviewConfig.i18n?.variablesSectionParams || 'Parameters');
+            section.appendChild(title);
+            
+            renderParamCards(paramNodes, section);
+            variablesPanelCards.appendChild(section);
+        }
+    }
+
+    /**
+     * Render variable cards for textKey nodes into a container
+     */
+    function renderVariableCards(textKeyNodes, container) {
         textKeyNodes.forEach(item => {
             const type = detectTextKeyType(item.textKey);
             const editValue = textKeyToEditValue(item.textKey, type);
@@ -6791,7 +7147,122 @@
                 });
             }
             
-            variablesPanelCards.appendChild(card);
+            container.appendChild(card);
+        });
+    }
+    
+    /**
+     * Render param variable cards into a container
+     */
+    function renderParamCards(paramNodes, container) {
+        paramNodes.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'preview-variable-card preview-variable-card--param';
+            card.dataset.paramName = item.paramName;
+            
+            // Param name header
+            const pathEl = document.createElement('div');
+            pathEl.className = 'preview-variable-card__path';
+            pathEl.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>' +
+                '<span>' + escapeHtml(item.paramName) + '</span>';
+            card.appendChild(pathEl);
+            
+            // Type selector (string / variable)
+            const typeDiv = document.createElement('div');
+            typeDiv.className = 'preview-variable-card__type';
+            const typeSelect = document.createElement('select');
+            typeSelect.innerHTML = 
+                '<option value="string"' + (!item.isVariable ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeString || 'Literal String') + '</option>' +
+                '<option value="variable"' + (item.isVariable ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeVariable || 'Variable {{...}}') + '</option>';
+            typeDiv.appendChild(typeSelect);
+            card.appendChild(typeDiv);
+            
+            // Value editor
+            const valueDiv = document.createElement('div');
+            valueDiv.className = 'preview-variable-card__value';
+            const editorWrapper = document.createElement('div');
+            editorWrapper.className = 'preview-variable-card__editor';
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.value = item.editValue;
+            inp.placeholder = item.isVariable 
+                ? (PreviewConfig.i18n?.variablesPlaceholderVariable || 'e.g. SUBTITLE')
+                : (PreviewConfig.i18n?.variablesPlaceholderParamString || 'e.g. /page/link');
+            editorWrapper.appendChild(inp);
+            
+            // Hint for variable type
+            const hint = document.createElement('div');
+            hint.className = 'preview-variable-card__hint';
+            hint.textContent = item.isVariable 
+                ? (PreviewConfig.i18n?.variablesHintVariable || '{{}} added automatically — use CAPS by convention')
+                : '';
+            hint.style.display = item.isVariable ? '' : 'none';
+            editorWrapper.appendChild(hint);
+            
+            valueDiv.appendChild(editorWrapper);
+            
+            const saveBtn = document.createElement('button');
+            saveBtn.type = 'button';
+            saveBtn.className = 'preview-variable-card__save-btn';
+            saveBtn.textContent = PreviewConfig.i18n?.save || 'Save';
+            valueDiv.appendChild(saveBtn);
+            card.appendChild(valueDiv);
+            
+            // Preview line
+            const previewEl = document.createElement('div');
+            previewEl.className = 'preview-variable-card__preview';
+            previewEl.textContent = '\u2192 ' + item.value;
+            card.appendChild(previewEl);
+            
+            // --- Event handlers ---
+            
+            // Type change: update hints/placeholder, keep value
+            typeSelect.addEventListener('change', function() {
+                const isVar = this.value === 'variable';
+                const currentVal = inp.value.trim();
+                
+                inp.placeholder = isVar 
+                    ? (PreviewConfig.i18n?.variablesPlaceholderVariable || 'e.g. SUBTITLE')
+                    : (PreviewConfig.i18n?.variablesPlaceholderParamString || 'e.g. /page/link');
+                hint.textContent = isVar 
+                    ? (PreviewConfig.i18n?.variablesHintVariable || '{{}} added automatically — use CAPS by convention')
+                    : '';
+                hint.style.display = isVar ? '' : 'none';
+                
+                const previewVal = isVar ? '{{' + currentVal + '}}' : currentVal;
+                previewEl.textContent = '\u2192 ' + (previewVal || '(empty)');
+            });
+            
+            // Input change: update preview
+            inp.addEventListener('input', function() {
+                const isVar = typeSelect.value === 'variable';
+                const val = this.value.trim();
+                const previewVal = isVar ? '{{' + val + '}}' : val;
+                previewEl.textContent = '\u2192 ' + (previewVal || '(empty)');
+            });
+            
+            // Save button
+            saveBtn.addEventListener('click', async function() {
+                const isVar = typeSelect.value === 'variable';
+                const val = inp.value.trim();
+                if (!val) {
+                    showToast(PreviewConfig.i18n?.variablesValueRequired || 'Value cannot be empty', 'warning');
+                    return;
+                }
+                const newParamValue = isVar ? '{{' + val + '}}' : val;
+                previewEl.textContent = '\u2192 ' + newParamValue;
+                await saveParamCard(card, item.paramName, newParamValue, previewEl);
+            });
+            
+            // Enter key
+            inp.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveBtn.click();
+                }
+            });
+            
+            container.appendChild(card);
         });
     }
     
@@ -6841,6 +7312,43 @@
     }
     
     /**
+     * Save a single param card's value to the backend
+     */
+    async function saveParamCard(cardEl, paramName, newValue, previewEl) {
+        if (!variablesPanelStructure) return;
+        
+        cardEl.classList.add('preview-variable-card--saving');
+        
+        try {
+            const nodeId = (selectedNode != null) ? selectedNode : '';
+            const targetNode = getNodeByPath(variablesPanelStructure, nodeId);
+            if (!targetNode) throw new Error('Node not found');
+            
+            if (!targetNode.params) targetNode.params = {};
+            targetNode.params[paramName] = newValue;
+            
+            // Send full structure to backend
+            const result = await QuickSiteAdmin.apiRequest('editStructure', 'PUT', {
+                type: 'component',
+                name: currentEditName,
+                structure: variablesPanelStructure
+            });
+            
+            if (!result.ok) throw new Error(result.data?.message || 'Save failed');
+            
+            showToast(PreviewConfig.i18n?.variablesSaved || 'Variable saved', 'success');
+            reloadPreview();
+            
+        } catch (error) {
+            console.error('[Preview] Param save error:', error);
+            showToast((PreviewConfig.i18n?.error || 'Error') + ': ' + error.message, 'error');
+            if (previewEl) previewEl.textContent = '\u2192 (save failed)';
+        } finally {
+            cardEl.classList.remove('preview-variable-card--saving');
+        }
+    }
+    
+    /**
      * Hide the Variables panel
      */
     function hideVariablesPanel() {
@@ -6849,8 +7357,9 @@
         variablesPanel.style.display = 'none';
         variablesPanelStructure = null;
         
-        const selectInfo = document.getElementById('contextual-select-info');
-        if (selectInfo) selectInfo.style.display = '';
+        // Restore action buttons
+        const nodeActions = document.getElementById('ctx-node-actions');
+        if (nodeActions) nodeActions.style.display = '';
     }
     
     // Deep clone a node (removes internal QS attributes) and remap textKeys

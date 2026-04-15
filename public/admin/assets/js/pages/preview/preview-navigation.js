@@ -61,7 +61,7 @@
      */
     function navigateToParent() {
         const state = getState();
-        if (!state || !state.navHasParent || !state.selectedStruct || !state.selectedNode) return;
+        if (!state || !state.navHasParent || !state.selectedStruct || state.selectedNode == null) return;
         
         PreviewState.sendToIframe('navigateToParent', {
             struct: state.selectedStruct,
@@ -74,7 +74,7 @@
      */
     function navigateToPrevSibling() {
         const state = getState();
-        if (!state || !state.navHasPrevSibling || !state.selectedStruct || !state.selectedNode) return;
+        if (!state || !state.navHasPrevSibling || !state.selectedStruct || state.selectedNode == null) return;
         
         PreviewState.sendToIframe('navigateToPrevSibling', {
             struct: state.selectedStruct,
@@ -87,7 +87,7 @@
      */
     function navigateToNextSibling() {
         const state = getState();
-        if (!state || !state.navHasNextSibling || !state.selectedStruct || !state.selectedNode) return;
+        if (!state || !state.navHasNextSibling || !state.selectedStruct || state.selectedNode == null) return;
         
         PreviewState.sendToIframe('navigateToNextSibling', {
             struct: state.selectedStruct,
@@ -100,7 +100,7 @@
      */
     function navigateToFirstChild() {
         const state = getState();
-        if (!state || !state.navHasChildren || !state.selectedStruct || !state.selectedNode) return;
+        if (!state || !state.navHasChildren || !state.selectedStruct || state.selectedNode == null) return;
         
         PreviewState.sendToIframe('navigateToFirstChild', {
             struct: state.selectedStruct,
@@ -116,7 +116,7 @@
      */
     function handleArrowKey(key) {
         const state = getState();
-        if (!state || !state.selectedNode) return false;
+        if (!state || state.selectedNode == null) return false;
         
         switch (key) {
             case 'ArrowUp':
