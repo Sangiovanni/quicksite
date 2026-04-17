@@ -401,6 +401,15 @@ class JsonToPhpCompiler {
         // Process system placeholders in data FIRST
         $data = $this->processDataPlaceholders($data);
         
+        // Extract __enums__ metadata and strip it from template before processing
+        $enums = $componentStructure['__enums__'] ?? null;
+        unset($componentStructure['__enums__']);
+        
+        // Resolve enum variables: enrich data with mapped values
+        if ($enums) {
+            $data = $this->resolveEnumVariables($enums, $data, $componentName);
+        }
+        
         // Then process component template with data
         $processedComponent = $this->processComponentTemplate($componentStructure, $data);
         
@@ -414,7 +423,8 @@ class JsonToPhpCompiler {
     private function processComponentTemplate($template, array $data) {
         if (is_string($template)) {
             // Replace {{placeholder}} with actual value
-            return preg_replace_callback('/\{\{(\w+)\}\}/', function($matches) use ($data) {
+            // [\w-]+ allows hyphens in variable names (e.g. alt-logo)
+            return preg_replace_callback('/\{\{([\w-]+)\}\}/', function($matches) use ($data) {
                 $key = $matches[1];
                 return $data[$key] ?? $matches[0]; // Keep placeholder if no data
             }, $template);
@@ -429,6 +439,47 @@ class JsonToPhpCompiler {
         }
         
         return $template;
+    }
+
+    /**
+     * Resolve enum variables from __enums__ metadata.
+     * For each enum definition, looks up the source key in data,
+     * finds the mapped value, and adds the derived variable to data.
+     *
+     * @param array $enums The __enums__ definitions from the component
+     * @param array $data The component instance data
+     * @param string $componentName For logging
+     * @return array Enriched data with resolved enum values
+     */
+    private function resolveEnumVariables(array $enums, array $data, string $componentName): array {
+        foreach ($enums as $varName => $enumDef) {
+            if (!is_array($enumDef) || !isset($enumDef['source']) || !isset($enumDef['map']) || !is_array($enumDef['map'])) {
+                continue;
+            }
+
+            $sourceKey = $enumDef['source'];
+            $map = $enumDef['map'];
+            $mapKeys = array_keys($map);
+
+            if (empty($mapKeys)) {
+                continue;
+            }
+
+            // Get the chosen key from instance data, or use default
+            $chosenKey = $data[$sourceKey] ?? null;
+            $defaultKey = $enumDef['default'] ?? $mapKeys[0];
+
+            if ($chosenKey === null || !isset($map[$chosenKey])) {
+                if ($chosenKey !== null) {
+                    error_log("Component '{$componentName}': enum '{$varName}' has unknown key '{$chosenKey}', using default '{$defaultKey}'");
+                }
+                $chosenKey = $defaultKey;
+            }
+
+            $data[$varName] = $map[$chosenKey];
+        }
+
+        return $data;
     }
     
     /**

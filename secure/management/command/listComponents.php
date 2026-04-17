@@ -54,7 +54,13 @@ function extractVariables($node, &$variables = []) {
                     if (!$exists) {
                         // Determine type based on attribute name
                         $type = in_array($paramName, $translatableParams, true) ? 'textKey' : 'param';
-                        $variables[] = ['name' => $varName, 'type' => $type];
+                        $entry = ['name' => $varName, 'type' => $type];
+                        // Include context for param variables (enables asset picker in frontend)
+                        if ($type === 'param') {
+                            $entry['paramName'] = $paramName;
+                            $entry['parentTag'] = $node['tag'] ?? null;
+                        }
+                        $variables[] = $entry;
                     }
                 }
             }
@@ -226,6 +232,45 @@ function __command_listComponents(array $params = [], array $urlParams = []): Ap
             // Array of nodes
             foreach ($structure as $node) {
                 extractVariables($node, $variables);
+            }
+        }
+        
+        // Extract __enums__ from root-level component structure
+        $enums = $structure['__enums__'] ?? [];
+        $enumDerivedVars = []; // Variable names auto-resolved by enums
+        $enumSourceVars = [];  // Source keys exposed to frontend as type "enum"
+        
+        if (is_array($enums) && !empty($enums)) {
+            foreach ($enums as $varName => $enumDef) {
+                if (!is_array($enumDef) || !isset($enumDef['source']) || !isset($enumDef['map']) || !is_array($enumDef['map'])) {
+                    continue;
+                }
+                
+                $enumDerivedVars[] = $varName;
+                $sourceKey = $enumDef['source'];
+                $mapKeys = array_keys($enumDef['map']);
+                $defaultKey = $enumDef['default'] ?? ($mapKeys[0] ?? null);
+                
+                // Only add source key once (multiple enums can share the same source)
+                if (!isset($enumSourceVars[$sourceKey])) {
+                    $enumSourceVars[$sourceKey] = [
+                        'name' => $sourceKey,
+                        'type' => 'enum',
+                        'options' => $mapKeys,
+                        'default' => $defaultKey,
+                    ];
+                }
+            }
+            
+            // Remove enum-derived variables from the regular variables list
+            // (they're auto-resolved, not user-fillable)
+            $variables = array_values(array_filter($variables, function ($v) use ($enumDerivedVars) {
+                return !in_array($v['name'], $enumDerivedVars, true);
+            }));
+            
+            // Add enum source keys to the variables list
+            foreach ($enumSourceVars as $enumVar) {
+                $variables[] = $enumVar;
             }
         }
         

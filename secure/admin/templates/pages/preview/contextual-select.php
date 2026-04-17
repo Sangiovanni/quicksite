@@ -78,11 +78,31 @@
                 </svg>
                 <span><?= __admin('preview.variables') ?? 'Variables' ?></span>
             </button>
+            <!-- Enums button (component-only, shown/hidden by JS) -->
+            <button type="button" class="admin-btn admin-btn--secondary" id="ctx-node-enums" title="<?= __admin('preview.enums') ?? 'Enums' ?>" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                </svg>
+                <span><?= __admin('preview.enums') ?? 'Enums' ?></span>
+            </button>
+            <!-- Emulation button (component-only, shown/hidden by JS) -->
+            <button type="button" class="admin-btn admin-btn--secondary" id="ctx-node-emulation" title="<?= __admin('preview.emulation') ?? 'Variable Emulation' ?>" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <span><?= __admin('preview.emulation') ?? 'Emulation' ?></span>
+            </button>
         </div>
     </div>
     
     <!-- Variables Panel (component-only) -->
     <?php include __DIR__ . '/contextual-variables.php'; ?>
+
+    <!-- Enums Panel (component-only) -->
+    <?php include __DIR__ . '/contextual-enums.php'; ?>
+
+    <!-- Variable Emulation Panel (component-only) -->
+    <?php include __DIR__ . '/contextual-emulation.php'; ?>
 
     <!-- Save as Snippet Form (shown when save-snippet clicked) -->
     <div class="preview-contextual-form save-snippet-form" id="contextual-save-snippet-form" style="display: none;">

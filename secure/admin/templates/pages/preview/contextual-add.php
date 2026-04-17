@@ -75,6 +75,21 @@
             <?php $selectorId = 'add'; include '_component-selector.php'; ?>
         </div>
         
+        <!-- Component Variables (for Component type) — right after selector for visibility -->
+        <div class="preview-contextual-form__section" id="add-component-vars" style="display: none;">
+            <div class="preview-contextual-form__component-vars-list" id="add-component-vars-container">
+                <!-- Dynamically populated: textKey info rows + param input rows -->
+            </div>
+            <div class="preview-contextual-form__info" id="add-component-no-vars" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="16" x2="12" y2="12"/>
+                    <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+                <span><?= __admin('preview.componentNoVars') ?? 'This component has no configurable variables' ?></span>
+            </div>
+        </div>
+
         <!-- Snippet Selection (for Snippet type) -->
         <div class="preview-contextual-form__field" id="add-snippet-field">
             <label><?= __admin('preview.selectSnippet') ?? 'Select Snippet' ?>:</label>
@@ -208,24 +223,6 @@
                 <polyline points="21 15 16 10 5 21"/>
             </svg>
             <span><?= __admin('preview.altKeyWillGenerate') ?? 'Alt text key will be auto-generated' ?>: <code id="add-generated-altkey-preview">-</code></span>
-        </div>
-        
-        <!-- Component Variables (for Component type) -->
-        <div class="preview-contextual-form__section" id="add-component-vars" style="display: none;">
-            <label class="preview-contextual-form__section-label">
-                <?= __admin('preview.componentVariables') ?? 'Component Variables' ?>:
-            </label>
-            <div class="preview-contextual-form__component-vars-list" id="add-component-vars-container">
-                <!-- Dynamically populated: textKey vars (read-only), param vars (input) -->
-            </div>
-            <div class="preview-contextual-form__info" id="add-component-no-vars" style="display: none;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="12" y1="16" x2="12" y2="12"/>
-                    <line x1="12" y1="8" x2="12.01" y2="8"/>
-                </svg>
-                <span><?= __admin('preview.componentNoVars') ?? 'This component has no configurable variables' ?></span>
-            </div>
         </div>
         
         <!-- BOTTOM Action Buttons -->

@@ -120,9 +120,6 @@
                         </svg>
                     </button>
                 </div>
-                <div class="preview-selectors-info" id="selector-info">
-                    <span id="selector-count">0</span> <?= __admin('preview.selectorsFound') ?? 'selectors' ?>
-                </div>
             </div>
             
             <!-- Selector Loading -->
@@ -221,12 +218,31 @@
                         </svg>
                         <?= __admin('preview.editStyles') ?? 'Edit Styles' ?>
                     </button>
+                    <button type="button" class="admin-btn admin-btn--sm admin-btn--outline" id="selector-copy-from-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                        <?= __admin('preview.copyStyleFrom') ?? 'Copy From…' ?>
+                    </button>
                     <button type="button" class="admin-btn admin-btn--sm admin-btn--secondary" id="selector-animate-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <polygon points="5 3 19 12 5 21 5 3"/>
                         </svg>
                         <?= __admin('preview.animate') ?? 'Animate' ?>
                     </button>
+                </div>
+                <!-- Copy From selector picker (hidden by default) -->
+                <div class="preview-selector-copy-picker" id="selector-copy-picker" style="display: none;">
+                    <div class="preview-selector-copy-picker__header">
+                        <span><?= __admin('preview.copyStyleFromLabel') ?? 'Copy styles from:' ?></span>
+                        <button type="button" class="preview-selector-copy-picker__close" id="selector-copy-picker-close" title="<?= __admin('common.cancel') ?? 'Cancel' ?>">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <input type="text" class="admin-input admin-input--sm preview-selector-copy-picker__search" id="selector-copy-search" placeholder="<?= __admin('preview.searchSelectors') ?? 'Search selectors…' ?>">
+                    <div class="preview-selector-copy-picker__list" id="selector-copy-list"></div>
                 </div>
             </div>
         </div>

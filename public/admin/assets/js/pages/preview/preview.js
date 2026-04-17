@@ -94,6 +94,27 @@
     const variablesPanelFooter = document.getElementById('variables-panel-footer');
     const variablesPanelFooterText = document.getElementById('variables-panel-footer-text');
     
+    // Enums panel elements (component-only)
+    const enumsPanel = document.getElementById('contextual-enums-panel');
+    const enumsPanelClose = document.getElementById('enums-panel-close');
+    const enumsPanelLoading = document.getElementById('enums-panel-loading');
+    const enumsPanelEmpty = document.getElementById('enums-panel-empty');
+    const enumsPanelCards = document.getElementById('enums-panel-cards');
+    const enumsPanelAdd = document.getElementById('enums-panel-add');
+    const enumsPanelAddBtn = document.getElementById('enums-panel-add-btn');
+    const ctxNodeEnums = document.getElementById('ctx-node-enums');
+    
+    // Emulation panel elements (component-only)
+    const emulationPanel = document.getElementById('contextual-emulation-panel');
+    const emulationPanelClose = document.getElementById('emulation-panel-close');
+    const emulationPanelLoading = document.getElementById('emulation-panel-loading');
+    const emulationPanelEmpty = document.getElementById('emulation-panel-empty');
+    const emulationPanelFields = document.getElementById('emulation-panel-fields');
+    const emulationPanelActions = document.getElementById('emulation-panel-actions');
+    const emulationApplyBtn = document.getElementById('emulation-apply-btn');
+    const emulationResetBtn = document.getElementById('emulation-reset-btn');
+    const ctxNodeEmulation = document.getElementById('ctx-node-emulation');
+    
     // Text mode contextual elements
     const ctxTextDefault = document.getElementById('contextual-text-default');
     const ctxTextInfo = document.getElementById('contextual-text-info');
@@ -2114,6 +2135,16 @@
         if (editType === 'component') {
             // Component preview - standalone component render
             url += '?_component=' + encodeURIComponent(editName) + '&_editor=1';
+            // Include emulation data if available
+            try {
+                const raw = localStorage.getItem('qs_emulate_' + editName);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+                        url += '&_emulate=' + encodeURIComponent(btoa(raw));
+                    }
+                }
+            } catch(e) {}
         } else if (editType === 'layout') {
             // Layout preview (menu/footer) - load home page where they're visible
             if (multilingual) {
@@ -2157,7 +2188,12 @@
         showLoading();
         startLoadingTimeout();
         overlayInjected = false;
-        iframe.src = iframe.src;
+        // For component preview, rebuild URL to include current emulation data
+        if (currentEditType === 'component') {
+            iframe.src = buildUrl(currentEditType, currentEditName);
+        } else {
+            iframe.src = iframe.src;
+        }
     }
     
     /**
@@ -2217,6 +2253,10 @@
         if (variablesPanel && variablesPanel.style.display !== 'none') {
             hideVariablesPanel();
         }
+        // Hide Enums panel when navigating away
+        if (enumsPanel && enumsPanel.style.display !== 'none') {
+            hideEnumsPanel();
+        }
         
         // Update component warning banner
         updateComponentWarning(editType, editName);
@@ -2255,9 +2295,25 @@
         if (ctxNodeVariables) {
             ctxNodeVariables.style.display = editType === 'component' ? '' : 'none';
         }
+        // Show/hide Enums button (component-only)
+        if (ctxNodeEnums) {
+            ctxNodeEnums.style.display = editType === 'component' ? '' : 'none';
+        }
+        // Show/hide Emulation button (component-only)
+        if (ctxNodeEmulation) {
+            ctxNodeEmulation.style.display = editType === 'component' ? '' : 'none';
+        }
         // Hide Variables panel if open and switching away from component
         if (editType !== 'component' && variablesPanel && variablesPanel.style.display !== 'none') {
             hideVariablesPanel();
+        }
+        // Hide Enums panel if open and switching away from component
+        if (editType !== 'component' && enumsPanel && enumsPanel.style.display !== 'none') {
+            hideEnumsPanel();
+        }
+        // Hide Emulation panel if open and switching away from component
+        if (editType !== 'component' && emulationPanel && emulationPanel.style.display !== 'none') {
+            hideEmulationPanel();
         }
         
         if (editType !== 'component') {
@@ -2975,6 +3031,19 @@
             variablesPanel.style.display = 'none';
             variablesPanelStructure = null;
         }
+        // Hide Enums panel if open
+        if (enumsPanel && enumsPanel.style.display !== 'none') {
+            enumsPanel.style.display = 'none';
+            enumsPanelStructure = null;
+        }
+        // Hide Emulation panel if open
+        if (emulationPanel && emulationPanel.style.display !== 'none') {
+            emulationPanel.style.display = 'none';
+        }
+        
+        // Restore action buttons (may have been hidden by Variables/Enums panel)
+        const nodeActions = document.getElementById('ctx-node-actions');
+        if (nodeActions) nodeActions.style.display = '';
         
         // Hide mobile sections
         hideMobileSections();
@@ -3066,6 +3135,7 @@
             // Delegate to Style Editor module
             if (window.PreviewStyleEditor) {
                 PreviewSelectorBrowser.onOpenStyleEditor(PreviewStyleEditor.open);
+                PreviewSelectorBrowser.onCopyStyleFrom(PreviewStyleEditor.open);
             }
             PreviewSelectorBrowser.onOpenTransitionEditor(openTransitionEditor);
         }
@@ -3141,6 +3211,8 @@
         
         // If Variables panel is open, refresh it for the new node instead of hiding
         const variablesPanelOpen = variablesPanel && variablesPanel.style.display !== 'none';
+        // If Enums panel is open, keep it open (it's component-global, not node-specific)
+        const enumsPanelOpen = enumsPanel && enumsPanel.style.display !== 'none';
         if (variablesPanelOpen) {
             // Update state first, then refresh
             if (window.PreviewState) {
@@ -4214,6 +4286,31 @@
             variablesPanelClose.addEventListener('click', hideVariablesPanel);
         }
         
+        // Enums panel button
+        if (ctxNodeEnums) {
+            ctxNodeEnums.addEventListener('click', showEnumsPanel);
+        }
+        if (enumsPanelClose) {
+            enumsPanelClose.addEventListener('click', hideEnumsPanel);
+        }
+        if (enumsPanelAddBtn) {
+            enumsPanelAddBtn.addEventListener('click', addNewEnum);
+        }
+        
+        // Emulation panel button
+        if (ctxNodeEmulation) {
+            ctxNodeEmulation.addEventListener('click', showEmulationPanel);
+        }
+        if (emulationPanelClose) {
+            emulationPanelClose.addEventListener('click', hideEmulationPanel);
+        }
+        if (emulationApplyBtn) {
+            emulationApplyBtn.addEventListener('click', applyEmulation);
+        }
+        if (emulationResetBtn) {
+            emulationResetBtn.addEventListener('click', resetEmulation);
+        }
+        
         // Auto-generate ID from name
         if (saveSnippetName) {
             saveSnippetName.addEventListener('input', function() {
@@ -4817,32 +4914,104 @@
             if (!addComponentVarsContainer) return;
             
             addComponentVarsContainer.innerHTML = '';
-            vars.forEach(v => {
-                const row = document.createElement('div');
-                row.className = 'preview-contextual-form__param-row';
+            
+            const enumVars = vars.filter(v => v.type === 'enum');
+            const paramVars = vars.filter(v => v.type === 'param');
+            const textKeyVars = vars.filter(v => v.type === 'textKey');
+            
+            // Enums section — select dropdowns
+            if (enumVars.length > 0) {
+                const enumSection = document.createElement('div');
+                enumSection.className = 'preview-variables-section';
+                enumSection.innerHTML = `<div class="preview-variables-section__title">${PreviewConfig.i18n.variablesSectionEnums || 'Enums'}</div>`;
                 
-                if (v.type === 'textKey') {
+                enumVars.forEach(v => {
+                    const options = v.options || [];
+                    const defaultVal = v.default || options[0] || '';
+                    const row = document.createElement('div');
+                    row.className = 'preview-contextual-form__param-row';
                     row.innerHTML = `
                         <label class="preview-contextual-form__param-label">${escapeHTML(v.name)}:</label>
-                        <div class="preview-contextual-form__info" style="margin:0;padding:2px 0;">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-                            </svg>
-                            <span style="font-size:0.75rem;">${PreviewConfig.i18n.textKeyAutoGenerated || 'Auto-generated text key'}</span>
+                        <select class="admin-input admin-input--sm preview-contextual-form__param-input"
+                                data-var-name="${escapeHTML(v.name)}">
+                            ${options.map(opt => `<option value="${escapeHTML(opt)}"${opt === defaultVal ? ' selected' : ''}>${escapeHTML(opt)}</option>`).join('')}
+                        </select>
+                    `;
+                    enumSection.appendChild(row);
+                });
+                addComponentVarsContainer.appendChild(enumSection);
+            }
+            
+            // Parameters section — editable inputs
+            if (paramVars.length > 0) {
+                const paramSection = document.createElement('div');
+                paramSection.className = 'preview-variables-section';
+                paramSection.innerHTML = `<div class="preview-variables-section__title">${PreviewConfig.i18n.variablesSectionParams || 'Parameters'}</div>`;
+                
+                paramVars.forEach(v => {
+                    const row = document.createElement('div');
+                    row.className = 'preview-contextual-form__param-row';
+                    
+                    // Check if this param variable should show an asset browse button
+                    const showBrowse = v.paramName === 'src' && v.parentTag in ASSET_BROWSABLE_TAGS;
+                    const showRouteList = v.paramName === 'href' && v.parentTag === 'a';
+                    const datalistId = showRouteList ? `add-comp-${v.name}-routes` : '';
+                    
+                    row.innerHTML = `
+                        <label class="preview-contextual-form__param-label">${escapeHTML(v.name)}:</label>
+                        <div class="preview-contextual-form__param-input-group">
+                            <input type="text" 
+                                   class="admin-input admin-input--sm preview-contextual-form__param-input" 
+                                   data-var-name="${escapeHTML(v.name)}"
+                                   placeholder="${showRouteList ? (PreviewConfig.i18n.hrefPlaceholder || 'Select route or type URL') : `{{${escapeHTML(v.name)}}}`}"
+                                   ${showRouteList ? `list="${datalistId}"` : ''}>
+                            ${showBrowse ? `<button type="button" class="admin-btn admin-btn--sm admin-btn--outline preview-asset-browse-btn" data-category="${ASSET_BROWSABLE_TAGS[v.parentTag] || ''}" title="Browse assets">📁</button>` : ''}
                         </div>
-                        <input type="hidden" data-var-name="${escapeHTML(v.name)}" value="">
+                        ${showRouteList ? `<datalist id="${datalistId}"></datalist>` : ''}
                     `;
-                } else {
-                    row.innerHTML = `
-                        <label class="preview-contextual-form__param-label">${escapeHTML(v.name)}:</label>
-                        <input type="text" 
-                               class="admin-input admin-input--sm preview-contextual-form__param-input" 
-                               data-var-name="${escapeHTML(v.name)}"
-                               placeholder="${PreviewConfig.i18n.optional || 'Optional'}">
-                    `;
-                }
-                addComponentVarsContainer.appendChild(row);
-            });
+                    paramSection.appendChild(row);
+                    
+                    if (showBrowse) {
+                        row.querySelector('.preview-asset-browse-btn').addEventListener('click', () => {
+                            openAssetPicker(row.querySelector(`input[data-var-name="${v.name}"]`), ASSET_BROWSABLE_TAGS[v.parentTag]);
+                        });
+                    }
+                    
+                    if (showRouteList) {
+                        populateRouteDatalist(datalistId);
+                    }
+                });
+                addComponentVarsContainer.appendChild(paramSection);
+            }
+            
+            // Text keys section — info only
+            if (textKeyVars.length > 0) {
+                const textSection = document.createElement('div');
+                textSection.className = 'preview-variables-section';
+                textSection.innerHTML = `<div class="preview-variables-section__title">${PreviewConfig.i18n.variablesSectionText || 'Text Variables'}</div>`;
+                
+                const infoRow = document.createElement('div');
+                infoRow.className = 'preview-contextual-form__info';
+                infoRow.style.margin = '0';
+                infoRow.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                    </svg>
+                    <span style="font-size:0.75rem;">${textKeyVars.map(v => escapeHTML(v.name)).join(', ')} — ${PreviewConfig.i18n.textKeyAutoGenerated || 'auto-generated text keys, editable in Text mode'}</span>
+                `;
+                textSection.appendChild(infoRow);
+                
+                // Hidden inputs for data collection
+                textKeyVars.forEach(v => {
+                    const hidden = document.createElement('input');
+                    hidden.type = 'hidden';
+                    hidden.dataset.varName = v.name;
+                    hidden.value = '';
+                    textSection.appendChild(hidden);
+                });
+                
+                addComponentVarsContainer.appendChild(textSection);
+            }
         }
         
         // Search filtering
@@ -6240,7 +6409,7 @@
         
         // Collect component variables if any
         const vars = {};
-        const varInputs = addComponentVarsContainer?.querySelectorAll('input[data-var-name]') || [];
+        const varInputs = addComponentVarsContainer?.querySelectorAll('input[data-var-name], select[data-var-name]') || [];
         varInputs.forEach(input => {
             const varName = input.dataset.varName;
             if (input.value) vars[varName] = input.value;
@@ -6690,6 +6859,8 @@
     let variablesPanelStructure = null;
     // Cached flat list of translation key names
     let variablesPanelTranslationKeys = [];
+    // Cached list of enum variable names (keys from __enums__)
+    let variablesPanelEnumVarNames = [];
     
     /**
      * Flatten nested translation object into dot-notation keys
@@ -6715,7 +6886,12 @@
      */
     function detectTextKeyType(textKey) {
         if (!textKey) return 'translation';
-        if (textKey.startsWith('{{') && textKey.endsWith('}}')) return 'variable';
+        if (textKey.startsWith('{{') && textKey.endsWith('}}')) {
+            // Check if it's an enum-derived variable
+            const varName = textKey.slice(2, -2);
+            if (variablesPanelEnumVarNames.includes(varName)) return 'enum';
+            return 'variable';
+        }
         if (textKey.startsWith('__RAW__')) return 'raw';
         return 'translation';
     }
@@ -6725,7 +6901,7 @@
      */
     function textKeyToEditValue(textKey, type) {
         if (!textKey) return '';
-        if (type === 'variable') return textKey.slice(2, -2); // strip {{ }}
+        if (type === 'variable' || type === 'enum') return textKey.slice(2, -2); // strip {{ }}
         if (type === 'raw') return textKey.slice(7); // strip __RAW__
         return textKey; // translation key as-is
     }
@@ -6735,7 +6911,7 @@
      */
     function editValueToTextKey(value, type) {
         if (!value) return '';
-        if (type === 'variable') return '{{' + value + '}}';
+        if (type === 'variable' || type === 'enum') return '{{' + value + '}}';
         if (type === 'raw') return '__RAW__' + value;
         return value; // translation key as-is
     }
@@ -6902,6 +7078,13 @@
             
             variablesPanelStructure = JSON.parse(JSON.stringify(resp.data.data.structure));
             
+            // Extract available enum variable names from __enums__
+            variablesPanelEnumVarNames = [];
+            const enums = variablesPanelStructure.__enums__;
+            if (enums && typeof enums === 'object') {
+                variablesPanelEnumVarNames = Object.keys(enums);
+            }
+            
             // Extract flat translation key list from first available language
             variablesPanelTranslationKeys = [];
             if (transResp.ok && transResp.data?.data?.translations) {
@@ -6983,6 +7166,30 @@
                 sel.appendChild(customOpt);
             }
             wrapper.appendChild(sel);
+            return { container: wrapper, getValue: () => sel.value, el: sel };
+        }
+
+        if (type === 'enum') {
+            // Select dropdown populated from __enums__ variable names
+            const sel = document.createElement('select');
+            sel.className = 'preview-variable-card__value-select';
+            const emptyOpt = document.createElement('option');
+            emptyOpt.value = '';
+            emptyOpt.textContent = '— ' + (PreviewConfig.i18n?.variablesSelectEnum || 'Select an enum variable') + ' —';
+            sel.appendChild(emptyOpt);
+            variablesPanelEnumVarNames.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                if (name === currentValue) opt.selected = true;
+                sel.appendChild(opt);
+            });
+            wrapper.appendChild(sel);
+            // Hint
+            const hint = document.createElement('div');
+            hint.className = 'preview-variable-card__hint';
+            hint.textContent = PreviewConfig.i18n?.variablesHintEnum || 'Resolved from enum definition at render time';
+            wrapper.appendChild(hint);
             return { container: wrapper, getValue: () => sel.value, el: sel };
         }
 
@@ -7078,6 +7285,7 @@
             typeSelect.innerHTML = 
                 '<option value="translation"' + (type === 'translation' ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeTranslation || 'Translation Key') + '</option>' +
                 '<option value="variable"' + (type === 'variable' ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeVariable || 'Variable {{...}}') + '</option>' +
+                '<option value="enum"' + (type === 'enum' ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeEnum || 'Enum') + '</option>' +
                 '<option value="raw"' + (type === 'raw' ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeRaw || 'Raw Text') + '</option>';
             typeDiv.appendChild(typeSelect);
             card.appendChild(typeDiv);
@@ -7160,6 +7368,10 @@
             card.className = 'preview-variable-card preview-variable-card--param';
             card.dataset.paramName = item.paramName;
             
+            // Detect initial type: enum, variable, or string
+            const isEnum = item.isVariable && variablesPanelEnumVarNames.includes(item.editValue);
+            const initialType = isEnum ? 'enum' : (item.isVariable ? 'variable' : 'string');
+            
             // Param name header
             const pathEl = document.createElement('div');
             pathEl.className = 'preview-variable-card__path';
@@ -7167,13 +7379,14 @@
                 '<span>' + escapeHtml(item.paramName) + '</span>';
             card.appendChild(pathEl);
             
-            // Type selector (string / variable)
+            // Type selector (string / variable / enum)
             const typeDiv = document.createElement('div');
             typeDiv.className = 'preview-variable-card__type';
             const typeSelect = document.createElement('select');
             typeSelect.innerHTML = 
-                '<option value="string"' + (!item.isVariable ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeString || 'Literal String') + '</option>' +
-                '<option value="variable"' + (item.isVariable ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeVariable || 'Variable {{...}}') + '</option>';
+                '<option value="string"' + (initialType === 'string' ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeString || 'Literal String') + '</option>' +
+                '<option value="variable"' + (initialType === 'variable' ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeVariable || 'Variable {{...}}') + '</option>' +
+                '<option value="enum"' + (initialType === 'enum' ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeEnum || 'Enum') + '</option>';
             typeDiv.appendChild(typeSelect);
             card.appendChild(typeDiv);
             
@@ -7182,21 +7395,52 @@
             valueDiv.className = 'preview-variable-card__value';
             const editorWrapper = document.createElement('div');
             editorWrapper.className = 'preview-variable-card__editor';
+            
+            // Text input (for string / variable types)
             const inp = document.createElement('input');
             inp.type = 'text';
-            inp.value = item.editValue;
-            inp.placeholder = item.isVariable 
+            inp.value = isEnum ? '' : item.editValue;
+            inp.placeholder = initialType === 'variable' 
                 ? (PreviewConfig.i18n?.variablesPlaceholderVariable || 'e.g. SUBTITLE')
                 : (PreviewConfig.i18n?.variablesPlaceholderParamString || 'e.g. /page/link');
-            editorWrapper.appendChild(inp);
             
-            // Hint for variable type
+            // Enum select (for enum type)
+            const enumSel = document.createElement('select');
+            enumSel.className = 'preview-variable-card__value-select';
+            const emptyOpt = document.createElement('option');
+            emptyOpt.value = '';
+            emptyOpt.textContent = '— ' + (PreviewConfig.i18n?.variablesSelectEnum || 'Select an enum variable') + ' —';
+            enumSel.appendChild(emptyOpt);
+            variablesPanelEnumVarNames.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                if (isEnum && name === item.editValue) opt.selected = true;
+                enumSel.appendChild(opt);
+            });
+            
+            // Show the right editor based on initial type
+            if (initialType === 'enum') {
+                inp.style.display = 'none';
+                editorWrapper.appendChild(enumSel);
+                editorWrapper.appendChild(inp);
+            } else {
+                enumSel.style.display = 'none';
+                editorWrapper.appendChild(inp);
+                editorWrapper.appendChild(enumSel);
+            }
+            
+            // Hint
             const hint = document.createElement('div');
             hint.className = 'preview-variable-card__hint';
-            hint.textContent = item.isVariable 
-                ? (PreviewConfig.i18n?.variablesHintVariable || '{{}} added automatically — use CAPS by convention')
-                : '';
-            hint.style.display = item.isVariable ? '' : 'none';
+            if (initialType === 'variable') {
+                hint.textContent = PreviewConfig.i18n?.variablesHintVariable || '{{}} added automatically — use CAPS by convention';
+            } else if (initialType === 'enum') {
+                hint.textContent = PreviewConfig.i18n?.variablesHintEnum || 'Resolved from enum definition at render time';
+            } else {
+                hint.textContent = '';
+                hint.style.display = 'none';
+            }
             editorWrapper.appendChild(hint);
             
             valueDiv.appendChild(editorWrapper);
@@ -7216,21 +7460,34 @@
             
             // --- Event handlers ---
             
-            // Type change: update hints/placeholder, keep value
+            // Type change: toggle input vs enum select, update hints/placeholder
             typeSelect.addEventListener('change', function() {
-                const isVar = this.value === 'variable';
-                const currentVal = inp.value.trim();
-                
-                inp.placeholder = isVar 
-                    ? (PreviewConfig.i18n?.variablesPlaceholderVariable || 'e.g. SUBTITLE')
-                    : (PreviewConfig.i18n?.variablesPlaceholderParamString || 'e.g. /page/link');
-                hint.textContent = isVar 
-                    ? (PreviewConfig.i18n?.variablesHintVariable || '{{}} added automatically — use CAPS by convention')
-                    : '';
-                hint.style.display = isVar ? '' : 'none';
-                
-                const previewVal = isVar ? '{{' + currentVal + '}}' : currentVal;
-                previewEl.textContent = '\u2192 ' + (previewVal || '(empty)');
+                const newType = this.value;
+                if (newType === 'enum') {
+                    inp.style.display = 'none';
+                    enumSel.style.display = '';
+                    hint.textContent = PreviewConfig.i18n?.variablesHintEnum || 'Resolved from enum definition at render time';
+                    hint.style.display = '';
+                    const selVal = enumSel.value;
+                    previewEl.textContent = '\u2192 ' + (selVal ? '{{' + selVal + '}}' : '(empty)');
+                } else {
+                    inp.style.display = '';
+                    enumSel.style.display = 'none';
+                    const isVar = newType === 'variable';
+                    inp.placeholder = isVar 
+                        ? (PreviewConfig.i18n?.variablesPlaceholderVariable || 'e.g. SUBTITLE')
+                        : (PreviewConfig.i18n?.variablesPlaceholderParamString || 'e.g. /page/link');
+                    if (isVar) {
+                        hint.textContent = PreviewConfig.i18n?.variablesHintVariable || '{{}} added automatically — use CAPS by convention';
+                        hint.style.display = '';
+                    } else {
+                        hint.textContent = '';
+                        hint.style.display = 'none';
+                    }
+                    const currentVal = inp.value.trim();
+                    const previewVal = isVar ? '{{' + currentVal + '}}' : currentVal;
+                    previewEl.textContent = '\u2192 ' + (previewVal || '(empty)');
+                }
             });
             
             // Input change: update preview
@@ -7241,20 +7498,37 @@
                 previewEl.textContent = '\u2192 ' + (previewVal || '(empty)');
             });
             
+            // Enum select change: update preview
+            enumSel.addEventListener('change', function() {
+                const val = this.value;
+                previewEl.textContent = '\u2192 ' + (val ? '{{' + val + '}}' : '(empty)');
+            });
+            
             // Save button
             saveBtn.addEventListener('click', async function() {
-                const isVar = typeSelect.value === 'variable';
-                const val = inp.value.trim();
-                if (!val) {
-                    showToast(PreviewConfig.i18n?.variablesValueRequired || 'Value cannot be empty', 'warning');
-                    return;
+                const currentType = typeSelect.value;
+                let newParamValue;
+                if (currentType === 'enum') {
+                    const val = enumSel.value;
+                    if (!val) {
+                        showToast(PreviewConfig.i18n?.variablesValueRequired || 'Value cannot be empty', 'warning');
+                        return;
+                    }
+                    newParamValue = '{{' + val + '}}';
+                } else {
+                    const isVar = currentType === 'variable';
+                    const val = inp.value.trim();
+                    if (!val) {
+                        showToast(PreviewConfig.i18n?.variablesValueRequired || 'Value cannot be empty', 'warning');
+                        return;
+                    }
+                    newParamValue = isVar ? '{{' + val + '}}' : val;
                 }
-                const newParamValue = isVar ? '{{' + val + '}}' : val;
                 previewEl.textContent = '\u2192 ' + newParamValue;
                 await saveParamCard(card, item.paramName, newParamValue, previewEl);
             });
             
-            // Enter key
+            // Enter key (only on text input)
             inp.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -7360,6 +7634,1008 @@
         // Restore action buttons
         const nodeActions = document.getElementById('ctx-node-actions');
         if (nodeActions) nodeActions.style.display = '';
+    }
+    
+    // ==================== Enums Panel (Component-only) ====================
+    
+    // Stored component structure for enums editing
+    let enumsPanelStructure = null;
+    // Cached flat list of translation key names for enum value selection
+    let enumsPanelTranslationKeys = [];
+    
+    /**
+     * Show the Enums panel — loads component structure, extracts __enums__
+     */
+    async function showEnumsPanel() {
+        if (!enumsPanel || currentEditType !== 'component') return;
+        
+        // Hide other panels
+        const nodeActions = document.getElementById('ctx-node-actions');
+        if (nodeActions) nodeActions.style.display = 'none';
+        if (variablesPanel) variablesPanel.style.display = 'none';
+        if (emulationPanel) emulationPanel.style.display = 'none';
+        if (saveSnippetForm) saveSnippetForm.style.display = 'none';
+        if (saveComponentForm) saveComponentForm.style.display = 'none';
+        
+        enumsPanel.style.display = '';
+        
+        // Show loading
+        if (enumsPanelLoading) enumsPanelLoading.style.display = '';
+        if (enumsPanelEmpty) enumsPanelEmpty.style.display = 'none';
+        if (enumsPanelCards) enumsPanelCards.innerHTML = '';
+        if (enumsPanelAdd) enumsPanelAdd.style.display = 'none';
+        
+        try {
+            const structInfo = parseStruct(selectedStruct || ('component-' + currentEditName));
+            if (!structInfo) throw new Error('Invalid struct');
+            
+            const urlParams = [structInfo.type];
+            if (structInfo.name) urlParams.push(structInfo.name);
+            
+            const [resp, transResp] = await Promise.all([
+                QuickSiteAdmin.apiRequest('getStructure', 'GET', null, urlParams),
+                QuickSiteAdmin.apiRequest('getTranslations', 'GET')
+            ]);
+            
+            if (!resp.ok || !resp.data?.data?.structure) throw new Error('Failed to get structure');
+            
+            enumsPanelStructure = JSON.parse(JSON.stringify(resp.data.data.structure));
+            
+            // Extract flat translation key list from first available language
+            enumsPanelTranslationKeys = [];
+            if (transResp.ok && transResp.data?.data?.translations) {
+                const allTranslations = transResp.data.data.translations;
+                const firstLang = Object.keys(allTranslations)[0];
+                if (firstLang) {
+                    enumsPanelTranslationKeys = flattenTranslationKeys(allTranslations[firstLang], '').sort();
+                }
+            }
+            
+            const enums = enumsPanelStructure.__enums__ || {};
+            
+            // Hide loading
+            if (enumsPanelLoading) enumsPanelLoading.style.display = 'none';
+            
+            if (Object.keys(enums).length === 0) {
+                if (enumsPanelEmpty) enumsPanelEmpty.style.display = '';
+            } else {
+                renderEnumCards(enums);
+            }
+            
+            // Show Add button
+            if (enumsPanelAdd) enumsPanelAdd.style.display = '';
+            
+        } catch (error) {
+            console.error('[Preview] Enums panel error:', error);
+            if (enumsPanelLoading) enumsPanelLoading.style.display = 'none';
+            if (enumsPanelCards) {
+                enumsPanelCards.innerHTML = '<div style="color:var(--admin-danger);font-size:var(--font-size-sm);padding:var(--space-sm);">' +
+                    (PreviewConfig.i18n?.error || 'Error') + ': ' + error.message + '</div>';
+            }
+        }
+    }
+    
+    /**
+     * Hide the Enums panel
+     */
+    function hideEnumsPanel() {
+        if (!enumsPanel) return;
+        
+        enumsPanel.style.display = 'none';
+        enumsPanelStructure = null;
+        enumsPanelTranslationKeys = [];
+        
+        // Restore action buttons
+        const nodeActions = document.getElementById('ctx-node-actions');
+        if (nodeActions) nodeActions.style.display = '';
+    }
+    
+    /**
+     * Render all enum cards into the panel
+     */
+    function renderEnumCards(enums) {
+        if (!enumsPanelCards) return;
+        enumsPanelCards.innerHTML = '';
+        
+        for (const [varName, enumDef] of Object.entries(enums)) {
+            if (!enumDef || typeof enumDef !== 'object' || !enumDef.source || !enumDef.map) continue;
+            enumsPanelCards.appendChild(createEnumCard(varName, enumDef));
+        }
+    }
+    
+    /**
+     * Create a single enum card element
+     * 
+     * Card layout:
+     * ┌─ varName ─────────────────────────────┐
+     * │ Source: [sourceKey]                     │
+     * │ Default: [select ▾]                    │
+     * │ ┌──────────────────────────────────┐   │
+     * │ │ Key     │ Value                  │   │
+     * │ │ get     │ get-style              │ 🗑│
+     * │ │ post    │ post-style             │ 🗑│
+     * │ └──────────────────────────────────┘   │
+     * │ [+ Add Option]            [Save] [🗑]  │
+     * └────────────────────────────────────────┘
+     */
+    function createEnumCard(varName, enumDef) {
+        const card = document.createElement('div');
+        card.className = 'preview-enum-card';
+        card.dataset.varName = varName;
+        
+        const source = enumDef.source || '';
+        const map = enumDef.map || {};
+        const mapKeys = Object.keys(map);
+        const defaultKey = enumDef.default || mapKeys[0] || '';
+        
+        // Header with variable name (clickable to rename)
+        const header = document.createElement('div');
+        header.className = 'preview-enum-card__header';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'preview-enum-card__name';
+        nameSpan.textContent = varName;
+
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'preview-enum-card__edit-name-btn';
+        editBtn.title = PreviewConfig.i18n?.enumRenameTip || 'Rename';
+        editBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'admin-input admin-input--sm preview-enum-card__name-input';
+        nameInput.value = varName;
+        nameInput.placeholder = PreviewConfig.i18n?.enumNamePlaceholder || 'enum_name';
+        nameInput.style.display = 'none';
+
+        const confirmBtn = document.createElement('button');
+        confirmBtn.type = 'button';
+        confirmBtn.className = 'preview-enum-card__name-confirm';
+        confirmBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="20 6 9 17 4 12"/></svg>';
+        confirmBtn.style.display = 'none';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'preview-enum-card__name-cancel';
+        cancelBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+        cancelBtn.style.display = 'none';
+
+        function startRename() {
+            nameSpan.style.display = 'none';
+            editBtn.style.display = 'none';
+            nameInput.style.display = '';
+            confirmBtn.style.display = '';
+            cancelBtn.style.display = '';
+            nameInput.value = card.dataset.varName;
+            nameInput.focus();
+            nameInput.select();
+        }
+
+        function finishRename(accept) {
+            if (accept) {
+                const newName = nameInput.value.trim().replace(/[^a-zA-Z0-9_]/g, '_');
+                const oldName = card.dataset.varName;
+                if (!newName) {
+                    showToast(PreviewConfig.i18n?.enumNameRequired || 'Enum name is required', 'warning');
+                    nameInput.focus();
+                    return;
+                }
+                // Check for duplicates (skip self)
+                const existing = enumsPanelStructure?.__enums__ || {};
+                if (newName !== oldName && existing[newName]) {
+                    showToast((PreviewConfig.i18n?.enumNameDuplicate || 'Enum "%s" already exists').replace('%s', newName), 'warning');
+                    nameInput.focus();
+                    return;
+                }
+                nameSpan.textContent = newName;
+                card.dataset.varName = newName;
+            }
+            nameSpan.style.display = '';
+            editBtn.style.display = '';
+            nameInput.style.display = 'none';
+            confirmBtn.style.display = 'none';
+            cancelBtn.style.display = 'none';
+        }
+
+        editBtn.addEventListener('click', startRename);
+        nameSpan.addEventListener('dblclick', startRename);
+        confirmBtn.addEventListener('click', () => finishRename(true));
+        cancelBtn.addEventListener('click', () => finishRename(false));
+        nameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); finishRename(true); }
+            if (e.key === 'Escape') { finishRename(false); }
+        });
+
+        header.appendChild(nameSpan);
+        header.appendChild(editBtn);
+        header.appendChild(nameInput);
+        header.appendChild(confirmBtn);
+        header.appendChild(cancelBtn);
+        card.appendChild(header);
+        
+        // Source key field
+        const sourceRow = document.createElement('div');
+        sourceRow.className = 'preview-enum-card__field';
+        sourceRow.innerHTML = `
+            <label class="preview-enum-card__label">${PreviewConfig.i18n?.enumSource || 'Source key'}:</label>
+            <input type="text" class="admin-input admin-input--sm preview-enum-card__source-input" value="${escapeHTML(source)}" placeholder="e.g. method">
+        `;
+        card.appendChild(sourceRow);
+        
+        // Detect default type from existing values: majority __RAW__ → raw, otherwise translation
+        const rawCount = Object.values(map).filter(v => String(v).startsWith('__RAW__')).length;
+        const totalCount = mapKeys.length;
+        const detectedDefault = (totalCount > 0 && rawCount > totalCount / 2) ? 'raw' : 'translation';
+        
+        // Default value type dropdown (card-level)
+        const typeRow = document.createElement('div');
+        typeRow.className = 'preview-enum-card__field';
+        const rawLabel = PreviewConfig.i18n?.variablesTypeRaw || 'Raw Text';
+        const transLabel = PreviewConfig.i18n?.variablesTypeTranslation || 'Translation Key';
+        typeRow.innerHTML = `
+            <label class="preview-enum-card__label">${PreviewConfig.i18n?.enumValueType || 'Value type'}:</label>
+            <select class="admin-input admin-input--sm preview-enum-card__type-select">
+                <option value="raw" ${detectedDefault === 'raw' ? 'selected' : ''}>${escapeHTML(rawLabel)}</option>
+                <option value="translation" ${detectedDefault === 'translation' ? 'selected' : ''}>${escapeHTML(transLabel)}</option>
+            </select>
+        `;
+        card.appendChild(typeRow);
+        
+        // Default dropdown
+        const defaultRow = document.createElement('div');
+        defaultRow.className = 'preview-enum-card__field';
+        defaultRow.innerHTML = `
+            <label class="preview-enum-card__label">${PreviewConfig.i18n?.enumDefault || 'Default'}:</label>
+            <select class="admin-input admin-input--sm preview-enum-card__default-select">
+                ${mapKeys.map(k => `<option value="${escapeHTML(k)}" ${k === defaultKey ? 'selected' : ''}>${escapeHTML(k)}</option>`).join('')}
+            </select>
+        `;
+        card.appendChild(defaultRow);
+        
+        // Map table
+        const mapContainer = document.createElement('div');
+        mapContainer.className = 'preview-enum-card__map';
+        
+        const table = document.createElement('table');
+        table.className = 'preview-enum-card__table';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>${PreviewConfig.i18n?.enumKey || 'Key'}</th>
+                    <th>${PreviewConfig.i18n?.enumValue || 'Value'}</th>
+                    <th>${PreviewConfig.i18n?.enumType || 'Type'}</th>
+                    <th></th>
+                </tr>
+            </thead>
+        `;
+        const tbody = document.createElement('tbody');
+        tbody.className = 'preview-enum-card__tbody';
+        
+        mapKeys.forEach(key => {
+            const rawValue = map[key];
+            const isRaw = String(rawValue).startsWith('__RAW__');
+            // Per-row type: if it differs from card default, it's an override
+            const rowType = isRaw ? 'raw' : 'translation';
+            const displayValue = isRaw ? String(rawValue).slice(7) : rawValue;
+            const hasOverride = rowType !== detectedDefault;
+            tbody.appendChild(createEnumMapRow(key, displayValue, hasOverride ? rowType : null, detectedDefault));
+        });
+        
+        table.appendChild(tbody);
+        mapContainer.appendChild(table);
+        card.appendChild(mapContainer);
+        
+        // When card-level type changes, update all rows without an override
+        const cardTypeSelect = typeRow.querySelector('.preview-enum-card__type-select');
+        cardTypeSelect?.addEventListener('change', () => {
+            const newCardType = cardTypeSelect.value;
+            tbody.querySelectorAll('.preview-enum-card__row').forEach(row => {
+                const rowTypeSelect = row.querySelector('.preview-enum-card__row-type-select');
+                if (!rowTypeSelect?.value) {
+                    // No override — follows card default
+                    const valInput = row.querySelector('.preview-enum-card__value-input');
+                    const valSelect = row.querySelector('.preview-enum-card__value-select');
+                    if (valInput && valSelect) updateEnumRowValueWidget(valInput, valSelect, newCardType);
+                }
+            });
+        });
+        
+        // Add option button
+        const addOptionBtn = document.createElement('button');
+        addOptionBtn.type = 'button';
+        addOptionBtn.className = 'admin-btn admin-btn--sm admin-btn--outline preview-enum-card__add-option';
+        addOptionBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> ${PreviewConfig.i18n?.enumAddOption || 'Add Option'}`;
+        addOptionBtn.addEventListener('click', () => {
+            const currentCardType = card.querySelector('.preview-enum-card__type-select')?.value || 'translation';
+            tbody.appendChild(createEnumMapRow('', '', null, currentCardType));
+            refreshDefaultSelect(card, tbody);
+        });
+        card.appendChild(addOptionBtn);
+        
+        // Action buttons — Save and Delete
+        const actions = document.createElement('div');
+        actions.className = 'preview-enum-card__actions';
+        
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.className = 'admin-btn admin-btn--sm admin-btn--primary';
+        saveBtn.textContent = PreviewConfig.i18n?.save || 'Save';
+        saveBtn.addEventListener('click', () => saveEnumCard(card, varName));
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'admin-btn admin-btn--sm admin-btn--danger';
+        deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
+        deleteBtn.title = PreviewConfig.i18n?.delete || 'Delete';
+        deleteBtn.addEventListener('click', () => deleteEnumCard(varName));
+        
+        actions.appendChild(saveBtn);
+        actions.appendChild(deleteBtn);
+        card.appendChild(actions);
+        
+        return card;
+    }
+    
+    /**
+     * Create a single row in the enum map table
+     * @param {string} key - Map key
+     * @param {string} value - Display value (already stripped of __RAW__ if applicable)
+     * @param {string|null} typeOverride - 'raw'|'translation' if row overrides card default, null for default
+     * @param {string} cardDefaultType - The card-level default type ('raw' or 'translation')
+     */
+    function createEnumMapRow(key, value, typeOverride, cardDefaultType) {
+        const tr = document.createElement('tr');
+        tr.className = 'preview-enum-card__row';
+        
+        const rawLabel = PreviewConfig.i18n?.variablesTypeRaw || 'Raw Text';
+        const transLabel = PreviewConfig.i18n?.variablesTypeTranslation || 'Translation Key';
+        const defaultLabel = PreviewConfig.i18n?.enumTypeDefault || '(default)';
+        
+        // Key cell
+        const keyTd = document.createElement('td');
+        keyTd.innerHTML = `<input type="text" class="admin-input admin-input--sm preview-enum-card__key-input" value="${escapeHTML(String(key))}" placeholder="${PreviewConfig.i18n?.enumKeyPlaceholder || 'key'}">`;
+        
+        // Value cell — contains both a text input and a translation select, one visible at a time
+        const valueTd = document.createElement('td');
+        
+        const valInput = document.createElement('input');
+        valInput.type = 'text';
+        valInput.className = 'admin-input admin-input--sm preview-enum-card__value-input';
+        valInput.value = String(value);
+        valInput.placeholder = PreviewConfig.i18n?.enumValuePlaceholder || 'value';
+        
+        const valSelect = document.createElement('select');
+        valSelect.className = 'admin-input admin-input--sm preview-enum-card__value-select';
+        const emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = '— ' + (PreviewConfig.i18n?.variablesPlaceholderTranslation || 'Select a translation key') + ' —';
+        valSelect.appendChild(emptyOpt);
+        enumsPanelTranslationKeys.forEach(k => {
+            const opt = document.createElement('option');
+            opt.value = k;
+            opt.textContent = k;
+            if (k === value) opt.selected = true;
+            valSelect.appendChild(opt);
+        });
+        // If current value exists but not in the list, add as custom option
+        if (value && !enumsPanelTranslationKeys.includes(value)) {
+            const customOpt = document.createElement('option');
+            customOpt.value = value;
+            customOpt.textContent = value + ' (?)';
+            customOpt.selected = true;
+            valSelect.appendChild(customOpt);
+        }
+        
+        valueTd.appendChild(valInput);
+        valueTd.appendChild(valSelect);
+        
+        // Determine effective type and show correct widget
+        const effectiveType = typeOverride || cardDefaultType || 'translation';
+        updateEnumRowValueWidget(valInput, valSelect, effectiveType);
+        
+        // Type cell — shows "(default)" label that can be clicked to override
+        const typeTd = document.createElement('td');
+        typeTd.className = 'preview-enum-card__type-cell';
+        
+        const typeLabel = document.createElement('span');
+        typeLabel.className = 'preview-enum-card__type-label';
+        typeLabel.textContent = defaultLabel;
+        typeLabel.title = PreviewConfig.i18n?.enumTypeOverrideTip || 'Click to override type';
+        
+        const typeSelect = document.createElement('select');
+        typeSelect.className = 'admin-input admin-input--sm preview-enum-card__row-type-select';
+        typeSelect.innerHTML = `
+            <option value="">${escapeHTML(defaultLabel)}</option>
+            <option value="raw">${escapeHTML(rawLabel)}</option>
+            <option value="translation">${escapeHTML(transLabel)}</option>
+        `;
+        
+        if (typeOverride) {
+            typeSelect.value = typeOverride;
+            typeLabel.style.display = 'none';
+            typeSelect.style.display = '';
+        } else {
+            typeLabel.style.display = '';
+            typeSelect.style.display = 'none';
+        }
+        
+        typeLabel.addEventListener('click', () => {
+            typeLabel.style.display = 'none';
+            typeSelect.style.display = '';
+            typeSelect.focus();
+        });
+        
+        typeSelect.addEventListener('change', () => {
+            if (typeSelect.value === '') {
+                // Reverted to default — use card default type
+                typeSelect.style.display = 'none';
+                typeLabel.style.display = '';
+                const card = tr.closest('.preview-enum-card');
+                const cardType = card?.querySelector('.preview-enum-card__type-select')?.value || 'translation';
+                updateEnumRowValueWidget(valInput, valSelect, cardType);
+            } else {
+                updateEnumRowValueWidget(valInput, valSelect, typeSelect.value);
+            }
+        });
+        
+        typeTd.appendChild(typeLabel);
+        typeTd.appendChild(typeSelect);
+        
+        // Remove cell
+        const removeTd = document.createElement('td');
+        removeTd.innerHTML = `<button type="button" class="preview-enum-card__remove-row" title="${PreviewConfig.i18n?.remove || 'Remove'}">&times;</button>`;
+        
+        tr.appendChild(keyTd);
+        tr.appendChild(valueTd);
+        tr.appendChild(typeTd);
+        tr.appendChild(removeTd);
+        
+        // Remove row button
+        removeTd.querySelector('.preview-enum-card__remove-row').addEventListener('click', () => {
+            const card = tr.closest('.preview-enum-card');
+            const tbody = tr.closest('tbody');
+            tr.remove();
+            if (card && tbody) refreshDefaultSelect(card, tbody);
+        });
+        
+        // Update default select when key changes
+        keyTd.querySelector('.preview-enum-card__key-input').addEventListener('change', () => {
+            const card = tr.closest('.preview-enum-card');
+            const tbody = tr.closest('tbody');
+            if (card && tbody) refreshDefaultSelect(card, tbody);
+        });
+        
+        return tr;
+    }
+    
+    /**
+     * Toggle between text input and translation select for an enum map row value cell
+     */
+    function updateEnumRowValueWidget(valInput, valSelect, effectiveType) {
+        if (effectiveType === 'translation') {
+            valInput.style.display = 'none';
+            valSelect.style.display = '';
+        } else {
+            valInput.style.display = '';
+            valSelect.style.display = 'none';
+        }
+    }
+    
+    /**
+     * Refresh the default dropdown options from current map rows
+     */
+    function refreshDefaultSelect(card, tbody) {
+        const select = card.querySelector('.preview-enum-card__default-select');
+        if (!select) return;
+        
+        const currentDefault = select.value;
+        const keys = [];
+        tbody.querySelectorAll('.preview-enum-card__key-input').forEach(inp => {
+            const k = inp.value.trim();
+            if (k) keys.push(k);
+        });
+        
+        select.innerHTML = keys.map(k =>
+            `<option value="${escapeHTML(k)}" ${k === currentDefault ? 'selected' : ''}>${escapeHTML(k)}</option>`
+        ).join('');
+        
+        // If previous default no longer exists, select first
+        if (!keys.includes(currentDefault) && keys.length > 0) {
+            select.value = keys[0];
+        }
+    }
+    
+    /**
+     * Read card form data and save the enum to the component structure
+     */
+    async function saveEnumCard(card, originalVarName) {
+        if (!enumsPanelStructure) return;
+        
+        // Read the current name from the card (may have been renamed)
+        const currentVarName = card.dataset.varName || originalVarName;
+        
+        const sourceInput = card.querySelector('.preview-enum-card__source-input');
+        const defaultSelect = card.querySelector('.preview-enum-card__default-select');
+        const tbody = card.querySelector('.preview-enum-card__tbody');
+        
+        const source = sourceInput?.value?.trim();
+        const defaultVal = defaultSelect?.value || '';
+        
+        if (!source) {
+            showToast(PreviewConfig.i18n?.enumSourceRequired || 'Source key is required', 'warning');
+            sourceInput?.focus();
+            return;
+        }
+        
+        // Get card-level default type
+        const cardTypeSelect = card.querySelector('.preview-enum-card__type-select');
+        const cardDefaultType = cardTypeSelect?.value || 'translation';
+        
+        // Collect map entries (applying __RAW__ prefix based on effective type)
+        const map = {};
+        let hasEmpty = false;
+        tbody?.querySelectorAll('.preview-enum-card__row').forEach(row => {
+            const key = row.querySelector('.preview-enum-card__key-input')?.value?.trim();
+            // Determine effective type: row override or card default
+            const rowTypeSelect = row.querySelector('.preview-enum-card__row-type-select');
+            const effectiveType = (rowTypeSelect?.value) || cardDefaultType;
+            // Read value from the correct widget
+            let value;
+            if (effectiveType === 'translation') {
+                value = row.querySelector('.preview-enum-card__value-select')?.value?.trim() || '';
+            } else {
+                value = row.querySelector('.preview-enum-card__value-input')?.value?.trim() || '';
+            }
+            if (key) {
+                // Apply __RAW__ prefix for raw type
+                map[key] = (effectiveType === 'raw' && value) ? '__RAW__' + value : (value || '');
+            } else {
+                hasEmpty = true;
+            }
+        });
+        
+        if (Object.keys(map).length === 0) {
+            showToast(PreviewConfig.i18n?.enumNeedsOptions || 'At least one option is required', 'warning');
+            return;
+        }
+        
+        card.classList.add('preview-enum-card--saving');
+        
+        try {
+            // Update __enums__ in structure
+            if (!enumsPanelStructure.__enums__) {
+                enumsPanelStructure.__enums__ = {};
+            }
+            
+            // If varName changed, remove old entry
+            if (originalVarName && currentVarName !== originalVarName) {
+                delete enumsPanelStructure.__enums__[originalVarName];
+            }
+            
+            // Build the enum definition
+            const enumDef = { source, map };
+            const mapKeys = Object.keys(map);
+            // Only include default if it differs from first key
+            if (defaultVal && defaultVal !== mapKeys[0]) {
+                enumDef.default = defaultVal;
+            }
+            
+            enumsPanelStructure.__enums__[currentVarName] = enumDef;
+            
+            // Save via editStructure API
+            const result = await QuickSiteAdmin.apiRequest('editStructure', 'PUT', {
+                type: 'component',
+                name: currentEditName,
+                structure: enumsPanelStructure
+            });
+            
+            if (!result.ok) throw new Error(result.data?.message || 'Save failed');
+            
+            showToast(PreviewConfig.i18n?.enumSaved || 'Enum saved', 'success');
+            
+            // Phase 9: Auto-create CSS stubs for class-bound enum values
+            await createCssStubsForEnumIfNeeded(enumsPanelStructure, currentVarName, map);
+            
+            reloadPreview();
+            
+        } catch (error) {
+            console.error('[Preview] Enum save error:', error);
+            showToast((PreviewConfig.i18n?.error || 'Error') + ': ' + error.message, 'error');
+        } finally {
+            card.classList.remove('preview-enum-card--saving');
+        }
+    }
+    
+    /**
+     * Delete an enum from the component structure
+     */
+    async function deleteEnumCard(varName) {
+        if (!enumsPanelStructure) return;
+        
+        const confirmMsg = (PreviewConfig.i18n?.enumConfirmDelete || 'Delete enum "%s"?').replace('%s', varName);
+        if (!confirm(confirmMsg)) return;
+        
+        try {
+            if (enumsPanelStructure.__enums__) {
+                delete enumsPanelStructure.__enums__[varName];
+                
+                // Clean up empty __enums__ object
+                if (Object.keys(enumsPanelStructure.__enums__).length === 0) {
+                    delete enumsPanelStructure.__enums__;
+                }
+            }
+            
+            const result = await QuickSiteAdmin.apiRequest('editStructure', 'PUT', {
+                type: 'component',
+                name: currentEditName,
+                structure: enumsPanelStructure
+            });
+            
+            if (!result.ok) throw new Error(result.data?.message || 'Delete failed');
+            
+            showToast(PreviewConfig.i18n?.enumDeleted || 'Enum deleted', 'success');
+            
+            // Refresh the panel
+            showEnumsPanel();
+            reloadPreview();
+            
+        } catch (error) {
+            console.error('[Preview] Enum delete error:', error);
+            showToast((PreviewConfig.i18n?.error || 'Error') + ': ' + error.message, 'error');
+        }
+    }
+    
+    /**
+     * Add a new blank enum and render a card for it
+     */
+    function addNewEnum() {
+        if (!enumsPanelStructure) return;
+        
+        // Generate a unique name
+        const existing = enumsPanelStructure.__enums__ || {};
+        let idx = 1;
+        let name = 'new_enum';
+        while (existing[name]) {
+            name = 'new_enum_' + (++idx);
+        }
+        
+        // Create a blank enum definition
+        const enumDef = {
+            source: '',
+            map: {}
+        };
+        
+        // Add to structure in-memory
+        if (!enumsPanelStructure.__enums__) {
+            enumsPanelStructure.__enums__ = {};
+        }
+        enumsPanelStructure.__enums__[name] = enumDef;
+        
+        // Hide empty state if visible
+        if (enumsPanelEmpty) enumsPanelEmpty.style.display = 'none';
+        
+        // Render card (unsaved — user needs to fill it and click Save)
+        const card = createEnumCard(name, enumDef);
+        if (enumsPanelCards) enumsPanelCards.appendChild(card);
+        
+        // Auto-activate the rename input so user types a real name immediately
+        const editNameBtn = card.querySelector('.preview-enum-card__edit-name-btn');
+        if (editNameBtn) editNameBtn.click();
+    }
+    
+    // ==================== Variable Emulation Panel ====================
+    
+    /**
+     * Show the Variable Emulation panel
+     */
+    async function showEmulationPanel() {
+        if (!emulationPanel || currentEditType !== 'component') return;
+        
+        // Hide other panels
+        const nodeActions = document.getElementById('ctx-node-actions');
+        if (nodeActions) nodeActions.style.display = 'none';
+        if (variablesPanel) variablesPanel.style.display = 'none';
+        if (enumsPanel) enumsPanel.style.display = 'none';
+        if (saveSnippetForm) saveSnippetForm.style.display = 'none';
+        if (saveComponentForm) saveComponentForm.style.display = 'none';
+        
+        emulationPanel.style.display = '';
+        
+        // Show loading
+        if (emulationPanelLoading) emulationPanelLoading.style.display = '';
+        if (emulationPanelEmpty) emulationPanelEmpty.style.display = 'none';
+        if (emulationPanelFields) emulationPanelFields.innerHTML = '';
+        if (emulationPanelActions) emulationPanelActions.style.display = 'none';
+        
+        try {
+            const structInfo = parseStruct(selectedStruct || ('component-' + currentEditName));
+            if (!structInfo) throw new Error('Invalid struct');
+            
+            const urlParams = [structInfo.type];
+            if (structInfo.name) urlParams.push(structInfo.name);
+            
+            const resp = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, urlParams);
+            if (!resp.ok || !resp.data?.data?.structure) throw new Error('Failed to get structure');
+            
+            const structure = resp.data.data.structure;
+            const enums = structure.__enums__ || {};
+            
+            // Extract all placeholders from the structure (excluding __enums__)
+            const structCopy = JSON.parse(JSON.stringify(structure));
+            delete structCopy.__enums__;
+            const placeholders = extractPlaceholdersFromStructure(structCopy);
+            
+            // Build the enum variable names set
+            const enumVarNames = Object.keys(enums);
+            
+            if (emulationPanelLoading) emulationPanelLoading.style.display = 'none';
+            
+            if (placeholders.length === 0 && enumVarNames.length === 0) {
+                if (emulationPanelEmpty) emulationPanelEmpty.style.display = '';
+                return;
+            }
+            
+            // Load existing emulation data from localStorage
+            const storageKey = 'qs_emulate_' + currentEditName;
+            let savedData = {};
+            try { savedData = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch(e) {}
+            
+            // Build form fields
+            if (emulationPanelFields) {
+                // Regular variables (non-enum)
+                const regularVars = placeholders.filter(p => !enumVarNames.includes(p));
+                regularVars.forEach(varName => {
+                    emulationPanelFields.appendChild(
+                        createEmulationField(varName, 'text', savedData[varName] || '', null)
+                    );
+                });
+                
+                // Enum variables
+                enumVarNames.forEach(varName => {
+                    const enumDef = enums[varName];
+                    const mapKeys = Object.keys(enumDef.map || {});
+                    const savedKey = savedData[varName];
+                    emulationPanelFields.appendChild(
+                        createEmulationField(varName, 'enum', savedKey || '', mapKeys)
+                    );
+                });
+            }
+            
+            if (emulationPanelActions) emulationPanelActions.style.display = '';
+            
+        } catch (error) {
+            console.error('[Preview] Emulation panel error:', error);
+            if (emulationPanelLoading) emulationPanelLoading.style.display = 'none';
+            if (emulationPanelFields) {
+                emulationPanelFields.innerHTML = '<div style="color:var(--admin-danger);font-size:var(--font-size-sm);padding:var(--space-sm);">' +
+                    (PreviewConfig.i18n?.error || 'Error') + ': ' + error.message + '</div>';
+            }
+        }
+    }
+    
+    /**
+     * Hide the Emulation panel
+     */
+    function hideEmulationPanel() {
+        if (!emulationPanel) return;
+        emulationPanel.style.display = 'none';
+        
+        const nodeActions = document.getElementById('ctx-node-actions');
+        if (nodeActions) nodeActions.style.display = '';
+    }
+    
+    /**
+     * Extract all {{placeholder}} names from a component structure (client-side)
+     */
+    function extractPlaceholdersFromStructure(node) {
+        const found = new Set();
+        const regex = /\{\{(\w+)\}\}/g;
+        
+        function walk(obj) {
+            if (!obj || typeof obj !== 'object') return;
+            if (typeof obj === 'string') {
+                let m;
+                while ((m = regex.exec(obj)) !== null) found.add(m[1]);
+                return;
+            }
+            for (const key of Object.keys(obj)) {
+                const val = obj[key];
+                if (typeof val === 'string') {
+                    let m;
+                    regex.lastIndex = 0;
+                    while ((m = regex.exec(val)) !== null) found.add(m[1]);
+                } else if (typeof val === 'object' && val !== null) {
+                    walk(val);
+                }
+            }
+        }
+        walk(node);
+        return Array.from(found);
+    }
+    
+    /**
+     * Create a single emulation field row
+     */
+    function createEmulationField(varName, type, savedValue, enumKeys) {
+        const row = document.createElement('div');
+        row.className = 'preview-emulation-field';
+        row.dataset.varName = varName;
+        
+        const label = document.createElement('label');
+        label.className = 'preview-emulation-field__label';
+        label.textContent = varName;
+        if (type === 'enum') {
+            const badge = document.createElement('span');
+            badge.className = 'preview-emulation-field__badge';
+            badge.textContent = 'enum';
+            label.appendChild(badge);
+        }
+        
+        let input;
+        if (type === 'enum' && enumKeys && enumKeys.length > 0) {
+            input = document.createElement('select');
+            input.className = 'admin-input admin-input--sm preview-emulation-field__input';
+            input.innerHTML = '<option value="">— {{' + escapeHTML(varName) + '}} —</option>' +
+                enumKeys.map(k => '<option value="' + escapeHTML(k) + '"' +
+                    (k === savedValue ? ' selected' : '') + '>' + escapeHTML(k) + '</option>').join('');
+        } else {
+            input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'admin-input admin-input--sm preview-emulation-field__input';
+            input.value = savedValue;
+            input.placeholder = '{{' + varName + '}}';
+        }
+        
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.className = 'preview-emulation-field__reset';
+        resetBtn.title = PreviewConfig.i18n?.emulationResetField || 'Reset';
+        resetBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>';
+        resetBtn.addEventListener('click', () => {
+            if (input.tagName === 'SELECT') {
+                input.value = '';
+            } else {
+                input.value = '';
+            }
+        });
+        
+        row.appendChild(label);
+        row.appendChild(input);
+        row.appendChild(resetBtn);
+        return row;
+    }
+    
+    /**
+     * Apply emulation: store values in localStorage and reload preview
+     */
+    function applyEmulation() {
+        if (!emulationPanelFields) return;
+        
+        const data = {};
+        let hasValues = false;
+        
+        emulationPanelFields.querySelectorAll('.preview-emulation-field').forEach(row => {
+            const varName = row.dataset.varName;
+            const input = row.querySelector('.preview-emulation-field__input');
+            const value = input?.value?.trim();
+            if (value) {
+                data[varName] = value;
+                hasValues = true;
+            }
+        });
+        
+        const storageKey = 'qs_emulate_' + currentEditName;
+        
+        if (hasValues) {
+            localStorage.setItem(storageKey, JSON.stringify(data));
+        } else {
+            localStorage.removeItem(storageKey);
+        }
+        
+        reloadPreview();
+        showToast(PreviewConfig.i18n?.emulationApplied || 'Emulation applied', 'success');
+    }
+    
+    /**
+     * Reset emulation: clear localStorage and reload preview
+     */
+    function resetEmulation() {
+        const storageKey = 'qs_emulate_' + currentEditName;
+        localStorage.removeItem(storageKey);
+        
+        // Reset all fields
+        if (emulationPanelFields) {
+            emulationPanelFields.querySelectorAll('.preview-emulation-field__input').forEach(input => {
+                if (input.tagName === 'SELECT') {
+                    input.value = '';
+                } else {
+                    input.value = '';
+                }
+            });
+        }
+        
+        reloadPreview();
+        showToast(PreviewConfig.i18n?.emulationReset || 'Emulation reset', 'success');
+    }
+    
+    /**
+     * Detect if an enum variable is used in a class param and create CSS stubs
+     * for all map values that don't already have a CSS rule.
+     */
+    async function createCssStubsForEnumIfNeeded(structure, varName, map) {
+        try {
+            // Check if {{varName}} is used in any class param
+            const placeholder = '{{' + varName + '}}';
+            if (!detectEnumInClassParams(structure, placeholder)) return;
+            
+            // Collect map values as potential class names (strip __RAW__ prefix)
+            const classNames = Object.values(map)
+                .map(v => String(v).replace(/^__RAW__/, '').trim())
+                .filter(v => v && /^[a-zA-Z_-][\w-]*$/.test(v));
+            
+            if (classNames.length === 0) return;
+            
+            // Create empty CSS stubs for each class
+            const created = [];
+            for (const cls of classNames) {
+                const selector = '.' + cls;
+                try {
+                    const result = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
+                        selector: selector,
+                        styles: ''
+                    });
+                    if (result.ok && result.data?.action === 'created') {
+                        created.push(selector);
+                    }
+                } catch (e) {
+                    // Ignore individual failures — selector may already exist
+                    console.warn('[Preview] CSS stub failed for', selector, e);
+                }
+            }
+            
+            if (created.length > 0) {
+                const msg = (PreviewConfig.i18n?.enumCssStubsCreated || 'CSS stubs created: %s')
+                    .replace('%s', created.join(', '));
+                showToast(msg, 'success');
+            }
+        } catch (e) {
+            console.warn('[Preview] CSS stub creation skipped:', e);
+        }
+    }
+    
+    /**
+     * Recursively check if a placeholder string appears in any class param
+     */
+    function detectEnumInClassParams(node, placeholder) {
+        if (!node || typeof node !== 'object') return false;
+        // Skip __enums__ metadata
+        if (node.__enums__) {
+            const copy = Object.assign({}, node);
+            delete copy.__enums__;
+            return detectEnumInClassParams(copy, placeholder);
+        }
+        // Check params.class
+        if (node.params?.class) {
+            const classVal = Array.isArray(node.params.class)
+                ? node.params.class.join(' ')
+                : String(node.params.class);
+            if (classVal.includes(placeholder)) return true;
+        }
+        // Recurse into children
+        if (Array.isArray(node.children)) {
+            for (const child of node.children) {
+                if (detectEnumInClassParams(child, placeholder)) return true;
+            }
+        }
+        // Recurse into object values (for root-level structures)
+        for (const key of Object.keys(node)) {
+            if (key === 'params' || key === 'children' || key === '__enums__') continue;
+            if (typeof node[key] === 'object' && node[key] !== null) {
+                if (detectEnumInClassParams(node[key], placeholder)) return true;
+            }
+        }
+        return false;
     }
     
     // Deep clone a node (removes internal QS attributes) and remap textKeys

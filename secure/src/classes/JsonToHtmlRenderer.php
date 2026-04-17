@@ -119,7 +119,7 @@ class JsonToHtmlRenderer {
      * @param array $sampleData Optional sample data for component variables
      * @return string Rendered HTML
      */
-    public function renderComponent(string $componentName, array $sampleData = []): string {
+    public function renderComponent(string $componentName, array $sampleData = [], array $emulateOverrides = []): string {
         // Set structure context for editor mode - component editing
         $this->currentStructure = 'component-' . $componentName;
         $this->currentNodePath = [];
@@ -131,13 +131,42 @@ class JsonToHtmlRenderer {
             return "<!-- Component not found: {$componentName} -->";
         }
         
+        // Extract __enums__ metadata and strip it from template before processing
+        $enums = $componentTemplate['__enums__'] ?? null;
+        unset($componentTemplate['__enums__']);
+        
         // If no sample data provided, generate placeholder data from template
         if (empty($sampleData)) {
             $sampleData = $this->generatePlaceholderData($componentTemplate);
+            
+            // Apply emulation overrides (editor preview only)
+            $emulatedRawValues = [];
+            if (!empty($emulateOverrides)) {
+                foreach ($emulateOverrides as $key => $value) {
+                    if (!is_string($value) || $value === '') continue;
+                    // For enum variables, set the source key so resolveEnumVariables picks it up
+                    if ($enums && isset($enums[$key]['source'])) {
+                        $sampleData[$enums[$key]['source']] = $value;
+                    } else {
+                        $sampleData[$key] = $value;
+                        $emulatedRawValues[] = $value;
+                    }
+                }
+            }
+        }
+        
+        // Resolve enum variables: enrich sample data with mapped values
+        if ($enums) {
+            $sampleData = $this->resolveEnumVariables($enums, $sampleData, $componentName);
         }
         
         // Process placeholders with sample data
         $processedTemplate = $this->processComponentTemplate($componentTemplate, $sampleData);
+        
+        // In emulation mode, mark resolved textKeys as raw to prevent translation lookup
+        if (!empty($emulatedRawValues)) {
+            $this->rawifyEmulatedTextKeys($processedTemplate, $emulatedRawValues);
+        }
         
         // Render the processed template
         return $this->renderNode($processedTemplate, false);
@@ -303,6 +332,15 @@ class JsonToHtmlRenderer {
                 $this->currentComponentNode = $prevComponentNode;
                 error_log("Component not found: {$componentName}");
                 return "<!-- Component not found: {$componentName} -->";
+            }
+            
+            // Extract __enums__ metadata and strip it from template before processing
+            $enums = $componentTemplate['__enums__'] ?? null;
+            unset($componentTemplate['__enums__']);
+            
+            // Resolve enum variables: enrich data with mapped values
+            if ($enums) {
+                $componentData = $this->resolveEnumVariables($enums, $componentData, $componentName);
             }
             
             // Replace placeholders with data
@@ -721,7 +759,8 @@ class JsonToHtmlRenderer {
     private function processComponentTemplate($template, array $data) {
         if (is_string($template)) {
             // Replace {{placeholder}} or {{$placeholder}} with actual value
-            return preg_replace_callback('/\{\{(\$?\w+)\}\}/', function($matches) use ($data) {
+            // [\w-]+ allows hyphens in variable names (e.g. alt-logo)
+            return preg_replace_callback('/\{\{(\$?[\w-]+)\}\}/', function($matches) use ($data) {
                 $key = $matches[1];
                 return $data[$key] ?? $matches[0]; // Keep placeholder if no data
             }, $template);
@@ -736,6 +775,67 @@ class JsonToHtmlRenderer {
         }
 
         return $template;
+    }
+
+    /**
+     * In emulation mode, mark resolved textKey values as raw to prevent translation lookup.
+     * Only affects textKeys that exactly match an emulated regular variable value.
+     */
+    private function rawifyEmulatedTextKeys(array &$node, array $emulatedValues): void {
+        if (isset($node['textKey']) && is_string($node['textKey'])) {
+            $tk = $node['textKey'];
+            if ($tk !== '' && strpos($tk, '__RAW__') !== 0 && in_array($tk, $emulatedValues, true)) {
+                $node['textKey'] = '__RAW__' . $tk;
+            }
+        }
+        if (isset($node['children']) && is_array($node['children'])) {
+            foreach ($node['children'] as &$child) {
+                if (is_array($child)) {
+                    $this->rawifyEmulatedTextKeys($child, $emulatedValues);
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolve enum variables from __enums__ metadata.
+     * For each enum definition, looks up the source key in data,
+     * finds the mapped value, and adds the derived variable to data.
+     *
+     * @param array $enums The __enums__ definitions from the component
+     * @param array $data The component instance data
+     * @param string $componentName For logging
+     * @return array Enriched data with resolved enum values
+     */
+    private function resolveEnumVariables(array $enums, array $data, string $componentName): array {
+        foreach ($enums as $varName => $enumDef) {
+            if (!is_array($enumDef) || !isset($enumDef['source']) || !isset($enumDef['map']) || !is_array($enumDef['map'])) {
+                continue;
+            }
+
+            $sourceKey = $enumDef['source'];
+            $map = $enumDef['map'];
+            $mapKeys = array_keys($map);
+
+            if (empty($mapKeys)) {
+                continue;
+            }
+
+            // Get the chosen key from instance data, or use default
+            $chosenKey = $data[$sourceKey] ?? null;
+            $defaultKey = $enumDef['default'] ?? $mapKeys[0];
+
+            if ($chosenKey === null || !isset($map[$chosenKey])) {
+                if ($chosenKey !== null) {
+                    error_log("Component '{$componentName}': enum '{$varName}' has unknown key '{$chosenKey}', using default '{$defaultKey}'");
+                }
+                $chosenKey = $defaultKey;
+            }
+
+            $data[$varName] = $map[$chosenKey];
+        }
+
+        return $data;
     }
 
     /**

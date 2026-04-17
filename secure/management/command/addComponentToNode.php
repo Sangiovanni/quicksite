@@ -216,6 +216,33 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
     $variables = [];
     extractComponentVariables($componentStructure, $variables);
     
+    // Extract __enums__ from component definition
+    $enums = $componentStructure['__enums__'] ?? [];
+    $enumDerivedVars = [];  // Variable names auto-resolved by enums (not stored in data)
+    $enumSourceKeys = [];   // Source keys that need user input
+    
+    if (is_array($enums) && !empty($enums)) {
+        foreach ($enums as $varName => $enumDef) {
+            if (!is_array($enumDef) || !isset($enumDef['source']) || !isset($enumDef['map']) || !is_array($enumDef['map'])) {
+                continue;
+            }
+            
+            $enumDerivedVars[] = $varName;
+            $sourceKey = $enumDef['source'];
+            $mapKeys = array_keys($enumDef['map']);
+            $defaultKey = $enumDef['default'] ?? ($mapKeys[0] ?? null);
+            
+            if (!isset($enumSourceKeys[$sourceKey])) {
+                $enumSourceKeys[$sourceKey] = $defaultKey;
+            }
+        }
+        
+        // Remove enum-derived variables (they're auto-resolved, not stored in data)
+        foreach ($enumDerivedVars as $derived) {
+            unset($variables[$derived]);
+        }
+    }
+    
     // Build JSON file path
     if ($type === 'page') {
         $jsonPath = resolvePageJsonPath($name);
@@ -284,6 +311,15 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
             $generatedTextKeys[$varName] = $textKey;
         }
         // param-type variables without user value are left empty (or could use defaults)
+    }
+    
+    // Add enum source keys to data
+    foreach ($enumSourceKeys as $sourceKey => $defaultKey) {
+        if (isset($userData[$sourceKey])) {
+            $finalData[$sourceKey] = $userData[$sourceKey];
+        } elseif ($defaultKey !== null) {
+            $finalData[$sourceKey] = $defaultKey;
+        }
     }
     
     // Build the component node

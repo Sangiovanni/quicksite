@@ -105,6 +105,7 @@ $selectorId = $selectorId ?? 'add';
             </div>
             <pre class="snippet-selector__css-code" id="<?= $selectorId ?>-snippet-css-code" style="display: none;"></pre>
         </div>
+        </div><!-- End snippet-selector__css-status -->
         <!-- Actions for non-core snippets -->
         <div class="snippet-selector__preview-actions" id="<?= $selectorId ?>-snippet-preview-actions" style="display: none;">
             <button type="button" class="admin-btn admin-btn--sm admin-btn--danger" id="delete-snippet-btn">

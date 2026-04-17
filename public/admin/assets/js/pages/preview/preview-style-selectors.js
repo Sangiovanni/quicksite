@@ -40,6 +40,11 @@
     let selectorMatchCount = null;
     let selectorEditBtn = null;
     let selectorAnimateBtn = null;
+    let selectorCopyFromBtn = null;
+    let selectorCopyPicker = null;
+    let selectorCopyPickerClose = null;
+    let selectorCopySearch = null;
+    let selectorCopyList = null;
     let selectorTagsList = null;
     let selectorTagsCount = null;
     let selectorClassesList = null;
@@ -59,6 +64,7 @@
     // Callback references
     let onOpenStyleEditor = null;
     let onOpenTransitionEditor = null;
+    let onCopyStyleFrom = null;
 
     // ==================== Utility Functions ====================
     
@@ -83,6 +89,11 @@
         selectorMatchCount = document.getElementById('selector-match-count');
         selectorEditBtn = document.getElementById('selector-edit-btn');
         selectorAnimateBtn = document.getElementById('selector-animate-btn');
+        selectorCopyFromBtn = document.getElementById('selector-copy-from-btn');
+        selectorCopyPicker = document.getElementById('selector-copy-picker');
+        selectorCopyPickerClose = document.getElementById('selector-copy-picker-close');
+        selectorCopySearch = document.getElementById('selector-copy-search');
+        selectorCopyList = document.getElementById('selector-copy-list');
         selectorTagsList = document.getElementById('selectors-tags-list');
         selectorTagsCount = document.getElementById('selectors-tags-count');
         selectorClassesList = document.getElementById('selectors-classes-list');
@@ -769,6 +780,27 @@
             });
         }
         
+        // Copy From button - shows selector picker
+        if (selectorCopyFromBtn) {
+            selectorCopyFromBtn.addEventListener('click', () => {
+                if (currentSelectedSelector) {
+                    showCopyFromPicker();
+                }
+            });
+        }
+        
+        // Copy From picker close
+        if (selectorCopyPickerClose) {
+            selectorCopyPickerClose.addEventListener('click', hideCopyFromPicker);
+        }
+        
+        // Copy From search filter
+        if (selectorCopySearch) {
+            selectorCopySearch.addEventListener('input', (e) => {
+                filterCopyFromList(e.target.value);
+            });
+        }
+        
         // Group header collapse/expand
         selectorsGroups?.querySelectorAll('.preview-selectors-group__header').forEach(header => {
             header.addEventListener('click', () => {
@@ -781,6 +813,111 @@
                 }
             });
         });
+    }
+
+    // ==================== Copy From Selector Picker ====================
+    
+    function showCopyFromPicker() {
+        if (!selectorCopyPicker || !selectorCopyList) return;
+        
+        // Build list of all selectors with rules (excluding the current one)
+        const currentSel = currentSelectedSelector?.selector;
+        selectorCopyList.innerHTML = '';
+        
+        const withRules = getSelectorsWithRules().filter(s => s.selector !== currentSel);
+        
+        if (withRules.length === 0) {
+            selectorCopyList.innerHTML = '<div class="preview-selector-copy-picker__empty">' +
+                (PreviewConfig.i18n?.noSelectorsWithRules || 'No other selectors with styles found') + '</div>';
+        } else {
+            withRules.forEach(item => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'preview-selector-copy-picker__item';
+                btn.dataset.selector = item.selector;
+                btn.textContent = item.selector;
+                if (item.mediaQuery) {
+                    const mq = document.createElement('span');
+                    mq.className = 'preview-selector-copy-picker__mq';
+                    mq.textContent = '@' + item.mediaQuery;
+                    btn.appendChild(mq);
+                }
+                btn.addEventListener('click', () => {
+                    selectCopyFromSource(item.selector, item.mediaQuery);
+                });
+                selectorCopyList.appendChild(btn);
+            });
+        }
+        
+        if (selectorCopySearch) selectorCopySearch.value = '';
+        selectorCopyPicker.style.display = '';
+        selectorCopySearch?.focus();
+    }
+    
+    function hideCopyFromPicker() {
+        if (selectorCopyPicker) selectorCopyPicker.style.display = 'none';
+    }
+    
+    function filterCopyFromList(query) {
+        if (!selectorCopyList) return;
+        const q = query.toLowerCase().trim();
+        selectorCopyList.querySelectorAll('.preview-selector-copy-picker__item').forEach(btn => {
+            const sel = (btn.dataset.selector || '').toLowerCase();
+            btn.style.display = (!q || sel.includes(q)) ? '' : 'none';
+        });
+    }
+    
+    function getSelectorsWithRules() {
+        const result = [];
+        const cats = categorizedSelectors;
+        for (const group of ['tags', 'classes', 'ids', 'attributes']) {
+            for (const item of cats[group]) {
+                if (item.hasRules) {
+                    result.push({ selector: item.selector, mediaQuery: item.mediaQuery || null });
+                }
+            }
+        }
+        // Media selectors
+        if (cats.media) {
+            for (const [mq, items] of Object.entries(cats.media)) {
+                for (const item of items) {
+                    if (item.hasRules) {
+                        result.push({ selector: item.selector, mediaQuery: mq });
+                    }
+                }
+            }
+        }
+        return result;
+    }
+    
+    async function selectCopyFromSource(sourceSelector, mediaQuery) {
+        hideCopyFromPicker();
+        
+        if (!currentSelectedSelector || !onCopyStyleFrom) return;
+        
+        try {
+            // Fetch source selector's styles
+            let url = managementUrl + 'getStyleRule/' + encodeURIComponent(sourceSelector);
+            if (mediaQuery) url += '?mediaQuery=' + encodeURIComponent(mediaQuery);
+            
+            const response = await fetch(url, {
+                headers: authToken ? { 'Authorization': 'Bearer ' + authToken } : {}
+            });
+            
+            const result = await response.json();
+            
+            if (!response.ok || !result.data?.styles) {
+                if (typeof showToast === 'function') {
+                    showToast(PreviewConfig.i18n?.noStylesToCopy || 'No styles found on source selector', 'warning');
+                }
+                return;
+            }
+            
+            // Open style editor for current selector with copied styles
+            onCopyStyleFrom(currentSelectedSelector.selector, editingSelectorCount || 0, result.data.styles);
+        } catch (error) {
+            console.error('[SelectorBrowser] Copy from error:', error);
+        }
     }
 
     // ==================== Public API ====================
@@ -817,7 +954,8 @@
         
         // Register callbacks
         onOpenStyleEditor: function(callback) { onOpenStyleEditor = callback; },
-        onOpenTransitionEditor: function(callback) { onOpenTransitionEditor = callback; }
+        onOpenTransitionEditor: function(callback) { onOpenTransitionEditor = callback; },
+        onCopyStyleFrom: function(callback) { onCopyStyleFrom = callback; }
     };
 
     // Initialize when DOM is ready

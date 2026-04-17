@@ -164,7 +164,7 @@
      * @param {string} selector - CSS selector to edit
      * @param {number} matchCount - Number of elements matching this selector
      */
-    async function openStyleEditor(selector, matchCount = 0) {
+    async function openStyleEditor(selector, matchCount = 0, initialStylesString = null) {
         if (!styleEditor) return;
         
         // Auto-load theme variables if not already loaded (for CSS var dropdowns)
@@ -208,18 +208,28 @@
                 const stylesString = result.data.styles || '';
                 originalStyles = parseStylesString(stylesString);
                 currentStyles = { ...originalStyles };
-                
-                if (Object.keys(originalStyles).length === 0) {
-                    showStyleEditorState('empty');
-                } else {
-                    renderStyleProperties();
-                    showStyleEditorState('properties');
-                }
             } else {
-                // Selector not found in CSS (might be a browser-default or doesn't exist)
                 originalStyles = {};
                 currentStyles = {};
+            }
+            
+            // Merge copied styles on top of existing ones (if any)
+            if (initialStylesString) {
+                const copiedStyles = parseStylesString(initialStylesString);
+                for (const [prop, val] of Object.entries(copiedStyles)) {
+                    currentStyles[prop] = val;
+                }
+            }
+            
+            if (Object.keys(currentStyles).length === 0) {
                 showStyleEditorState('empty');
+            } else {
+                renderStyleProperties();
+                showStyleEditorState('properties');
+                // If copied styles were merged, trigger live preview immediately
+                if (initialStylesString) {
+                    applyLivePreview();
+                }
             }
         } catch (error) {
             console.error('Failed to load styles:', error);

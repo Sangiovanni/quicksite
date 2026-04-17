@@ -20,8 +20,24 @@ if (isset($_GET['_component']) && isset($_GET['_editor']) && $_GET['_editor'] ==
         'lang' => $lang,
     ]);
     
+    // Decode emulation overrides from URL parameter (editor variable emulation)
+    $emulateOverrides = [];
+    if (!empty($_GET['_emulate'])) {
+        $decoded = base64_decode($_GET['_emulate'], true);
+        if ($decoded !== false) {
+            $parsed = json_decode($decoded, true);
+            if (is_array($parsed)) {
+                foreach ($parsed as $key => $value) {
+                    if (is_string($key) && is_string($value) && strlen($value) < 500 && preg_match('/^[\w-]+$/', $key)) {
+                        $emulateOverrides[$key] = $value;
+                    }
+                }
+            }
+        }
+    }
+    
     // Render component in isolation
-    $componentHtml = $renderer->renderComponent($componentName);
+    $componentHtml = $renderer->renderComponent($componentName, [], $emulateOverrides);
     
     // Output minimal HTML wrapper with component
     ?><!DOCTYPE html>
