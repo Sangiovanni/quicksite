@@ -276,6 +276,7 @@ window.PreviewConfig = {
         enumValueType: <?= json_encode(__admin('preview.enumValueType') ?? 'Value type') ?>,
         enumType: <?= json_encode(__admin('preview.enumType') ?? 'Type') ?>,
         enumTypeDefault: <?= json_encode(__admin('preview.enumTypeDefault') ?? '(default)') ?>,
+        enumTypeLiteral: <?= json_encode(__admin('preview.enumTypeLiteral') ?? 'Literal') ?>,
         enumTypeOverrideTip: <?= json_encode(__admin('preview.enumTypeOverrideTip') ?? 'Click to override type for this row') ?>,
         advanced: <?= json_encode(__admin('preview.advanced') ?? 'Advanced') ?>,
         responseMapping: <?= json_encode(__admin('preview.responseMapping') ?? 'Response Mapping') ?>,

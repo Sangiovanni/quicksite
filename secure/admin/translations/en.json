@@ -1842,6 +1842,7 @@
         "enumValueType": "Value type",
         "enumType": "Type",
         "enumTypeDefault": "(default)",
+        "enumTypeLiteral": "Literal",
         "enumTypeOverrideTip": "Click to override type for this row",
         "enumSourceRequired": "Source key is required",
         "enumNeedsOptions": "At least one option is required",

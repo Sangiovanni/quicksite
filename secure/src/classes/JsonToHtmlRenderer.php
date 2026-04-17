@@ -390,6 +390,12 @@ class JsonToHtmlRenderer {
             return htmlspecialchars($rawText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
 
+        // Check if it's a literal value (used as-is, same as raw for textKeys)
+        if (strpos($textKey, '__LIT__') === 0) {
+            $litText = substr($textKey, 7); // Remove __LIT__ prefix
+            return htmlspecialchars($litText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
         // Check if it's a variable placeholder (e.g., {{varName}} or {{$varName}}) - display as-is
         if (preg_match('/^\{\{\$?\w+\}\}$/', $textKey)) {
             $displayText = htmlspecialchars($textKey, ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -581,6 +587,10 @@ class JsonToHtmlRenderer {
             if (strpos($value, '__RAW__') === 0) {
                 $value = substr($value, 7); // Remove __RAW__ prefix
             }
+            // Check for __LIT__ prefix - same as __RAW__ for translatable attributes
+            elseif (strpos($value, '__LIT__') === 0) {
+                $value = substr($value, 7); // Remove __LIT__ prefix
+            }
             // Check if value looks like a translation key (contains dots, alphanumeric/underscore, no spaces)
             elseif (preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/i', $value)) {
                 // It's a translation key - translate it
@@ -600,6 +610,11 @@ class JsonToHtmlRenderer {
             if (!preg_match('/^(https?:)?\/\//i', $value)) {
                 $value = $this->processUrl($value);
             }
+        }
+
+        // Strip __LIT__ prefix from any attribute value (literal values used as-is everywhere)
+        if (is_string($value) && strpos($value, '__LIT__') === 0) {
+            $value = substr($value, 7);
         }
 
         // Convert value to string and escape
@@ -784,7 +799,7 @@ class JsonToHtmlRenderer {
     private function rawifyEmulatedTextKeys(array &$node, array $emulatedValues): void {
         if (isset($node['textKey']) && is_string($node['textKey'])) {
             $tk = $node['textKey'];
-            if ($tk !== '' && strpos($tk, '__RAW__') !== 0 && in_array($tk, $emulatedValues, true)) {
+            if ($tk !== '' && strpos($tk, '__RAW__') !== 0 && strpos($tk, '__LIT__') !== 0 && in_array($tk, $emulatedValues, true)) {
                 $node['textKey'] = '__RAW__' . $tk;
             }
         }

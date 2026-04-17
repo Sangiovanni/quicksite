@@ -7863,19 +7863,25 @@
         `;
         card.appendChild(sourceRow);
         
-        // Detect default type from existing values: majority __RAW__ → raw, otherwise translation
+        // Detect default type from existing values
         const rawCount = Object.values(map).filter(v => String(v).startsWith('__RAW__')).length;
+        const litCount = Object.values(map).filter(v => String(v).startsWith('__LIT__')).length;
         const totalCount = mapKeys.length;
-        const detectedDefault = (totalCount > 0 && rawCount > totalCount / 2) ? 'raw' : 'translation';
+        const detectedDefault = totalCount === 0 ? 'literal'
+            : (litCount > rawCount && litCount >= totalCount / 2) ? 'literal'
+            : (rawCount > litCount && rawCount >= totalCount / 2) ? 'raw'
+            : 'literal';
         
         // Default value type dropdown (card-level)
         const typeRow = document.createElement('div');
         typeRow.className = 'preview-enum-card__field';
+        const litLabel = PreviewConfig.i18n?.enumTypeLiteral || 'Literal';
         const rawLabel = PreviewConfig.i18n?.variablesTypeRaw || 'Raw Text';
         const transLabel = PreviewConfig.i18n?.variablesTypeTranslation || 'Translation Key';
         typeRow.innerHTML = `
             <label class="preview-enum-card__label">${PreviewConfig.i18n?.enumValueType || 'Value type'}:</label>
             <select class="admin-input admin-input--sm preview-enum-card__type-select">
+                <option value="literal" ${detectedDefault === 'literal' ? 'selected' : ''}>${escapeHTML(litLabel)}</option>
                 <option value="raw" ${detectedDefault === 'raw' ? 'selected' : ''}>${escapeHTML(rawLabel)}</option>
                 <option value="translation" ${detectedDefault === 'translation' ? 'selected' : ''}>${escapeHTML(transLabel)}</option>
             </select>
@@ -7915,9 +7921,10 @@
         mapKeys.forEach(key => {
             const rawValue = map[key];
             const isRaw = String(rawValue).startsWith('__RAW__');
+            const isLit = String(rawValue).startsWith('__LIT__');
             // Per-row type: if it differs from card default, it's an override
-            const rowType = isRaw ? 'raw' : 'translation';
-            const displayValue = isRaw ? String(rawValue).slice(7) : rawValue;
+            const rowType = isLit ? 'literal' : isRaw ? 'raw' : 'translation';
+            const displayValue = isRaw ? String(rawValue).slice(7) : isLit ? String(rawValue).slice(7) : rawValue;
             const hasOverride = rowType !== detectedDefault;
             tbody.appendChild(createEnumMapRow(key, displayValue, hasOverride ? rowType : null, detectedDefault));
         });
@@ -7947,7 +7954,7 @@
         addOptionBtn.className = 'admin-btn admin-btn--sm admin-btn--outline preview-enum-card__add-option';
         addOptionBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> ${PreviewConfig.i18n?.enumAddOption || 'Add Option'}`;
         addOptionBtn.addEventListener('click', () => {
-            const currentCardType = card.querySelector('.preview-enum-card__type-select')?.value || 'translation';
+            const currentCardType = card.querySelector('.preview-enum-card__type-select')?.value || 'literal';
             tbody.appendChild(createEnumMapRow('', '', null, currentCardType));
             refreshDefaultSelect(card, tbody);
         });
@@ -7988,6 +7995,7 @@
         const tr = document.createElement('tr');
         tr.className = 'preview-enum-card__row';
         
+        const litLabel = PreviewConfig.i18n?.enumTypeLiteral || 'Literal';
         const rawLabel = PreviewConfig.i18n?.variablesTypeRaw || 'Raw Text';
         const transLabel = PreviewConfig.i18n?.variablesTypeTranslation || 'Translation Key';
         const defaultLabel = PreviewConfig.i18n?.enumTypeDefault || '(default)';
@@ -8047,6 +8055,7 @@
         typeSelect.className = 'admin-input admin-input--sm preview-enum-card__row-type-select';
         typeSelect.innerHTML = `
             <option value="">${escapeHTML(defaultLabel)}</option>
+            <option value="literal">${escapeHTML(litLabel)}</option>
             <option value="raw">${escapeHTML(rawLabel)}</option>
             <option value="translation">${escapeHTML(transLabel)}</option>
         `;
@@ -8072,7 +8081,7 @@
                 typeSelect.style.display = 'none';
                 typeLabel.style.display = '';
                 const card = tr.closest('.preview-enum-card');
-                const cardType = card?.querySelector('.preview-enum-card__type-select')?.value || 'translation';
+                const cardType = card?.querySelector('.preview-enum-card__type-select')?.value || 'literal';
                 updateEnumRowValueWidget(valInput, valSelect, cardType);
             } else {
                 updateEnumRowValueWidget(valInput, valSelect, typeSelect.value);
@@ -8117,6 +8126,7 @@
             valInput.style.display = 'none';
             valSelect.style.display = '';
         } else {
+            // Both 'literal' and 'raw' use the free text input
             valInput.style.display = '';
             valSelect.style.display = 'none';
         }
@@ -8170,9 +8180,9 @@
         
         // Get card-level default type
         const cardTypeSelect = card.querySelector('.preview-enum-card__type-select');
-        const cardDefaultType = cardTypeSelect?.value || 'translation';
+        const cardDefaultType = cardTypeSelect?.value || 'literal';
         
-        // Collect map entries (applying __RAW__ prefix based on effective type)
+        // Collect map entries (applying prefix based on effective type)
         const map = {};
         let hasEmpty = false;
         tbody?.querySelectorAll('.preview-enum-card__row').forEach(row => {
@@ -8188,8 +8198,14 @@
                 value = row.querySelector('.preview-enum-card__value-input')?.value?.trim() || '';
             }
             if (key) {
-                // Apply __RAW__ prefix for raw type
-                map[key] = (effectiveType === 'raw' && value) ? '__RAW__' + value : (value || '');
+                // Apply prefix based on type: __RAW__ for raw text, __LIT__ for literal, nothing for translation
+                if (effectiveType === 'raw' && value) {
+                    map[key] = '__RAW__' + value;
+                } else if (effectiveType === 'literal' && value) {
+                    map[key] = '__LIT__' + value;
+                } else {
+                    map[key] = value || '';
+                }
             } else {
                 hasEmpty = true;
             }
