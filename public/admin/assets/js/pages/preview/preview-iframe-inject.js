@@ -38,6 +38,17 @@
     let dragActivated = false; // true once threshold exceeded
     let dragPendingElement = null; // element waiting for threshold
     
+    // Drag Phase 1/2 state
+    let dragSelectedElement = null; // Phase 1: currently selected element
+    let dragLocked = false; // Phase 2: element is locked for dragging
+    let dragLockPersistent = false; // true = locked via button click (stays locked after drop)
+    let longPressTimer = null; // timer for long-press lock detection
+    let longPressDelay = 400; // ms before long-press triggers lock
+    
+    // Drag undo/redo stacks
+    let dragUndoStack = []; // { element, oldParent, oldNextSibling, newParent, newNextSibling, struct }
+    let dragRedoStack = [];
+    
     // Text edit state
     let editingElement = null;
     let editingTextKey = null;
@@ -84,6 +95,29 @@
             }
             if (e.data.action === 'reindexNodes') {
                 reindexAllNodes(e.data.struct);
+            }
+            // Drag tool options from parent
+            if (e.data.action === 'dragToggleLock') {
+                toggleDragLockPersistent();
+            }
+            if (e.data.action === 'dragUndo') {
+                dragUndoMove();
+            }
+            if (e.data.action === 'dragRedo') {
+                dragRedoMove();
+            }
+            // Drag navigation from parent buttons
+            if (e.data.action === 'dragNavParent') {
+                dragNavigateParent();
+            }
+            if (e.data.action === 'dragNavPrev') {
+                dragNavigatePrevSibling();
+            }
+            if (e.data.action === 'dragNavNext') {
+                dragNavigateNextSibling();
+            }
+            if (e.data.action === 'dragNavChild') {
+                dragNavigateChild();
             }
             if (e.data.action === 'showStruct') {
                 toggleStructVisibility(e.data.struct, true);
@@ -1047,13 +1081,26 @@
         dropIndicator.style.display = 'none';
         document.body.appendChild(dropIndicator);
         
-        console.log('[QuickSite] Drag mode enabled');
+        // Reset Phase 1/2 state
+        dragSelectedElement = null;
+        dragLocked = false;
+        dragLockPersistent = false;
+        
+        // Notify parent to show drag options and set initial hint
+        window.parent.postMessage({
+            source: 'quicksite-preview',
+            action: 'dragModeReady',
+            undoCount: dragUndoStack.length,
+            redoCount: dragRedoStack.length
+        }, '*');
+        
+        console.log('[QuickSite] Drag mode enabled (Phase 1: select)');
     }
     
     function disableDragMode() {
         // Remove draggable class from all elements
         document.querySelectorAll('.qs-draggable').forEach(el => {
-            el.classList.remove('qs-draggable', 'qs-dragging', 'qs-drag-over', 'qs-drag-shifting', 'qs-drag-rollback');
+            el.classList.remove('qs-draggable', 'qs-dragging', 'qs-drag-over', 'qs-drag-shifting', 'qs-drag-rollback', 'qs-drag-selected', 'qs-drag-locked');
         });
         
         // Remove drop indicator
@@ -1068,6 +1115,12 @@
             dragGhost = null;
         }
         
+        // Clear long-press timer
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+        
         isDragging = false;
         dragActivated = false;
         dragElement = null;
@@ -1077,8 +1130,287 @@
         dropPosition = null;
         dragOriginalParent = null;
         dragOriginalNextSibling = null;
+        dragSelectedElement = null;
+        dragLocked = false;
+        dragLockPersistent = false;
+        
+        // Note: undo/redo stacks are cleared when leaving drag mode
+        dragUndoStack = [];
+        dragRedoStack = [];
         
         console.log('[QuickSite] Drag mode disabled');
+    }
+    
+    // ===== DRAG PHASE 1: Selection =====
+    
+    function dragSelectElement(el) {
+        if (!el) return;
+        // Clear previous selection
+        if (dragSelectedElement) {
+            dragSelectedElement.classList.remove('qs-drag-selected', 'qs-drag-locked');
+        }
+        dragSelectedElement = el;
+        dragLocked = false;
+        el.classList.add('qs-drag-selected');
+        
+        // Send element info to parent for info panel
+        const info = getElementInfo(el);
+        window.parent.postMessage({
+            source: 'quicksite-preview',
+            action: 'dragElementSelected',
+            ...info
+        }, '*');
+        
+        console.log('[QuickSite] Drag Phase 1: selected', info.tag, info.node);
+    }
+    
+    function dragLockElement(persistent) {
+        if (!dragSelectedElement) return;
+        dragLocked = true;
+        dragLockPersistent = !!persistent;
+        dragSelectedElement.classList.remove('qs-drag-selected');
+        dragSelectedElement.classList.add('qs-drag-locked');
+        
+        window.parent.postMessage({
+            source: 'quicksite-preview',
+            action: 'dragElementLocked',
+            persistent: dragLockPersistent
+        }, '*');
+        
+        console.log('[QuickSite] Drag Phase 2: locked', dragLockPersistent ? '(persistent)' : '(momentary)');
+    }
+    
+    function dragUnlockElement() {
+        if (!dragSelectedElement) return;
+        dragLocked = false;
+        dragLockPersistent = false;
+        dragSelectedElement.classList.remove('qs-drag-locked');
+        dragSelectedElement.classList.add('qs-drag-selected');
+        
+        const navInfo = getDragNavInfo(dragSelectedElement);
+        window.parent.postMessage({
+            source: 'quicksite-preview',
+            action: 'dragElementUnlocked',
+            ...navInfo
+        }, '*');
+        
+        console.log('[QuickSite] Drag: unlocked, back to Phase 1');
+    }
+    
+    function toggleDragLockPersistent() {
+        if (!dragSelectedElement) return;
+        if (dragLocked && dragLockPersistent) {
+            // Unlock
+            dragUnlockElement();
+        } else {
+            // Lock (persistent)
+            dragLockElement(true);
+        }
+    }
+    
+    // ===== DRAG NAVIGATION HELPERS =====
+    
+    function getDragNavInfo(el) {
+        if (!el) return { hasParent: false, hasPrevSibling: false, hasNextSibling: false, hasChildren: false };
+        const parent = el.parentElement ? el.parentElement.closest('[data-qs-node]') : null;
+        let hasPrevSibling = false, hasNextSibling = false;
+        if (el.parentElement) {
+            const siblings = Array.from(el.parentElement.children).filter(c => c.hasAttribute('data-qs-node'));
+            const idx = siblings.indexOf(el);
+            hasPrevSibling = idx > 0;
+            hasNextSibling = idx < siblings.length - 1;
+        }
+        return {
+            hasParent: !!parent,
+            hasPrevSibling: hasPrevSibling,
+            hasNextSibling: hasNextSibling,
+            hasChildren: el.querySelector('[data-qs-node]') !== null
+        };
+    }
+    
+    // ===== DRAG ARROW NAVIGATION (Phase 1) =====
+    
+    function dragNavigateParent() {
+        if (!dragSelectedElement || dragLocked) return false;
+        const parent = dragSelectedElement.parentElement ? dragSelectedElement.parentElement.closest('[data-qs-node]') : null;
+        if (parent && parent.classList.contains('qs-draggable')) {
+            dragSelectElement(parent);
+            parent.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return true;
+        }
+        return false;
+    }
+    
+    function dragNavigateChild() {
+        if (!dragSelectedElement || dragLocked) return false;
+        const firstChild = dragSelectedElement.querySelector('[data-qs-node]');
+        if (firstChild && firstChild.classList.contains('qs-draggable')) {
+            dragSelectElement(firstChild);
+            firstChild.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return true;
+        }
+        return false;
+    }
+    
+    function dragNavigatePrevSibling() {
+        if (!dragSelectedElement || dragLocked) return false;
+        if (!dragSelectedElement.parentElement) return false;
+        const siblings = Array.from(dragSelectedElement.parentElement.children).filter(c => c.hasAttribute('data-qs-node'));
+        const idx = siblings.indexOf(dragSelectedElement);
+        if (idx > 0) {
+            dragSelectElement(siblings[idx - 1]);
+            siblings[idx - 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return true;
+        }
+        return false;
+    }
+    
+    function dragNavigateNextSibling() {
+        if (!dragSelectedElement || dragLocked) return false;
+        if (!dragSelectedElement.parentElement) return false;
+        const siblings = Array.from(dragSelectedElement.parentElement.children).filter(c => c.hasAttribute('data-qs-node'));
+        const idx = siblings.indexOf(dragSelectedElement);
+        if (idx < siblings.length - 1) {
+            dragSelectElement(siblings[idx + 1]);
+            siblings[idx + 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return true;
+        }
+        return false;
+    }
+    
+    // ===== DRAG UNDO/REDO =====
+    
+    function dragPushUndo(entry) {
+        dragUndoStack.push(entry);
+        dragRedoStack = []; // Clear redo on new move
+        notifyDragStackState();
+    }
+    
+    function notifyDragStackState() {
+        window.parent.postMessage({
+            source: 'quicksite-preview',
+            action: 'dragStackUpdate',
+            undoCount: dragUndoStack.length,
+            redoCount: dragRedoStack.length
+        }, '*');
+    }
+    
+    function dragUndoMove() {
+        if (dragUndoStack.length === 0) return;
+        const entry = dragUndoStack.pop();
+        
+        // Store current position for redo
+        const redoEntry = {
+            element: entry.element,
+            oldParent: entry.element.parentNode,
+            oldNextSibling: entry.element.nextElementSibling,
+            newParent: entry.oldParent,
+            newNextSibling: entry.oldNextSibling,
+            struct: entry.struct,
+            sourceInfo: entry.targetInfo,
+            targetInfo: entry.sourceInfo
+        };
+        
+        // Move element back to original position
+        if (entry.oldNextSibling && entry.oldNextSibling.parentNode === entry.oldParent) {
+            entry.oldParent.insertBefore(entry.element, entry.oldNextSibling);
+        } else {
+            entry.oldParent.appendChild(entry.element);
+        }
+        
+        // Push redo before async API call
+        dragRedoStack.push(redoEntry);
+        notifyDragStackState();
+        
+        // Re-select the element at its restored position
+        dragSelectElement(entry.element);
+        entry.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Compute move params from current DOM state and call API
+        performUndoRedoApiCall(entry.element, entry.struct, 'undo');
+    }
+    
+    function dragRedoMove() {
+        if (dragRedoStack.length === 0) return;
+        const entry = dragRedoStack.pop();
+        
+        // Store current position for undo
+        const undoEntry = {
+            element: entry.element,
+            oldParent: entry.element.parentNode,
+            oldNextSibling: entry.element.nextElementSibling,
+            newParent: entry.newParent,
+            newNextSibling: entry.newNextSibling,
+            struct: entry.struct,
+            sourceInfo: entry.targetInfo,
+            targetInfo: entry.sourceInfo
+        };
+        
+        // Move element to redo position
+        if (entry.newNextSibling && entry.newNextSibling.parentNode === entry.newParent) {
+            entry.newParent.insertBefore(entry.element, entry.newNextSibling);
+        } else {
+            entry.newParent.appendChild(entry.element);
+        }
+        
+        // Push undo
+        dragUndoStack.push(undoEntry);
+        notifyDragStackState();
+        
+        // Re-select the element at its new position
+        dragSelectElement(entry.element);
+        entry.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Call API to sync
+        performUndoRedoApiCall(entry.element, entry.struct, 'redo');
+    }
+    
+    /**
+     * After undo/redo DOM move, compute API params from current DOM position
+     * and post 'elementMoved' to parent for server sync.
+     */
+    function performUndoRedoApiCall(element, struct, action) {
+        // After DOM move, figure out the element's new position relative to a sibling or parent
+        const sourceInfo = getElementInfo(element);
+        
+        // Find the reference element: previous sibling or parent
+        let targetEl = null;
+        let position = null;
+        
+        const prevSibling = element.previousElementSibling;
+        const nextSibling = element.nextElementSibling;
+        
+        if (prevSibling && prevSibling.hasAttribute('data-qs-node')) {
+            targetEl = prevSibling;
+            position = 'after';
+        } else if (nextSibling && nextSibling.hasAttribute('data-qs-node')) {
+            targetEl = nextSibling;
+            position = 'before';
+        } else {
+            // Only child — moved inside parent
+            const parentNode = element.parentElement ? element.parentElement.closest('[data-qs-node]') : null;
+            if (parentNode) {
+                targetEl = parentNode;
+                position = 'inside';
+            }
+        }
+        
+        if (!targetEl || !position) {
+            console.warn('[QuickSite] Undo/redo: could not determine target element');
+            return;
+        }
+        
+        const targetInfo = getElementInfo(targetEl);
+        
+        window.parent.postMessage({
+            source: 'quicksite-preview',
+            action: 'elementMoved',
+            sourceElement: sourceInfo,
+            targetElement: targetInfo,
+            position: position,
+            isUndoRedo: true,
+            undoRedoAction: action
+        }, '*');
     }
     
     // ===== TEXT MODE FUNCTIONALITY =====
@@ -1656,19 +1988,16 @@
     function handleDragEnd(e) {
         if (!isDragging) return;
         
-        // If threshold wasn't met (simple click), show element info and cancel
+        // If threshold wasn't met (quick click on locked element), just cancel
         if (!dragActivated) {
-            // Send info to parent so the info panel updates on click
-            if (dragInfo) {
-                window.parent.postMessage({ 
-                    source: 'quicksite-preview', 
-                    action: 'dragStarted',
-                    ...dragInfo
-                }, '*');
-            }
             isDragging = false;
             dragPendingElement = null;
             dragInfo = null;
+            
+            // If momentary lock (from long-press), unlock back to Phase 1
+            if (dragLocked && !dragLockPersistent) {
+                dragUnlockElement();
+            }
             return;
         }
         
@@ -1699,10 +2028,16 @@
         });
         
         // Check if we have a valid and meaningful move.
-        // DOM moves are all deferred to here (no live reorder during drag).
-        // We check against the ORIGINAL position before doing any DOM move.
         if (dragElement && dragInfo && dropTarget && dropPosition) {
             if (isMeaningfulMove(dragElement, dropTarget, dropPosition)) {
+                // Save undo state BEFORE the DOM move
+                const undoEntry = {
+                    element: dragElement,
+                    oldParent: dragOriginalParent,
+                    oldNextSibling: dragOriginalNextSibling,
+                    struct: dragInfo.struct
+                };
+                
                 // Perform the DOM move now
                 try {
                     if (dropPosition === 'before') {
@@ -1722,6 +2057,11 @@
                     dropPosition = null;
                     return;
                 }
+                
+                // Save new position for undo entry
+                undoEntry.newParent = dragElement.parentNode;
+                undoEntry.newNextSibling = dragElement.nextElementSibling;
+                dragPushUndo(undoEntry);
                 
                 const finalTargetInfo = getElementInfo(dropTarget);
                 
@@ -1747,12 +2087,37 @@
         
         isDragging = false;
         dragActivated = false;
-        // Keep dragElement, dragOriginalParent, dragOriginalNextSibling alive
-        // for potential rollback from parent on API failure.
-        // They will be cleared on next drag start or mode change.
         dragInfo = null;
         dropTarget = null;
         dropPosition = null;
+        
+        // After drop: handle lock state
+        if (dragLockPersistent && dragSelectedElement) {
+            // Persistent lock: element stays locked, re-apply visual
+            dragSelectedElement.classList.add('qs-drag-locked');
+            // Keep dragElement + rollback refs alive for the persistent lock case
+        } else if (dragLocked && !dragLockPersistent) {
+            // Momentary lock (long-press): unlock back to Phase 1
+            dragLocked = false;
+            if (dragSelectedElement) {
+                dragSelectedElement.classList.remove('qs-drag-locked');
+                dragSelectedElement.classList.add('qs-drag-selected');
+            }
+            const navInfo = getDragNavInfo(dragSelectedElement);
+            window.parent.postMessage({
+                source: 'quicksite-preview',
+                action: 'dragElementUnlocked',
+                ...navInfo
+            }, '*');
+        } else {
+            // Re-select the element in Phase 1 after drop
+            if (dragSelectedElement) {
+                dragSelectedElement.classList.add('qs-drag-selected');
+            }
+        }
+        
+        // Keep dragElement, dragOriginalParent, dragOriginalNextSibling alive
+        // for potential rollback from parent on API failure.
     }
     
     /**
@@ -1903,27 +2268,100 @@
         }
     }, true);
     
-    // Keyboard handling for text editing
+    // Keyboard handling for text editing and drag mode navigation
     document.addEventListener('keydown', function(e) {
-        // Escape cancels active drag
-        if (e.key === 'Escape' && currentMode === 'drag' && isDragging) {
-            e.preventDefault();
-            // Clean up visual state
-            if (dragElement) dragElement.classList.remove('qs-dragging');
-            if (dropTarget) dropTarget.classList.remove('qs-drag-over');
-            if (dragGhost) { dragGhost.remove(); dragGhost = null; }
-            document.querySelectorAll('.qs-drag-shifting').forEach(el => el.classList.remove('qs-drag-shifting'));
+        // Drag mode: arrow key navigation (Phase 1 only) and Escape
+        if (currentMode === 'drag') {
+            // Escape cancels active drag or unlocks
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                if (isDragging) {
+                    // Clean up active drag
+                    if (dragElement) dragElement.classList.remove('qs-dragging');
+                    if (dropTarget) dropTarget.classList.remove('qs-drag-over');
+                    if (dragGhost) { dragGhost.remove(); dragGhost = null; }
+                    document.querySelectorAll('.qs-drag-shifting').forEach(el => el.classList.remove('qs-drag-shifting'));
+                    hideDropIndicator();
+                    
+                    if (dragActivated) rollbackDrag();
+                    
+                    isDragging = false;
+                    dragActivated = false;
+                    dragElement = null;
+                    dragPendingElement = null;
+                    dragInfo = null;
+                    dropTarget = null;
+                    dropPosition = null;
+                    
+                    // After cancelling drag, go back to Phase 1 with the element still selected
+                    if (dragSelectedElement) {
+                        dragLocked = false;
+                        dragLockPersistent = false;
+                        dragSelectedElement.classList.remove('qs-drag-locked');
+                        dragSelectedElement.classList.add('qs-drag-selected');
+                        const navInfo = getDragNavInfo(dragSelectedElement);
+                        window.parent.postMessage({
+                            source: 'quicksite-preview',
+                            action: 'dragElementUnlocked',
+                            ...navInfo
+                        }, '*');
+                    }
+                } else if (dragLocked) {
+                    // Unlock if locked
+                    dragUnlockElement();
+                } else if (dragSelectedElement) {
+                    // Deselect
+                    dragSelectedElement.classList.remove('qs-drag-selected');
+                    dragSelectedElement = null;
+                    window.parent.postMessage({
+                        source: 'quicksite-preview',
+                        action: 'dragElementDeselected'
+                    }, '*');
+                }
+                return;
+            }
             
-            if (dragActivated) rollbackDrag();
+            // Arrow keys for Phase 1 navigation (not during drag, not when locked)
+            if (dragSelectedElement && !dragLocked && !isDragging) {
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    dragNavigatePrevSibling();
+                    return;
+                }
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    dragNavigateNextSibling();
+                    return;
+                }
+                if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    dragNavigateParent();
+                    return;
+                }
+                if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    dragNavigateChild();
+                    return;
+                }
+                // Enter locks the element (keyboard alternative to long-press)
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    dragLockElement(true);
+                    return;
+                }
+            }
             
-            isDragging = false;
-            dragActivated = false;
-            dragElement = null;
-            dragPendingElement = null;
-            dragInfo = null;
-            dropTarget = null;
-            dropPosition = null;
-            return;
+            // Ctrl+Z / Ctrl+Y for undo/redo (always available in drag mode)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                dragUndoMove();
+                return;
+            }
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                e.preventDefault();
+                dragRedoMove();
+                return;
+            }
         }
         
         if (currentMode === 'text' && editingElement) {
@@ -1959,24 +2397,65 @@
         
         if (currentMode === 'drag') {
             const target = getDraggableTarget(e.target, e.clientX, e.clientY);
-            if (target && target.classList.contains('qs-draggable')) {
-                e.preventDefault();
-                handleDragStart(e, target);
+            if (!target || !target.classList.contains('qs-draggable')) return;
+            
+            e.preventDefault();
+            
+            if (dragLocked && dragSelectedElement) {
+                // Phase 2: Locked — mousedown starts the actual drag
+                handleDragStart(e, dragSelectedElement);
+            } else {
+                // Phase 1: Select the element and start long-press timer
+                dragSelectElement(target);
+                
+                // Start long-press timer for momentary lock
+                dragStartX = e.clientX;
+                dragStartY = e.clientY;
+                if (longPressTimer) clearTimeout(longPressTimer);
+                longPressTimer = setTimeout(function() {
+                    longPressTimer = null;
+                    // Only lock if mouse hasn't moved much (not a drag gesture)
+                    if (dragSelectedElement === target && !isDragging) {
+                        dragLockElement(false); // momentary lock
+                        // Immediately start drag with this element
+                        handleDragStart(e, dragSelectedElement);
+                    }
+                }, longPressDelay);
             }
         }
     }, true);
     
     document.addEventListener('mousemove', function(e) {
-        if (currentMode === 'drag' && isDragging) {
-            e.preventDefault();
-            handleDragMove(e);
+        if (currentMode === 'drag') {
+            // Cancel long-press if mouse moves significantly before timer fires
+            if (longPressTimer) {
+                const dx = e.clientX - dragStartX;
+                const dy = e.clientY - dragStartY;
+                if (Math.sqrt(dx * dx + dy * dy) > dragThreshold) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
+            }
+            
+            if (isDragging) {
+                e.preventDefault();
+                handleDragMove(e);
+            }
         }
     }, true);
     
     document.addEventListener('mouseup', function(e) {
-        if (currentMode === 'drag' && isDragging) {
-            e.preventDefault();
-            handleDragEnd(e);
+        if (currentMode === 'drag') {
+            // Clear long-press timer
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+            
+            if (isDragging) {
+                e.preventDefault();
+                handleDragEnd(e);
+            }
         }
     }, true);
     

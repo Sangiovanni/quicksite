@@ -6508,6 +6508,66 @@ kbd {
     overflow-x: hidden;
 }
 
+/* Tool Options Bar (lock/undo/redo for drag mode) */
+.preview-sidebar-tool-options {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    margin: 0 var(--space-sm) var(--space-xs);
+    background: var(--admin-bg-secondary);
+    border-radius: var(--radius-md);
+    flex-wrap: wrap;
+}
+
+.preview-sidebar-tool-option {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: transparent;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.preview-sidebar-tool-option svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.preview-sidebar-tool-option:hover:not(:disabled) {
+    color: var(--admin-text);
+    border-color: var(--admin-primary);
+    background: var(--admin-bg-tertiary);
+}
+
+.preview-sidebar-tool-option:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.preview-sidebar-tool-option--active {
+    color: var(--admin-primary);
+    border-color: var(--admin-primary);
+    background: color-mix(in srgb, var(--admin-primary) 12%, transparent);
+}
+
+.preview-sidebar-tool-option--active svg {
+    fill: var(--admin-primary);
+}
+
+.preview-sidebar-tool-hint {
+    width: 100%;
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+    padding-top: 2px;
+}
+
 /* Main Preview Area */
 .preview-main {
     display: flex;

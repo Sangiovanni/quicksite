@@ -43,6 +43,20 @@ embed[data-qs-struct], object[data-qs-struct] {
     outline: 2px dashed #10b981 !important;
     outline-offset: 2px !important;
 }
+/* Phase 1: Selected for move (click to select, arrows to navigate) */
+.qs-drag-selected {
+    outline: 2px solid #10b981 !important;
+    outline-offset: 2px !important;
+    background-color: #10b9811a !important;
+    cursor: grab !important;
+}
+/* Phase 2: Locked and ready to drag */
+.qs-drag-locked {
+    outline: 3px solid #059669 !important;
+    outline-offset: 2px !important;
+    background-color: #05966926 !important;
+    cursor: grab !important;
+}
 .qs-dragging {
     opacity: 0.25 !important;
     cursor: grabbing !important;

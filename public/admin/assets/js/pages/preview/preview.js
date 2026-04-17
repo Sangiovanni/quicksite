@@ -135,6 +135,19 @@
     const sidebarTools = document.getElementById('preview-sidebar-tools');
     const toolsShowNames = document.getElementById('preview-tools-show-names');
     
+    // Drag tool options
+    const dragDefault = document.getElementById('contextual-drag-default');
+    const dragInfo = document.getElementById('contextual-drag-info');
+    const dragLockBtn = document.getElementById('preview-drag-lock');
+    const dragUndoBtn = document.getElementById('preview-drag-undo');
+    const dragRedoBtn = document.getElementById('preview-drag-redo');
+    const dragHint = document.getElementById('preview-drag-hint');
+    // Drag navigation buttons
+    const dragNavParent = document.getElementById('ctx-drag-nav-parent');
+    const dragNavPrev = document.getElementById('ctx-drag-nav-prev');
+    const dragNavNext = document.getElementById('ctx-drag-nav-next');
+    const dragNavChild = document.getElementById('ctx-drag-nav-child');
+    
     // Mobile sections elements (low-width mode)
     const mobileSections = document.getElementById('preview-mobile-sections');
     const mobileSectionInfo = document.getElementById('mobile-section-info');
@@ -2694,6 +2707,14 @@
             hideNodePanel();
         }
         
+        // Reset drag contextual when entering drag mode
+        if (mode === 'drag') {
+            if (dragDefault) dragDefault.style.display = '';
+            if (dragInfo) dragInfo.style.display = 'none';
+            if (dragHint) dragHint.textContent = PreviewConfig.i18n.dragSelectHint || '';
+            if (dragLockBtn) dragLockBtn.classList.remove('preview-sidebar-tool-option--active');
+        }
+        
         // Clear style mode state when switching away
         if (mode !== 'style') {
             sendToIframe('clearStyleSelection', {});
@@ -3434,6 +3455,54 @@
                 // Show dragged element info in the contextual info panel
                 showContextualInfo(e.data);
             }
+            // Drag Phase 1/2 messages
+            if (e.data.action === 'dragElementSelected') {
+                // Show drag info panel, hide default
+                if (dragDefault) dragDefault.style.display = 'none';
+                if (dragInfo) dragInfo.style.display = '';
+                // Update nav button states
+                if (dragNavParent) dragNavParent.disabled = !e.data.hasParent;
+                if (dragNavPrev) dragNavPrev.disabled = !e.data.hasPrevSibling;
+                if (dragNavNext) dragNavNext.disabled = !e.data.hasNextSibling;
+                if (dragNavChild) dragNavChild.disabled = !e.data.hasChildren;
+                if (dragLockBtn) dragLockBtn.classList.remove('preview-sidebar-tool-option--active');
+                if (dragHint) dragHint.textContent = PreviewConfig.i18n.dragSelectHint || '';
+                updateGlobalElementInfo(e.data);
+            }
+            if (e.data.action === 'dragElementLocked') {
+                if (dragLockBtn) dragLockBtn.classList.toggle('preview-sidebar-tool-option--active', !!e.data.persistent);
+                if (dragHint) dragHint.textContent = PreviewConfig.i18n.dragLockedHint || '';
+                // Disable nav buttons while locked
+                if (dragNavParent) dragNavParent.disabled = true;
+                if (dragNavPrev) dragNavPrev.disabled = true;
+                if (dragNavNext) dragNavNext.disabled = true;
+                if (dragNavChild) dragNavChild.disabled = true;
+            }
+            if (e.data.action === 'dragElementUnlocked') {
+                if (dragLockBtn) dragLockBtn.classList.remove('preview-sidebar-tool-option--active');
+                if (dragHint) dragHint.textContent = PreviewConfig.i18n.dragSelectHint || '';
+                // Re-enable nav buttons (will be re-evaluated on next select)
+                if (dragNavParent) dragNavParent.disabled = !e.data.hasParent;
+                if (dragNavPrev) dragNavPrev.disabled = !e.data.hasPrevSibling;
+                if (dragNavNext) dragNavNext.disabled = !e.data.hasNextSibling;
+                if (dragNavChild) dragNavChild.disabled = !e.data.hasChildren;
+            }
+            if (e.data.action === 'dragElementDeselected') {
+                if (dragLockBtn) dragLockBtn.classList.remove('preview-sidebar-tool-option--active');
+                if (dragHint) dragHint.textContent = PreviewConfig.i18n.dragSelectHint || '';
+                // Show default, hide info
+                if (dragDefault) dragDefault.style.display = '';
+                if (dragInfo) dragInfo.style.display = 'none';
+            }
+            if (e.data.action === 'dragStackUpdate') {
+                if (dragUndoBtn) dragUndoBtn.disabled = (e.data.undoCount === 0);
+                if (dragRedoBtn) dragRedoBtn.disabled = (e.data.redoCount === 0);
+            }
+            if (e.data.action === 'dragModeReady') {
+                if (dragUndoBtn) dragUndoBtn.disabled = (e.data.undoCount === 0);
+                if (dragRedoBtn) dragRedoBtn.disabled = (e.data.redoCount === 0);
+                if (dragHint) dragHint.textContent = PreviewConfig.i18n.dragSelectHint || '';
+            }
             if (e.data.action === 'textEdited') {
                 handleTextEdited(e.data);
             }
@@ -3559,6 +3628,8 @@
         const source = data.sourceElement;
         const target = data.targetElement;
         const position = data.position; // 'before', 'after', or 'inside'
+        const isUndoRedo = !!data.isUndoRedo;
+        const undoRedoAction = data.undoRedoAction; // 'undo' or 'redo'
         
         if (!source || !target || !source.struct || !source.node || !target.node) {
             console.error('[Preview] Invalid move data:', { source, target, position });
@@ -3621,14 +3692,25 @@
                 }
             }, 50);
             
-            showToast(PreviewConfig.i18n.elementMoved, 'success');
+            showToast(
+                isUndoRedo
+                    ? (undoRedoAction === 'undo' ? PreviewConfig.i18n.elementMoveUndone : PreviewConfig.i18n.elementMoveRedone)
+                    : PreviewConfig.i18n.elementMoved,
+                'success'
+            );
             console.log('[Preview] Move saved successfully');
             
         } catch (error) {
             console.error('[Preview] Move error:', error);
             showToast(PreviewConfig.i18n.error + ': ' + error.message, 'error');
-            // Rollback DOM in iframe since API failed
-            sendToIframe('rollbackDrag', {});
+            if (isUndoRedo) {
+                // For undo/redo, reverse the DOM move by telling iframe to undo/redo the opposite
+                // Since the stacks were already updated, we pop the last entry and move back
+                sendToIframe(undoRedoAction === 'undo' ? 'dragRedo' : 'dragUndo', {});
+            } else {
+                // Rollback DOM in iframe since API failed
+                sendToIframe('rollbackDrag', {});
+            }
         }
     }
     
@@ -3879,6 +3961,44 @@
                 setMode(this.dataset.mode);
             });
         });
+        
+        // Drag tool option buttons (lock, undo, redo)
+        if (dragLockBtn) {
+            dragLockBtn.addEventListener('click', function() {
+                sendToIframe('dragToggleLock', {});
+            });
+        }
+        if (dragUndoBtn) {
+            dragUndoBtn.addEventListener('click', function() {
+                sendToIframe('dragUndo', {});
+            });
+        }
+        if (dragRedoBtn) {
+            dragRedoBtn.addEventListener('click', function() {
+                sendToIframe('dragRedo', {});
+            });
+        }
+        // Drag navigation buttons
+        if (dragNavParent) {
+            dragNavParent.addEventListener('click', function() {
+                sendToIframe('dragNavParent', {});
+            });
+        }
+        if (dragNavPrev) {
+            dragNavPrev.addEventListener('click', function() {
+                sendToIframe('dragNavPrev', {});
+            });
+        }
+        if (dragNavNext) {
+            dragNavNext.addEventListener('click', function() {
+                sendToIframe('dragNavNext', {});
+            });
+        }
+        if (dragNavChild) {
+            dragNavChild.addEventListener('click', function() {
+                sendToIframe('dragNavChild', {});
+            });
+        }
     }
     
     initIframeAndControls();
@@ -3890,6 +4010,20 @@
             // Ignore if typing in an input/textarea
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
                 return;
+            }
+            
+            // Drag mode: Ctrl+Z / Ctrl+Y for undo/redo
+            if (currentMode === 'drag') {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendToIframe('dragUndo', {});
+                    return;
+                }
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                    e.preventDefault();
+                    sendToIframe('dragRedo', {});
+                    return;
+                }
             }
             
             // Arrow keys - Navigate selection (only in select mode with a selection)
