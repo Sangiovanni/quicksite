@@ -1903,7 +1903,19 @@
         "emptyText": "Empty text:",
         "emptyTextPlaceholder": "e.g. No items found  (optional)",
         "emptyTextHint": "Text shown when the array is empty",
-        "listModeHint": "Uses data-bind attributes inside the container's first child as item template."
+        "listModeHint": "Uses data-bind attributes inside the container's first child as item template.",
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System",
+        "themePreview": "Theme",
+        "themeLight": "Preview light mode",
+        "themeDark": "Preview dark mode",
+        "themeModeConfig": "Theme Mode Settings",
+        "themeModeEnabled": "Dark mode support",
+        "themeDefault": "Default mode",
+        "themeUserToggle": "Visitor can switch",
+        "saveThemeConfig": "Save Settings",
+        "themeConfigSaved": "Theme settings saved successfully"
     },
     "apis": {
         "title": "API Registry",

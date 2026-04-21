@@ -1,0 +1,45 @@
+{
+    "$schema": "../schema.json",
+    "id": "setup-theme-switch",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "🌙",
+        "titleKey": "workflows.specs.setupThemeSwitch.title",
+        "descriptionKey": "workflows.specs.setupThemeSwitch.description",
+        "category": "modification",
+        "tags": ["theme", "dark", "light", "switch", "toggle"],
+        "difficulty": "beginner"
+    },
+    "parameters": [],
+    "steps": [
+        {
+            "command": "editStructure",
+            "params": {
+                "type": "component",
+                "name": "theme-switch",
+                "structure": {
+                    "tag": "button",
+                    "params": {
+                        "class": "theme-switch",
+                        "data-theme-toggle": "true",
+                        "type": "button",
+                        "aria-label": "Toggle light/dark theme",
+                        "aria-pressed": "false"
+                    },
+                    "children": [
+                        {
+                            "tag": "span",
+                            "params": { "class": "theme-switch-icon", "aria-hidden": "true" },
+                            "children": [{ "textKey": "__RAW__🌙" }]
+                        },
+                        {
+                            "tag": "span",
+                            "params": { "class": "theme-switch-label" },
+                            "children": [{ "textKey": "__RAW__Dark mode" }]
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

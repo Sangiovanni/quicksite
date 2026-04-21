@@ -247,6 +247,19 @@ if(!defined('MULTILINGUAL_SUPPORT')){
     define('MULTILINGUAL_SUPPORT', CONFIG['MULTILINGUAL_SUPPORT']);
 }
 
+// ============================================================================
+// THEME CONFIGURATION — flags read from project config with safe fallbacks
+// ============================================================================
+if (!defined('THEME_MODE_ENABLED')) {
+    define('THEME_MODE_ENABLED', CONFIG['THEME_MODE_ENABLED'] ?? false);
+}
+if (!defined('THEME_DEFAULT')) {
+    define('THEME_DEFAULT', CONFIG['THEME_DEFAULT'] ?? 'light');
+}
+if (!defined('THEME_USER_TOGGLE_ENABLED')) {
+    define('THEME_USER_TOGGLE_ENABLED', CONFIG['THEME_USER_TOGGLE_ENABLED'] ?? false);
+}
+
 if(!defined('ROUTES_PATH')){
     define('ROUTES_PATH', PROJECT_PATH . DIRECTORY_SEPARATOR . 'routes.php');
 }

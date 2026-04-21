@@ -13,6 +13,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsStyleManagement.php';
 
 // Get parameters
 $params = $trimParametersManagement->params();
@@ -89,7 +90,7 @@ if ($mediaQuery !== null && !RegexPatterns::match('media_query_basic', $mediaQue
     }
 }
 
-$styleFile = PUBLIC_CONTENT_PATH . '/style/style.css';
+$styleFile = cssLivePath();
 
 // Check file exists
 if (!file_exists($styleFile)) {
@@ -99,11 +100,8 @@ if (!file_exists($styleFile)) {
 }
 
 // Use file locking
-$lockFile = sys_get_temp_dir() . '/quicksite_style_' . md5($styleFile) . '.lock';
-$lock = fopen($lockFile, 'w');
-
-if (!flock($lock, LOCK_EX)) {
-    fclose($lock);
+$lock = cssAcquireLock($styleFile);
+if ($lock === null) {
     ApiResponse::create(500, 'server.lock_failed')
         ->withMessage('Could not acquire file lock')
         ->send();
@@ -120,14 +118,11 @@ try {
     $parser = new CssParser($content);
     $result = $parser->setStyleRule($selector, $styles, $mediaQuery, $removeProperties);
     
-    // Write updated content
-    if (file_put_contents($styleFile, $parser->getContent()) === false) {
-        throw new Exception('Failed to write style file');
-    }
-    
-    flock($lock, LOCK_UN);
-    fclose($lock);
-    
+    // Write updated content to live stylesheet and project backup copy
+    cssWriteAllTargets($parser->getContent(), $styleFile, cssProjectPath());
+
+    cssReleaseLock($lock);
+
     ApiResponse::create(200, 'operation.success')
         ->withMessage('Style rule ' . $result['action'] . ' successfully')
         ->withData([
@@ -137,10 +132,9 @@ try {
             'styles' => $styles
         ])
         ->send();
-    
+
 } catch (Exception $e) {
-    flock($lock, LOCK_UN);
-    fclose($lock);
+    cssReleaseLock($lock);
     ApiResponse::create(500, 'server.operation_failed')
         ->withMessage($e->getMessage())
         ->send();

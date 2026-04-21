@@ -1,0 +1,22 @@
+{
+    "tag": "button",
+    "params": {
+        "class": "theme-switch",
+        "data-theme-toggle": "true",
+        "type": "button",
+        "aria-label": "Toggle light/dark theme",
+        "aria-pressed": "false"
+    },
+    "children": [
+        {
+            "tag": "span",
+            "params": { "class": "theme-switch-icon", "aria-hidden": "true" },
+            "children": [{ "textKey": "__RAW__🌙" }]
+        },
+        {
+            "tag": "span",
+            "params": { "class": "theme-switch-label" },
+            "children": [{ "textKey": "__RAW__Dark mode" }]
+        }
+    ]
+}

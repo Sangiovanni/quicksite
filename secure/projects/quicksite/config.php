@@ -15,4 +15,7 @@ return array (
     'fr' => 'Français',
   ),
   'MAX_BUILD_SIZE_MB' => 500,
+  'THEME_MODE_ENABLED' => false,
+  'THEME_DEFAULT' => 'light',
+  'THEME_USER_TOGGLE_ENABLED' => false,
 );

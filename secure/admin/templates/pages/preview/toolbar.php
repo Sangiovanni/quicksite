@@ -48,8 +48,22 @@
             </select>
         </div>
         <?php endif; ?>
-        
-        <!-- Route Layout Toggles (shown only when editing a page) -->
+
+        <!-- Theme Preview Toggle (shown only when THEME_MODE_ENABLED) -->
+        <?php if (CONFIG['THEME_MODE_ENABLED'] ?? false): ?>
+        <div class="preview-toolbar__group" id="preview-theme-toggle-group">
+            <label class="preview-toolbar__label"><?= __admin('preview.themePreview') ?? 'Theme' ?>:</label>
+            <div class="preview-toolbar__segmented" id="preview-theme-mode-switcher">
+                <button type="button" class="preview-toolbar__seg-btn preview-toolbar__seg-btn--active" data-theme-preview="light" title="<?= __admin('preview.themeLight') ?? 'Preview light mode' ?>">
+                    <span aria-hidden="true">☀</span> <?= __admin('preview.light') ?? 'Light' ?>
+                </button>
+                <button type="button" class="preview-toolbar__seg-btn" data-theme-preview="dark" title="<?= __admin('preview.themeDark') ?? 'Preview dark mode' ?>">
+                    <span aria-hidden="true">🌙</span> <?= __admin('preview.dark') ?? 'Dark' ?>
+                </button>
+            </div>
+        </div>
+        <?php endif; ?>
+        <!-- Layout toggles (shown only when editing a page) -->
         <div class="preview-toolbar__group preview-toolbar__layout-toggles" id="preview-layout-toggles" style="display: none;" title="<?= __admin('preview.layoutTogglesHint') ?? 'Show or hide shared sections on this page' ?>">
             <label class="preview-toolbar__toggle" title="<?= __admin('preview.menuToggleHint') ?? 'Show or hide the menu on this page' ?>">
                 <input type="checkbox" id="preview-toggle-menu" checked>

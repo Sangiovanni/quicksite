@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * CSS Parser Utility Class
  * Parses and manipulates CSS content for Quicksite API
@@ -24,112 +24,118 @@ class CssParser {
      * @return array Associative array of variable name => value
      */
     public function getRootVariables(): array {
+        return $this->getVariablesInScope(':root');
+    }
+    /**
+     * Get CSS custom properties defined in a specific selector scope.
+     *
+     * @param string $selector CSS selector to search (e.g. ':root', '[data-theme="dark"]')
+     * @return array Associative array of variable name => value
+     */
+    public function getVariablesInScope(string $selector): array {
         $variables = [];
-        
-        // Match :root block
-        if (preg_match('/:root\s*\{([^}]+)\}/s', $this->content, $matches)) {
-            $rootContent = $matches[1];
-            
-            // Match all --variable: value pairs
-            preg_match_all('/(--.+?)\s*:\s*([^;]+);/s', $rootContent, $varMatches, PREG_SET_ORDER);
-            
+        $escapedSelector = preg_quote($selector, '/');
+        if (preg_match('/' . $escapedSelector . '\s*\{([^}]+)\}/s', $this->content, $matches)) {
+            preg_match_all('/(--.+?)\s*:\s*([^;]+);/s', $matches[1], $varMatches, PREG_SET_ORDER);
             foreach ($varMatches as $match) {
-                $varName = trim($match[1]);
-                $varValue = trim($match[2]);
-                $variables[$varName] = $varValue;
+                $variables[trim($match[1])] = trim($match[2]);
             }
         }
-        
         return $variables;
     }
-    
+
     /**
-     * Set/update :root variables
+     * Set/update CSS custom properties in a specific selector scope.
+     * Creates the scope block if it does not exist (appended at end of stylesheet).
+     *
+     * @param array  $variables Associative array of variable name => value
+     * @param string $selector  CSS selector that owns the variables block
+     * @return array Summary of changes: added, updated, total_changes
+     */
+    public function setVariablesInScope(array $variables, string $selector): array {
+        $added   = [];
+        $updated = [];
+
+        $escapedSelector = preg_quote($selector, '/');
+        $pattern = '/' . $escapedSelector . '\s*\{([^}]+)\}/s';
+
+        if (preg_match($pattern, $this->content, $matches, PREG_OFFSET_CAPTURE)) {
+            $blockContent = $matches[1][0];
+            $blockStart   = $matches[0][1];
+            $blockEnd     = $blockStart + strlen($matches[0][0]);
+            $newContent   = $blockContent;
+
+            foreach ($variables as $varName => $varValue) {
+                if (strpos($varName, '--') !== 0) {
+                    $varName = '--' . $varName;
+                }
+                $varPattern = '/(' . preg_quote($varName, '/') . '\s*:\s*)([^;]+)(;)/s';
+                if (preg_match($varPattern, $newContent)) {
+                    $safeValue  = str_replace(['\\', '$'], ['\\\\', '\\$'], $varValue);
+                    $newContent = preg_replace($varPattern, '${1}' . $safeValue . '${3}', $newContent);
+                    $updated[$varName] = $varValue;
+                } else {
+                    $newContent = rtrim($newContent) . "\n    " . $varName . ': ' . $varValue . ";\n";
+                    $added[$varName] = $varValue;
+                }
+            }
+
+            $newBlock = $selector . ' {' . $newContent . '}';
+            $this->content = substr($this->content, 0, $blockStart) . $newBlock . substr($this->content, $blockEnd);
+
+        } else {
+            // Block does not exist - append a new one at the end of the stylesheet
+            $newBlock = "\n" . $selector . " {\n";
+            foreach ($variables as $varName => $varValue) {
+                if (strpos($varName, '--') !== 0) {
+                    $varName = '--' . $varName;
+                }
+                $newBlock .= "    " . $varName . ': ' . $varValue . ";\n";
+                $added[$varName] = $varValue;
+            }
+            $newBlock .= "}\n";
+            $this->content .= $newBlock;
+        }
+
+        return [
+            'added'         => $added,
+            'updated'       => $updated,
+            'total_changes' => count($added) + count($updated)
+        ];
+    }
+
+    /**
+     * Set/update :root variables (wrapper around setVariablesInScope for :root)
      * @param array $variables Associative array of variable name => value
      * @return array Summary of changes
      */
     public function setRootVariables(array $variables): array {
-        $added = [];
-        $updated = [];
-        
-        // Find existing :root block
-        if (preg_match('/:root\s*\{([^}]+)\}/s', $this->content, $matches, PREG_OFFSET_CAPTURE)) {
-            $rootContent = $matches[1][0];
-            $rootStart = $matches[0][1];
-            $rootEnd = $rootStart + strlen($matches[0][0]);
-            
-            $newRootContent = $rootContent;
-            
-            foreach ($variables as $varName => $varValue) {
-                // Ensure variable name starts with --
-                if (strpos($varName, '--') !== 0) {
-                    $varName = '--' . $varName;
-                }
-                
-                // Check if variable exists
-                $pattern = '/(' . preg_quote($varName, '/') . '\s*:\s*)([^;]+)(;)/s';
-                
-                if (preg_match($pattern, $newRootContent)) {
-                    // Update existing - escape $ in replacement to prevent backreference issues
-                    $safeValue = str_replace(['\\', '$'], ['\\\\', '\\$'], $varValue);
-                    $newRootContent = preg_replace($pattern, '${1}' . $safeValue . '${3}', $newRootContent);
-                    $updated[$varName] = $varValue;
-                } else {
-                    // Add new variable before closing brace
-                    $newRootContent = rtrim($newRootContent) . "\n    " . $varName . ': ' . $varValue . ";\n";
-                    $added[$varName] = $varValue;
-                }
-            }
-            
-            // Replace :root block
-            $newRootBlock = ':root {' . $newRootContent . '}';
-            $this->content = substr($this->content, 0, $rootStart) . $newRootBlock . substr($this->content, $rootEnd);
-            
-        } else {
-            // No :root block exists, create one at the beginning
-            $rootBlock = ":root {\n";
-            foreach ($variables as $varName => $varValue) {
-                if (strpos($varName, '--') !== 0) {
-                    $varName = '--' . $varName;
-                }
-                $rootBlock .= "    " . $varName . ': ' . $varValue . ";\n";
-                $added[$varName] = $varValue;
-            }
-            $rootBlock .= "}\n\n";
-            
-            $this->content = $rootBlock . $this->content;
-        }
-        
-        return [
-            'added' => $added,
-            'updated' => $updated,
-            'total_changes' => count($added) + count($updated)
-        ];
+        return $this->setVariablesInScope($variables, ':root');
     }
-    
+
     /**
      * Get all selectors in the stylesheet
      * @return array List of selectors with their context (global or media query)
      */
     public function listSelectors(): array {
         $selectors = [];
-        
+
         // First, extract selectors outside of @media and @keyframes
         $contentWithoutMedia = $this->content;
-        
+
         // Remove @keyframes blocks temporarily
         $contentWithoutMedia = preg_replace('/@keyframes\s+[\w-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/s', '', $contentWithoutMedia);
-        
+
         // Extract @media blocks and their selectors
         preg_match_all('/@media\s*([^{]+)\s*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/s', $contentWithoutMedia, $mediaMatches, PREG_SET_ORDER);
-        
+
         foreach ($mediaMatches as $media) {
             $mediaQuery = trim($media[1]);
             $mediaContent = $media[2];
-            
+
             // Extract selectors within this media query
             preg_match_all('/([^{@][^{]*)\s*\{[^}]*\}/s', $mediaContent, $selectorMatches);
-            
+
             foreach ($selectorMatches[1] as $selector) {
                 $selector = trim($selector);
                 if (!empty($selector) && strpos($selector, '/*') === false) {
@@ -140,13 +146,13 @@ class CssParser {
                 }
             }
         }
-        
+
         // Remove @media blocks from content to find global selectors
         $globalContent = preg_replace('/@media\s*[^{]+\s*\{(?:[^{}]*\{[^{}]*\})*\s*\}/s', '', $contentWithoutMedia);
-        
+
         // Extract global selectors (not in @media)
         preg_match_all('/([^{@][^{]*)\s*\{[^}]*\}/s', $globalContent, $globalMatches);
-        
+
         foreach ($globalMatches[1] as $selector) {
             $selector = trim($selector);
             if (!empty($selector) && strpos($selector, '/*') === false && strpos($selector, ':root') === false) {
@@ -156,7 +162,7 @@ class CssParser {
                 ];
             }
         }
-        
+
         return $selectors;
     }
     

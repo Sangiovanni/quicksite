@@ -35,8 +35,10 @@
     // ==================== State ====================
     
     let themeVariablesLoaded = false;
-    let originalThemeVariables = {};
-    let currentThemeVariables = {};
+    let originalThemeVariables = {};    // values for current scope
+    let currentThemeVariables = {};     // edited values for current scope
+    let lightVariables = {};            // :root values (always loaded)
+    let currentScope = 'light';         // 'light' | 'dark'
     
     // ==================== Configuration ====================
     
@@ -122,41 +124,65 @@
     }
     
     // ==================== Load Theme Variables ====================
-    
+
     /**
-     * Load theme variables from the API
+     * Fetch variables for one scope from the API
+     * @param {string} scope 'light' | 'dark'
+     * @returns {Promise<Object>} variable map
+     */
+    async function fetchScopeVariables(scope) {
+        const managementUrl = getManagementUrl();
+        const authToken = getAuthToken();
+        const url = managementUrl + 'getRootVariables' + (scope === 'dark' ? '?themeTarget=dark' : '');
+        const response = await fetch(url, {
+            headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+        });
+        const data = await response.json();
+        if (data.status === 200 && data.data?.variables) {
+            return data.data.variables;
+        }
+        throw new Error(data.message || 'Failed to load theme variables');
+    }
+
+    /**
+     * Load theme variables for the current scope.
+     * For 'dark': always loads :root names, then overlays saved dark overrides.
      */
     async function loadThemeVariables() {
         if (!themeLoading || !themeContent) return;
         
         const i18n = getI18n();
-        const managementUrl = getManagementUrl();
-        const authToken = getAuthToken();
         
-        // Show loading state
         themeLoading.style.display = '';
         themeContent.style.display = 'none';
         
         try {
-            const response = await fetch(managementUrl + 'getRootVariables', {
-                headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
-            });
-            const data = await response.json();
-            
-            if (data.status === 200 && data.data?.variables) {
-                originalThemeVariables = { ...data.data.variables };
-                currentThemeVariables = { ...data.data.variables };
-                themeVariablesLoaded = true;
-                
-                // Populate the theme editor UI
-                populateThemeEditor(data.data.variables);
-                
-                // Show content, hide loading
-                themeLoading.style.display = 'none';
-                themeContent.style.display = '';
-            } else {
-                throw new Error(data.message || 'Failed to load theme variables');
+            // Always load :root so we have canonical variable names
+            lightVariables = await fetchScopeVariables('light');
+
+            let displayVars = lightVariables;
+
+            if (currentScope === 'dark') {
+                // Load dark overrides; fall back to light values for any missing variable
+                const darkVars = await fetchScopeVariables('dark');
+                displayVars = {};
+                for (const [name, lightVal] of Object.entries(lightVariables)) {
+                    displayVars[name] = darkVars[name] !== undefined ? darkVars[name] : lightVal;
+                }
+                // Also pick up any dark-only variables not in :root
+                for (const [name, darkVal] of Object.entries(darkVars)) {
+                    if (!(name in displayVars)) displayVars[name] = darkVal;
+                }
             }
+
+            originalThemeVariables = { ...displayVars };
+            currentThemeVariables  = { ...displayVars };
+            themeVariablesLoaded   = true;
+            
+            populateThemeEditor(displayVars);
+            
+            themeLoading.style.display = 'none';
+            themeContent.style.display = '';
         } catch (error) {
             console.error('[PreviewStyleTheme] Error loading theme variables:', error);
             themeLoading.innerHTML = `
@@ -315,7 +341,8 @@
     }
     
     /**
-     * Live preview a theme variable change in the iframe
+     * Live preview a theme variable change in the iframe.
+     * For dark scope, injects overrides into [data-theme="dark"] block.
      */
     function previewThemeVariable(name, value) {
         currentThemeVariables[name] = value;
@@ -327,7 +354,6 @@
             const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
             if (!iframeDoc) return;
             
-            // Find or create the preview style element
             let previewStyle = iframeDoc.getElementById('quicksite-theme-preview');
             if (!previewStyle) {
                 previewStyle = iframeDoc.createElement('style');
@@ -335,13 +361,13 @@
                 iframeDoc.head.appendChild(previewStyle);
             }
             
-            // Build CSS from all modified variables
             const modifiedVars = Object.entries(currentThemeVariables)
                 .filter(([k, v]) => v !== originalThemeVariables[k])
                 .map(([k, v]) => `${k}: ${v};`)
-                .join('\n');
-            
-            previewStyle.textContent = `:root {\n${modifiedVars}\n}`;
+                .join('\n    ');
+
+            const selector = currentScope === 'dark' ? '[data-theme="dark"]' : ':root';
+            previewStyle.textContent = `${selector} {\n    ${modifiedVars}\n}`;
         } catch (e) {
             console.warn('[PreviewStyleTheme] Could not preview theme variable:', e);
         }
@@ -374,10 +400,13 @@
             const headers = { 'Content-Type': 'application/json' };
             if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
             
+            const body = { variables: currentThemeVariables };
+            if (currentScope === 'dark') body.themeTarget = 'dark';
+
             const response = await fetch(managementUrl + 'setRootVariables', {
                 method: 'POST',
                 headers: headers,
-                body: JSON.stringify({ variables: currentThemeVariables })
+                body: JSON.stringify(body)
             });
             
             const data = await response.json();
@@ -441,6 +470,141 @@
         showToast(i18n.themeReset || 'Theme reset', 'info');
     }
     
+    // ==================== Scope Switcher ====================
+
+    /**
+     * Switch between light and dark variable scope.
+     * Reloads variables and updates iframe preview theme.
+     */
+    function switchScope(scope) {
+        if (scope === currentScope) return;
+        currentScope = scope;
+
+        // Update scope switcher buttons
+        document.querySelectorAll('[data-scope]').forEach(btn => {
+            btn.classList.toggle('preview-theme-scope__btn--active', btn.dataset.scope === scope);
+        });
+
+        // Sync toolbar toggle buttons
+        document.querySelectorAll('[data-theme-preview]').forEach(btn => {
+            btn.classList.toggle('preview-toolbar__seg-btn--active', btn.dataset.themePreview === scope);
+        });
+
+        // Set data-theme on iframe <html> so the preview renders in the right mode
+        try {
+            const iframe = getIframe();
+            if (iframe) {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                if (iframeDoc?.documentElement) {
+                    iframeDoc.documentElement.setAttribute('data-theme', scope);
+                }
+            }
+        } catch (e) { /* cross-origin guard */ }
+
+        // Reload variables for the new scope (resets unsaved changes)
+        themeVariablesLoaded = false;
+        loadThemeVariables();
+    }
+
+    // Wire scope switcher buttons (inside style panel)
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('[data-scope]');
+        if (btn) switchScope(btn.dataset.scope);
+    });
+
+    // Wire toolbar preview toggle buttons
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('[data-theme-preview]');
+        if (btn) switchScope(btn.dataset.themePreview);
+    });
+
+    // ==================== Theme Mode Config Panel ====================
+
+    const themeConfigToggle   = document.getElementById('theme-config-toggle');
+    const themeConfigBody     = document.getElementById('theme-config-body');
+    const themeConfigSaveBtn  = document.getElementById('theme-config-save-btn');
+    const themeConfigEnabled  = document.getElementById('theme-config-enabled');
+    const themeConfigDefault  = document.getElementById('theme-config-default');
+    const themeConfigToggleEl = document.getElementById('theme-config-usertoggle');
+
+    /**
+     * Sync the dependent controls (default mode, visitor toggle) based on
+     * whether dark mode support is enabled. When disabled, reset to defaults
+     * and prevent interaction.
+     */
+    function syncThemeConfigDependents() {
+        if (!themeConfigEnabled) return;
+        const enabled = themeConfigEnabled.checked;
+
+        // Dependent config controls
+        if (themeConfigDefault)  { themeConfigDefault.disabled  = !enabled; }
+        if (themeConfigToggleEl) { themeConfigToggleEl.disabled = !enabled; }
+        if (!enabled) {
+            if (themeConfigDefault)  themeConfigDefault.value    = 'light';
+            if (themeConfigToggleEl) themeConfigToggleEl.checked = false;
+        }
+
+        // Scope switcher inside style panel
+        const scopeSwitcher = document.getElementById('theme-scope-switcher');
+        if (scopeSwitcher) scopeSwitcher.style.display = enabled ? '' : 'none';
+
+        // Toolbar theme toggle group
+        const toolbarGroup = document.getElementById('preview-theme-toggle-group');
+        if (toolbarGroup) toolbarGroup.style.display = enabled ? '' : 'none';
+
+        // If dark mode is being disabled and we're currently in dark scope, switch back to light
+        if (!enabled && currentScope === 'dark') {
+            switchScope('light');
+        }
+    }
+
+    if (themeConfigEnabled) {
+        themeConfigEnabled.addEventListener('change', syncThemeConfigDependents);
+        // Run once on init to set correct state based on current PHP-rendered value
+        syncThemeConfigDependents();
+    }
+
+    if (themeConfigToggle && themeConfigBody) {
+        themeConfigToggle.addEventListener('click', function() {
+            const open = themeConfigBody.style.display !== 'none';
+            themeConfigBody.style.display = open ? 'none' : '';
+            themeConfigToggle.setAttribute('aria-expanded', String(!open));
+        });
+    }
+
+    if (themeConfigSaveBtn) {
+        themeConfigSaveBtn.addEventListener('click', async function() {
+            const managementUrl = getManagementUrl();
+            const authToken = getAuthToken();
+            const i18n = getI18n();
+
+            const body = {};
+            if (themeConfigEnabled  !== null) body.enabled    = themeConfigEnabled.checked;
+            if (themeConfigDefault  !== null) body.default    = themeConfigDefault.value;
+            if (themeConfigToggleEl !== null) body.userToggle = themeConfigToggleEl.checked;
+
+            themeConfigSaveBtn.disabled = true;
+            try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+                const res = await fetch(managementUrl + 'setThemeMode', {
+                    method: 'POST', headers, body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (data.status === 200) {
+                    showToast(i18n.themeConfigSaved || 'Theme settings saved', 'success');
+                } else {
+                    throw new Error(data.message || 'Failed to save');
+                }
+            } catch (err) {
+                showToast(i18n.themeSaveError || 'Failed to save theme settings', 'error');
+                console.error('[PreviewStyleTheme] setThemeMode error:', err);
+            } finally {
+                themeConfigSaveBtn.disabled = false;
+            }
+        });
+    }
+
     // ==================== Event Listeners ====================
     
     if (themeResetBtn) {
@@ -457,6 +621,8 @@
         load: loadThemeVariables,
         save: saveThemeVariables,
         reset: resetThemeVariables,
+        switchScope,
+        getScope: () => currentScope,
         isLoaded: () => themeVariablesLoaded,
         getOriginal: () => ({ ...originalThemeVariables }),
         getCurrent: () => ({ ...currentThemeVariables })

@@ -1918,7 +1918,19 @@
         "emptyText": "Texte vide :",
         "emptyTextPlaceholder": "ex. Aucun élément trouvé  (optionnel)",
         "emptyTextHint": "Texte affiché lorsque le tableau est vide",
-        "listModeHint": "Utilise les attributs data-bind dans le premier enfant du conteneur comme modèle d'élément."
+        "listModeHint": "Utilise les attributs data-bind dans le premier enfant du conteneur comme modèle d'élément.",
+        "light": "Clair",
+        "dark": "Sombre",
+        "system": "Système",
+        "themePreview": "Thème",
+        "themeLight": "Aperçu mode clair",
+        "themeDark": "Aperçu mode sombre",
+        "themeModeConfig": "Paramètres du mode thème",
+        "themeModeEnabled": "Support du mode sombre",
+        "themeDefault": "Mode par défaut",
+        "themeUserToggle": "Le visiteur peut changer",
+        "saveThemeConfig": "Enregistrer",
+        "themeConfigSaved": "Paramètres du thème enregistrés"
     },
     "apis": {
         "title": "Registre d'APIs",

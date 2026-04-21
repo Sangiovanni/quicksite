@@ -20,8 +20,42 @@ class PageManagement {
         if($this->lang === null){
             $this->lang = 'en';
         }
+
+        // ── Theme resolution (Step 3) ─────────────────────────────────────
+        // Compute server-side initial data-theme value. Client-side script
+        // overrides it from localStorage before first paint when needed.
+        $themeEnabled   = defined('THEME_MODE_ENABLED') && THEME_MODE_ENABLED;
+        $themeDefault   = defined('THEME_DEFAULT') ? THEME_DEFAULT : 'light';
+        $toggleEnabled  = defined('THEME_USER_TOGGLE_ENABLED') && THEME_USER_TOGGLE_ENABLED;
+        $projectKey     = defined('PROJECT_NAME') ? PROJECT_NAME : 'default';
+
+        // Server-side initial value: "light" or "dark"; "system" falls back to
+        // "light" here — the inline script will correct it before first paint.
+        $themeAttr = '';
+        if ($themeEnabled) {
+            $themeAttr = ' data-theme="' . (($themeDefault === 'dark') ? 'dark' : 'light') . '"';
+        }
+
+        // Inline anti-flicker script: runs synchronously in <head>, sets
+        // data-theme from localStorage (user choice) or prefers-color-scheme
+        // (when default is "system"), before any painting occurs.
+        $themeScript = '';
+        if ($themeEnabled && ($toggleEnabled || $themeDefault === 'system')) {
+            $js = '(function(){try{';
+            if ($toggleEnabled) {
+                $js .= 'var s=localStorage.getItem("qs-theme-' . $projectKey . '");';
+                $js .= 'if(s==="dark"||s==="light"){document.documentElement.setAttribute("data-theme",s);return;}';
+            }
+            if ($themeDefault === 'system') {
+                $js .= 'if(window.matchMedia&&window.matchMedia("(prefers-color-scheme:dark)").matches){document.documentElement.setAttribute("data-theme","dark");}';
+            }
+            $js .= '}catch(e){}})();';
+            $themeScript = '<script>' . $js . '</script>';
+        }
+        // ─────────────────────────────────────────────────────────────────
+
         $header = "<!DOCTYPE html>";
-        $header .= '<html lang="' . htmlspecialchars($this->lang) . '">';
+        $header .= '<html lang="' . htmlspecialchars($this->lang) . '"' . $themeAttr . '>';
         $header .="<head>";
         $header .= "<title>" . htmlspecialchars($this->title) . "</title>";
         $header .= '<link rel="icon" type="image/png" href="' . BASE_URL . '/assets/images/favicon.png">';
@@ -41,6 +75,7 @@ class PageManagement {
             }
         }
 
+        $header .= $themeScript;
         $header .= "</head>";
         $body = "<body>";
 
@@ -86,6 +121,35 @@ class PageManagement {
 
         // Always include QuickSite core library for {{call:...}} interactions
         $body .= '<script src="' . BASE_URL . '/scripts/qs.js"></script>';
+
+        // Inject theme toggle behaviour when THEME_USER_TOGGLE_ENABLED is true.
+        // Finds all [data-theme-toggle] buttons, updates icon/label on load and
+        // on click, and persists the choice to localStorage.
+        if ($themeEnabled && $toggleEnabled) {
+            $key = 'qs-theme-' . $projectKey;
+            $js  = '(function(){';
+            $js .= 'var key="' . $key . '";';
+            $js .= 'function apply(t){document.documentElement.setAttribute("data-theme",t);try{localStorage.setItem(key,t);}catch(e){}}';
+            $js .= 'function sync(t){document.querySelectorAll("[data-theme-toggle]").forEach(function(b){';
+            $js .= 'var icon=b.querySelector(".theme-switch-icon");';
+            $js .= 'var lbl=b.querySelector(".theme-switch-label");';
+            $js .= 'if(icon)icon.textContent=t==="dark"?"☀️":"🌙";';
+            $js .= 'if(lbl)lbl.textContent=t==="dark"?"Light mode":"Dark mode";';
+            $js .= 'b.setAttribute("aria-pressed",t==="dark"?"true":"false");';
+            $js .= '});}';
+            $js .= 'document.addEventListener("DOMContentLoaded",function(){';
+            $js .= 'var cur=document.documentElement.getAttribute("data-theme")||"light";';
+            $js .= 'sync(cur);';
+            $js .= 'document.querySelectorAll("[data-theme-toggle]").forEach(function(b){';
+            $js .= 'b.addEventListener("click",function(){';
+            $js .= 'var cur=document.documentElement.getAttribute("data-theme")||"light";';
+            $js .= 'var next=cur==="dark"?"light":"dark";apply(next);sync(next);';
+            $js .= '});});';
+            $js .= '});';
+            $js .= '})();';
+            $body .= '<script>' . $js . '</script>';
+        }
+
         // Include API endpoint config if file exists and has real content
         $apiConfigPath = PUBLIC_CONTENT_PATH . '/scripts/qs-api-config.js';
         if (file_exists($apiConfigPath) && filesize($apiConfigPath) > 100) {

@@ -117,6 +117,97 @@
     --spacing-xl: 4rem;}
 
 /* =============================================================================
+   DARK THEME TOKEN OVERRIDES
+   =============================================================================
+   AI / WORKFLOW EDITING NOTICE:
+   This block overrides only CSS custom properties (design tokens) for dark mode.
+   Rules:
+   - Do NOT remove or merge this block into :root.
+   - Do NOT convert variable usages in the rest of this file to hardcoded values.
+   - When updating a color token, update BOTH :root (light) AND this block (dark).
+   - Spacing, typography, radius, layout, and transition tokens are intentionally
+     absent here — they are theme-neutral and must not be duplicated.
+   - If you are an AI assistant, edit ONE token at a time and confirm before
+     touching the rest of this block. Never rewrite the full block in one pass.
+   ============================================================================= */
+[data-theme="dark"] {
+    /* Backgrounds — warm near-black, consistent with brand warmth */
+    --color-background:     #1a1510;
+    --color-background-alt: #211c15;
+    --color-surface:        #2c2419;
+    --color-surface-hover:  #3d3229;
+
+    /* Text — warm cream, readable on dark backgrounds */
+    --color-text:         #e8dfd0;
+    --color-text-muted:   #b0a090;
+    --color-text-light:   #8a7a68;
+    --color-text-inverse: #1a1510;
+
+    /* Brand primary — slightly lighter for contrast on dark bg */
+    --color-primary:       #d4865a;
+    --color-primary-light: #e09a72;
+    --color-primary-dark:  #c2703e;
+
+    /* Brand secondary — slightly lighter for contrast on dark bg */
+    --color-secondary:       #97a88a;
+    --color-secondary-light: #adc1a0;
+    --color-secondary-dark:  #7a8b6e;
+
+    /* Interactive — brighter links for dark surfaces */
+    --color-link:       #d4865a;
+    --color-link-hover: #e09a72;
+
+    /* Dark sections (menu, footer) — flip to light since bg is already dark */
+    --color-dark:         #e8dfd0;
+    --color-dark-surface: #f0e8dc;
+
+    /* Borders — lighter stroke on dark */
+    --border-color: rgba(232, 223, 208, 0.12);
+
+    /* Shadows — stronger on dark backgrounds */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+    --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.6);
+
+    /* Aliases used in some components */
+    --color-accent:        #d4a84b;
+    --color-bg:            #1a1510;
+    --color-bg-light:      #211c15;
+    --color-bg-card:       #2c2419;
+    --color-text-heading:  #e8dfd0;
+}
+
+    /* =============================================================================
+       THEME SWITCH COMPONENT
+       Used by the theme-switch component to render a light/dark toggle button.
+       All values use CSS variables so the button itself adapts to both themes.
+       ============================================================================= */
+    .theme-switch {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-xs);
+        padding: var(--space-xs) var(--space-sm);
+        background: transparent;
+        border: var(--border-width) solid var(--border-color);
+        border-radius: var(--radius-full);
+        color: var(--color-text-muted);
+        font-family: var(--font-family);
+        font-size: var(--font-size-sm);
+        cursor: pointer;
+        transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+    }
+    .theme-switch:hover {
+        color: var(--color-text);
+        border-color: var(--color-primary);
+        background: var(--color-surface);
+    }
+    .theme-switch-icon {
+        font-size: var(--font-size-base);
+        line-height: 1;
+    }
+
+/* =============================================================================
    ANIMATIONS
    ============================================================================= */
 @keyframes fadeIn {

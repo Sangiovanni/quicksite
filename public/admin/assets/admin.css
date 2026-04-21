@@ -7402,6 +7402,139 @@ code.preview-contextual-info__value {
     margin-top: var(--space-xs);
 }
 
+/* ===== Theme Scope Switcher & Config Panel ===== */
+
+.preview-theme-scope {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: var(--space-sm);
+}
+
+.preview-theme-scope__btn {
+    flex: 1;
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--admin-bg-secondary);
+    color: var(--admin-text-muted);
+    border: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.15s, color 0.15s;
+}
+
+.preview-theme-scope__btn:first-child {
+    border-right: 1px solid var(--admin-border);
+}
+
+.preview-theme-scope__btn--active {
+    background: var(--admin-primary);
+    color: #fff;
+}
+
+.preview-theme-scope__btn:not(.preview-theme-scope__btn--active):hover {
+    background: var(--admin-bg-hover);
+    color: var(--admin-text);
+}
+
+.preview-theme-section--config {
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: var(--space-sm);
+}
+
+.preview-theme-config-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--admin-bg-secondary);
+    border: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--admin-text);
+    text-align: left;
+}
+
+.preview-theme-config-toggle:hover {
+    background: var(--admin-bg-hover);
+}
+
+.preview-theme-config-arrow {
+    margin-left: auto;
+    transition: transform 0.2s;
+}
+
+.preview-theme-config-toggle[aria-expanded="true"] .preview-theme-config-arrow {
+    transform: rotate(180deg);
+}
+
+.preview-theme-config-body {
+    padding: var(--space-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    background: var(--admin-bg);
+    border-top: 1px solid var(--admin-border);
+}
+
+.preview-theme-config-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: 0.85rem;
+    color: var(--admin-text);
+}
+
+.preview-theme-config-label {
+    flex: 1;
+}
+
+.preview-theme-config-row select:disabled,
+.preview-theme-config-row input[type="checkbox"]:disabled + .preview-toggle__track,
+.preview-theme-config-row label:has(input:disabled) {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Toolbar segmented button (theme preview) */
+.preview-toolbar__segmented {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.preview-toolbar__seg-btn {
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--admin-bg-secondary);
+    color: var(--admin-text-muted);
+    border: none;
+    cursor: pointer;
+    font-size: 0.8rem;
+    line-height: 1;
+    transition: background 0.15s, color 0.15s;
+}
+
+.preview-toolbar__seg-btn:not(:last-child) {
+    border-right: 1px solid var(--admin-border);
+}
+
+.preview-toolbar__seg-btn--active {
+    background: var(--admin-primary);
+    color: #fff;
+}
+
+.preview-toolbar__seg-btn:not(.preview-toolbar__seg-btn--active):hover {
+    background: var(--admin-bg-hover);
+    color: var(--admin-text);
+}
+
 /* ===== Selectors Panel (Phase 8.4) ===== */
 .preview-selectors-panel,
 .preview-animations-panel {

@@ -1,13 +1,17 @@
 <?php
 /**
- * setRootVariables - Set/update CSS custom properties in :root
+ * setRootVariables - Set/update CSS custom properties in :root (light) or [data-theme="dark"]
  * Method: POST
  * URL: /management/setRootVariables
- * Body: {"variables": {"--color-primary": "#007bff", "--spacing-md": "1rem"}}
+ * Body: {
+ *   "variables": {"--color-primary": "#007bff", "--spacing-md": "1rem"},
+ *   "themeTarget": "light"   // optional — "light" (default) or "dark"
+ * }
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsStyleManagement.php';
 
 $params = $trimParametersManagement->params();
 
@@ -43,8 +47,18 @@ foreach ($variables as $name => $value) {
     }
 }
 
-$styleFile = PUBLIC_CONTENT_PATH . '/style/style.css';
-$projectStyleFile = PROJECT_PATH . '/public/style/style.css';
+// Resolve themeTarget → CSS scope selector
+// "light" (default) → :root   |   "dark" → [data-theme="dark"]
+$themeTarget = isset($params['themeTarget']) ? trim($params['themeTarget']) : 'light';
+if (!in_array($themeTarget, ['light', 'dark'], true)) {
+    ApiResponse::create(400, 'validation.invalid_format')
+        ->withMessage('themeTarget must be "light" or "dark"')
+        ->send();
+}
+$cssScope = ($themeTarget === 'dark') ? '[data-theme="dark"]' : ':root';
+
+$styleFile    = cssLivePath();
+$projectStyleFile = cssProjectPath();
 
 // Check live stylesheet exists
 if (!file_exists($styleFile)) {
@@ -53,20 +67,8 @@ if (!file_exists($styleFile)) {
         ->send();
 }
 
-// Ensure project style directory exists so the project copy stays in sync
-$projectStyleDir = dirname($projectStyleFile);
-if (!is_dir($projectStyleDir) && !mkdir($projectStyleDir, 0755, true)) {
-    ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage('Failed to create project style directory')
-        ->send();
-}
-
-// Use file locking
-$lockFile = sys_get_temp_dir() . '/quicksite_style_' . md5($styleFile) . '.lock';
-$lock = fopen($lockFile, 'w');
-
-if (!flock($lock, LOCK_EX)) {
-    fclose($lock);
+$lock = cssAcquireLock($styleFile);
+if ($lock === null) {
     ApiResponse::create(500, 'server.lock_failed')
         ->withMessage('Could not acquire file lock')
         ->send();
@@ -81,20 +83,12 @@ try {
     
     // Parse and update
     $parser = new CssParser($content);
-    $result = $parser->setRootVariables($variables);
+    $result = $parser->setVariablesInScope($variables, $cssScope);
     
     $updatedContent = $parser->getContent();
 
-    // Write updated content to live stylesheet and project stylesheet copy
-    if (file_put_contents($styleFile, $updatedContent, LOCK_EX) === false) {
-        throw new Exception('Failed to write live style file');
-    }
-    if ($projectStyleFile !== $styleFile && file_put_contents($projectStyleFile, $updatedContent, LOCK_EX) === false) {
-        throw new Exception('Failed to write project style file');
-    }
-    
-    flock($lock, LOCK_UN);
-    fclose($lock);
+    cssWriteAllTargets($updatedContent, $styleFile, $projectStyleFile);
+    cssReleaseLock($lock);
     
     ApiResponse::create(200, 'operation.success')
         ->withMessage('Root variables updated successfully')
@@ -102,13 +96,13 @@ try {
             'added' => $result['added'],
             'updated' => $result['updated'],
             'total_changes' => $result['total_changes'],
-            'current_variables' => $parser->getRootVariables()
+            'theme_target' => $themeTarget,
+            'current_variables' => $parser->getVariablesInScope($cssScope)
         ])
         ->send();
     
 } catch (Exception $e) {
-    flock($lock, LOCK_UN);
-    fclose($lock);
+    cssReleaseLock($lock);
     ApiResponse::create(500, 'server.operation_failed')
         ->withMessage($e->getMessage())
         ->send();

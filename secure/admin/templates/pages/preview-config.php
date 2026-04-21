@@ -19,6 +19,11 @@ window.PreviewConfig = {
     multilingual: <?= json_encode(CONFIG['MULTILINGUAL_SUPPORT'] ?? false) ?>,
     defaultLang: <?= json_encode(CONFIG['LANGUAGE_DEFAULT'] ?? 'en') ?>,
     
+    // Theme mode
+    themeModeEnabled: <?= json_encode(CONFIG['THEME_MODE_ENABLED'] ?? false) ?>,
+    themeDefault: <?= json_encode(CONFIG['THEME_DEFAULT'] ?? 'light') ?>,
+    themeUserToggle: <?= json_encode(CONFIG['THEME_USER_TOGGLE_ENABLED'] ?? false) ?>,
+    
     // Translations - common
     i18n: {
         delete: <?= json_encode(__admin('common.delete') ?? 'Delete') ?>,

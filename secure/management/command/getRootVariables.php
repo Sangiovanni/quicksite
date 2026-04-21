@@ -14,12 +14,20 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 /**
  * Command function for internal execution via CommandRunner
  * 
- * @param array $params Body parameters (unused for this command)
+ * @param array $params Body parameters — optional: themeTarget ("light"|"dark")
  * @param array $urlParams URL segments (unused for this command)
  * @return ApiResponse
  */
 function __command_getRootVariables(array $params = [], array $urlParams = []): ApiResponse {
     $styleFile = PUBLIC_CONTENT_PATH . '/style/style.css';
+
+    // Resolve themeTarget → CSS scope selector ("light" or omitted → :root, "dark" → [data-theme="dark"])
+    $themeTarget = isset($params['themeTarget']) ? trim($params['themeTarget']) : 'light';
+    if (!in_array($themeTarget, ['light', 'dark'], true)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('themeTarget must be "light" or "dark"');
+    }
+    $cssScope = ($themeTarget === 'dark') ? '[data-theme="dark"]' : ':root';
 
     // Check file exists
     if (!file_exists($styleFile)) {
@@ -36,13 +44,14 @@ function __command_getRootVariables(array $params = [], array $urlParams = []): 
 
     // Parse CSS
     $parser = new CssParser($content);
-    $variables = $parser->getRootVariables();
+    $variables = $parser->getVariablesInScope($cssScope);
 
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('Root variables retrieved successfully')
         ->withData([
             'variables' => $variables,
-            'count' => count($variables)
+            'count' => count($variables),
+            'theme_target' => $themeTarget
         ]);
 }
 

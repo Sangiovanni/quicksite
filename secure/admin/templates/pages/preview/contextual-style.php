@@ -30,7 +30,58 @@
             </div>
             
             <div class="preview-theme-content" id="theme-content" style="display: none;">
-                <!-- Colors Section -->
+                <!-- Theme Mode Config (collapsible) -->
+                <div class="preview-theme-section preview-theme-section--config" id="theme-mode-config">
+                    <button type="button" class="preview-theme-config-toggle" id="theme-config-toggle" aria-expanded="false">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                        <?= __admin('preview.themeModeConfig') ?? 'Theme Mode Settings' ?>
+                        <svg class="preview-theme-config-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </button>
+                    <div class="preview-theme-config-body" id="theme-config-body" style="display: none;">
+                        <div class="preview-theme-config-row">
+                            <span class="preview-theme-config-label"><?= __admin('preview.themeModeEnabled') ?? 'Dark mode support' ?></span>
+                            <label class="preview-toggle">
+                                <input type="checkbox" id="theme-config-enabled" <?= (CONFIG['THEME_MODE_ENABLED'] ?? false) ? 'checked' : '' ?>>
+                                <span class="preview-toggle__track"></span>
+                            </label>
+                        </div>
+                        <div class="preview-theme-config-row">
+                            <span class="preview-theme-config-label"><?= __admin('preview.themeDefault') ?? 'Default mode' ?></span>
+                            <select id="theme-config-default" class="preview-toolbar__select preview-toolbar__select--sm">
+                                <option value="light" <?= (CONFIG['THEME_DEFAULT'] ?? 'light') === 'light' ? 'selected' : '' ?>>☀ <?= __admin('preview.light') ?? 'Light' ?></option>
+                                <option value="dark"  <?= (CONFIG['THEME_DEFAULT'] ?? 'light') === 'dark'  ? 'selected' : '' ?>>🌙 <?= __admin('preview.dark') ?? 'Dark' ?></option>
+                                <option value="system"<?= (CONFIG['THEME_DEFAULT'] ?? 'light') === 'system'? 'selected' : '' ?>>⚙ <?= __admin('preview.system') ?? 'System' ?></option>
+                            </select>
+                        </div>
+                        <div class="preview-theme-config-row">
+                            <span class="preview-theme-config-label"><?= __admin('preview.themeUserToggle') ?? 'Visitor can switch' ?></span>
+                            <label class="preview-toggle">
+                                <input type="checkbox" id="theme-config-usertoggle" <?= (CONFIG['THEME_USER_TOGGLE_ENABLED'] ?? false) ? 'checked' : '' ?>>
+                                <span class="preview-toggle__track"></span>
+                            </label>
+                        </div>
+                        <button type="button" class="admin-btn admin-btn--primary admin-btn--sm" id="theme-config-save-btn" style="margin-top: 8px; width: 100%;">
+                            <?= __admin('preview.saveThemeConfig') ?? 'Save Settings' ?>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Light / Dark scope switcher (visible only when THEME_MODE_ENABLED) -->
+                <?php if (CONFIG['THEME_MODE_ENABLED'] ?? false): ?>
+                <div class="preview-theme-scope" id="theme-scope-switcher">
+                    <button type="button" class="preview-theme-scope__btn preview-theme-scope__btn--active" data-scope="light">
+                        <span aria-hidden="true">☀</span> <?= __admin('preview.light') ?? 'Light' ?>
+                    </button>
+                    <button type="button" class="preview-theme-scope__btn" data-scope="dark">
+                        <span aria-hidden="true">🌙</span> <?= __admin('preview.dark') ?? 'Dark' ?>
+                    </button>
+                </div>
+                <?php endif; ?>
                 <div class="preview-theme-section" id="theme-colors-section">
                     <h4 class="preview-theme-section__title">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">

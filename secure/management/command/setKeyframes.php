@@ -27,6 +27,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsStyleManagement.php';
 
 // Get parameters
 $params = $trimParametersManagement->params();
@@ -91,7 +92,7 @@ foreach ($frames as $key => $styles) {
     }
 }
 
-$styleFile = PUBLIC_CONTENT_PATH . '/style/style.css';
+$styleFile = cssLivePath();
 
 // Check file exists
 if (!file_exists($styleFile)) {
@@ -101,11 +102,8 @@ if (!file_exists($styleFile)) {
 }
 
 // Use file locking
-$lockFile = sys_get_temp_dir() . '/quicksite_style_' . md5($styleFile) . '.lock';
-$lock = fopen($lockFile, 'w');
-
-if (!flock($lock, LOCK_EX)) {
-    fclose($lock);
+$lock = cssAcquireLock($styleFile);
+if ($lock === null) {
     ApiResponse::create(500, 'server.lock_failed')
         ->withMessage('Could not acquire file lock')
         ->send();
@@ -125,8 +123,7 @@ try {
     // If keyframe exists and allowOverwrite is not true, reject the request
     $allowOverwrite = isset($params['allowOverwrite']) && $params['allowOverwrite'] === true;
     if (isset($existingKeyframes[$name]) && !$allowOverwrite) {
-        flock($lock, LOCK_UN);
-        fclose($lock);
+        cssReleaseLock($lock);
         ApiResponse::create(409, 'keyframe.already_exists')
             ->withMessage("Keyframe '$name' already exists. Set allowOverwrite: true to replace it.")
             ->withData(['name' => $name, 'existingFrames' => array_keys($existingKeyframes[$name])])
@@ -136,14 +133,11 @@ try {
     // Update keyframes
     $result = $parser->setKeyframes($name, $frames);
     
-    // Write updated content
-    if (file_put_contents($styleFile, $parser->getContent()) === false) {
-        throw new Exception('Failed to write style file');
-    }
-    
-    flock($lock, LOCK_UN);
-    fclose($lock);
-    
+    // Write updated content to live stylesheet and project backup copy
+    cssWriteAllTargets($parser->getContent(), $styleFile, cssProjectPath());
+
+    cssReleaseLock($lock);
+
     ApiResponse::create(200, 'operation.success')
         ->withMessage('Keyframe animation ' . $result['action'] . ' successfully')
         ->withData([
@@ -152,10 +146,9 @@ try {
             'frames' => $result['frames']
         ])
         ->send();
-    
+
 } catch (Exception $e) {
-    flock($lock, LOCK_UN);
-    fclose($lock);
+    cssReleaseLock($lock);
     ApiResponse::create(500, 'server.operation_failed')
         ->withMessage($e->getMessage())
         ->send();
