@@ -2147,6 +2147,10 @@
         
         if (editType === 'component') {
             // Component preview - standalone component render
+            // Include language prefix so component translation follows toolbar language.
+            if (multilingual) {
+                url += getCurrentLang() + '/';
+            }
             url += '?_component=' + encodeURIComponent(editName) + '&_editor=1';
             // Include emulation data if available
             try {
@@ -5203,10 +5207,10 @@
     const addComponentSelector = initComponentSelector('add');
     
     // Load components for sidebar add form
-    async function loadSidebarComponentsList() {
+    async function loadSidebarComponentsList(forceReload = false) {
         if (!addComponentSelector) return;
         
-        if (componentsLoaded) return;
+        if (componentsLoaded && !forceReload) return;
         
         addComponentSelector.showLoading();
         
@@ -6977,6 +6981,9 @@
                     addComponentSelect.appendChild(opt);
                 }
 
+                // Invalidate cached component list so add-form picks up the new component
+                componentsLoaded = false;
+
                 hideSaveComponentForm();
             } else {
                 throw new Error(response.data?.message || 'Failed to save component');
@@ -6993,22 +7000,30 @@
     let variablesPanelStructure = null;
     // Cached flat list of translation key names
     let variablesPanelTranslationKeys = [];
+    // Cached map of translation key → first-language value (for preview)
+    let variablesPanelTranslationValues = {};
+    // Cached list of available language codes
+    let variablesPanelLanguages = [];
     // Cached list of enum variable names (keys from __enums__)
     let variablesPanelEnumVarNames = [];
     
     /**
      * Flatten nested translation object into dot-notation keys
      * e.g. { home: { title: "x" } } → ["home.title"]
+     * Also populates valueMap with key → value mappings
      */
-    function flattenTranslationKeys(obj, prefix) {
+    function flattenTranslationKeys(obj, prefix, valueMap) {
         const keys = [];
         if (!obj || typeof obj !== 'object') return keys;
         for (const key of Object.keys(obj)) {
             const fullKey = prefix ? prefix + '.' + key : key;
             if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-                keys.push(...flattenTranslationKeys(obj[key], fullKey));
+                keys.push(...flattenTranslationKeys(obj[key], fullKey, valueMap));
             } else {
                 keys.push(fullKey);
+                if (valueMap) {
+                    valueMap[fullKey] = (obj[key] != null) ? String(obj[key]) : '';
+                }
             }
         }
         return keys;
@@ -7221,11 +7236,15 @@
             
             // Extract flat translation key list from first available language
             variablesPanelTranslationKeys = [];
+            variablesPanelTranslationValues = {};
+            variablesPanelLanguages = [];
             if (transResp.ok && transResp.data?.data?.translations) {
                 const allTranslations = transResp.data.data.translations;
+                variablesPanelLanguages = transResp.data.data.languages || Object.keys(allTranslations);
                 const firstLang = Object.keys(allTranslations)[0];
                 if (firstLang) {
-                    variablesPanelTranslationKeys = flattenTranslationKeys(allTranslations[firstLang], '').sort();
+                    variablesPanelTranslationValues = {};
+                    variablesPanelTranslationKeys = flattenTranslationKeys(allTranslations[firstLang], '', variablesPanelTranslationValues).sort();
                 }
             }
             
@@ -7276,31 +7295,207 @@
         wrapper.className = 'preview-variable-card__editor';
 
         if (type === 'translation') {
-            // Select dropdown populated from existing translation keys
-            const sel = document.createElement('select');
-            sel.className = 'preview-variable-card__value-select';
-            // Empty option
-            const emptyOpt = document.createElement('option');
-            emptyOpt.value = '';
-            emptyOpt.textContent = '— ' + (PreviewConfig.i18n?.variablesPlaceholderTranslation || 'Select a translation key') + ' —';
-            sel.appendChild(emptyOpt);
-            variablesPanelTranslationKeys.forEach(key => {
-                const opt = document.createElement('option');
-                opt.value = key;
-                opt.textContent = key;
-                if (key === currentValue) opt.selected = true;
-                sel.appendChild(opt);
-            });
-            // If currentValue exists but is not in the list, add it as a custom option
-            if (currentValue && !variablesPanelTranslationKeys.includes(currentValue)) {
-                const customOpt = document.createElement('option');
-                customOpt.value = currentValue;
-                customOpt.textContent = currentValue + ' (?)';
-                customOpt.selected = true;
-                sel.appendChild(customOpt);
+            // Searchable combo: text input + dropdown list + create form
+            let selectedKey = currentValue || '';
+            
+            const combo = document.createElement('div');
+            combo.className = 'preview-variable-combo';
+            
+            // Search input
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'preview-variable-combo__input';
+            input.placeholder = PreviewConfig.i18n?.variablesPlaceholderTranslation || 'Search or type a translation key';
+            input.value = selectedKey;
+            input.autocomplete = 'off';
+            combo.appendChild(input);
+            
+            // Dropdown list
+            const dropdown = document.createElement('div');
+            dropdown.className = 'preview-variable-combo__dropdown';
+            dropdown.style.display = 'none';
+            combo.appendChild(dropdown);
+            
+            // Truncate helper
+            function truncateValue(val, max) {
+                if (!val) return '';
+                return val.length > max ? val.substring(0, max) + '…' : val;
             }
-            wrapper.appendChild(sel);
-            return { container: wrapper, getValue: () => sel.value, el: sel };
+            
+            // Build filtered option list
+            function buildDropdown(query) {
+                dropdown.innerHTML = '';
+                const q = (query || '').toLowerCase();
+                let hasExact = false;
+                let count = 0;
+                
+                variablesPanelTranslationKeys.forEach(key => {
+                    if (q && !key.toLowerCase().includes(q)) return;
+                    if (key.toLowerCase() === q) hasExact = true;
+                    if (count >= 80) return; // Limit visible options for performance
+                    count++;
+                    
+                    const item = document.createElement('div');
+                    item.className = 'preview-variable-combo__item';
+                    if (key === selectedKey) item.classList.add('preview-variable-combo__item--selected');
+                    item.dataset.key = key;
+                    
+                    const keySpan = document.createElement('span');
+                    keySpan.className = 'preview-variable-combo__item-key';
+                    keySpan.textContent = key;
+                    item.appendChild(keySpan);
+                    
+                    const val = variablesPanelTranslationValues[key];
+                    if (val) {
+                        const valSpan = document.createElement('span');
+                        valSpan.className = 'preview-variable-combo__item-value';
+                        valSpan.textContent = truncateValue(val, 30);
+                        valSpan.title = val;
+                        item.appendChild(valSpan);
+                    }
+                    
+                    item.addEventListener('mousedown', (e) => {
+                        e.preventDefault(); // Prevent blur
+                        selectedKey = key;
+                        input.value = key;
+                        dropdown.style.display = 'none';
+                        createForm.style.display = 'none';
+                    });
+                    
+                    dropdown.appendChild(item);
+                });
+                
+                // Show "create" form when query doesn't match any exact key
+                if (q && !hasExact) {
+                    createForm.style.display = '';
+                    const resolvedKey = q.startsWith('.') || q.startsWith('#') ? q : q;
+                    createKeyLabel.textContent = (PreviewConfig.i18n?.variablesCreateKey || 'Create') + ' "' + query.trim() + '"';
+                } else {
+                    createForm.style.display = 'none';
+                }
+                
+                dropdown.style.display = (count > 0 || (q && !hasExact)) ? '' : 'none';
+            }
+            
+            // Create new key form
+            const createForm = document.createElement('div');
+            createForm.className = 'preview-variable-combo__create';
+            createForm.style.display = 'none';
+            
+            const createKeyLabel = document.createElement('div');
+            createKeyLabel.className = 'preview-variable-combo__create-label';
+            createForm.appendChild(createKeyLabel);
+            
+            const createValueRow = document.createElement('div');
+            createValueRow.className = 'preview-variable-combo__create-row';
+            
+            const createValueLabel = document.createElement('label');
+            createValueLabel.className = 'preview-variable-combo__create-value-label';
+            createValueLabel.textContent = PreviewConfig.i18n?.variablesCreateKeyValue || 'Value';
+            createValueRow.appendChild(createValueLabel);
+            
+            const createValueInput = document.createElement('input');
+            createValueInput.type = 'text';
+            createValueInput.className = 'preview-variable-combo__create-value';
+            createValueInput.placeholder = 'e.g. My text content';
+            createValueRow.appendChild(createValueInput);
+            
+            createForm.appendChild(createValueRow);
+            
+            const createBtn = document.createElement('button');
+            createBtn.type = 'button';
+            createBtn.className = 'admin-btn admin-btn--success admin-btn--sm';
+            createBtn.textContent = PreviewConfig.i18n?.variablesCreateKey || 'Create';
+            
+            createBtn.addEventListener('click', async () => {
+                const newKey = input.value.trim();
+                const newValue = createValueInput.value.trim() || newKey;
+                if (!newKey) return;
+                
+                createBtn.disabled = true;
+                try {
+                    // Create for all languages; only current language gets the provided value.
+                    const currentLang = getCurrentLang();
+                    const targetLanguages = variablesPanelLanguages.length > 0
+                        ? variablesPanelLanguages
+                        : [currentLang];
+
+                    const promises = targetLanguages.map(lang => {
+                        const valueForLang = (lang === currentLang) ? newValue : '';
+                        // Build nested object from dot-notation key
+                        const translations = {};
+                        const parts = newKey.split('.');
+                        let obj = translations;
+                        for (let i = 0; i < parts.length - 1; i++) {
+                            obj[parts[i]] = {};
+                            obj = obj[parts[i]];
+                        }
+                        obj[parts[parts.length - 1]] = valueForLang;
+                        
+                        return QuickSiteAdmin.apiRequest('setTranslationKeys', 'POST', {
+                            language: lang,
+                            translations: translations
+                        });
+                    });
+                    
+                    await Promise.all(promises);
+                    
+                    // Add to local cache
+                    variablesPanelTranslationKeys.push(newKey);
+                    variablesPanelTranslationKeys.sort();
+                    variablesPanelTranslationValues[newKey] = newValue;
+                    
+                    // Select it
+                    selectedKey = newKey;
+                    input.value = newKey;
+                    dropdown.style.display = 'none';
+                    createForm.style.display = 'none';
+                    
+                    if (typeof showToast === 'function') {
+                        showToast(PreviewConfig.i18n?.variablesKeyCreated || 'Translation key created', 'success');
+                    }
+                } catch (err) {
+                    console.error('[Variables] Create translation key error:', err);
+                    if (typeof showToast === 'function') {
+                        showToast(PreviewConfig.i18n?.variablesKeyCreateError || 'Failed to create translation key', 'error');
+                    }
+                } finally {
+                    createBtn.disabled = false;
+                }
+            });
+            
+            createForm.appendChild(createBtn);
+            combo.appendChild(createForm);
+            
+            // Events
+            input.addEventListener('focus', () => {
+                buildDropdown(input.value);
+            });
+            
+            input.addEventListener('input', () => {
+                buildDropdown(input.value);
+                // Update selectedKey to raw input for freeform typing
+                selectedKey = input.value.trim();
+            });
+            
+            input.addEventListener('blur', () => {
+                // Delay to allow mousedown on dropdown items
+                setTimeout(() => {
+                    dropdown.style.display = 'none';
+                    // Don't hide create form on blur — user may be typing in value input
+                }, 200);
+            });
+            
+            // Allow Enter in create value input to trigger create
+            createValueInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    createBtn.click();
+                }
+            });
+            
+            wrapper.appendChild(combo);
+            return { container: wrapper, getValue: () => selectedKey, el: input };
         }
 
         if (type === 'enum') {
@@ -7706,6 +7901,7 @@
             if (!result.ok) throw new Error(result.data?.message || 'Save failed');
             
             showToast(PreviewConfig.i18n?.variablesSaved || 'Variable saved', 'success');
+            componentsLoaded = false; // Invalidate component cache
             
             // Reload preview to reflect change
             reloadPreview();
@@ -7745,6 +7941,7 @@
             if (!result.ok) throw new Error(result.data?.message || 'Save failed');
             
             showToast(PreviewConfig.i18n?.variablesSaved || 'Variable saved', 'success');
+            componentsLoaded = false; // Invalidate component cache
             reloadPreview();
             
         } catch (error) {
@@ -8383,6 +8580,7 @@
             if (!result.ok) throw new Error(result.data?.message || 'Save failed');
             
             showToast(PreviewConfig.i18n?.enumSaved || 'Enum saved', 'success');
+            componentsLoaded = false; // Invalidate component cache
             
             // Phase 9: Auto-create CSS stubs for class-bound enum values
             await createCssStubsForEnumIfNeeded(enumsPanelStructure, currentVarName, map);

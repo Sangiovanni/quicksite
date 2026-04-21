@@ -44,11 +44,20 @@ foreach ($variables as $name => $value) {
 }
 
 $styleFile = PUBLIC_CONTENT_PATH . '/style/style.css';
+$projectStyleFile = PROJECT_PATH . '/public/style/style.css';
 
-// Check file exists
+// Check live stylesheet exists
 if (!file_exists($styleFile)) {
     ApiResponse::create(404, 'file.not_found')
         ->withMessage('Style file not found')
+        ->send();
+}
+
+// Ensure project style directory exists so the project copy stays in sync
+$projectStyleDir = dirname($projectStyleFile);
+if (!is_dir($projectStyleDir) && !mkdir($projectStyleDir, 0755, true)) {
+    ApiResponse::create(500, 'server.file_write_failed')
+        ->withMessage('Failed to create project style directory')
         ->send();
 }
 
@@ -74,9 +83,14 @@ try {
     $parser = new CssParser($content);
     $result = $parser->setRootVariables($variables);
     
-    // Write updated content
-    if (file_put_contents($styleFile, $parser->getContent()) === false) {
-        throw new Exception('Failed to write style file');
+    $updatedContent = $parser->getContent();
+
+    // Write updated content to live stylesheet and project stylesheet copy
+    if (file_put_contents($styleFile, $updatedContent, LOCK_EX) === false) {
+        throw new Exception('Failed to write live style file');
+    }
+    if ($projectStyleFile !== $styleFile && file_put_contents($projectStyleFile, $updatedContent, LOCK_EX) === false) {
+        throw new Exception('Failed to write project style file');
     }
     
     flock($lock, LOCK_UN);

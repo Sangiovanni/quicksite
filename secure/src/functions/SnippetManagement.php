@@ -319,9 +319,16 @@ function extractSnippetCss(array $structure, string $projectName): array {
         'ids' => $allSelectors['ids'] ?? [],
     ];
 
-    // Load project CSS
-    $stylesheetPath = SECURE_FOLDER_PATH . '/projects/' . $projectName . '/public/style/style.css';
-    if (!file_exists($stylesheetPath)) {
+    // Load CSS from live public stylesheet first (source of truth),
+    // then fallback to project copy if live file is unavailable.
+    $liveStylesheetPath = PUBLIC_CONTENT_PATH . '/style/style.css';
+    $projectStylesheetPath = SECURE_FOLDER_PATH . '/projects/' . $projectName . '/public/style/style.css';
+
+    if (file_exists($liveStylesheetPath)) {
+        $stylesheetPath = $liveStylesheetPath;
+    } else if (file_exists($projectStylesheetPath)) {
+        $stylesheetPath = $projectStylesheetPath;
+    } else {
         return ['selectors' => $selectors, 'css' => ''];
     }
 

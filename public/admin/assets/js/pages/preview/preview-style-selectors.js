@@ -540,7 +540,7 @@
         
         const searchLower = query.toLowerCase();
         
-        selectorsGroups?.querySelectorAll('.preview-selector-item').forEach(chip => {
+        selectorsGroups?.querySelectorAll('.preview-selector-item:not(.preview-selector-item--create)').forEach(chip => {
             const selector = chip.dataset.selector || '';
             const matches = selector.toLowerCase().includes(searchLower);
             chip.style.display = matches ? '' : 'none';
@@ -553,6 +553,9 @@
         if (selectorSearchClear) {
             selectorSearchClear.style.display = query ? '' : 'none';
         }
+        
+        // Show/hide create chip
+        updateCreateSelectorChip(query);
     }
     
     /**
@@ -621,7 +624,7 @@
             relevantSelectors.add('#' + elementFilterInfo.id);
         }
         
-        selectorsGroups?.querySelectorAll('.preview-selector-item').forEach(chip => {
+        selectorsGroups?.querySelectorAll('.preview-selector-item:not(.preview-selector-item--create)').forEach(chip => {
             const selector = chip.dataset.selector || '';
             
             // Must match element (tag, class, or id)
@@ -640,6 +643,9 @@
         if (selectorSearchClear) {
             selectorSearchClear.style.display = searchQuery ? '' : 'none';
         }
+        
+        // Show/hide create chip
+        updateCreateSelectorChip(searchQuery);
     }
     
     /**
@@ -709,12 +715,176 @@
         filterSelectors(searchQuery);
     }
     
+    // ==================== Create Selector Chip ====================
+    
+    /**
+     * Determine the normalized selector and target group for a search query.
+     * @param {string} query - raw search input
+     * @returns {{ selector: string, targetList: HTMLElement|null, type: string }|null}
+     */
+    function resolveCreateTarget(query) {
+        const trimmed = query.trim();
+        if (!trimmed) return null;
+        
+        if (trimmed.startsWith('#')) {
+            return { selector: trimmed, targetList: selectorIdsList, type: 'id' };
+        }
+        if (trimmed.startsWith('.')) {
+            return { selector: trimmed, targetList: selectorClassesList, type: 'class' };
+        }
+        if (trimmed.startsWith('[')) {
+            return { selector: trimmed, targetList: selectorAttributesList, type: 'attribute' };
+        }
+        // Default: treat as class
+        return { selector: '.' + trimmed, targetList: selectorClassesList, type: 'class' };
+    }
+    
+    /**
+     * Check if an exact selector already exists among all known selectors.
+     */
+    function selectorExists(selector) {
+        const lower = selector.toLowerCase();
+        for (const group of ['tags', 'classes', 'ids', 'attributes']) {
+            for (const item of categorizedSelectors[group]) {
+                if (item.selector.toLowerCase() === lower) return true;
+            }
+        }
+        for (const items of Object.values(categorizedSelectors.media)) {
+            for (const item of items) {
+                const sel = typeof item === 'string' ? item : item.selector;
+                if (sel && sel.toLowerCase() === lower) return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Show or hide the "Create selector" chip based on current search query.
+     */
+    function updateCreateSelectorChip(query) {
+        // Remove any existing create chip
+        selectorsGroups?.querySelectorAll('.preview-selector-item--create').forEach(el => el.remove());
+        
+        const target = resolveCreateTarget(query);
+        if (!target) return;
+        
+        // Don't show if this selector already exists
+        if (selectorExists(target.selector)) return;
+        
+        // Create the chip
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'preview-selector-item preview-selector-item--create preview-selector-item--' + target.type;
+        
+        // "+" icon
+        const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        icon.setAttribute('viewBox', '0 0 24 24');
+        icon.setAttribute('fill', 'none');
+        icon.setAttribute('stroke', 'currentColor');
+        icon.setAttribute('stroke-width', '2');
+        const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line1.setAttribute('x1', '12'); line1.setAttribute('y1', '5');
+        line1.setAttribute('x2', '12'); line1.setAttribute('y2', '19');
+        const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line2.setAttribute('x1', '5'); line2.setAttribute('y1', '12');
+        line2.setAttribute('x2', '19'); line2.setAttribute('y2', '12');
+        icon.appendChild(line1);
+        icon.appendChild(line2);
+        
+        const label = document.createElement('span');
+        label.textContent = (PreviewConfig.i18n?.createSelector || 'Create') + ' ' + target.selector;
+        
+        chip.appendChild(icon);
+        chip.appendChild(label);
+        chip.title = (PreviewConfig.i18n?.createSelector || 'Create') + ' ' + target.selector;
+        chip.dataset.selector = target.selector;
+        
+        chip.addEventListener('click', () => {
+            createNewSelector(target.selector);
+        });
+        
+        // Insert at the top of the target group list
+        if (target.targetList) {
+            target.targetList.prepend(chip);
+            // Make sure the parent group is visible
+            const group = target.targetList.closest('.preview-selectors-group');
+            if (group) group.style.display = '';
+        }
+    }
+    
+    /**
+     * Create a new empty CSS rule via the API, add the chip, and auto-select it.
+     */
+    async function createNewSelector(selector) {
+        try {
+            const response = await fetch(managementUrl + 'setStyleRule', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(authToken ? { 'Authorization': 'Bearer ' + authToken } : {})
+                },
+                body: JSON.stringify({ selector: selector, styles: '/* empty */' })
+            });
+            
+            const result = await response.json();
+            
+            if (!response.ok || result.status >= 400) {
+                if (typeof showToast === 'function') {
+                    showToast(PreviewConfig.i18n?.selectorCreateError || 'Failed to create selector', 'error');
+                }
+                return;
+            }
+            
+            // Add to categorized selectors
+            const target = resolveCreateTarget(selector);
+            if (target) {
+                const entry = { selector: selector, mediaQuery: null, hasRules: true };
+                if (target.type === 'class') categorizedSelectors.classes.push(entry);
+                else if (target.type === 'id') categorizedSelectors.ids.push(entry);
+                else if (target.type === 'attribute') categorizedSelectors.attributes.push(entry);
+                else categorizedSelectors.tags.push(entry);
+            }
+            
+            // Remove the create chip
+            selectorsGroups?.querySelectorAll('.preview-selector-item--create').forEach(el => el.remove());
+            
+            // Add a real chip in the right list
+            const type = target?.type || 'class';
+            const listMap = { class: selectorClassesList, id: selectorIdsList, attribute: selectorAttributesList, tag: selectorTagsList };
+            const listEl = listMap[type];
+            if (listEl) {
+                const chip = createSelectorChip(selector, type, null, true);
+                listEl.prepend(chip);
+            }
+            
+            // Update counts
+            updateSelectorCounts();
+            updateVisibleSelectorCounts();
+            
+            // Auto-select it and open editor
+            selectSelector(selector, null);
+            
+            // Clear search
+            if (selectorSearchInput) selectorSearchInput.value = '';
+            filterSelectors('');
+            
+            if (typeof showToast === 'function') {
+                showToast(PreviewConfig.i18n?.selectorCreated || 'Selector created', 'success');
+            }
+        } catch (error) {
+            console.error('[SelectorBrowser] Create selector error:', error);
+            if (typeof showToast === 'function') {
+                showToast(PreviewConfig.i18n?.selectorCreateError || 'Failed to create selector', 'error');
+            }
+        }
+    }
+
     /**
      * Update counts based on visible selectors after filtering
      */
     function updateVisibleSelectorCounts() {
         const countVisibleIn = (listEl) => {
-            return listEl?.querySelectorAll('.preview-selector-item:not([style*="display: none"])').length || 0;
+            return listEl?.querySelectorAll('.preview-selector-item:not([style*="display: none"]):not(.preview-selector-item--create)').length || 0;
         };
         
         if (selectorTagsCount) selectorTagsCount.textContent = countVisibleIn(selectorTagsList);

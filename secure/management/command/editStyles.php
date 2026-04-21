@@ -75,12 +75,21 @@ foreach ($dangerousPatterns as $pattern => $description) {
 }
 
 $styleFile = PUBLIC_CONTENT_PATH . '/style/style.css';
+$projectStyleFile = PROJECT_PATH . '/public/style/style.css';
 
-// Check if file exists
+// Check if live file exists
 if (!file_exists($styleFile)) {
     ApiResponse::create(404, 'file.not_found')
         ->withMessage("Style file not found")
         ->withData(['file' => $styleFile])
+        ->send();
+}
+
+// Ensure project style directory exists (kept in sync with live stylesheet)
+$projectStyleDir = dirname($projectStyleFile);
+if (!is_dir($projectStyleDir) && !mkdir($projectStyleDir, 0755, true)) {
+    ApiResponse::create(500, 'server.file_write_failed')
+        ->withMessage("Failed to create project style directory")
         ->send();
 }
 
@@ -92,10 +101,16 @@ if ($oldContent === false) {
         ->send();
 }
 
-// Write new content
+// Write new content to live stylesheet and project stylesheet copy
 if (file_put_contents($styleFile, $newContent, LOCK_EX) === false) {
     ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage("Failed to write style file")
+        ->withMessage("Failed to write live style file")
+        ->send();
+}
+
+if ($projectStyleFile !== $styleFile && file_put_contents($projectStyleFile, $newContent, LOCK_EX) === false) {
+    ApiResponse::create(500, 'server.file_write_failed')
+        ->withMessage("Failed to write project style file")
         ->send();
 }
 
@@ -104,6 +119,7 @@ ApiResponse::create(200, 'operation.success')
     ->withMessage('Style file updated successfully')
     ->withData([
         'file' => $styleFile,
+        'project_file' => $projectStyleFile,
         'new_size' => strlen($newContent),
         'old_size' => strlen($oldContent),
         'backup_content' => $oldContent, // For rollback
