@@ -337,7 +337,27 @@
         "build": "Construire",
         "inspect": "Inspecter",
         "interactions": "Interactions",
-        "sitemap": "Plan du site"
+        "sitemap": "Plan du site",
+        "optimize": "Optimiser"
+    },
+    "optimize": {
+        "title": "Outils d'optimisation",
+        "subtitle": "Analysez et nettoyez le CSS de votre projet",
+        "tools": "Outils",
+        "cssRefiner": {
+            "title": "Affineur CSS",
+            "subtitle": "Trouvez et corrigez les redondances, doublons et opportunités d'optimisation",
+            "analyze": "Analyser",
+            "autoRefine": "Affinage automatique sûr",
+            "reset": "Réinitialiser",
+            "applySelected": "Appliquer la sélection",
+            "emptyState": "Cliquez sur Analyser pour scanner votre CSS.",
+            "libNotReady": "Les modules CSS Refiner ne sont pas encore installés. Voir les notes d'intégration.",
+            "autoRefineModal": {
+                "title": "Résumé de l'affinage automatique",
+                "backupNote": "Une sauvegarde sera créée automatiquement."
+            }
+        }
     },
     "sitemapPage": {
         "title": "Plan du site",

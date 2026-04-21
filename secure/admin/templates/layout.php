@@ -178,6 +178,15 @@ $langNames = [
                 <span><?= __admin('nav.sitemap') ?></span>
             </a>
             
+            <!-- Optimize - Top-level tab -->
+            <a href="<?= $router->url('optimize') ?>" 
+               class="admin-nav__link<?= $currentPage === 'optimize' ? ' admin-nav__link--active' : '' ?>">
+                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                <span><?= __admin('nav.optimize') ?></span>
+            </a>
+            
             <!-- Settings Group - Click goes to Project Settings -->
             <div class="admin-nav__group<?= $isSettingsActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="settings">
                 <a href="<?= $router->url('settings') ?>" class="admin-nav__group-toggle">

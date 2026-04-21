@@ -323,7 +323,27 @@
         "build": "Build",
         "inspect": "Inspect",
         "interactions": "Interactions",
-        "sitemap": "Sitemap"
+        "sitemap": "Sitemap",
+        "optimize": "Optimize"
+    },
+    "optimize": {
+        "title": "Optimization Tools",
+        "subtitle": "Analyze and clean up your project's CSS",
+        "tools": "Tools",
+        "cssRefiner": {
+            "title": "CSS Refiner",
+            "subtitle": "Find and fix redundancies, duplicates, and optimization opportunities",
+            "analyze": "Analyze",
+            "autoRefine": "Auto-Refine Safe",
+            "reset": "Reset",
+            "applySelected": "Apply Selected",
+            "emptyState": "Click Analyze to scan your CSS for suggestions.",
+            "libNotReady": "CSS Refiner modules not yet installed. See integration notes.",
+            "autoRefineModal": {
+                "title": "Auto-Refine Summary",
+                "backupNote": "A backup will be saved automatically."
+            }
+        }
     },
     "sitemapPage": {
         "title": "Sitemap",

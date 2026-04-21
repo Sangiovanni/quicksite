@@ -26,6 +26,7 @@ class AdminRouter {
         'apis',        // External API Registry
         'assets',      // Asset Management page
         'sitemap',     // Visual Sitemap & Route Management
+        'optimize',    // Optimization Tools
         'logout'       // Logout action
     ];
 

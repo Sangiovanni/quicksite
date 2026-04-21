@@ -12958,6 +12958,278 @@ code.preview-node-panel__value {
     margin-bottom: var(--space-sm);
 }
 
+/* ============================================================
+   Optimization Tools page
+   ============================================================ */
+
+.optimize-page {
+    max-width: 1200px;
+}
+
+.optimize-layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: var(--space-lg);
+    align-items: start;
+}
+
+/* Sidebar */
+.optimize-sidebar {
+    position: sticky;
+    top: var(--space-lg);
+}
+
+.optimize-tool-nav {
+    padding: var(--space-xs) 0;
+}
+
+.optimize-tool-nav__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    width: 100%;
+    padding: var(--space-sm) var(--space-md);
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--admin-text);
+    cursor: pointer;
+    font-size: var(--font-sm);
+    text-align: left;
+    transition: background 0.15s;
+}
+
+.optimize-tool-nav__item:hover {
+    background: var(--admin-hover);
+}
+
+.optimize-tool-nav__item--active {
+    background: var(--admin-accent-subtle, rgba(99,102,241,0.12));
+    color: var(--admin-accent, #6366f1);
+    font-weight: 600;
+}
+
+.optimize-tool-nav__icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+/* Toolbar */
+.optimize-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+    padding-bottom: var(--space-md);
+    border-bottom: 1px solid var(--admin-border);
+    margin-bottom: var(--space-md);
+}
+
+.optimize-toolbar__status {
+    font-size: var(--font-sm);
+    color: var(--admin-text-muted);
+    margin-left: auto;
+}
+
+.optimize-toolbar__status--loading {
+    color: var(--admin-text-muted);
+}
+
+.optimize-toolbar__status--ok {
+    color: var(--color-success, #22c55e);
+}
+
+.optimize-toolbar__status--error {
+    color: var(--color-error, #ef4444);
+}
+
+/* Empty state */
+.optimize-empty-state,
+.optimize-setup-notice {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-xl) var(--space-lg);
+    text-align: center;
+    color: var(--admin-text-muted);
+}
+
+/* Analyzer sections */
+.optimize-analyzer-section {
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-md);
+    overflow: hidden;
+}
+
+.optimize-analyzer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--admin-surface-alt, var(--admin-surface));
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.optimize-analyzer-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--admin-text);
+    font-weight: 600;
+    font-size: var(--font-sm);
+    padding: 0;
+}
+
+.optimize-analyzer-arrow {
+    transition: transform 0.15s;
+}
+
+.optimize-analyzer-toggle[aria-expanded="false"] .optimize-analyzer-arrow {
+    transform: rotate(-90deg);
+}
+
+.optimize-analyzer-count {
+    color: var(--admin-text-muted);
+    font-weight: normal;
+}
+
+.optimize-analyzer-badge {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 99px;
+    font-weight: 600;
+}
+
+.optimize-analyzer-badge--warn {
+    background: rgba(234,179,8,0.15);
+    color: #b45309;
+}
+
+.optimize-analyzer-actions {
+    display: flex;
+    gap: var(--space-xs);
+}
+
+/* Suggestion list */
+.optimize-suggestion-list {
+    padding: var(--space-xs) 0;
+}
+
+.optimize-suggestion {
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--admin-border);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-xs);
+}
+
+.optimize-suggestion:last-child {
+    border-bottom: none;
+}
+
+.optimize-suggestion__label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex: 1;
+    cursor: pointer;
+}
+
+.optimize-suggestion__check {
+    flex-shrink: 0;
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+}
+
+.optimize-suggestion__desc {
+    font-size: var(--font-sm);
+    font-family: var(--font-mono, monospace);
+    color: var(--admin-text);
+    word-break: break-all;
+}
+
+.optimize-suggestion__diff {
+    width: 100%;
+    margin-top: var(--space-xs);
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm);
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    overflow-x: auto;
+    white-space: pre;
+}
+
+/* Design token row */
+.optimize-design-token-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-top: var(--space-xs);
+    padding-top: var(--space-xs);
+    border-top: 1px dashed var(--admin-border);
+}
+
+.optimize-design-token-value {
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    color: var(--admin-text-muted);
+    flex-shrink: 0;
+}
+
+.optimize-design-token-name {
+    flex: 1;
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    padding: 3px 8px;
+}
+
+/* Apply bar */
+.optimize-apply-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-md);
+    padding: var(--space-md) 0;
+    border-top: 1px solid var(--admin-border);
+    margin-top: var(--space-md);
+}
+
+/* Modal body rows */
+.optimize-modal-row {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-xs);
+    padding: var(--space-xs) 0;
+    font-size: var(--font-sm);
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.optimize-modal-row:last-child {
+    border-bottom: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .optimize-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .optimize-sidebar {
+        position: static;
+    }
+}
+
 .tag-selector__preview-tag {
     font-family: var(--font-mono, monospace);
     font-size: 1.1rem;
