@@ -17,6 +17,7 @@
     const pageSize = 50;
     let totalEntries = 0;
     let totalPages = 0;
+    const entryCache = new Map();
 
     // DOM Elements (cached after init)
     let filterDate, filterCommand, filterStatus;
@@ -60,6 +61,14 @@
                 closeModal();
             }
         });
+
+        // Delegated click for history table detail buttons
+        if (historyContent) {
+            historyContent.addEventListener('click', function(e) {
+                const btn = e.target.closest('[data-action="show-detail"]');
+                if (btn) showDetail(entryCache.get(btn.dataset.entryId));
+            });
+        }
     }
 
     /**
@@ -152,6 +161,8 @@
         const t = window.QUICKSITE_CONFIG?.translations?.history?.columns || {};
         const commandUrl = window.QUICKSITE_CONFIG?.commandUrl || '';
 
+        entryCache.clear();
+
         let html = `
             <div class="admin-table-wrapper">
                 <table class="admin-table">
@@ -176,7 +187,7 @@
             const statusClass = isSuccess ? 'badge--success' : 'badge--error';
             const statusText = isSuccess ? 'Success' : 'Error';
             const timestamp = new Date(entry.timestamp).toLocaleString();
-            const entryJson = JSON.stringify(entry).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            entryCache.set(String(entry.id), entry);
 
             html += `
                 <tr>
@@ -190,7 +201,7 @@
                     <td><span class="badge ${statusClass}">${statusText}</span></td>
                     <td>${entry.duration_ms}ms</td>
                     <td>
-                        <button class="admin-btn admin-btn--ghost admin-btn--sm" onclick="showDetail('${entryJson}')">
+                        <button class="admin-btn admin-btn--ghost admin-btn--sm" data-action="show-detail" data-entry-id="${QuickSiteAdmin.escapeHtml(String(entry.id))}">
                             ${QuickSiteUtils.iconEye(16)}
                         </button>
                     </td>
@@ -313,7 +324,6 @@
     window.changePage = changePage;
     window.clearDateFilter = clearDateFilter;
     window.clearFilters = clearFilters;
-    window.showDetail = showDetail;
     window.closeModal = closeModal;
 
 })();

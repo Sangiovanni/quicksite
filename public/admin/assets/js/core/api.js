@@ -94,6 +94,13 @@ window.QuickSiteAPI = (function() {
     // Core API Methods
     // ============================================
 
+    /**
+     * @typedef {Object} ApiResponse
+     * @property {boolean} ok - True if HTTP response was successful (2xx)
+     * @property {number} status - HTTP status code (0 on network error)
+     * @property {Object} data - Parsed JSON response body
+     */
+
     let redirectingToLogin = false;
 
     /**

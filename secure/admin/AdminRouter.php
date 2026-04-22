@@ -17,7 +17,6 @@ class AdminRouter {
         'login',       // Authentication page
         'dashboard',   // Main admin panel after login
         'command',     // Individual command pages
-        'history',     // Command history viewer
         'settings',    // Settings and configuration
         'workflows',   // Workflows (AI and manual)
         'ai-settings', // AI Provider Settings (BYOK)
@@ -159,6 +158,55 @@ class AdminRouter {
     }
 
     /**
+     * Get the role of the currently authenticated token.
+     * Returns '*' for superadmin, a role slug (e.g. 'viewer') for named roles,
+     * or null when not authenticated.
+     */
+    public function getTokenRole(): ?string {
+        $token = $this->getToken();
+        if (!$token) return null;
+
+        $authConfigPath = SECURE_FOLDER_PATH . '/management/config/auth.php';
+        if (!file_exists($authConfigPath)) return null;
+
+        $authConfig = include $authConfigPath;
+        return $authConfig['authentication']['tokens'][$token]['role'] ?? null;
+    }
+
+    /**
+     * Pages that require at least one specific command in the token's role.
+     * Superadmin ('*') always passes. Any other role must have at least one listed command.
+     * Pages not listed here are open to all authenticated users.
+     */
+    private const PAGE_PERMISSIONS = [
+        'assets'         => ['listAssets', 'uploadAsset'],
+        'sitemap'        => ['getSiteMap', 'addRoute'],
+        'optimize'       => ['getStyles', 'editStyles'],
+        'ai-settings'    => ['listAiProviders'],
+        'apis'           => ['listApiEndpoints'],
+        'embed-security' => ['getIframeSandbox'],
+        'workflows'      => ['callAi'],
+    ];
+
+    /**
+     * Check whether the current token may access the requested page.
+     */
+    public function canAccessPage(string $page): bool {
+        if (!isset(self::PAGE_PERMISSIONS[$page])) return true;
+
+        $role = $this->getTokenRole();
+        if ($role === null) return false;
+        if ($role === '*') return true;
+
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+        $commands = getRoleCommands($role) ?? [];
+        foreach (self::PAGE_PERMISSIONS[$page] as $cmd) {
+            if (in_array($cmd, $commands, true)) return true;
+        }
+        return false;
+    }
+
+    /**
      * Store authentication token
      */
     public function setToken(string $token, bool $remember = false): void {
@@ -271,6 +319,11 @@ class AdminRouter {
         // If already authenticated and trying to access login, go to dashboard
         if ($this->page === 'login' && $this->isAuthenticated()) {
             $this->redirect('dashboard');
+        }
+
+        // Check page-level permissions (role-based access control)
+        if ($this->isAuthenticated() && !$this->canAccessPage($this->page)) {
+            $this->redirect('dashboard?denied=1');
         }
         
         // Load the appropriate template

@@ -13,11 +13,11 @@
     // Multi-Provider AI Settings Manager
     const AISettings = {
         // Storage keys - v2 uses objects for multi-provider support
-        storageKeyV2: 'quicksite_ai_keys_v2',  // { providerId: { key, models, defaultModel } }
-        defaultProviderKey: 'quicksite_ai_default_provider',
-        persistKey: 'quicksite_ai_persist',
-        autoPreviewKey: 'quicksite_ai_auto_preview',
-        autoExecuteKey: 'quicksite_ai_auto_execute',
+        storageKeyV2: QuickSiteStorageKeys.aiKeysV2,
+        defaultProviderKey: QuickSiteStorageKeys.aiDefaultProvider,
+        persistKey: QuickSiteStorageKeys.aiPersist,
+        autoPreviewKey: QuickSiteStorageKeys.aiAutoPreview,
+        autoExecuteKey: QuickSiteStorageKeys.aiAutoExecute,
         
         providers: [],
         configuredProviders: {},  // { providerId: { key, name, models, defaultModel } }
@@ -700,11 +700,11 @@
 
         // Global helper for other pages to get AI config
         getAIConfig: function() {
-            const persist = localStorage.getItem('quicksite_ai_persist') === 'true';
+            const persist = localStorage.getItem(QuickSiteStorageKeys.aiPersist) === 'true';
             const storage = persist ? localStorage : sessionStorage;
             
-            const storedData = storage.getItem('quicksite_ai_keys_v2');
-            const defaultProvider = storage.getItem('quicksite_ai_default_provider');
+            const storedData = storage.getItem(QuickSiteStorageKeys.aiKeysV2);
+            const defaultProvider = storage.getItem(QuickSiteStorageKeys.aiDefaultProvider);
             
             if (!storedData || !defaultProvider) {
                 return null;

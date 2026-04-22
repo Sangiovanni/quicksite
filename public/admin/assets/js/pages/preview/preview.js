@@ -135,18 +135,7 @@
     const sidebarTools = document.getElementById('preview-sidebar-tools');
     const toolsShowNames = document.getElementById('preview-tools-show-names');
     
-    // Drag tool options
-    const dragDefault = document.getElementById('contextual-drag-default');
-    const dragInfo = document.getElementById('contextual-drag-info');
-    const dragLockBtn = document.getElementById('preview-drag-lock');
-    const dragUndoBtn = document.getElementById('preview-drag-undo');
-    const dragRedoBtn = document.getElementById('preview-drag-redo');
-    const dragHint = document.getElementById('preview-drag-hint');
-    // Drag navigation buttons
-    const dragNavParent = document.getElementById('ctx-drag-nav-parent');
-    const dragNavPrev = document.getElementById('ctx-drag-nav-prev');
-    const dragNavNext = document.getElementById('ctx-drag-nav-next');
-    const dragNavChild = document.getElementById('ctx-drag-nav-child');
+    // Drag tool options — DOM refs and logic extracted to preview-drag.js (window.PreviewDrag)
     
     // Mobile sections elements (low-width mode)
     const mobileSections = document.getElementById('preview-mobile-sections');
@@ -2711,12 +2700,9 @@
             hideNodePanel();
         }
         
-        // Reset drag contextual when entering drag mode
-        if (mode === 'drag') {
-            if (dragDefault) dragDefault.style.display = '';
-            if (dragInfo) dragInfo.style.display = 'none';
-            if (dragHint) dragHint.textContent = PreviewConfig.i18n.dragSelectHint || '';
-            if (dragLockBtn) dragLockBtn.classList.remove('preview-sidebar-tool-option--active');
+        // Reset drag UI when entering drag mode
+        if (mode === 'drag' && window.PreviewDrag) {
+            PreviewDrag.onModeEnter();
         }
         
         // Clear style mode state when switching away
@@ -2786,6 +2772,8 @@
         if (mode === 'style') {
             if (styleTabs) styleTabs.style.display = '';
             if (styleContent) styleContent.style.display = '';
+            // Merge theme panel i18n (default tab) before the module renders
+            ensureI18nPanel('theme');
             // Load theme variables via module if not already loaded
             if (window.PreviewStyleTheme && !PreviewStyleTheme.isLoaded()) {
                 PreviewStyleTheme.load();
@@ -2799,7 +2787,26 @@
     function toggleContextualArea() {
         contextualArea.classList.toggle('preview-contextual-area--collapsed');
     }
-    
+
+    // ==================== i18n Panel Merging ====================
+
+    /**
+     * Merge panel-specific i18n keys into PreviewConfig.i18n on first activation.
+     * Keys for theme, selectors, and animations tabs live in PreviewConfig.i18nPanels
+     * and are merged here so the initial page-load script block stays lean.
+     *
+     * @param {string} panelName - Panel key matching a PreviewConfig.i18nPanels entry
+     */
+    const _i18nPanelsMerged = new Set();
+    function ensureI18nPanel(panelName) {
+        if (_i18nPanelsMerged.has(panelName)) return;
+        const partial = window.PreviewConfig?.i18nPanels?.[panelName];
+        if (partial) {
+            Object.assign(PreviewConfig.i18n, partial);
+        }
+        _i18nPanelsMerged.add(panelName);
+    }
+
     // ==================== Preview Resize ====================
     
     const PREVIEW_HEIGHT_KEY = 'quicksite-preview-height';
@@ -3092,6 +3099,9 @@
             tab.addEventListener('click', () => {
                 const tabName = tab.dataset.tab;
                 if (tabName === activeStyleTab) return;
+                
+                // Merge panel-specific i18n keys on first activation
+                ensureI18nPanel(tabName);
                 
                 // Update active tab button
                 tabs.forEach(t => t.classList.remove('preview-contextual-style-tab--active'));
@@ -3452,60 +3462,8 @@
                     syncLayoutTogglesFromIframe();
                 }, 50); // Small delay to ensure iframe is ready to receive messages
             }
-            if (e.data.action === 'elementMoved') {
-                handleElementMoved(e.data);
-            }
-            if (e.data.action === 'dragStarted') {
-                // Show dragged element info in the contextual info panel
-                showContextualInfo(e.data);
-            }
-            // Drag Phase 1/2 messages
-            if (e.data.action === 'dragElementSelected') {
-                // Show drag info panel, hide default
-                if (dragDefault) dragDefault.style.display = 'none';
-                if (dragInfo) dragInfo.style.display = '';
-                // Update nav button states
-                if (dragNavParent) dragNavParent.disabled = !e.data.hasParent;
-                if (dragNavPrev) dragNavPrev.disabled = !e.data.hasPrevSibling;
-                if (dragNavNext) dragNavNext.disabled = !e.data.hasNextSibling;
-                if (dragNavChild) dragNavChild.disabled = !e.data.hasChildren;
-                if (dragLockBtn) dragLockBtn.classList.remove('preview-sidebar-tool-option--active');
-                if (dragHint) dragHint.textContent = PreviewConfig.i18n.dragSelectHint || '';
-                updateGlobalElementInfo(e.data);
-            }
-            if (e.data.action === 'dragElementLocked') {
-                if (dragLockBtn) dragLockBtn.classList.toggle('preview-sidebar-tool-option--active', !!e.data.persistent);
-                if (dragHint) dragHint.textContent = PreviewConfig.i18n.dragLockedHint || '';
-                // Disable nav buttons while locked
-                if (dragNavParent) dragNavParent.disabled = true;
-                if (dragNavPrev) dragNavPrev.disabled = true;
-                if (dragNavNext) dragNavNext.disabled = true;
-                if (dragNavChild) dragNavChild.disabled = true;
-            }
-            if (e.data.action === 'dragElementUnlocked') {
-                if (dragLockBtn) dragLockBtn.classList.remove('preview-sidebar-tool-option--active');
-                if (dragHint) dragHint.textContent = PreviewConfig.i18n.dragSelectHint || '';
-                // Re-enable nav buttons (will be re-evaluated on next select)
-                if (dragNavParent) dragNavParent.disabled = !e.data.hasParent;
-                if (dragNavPrev) dragNavPrev.disabled = !e.data.hasPrevSibling;
-                if (dragNavNext) dragNavNext.disabled = !e.data.hasNextSibling;
-                if (dragNavChild) dragNavChild.disabled = !e.data.hasChildren;
-            }
-            if (e.data.action === 'dragElementDeselected') {
-                if (dragLockBtn) dragLockBtn.classList.remove('preview-sidebar-tool-option--active');
-                if (dragHint) dragHint.textContent = PreviewConfig.i18n.dragSelectHint || '';
-                // Show default, hide info
-                if (dragDefault) dragDefault.style.display = '';
-                if (dragInfo) dragInfo.style.display = 'none';
-            }
-            if (e.data.action === 'dragStackUpdate') {
-                if (dragUndoBtn) dragUndoBtn.disabled = (e.data.undoCount === 0);
-                if (dragRedoBtn) dragRedoBtn.disabled = (e.data.redoCount === 0);
-            }
-            if (e.data.action === 'dragModeReady') {
-                if (dragUndoBtn) dragUndoBtn.disabled = (e.data.undoCount === 0);
-                if (dragRedoBtn) dragRedoBtn.disabled = (e.data.redoCount === 0);
-                if (dragHint) dragHint.textContent = PreviewConfig.i18n.dragSelectHint || '';
+            if (e.data.action === 'elementMoved' || e.data.action.startsWith('drag')) {
+                if (window.PreviewDrag) PreviewDrag.handleMessage(e.data);
             }
             if (e.data.action === 'textEdited') {
                 handleTextEdited(e.data);
@@ -3626,97 +3584,7 @@
         return clone;
     }
     
-    async function handleElementMoved(data) {
-        console.log('[Preview] Element moved:', data);
-        
-        const source = data.sourceElement;
-        const target = data.targetElement;
-        const position = data.position; // 'before', 'after', or 'inside'
-        const isUndoRedo = !!data.isUndoRedo;
-        const undoRedoAction = data.undoRedoAction; // 'undo' or 'redo'
-        
-        if (!source || !target || !source.struct || !source.node || !target.node) {
-            console.error('[Preview] Invalid move data:', { source, target, position });
-            showToast(PreviewConfig.i18n.error + ': Invalid move data', 'error');
-            // Rollback — DOM was already moved live in iframe
-            sendToIframe('rollbackDrag', {});
-            return;
-        }
-        
-        // Parse struct to get type and name
-        const structInfo = parseStruct(source.struct);
-        if (!structInfo || !structInfo.type) {
-            showToast(PreviewConfig.i18n.error + ': Invalid structure type', 'error');
-            sendToIframe('rollbackDrag', {});
-            return;
-        }
-        
-        try {
-            // Use the atomic moveNode command
-            const params = {
-                type: structInfo.type,
-                sourceNodeId: source.node,
-                targetNodeId: target.node,
-                position: position
-            };
-            if (structInfo.name) {
-                params.name = structInfo.name;
-            }
-            
-            console.log('[Preview] Moving node:', params);
-            const result = await QuickSiteAdmin.apiRequest('moveNode', 'PATCH', params);
-            
-            if (!result.ok) {
-                throw new Error(result.data?.message || result.data?.data?.message || 'Failed to move node');
-            }
-            
-            // Success! DOM is already in the correct position (live drag did this)
-            // Reindex ALL node IDs in this struct so they match the new JSON structure
-            sendToIframe('reindexNodes', { struct: source.struct });
-            
-            // Highlight the moved element after reindex (use a short delay for reindex to finish)
-            setTimeout(() => {
-                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                // After reindex, the moved element has a new node ID from the server
-                const newNodeId = result.data?.data?.newNodeId;
-                const highlightSelector = newNodeId
-                    ? `[data-qs-struct="${source.struct}"][data-qs-node="${newNodeId}"], [data-qs-struct="${source.struct}"] [data-qs-node="${newNodeId}"]`
-                    : null;
-                
-                let sourceEl = highlightSelector ? iframeDoc.querySelector(highlightSelector) : null;
-                
-                if (sourceEl) {
-                    sourceEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    sourceEl.style.outline = '3px solid var(--primary, #3b82f6)';
-                    sourceEl.style.outlineOffset = '2px';
-                    setTimeout(() => {
-                        sourceEl.style.outline = '';
-                        sourceEl.style.outlineOffset = '';
-                    }, 1500);
-                }
-            }, 50);
-            
-            showToast(
-                isUndoRedo
-                    ? (undoRedoAction === 'undo' ? PreviewConfig.i18n.elementMoveUndone : PreviewConfig.i18n.elementMoveRedone)
-                    : PreviewConfig.i18n.elementMoved,
-                'success'
-            );
-            console.log('[Preview] Move saved successfully');
-            
-        } catch (error) {
-            console.error('[Preview] Move error:', error);
-            showToast(PreviewConfig.i18n.error + ': ' + error.message, 'error');
-            if (isUndoRedo) {
-                // For undo/redo, reverse the DOM move by telling iframe to undo/redo the opposite
-                // Since the stacks were already updated, we pop the last entry and move back
-                sendToIframe(undoRedoAction === 'undo' ? 'dragRedo' : 'dragUndo', {});
-            } else {
-                // Rollback DOM in iframe since API failed
-                sendToIframe('rollbackDrag', {});
-            }
-        }
-    }
+    // handleElementMoved — extracted to preview-drag.js (PreviewDrag.handleMessage)
     
     // ==================== Text Edit Handler ====================
     
@@ -3874,6 +3742,16 @@
     }
     
     /**
+     * Initialize Drag module with callbacks from preview.js
+     */
+    function initPreviewDrag() {
+        if (window.PreviewDrag) {
+            PreviewDrag.setShowContextualInfo(showContextualInfo);
+            PreviewDrag.setUpdateGlobalElementInfo(updateGlobalElementInfo);
+        }
+    }
+
+    /**
      * Initialize JS Interactions module with callbacks
      */
     function initJsInteractions() {
@@ -3893,6 +3771,9 @@
         }
     }
     
+    // Initialize Drag module
+    initPreviewDrag();
+
     // Initialize JS Interactions module
     initJsInteractions();
     
@@ -3966,43 +3847,7 @@
             });
         });
         
-        // Drag tool option buttons (lock, undo, redo)
-        if (dragLockBtn) {
-            dragLockBtn.addEventListener('click', function() {
-                sendToIframe('dragToggleLock', {});
-            });
-        }
-        if (dragUndoBtn) {
-            dragUndoBtn.addEventListener('click', function() {
-                sendToIframe('dragUndo', {});
-            });
-        }
-        if (dragRedoBtn) {
-            dragRedoBtn.addEventListener('click', function() {
-                sendToIframe('dragRedo', {});
-            });
-        }
-        // Drag navigation buttons
-        if (dragNavParent) {
-            dragNavParent.addEventListener('click', function() {
-                sendToIframe('dragNavParent', {});
-            });
-        }
-        if (dragNavPrev) {
-            dragNavPrev.addEventListener('click', function() {
-                sendToIframe('dragNavPrev', {});
-            });
-        }
-        if (dragNavNext) {
-            dragNavNext.addEventListener('click', function() {
-                sendToIframe('dragNavNext', {});
-            });
-        }
-        if (dragNavChild) {
-            dragNavChild.addEventListener('click', function() {
-                sendToIframe('dragNavChild', {});
-            });
-        }
+        // Drag tool button events are handled by PreviewDrag module (preview-drag.js)
     }
     
     initIframeAndControls();
@@ -4016,18 +3861,9 @@
                 return;
             }
             
-            // Drag mode: Ctrl+Z / Ctrl+Y for undo/redo
-            if (currentMode === 'drag') {
-                if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendToIframe('dragUndo', {});
-                    return;
-                }
-                if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
-                    e.preventDefault();
-                    sendToIframe('dragRedo', {});
-                    return;
-                }
+            // Drag mode: Ctrl+Z / Ctrl+Y for undo/redo — handled by PreviewDrag module
+            if (currentMode === 'drag' && window.PreviewDrag) {
+                if (PreviewDrag.handleKeydown(e)) return;
             }
             
             // Arrow keys - Navigate selection (only in select mode with a selection)

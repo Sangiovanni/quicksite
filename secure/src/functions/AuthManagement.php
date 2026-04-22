@@ -261,7 +261,11 @@ function getTokenPermissions(array $tokenInfo): array {
     
     return [
         'role' => $role,
-        'commands' => $commands
+        // array_values() re-indexes sequentially so json_encode always
+        // produces a JSON array [], never an object {} — roles.php can have
+        // duplicate or non-contiguous integer keys which would otherwise
+        // cause PHP to serialize the array as a JSON object.
+        'commands' => array_values(array_unique($commands))
     ];
 }
 

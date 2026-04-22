@@ -71,9 +71,8 @@
                     </div>
                 </div>
 
-                <!-- Light / Dark scope switcher (visible only when THEME_MODE_ENABLED) -->
-                <?php if (CONFIG['THEME_MODE_ENABLED'] ?? false): ?>
-                <div class="preview-theme-scope" id="theme-scope-switcher">
+                <!-- Light / Dark scope switcher (always rendered; visibility managed by JS/config) -->
+                <div class="preview-theme-scope" id="theme-scope-switcher" style="display: <?= (CONFIG['THEME_MODE_ENABLED'] ?? false) ? '' : 'none' ?>;">
                     <button type="button" class="preview-theme-scope__btn preview-theme-scope__btn--active" data-scope="light">
                         <span aria-hidden="true">☀</span> <?= __admin('preview.light') ?? 'Light' ?>
                     </button>
@@ -81,7 +80,6 @@
                         <span aria-hidden="true">🌙</span> <?= __admin('preview.dark') ?? 'Dark' ?>
                     </button>
                 </div>
-                <?php endif; ?>
                 <div class="preview-theme-section" id="theme-colors-section">
                     <h4 class="preview-theme-section__title">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">

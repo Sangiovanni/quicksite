@@ -238,9 +238,9 @@
     // ========================================================================
 
     const AI_STORAGE_KEYS = {
-        keysV2: 'quicksite_ai_keys_v2',
-        defaultProvider: 'quicksite_ai_default_provider',
-        persist: 'quicksite_ai_persist',
+        keysV2: QuickSiteStorageKeys.aiKeysV2,
+        defaultProvider: QuickSiteStorageKeys.aiDefaultProvider,
+        persist: QuickSiteStorageKeys.aiPersist,
         legacyKey: 'quicksite_ai_key',
         legacyProvider: 'quicksite_ai_provider',
         legacyModel: 'quicksite_ai_model'
@@ -625,7 +625,7 @@
         }
 
         // -- Auto options persistence --
-        const AUTO_KEYS = { autoPreview: 'quicksite_ai_auto_preview', autoExecute: 'quicksite_ai_auto_execute' };
+        const AUTO_KEYS = { autoPreview: QuickSiteStorageKeys.aiAutoPreview, autoExecute: QuickSiteStorageKeys.aiAutoExecute };
         if (els.autoPreviewCheckbox) {
             els.autoPreviewCheckbox.addEventListener('change', function() {
                 localStorage.setItem(AUTO_KEYS.autoPreview, this.checked);
@@ -1871,10 +1871,10 @@
 
     function loadAutoOptions(els) {
         if (els.autoPreviewCheckbox) {
-            els.autoPreviewCheckbox.checked = localStorage.getItem('quicksite_ai_auto_preview') === 'true';
+            els.autoPreviewCheckbox.checked = localStorage.getItem(QuickSiteStorageKeys.aiAutoPreview) === 'true';
         }
         if (els.autoExecuteCheckbox) {
-            els.autoExecuteCheckbox.checked = localStorage.getItem('quicksite_ai_auto_execute') === 'true';
+            els.autoExecuteCheckbox.checked = localStorage.getItem(QuickSiteStorageKeys.aiAutoExecute) === 'true';
         }
     }
 

@@ -1,26 +1,221 @@
 ﻿<?php
 /**
  * CSS Parser Utility Class
- * Parses and manipulates CSS content for Quicksite API
+ *
+ * Parses and manipulates CSS content using a structured block-tree approach.
+ * Instead of fragile regex patterns for brace matching, the parser tokenizes
+ * the CSS content into top-level block descriptors (rules and at-rules) that
+ * correctly handle nested braces, comments, and string literals.
+ *
+ * Supported operations:
+ *  - Read / write CSS custom properties inside :root or [data-theme="dark"] scopes
+ *  - Read / write / delete style rules (global scope and inside @media)
+ *  - List all selectors in the stylesheet
+ *  - Read / write / delete @keyframes animations
+ *  - Extract all CSS rules relevant to a set of classes / IDs / tags
  */
-
 class CssParser {
-    
+
     private string $content;
-    
+
     public function __construct(string $content) {
         $this->content = $content;
     }
-    
+
     /**
-     * Get the current CSS content
+     * Get the current CSS content (after any modifications).
      */
     public function getContent(): string {
         return $this->content;
     }
-    
+
+    // =========================================================================
+    // Parse Tree Infrastructure (private)
+    // =========================================================================
+
     /**
-     * Extract all :root variables
+     * Skip over a CSS string literal starting at $pos (which must be a quote char).
+     * Returns the position AFTER the closing quote.
+     */
+    private function skipString(int $pos): int {
+        $quote = $this->content[$pos];
+        $len   = strlen($this->content);
+        $pos++;
+        while ($pos < $len) {
+            $ch = $this->content[$pos];
+            if ($ch === '\\')   { $pos += 2; continue; }
+            if ($ch === $quote) { $pos++;    break;     }
+            $pos++;
+        }
+        return $pos;
+    }
+
+    /**
+     * Find the next `{` starting at $from, skipping comments and string literals.
+     * Returns false when no opening brace exists beyond $from.
+     */
+    private function findNextOpenBrace(int $from): int|false {
+        $len = strlen($this->content);
+        $pos = $from;
+        while ($pos < $len) {
+            $ch = $this->content[$pos];
+            if ($ch === '/' && ($pos + 1) < $len && $this->content[$pos + 1] === '*') {
+                $end = strpos($this->content, '*/', $pos + 2);
+                $pos = ($end !== false) ? $end + 2 : $len;
+                continue;
+            }
+            if ($ch === '"' || $ch === "'") { $pos = $this->skipString($pos); continue; }
+            if ($ch === '{') return $pos;
+            $pos++;
+        }
+        return false;
+    }
+
+    /**
+     * Given the position of `{`, find the position ONE PAST the matching `}`.
+     * Properly handles nested braces, comments, and strings.
+     */
+    private function findMatchingClose(int $openPos): int {
+        $len   = strlen($this->content);
+        $depth = 1;
+        $pos   = $openPos + 1;
+        while ($pos < $len && $depth > 0) {
+            $ch = $this->content[$pos];
+            if ($ch === '/' && ($pos + 1) < $len && $this->content[$pos + 1] === '*') {
+                $end = strpos($this->content, '*/', $pos + 2);
+                $pos = ($end !== false) ? $end + 2 : $len;
+                continue;
+            }
+            if ($ch === '"' || $ch === "'") { $pos = $this->skipString($pos); continue; }
+            if ($ch === '{') $depth++;
+            if ($ch === '}') $depth--;
+            $pos++;
+        }
+        return $pos; // position AFTER the closing }
+    }
+
+    /**
+     * Normalize a CSS selector or at-rule prelude for comparison:
+     * collapses all whitespace and normalises single quotes to double quotes.
+     */
+    private function normalizeSelector(string $selector): string {
+        $s = preg_replace('/\s+/', ' ', trim($selector));
+        return str_replace("'", '"', $s);
+    }
+
+    /**
+     * Parse the CSS content into an array of top-level block descriptors.
+     *
+     * Each entry contains:
+     *   'type'       => 'rule' | 'atrule'
+     *   'selector'   => string  (rules only)
+     *   'keyword'    => string  (at-rules only, e.g. 'media', 'keyframes')
+     *   'prelude'    => string  (at-rules only, e.g. '(max-width: 768px)')
+     *   'start'      => int     byte offset of the first char of the prelude
+     *   'end'        => int     byte offset ONE PAST the closing '}'
+     *   'innerStart' => int     byte offset of the first char after '{'
+     *   'innerEnd'   => int     byte offset of the closing '}'
+     */
+    private function parseTopLevelBlocks(): array {
+        $blocks = [];
+        $len    = strlen($this->content);
+        $pos    = 0;
+
+        while ($pos < $len) {
+            // Skip leading whitespace
+            while ($pos < $len && ctype_space($this->content[$pos])) {
+                $pos++;
+            }
+            if ($pos >= $len) break;
+
+            // Skip comments
+            if ($pos + 1 < $len && $this->content[$pos] === '/' && $this->content[$pos + 1] === '*') {
+                $end = strpos($this->content, '*/', $pos + 2);
+                $pos = ($end !== false) ? $end + 2 : $len;
+                continue;
+            }
+
+            $blockStart = $pos;
+
+            // Find the next opening brace (the prelude ends here)
+            $bracePos = $this->findNextOpenBrace($pos);
+            if ($bracePos === false) break;
+
+            $prelude = trim(substr($this->content, $pos, $bracePos - $pos));
+            if ($prelude === '') {
+                // No prelude — malformed or an empty rule; skip past this brace
+                $pos = $bracePos + 1;
+                continue;
+            }
+
+            // Find matching closing brace
+            $closePos = $this->findMatchingClose($bracePos); // ONE PAST '}'
+
+            if (str_starts_with($prelude, '@')) {
+                preg_match('/^@([\w-]+)\s*(.*)/s', $prelude, $m);
+                $blocks[] = [
+                    'type'       => 'atrule',
+                    'keyword'    => $m[1] ?? '',
+                    'prelude'    => trim($m[2] ?? ''),
+                    'start'      => $blockStart,
+                    'end'        => $closePos,
+                    'innerStart' => $bracePos + 1,
+                    'innerEnd'   => $closePos - 1,
+                ];
+            } else {
+                $blocks[] = [
+                    'type'       => 'rule',
+                    'selector'   => $prelude,
+                    'start'      => $blockStart,
+                    'end'        => $closePos,
+                    'innerStart' => $bracePos + 1,
+                    'innerEnd'   => $closePos - 1,
+                ];
+            }
+
+            $pos = $closePos;
+        }
+
+        return $blocks;
+    }
+
+    /**
+     * Find a top-level rule block by selector (normalised comparison).
+     * Returns the block descriptor array or null.
+     */
+    private function findTopLevelBlock(string $selector): ?array {
+        $normalized = $this->normalizeSelector($selector);
+        foreach ($this->parseTopLevelBlocks() as $block) {
+            if ($block['type'] === 'rule'
+                && $this->normalizeSelector($block['selector']) === $normalized) {
+                return $block;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Find a top-level @-rule block by keyword and optional prelude.
+     * If $prelude is non-empty it must match (normalised); otherwise any prelude matches.
+     */
+    private function findTopLevelAtrule(string $keyword, string $prelude = ''): ?array {
+        $normPrelude = ($prelude !== '') ? $this->normalizeSelector($prelude) : null;
+        foreach ($this->parseTopLevelBlocks() as $block) {
+            if ($block['type'] !== 'atrule' || $block['keyword'] !== $keyword) continue;
+            if ($normPrelude !== null
+                && $this->normalizeSelector($block['prelude']) !== $normPrelude) continue;
+            return $block;
+        }
+        return null;
+    }
+
+    // =========================================================================
+    // Variable Scope Operations
+    // =========================================================================
+
+    /**
+     * Extract all :root variables.
+     *
      * @return array Associative array of variable name => value
      */
     public function getRootVariables(): array {
@@ -33,13 +228,14 @@ class CssParser {
      * @return array Associative array of variable name => value
      */
     public function getVariablesInScope(string $selector): array {
+        $block = $this->findTopLevelBlock($selector);
+        if ($block === null) return [];
+
+        $inner = substr($this->content, $block['innerStart'], $block['innerEnd'] - $block['innerStart']);
         $variables = [];
-        $escapedSelector = preg_quote($selector, '/');
-        if (preg_match('/' . $escapedSelector . '\s*\{([^}]+)\}/s', $this->content, $matches)) {
-            preg_match_all('/(--.+?)\s*:\s*([^;]+);/s', $matches[1], $varMatches, PREG_SET_ORDER);
-            foreach ($varMatches as $match) {
-                $variables[trim($match[1])] = trim($match[2]);
-            }
+        preg_match_all('/(--.+?)\s*:\s*([^;]+);/s', $inner, $matches, PREG_SET_ORDER);
+        foreach ($matches as $match) {
+            $variables[trim($match[1])] = trim($match[2]);
         }
         return $variables;
     }
@@ -56,41 +252,39 @@ class CssParser {
         $added   = [];
         $updated = [];
 
-        $escapedSelector = preg_quote($selector, '/');
-        $pattern = '/' . $escapedSelector . '\s*\{([^}]+)\}/s';
+        $block = $this->findTopLevelBlock($selector);
 
-        if (preg_match($pattern, $this->content, $matches, PREG_OFFSET_CAPTURE)) {
-            $blockContent = $matches[1][0];
-            $blockStart   = $matches[0][1];
-            $blockEnd     = $blockStart + strlen($matches[0][0]);
-            $newContent   = $blockContent;
+        if ($block !== null) {
+            $inner    = substr($this->content, $block['innerStart'], $block['innerEnd'] - $block['innerStart']);
+            $newInner = $inner;
 
             foreach ($variables as $varName => $varValue) {
-                if (strpos($varName, '--') !== 0) {
+                if (!str_starts_with((string)$varName, '--')) {
                     $varName = '--' . $varName;
                 }
                 $varPattern = '/(' . preg_quote($varName, '/') . '\s*:\s*)([^;]+)(;)/s';
-                if (preg_match($varPattern, $newContent)) {
+                if (preg_match($varPattern, $newInner)) {
                     $safeValue  = str_replace(['\\', '$'], ['\\\\', '\\$'], $varValue);
-                    $newContent = preg_replace($varPattern, '${1}' . $safeValue . '${3}', $newContent);
+                    $newInner   = preg_replace($varPattern, '${1}' . $safeValue . '${3}', $newInner);
                     $updated[$varName] = $varValue;
                 } else {
-                    $newContent = rtrim($newContent) . "\n    " . $varName . ': ' . $varValue . ";\n";
-                    $added[$varName] = $varValue;
+                    $newInner         = rtrim($newInner) . "\n    " . $varName . ': ' . $varValue . ";\n";
+                    $added[$varName]  = $varValue;
                 }
             }
 
-            $newBlock = $selector . ' {' . $newContent . '}';
-            $this->content = substr($this->content, 0, $blockStart) . $newBlock . substr($this->content, $blockEnd);
-
+            // Splice new inner content back into the full CSS using byte positions
+            $this->content = substr($this->content, 0, $block['innerStart'])
+                           . $newInner
+                           . substr($this->content, $block['innerEnd']);
         } else {
-            // Block does not exist - append a new one at the end of the stylesheet
+            // Block doesn't exist — append a new one at the end of the stylesheet
             $newBlock = "\n" . $selector . " {\n";
             foreach ($variables as $varName => $varValue) {
-                if (strpos($varName, '--') !== 0) {
+                if (!str_starts_with((string)$varName, '--')) {
                     $varName = '--' . $varName;
                 }
-                $newBlock .= "    " . $varName . ': ' . $varValue . ";\n";
+                $newBlock        .= "    " . $varName . ': ' . $varValue . ";\n";
                 $added[$varName] = $varValue;
             }
             $newBlock .= "}\n";
@@ -100,8 +294,21 @@ class CssParser {
         return [
             'added'         => $added,
             'updated'       => $updated,
-            'total_changes' => count($added) + count($updated)
+            'total_changes' => count($added) + count($updated),
         ];
+    }
+
+    /**
+     * Build a regex pattern for matching a scope block.
+     * @deprecated Use findTopLevelBlock() instead.
+     */
+    private function buildScopePattern(string $selector): string {
+        $trimmed = trim($selector);
+        if ($trimmed === '[data-theme="dark"]' || $trimmed === "[data-theme='dark']") {
+            return '/\[data-theme\s*=\s*["\']dark["\']\]\s*\{([^}]+)\}/s';
+        }
+        $escapedSelector = preg_quote($selector, '/');
+        return '/' . $escapedSelector . '\s*\{([^}]+)\}/s';
     }
 
     /**
@@ -114,98 +321,64 @@ class CssParser {
     }
 
     /**
-     * Get all selectors in the stylesheet
-     * @return array List of selectors with their context (global or media query)
+     * Get all selectors in the stylesheet.
+     *
+     * @return array List of ['selector' => string, 'mediaQuery' => string|null]
      */
     public function listSelectors(): array {
         $selectors = [];
-
-        // First, extract selectors outside of @media and @keyframes
-        $contentWithoutMedia = $this->content;
-
-        // Remove @keyframes blocks temporarily
-        $contentWithoutMedia = preg_replace('/@keyframes\s+[\w-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/s', '', $contentWithoutMedia);
-
-        // Extract @media blocks and their selectors
-        preg_match_all('/@media\s*([^{]+)\s*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/s', $contentWithoutMedia, $mediaMatches, PREG_SET_ORDER);
-
-        foreach ($mediaMatches as $media) {
-            $mediaQuery = trim($media[1]);
-            $mediaContent = $media[2];
-
-            // Extract selectors within this media query
-            preg_match_all('/([^{@][^{]*)\s*\{[^}]*\}/s', $mediaContent, $selectorMatches);
-
-            foreach ($selectorMatches[1] as $selector) {
-                $selector = trim($selector);
-                if (!empty($selector) && strpos($selector, '/*') === false) {
-                    $selectors[] = [
-                        'selector' => $selector,
-                        'mediaQuery' => $mediaQuery
-                    ];
+        foreach ($this->parseTopLevelBlocks() as $block) {
+            if ($block['type'] === 'atrule' && $block['keyword'] === 'media') {
+                $mediaQuery   = $block['prelude'];
+                $innerContent = substr($this->content, $block['innerStart'], $block['innerEnd'] - $block['innerStart']);
+                $innerParser  = new self($innerContent);
+                foreach ($innerParser->parseTopLevelBlocks() as $inner) {
+                    if ($inner['type'] === 'rule') {
+                        $sel = trim($inner['selector']);
+                        if ($sel !== '' && !str_starts_with($sel, '/*')) {
+                            $selectors[] = ['selector' => $sel, 'mediaQuery' => $mediaQuery];
+                        }
+                    }
+                }
+            } elseif ($block['type'] === 'rule') {
+                $sel = trim($block['selector']);
+                if ($sel !== ''
+                    && !str_starts_with($sel, '/*')
+                    && $sel !== ':root') {
+                    $selectors[] = ['selector' => $sel, 'mediaQuery' => null];
                 }
             }
         }
-
-        // Remove @media blocks from content to find global selectors
-        $globalContent = preg_replace('/@media\s*[^{]+\s*\{(?:[^{}]*\{[^{}]*\})*\s*\}/s', '', $contentWithoutMedia);
-
-        // Extract global selectors (not in @media)
-        preg_match_all('/([^{@][^{]*)\s*\{[^}]*\}/s', $globalContent, $globalMatches);
-
-        foreach ($globalMatches[1] as $selector) {
-            $selector = trim($selector);
-            if (!empty($selector) && strpos($selector, '/*') === false && strpos($selector, ':root') === false) {
-                $selectors[] = [
-                    'selector' => $selector,
-                    'mediaQuery' => null
-                ];
-            }
-        }
-
         return $selectors;
     }
     
     /**
-     * Get styles for a specific selector
-     * @param string $selector CSS selector
+     * Get styles for a specific selector.
+     *
+     * @param string      $selector   CSS selector
      * @param string|null $mediaQuery Optional media query context
-     * @return array|null Styles or null if not found
+     * @return array|null ['selector', 'styles', 'mediaQuery'] or null if not found
      */
     public function getStyleRule(string $selector, ?string $mediaQuery = null): ?array {
-        $escapedSelector = preg_quote($selector, '/');
-        
         if ($mediaQuery !== null) {
-            // Look within specific media query
-            $escapedMedia = preg_quote($mediaQuery, '/');
-            $pattern = '/@media\s*' . $escapedMedia . '\s*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/s';
-            
-            if (preg_match($pattern, $this->content, $mediaMatch)) {
-                $mediaContent = $mediaMatch[1];
-                
-                if (preg_match('/' . $escapedSelector . '\s*\{([^}]*)\}/s', $mediaContent, $match)) {
-                    return [
-                        'selector' => $selector,
-                        'styles' => trim($match[1]),
-                        'mediaQuery' => $mediaQuery
-                    ];
-                }
-            }
-            return null;
+            $mediaBlock = $this->findTopLevelAtrule('media', $mediaQuery);
+            if ($mediaBlock === null) return null;
+
+            $innerContent = substr($this->content, $mediaBlock['innerStart'], $mediaBlock['innerEnd'] - $mediaBlock['innerStart']);
+            $innerParser  = new self($innerContent);
+            $rule         = $innerParser->findTopLevelBlock($selector);
+            if ($rule === null) return null;
+
+            $inner = substr($innerContent, $rule['innerStart'], $rule['innerEnd'] - $rule['innerStart']);
+            return ['selector' => $selector, 'styles' => trim($inner), 'mediaQuery' => $mediaQuery];
         }
-        
-        // Look in global scope (outside @media and @keyframes blocks)
-        $globalContent = $this->getGlobalContent();
-        
-        if (preg_match('/' . $escapedSelector . '\s*\{([^}]*)\}/s', $globalContent, $match)) {
-            return [
-                'selector' => $selector,
-                'styles' => trim($match[1]),
-                'mediaQuery' => null
-            ];
-        }
-        
-        return null;
+
+        // Global scope
+        $block = $this->findTopLevelBlock($selector);
+        if ($block === null) return null;
+
+        $inner = substr($this->content, $block['innerStart'], $block['innerEnd'] - $block['innerStart']);
+        return ['selector' => $selector, 'styles' => trim($inner), 'mediaQuery' => null];
     }
     
     /**
@@ -266,164 +439,144 @@ class CssParser {
     }
     
     /**
-     * Set/update a style rule (merges with existing properties)
-     * @param string $selector CSS selector
-     * @param string $styles CSS declarations
-     * @param string|null $mediaQuery Optional media query context
-     * @param array $removeProperties Properties to remove
-     * @return array Operation result
+     * Set/update a style rule (merges with existing properties).
+     *
+     * @param string      $selector         CSS selector
+     * @param string      $styles           CSS declarations
+     * @param string|null $mediaQuery       Optional media query context
+     * @param array       $removeProperties Properties to remove
+     * @return array Operation result ['action', 'selector', 'mediaQuery']
      */
     public function setStyleRule(string $selector, string $styles, ?string $mediaQuery = null, array $removeProperties = []): array {
-        $escapedSelector = preg_quote($selector, '/');
         $action = 'added';
-        
+
         if ($mediaQuery !== null) {
-            // Handle media query context
-            $escapedMedia = preg_quote($mediaQuery, '/');
-            $mediaPattern = '/@media\s*' . $escapedMedia . '\s*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/s';
-            
-            if (preg_match($mediaPattern, $this->content, $mediaMatch, PREG_OFFSET_CAPTURE)) {
-                $mediaContent = $mediaMatch[1][0];
-                $mediaStart = $mediaMatch[0][1];
-                $mediaFull = $mediaMatch[0][0];
-                
-                // Check if selector exists in this media query
-                $selectorPattern = '/' . $escapedSelector . '\s*\{([^}]*)\}/s';
-                
-                if (preg_match($selectorPattern, $mediaContent, $match)) {
-                    // Merge with existing rule
-                    $existingStyles = $match[1];
-                    $mergedStyles = $this->mergeStyles($existingStyles, $styles, $removeProperties);
-                    
-                    // If merged result is empty, remove the rule from media query
+            $mediaBlock = $this->findTopLevelAtrule('media', $mediaQuery);
+            if ($mediaBlock !== null) {
+                $innerContent = substr($this->content, $mediaBlock['innerStart'], $mediaBlock['innerEnd'] - $mediaBlock['innerStart']);
+                $innerParser  = new self($innerContent);
+                $rule         = $innerParser->findTopLevelBlock($selector);
+
+                if ($rule !== null) {
+                    $existingStyles = substr($innerContent, $rule['innerStart'], $rule['innerEnd'] - $rule['innerStart']);
+                    $mergedStyles   = $this->mergeStyles($existingStyles, $styles, $removeProperties);
+
                     if (trim($mergedStyles) === '') {
-                        $replacePattern = '/\s*' . $escapedSelector . '\s*\{[^}]*\}/s';
-                        $newMediaContent = preg_replace($replacePattern, '', $mediaContent);
-                        
-                        // If media query is now empty, delete the entire media block
-                        if (trim($newMediaContent) === '') {
-                            $this->content = substr($this->content, 0, $mediaStart) . substr($this->content, $mediaStart + strlen($mediaFull));
-                            // Clean up extra newlines
+                        // Remove this rule from the media content
+                        $newInnerContent = substr($innerContent, 0, $rule['start'])
+                                         . substr($innerContent, $rule['end']);
+                        $newInnerContent = preg_replace('/\n{3,}/', "\n\n", $newInnerContent);
+                        if (trim($newInnerContent) === '') {
+                            // Media query is now empty — remove entire block
+                            $this->content = substr($this->content, 0, $mediaBlock['start'])
+                                           . substr($this->content, $mediaBlock['end']);
                             $this->content = preg_replace('/\n{3,}/', "\n\n", $this->content);
-                            return [
-                                'action' => 'deleted',
-                                'selector' => $selector,
-                                'mediaQuery' => $mediaQuery
-                            ];
+                            return ['action' => 'deleted', 'selector' => $selector, 'mediaQuery' => $mediaQuery];
                         }
-                        
-                        $action = 'deleted';
-                    } else {
-                        $safeStyles = str_replace(['\\', '$'], ['\\\\', '\\$'], $mergedStyles);
-                        $replacePattern = '/(' . $escapedSelector . '\s*\{)[^}]*(\})/s';
-                        $newMediaContent = preg_replace($replacePattern, '${1}' . "\n" . $safeStyles . "\n" . '${2}', $mediaContent);
-                        $action = 'updated';
+                        $newMediaContent = '@media ' . $mediaBlock['prelude'] . " {\n" . $newInnerContent . "\n}";
+                        $this->content   = substr($this->content, 0, $mediaBlock['start'])
+                                         . $newMediaContent
+                                         . substr($this->content, $mediaBlock['end']);
+                        return ['action' => 'deleted', 'selector' => $selector, 'mediaQuery' => $mediaQuery];
                     }
+
+                    // Update the rule in inner content
+                    $newRule         = $rule['selector'] . " {\n" . $mergedStyles . "\n}";
+                    $newInnerContent = substr($innerContent, 0, $rule['start'])
+                                     . $newRule
+                                     . substr($innerContent, $rule['end']);
+                    $action = 'updated';
+
                 } else {
-                    // Add new rule to media query
+                    // Add new rule to existing media block
                     $formattedStyles = $this->formatStyles($styles);
-                    $newMediaContent = rtrim($mediaContent) . "\n    " . $selector . " {\n" . $formattedStyles . "\n    }\n";
+                    $newRule         = "    " . $selector . " {\n" . $formattedStyles . "\n    }";
+                    $newInnerContent = rtrim($innerContent) . "\n" . $newRule . "\n";
                 }
-                
-                $newMediaBlock = '@media ' . $mediaQuery . ' {' . $newMediaContent . '}';
-                $this->content = substr($this->content, 0, $mediaStart) . $newMediaBlock . substr($this->content, $mediaStart + strlen($mediaFull));
-                
+
+                $newMediaContent = '@media ' . $mediaBlock['prelude'] . " {\n" . $newInnerContent . "}";
+                $this->content   = substr($this->content, 0, $mediaBlock['start'])
+                                 . $newMediaContent
+                                 . substr($this->content, $mediaBlock['end']);
             } else {
-                // Media query doesn't exist, create it
+                // Media query doesn't exist — create it
                 $formattedStyles = $this->formatStyles($styles);
-                $newMediaBlock = "\n\n@media " . $mediaQuery . " {\n    " . $selector . " {\n" . $formattedStyles . "\n    }\n}";
-                $this->content = $this->appendToCustomSection($newMediaBlock);
+                $newMediaBlock   = "\n\n@media " . $mediaQuery . " {\n    " . $selector . " {\n" . $formattedStyles . "\n    }\n}";
+                $this->content   = $this->appendToCustomSection($newMediaBlock);
             }
-            
+
         } else {
             // Global scope
-            
-            // Check if it exists globally (not in @media)
-            $existing = $this->getStyleRule($selector, null);
-            
-            if ($existing !== null) {
-                // Merge with existing styles
-                $action = 'updated';
-                $mergedStyles = $this->mergeStyles($existing['styles'], $styles, $removeProperties);
-                
-                // If merged result is empty, delete the rule entirely
+            $block = $this->findTopLevelBlock($selector);
+
+            if ($block !== null) {
+                $existingStyles = substr($this->content, $block['innerStart'], $block['innerEnd'] - $block['innerStart']);
+                $mergedStyles   = $this->mergeStyles($existingStyles, $styles, $removeProperties);
+
                 if (trim($mergedStyles) === '') {
-                    $this->deleteStyleRule($selector, null);
-                    return [
-                        'action' => 'deleted',
-                        'selector' => $selector,
-                        'mediaQuery' => $mediaQuery
-                    ];
+                    $this->content = substr($this->content, 0, $block['start'])
+                                   . substr($this->content, $block['end']);
+                    $this->content = preg_replace('/\n{3,}/', "\n\n", $this->content);
+                    return ['action' => 'deleted', 'selector' => $selector, 'mediaQuery' => null];
                 }
-                
-                // Find and replace the rule outside of @media blocks
-                $this->content = $this->replaceGlobalRule($selector, $mergedStyles);
+
+                $newBlock      = $block['selector'] . " {\n" . $mergedStyles . "\n}";
+                $this->content = substr($this->content, 0, $block['start'])
+                               . $newBlock
+                               . substr($this->content, $block['end']);
+                $action = 'updated';
             } else {
-                // Add new rule
                 $formattedStyles = $this->formatStyles($styles);
-                $newRule = "\n" . $selector . " {\n" . $formattedStyles . "\n}";
-                $this->content = $this->appendToCustomSection($newRule);
+                $newRule         = "\n" . $selector . " {\n" . $formattedStyles . "\n}";
+                $this->content   = $this->appendToCustomSection($newRule);
             }
         }
-        
-        return [
-            'action' => $action,
-            'selector' => $selector,
-            'mediaQuery' => $mediaQuery
-        ];
+
+        return ['action' => $action, 'selector' => $selector, 'mediaQuery' => $mediaQuery];
     }
     
     /**
-     * Delete a style rule
-     * @param string $selector CSS selector
+     * Delete a style rule.
+     *
+     * @param string      $selector   CSS selector
      * @param string|null $mediaQuery Optional media query context
      * @return bool True if deleted, false if not found
      */
     public function deleteStyleRule(string $selector, ?string $mediaQuery = null): bool {
-        $escapedSelector = preg_quote($selector, '/');
-        
         if ($mediaQuery !== null) {
-            // Delete from specific media query
-            $escapedMedia = preg_quote($mediaQuery, '/');
-            $mediaPattern = '/@media\s*' . $escapedMedia . '\s*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/s';
-            
-            if (preg_match($mediaPattern, $this->content, $mediaMatch, PREG_OFFSET_CAPTURE)) {
-                $mediaContent = $mediaMatch[1][0];
-                $mediaStart = $mediaMatch[0][1];
-                $mediaFull = $mediaMatch[0][0];
-                
-                $selectorPattern = '/\s*' . $escapedSelector . '\s*\{[^}]*\}\s*/s';
-                
-                if (preg_match($selectorPattern, $mediaContent)) {
-                    $newMediaContent = preg_replace($selectorPattern, "\n", $mediaContent);
-                    
-                    // Check if media query is now empty
-                    if (trim(preg_replace('/\s+/', '', $newMediaContent)) === '') {
-                        // Remove entire media block
-                        $this->content = substr($this->content, 0, $mediaStart) . substr($this->content, $mediaStart + strlen($mediaFull));
-                    } else {
-                        $newMediaBlock = '@media ' . $mediaQuery . ' {' . $newMediaContent . '}';
-                        $this->content = substr($this->content, 0, $mediaStart) . $newMediaBlock . substr($this->content, $mediaStart + strlen($mediaFull));
-                    }
-                    return true;
-                }
+            $mediaBlock = $this->findTopLevelAtrule('media', $mediaQuery);
+            if ($mediaBlock === null) return false;
+
+            $innerContent = substr($this->content, $mediaBlock['innerStart'], $mediaBlock['innerEnd'] - $mediaBlock['innerStart']);
+            $innerParser  = new self($innerContent);
+            $rule         = $innerParser->findTopLevelBlock($selector);
+            if ($rule === null) return false;
+
+            $newInnerContent = substr($innerContent, 0, $rule['start'])
+                             . substr($innerContent, $rule['end']);
+            $newInnerContent = preg_replace('/\n{3,}/', "\n\n", $newInnerContent);
+
+            if (trim($newInnerContent) === '') {
+                // Media query is now empty — remove entire block
+                $this->content = substr($this->content, 0, $mediaBlock['start'])
+                               . substr($this->content, $mediaBlock['end']);
+            } else {
+                $newMediaBlock = '@media ' . $mediaBlock['prelude'] . " {\n" . $newInnerContent . "\n}";
+                $this->content = substr($this->content, 0, $mediaBlock['start'])
+                               . $newMediaBlock
+                               . substr($this->content, $mediaBlock['end']);
             }
-            return false;
+            $this->content = preg_replace('/\n{3,}/', "\n\n", $this->content);
+            return true;
         }
-        
-        // Delete from global scope
-        $existing = $this->getStyleRule($selector, null);
-        if ($existing === null) {
-            return false;
-        }
-        
-        // Remove the rule (being careful not to remove from @media blocks)
-        $pattern = '/\n*' . $escapedSelector . '\s*\{[^}]*\}\s*/s';
-        
-        // We need to ensure we're not matching inside @media
-        // Split content by @media blocks, process global parts, then reassemble
-        $this->content = $this->removeGlobalRule($selector);
-        
+
+        // Global scope
+        $block = $this->findTopLevelBlock($selector);
+        if ($block === null) return false;
+
+        $this->content = substr($this->content, 0, $block['start'])
+                       . substr($this->content, $block['end']);
+        $this->content = preg_replace('/\n{3,}/', "\n\n", $this->content);
         return true;
     }
     
@@ -512,93 +665,41 @@ class CssParser {
     }
     
     /**
-     * Format CSS styles with proper indentation
+     * Format CSS styles with proper indentation.
      */
     private function formatStyles(string $styles, string $indent = '    '): string {
-        // Split by semicolons and format each declaration
         $declarations = array_filter(array_map('trim', explode(';', $styles)));
-        $formatted = [];
-        
+        $formatted    = [];
         foreach ($declarations as $declaration) {
-            if (!empty($declaration)) {
+            if ($declaration !== '') {
                 $formatted[] = $indent . trim($declaration) . ';';
             }
         }
-        
         return implode("\n", $formatted);
     }
-    
+
     /**
-     * Append content to the custom section at the end of the file
+     * Append content to the end of the stylesheet.
      */
     private function appendToCustomSection(string $content): string {
-        // Look for custom section marker
-        $marker = '/* CUSTOM OVERRIDES */';
-        $markerAlt = '/* =============================================================================
-   CUSTOM OVERRIDES (API-managed)';
-        
-        if (strpos($this->content, $markerAlt) !== false) {
-            // Append before the final closing
-            return rtrim($this->content) . "\n" . $content . "\n";
-        } elseif (strpos($this->content, $marker) !== false) {
-            return rtrim($this->content) . "\n" . $content . "\n";
-        } else {
-            // No marker, just append
-            return rtrim($this->content) . "\n" . $content . "\n";
-        }
+        return rtrim($this->content) . "\n" . $content . "\n";
     }
-    
+
     /**
-     * Replace a rule in global scope (not inside @media)
+     * Remove a rule from global scope (not inside @media).
+     * Returns the updated CSS content string.
+     * Kept as a public method for external callers (e.g. injectSnippetCss.php).
+     *
+     * @param string $selector CSS selector to remove
+     * @return string Updated CSS content
      */
-    private function replaceGlobalRule(string $selector, string $formattedStyles): string {
-        $escapedSelector = preg_quote($selector, '/');
-        $result = '';
-        $pos = 0;
-        $len = strlen($this->content);
-        
-        while ($pos < $len) {
-            // Check for @media
-            if (preg_match('/@media\s*[^{]+\s*\{/s', $this->content, $match, PREG_OFFSET_CAPTURE, $pos)) {
-                $mediaStart = $match[0][1];
-                
-                // Add content before @media
-                $beforeMedia = substr($this->content, $pos, $mediaStart - $pos);
-                
-                // Replace in this section - escape $ to prevent backreference issues
-                $pattern = '/(' . $escapedSelector . '\s*\{)[^}]*(\})/s';
-                $safeStyles = str_replace(['\\', '$'], ['\\\\', '\\$'], $formattedStyles);
-                $replacement = '${1}' . "\n" . $safeStyles . "\n" . '${2}';
-                $beforeMedia = preg_replace($pattern, $replacement, $beforeMedia, 1);
-                
-                $result .= $beforeMedia;
-                
-                // Find end of @media block
-                $braceCount = 0;
-                $i = $mediaStart + strlen($match[0][0]);
-                $braceCount = 1;
-                
-                while ($i < $len && $braceCount > 0) {
-                    if ($this->content[$i] === '{') $braceCount++;
-                    if ($this->content[$i] === '}') $braceCount--;
-                    $i++;
-                }
-                
-                // Add @media block unchanged
-                $result .= substr($this->content, $mediaStart, $i - $mediaStart);
-                $pos = $i;
-            } else {
-                // No more @media blocks - escape $ to prevent backreference issues
-                $remaining = substr($this->content, $pos);
-                $pattern = '/(' . $escapedSelector . '\s*\{)[^}]*(\})/s';
-                $safeStyles = str_replace(['\\', '$'], ['\\\\', '\\$'], $formattedStyles);
-                $replacement = '${1}' . "\n" . $safeStyles . "\n" . '${2}';
-                $result .= preg_replace($pattern, $replacement, $remaining, 1);
-                break;
-            }
-        }
-        
-        return $result;
+    public function removeGlobalRule(string $selector): string {
+        $block = $this->findTopLevelBlock($selector);
+        if ($block === null) return $this->content;
+
+        $result = substr($this->content, 0, $block['start'])
+                . substr($this->content, $block['end']);
+        return preg_replace('/\n{3,}/', "\n\n", $result);
     }
     
     /**
@@ -742,69 +843,4 @@ class CssParser {
         return trim($output);
     }
     
-    /**
-     * Get content without @media and @keyframes blocks (global scope only)
-     * @return string CSS content with only global rules
-     */
-    private function getGlobalContent(): string {
-        $content = $this->content;
-        
-        // Remove @keyframes blocks (they have nested braces)
-        $content = preg_replace('/@keyframes\s+[\w-]+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/s', '', $content);
-        
-        // Remove @media blocks (they also have nested braces)
-        $content = preg_replace('/@media\s*[^{]+\s*\{(?:[^{}]*\{[^{}]*\})*\s*\}/s', '', $content);
-        
-        return $content;
-    }
-    
-    /**
-     * Remove a rule from global scope (not inside @media)
-     * Returns updated CSS content string.
-     */
-    public function removeGlobalRule(string $selector): string {
-        $escapedSelector = preg_quote($selector, '/');
-        $result = '';
-        $pos = 0;
-        $len = strlen($this->content);
-        
-        while ($pos < $len) {
-            // Check for @media
-            if (preg_match('/@media\s*[^{]+\s*\{/s', $this->content, $match, PREG_OFFSET_CAPTURE, $pos)) {
-                $mediaStart = $match[0][1];
-                
-                // Add content before @media
-                $beforeMedia = substr($this->content, $pos, $mediaStart - $pos);
-                
-                // Remove in this section
-                $pattern = '/\n*' . $escapedSelector . '\s*\{[^}]*\}\s*/s';
-                $beforeMedia = preg_replace($pattern, "\n", $beforeMedia, 1);
-                
-                $result .= $beforeMedia;
-                
-                // Find end of @media block
-                $braceCount = 0;
-                $i = $mediaStart + strlen($match[0][0]);
-                $braceCount = 1;
-                
-                while ($i < $len && $braceCount > 0) {
-                    if ($this->content[$i] === '{') $braceCount++;
-                    if ($this->content[$i] === '}') $braceCount--;
-                    $i++;
-                }
-                
-                // Add @media block unchanged
-                $result .= substr($this->content, $mediaStart, $i - $mediaStart);
-                $pos = $i;
-            } else {
-                // No more @media blocks
-                $remaining = substr($this->content, $pos);
-                $pattern = '/\n*' . $escapedSelector . '\s*\{[^}]*\}\s*/s';
-                $result .= preg_replace($pattern, "\n", $remaining, 1);
-                break;
-            }
-        }
-        
-        return $result;
-    }
 }

@@ -19,11 +19,11 @@
     
     // AI Storage Keys
     const AI_STORAGE_KEYS = {
-        keysV2: 'quicksite_ai_keys_v2',
-        defaultProvider: 'quicksite_ai_default_provider',
-        persist: 'quicksite_ai_persist',
-        autoPreview: 'quicksite_ai_auto_preview',
-        autoExecute: 'quicksite_ai_auto_execute'
+        keysV2: QuickSiteStorageKeys.aiKeysV2,
+        defaultProvider: QuickSiteStorageKeys.aiDefaultProvider,
+        persist: QuickSiteStorageKeys.aiPersist,
+        autoPreview: QuickSiteStorageKeys.aiAutoPreview,
+        autoExecute: QuickSiteStorageKeys.aiAutoExecute
     };
     
     // Shared template helpers

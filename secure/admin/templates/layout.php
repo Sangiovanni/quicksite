@@ -82,6 +82,8 @@ $langNames = [
     <!-- Admin-specific styles -->
     <link rel="stylesheet" href="<?= $versionedAsset('/admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/tag-examples.css') ?>">
+    <!-- Storage key registry — must load before any page script that references QuickSiteStorageKeys -->
+    <script src="<?= $versionedAsset('/js/core/storage-keys.js') ?>"></script>
 </head>
 <body class="admin-body<?= $isLoginPage ? ' admin-body--login' : '' ?>" data-page="<?= adminEscape($currentPage) ?>">
     
@@ -120,8 +122,8 @@ $langNames = [
             </a>
             
             <!-- Build Tools Group - Click goes to Visual Editor -->
-            <div class="admin-nav__group<?= $isBuildActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="build">
-                <a href="<?= $router->url('preview') ?>" class="admin-nav__group-toggle">
+            <div class="admin-nav__group<?= $isBuildActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="build" data-requires-command="editStructure">
+                <a href="<?= $router->url('preview') ?>" class="admin-nav__group-toggle" data-requires-command="editStructure">
                     <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
                     </svg>
@@ -141,7 +143,8 @@ $langNames = [
                         <span><?= __admin('nav.visualEditor') ?></span>
                     </a>
                     <a href="<?= $router->url('workflows') ?>" 
-                       class="admin-nav__link<?= $currentPage === 'workflows' ? ' admin-nav__link--active' : '' ?>">
+                       class="admin-nav__link<?= $currentPage === 'workflows' ? ' admin-nav__link--active' : '' ?>"
+                       data-requires-command="callAi">
                         <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
                             <circle cx="7.5" cy="14.5" r="1.5"/>
@@ -162,7 +165,8 @@ $langNames = [
             
             <!-- Assets - Top-level tab -->
             <a href="<?= $router->url('assets') ?>" 
-               class="admin-nav__link<?= $isAssetsActive ? ' admin-nav__link--active' : '' ?>">
+               class="admin-nav__link<?= $isAssetsActive ? ' admin-nav__link--active' : '' ?>"
+               data-requires-command="listAssets">
                 <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
@@ -171,7 +175,8 @@ $langNames = [
             
             <!-- Sitemap - Top-level tab -->
             <a href="<?= $router->url('sitemap') ?>" 
-               class="admin-nav__link<?= $currentPage === 'sitemap' ? ' admin-nav__link--active' : '' ?>">
+               class="admin-nav__link<?= $currentPage === 'sitemap' ? ' admin-nav__link--active' : '' ?>"
+               data-requires-command="getSiteMap">
                 <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                 </svg>
@@ -180,7 +185,8 @@ $langNames = [
             
             <!-- Optimize - Top-level tab -->
             <a href="<?= $router->url('optimize') ?>" 
-               class="admin-nav__link<?= $currentPage === 'optimize' ? ' admin-nav__link--active' : '' ?>">
+               class="admin-nav__link<?= $currentPage === 'optimize' ? ' admin-nav__link--active' : '' ?>"
+               data-requires-command="getStyles">
                 <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                 </svg>
@@ -188,8 +194,8 @@ $langNames = [
             </a>
             
             <!-- Settings Group - Click goes to Project Settings -->
-            <div class="admin-nav__group<?= $isSettingsActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="settings">
-                <a href="<?= $router->url('settings') ?>" class="admin-nav__group-toggle">
+            <div class="admin-nav__group<?= $isSettingsActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="settings" data-requires-command="getMyPermissions">
+                <a href="<?= $router->url('settings') ?>" class="admin-nav__group-toggle" data-requires-command="getMyPermissions">
                     <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="3"/>
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -209,7 +215,8 @@ $langNames = [
                         <span><?= __admin('nav.projectSettings') ?></span>
                     </a>
                     <a href="<?= $router->url('apis') ?>" 
-                       class="admin-nav__link<?= $currentPage === 'apis' ? ' admin-nav__link--active' : '' ?>">
+                       class="admin-nav__link<?= $currentPage === 'apis' ? ' admin-nav__link--active' : '' ?>"
+                       data-requires-command="listApiEndpoints">
                         <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                             <polyline points="22 6 12 13 2 6"/>
@@ -217,14 +224,16 @@ $langNames = [
                         <span><?= __admin('nav.apiEndpoints') ?></span>
                     </a>
                     <a href="<?= $router->url('ai-settings') ?>" 
-                       class="admin-nav__link<?= $currentPage === 'ai-settings' ? ' admin-nav__link--active' : '' ?>">
+                       class="admin-nav__link<?= $currentPage === 'ai-settings' ? ' admin-nav__link--active' : '' ?>"
+                       data-requires-command="listAiProviders">
                         <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
                         </svg>
                         <span><?= __admin('nav.aiApiKeys') ?></span>
                     </a>
                     <a href="<?= $router->url('embed-security') ?>" 
-                       class="admin-nav__link<?= $currentPage === 'embed-security' ? ' admin-nav__link--active' : '' ?>">
+                       class="admin-nav__link<?= $currentPage === 'embed-security' ? ' admin-nav__link--active' : '' ?>"
+                       data-requires-command="getIframeSandbox">
                         <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                         </svg>

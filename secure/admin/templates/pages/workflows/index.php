@@ -116,7 +116,7 @@ window.QUICKSITE_CONFIG.translations = {
     importError: '<?= __admin('ai.browser.importError', 'Import failed:') ?>'
 };
 </script>
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/ai-index.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai-index.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/ai/ai-index.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/ai-index.js') ?>"></script>
 
 <div class="ai-browser">
     <div class="ai-browser__header">

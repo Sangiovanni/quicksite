@@ -39,6 +39,7 @@
     let currentThemeVariables = {};     // edited values for current scope
     let lightVariables = {};            // :root values (always loaded)
     let currentScope = 'light';         // 'light' | 'dark'
+    let _loadAbortCtrl = null;          // AbortController for in-flight loadThemeVariables calls
     
     // ==================== Configuration ====================
     
@@ -130,12 +131,30 @@
      * @param {string} scope 'light' | 'dark'
      * @returns {Promise<Object>} variable map
      */
-    async function fetchScopeVariables(scope) {
+    async function fetchScopeVariables(scope, signal) {
+        // Use the shared API layer to keep auth/query handling consistent.
+        if (window.QuickSiteAPI?.request) {
+            const result = await QuickSiteAPI.request(
+                'getRootVariables',
+                'GET',
+                null,
+                [],
+                scope === 'dark' ? { themeTarget: 'dark' } : {}
+            );
+            if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+            if (result.ok && result.data?.data?.variables) {
+                return result.data.data.variables;
+            }
+            throw new Error(result.data?.message || result.data?.error || 'Failed to load theme variables');
+        }
+
+        // Fallback for contexts where QuickSiteAPI is unavailable.
         const managementUrl = getManagementUrl();
         const authToken = getAuthToken();
         const url = managementUrl + 'getRootVariables' + (scope === 'dark' ? '?themeTarget=dark' : '');
         const response = await fetch(url, {
-            headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+            headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
+            signal: signal ?? undefined
         });
         const data = await response.json();
         if (data.status === 200 && data.data?.variables) {
@@ -150,21 +169,31 @@
      */
     async function loadThemeVariables() {
         if (!themeLoading || !themeContent) return;
-        
+
+        // Abort any in-flight load and start a fresh controller.
+        if (_loadAbortCtrl) _loadAbortCtrl.abort();
+        _loadAbortCtrl = new AbortController();
+        const { signal } = _loadAbortCtrl;
+
         const i18n = getI18n();
         
         themeLoading.style.display = '';
         themeContent.style.display = 'none';
+        if (themeSaveBtn) themeSaveBtn.disabled = true;
+        if (themeResetBtn) themeResetBtn.disabled = true;
+        themeVariablesLoaded = false;
+        originalThemeVariables = {};
+        currentThemeVariables = {};
         
         try {
             // Always load :root so we have canonical variable names
-            lightVariables = await fetchScopeVariables('light');
+            lightVariables = await fetchScopeVariables('light', signal);
 
             let displayVars = lightVariables;
 
             if (currentScope === 'dark') {
                 // Load dark overrides; fall back to light values for any missing variable
-                const darkVars = await fetchScopeVariables('dark');
+                const darkVars = await fetchScopeVariables('dark', signal);
                 displayVars = {};
                 for (const [name, lightVal] of Object.entries(lightVariables)) {
                     displayVars[name] = darkVars[name] !== undefined ? darkVars[name] : lightVal;
@@ -175,6 +204,9 @@
                 }
             }
 
+            // Ignore results if a newer load was triggered while we were awaiting.
+            if (signal.aborted) return;
+
             originalThemeVariables = { ...displayVars };
             currentThemeVariables  = { ...displayVars };
             themeVariablesLoaded   = true;
@@ -183,12 +215,17 @@
             
             themeLoading.style.display = 'none';
             themeContent.style.display = '';
+            if (themeSaveBtn) themeSaveBtn.disabled = false;
+            if (themeResetBtn) themeResetBtn.disabled = false;
         } catch (error) {
+            if (error.name === 'AbortError') return; // superseded by a newer load — ignore silently
             console.error('[PreviewStyleTheme] Error loading theme variables:', error);
             themeLoading.innerHTML = `
                 ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.alertCircle, 24, null, 'style="color: #ef4444;"')}
                 <span style="color: #ef4444;">${i18n.themeLoadError || 'Failed to load theme'}</span>
             `;
+            if (themeSaveBtn) themeSaveBtn.disabled = true;
+            if (themeResetBtn) themeResetBtn.disabled = true;
         }
     }
     
@@ -380,6 +417,10 @@
      */
     async function saveThemeVariables() {
         if (!themeSaveBtn) return;
+        if (!themeVariablesLoaded) {
+            showToast(getI18n().themeLoadError || 'Theme data is still loading', 'warning');
+            return;
+        }
         
         const i18n = getI18n();
         const managementUrl = getManagementUrl();
@@ -397,23 +438,43 @@
         `;
         
         try {
-            const headers = { 'Content-Type': 'application/json' };
-            if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-            
-            const body = { variables: currentThemeVariables };
+            const changedVariables = Object.fromEntries(
+                Object.entries(currentThemeVariables).filter(([name, value]) => value !== originalThemeVariables[name])
+            );
+
+            if (Object.keys(changedVariables).length === 0) {
+                showToast(i18n.noChanges || 'No changes to save', 'info');
+                return;
+            }
+
+            const body = { variables: changedVariables };
             if (currentScope === 'dark') body.themeTarget = 'dark';
 
-            const response = await fetch(managementUrl + 'setRootVariables', {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(body)
-            });
-            
-            const data = await response.json();
+            let data;
+            if (window.QuickSiteAPI?.request) {
+                const result = await QuickSiteAPI.request('setRootVariables', 'POST', body);
+                if (!result.ok) {
+                    throw new Error(result.data?.message || result.data?.error || 'Failed to save theme variables');
+                }
+                data = result.data;
+            } else {
+                const headers = { 'Content-Type': 'application/json' };
+                if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+                const response = await fetch(managementUrl + 'setRootVariables', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(body)
+                });
+                data = await response.json();
+            }
             
             if (data.status === 200 || data.status === 201) {
-                // Update original values to current
-                originalThemeVariables = { ...currentThemeVariables };
+                // Update baseline only for the values we persisted.
+                for (const [name, value] of Object.entries(changedVariables)) {
+                    originalThemeVariables[name] = value;
+                }
+                currentThemeVariables = { ...originalThemeVariables };
                 
                 // Show success toast
                 showToast(i18n.themeSaved || 'Theme saved', 'success');
@@ -480,6 +541,14 @@
         if (scope === currentScope) return;
         currentScope = scope;
 
+        // Remove transient preview override from previous scope to avoid stale values
+        // leaking when switching between :root and [data-theme="dark"].
+        try {
+            const iframe = getIframe();
+            const iframeDoc = iframe?.contentDocument || iframe?.contentWindow?.document;
+            iframeDoc?.getElementById('quicksite-theme-preview')?.remove();
+        } catch (e) { /* cross-origin guard */ }
+
         // Update scope switcher buttons
         document.querySelectorAll('[data-scope]').forEach(btn => {
             btn.classList.toggle('preview-theme-scope__btn--active', btn.dataset.scope === scope);
@@ -503,6 +572,8 @@
 
         // Reload variables for the new scope (resets unsaved changes)
         themeVariablesLoaded = false;
+        if (themeSaveBtn) themeSaveBtn.disabled = true;
+        if (themeResetBtn) themeResetBtn.disabled = true;
         loadThemeVariables();
     }
 
@@ -592,6 +663,20 @@
                 });
                 const data = await res.json();
                 if (data.status === 200) {
+                    // Reflect new config immediately in this panel and toolbar visibility.
+                    syncThemeConfigDependents();
+
+                    // Keep editor scope aligned with configured default when dark mode is enabled.
+                    if (themeConfigEnabled?.checked) {
+                        switchScope(themeConfigDefault?.value === 'dark' ? 'dark' : 'light');
+                    } else {
+                        switchScope('light');
+                    }
+
+                    // Theme mode impacts frontend rendering conditions (e.g. visitor toggle).
+                    // Force a preview refresh so controls appear/disappear without full tab reload.
+                    reloadPreview();
+
                     showToast(i18n.themeConfigSaved || 'Theme settings saved', 'success');
                 } else {
                     throw new Error(data.message || 'Failed to save');

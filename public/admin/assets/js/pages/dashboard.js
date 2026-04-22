@@ -178,24 +178,32 @@
 
     async function loadDashboardStats() {
         try {
+            const hp = (cmd) => window.QuickSiteAdmin?.hasPermission(cmd) ?? true;
+
             const routesResult = await QuickSiteAdmin.apiRequest('getRoutes');
             if (routesResult.ok) {
                 document.getElementById('stat-routes').textContent = routesResult.data.data?.count || 0;
             }
             
-            const pagesResult = await QuickSiteAdmin.apiRequest('listPages');
-            if (pagesResult.ok) {
-                document.getElementById('stat-pages').textContent = pagesResult.data.data?.count || 0;
+            if (hp('listPages')) {
+                const pagesResult = await QuickSiteAdmin.apiRequest('listPages');
+                if (pagesResult.ok) {
+                    document.getElementById('stat-pages').textContent = pagesResult.data.data?.count || 0;
+                }
             }
             
-            const componentsResult = await QuickSiteAdmin.apiRequest('listComponents');
-            if (componentsResult.ok) {
-                document.getElementById('stat-components').textContent = componentsResult.data.data?.count || 0;
+            if (hp('listComponents')) {
+                const componentsResult = await QuickSiteAdmin.apiRequest('listComponents');
+                if (componentsResult.ok) {
+                    document.getElementById('stat-components').textContent = componentsResult.data.data?.count || 0;
+                }
             }
             
-            const langResult = await QuickSiteAdmin.apiRequest('getLangList');
-            if (langResult.ok) {
-                document.getElementById('stat-languages').textContent = langResult.data.data?.languages?.length || 1;
+            if (hp('getLangList')) {
+                const langResult = await QuickSiteAdmin.apiRequest('getLangList');
+                if (langResult.ok) {
+                    document.getElementById('stat-languages').textContent = langResult.data.data?.languages?.length || 1;
+                }
             }
         } catch (error) {
             console.error('Failed to load stats:', error);
@@ -1455,13 +1463,18 @@
 
     document.addEventListener('DOMContentLoaded', async function() {
         setupRestoreConfirmModal();
-        
-        // Load all dashboard data in parallel
+
+        // Wait for admin.js to finish loading permissions before checking them
+        await (window.QuickSiteAdmin?.permissionsReady || Promise.resolve());
+
+        const hp = (cmd) => window.QuickSiteAdmin?.hasPermission(cmd) ?? true;
+
+        // Load dashboard data, skipping sections the current user lacks permission for
         await Promise.all([
             loadDashboardStats(),
-            loadSiteMap(),
-            loadRecentCommands(),
-            loadProjectManager(),
+            hp('getSiteMap')         ? loadSiteMap()         : Promise.resolve(),
+            hp('getCommandHistory')  ? loadRecentCommands()  : Promise.resolve(),
+            hp('listProjects')       ? loadProjectManager()  : Promise.resolve(),
             loadStorageOverview()
         ]);
         

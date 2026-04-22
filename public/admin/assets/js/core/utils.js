@@ -339,6 +339,14 @@ window.QuickSiteUtils = (function() {
     // SVG Icon Helpers
     // ============================================
 
+    /**
+     * Build an inline SVG string
+     * @param {string} paths - Raw SVG path/shape markup to embed inside the `<svg>`
+     * @param {number} [size=14] - Width and height in pixels (0 = no size attributes)
+     * @param {string} [cls] - Optional CSS class for the `<svg>` element
+     * @param {string} [attrs] - Optional extra attribute string appended to the `<svg>` tag
+     * @returns {string} HTML string containing the SVG element
+     */
     function svgIcon(paths, size = 14, cls, attrs) {
         const sizeAttr = size ? ` width="${size}" height="${size}"` : '';
         return `<svg${cls ? ` class="${cls}"` : ''}${attrs ? ' ' + attrs : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"${sizeAttr}>${paths}</svg>`;
@@ -414,26 +422,61 @@ window.QuickSiteUtils = (function() {
     // HTML Fragment Helpers
     // ============================================
 
+    /**
+     * Render an animated spinner element
+     * @param {number} [size] - Size in pixels (omit to use CSS default)
+     * @returns {string} HTML string for a spinner `<span>`
+     */
     function htmlSpinner(size) {
         return `<span class="admin-spinner"${size ? ` style="width:${size}px;height:${size}px;"` : ''}></span>`;
     }
 
+    /**
+     * Render a loading indicator with optional label text
+     * @param {string} text - Label shown beside the spinner
+     * @returns {string} HTML string for a loading block
+     */
     function htmlLoading(text) {
         return `<div class="admin-loading">${htmlSpinner()} ${text}</div>`;
     }
 
+    /**
+     * Render an HTTP method badge (GET, POST, PUT, DELETE, …)
+     * @param {string} method - HTTP method string
+     * @returns {string} HTML string for a styled method badge
+     */
     function htmlMethodBadge(method) {
         return `<span class="badge badge--${escapeHtml(method.toLowerCase())}">${escapeHtml(method)}</span>`;
     }
 
+    /**
+     * Render a generic status badge
+     * @param {string} text - Badge label
+     * @param {string} [type='default'] - Visual variant class suffix (e.g. 'success', 'danger')
+     * @returns {string} HTML string for the badge
+     */
     function htmlStatusBadge(text, type) {
         return `<span class="admin-badge admin-badge--${type || 'default'}">${escapeHtml(text)}</span>`;
     }
 
+    /**
+     * Render an inline alert message box
+     * @param {string} message - Alert text
+     * @param {string} [type='error'] - Visual variant class suffix (e.g. 'error', 'warning', 'info')
+     * @returns {string} HTML string for the alert
+     */
     function htmlAlert(message, type) {
         return `<div class="admin-alert admin-alert--${type || 'error'}">${escapeHtml(message)}</div>`;
     }
 
+    /**
+     * Render an empty-state placeholder block
+     * @param {string|null} icon - SVG icon HTML or null to omit
+     * @param {string|null} title - Heading text or null to omit
+     * @param {string|null} desc - Description text or null to omit
+     * @param {boolean} [compact=false] - Use compact layout variant
+     * @returns {string} HTML string for the empty-state element
+     */
     function htmlEmptyState(icon, title, desc, compact) {
         const cls = compact ? 'admin-empty admin-empty--compact' : 'admin-empty';
         let html = `<div class="${cls}">`;

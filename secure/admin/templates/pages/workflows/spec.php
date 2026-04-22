@@ -10,7 +10,7 @@
  * - Related commands reference
  * 
  * @version 2.1.0
- * JavaScript: /admin/assets/js/pages/ai-spec.js
+ * JavaScript: /admin/assets/js/pages/ai/ai-spec.js
  * CSS: Moved to admin.css (AI SPEC PAGE section)
  */
 
@@ -838,4 +838,4 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
 </div>
 
 
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/ai-spec.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai-spec.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/ai/ai-spec.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/ai-spec.js') ?>"></script>

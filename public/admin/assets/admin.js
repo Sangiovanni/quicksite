@@ -76,7 +76,7 @@ const QuickSiteAdmin = {
                 this.permissions = {
                     loaded: true,
                     role: response.data.data.role,
-                    commands: response.data.data.commands || [],
+                    commands: (() => { const c = response.data.data.commands; return Array.isArray(c) ? c : Object.values(c || {}); })(),
                     isSuperAdmin: response.data.data.is_superadmin || false,
                     tokenName: response.data.data.token_name || null
                 };
@@ -202,8 +202,8 @@ const QuickSiteAdmin = {
         this.initKeyboardShortcuts();
         this.checkPendingMessage();
         
-        // Load permissions (async - will filter UI when complete)
-        this.loadPermissions();
+        // Permissions are already loading (started at parse time via QuickSiteAdmin.permissionsReady).
+        // filterByPermissions() and updateUserBadge() will be called when that fetch resolves.
     },
 
     /**
@@ -1355,7 +1355,12 @@ const QuickSiteAdmin = {
     }
 };
 
-// Initialize when DOM is ready
+// Kick off the permission fetch immediately at parse time (admin.js is in the footer so
+// the DOM is already fully parsed). This lets page scripts whose DOMContentLoaded
+// listener fires before init() to await QuickSiteAdmin.permissionsReady for real permissions.
+QuickSiteAdmin.permissionsReady = QuickSiteAdmin.loadPermissions();
+
+// Initialize when DOM is ready (remaining sync setup)
 document.addEventListener('DOMContentLoaded', () => {
     QuickSiteAdmin.init();
 });

@@ -57,5 +57,8 @@ function __command_getRootVariables(array $params = [], array $urlParams = []): 
 
 // Execute via HTTP (only when not called internally)
 if (!defined('COMMAND_INTERNAL_CALL')) {
-    __command_getRootVariables()->send();
+    // Forward parsed request params so query/body themeTarget is honored.
+    $params = isset($trimParametersManagement) ? $trimParametersManagement->params() : [];
+    $urlParams = isset($trimParametersManagement) ? $trimParametersManagement->additionalParams() : [];
+    __command_getRootVariables($params, $urlParams)->send();
 }

@@ -121,7 +121,7 @@ $baseUrl = rtrim(BASE_URL, '/');
 </section>
 
 <!-- Project Manager -->
-<section class="admin-section">
+<section class="admin-section" data-requires-command="listProjects">
     <h2 class="admin-section__title"><?= __admin('dashboard.projects.title') ?></h2>
     <div class="admin-card">
         <div class="admin-card__body">
@@ -412,7 +412,7 @@ $baseUrl = rtrim(BASE_URL, '/');
 </section>
 
 <!-- Site Map -->
-<section class="admin-section">
+<section class="admin-section" data-requires-command="getSiteMap">
     <h2 class="admin-section__title"><?= __admin('dashboard.sitemap.title') ?></h2>
     <div class="admin-card">
         <div class="admin-card__body" id="sitemap-container">
@@ -478,7 +478,7 @@ $baseUrl = rtrim(BASE_URL, '/');
 </section>
 
 <!-- Recent Command History -->
-<section class="admin-section">
+<section class="admin-section" data-requires-command="getCommandHistory">
     <div class="admin-section__header">
         <h2 class="admin-section__title"><?= __admin('dashboard.recentCommands') ?></h2>
         <a href="<?= $router->url('command') ?>?tab=history" class="admin-btn admin-btn--ghost">
