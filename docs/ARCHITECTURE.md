@@ -349,7 +349,7 @@ The core registry currently exposes 15 built-ins:
 
 Use the live `listJsFunctions` command for the authoritative list — it is the registry the visual editor and `addInteraction` validate against.
 
-> _Roadmap note:_ this list will grow with beta.6 (interactions + search/filter), beta.7 (client-side API) and beta.8 (server-side API). Re-check this section when releasing those versions. See `NOTES/beta/1.0.0-beta-overview-future.txt` for the schedule.
+> _Roadmap note:_ this list will grow with beta.6 (interactions + search/filter), beta.7 (client-side API) and beta.8 (server-side API). Re-check this section when releasing those versions.
 
 A project-scoped "custom JS function" feature existed in earlier betas (`addJsFunction` / `qs-custom.js`); it was removed in beta.3 for security reasons. Custom logic is now expressed by composing the core functions or, for richer client behaviour, registered API endpoints (see `addApi` / `testApiEndpoint`).
 

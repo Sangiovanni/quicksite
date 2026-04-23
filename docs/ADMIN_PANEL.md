@@ -276,7 +276,7 @@ For the full per-command reference see [COMMAND_API.md](COMMAND_API.md).
 
 ## 10. Risk hotspots
 
-These are the live concerns to keep in mind when touching the panel. They are tracked in detail in `NOTES/working/ADMIN_JS_DEPENDENCY_GRAPH.md`'s refactor backlog.
+These are the live concerns to keep in mind when touching the panel.
 
 | ID | Risk | Where |
 |---|---|---|
