@@ -93,7 +93,20 @@ Every page, menu, footer, and component is defined as a tree of nodes:
 }
 ```
 
-Node kinds:
+#### Why JSON, not HTML
+
+Page structure is JSON rather than HTML for a handful of pragmatic reasons:
+
+- **API-first contract.** Every external client — admin panel, CLI, AI agent — produces JSON natively. An HTML-to-JSON parser would be lossy and a security pit.
+- **Deterministic AI output.** Validating that an LLM produced a tree with known keys is tractable; validating that it produced safe HTML is famously not.
+- **Security by construction.** A single chokepoint applies the tag blacklist (see §7) and escapes attribute values. There is no path for raw `<script>` to slip through.
+- **Translation separation.** `textKey` cleanly decouples content from structure. The same tree renders in any active language without template duplication.
+- **Tree addressability.** Every node has a stable path (`data-qs-node="0.1.2"` in editor mode). The visual editor maps an iframe click back to the exact JSON node and back again — trivial on a tree, painful on free-form HTML.
+- **Single source, two outputs.** The same JSON feeds the runtime renderer (`JsonToHtmlRenderer`) and the build-time compiler (`JsonToPhpCompiler`). Editing HTML twice is exactly the bit-rot we want to avoid.
+- **Git-friendly diffs.** Tree-shaped JSON diffs tell you what changed semantically; HTML diffs are string diffs.
+- **Future formats reuse the tree.** Sitemaps, JSON-LD, RSS, build-time PDF exports all consume the same structure.
+
+#### Node kinds
 
 | Kind | Shape | Notes |
 |---|---|---|
@@ -103,6 +116,18 @@ Node kinds:
 | Component | `{ component, data? }` | Inlines a component's JSON, with `{{var}}` interpolation. |
 
 Attributes also accept a `{ condition, value }` shape for conditional rendering of a single attribute (evaluated server-side at render time).
+
+#### Special prefixes & placeholders
+
+A small vocabulary of markers controls rendering. They are described by intent — pick the one that matches what you mean, even when the renderer would accept either.
+
+- **`__RAW__`** — for **text content**. Marks a `textKey` value as literal: do not look it up in translations, just emit it (escaped). Use this when a textual node really is a fixed string, not a key.
+- **`__LIT__`** — for **attribute or component params**. Marks the value as literal so it is used as-is everywhere it can appear. In the renderer `__LIT__` and `__RAW__` overlap for text and translatable attributes; the distinction is one of intent for the next reader, not a behavioural difference.
+- **`__enums__`** — a root-level metadata block on a component template that derives variables from a single source key. Each entry maps a derived variable name to a value map plus an optional default. Use `listComponents` at runtime to see what a component exposes.
+- **`{{var}}` and `{{$var}}`** — placeholders interpolated from the caller's `data` when a component is inlined. Variable names accept letters, digits, underscores, and hyphens.
+- **`{{__system__}}` placeholders** — runtime values resolved by the renderer, for example `{{__current_page;lang=en}}`. The full list lives in the relevant command's `help` output, not here.
+- **Translatable attributes** (`placeholder`, `title`, `alt`, `aria-label`, `aria-placeholder`, `aria-description`) auto-resolve their value as a translation key when it looks like one — lowercase identifiers separated by dots, e.g. `form.contact.placeholder`. Prefix with `__RAW__` or `__LIT__` to opt out.
+- **URL attributes** (`href`, `src`, `data`, `poster`, `action`, `formaction`, `cite`, `srcset`) get base-URL and language-prefix processing automatically. System placeholders inside them (`{{__current_page;…}}`) are resolved before URL processing.
 
 This is the single source of truth for page content. Everything the admin panel does ultimately writes back to one of these JSON files (or to `routes.php` / `translate/*.json` / `style/style.css`).
 

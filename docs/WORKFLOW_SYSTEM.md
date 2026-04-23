@@ -197,7 +197,7 @@ User input form fields. Each parameter:
 
 **Validation constraints** (mapped to HTML input attributes, enforced by the browser):
 - `minLength` / `maxLength` — character count limits (for `text` and `textarea`)
-- `pattern` — JavaScript regex the value must match (for `text`). Anchored automatically by the browser — `^[a-z]+$` enforces lowercase only.
+- `pattern` — a JavaScript regular expression the value must match (for `text`). The browser anchors it automatically; for example, the pattern in the snippet above restricts input to lowercase letters only.
 - `min` / `max` — numeric range limits (for `number`)
 
 **Parameter types:**
