@@ -17,9 +17,6 @@ window.QuickSiteStorageKeys = Object.freeze({
     adminPrefs:          'quicksite_admin_prefs',
     pendingMessage:      'quicksite_pending_message',
 
-    // Batch queue
-    batchQueue:          'admin_batch_queue',
-
     // External API registry
     apiAuthTokens:       'qs_api_auth_tokens',
 

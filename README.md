@@ -2,7 +2,7 @@
 
 A file-based PHP CMS with a built-in visual admin panel. Define page structures in JSON, manage everything through a REST API or the admin UI, and deploy production builds — no database required.
 
-> **Current version: `1.0.0-beta.2`** — Actively developed.
+> **Current version: `1.0.0-beta.5`** — Actively developed. _Last updated: 2026-04-23._
 
 <a href="https://www.youtube.com/watch?v=LHheKkI1rLw">
   <img src="https://img.youtube.com/vi/LHheKkI1rLw/maxresdefault.jpg" alt="Watch the demo" width="50%">
@@ -12,16 +12,30 @@ A file-based PHP CMS with a built-in visual admin panel. Define page structures 
 
 ## What is QuickSite?
 
+QuickSite is a file-based, API-first website operations platform with a visual editor and workflow engine for deterministic and AI-assisted site changes.
+
+It is exportable and production-friendly, and while file-native by default, it is designed to integrate quickly with external client-side and server-side APIs when backend capabilities are needed.
+
 QuickSite started as a simple HTML template and evolved into a full CMS. The idea: manage an entire website — pages, translations, styles, assets, components — through a clean API, with all data stored as flat files you can version-control and deploy anywhere.
 
 It now includes a **visual admin panel** with an iframe-based page editor, letting you build and edit sites directly in the browser without writing code. The API remains the backbone — the admin panel is a client of its own API.
 
 QuickSite focuses on **frontend sites** — it manages HTML structure, CSS, translations, and assets. It doesn't handle backend logic or databases, though the built-in [interactions system](docs/README.md) can connect your pages to external APIs and services.
 
+### Architecture
+
+For a deeper view of how QuickSite is organized:
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — three-layer model (Project / Management / Admin), JSON-to-HTML pipeline, request lifecycle, multi-project model, security boundary.
+- [docs/ADMIN_PANEL.md](docs/ADMIN_PANEL.md) — admin panel internals: boot flow, page modules, visual editor, preview subsystem.
+- [docs/COMMAND_API.md](docs/COMMAND_API.md) — Management API surface and command catalogue.
+- [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) — on-disk layout.
+- [docs/WORKFLOW_SYSTEM.md](docs/WORKFLOW_SYSTEM.md) — workflow engine reference.
+
 ### Key features
 
 - **Visual Admin Panel** — iframe-based page editor with drag-and-drop node management, live preview, and component library
-- **116 API Commands** — RESTful endpoints covering pages, translations, styles, assets, builds, projects, backups, AI integration, and more
+- **122 API Commands** — RESTful endpoints covering pages, translations, styles, assets, builds, projects, backups, AI integration, and more
 - **JSON-Driven Templates** — page structures defined in JSON, compiled to optimized PHP for production
 - **Multilingual** — built-in translation system with validation, health checks, and mono/multi-language modes
 - **Multi-Project** — host multiple independent sites from one installation
@@ -197,78 +211,13 @@ On first load, QuickSite auto-creates sensitive config files from `.example` tem
 
 ## Project structure
 
-```
-quicksite/
-├── public/                       # Web root (Apache DocumentRoot points here)
-│   ├── index.php                 # Front controller — routes requests to pages
-│   ├── init.php                  # Bootstrap — defines all path constants
-│   ├── .htaccess                 # URL rewriting (FallbackResource → index.php)
-│   ├── admin/                    # Admin panel UI (HTML/JS/CSS)
-│   ├── management/               # API entry point
-│   │   ├── index.php             # API router — auth, dispatch, logging
-│   │   └── .htaccess             # Routes all /management/* to this index.php
-│   ├── assets/                   # Uploaded files organized by type
-│   │   ├── images/               # Image assets
-│   │   ├── font/                 # Font files
-│   │   ├── audio/                # Audio files
-│   │   └── videos/               # Video files
-│   ├── scripts/                  # Core front-end JS
-│   │   ├── qs.js                 # QuickSite runtime (show/hide, sort, routing)
-│   │   └── qs-api-config.js      # Client-side API endpoint configuration
-│   ├── style/                    # Site styles
-│   │   ├── style.css             # Main stylesheet (editable via API)
-│   │   └── index.php             # Style route handler
-│   └── build/                    # Production builds output (generated, gitignored)
-│
-├── secure/                       # Backend (outside web root, not publicly accessible)
-│   ├── management/               # API engine (shared across all projects)
-│   │   ├── command/              # 116 command handler files (one per command)
-│   │   ├── config/               # API configuration
-│   │   │   ├── target.php        # Active project selector (gitignored)
-│   │   │   ├── auth.php          # Tokens and CORS config (gitignored)
-│   │   │   └── roles.php         # Role definitions (gitignored)
-│   │   └── routes.php            # Command whitelist
-│   ├── admin/                    # Admin panel backend
-│   │   ├── AdminRouter.php       # Admin routing and page rendering
-│   │   ├── config/               # Admin panel configuration
-│   │   ├── functions/            # Admin helper functions
-│   │   ├── templates/            # Admin panel page templates
-│   │   ├── translations/         # Admin UI translations
-│   │   └── workflows/            # Visual editor workflow specs
-│   ├── src/                      # Shared engine code
-│   │   ├── classes/              # Core classes (ApiResponse, JsonToHtmlRenderer,
-│   │   │                         #   JsonToPhpCompiler, CssParser, Translator, etc.)
-│   │   └── functions/            # Utility functions (auth, paths, logging, etc.)
-│   ├── projects/                 # Project data (one folder per project)
-│   │   └── quicksite/            # Default project
-│   │       ├── config.php        # Project config (languages, settings)
-│   │       ├── routes.php        # Public route definitions
-│   │       ├── templates/        # Page and component JSON structures
-│   │       ├── translate/        # Translation files (en.json, fr.json, etc.)
-│   │       ├── data/             # Project data (aliases, asset metadata)
-│   │       ├── public/           # Project-specific public files
-│   │       └── backups/          # Project backups (gitignored)
-│   ├── snippets/                 # Reusable component snippets (nav, cards, forms, etc.)
-│   ├── nginx/                    # Auto-generated nginx config (dynamic_routes.conf)
-│   ├── cron/                     # Optional cron scripts (nginx reload fallback)
-│   ├── exports/                  # Project export ZIPs (generated)
-│   └── logs/                     # Command execution logs (gitignored)
-│
-├── docs/                         # Documentation (coming soon)
-├── tests/                        # Test suite
-├── setup.sh                      # Interactive setup wizard (Linux/macOS/Git Bash)
-├── setup.bat                     # Setup script (Windows)
-├── VERSION                       # Current version (1.0.0-beta.1)
-├── LICENSE                       # AGPL-3.0
-└── README.md
-```
+QuickSite has a strict public/private split:
 
-**Key concepts:**
-- **`public/`** is the only folder exposed to the web. Everything else is behind the firewall.
-- **`public/management/`** is the API gateway. Any client (admin panel, curl, Flutter app, custom UI) talks to QuickSite through this endpoint.
-- **`public/scripts/`** contains the core JS runtime. `qs.js` handles front-end features like show/hide triggers, sorting, and dynamic behavior.
-- **`secure/management/config/`** holds sensitive files (tokens, auth) that are gitignored. They are auto-created from `.example` templates on first load.
-- **Projects** are fully isolated in `secure/projects/`. Each has its own pages, translations, routes, and assets. Switch between them with `switchProject`.
+- `public/` — web root. Front controller, admin UI, `management/` API gateway, assets.
+- `secure/` — backend, outside the web root. API engine, admin backend, shared `src/`, isolated `projects/`, snippets, logs, exports.
+- `docs/`, `tests/`, `setup.sh`/`setup.bat`, `VERSION`, `LICENSE`, `README.md` at the repo root.
+
+Full tree, key concepts, and folder-customization details: **[docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)**.
 
 ### Folder customization
 
@@ -284,21 +233,16 @@ All steps support renaming, nesting, un-nesting, and are re-runnable. On nginx, 
 
 ## API overview
 
-The API is self-documenting. Once installed, call:
+QuickSite exposes a single self-documenting Management API. Once installed:
 
 ```
-GET /management/help
+GET /management/help              # full docs for all 122 commands
+GET /management/help/addRoute     # docs for one command
 ```
 
-This returns full documentation for all 116 commands, including parameters, examples, validation rules, and error codes. For a specific command:
+All endpoints except `help` require a bearer token (`Authorization: Bearer <token>`), scoped to roles with granular command-level permissions.
 
-```
-GET /management/help/addRoute
-```
-
-**Command categories**: pages, structure, translations, languages, assets, styles, CSS variables, animations, builds, projects, backups, export/import, tokens, roles, AI, snippets, JS functions, interactions, page events, API endpoints, system updates.
-
-**Authentication**: All endpoints except `help` require a bearer token (`Authorization: Bearer <token>`). The `help` endpoint is publicly accessible — it serves as live API documentation. Tokens are scoped to roles with granular command-level permissions.
+Full reference — endpoint shape, response envelope, command catalogue, auth, internals: **[docs/COMMAND_API.md](docs/COMMAND_API.md)**.
 
 ## Tutorials
 
