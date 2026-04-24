@@ -80,6 +80,10 @@
     // ==================== Utility Functions ====================
     
     function escapeHtml(text) {
+        // Delegate to canonical PreviewState.utils.escapeHtml when available.
+        if (window.PreviewState && PreviewState.utils && PreviewState.utils.escapeHtml) {
+            return PreviewState.utils.escapeHtml(text);
+        }
         if (!text) return '';
         const div = document.createElement('div');
         div.textContent = text;

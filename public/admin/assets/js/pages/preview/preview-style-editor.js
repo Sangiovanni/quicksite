@@ -163,8 +163,12 @@
      * Open the Style Editor for a selector
      * @param {string} selector - CSS selector to edit
      * @param {number} matchCount - Number of elements matching this selector
+     * @param {string|null} initialStylesString - Optional styles to merge in (copy-from flow)
+     * @param {boolean} hasRules - Whether the selector already has a rule on disk.
+     *                             When false, we skip the GET getStyleRule call
+     *                             (which would 404 for unstyled selectors).
      */
-    async function openStyleEditor(selector, matchCount = 0, initialStylesString = null) {
+    async function openStyleEditor(selector, matchCount = 0, initialStylesString = null, hasRules = true) {
         if (!styleEditor) return;
         
         // Auto-load theme variables if not already loaded (for CSS var dropdowns)
@@ -196,21 +200,29 @@
         styleEditor.style.display = 'flex';
         styleEditorVisible = true;
         
-        // Load styles from API
+        // Load styles from API.
+        // Skip the GET if caller already told us this selector has no rule
+        // on disk (avoids a guaranteed 404 on every "edit unstyled selector"
+        // and every "copy styles into unstyled selector" flow).
         try {
-            const response = await fetch(managementUrl + 'getStyleRule/' + encodeURIComponent(selector), {
-                headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
-            });
-            
-            const result = await response.json();
-            
-            if (response.ok && result.data) {
-                const stylesString = result.data.styles || '';
-                originalStyles = parseStylesString(stylesString);
-                currentStyles = { ...originalStyles };
-            } else {
+            if (hasRules === false) {
                 originalStyles = {};
                 currentStyles = {};
+            } else {
+                const response = await fetch(managementUrl + 'getStyleRule/' + encodeURIComponent(selector), {
+                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.data) {
+                    const stylesString = result.data.styles || '';
+                    originalStyles = parseStylesString(stylesString);
+                    currentStyles = { ...originalStyles };
+                } else {
+                    originalStyles = {};
+                    currentStyles = {};
+                }
             }
             
             // Merge copied styles on top of existing ones (if any)
@@ -274,33 +286,11 @@
     }
     
     /**
-     * Parse CSS styles string into object
-     * @param {string} stylesString - CSS declarations like "color: red; font-size: 16px;"
-     * @returns {Object} Property/value pairs
+     * Parse CSS styles string into object.
+     * Delegates to PreviewState.utils.parseStylesString (canonical).
      */
     function parseStylesString(stylesString) {
-        const result = {};
-        if (!stylesString) return result;
-        
-        // Split by semicolons, handling multi-line
-        const declarations = stylesString.split(/;\s*/);
-        
-        for (const decl of declarations) {
-            const trimmed = decl.trim();
-            if (!trimmed) continue;
-            
-            const colonIndex = trimmed.indexOf(':');
-            if (colonIndex === -1) continue;
-            
-            const property = trimmed.substring(0, colonIndex).trim();
-            const value = trimmed.substring(colonIndex + 1).trim();
-            
-            if (property && value) {
-                result[property] = value;
-            }
-        }
-        
-        return result;
+        return PreviewState.utils.parseStylesString(stylesString);
     }
     
     /**

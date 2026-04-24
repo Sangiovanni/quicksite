@@ -18,6 +18,22 @@
     
     console.log('[QuickSite] Overlay script loaded');
     
+    // Security: parent (admin) and this iframe (preview) are same-origin.
+    // Use the explicit origin for every postMessage instead of '*'.
+    const ALLOWED_ORIGIN = window.location.origin;
+    
+    // Safe attribute-selector helper: CSS.escape() guards against quotes
+    // or special chars sneaking into struct/nodeId values used in selectors.
+    function qsAttr(name, value) {
+        return '[' + name + '="' + (window.CSS && CSS.escape ? CSS.escape(String(value)) : String(value).replace(/"/g, '\\"')) + '"]';
+    }
+    function qsNodeSel(struct, nodeId) {
+        return qsAttr('data-qs-struct', struct) + qsAttr('data-qs-node', nodeId);
+    }
+    function qsStructSel(struct) {
+        return qsAttr('data-qs-struct', struct);
+    }
+    
     let currentMode = 'select';
     let hoveredElement = null;
     let selectedElement = null;
@@ -64,6 +80,8 @@
     
     // Listen for messages from admin
     window.addEventListener('message', function(e) {
+        // Security: reject messages from any other origin (admin is same-origin)
+        if (e.origin !== ALLOWED_ORIGIN) return;
         if (e.data && e.data.source === 'quicksite-admin') {
             console.log('[QuickSite] Received message:', e.data.action);
             if (e.data.action === 'setMode') {
@@ -183,7 +201,7 @@
             source: 'quicksite-preview',
             action: 'pageClassesResult',
             classes: classes
-        }, '*');
+        }, ALLOWED_ORIGIN);
         
         console.log('[QuickSite] Sent page classes:', classes.length, 'unique classes');
     }
@@ -201,11 +219,11 @@
             source: 'quicksite-preview', 
             action: 'elementSelected',
             ...info
-        }, '*');
+        }, ALLOWED_ORIGIN);
     }
     
     function navigateToParent(struct, nodeId) {
-        const current = document.querySelector('[data-qs-struct="' + struct + '"][data-qs-node="' + nodeId + '"]');
+        const current = document.querySelector(qsNodeSel(struct, nodeId));
         if (!current) return;
         
         const parent = current.parentElement ? current.parentElement.closest('[data-qs-node]') : null;
@@ -215,7 +233,7 @@
     }
     
     function navigateToPrevSibling(struct, nodeId) {
-        const current = document.querySelector('[data-qs-struct="' + struct + '"][data-qs-node="' + nodeId + '"]');
+        const current = document.querySelector(qsNodeSel(struct, nodeId));
         if (!current || !current.parentElement) return;
         
         const siblings = Array.from(current.parentElement.children).filter(function(c) {
@@ -228,7 +246,7 @@
     }
     
     function navigateToNextSibling(struct, nodeId) {
-        const current = document.querySelector('[data-qs-struct="' + struct + '"][data-qs-node="' + nodeId + '"]');
+        const current = document.querySelector(qsNodeSel(struct, nodeId));
         if (!current || !current.parentElement) return;
         
         const siblings = Array.from(current.parentElement.children).filter(function(c) {
@@ -241,7 +259,7 @@
     }
     
     function navigateToFirstChild(struct, nodeId) {
-        const current = document.querySelector('[data-qs-struct="' + struct + '"][data-qs-node="' + nodeId + '"]');
+        const current = document.querySelector(qsNodeSel(struct, nodeId));
         if (!current) return;
         
         const firstChild = current.querySelector('[data-qs-node]');
@@ -255,12 +273,12 @@
         console.log('[QuickSite] Inserting node:', { struct, targetNode, position, newNodeId });
         
         // Find the target element - try direct match first, then within struct container
-        let targetEl = document.querySelector('[data-qs-struct="' + struct + '"][data-qs-node="' + targetNode + '"]');
+        let targetEl = document.querySelector(qsNodeSel(struct, targetNode));
         if (!targetEl) {
             // If not found with struct attribute, search within struct container
-            const structContainer = document.querySelector('[data-qs-struct="' + struct + '"]');
+            const structContainer = document.querySelector(qsStructSel(struct));
             if (structContainer) {
-                targetEl = structContainer.querySelector('[data-qs-node="' + targetNode + '"]');
+                targetEl = structContainer.querySelector(qsAttr('data-qs-node', targetNode));
             }
         }
         if (!targetEl) {
@@ -269,7 +287,7 @@
                 source: 'quicksite-preview', 
                 action: 'insertNodeFailed', 
                 error: 'Target element not found' 
-            }, '*');
+            }, ALLOWED_ORIGIN);
             return;
         }
         
@@ -338,7 +356,7 @@
                 source: 'quicksite-preview', 
                 action: 'insertNodeFailed', 
                 error: 'Invalid HTML' 
-            }, '*');
+            }, ALLOWED_ORIGIN);
             return;
         }
         
@@ -364,11 +382,11 @@
         console.log('[QuickSite] Updating node:', { struct, nodeId });
         
         // Find the target element - try direct match first, then within struct container
-        let targetEl = document.querySelector('[data-qs-struct="' + struct + '"][data-qs-node="' + nodeId + '"]');
+        let targetEl = document.querySelector(qsNodeSel(struct, nodeId));
         if (!targetEl) {
-            const structContainer = document.querySelector('[data-qs-struct="' + struct + '"]');
+            const structContainer = document.querySelector(qsStructSel(struct));
             if (structContainer) {
-                targetEl = structContainer.querySelector('[data-qs-node="' + nodeId + '"]');
+                targetEl = structContainer.querySelector(qsAttr('data-qs-node', nodeId));
             }
         }
         if (!targetEl) {
@@ -377,7 +395,7 @@
                 source: 'quicksite-preview', 
                 action: 'updateNodeFailed', 
                 error: 'Target element not found' 
-            }, '*');
+            }, ALLOWED_ORIGIN);
             return;
         }
         
@@ -392,7 +410,7 @@
                 source: 'quicksite-preview', 
                 action: 'updateNodeFailed', 
                 error: 'Invalid HTML' 
-            }, '*');
+            }, ALLOWED_ORIGIN);
             return;
         }
         
@@ -410,12 +428,12 @@
         console.log('[QuickSite] Removing node:', { struct, nodeId });
         
         // Find the target element - try direct match first, then within struct container
-        let targetEl = document.querySelector('[data-qs-struct="' + struct + '"][data-qs-node="' + nodeId + '"]');
+        let targetEl = document.querySelector(qsNodeSel(struct, nodeId));
         if (!targetEl) {
             // If not found with struct attribute, search within struct container
-            const structContainer = document.querySelector('[data-qs-struct="' + struct + '"]');
+            const structContainer = document.querySelector(qsStructSel(struct));
             if (structContainer) {
-                targetEl = structContainer.querySelector('[data-qs-node="' + nodeId + '"]');
+                targetEl = structContainer.querySelector(qsAttr('data-qs-node', nodeId));
             }
         }
         if (!targetEl) {
@@ -424,7 +442,7 @@
                 source: 'quicksite-preview', 
                 action: 'removeNodeFailed', 
                 error: 'Target element not found' 
-            }, '*');
+            }, ALLOWED_ORIGIN);
             return;
         }
         
@@ -497,7 +515,7 @@
             source: 'quicksite-preview', 
             action: 'removeNodeSuccess', 
             nodeId: nodeId 
-        }, '*');
+        }, ALLOWED_ORIGIN);
         
         clearSelection();
     }
@@ -536,10 +554,10 @@
         console.log('[QuickSite] Reindexing all nodes for struct:', struct);
         
         // All elements with both data-qs-struct and data-qs-node
-        const allNodes = document.querySelectorAll('[data-qs-struct="' + struct + '"][data-qs-node]');
+        const allNodes = document.querySelectorAll(qsStructSel(struct) + '[data-qs-node]');
         
         // True root nodes = no ancestor with the same data-qs-struct + data-qs-node
-        const structSelector = '[data-qs-struct="' + struct + '"][data-qs-node]';
+        const structSelector = qsStructSel(struct) + '[data-qs-node]';
         const rootNodes = Array.from(allNodes).filter(function(el) {
             const parent = el.parentElement;
             if (!parent) return true;
@@ -627,11 +645,11 @@
         console.log('[QuickSite] Duplicating node:', { struct, sourceNodeId, newNodeId, hasHtml: !!html });
         
         // Find the source element - try direct match first, then within struct container
-        let sourceEl = document.querySelector('[data-qs-struct="' + struct + '"][data-qs-node="' + sourceNodeId + '"]');
+        let sourceEl = document.querySelector(qsNodeSel(struct, sourceNodeId));
         if (!sourceEl) {
-            const structContainer = document.querySelector('[data-qs-struct="' + struct + '"]');
+            const structContainer = document.querySelector(qsStructSel(struct));
             if (structContainer) {
-                sourceEl = structContainer.querySelector('[data-qs-node="' + sourceNodeId + '"]');
+                sourceEl = structContainer.querySelector(qsAttr('data-qs-node', sourceNodeId));
             }
         }
         if (!sourceEl) {
@@ -640,7 +658,7 @@
                 source: 'quicksite-preview', 
                 action: 'duplicateNodeFailed', 
                 error: 'Source element not found' 
-            }, '*');
+            }, ALLOWED_ORIGIN);
             return;
         }
         
@@ -736,7 +754,7 @@
      * Used by route layout toggles for live preview.
      */
     function toggleStructVisibility(struct, show) {
-        const elements = document.querySelectorAll('[data-qs-struct="' + struct + '"]');
+        const elements = document.querySelectorAll(qsStructSel(struct));
         elements.forEach(function(el) {
             el.style.display = show ? '' : 'none';
         });
@@ -832,7 +850,7 @@
     
     function highlightByNode(struct, node) {
         clearSelection();
-        const el = document.querySelector('[data-qs-struct="' + struct + '"][data-qs-node="' + node + '"]');
+        const el = document.querySelector(qsNodeSel(struct, node));
         if (el) {
             selectedElement = el;
             el.classList.add('qs-selected');
@@ -846,7 +864,7 @@
      */
     function selectByNode(struct, node) {
         clearSelection();
-        const el = document.querySelector('[data-qs-struct="' + struct + '"][data-qs-node="' + node + '"]');
+        const el = document.querySelector(qsNodeSel(struct, node));
         if (el) {
             selectElementAndNotify(el);
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1092,7 +1110,7 @@
             action: 'dragModeReady',
             undoCount: dragUndoStack.length,
             redoCount: dragRedoStack.length
-        }, '*');
+        }, ALLOWED_ORIGIN);
         
         console.log('[QuickSite] Drag mode enabled (Phase 1: select)');
     }
@@ -1159,7 +1177,7 @@
             source: 'quicksite-preview',
             action: 'dragElementSelected',
             ...info
-        }, '*');
+        }, ALLOWED_ORIGIN);
         
         console.log('[QuickSite] Drag Phase 1: selected', info.tag, info.node);
     }
@@ -1175,7 +1193,7 @@
             source: 'quicksite-preview',
             action: 'dragElementLocked',
             persistent: dragLockPersistent
-        }, '*');
+        }, ALLOWED_ORIGIN);
         
         console.log('[QuickSite] Drag Phase 2: locked', dragLockPersistent ? '(persistent)' : '(momentary)');
     }
@@ -1192,7 +1210,7 @@
             source: 'quicksite-preview',
             action: 'dragElementUnlocked',
             ...navInfo
-        }, '*');
+        }, ALLOWED_ORIGIN);
         
         console.log('[QuickSite] Drag: unlocked, back to Phase 1');
     }
@@ -1292,7 +1310,7 @@
             action: 'dragStackUpdate',
             undoCount: dragUndoStack.length,
             redoCount: dragRedoStack.length
-        }, '*');
+        }, ALLOWED_ORIGIN);
     }
     
     function dragUndoMove() {
@@ -1410,7 +1428,7 @@
             position: position,
             isUndoRedo: true,
             undoRedoAction: action
-        }, '*');
+        }, ALLOWED_ORIGIN);
     }
     
     // ===== TEXT MODE FUNCTIONALITY =====
@@ -1484,7 +1502,7 @@
                 source: 'quicksite-preview', 
                 action: 'textElementInfo',
                 element: elementInfo
-            }, '*');
+            }, ALLOWED_ORIGIN);
         }
         
         console.log('[QuickSite] Started editing:', editingTextKey);
@@ -1512,7 +1530,7 @@
                 newValue: newText,
                 oldValue: originalText,
                 structure: struct
-            }, '*');
+            }, ALLOWED_ORIGIN);
         } else {
             console.log('[QuickSite] Text unchanged, not saving');
         }
@@ -1614,7 +1632,7 @@
     
     // Apply live style preview to an element
     function applyLiveStyle(struct, nodeId, property, value) {
-        const selector = '[data-qs-struct="' + struct + '"][data-qs-node="' + nodeId + '"]';
+        const selector = qsNodeSel(struct, nodeId);
         const el = document.querySelector(selector);
         if (el) {
             // Convert property to camelCase for style property
@@ -1886,7 +1904,7 @@
             source: 'quicksite-preview', 
             action: 'dragStarted',
             ...dragInfo
-        }, '*');
+        }, ALLOWED_ORIGIN);
         
         console.log('[QuickSite] Drag activated');
     }
@@ -2077,7 +2095,7 @@
                     sourceElement: dragInfo,
                     targetElement: finalTargetInfo,
                     position: dropPosition
-                }, '*');
+                }, ALLOWED_ORIGIN);
             } else {
                 console.log('[QuickSite] No meaningful move (same position)');
             }
@@ -2108,7 +2126,7 @@
                 source: 'quicksite-preview',
                 action: 'dragElementUnlocked',
                 ...navInfo
-            }, '*');
+            }, ALLOWED_ORIGIN);
         } else {
             // Re-select the element in Phase 1 after drop
             if (dragSelectedElement) {
@@ -2172,10 +2190,80 @@
         }
     }, true);
     
+    // ===== Navigation guard (capture phase) =====
+    // Some previewed sites attach their own click handlers that call
+    // window.location = ... programmatically — preventDefault on the bubble
+    // phase doesn't stop that. Run a capture-phase blocker FIRST so we can
+    // stopImmediatePropagation on links / form submits before the site's
+    // own listeners get a chance to navigate. Only swallows nav-related
+    // targets so regular text/selection clicks still reach the bubble
+    // handler below for mode-specific behavior.
+    function isEditorMode() {
+        return currentMode === 'select'  || currentMode === 'drag' ||
+               currentMode === 'text'    || currentMode === 'style' ||
+               currentMode === 'js'      || currentMode === 'add'  ||
+               currentMode === 'preview';
+    }
+    function navTarget(el) {
+        if (!el || !el.closest) return null;
+        // Explicit nav / submit elements.
+        const direct = el.closest('a[href], button[type="submit"], input[type="submit"], input[type="image"], input[type="reset"], button[type="reset"]');
+        if (direct) return direct;
+        // A bare <button> inside a <form> defaults to type="submit". Some
+        // sites also wire button.onclick = () => form.submit() which never
+        // fires a submit event — swallow the click before it runs.
+        const btn = el.closest('button');
+        if (btn && !btn.hasAttribute('type') && btn.closest('form')) return btn;
+        return null;
+    }
+    document.addEventListener('click', function(e) {
+        if (isEditorMode() && navTarget(e.target)) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+        }
+    }, true);
+    document.addEventListener('auxclick', function(e) {
+        // Middle-click (button 1) on a link opens a new tab — block in editor.
+        if (isEditorMode() && navTarget(e.target)) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+        }
+    }, true);
+    document.addEventListener('submit', function(e) {
+        if (isEditorMode()) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+        }
+    }, true);
+
+    // Preview mode is a pure look-don't-touch view: also block focus / typing
+    // on form controls so the user can't accidentally fill an input. Other
+    // editor modes leave inputs alone (text mode etc. may need them).
+    function formField(el) {
+        return el && el.closest && el.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]');
+    }
+    document.addEventListener('mousedown', function(e) {
+        if (currentMode === 'preview' && formField(e.target)) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+        }
+    }, true);
+    document.addEventListener('keydown', function(e) {
+        if (currentMode === 'preview' && formField(e.target)) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+        }
+    }, true);
+    
     // Click handling
     document.addEventListener('click', function(e) {
         // Prevent link navigation in all editor modes
-        if (currentMode === 'select' || currentMode === 'drag' || currentMode === 'text' || currentMode === 'style' || currentMode === 'js' || currentMode === 'add') {
+        if (currentMode === 'select' || currentMode === 'drag' || currentMode === 'text' || currentMode === 'style' || currentMode === 'js' || currentMode === 'add' || currentMode === 'preview') {
             e.preventDefault();
             e.stopPropagation();
         }
@@ -2198,7 +2286,7 @@
                     source: 'quicksite-preview', 
                     action: 'elementSelected',
                     ...info
-                }, '*');
+                }, ALLOWED_ORIGIN);
             }
             return false;
         }
@@ -2235,7 +2323,7 @@
                     action: 'styleSelected',
                     element: elementInfo,
                     style: styleInfo
-                }, '*');
+                }, ALLOWED_ORIGIN);
             }
             return false;
         }
@@ -2262,7 +2350,7 @@
                     source: 'quicksite-preview', 
                     action: 'interactionSelected',
                     element: elementInfo
-                }, '*');
+                }, ALLOWED_ORIGIN);
             }
             return false;
         }
@@ -2304,7 +2392,7 @@
                             source: 'quicksite-preview',
                             action: 'dragElementUnlocked',
                             ...navInfo
-                        }, '*');
+                        }, ALLOWED_ORIGIN);
                     }
                 } else if (dragLocked) {
                     // Unlock if locked
@@ -2316,7 +2404,7 @@
                     window.parent.postMessage({
                         source: 'quicksite-preview',
                         action: 'dragElementDeselected'
-                    }, '*');
+                    }, ALLOWED_ORIGIN);
                 }
                 return;
             }
@@ -2463,7 +2551,7 @@
     window.parent.postMessage({ 
         source: 'quicksite-preview', 
         action: 'overlayReady'
-    }, '*');
+    }, ALLOWED_ORIGIN);
     
     // Initial scan for empty elements (default mode is select)
     scanEmptyElements();

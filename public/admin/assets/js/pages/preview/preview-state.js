@@ -100,7 +100,7 @@
         try {
             const iframeWindow = elements.iframe?.contentWindow;
             if (iframeWindow) {
-                iframeWindow.postMessage({ source: 'quicksite-admin', action, ...data }, '*');
+                iframeWindow.postMessage({ source: 'quicksite-admin', action, ...data }, window.location.origin);
             }
         } catch (e) {
             console.warn('[PreviewState] Could not send message to iframe:', e);
@@ -120,6 +120,37 @@
             clone[key] = cloneWithoutNodeIds(obj[key]);
         }
         return clone;
+    }
+    
+    /**
+     * Parse a CSS styles string into a property/value object.
+     * "color: red; font-size: 16px;" -> { color: 'red', 'font-size': '16px' }
+     */
+    function parseStylesString(stylesString) {
+        const result = {};
+        if (!stylesString) return result;
+        
+        const declarations = stylesString.split(/;\s*/);
+        for (const decl of declarations) {
+            const trimmed = decl.trim();
+            if (!trimmed) continue;
+            const colonIndex = trimmed.indexOf(':');
+            if (colonIndex === -1) continue;
+            const property = trimmed.substring(0, colonIndex).trim();
+            const value = trimmed.substring(colonIndex + 1).trim();
+            if (property && value) result[property] = value;
+        }
+        return result;
+    }
+    
+    /**
+     * Escape arbitrary text for safe HTML rendering (textContent -> innerHTML).
+     */
+    function escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        const div = document.createElement('div');
+        div.textContent = String(text);
+        return div.innerHTML;
     }
     
     // ==================== Public API ====================
@@ -260,7 +291,9 @@
             parseStruct: parseStruct,
             getNodeByPath: getNodeByPath,
             sendToIframe: sendToIframe,
-            cloneWithoutNodeIds: cloneWithoutNodeIds
+            cloneWithoutNodeIds: cloneWithoutNodeIds,
+            parseStylesString: parseStylesString,
+            escapeHtml: escapeHtml
         },
         
         // Direct access to sendToIframe (commonly used)

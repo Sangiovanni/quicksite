@@ -69,8 +69,14 @@
     // ==================== Utility Functions ====================
     
     function sendToIframe(action, data) {
+        // Delegate to PreviewState canonical sender (uses its own iframe ref).
+        if (window.PreviewState && PreviewState.sendToIframe) {
+            PreviewState.sendToIframe(action, data);
+            return;
+        }
+        // Fallback for very early calls before PreviewState.init().
         if (iframe && iframe.contentWindow) {
-            iframe.contentWindow.postMessage({ source: 'quicksite-admin', action, ...data }, '*');
+            iframe.contentWindow.postMessage({ source: 'quicksite-admin', action, ...data }, window.location.origin);
         }
     }
 
@@ -424,7 +430,7 @@
         
         // Click: select this selector
         chip.addEventListener('click', () => {
-            selectSelector(selector, mediaQuery);
+            selectSelector(selector, mediaQuery, hasRules);
         });
         
         return chip;
@@ -468,8 +474,8 @@
     /**
      * Select a selector and show its info
      */
-    function selectSelector(selector, mediaQuery = null) {
-        currentSelectedSelector = { selector, mediaQuery };
+    function selectSelector(selector, mediaQuery = null, hasRules = true) {
+        currentSelectedSelector = { selector, mediaQuery, hasRules };
         
         // Update UI
         if (selectorSelectedValue) selectorSelectedValue.textContent = selector;
@@ -936,7 +942,15 @@
         if (selectorEditBtn) {
             selectorEditBtn.addEventListener('click', () => {
                 if (currentSelectedSelector && onOpenStyleEditor) {
-                    onOpenStyleEditor(currentSelectedSelector.selector, editingSelectorCount || 0);
+                    // Pass hasRules so the editor can skip the GET when we
+                    // already know there's no existing style rule (avoids a
+                    // noisy 404 from getStyleRule on unstyled selectors).
+                    onOpenStyleEditor(
+                        currentSelectedSelector.selector,
+                        editingSelectorCount || 0,
+                        null,
+                        currentSelectedSelector.hasRules !== false
+                    );
                 }
             });
         }
@@ -1084,7 +1098,7 @@
             }
             
             // Open style editor for current selector with copied styles
-            onCopyStyleFrom(currentSelectedSelector.selector, editingSelectorCount || 0, result.data.styles);
+            onCopyStyleFrom(currentSelectedSelector.selector, editingSelectorCount || 0, result.data.styles, currentSelectedSelector.hasRules !== false);
         } catch (error) {
             console.error('[SelectorBrowser] Copy from error:', error);
         }

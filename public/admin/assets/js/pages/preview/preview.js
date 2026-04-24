@@ -24,7 +24,7 @@
     const langSelect = document.getElementById('preview-lang');
     const reloadBtn = document.getElementById('preview-reload');
     const deviceBtns = document.querySelectorAll('.preview-device-btn');
-    const modeBtns = document.querySelectorAll('.preview-sidebar-tool');
+    const modeBtns = document.querySelectorAll('.preview-sidebar-tool[data-mode]');
     
     // Node panel elements
     const nodePanel = document.getElementById('preview-node-panel');
@@ -2249,8 +2249,10 @@
         currentEditName = editName;
         iframe.src = buildUrl(editType, editName);
         
-        // Reset tool state: switch back to select mode and clear selection
-        if (currentMode !== 'select') {
+        // Reset tool state: switch back to select mode and clear selection.
+        // Preview mode is sticky across navigation (it's the "just look at
+        // the site" mode — no reason to drop the user back into editor).
+        if (currentMode !== 'select' && currentMode !== 'preview') {
             setMode('select');
         }
         hideNodePanel();
@@ -2657,7 +2659,19 @@
         if (isSwitchingMode) return;
         isSwitchingMode = true;
         
+        // "Preview" mode: just reload the iframe to show the page as a real
+        // visitor would see it (no selection / hover overlays, navigation
+        // still blocked by the iframe-inject capture-phase guard). After
+        // the reload, the overlay re-injection + overlayReady handler will
+        // re-send setMode('preview') so the iframe stays in preview mode.
         currentMode = mode;
+        
+        if (mode === 'preview') {
+            // Clear any current selection/panels before reloading.
+            hideNodePanel();
+            // Trigger a fresh fetch of the page.
+            reloadPreview();
+        }
         
         modeBtns.forEach(btn => {
             btn.classList.toggle('preview-sidebar-tool--active', btn.dataset.mode === mode);
@@ -3356,7 +3370,8 @@
         try {
             const iframeWindow = iframe.contentWindow;
             if (iframeWindow) {
-                iframeWindow.postMessage({ source: 'quicksite-admin', action, ...data }, '*');
+                // Same-origin: target the iframe's specific origin instead of '*'.
+                iframeWindow.postMessage({ source: 'quicksite-admin', action, ...data }, window.location.origin);
             }
         } catch (e) {
             console.warn('Could not send message to iframe:', e);
@@ -3412,6 +3427,8 @@
     
     // Listen for messages from iframe
     window.addEventListener('message', function(e) {
+        // Security: reject messages from any other origin (preview iframe is same-origin)
+        if (e.origin !== window.location.origin) return;
         if (e.data && e.data.source === 'quicksite-preview') {
             console.log('[Preview] Message from iframe:', e.data);
             if (e.data.action === 'elementSelected') {
@@ -3527,61 +3544,27 @@
     // ==================== Drag & Drop Handler ====================
     
     /**
-     * Parse struct string into type and name
-     * Format: "page-home" -> {type:"page", name:"home"}, "menu" -> {type:"menu", name:null}
+     * Parse struct string into type and name.
+     * Delegates to PreviewState.utils.parseStruct (canonical).
      */
     function parseStruct(struct) {
-        if (!struct) return null;
-        
-        // menu, footer are simple types
-        if (struct === 'menu' || struct === 'footer') {
-            return { type: struct, name: null };
-        }
-        
-        // page-{name} format
-        if (struct.startsWith('page-')) {
-            return { type: 'page', name: struct.substring(5) };
-        }
-        
-        // component-{name} format (if ever used)
-        if (struct.startsWith('component-')) {
-            return { type: 'component', name: struct.substring(10) };
-        }
-        
-        return null;
+        return PreviewState.utils.parseStruct(struct);
     }
     
     /**
-     * Get a node from structure by nodeId (e.g., "0.2.1")
+     * Get a node from structure by nodeId (e.g., "0.2.1").
+     * Delegates to PreviewState.utils.getNodeByPath (canonical).
      */
     function getNodeByPath(structure, nodeId) {
-        const indices = nodeId.split('.').map(Number);
-        let current = structure;
-        
-        for (let i = 0; i < indices.length; i++) {
-            if (!Array.isArray(current)) {
-                current = current.children;
-            }
-            if (!current || !Array.isArray(current)) return null;
-            current = current[indices[i]];
-            if (!current) return null;
-        }
-        return current;
+        return PreviewState.utils.getNodeByPath(structure, nodeId);
     }
     
     /**
-     * Deep clone an object, removing _nodeId properties
+     * Deep clone an object, removing _nodeId properties.
+     * Delegates to PreviewState.utils.cloneWithoutNodeIds (canonical).
      */
     function cloneWithoutNodeIds(obj) {
-        if (obj === null || typeof obj !== 'object') return obj;
-        if (Array.isArray(obj)) return obj.map(cloneWithoutNodeIds);
-        
-        const clone = {};
-        for (const key of Object.keys(obj)) {
-            if (key === '_nodeId') continue;
-            clone[key] = cloneWithoutNodeIds(obj[key]);
-        }
-        return clone;
+        return PreviewState.utils.cloneWithoutNodeIds(obj);
     }
     
     // handleElementMoved — extracted to preview-drag.js (PreviewDrag.handleMessage)
@@ -3666,45 +3649,21 @@
     // ==================== Utility Functions ====================
     
     /**
-     * Escape HTML for safe rendering
+     * Escape HTML for safe rendering. Delegates to PreviewState.utils.escapeHtml.
      */
     function escapeHTML(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+        return PreviewState.utils.escapeHtml(str);
     }
     
     // Alias for modules that use lowercase
     const escapeHtml = escapeHTML;
     
     /**
-     * Parse a CSS styles string into an object
-     * @param {string} stylesString - CSS declarations like "color: red; font-size: 16px;"
-     * @returns {Object} Property/value pairs
+     * Parse a CSS styles string into an object.
+     * Delegates to PreviewState.utils.parseStylesString (canonical).
      */
     function parseStylesString(stylesString) {
-        const result = {};
-        if (!stylesString) return result;
-        
-        // Split by semicolons, handling multi-line
-        const declarations = stylesString.split(/;\s*/);
-        
-        for (const decl of declarations) {
-            const trimmed = decl.trim();
-            if (!trimmed) continue;
-            
-            const colonIndex = trimmed.indexOf(':');
-            if (colonIndex === -1) continue;
-            
-            const property = trimmed.substring(0, colonIndex).trim();
-            const value = trimmed.substring(colonIndex + 1).trim();
-            
-            if (property && value) {
-                result[property] = value;
-            }
-        }
-        
-        return result;
+        return PreviewState.utils.parseStylesString(stylesString);
     }
     
     // Simple toast helper
@@ -3829,11 +3788,10 @@
             });
         });
         
-        // Sidebar refresh/eye button
-        const toolRefreshBtn = document.getElementById('preview-tool-refresh');
-        if (toolRefreshBtn) {
-            toolRefreshBtn.addEventListener('click', reloadPreview);
-        }
+        // (The former dedicated #preview-tool-refresh listener is gone:
+        // the refresh button is now a real mode tool [data-mode="preview"]
+        // and is wired by the modeBtns loop above. Entering preview mode
+        // triggers reloadPreview() inside setMode().)
         
         // Mobile tool buttons (bottom toolbar on small screens)
         const mobileBtns = document.querySelectorAll('.preview-mobile-tool');
@@ -3882,7 +3840,7 @@
                 if (selectedStruct && selectedNode != null) {
                     hideNodePanel();
                     if (iframe.contentWindow) {
-                        iframe.contentWindow.postMessage({ action: 'clearSelection' }, '*');
+                        iframe.contentWindow.postMessage({ action: 'clearSelection' }, window.location.origin);
                     }
                 }
                 return;
@@ -9157,227 +9115,6 @@
     }
     
     
-    // ==================== Miniplayer (Global Sync) ====================
-    
-    const MINIPLAYER_STORAGE_KEY = 'quicksite-miniplayer';
-    const previewPage = document.getElementById('preview-page');
-    const miniplayerToggle = document.getElementById('preview-miniplayer-toggle');
-    const miniplayerControls = document.getElementById('preview-miniplayer-controls');
-    const miniplayerReload = document.getElementById('miniplayer-reload');
-    const miniplayerExpand = document.getElementById('miniplayer-expand');
-    const miniplayerClose = document.getElementById('miniplayer-close');
-    
-    let isMiniplayer = false;
-    let isDragging = false;
-    let dragOffset = { x: 0, y: 0 };
-    
-    // Load saved miniplayer state (synced with global)
-    function loadMiniplayerState() {
-        const saved = localStorage.getItem(MINIPLAYER_STORAGE_KEY);
-        if (saved) {
-            try {
-                const state = JSON.parse(saved);
-                // Sync toggle button state with global enabled state
-                if (state.enabled) {
-                    updateToggleButtonState(true);
-                }
-                // Apply local preview miniplayer mode if it was enabled
-                if (state.previewMiniplayer) {
-                    enableMiniplayer(false);
-                    if (state.x !== null) {
-                        container.style.left = state.x + 'px';
-                        container.style.top = state.y + 'px';
-                        container.style.right = 'auto';
-                        container.style.bottom = 'auto';
-                    }
-                    if (state.width) {
-                        container.style.width = state.width + 'px';
-                        container.style.height = state.height + 'px';
-                    }
-                }
-            } catch (e) {
-                console.warn('Failed to load miniplayer state:', e);
-            }
-        }
-    }
-    
-    // Save miniplayer state (synced with global)
-    function saveMiniplayerState() {
-        // Read existing global state
-        let state = { enabled: false };
-        try {
-            const saved = localStorage.getItem(MINIPLAYER_STORAGE_KEY);
-            if (saved) state = JSON.parse(saved);
-        } catch (e) {}
-        
-        // Update with preview-specific state
-        state.previewMiniplayer = isMiniplayer;
-        if (isMiniplayer) {
-            const rect = container.getBoundingClientRect();
-            state.x = parseInt(container.style.left) || rect.left;
-            state.y = parseInt(container.style.top) || rect.top;
-            state.width = rect.width;
-            state.height = rect.height;
-        }
-        
-        // Sync route and lang from current preview
-        state.editTarget = targetSelect ? targetSelect.value : '';
-        state.lang = langSelect ? langSelect.value : '';
-        
-        localStorage.setItem(MINIPLAYER_STORAGE_KEY, JSON.stringify(state));
-    }
-    
-    // Update toggle button appearance
-    function updateToggleButtonState(enabled) {
-        if (!miniplayerToggle) return;
-        
-        const minimizeIcon = miniplayerToggle.querySelector('.preview-miniplayer-icon--minimize');
-        const expandIcon = miniplayerToggle.querySelector('.preview-miniplayer-icon--expand');
-        const minimizeText = miniplayerToggle.querySelector('.preview-miniplayer-text--minimize');
-        const expandText = miniplayerToggle.querySelector('.preview-miniplayer-text--expand');
-        
-        if (enabled) {
-            if (minimizeIcon) minimizeIcon.style.display = 'none';
-            if (expandIcon) expandIcon.style.display = 'block';
-            if (minimizeText) minimizeText.style.display = 'none';
-            if (expandText) expandText.style.display = 'inline';
-        } else {
-            if (minimizeIcon) minimizeIcon.style.display = 'block';
-            if (expandIcon) expandIcon.style.display = 'none';
-            if (minimizeText) minimizeText.style.display = 'inline';
-            if (expandText) expandText.style.display = 'none';
-        }
-    }
-    
-    function enableMiniplayer(save = true) {
-        isMiniplayer = true;
-        previewPage.classList.add('preview-page--miniplayer');
-        updateToggleButtonState(true);
-        if (save) saveMiniplayerState();
-    }
-    
-    function disableMiniplayer(save = true) {
-        isMiniplayer = false;
-        previewPage.classList.remove('preview-page--miniplayer');
-        updateToggleButtonState(false);
-        // Reset position and size
-        container.style.left = '';
-        container.style.top = '';
-        container.style.right = '';
-        container.style.bottom = '';
-        container.style.width = '';
-        container.style.height = '';
-        if (save) saveMiniplayerState();
-    }
-    
-    // Toggle global miniplayer state (for when user leaves preview page)
-    function toggleGlobalMiniplayer() {
-        let state = { enabled: false };
-        try {
-            const saved = localStorage.getItem(MINIPLAYER_STORAGE_KEY);
-            if (saved) state = JSON.parse(saved);
-        } catch (e) {}
-        
-        state.enabled = !state.enabled;
-        
-        // Sync route and lang
-        state.editTarget = targetSelect ? targetSelect.value : '';
-        state.lang = langSelect ? langSelect.value : '';
-        
-        localStorage.setItem(MINIPLAYER_STORAGE_KEY, JSON.stringify(state));
-        updateToggleButtonState(state.enabled);
-        
-        // Show a toast message
-        if (state.enabled) {
-            showToast(PreviewConfig.i18n.miniplayer + ': ON - Preview will float on other pages', 'success');
-        } else {
-            showToast(PreviewConfig.i18n.miniplayer + ': OFF', 'info');
-        }
-    }
-    
-    function toggleMiniplayer() {
-        // For preview page: toggle LOCAL miniplayer (floating within preview page)
-        if (isMiniplayer) {
-            disableMiniplayer();
-        } else {
-            enableMiniplayer();
-        }
-    }
-    
-    // Drag functionality
-    function onDragStart(e) {
-        // Only start drag from the header area (top 28px)
-        const rect = container.getBoundingClientRect();
-        const relativeY = e.clientY - rect.top;
-        
-        if (relativeY > 28) return; // Not in header area
-        if (e.target.closest('.preview-miniplayer-controls__btn')) return; // Clicked a button
-        
-        isDragging = true;
-        container.classList.add('preview-container--dragging');
-        
-        dragOffset.x = e.clientX - rect.left;
-        dragOffset.y = e.clientY - rect.top;
-        
-        e.preventDefault();
-    }
-    
-    function onDragMove(e) {
-        if (!isDragging) return;
-        
-        const newX = e.clientX - dragOffset.x;
-        const newY = e.clientY - dragOffset.y;
-        
-        // Constrain to viewport
-        const maxX = window.innerWidth - container.offsetWidth;
-        const maxY = window.innerHeight - container.offsetHeight;
-        
-        container.style.left = Math.max(0, Math.min(newX, maxX)) + 'px';
-        container.style.top = Math.max(0, Math.min(newY, maxY)) + 'px';
-        container.style.right = 'auto';
-        container.style.bottom = 'auto';
-    }
-    
-    function onDragEnd() {
-        if (isDragging) {
-            isDragging = false;
-            container.classList.remove('preview-container--dragging');
-            saveMiniplayerState();
-        }
-    }
-    
-    // Event listeners for miniplayer
-    if (miniplayerToggle) {
-        // Toggle button controls GLOBAL miniplayer (for use on other pages)
-        miniplayerToggle.addEventListener('click', toggleGlobalMiniplayer);
-    }
-    
-    if (miniplayerReload) {
-        miniplayerReload.addEventListener('click', reloadPreview);
-    }
-    
-    if (miniplayerExpand) {
-        // In preview-page local miniplayer, expand disables local miniplayer
-        miniplayerExpand.addEventListener('click', disableMiniplayer);
-    }
-    
-    if (miniplayerClose) {
-        miniplayerClose.addEventListener('click', disableMiniplayer);
-    }
-    
-    // Drag events
-    container.addEventListener('mousedown', onDragStart);
-    document.addEventListener('mousemove', onDragMove);
-    document.addEventListener('mouseup', onDragEnd);
-    
-    // Save size on resize
-    const resizeObserver = new ResizeObserver(() => {
-        if (isMiniplayer) {
-            saveMiniplayerState();
-        }
-    });
-    resizeObserver.observe(container);
-    
     // ==================== Public API ====================
     
     window.PreviewManager = {
@@ -9389,23 +9126,28 @@
         getCurrentMode: () => currentMode,
         highlightNode: (struct, node) => sendToIframe('highlightNode', { struct, node }),
         getSelectedNode: () => ({ struct: selectedStruct, node: selectedNode, component: selectedComponent }),
-        // Local miniplayer API (preview page only)
-        toggleMiniplayer: toggleMiniplayer,
-        isMiniplayer: () => isMiniplayer,
-        // Global miniplayer API
-        toggleGlobalMiniplayer: toggleGlobalMiniplayer,
-        isGlobalMiniplayerEnabled: () => {
-            try {
-                const saved = localStorage.getItem(MINIPLAYER_STORAGE_KEY);
-                if (saved) return JSON.parse(saved).enabled;
-            } catch (e) {}
-            return false;
-        }
+        // Miniplayer API — delegates to preview-miniplayer.js module
+        toggleMiniplayer: () => window.PreviewMiniplayer && window.PreviewMiniplayer.toggle(),
+        isMiniplayer: () => window.PreviewMiniplayer ? window.PreviewMiniplayer.isEnabled() : false,
+        toggleGlobalMiniplayer: () => window.PreviewMiniplayer && window.PreviewMiniplayer.toggleGlobal(),
+        isGlobalMiniplayerEnabled: () => window.PreviewMiniplayer ? window.PreviewMiniplayer.isGlobalEnabled() : false
     };
     
     // Initial state
     startLoadingTimeout();
-    loadMiniplayerState();
+    
+    // Initialize miniplayer module (preview-miniplayer.js, loaded before preview.js)
+    if (window.PreviewMiniplayer) {
+        window.PreviewMiniplayer.init({
+            container: container,
+            previewPage: document.getElementById('preview-page'),
+            targetSelect: targetSelect,
+            langSelect: langSelect,
+            showToast: showToast,
+            reloadPreview: reloadPreview,
+            i18n: PreviewConfig.i18n
+        });
+    }
     
     // Check for deep-link target from URL parameter (e.g., ?target=page-home)
     const urlTarget = new URLSearchParams(window.location.search).get('target');

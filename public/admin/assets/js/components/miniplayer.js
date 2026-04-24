@@ -20,12 +20,21 @@
     const closeBtn = document.getElementById('global-miniplayer-close');
     const header = miniplayer?.querySelector('.global-miniplayer__header');
     
-    if (!miniplayer || !iframe) return;
+    if (!miniplayer || !iframe) {
+        // Container markup not on this page — leave a trace so missing-include
+        // bugs are diagnosable instead of failing silently.
+        console.warn('[GlobalMiniplayer] Required DOM (#global-miniplayer / #global-miniplayer-iframe) not found — module disabled on this page.');
+        return;
+    }
     
     let isActive = false;
     let isDragging = false;
     let dragOffset = { x: 0, y: 0 };
     let iframeLoaded = false;
+    let resizeObserver = null;
+    let onCommandExecuted = null;
+    let onWorkflowComplete = null;
+    let onPageHide = null;
     
     // ============================================
     // State Management
@@ -48,17 +57,25 @@
      * Save state to localStorage
      */
     function saveState() {
-        const rect = miniplayer.getBoundingClientRect();
-        const state = {
-            enabled: isActive,
-            x: parseInt(miniplayer.style.left) || null,
-            y: parseInt(miniplayer.style.top) || null,
-            width: rect.width,
-            height: rect.height,
-            route: iframe.dataset.route || '',
-            lang: iframe.dataset.lang || ''
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        try {
+            const rect = miniplayer.getBoundingClientRect();
+            const state = {
+                enabled: isActive,
+                x: parseInt(miniplayer.style.left) || null,
+                y: parseInt(miniplayer.style.top) || null,
+                width: rect.width,
+                height: rect.height,
+                route: iframe.dataset.route || '',
+                lang: iframe.dataset.lang || ''
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (e) {
+            // Private browsing / quota exceeded — don't crash, just warn once.
+            if (!saveState._warned) {
+                console.warn('[GlobalMiniplayer] Could not persist state (localStorage unavailable):', e?.message || e);
+                saveState._warned = true;
+            }
+        }
     }
     
     // ============================================
@@ -137,11 +154,30 @@
         }
         url += route + '?_editor=1';
         
+        // Validate the assembled URL before assigning to iframe.src.
+        // Reject anything that isn't http(s) and that doesn't share our origin
+        // — prevents javascript: / data: injection if baseUrl ever gets tainted.
+        let parsed;
+        try {
+            parsed = new URL(url, window.location.href);
+        } catch (e) {
+            console.warn('[GlobalMiniplayer] navigateTo: invalid URL rejected:', url, e?.message);
+            return;
+        }
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            console.warn('[GlobalMiniplayer] navigateTo: refusing non-http(s) protocol:', parsed.protocol);
+            return;
+        }
+        if (parsed.origin !== window.location.origin) {
+            console.warn('[GlobalMiniplayer] navigateTo: refusing cross-origin target:', parsed.origin);
+            return;
+        }
+        
         iframe.dataset.route = route;
         iframe.dataset.lang = lang || '';
         
         loading.style.display = 'flex';
-        iframe.src = url;
+        iframe.src = parsed.href;
         saveState();
     }
     
@@ -215,25 +251,35 @@
             loading.style.display = 'none';
         });
         
-        const resizeObserver = new ResizeObserver(() => {
+        const resizeObserver_local = new ResizeObserver(() => {
             if (isActive) saveState();
         });
-        resizeObserver.observe(miniplayer);
+        resizeObserver_local.observe(miniplayer);
+        resizeObserver = resizeObserver_local;
         
         let reloadTimer = null;
-        window.addEventListener('quicksite:command-executed', function() {
+        onCommandExecuted = function() {
             if (isActive && iframeLoaded) {
                 clearTimeout(reloadTimer);
                 reloadTimer = setTimeout(reload, 500);
             }
-        });
+        };
+        window.addEventListener('quicksite:command-executed', onCommandExecuted);
         
-        window.addEventListener('quicksite:workflow-complete', function() {
+        onWorkflowComplete = function() {
             if (isActive) {
                 clearTimeout(reloadTimer);
                 setTimeout(reload, 300);
             }
-        });
+        };
+        window.addEventListener('quicksite:workflow-complete', onWorkflowComplete);
+        
+        // Tear down observers / listeners on page unload to avoid leaking
+        // handlers across SPA-style admin navigations.
+        onPageHide = function() {
+            destroy();
+        };
+        window.addEventListener('pagehide', onPageHide);
         
         // Restore state
         const state = loadState();
@@ -261,6 +307,33 @@
     }
     
     // ============================================
+    // Teardown
+    // ============================================
+    
+    /**
+     * Disconnect observers and remove window-level listeners.
+     * Safe to call multiple times.
+     */
+    function destroy() {
+        if (resizeObserver) {
+            try { resizeObserver.disconnect(); } catch (e) {}
+            resizeObserver = null;
+        }
+        if (onCommandExecuted) {
+            window.removeEventListener('quicksite:command-executed', onCommandExecuted);
+            onCommandExecuted = null;
+        }
+        if (onWorkflowComplete) {
+            window.removeEventListener('quicksite:workflow-complete', onWorkflowComplete);
+            onWorkflowComplete = null;
+        }
+        if (onPageHide) {
+            window.removeEventListener('pagehide', onPageHide);
+            onPageHide = null;
+        }
+    }
+    
+    // ============================================
     // Public API
     // ============================================
     
@@ -271,7 +344,8 @@
         reload: reload,
         navigateTo: navigateTo,
         isActive: () => isActive,
-        getIframe: () => iframe
+        getIframe: () => iframe,
+        destroy: destroy
     };
     
     // Initialize
