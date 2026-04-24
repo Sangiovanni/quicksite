@@ -336,13 +336,13 @@ Behaviour is declared **inline in the JSON structure** rather than injected as r
 
 The renderer turns `{{call:fn:arg1,arg2}}` into a namespaced call to a registered function. Only registered functions can be called; arbitrary inline JS is rejected. The keyword `event` passes through unquoted so handlers like `oninput="QS.filter(event, '.card')"` work.
 
-The core registry currently exposes 15 built-ins:
+The core registry currently exposes 16 built-ins:
 
 | Group | Functions |
 |---|---|
 | Visibility | `QS.show`, `QS.hide`, `QS.toggle`, `QS.toggleHide` |
 | Classes | `QS.addClass`, `QS.removeClass` |
-| Forms | `QS.setValue`, `QS.focus`, `QS.blur` |
+| Forms | `QS.setValue`, `QS.focus`, `QS.blur`, `QS.validate` |
 | Navigation | `QS.redirect`, `QS.scrollTo` |
 | Data | `QS.filter`, `QS.fetch`, `QS.renderList` |
 | Feedback | `QS.toast` |

@@ -153,6 +153,9 @@
                         <option value=""><?= __admin('preview.selectFunction') ?? '-- Select function --' ?></option>
                     </select>
                 </div>
+                <!-- Function details panel: full description + example.
+                     Populated on function-select change. Hidden when no selection. -->
+                <div class="preview-contextual-js-form-details" id="js-form-function-details" hidden></div>
             </div>
             
             <!-- API section (shown when action type = api, hidden by default) -->

@@ -701,7 +701,7 @@ class JsonToHtmlRenderer {
         return [
             'show', 'hide', 'toggle', 'toggleHide', 'addClass', 'removeClass',
             'setValue', 'redirect', 'filter', 'scrollTo', 'focus', 'blur', 'fetch',
-            'renderList', 'toast'
+            'renderList', 'toast', 'validate'
         ];
     }
 

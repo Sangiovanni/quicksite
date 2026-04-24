@@ -16,6 +16,11 @@
     let availableFunctions = [];
     let availableApiEndpoints = [];
     let currentAvailableEvents = [];
+    // Bucketed events from listInteractions (beta.6+):
+    //   { common: [...], lessCommon: [...], advanced: [...] }
+    // Falls back to a single 'common' bucket built from currentAvailableEvents
+    // if the API didn't ship the grouped shape.
+    let currentAvailableEventsGrouped = null;
     let editingInteraction = null;
     let currentInteractionsData = null;
     let currentPageName = null;
@@ -31,6 +36,7 @@
     let jsFormFunctionSection = null;
     let jsFormApiSection = null;
     let jsFormFunction = null;
+    let jsFormFunctionDetails = null;
     let jsFormApi = null;
     let jsFormEndpoint = null;
     let jsFormApiBody = null;
@@ -93,6 +99,7 @@
         jsFormFunctionSection = document.getElementById('js-form-function-section');
         jsFormApiSection = document.getElementById('js-form-api-section');
         jsFormFunction = document.getElementById('js-form-function');
+        jsFormFunctionDetails = document.getElementById('js-form-function-details');
         jsFormApi = document.getElementById('js-form-api');
         jsFormEndpoint = document.getElementById('js-form-endpoint');
         jsFormApiBody = document.getElementById('js-form-api-body');
@@ -384,8 +391,9 @@
             const result = await response.json();
             console.log('[PreviewJsInteractions] Interactions loaded:', result);
             
-            // Store available events for the add form
+            // Store available events for the add form (flat list kept for legacy callers)
             currentAvailableEvents = result.data?.availableEvents || [];
+            currentAvailableEventsGrouped = result.data?.availableEventsGrouped || null;
             
             // Cache interactions data for edit lookups
             currentInteractionsData = result.data;
@@ -791,12 +799,53 @@
     }
 
     /**
+     * Render the Details panel below the function <select>: full description
+     * + example. Hidden when no function is selected.
+     */
+    function renderFunctionDetails(selectedOption) {
+        if (!jsFormFunctionDetails) return;
+        const desc = selectedOption?.dataset?.description || '';
+        const example = selectedOption?.dataset?.example || '';
+        if (!selectedOption || !selectedOption.value || (!desc && !example)) {
+            jsFormFunctionDetails.hidden = true;
+            jsFormFunctionDetails.innerHTML = '';
+            return;
+        }
+        const i18n = PreviewConfig.i18n || {};
+        const exampleLabel = i18n.functionExample || 'Example';
+        const parts = [];
+        if (desc) {
+            const p = document.createElement('p');
+            p.className = 'preview-contextual-js-form-details__desc';
+            p.textContent = desc;
+            parts.push(p);
+        }
+        if (example) {
+            const wrap = document.createElement('div');
+            const label = document.createElement('span');
+            label.className = 'preview-contextual-js-form-details__example-label';
+            label.textContent = exampleLabel;
+            const code = document.createElement('code');
+            code.className = 'preview-contextual-js-form-details__example';
+            code.textContent = example;
+            wrap.appendChild(label);
+            wrap.appendChild(code);
+            parts.push(wrap);
+        }
+        jsFormFunctionDetails.innerHTML = '';
+        parts.forEach(el => jsFormFunctionDetails.appendChild(el));
+        jsFormFunctionDetails.hidden = false;
+    }
+
+    /**
      * Handle function dropdown change
      */
     function handleFunctionChange() {
         const selectedOption = jsFormFunction?.options[jsFormFunction.selectedIndex];
         const args = selectedOption?.dataset?.args ? JSON.parse(selectedOption.dataset.args) : [];
-        
+
+        renderFunctionDetails(selectedOption);
+
         if (!jsFormParams) return;
         
         jsFormParams.innerHTML = '';
@@ -903,18 +952,97 @@
     // ==================== Dropdown Population ====================
     
     /**
-     * Populate event dropdown
+     * Plain-English tooltips per event name. Sourced from the admin
+     * translation file (preview.eventTooltips), with the inline map below
+     * as a hard-coded EN fallback when the i18n bundle is missing the key.
+     */
+    const EVENT_TOOLTIPS_FALLBACK = {
+        // Common
+        onclick:        'When the user clicks the element',
+        ondblclick:     'When the user double-clicks the element',
+        onmouseenter:   'When the cursor enters the element',
+        onmouseleave:   'When the cursor leaves the element',
+        onfocus:        'When the element receives keyboard focus',
+        onblur:         'When the element loses keyboard focus',
+        onkeydown:      'When a key is pressed down while the element is focused',
+        onkeyup:        'When a key is released while the element is focused',
+        // Tag-specific (Common bucket per tag)
+        onsubmit:       'When the form is submitted',
+        onreset:        'When the form is reset',
+        oninput:        'Every time the value changes (every keystroke)',
+        onchange:       'When the value changes and the field loses focus',
+        ontoggle:       'When a <details> element is opened or closed',
+        onplay:         'When media starts playing',
+        onpause:        'When media is paused',
+        onended:        'When media playback ends',
+        onvolumechange: 'When the media volume changes',
+        ontimeupdate:   'While media is playing (fires repeatedly)',
+        onload:         'When the element finishes loading',
+        onerror:        'When the element fails to load',
+        onresize:       'When the window is resized',
+        onscroll:       'When the user scrolls',
+        // Less common
+        onmousemove:    'When the cursor moves over the element',
+        onmousedown:    'When a mouse button is pressed over the element',
+        onmouseup:      'When a mouse button is released over the element',
+        // Advanced
+        oncontextmenu:  'When the right-click / context menu is requested',
+        ontouchstart:   'When a finger touches the element',
+        ontouchend:     'When a finger is lifted off the element',
+        ontouchmove:    'When a finger moves across the element',
+        onfocusin:      'Focus entered the element or one of its children (bubbles)',
+        onfocusout:     'Focus left the element or one of its children (bubbles)',
+        onpaste:        'When the user pastes content into the field',
+        oncopy:         'When the user copies content from the field',
+        oncut:          'When the user cuts content from the field'
+    };
+
+    function eventTooltip(ev) {
+        const i18nMap = (PreviewConfig.i18n && PreviewConfig.i18n.eventTooltips) || {};
+        return i18nMap[ev] || EVENT_TOOLTIPS_FALLBACK[ev] || ev;
+    }
+
+    /**
+     * Build the bucketed shape from a flat list when the API only returned
+     * the legacy availableEvents field. Lets the picker keep working against
+     * a pre-beta.6 backend (or a stale cache).
+     */
+    function bucketsFromFlat(flat) {
+        return { common: Array.isArray(flat) ? flat.slice() : [], lessCommon: [], advanced: [] };
+    }
+
+    /**
+     * Populate event dropdown as three <optgroup>s: Common / Less common / Advanced.
+     * Each <option> carries a `title` attribute for native browser tooltips.
      */
     function populateEventDropdown() {
         if (!jsFormEvent) return;
-        
-        jsFormEvent.innerHTML = `<option value="">${PreviewConfig.i18n?.selectEvent || 'Select event...'}</option>`;
-        
-        currentAvailableEvents.forEach(event => {
-            const option = document.createElement('option');
-            option.value = event;
-            option.textContent = event;
-            jsFormEvent.appendChild(option);
+
+        const i18n = PreviewConfig.i18n || {};
+        const tag = currentJsContext?.tag || 'element';
+        const buckets = currentAvailableEventsGrouped || bucketsFromFlat(currentAvailableEvents);
+
+        jsFormEvent.innerHTML = '<option value="">' + (i18n.selectEvent || 'Select event...') + '</option>';
+
+        const groups = [
+            { key: 'common',     label: (i18n.eventsCommonFor || 'Common for') + ' <' + tag + '>' },
+            { key: 'lessCommon', label: i18n.eventsLessCommon || 'Less common' },
+            { key: 'advanced',   label: i18n.eventsAdvanced || 'Advanced' }
+        ];
+
+        groups.forEach(g => {
+            const list = buckets[g.key] || [];
+            if (list.length === 0) return;
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = g.label;
+            list.forEach(ev => {
+                const option = document.createElement('option');
+                option.value = ev;
+                option.textContent = ev;
+                option.title = eventTooltip(ev);
+                optgroup.appendChild(option);
+            });
+            jsFormEvent.appendChild(optgroup);
         });
     }
     
@@ -949,9 +1077,12 @@
             grouped[type].forEach(fn => {
                 const option = document.createElement('option');
                 option.value = fn.name;
-                option.textContent = fn.name + ' - ' + (fn.description || '').substring(0, 40);
+                // Show only the function name (beta.6: full description lives
+                // in the Details panel below the <select>, no truncation needed).
+                option.textContent = fn.name;
                 option.dataset.args = JSON.stringify(fn.args || []);
                 option.dataset.description = fn.description || '';
+                option.dataset.example = fn.example || '';
                 optgroup.appendChild(option);
             });
             
@@ -2166,8 +2297,12 @@
             grouped[type].forEach(function(fn) {
                 var option = document.createElement('option');
                 option.value = fn.name;
-                option.textContent = fn.name + ' - ' + (fn.description || '').substring(0, 40);
+                // Show only the function name (beta.6: Details panel carries
+                // the full description / example).
+                option.textContent = fn.name;
                 option.dataset.args = JSON.stringify(fn.args || []);
+                option.dataset.description = fn.description || '';
+                option.dataset.example = fn.example || '';
                 optgroup.appendChild(option);
             });
             selectEl.appendChild(optgroup);

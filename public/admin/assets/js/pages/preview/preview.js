@@ -4463,6 +4463,19 @@
         'source': null  // any category
     };
     
+    // Group A (beta.6): full HTML <input type=…> list. Meta-types
+    // "select" / "textarea" deliberately omitted here — those are
+    // separate tags reachable from the tag picker (Group B work).
+    const INPUT_TYPES_GROUP_A = [
+        'text', 'email', 'tel', 'url', 'number', 'password', 'search',
+        'date', 'time', 'datetime-local', 'month', 'week', 'color',
+        'file', 'hidden', 'checkbox', 'radio', 'range',
+        'submit', 'reset', 'button'
+    ];
+    // Types that DON'T need a name= (no form submission participation
+    // beyond the user's explicit opt-in).
+    const INPUT_TYPES_NAME_EXEMPT = new Set(['submit', 'reset', 'button', 'hidden']);
+
     // Update mandatory params based on selected tag
     function updateSidebarAddMandatoryParams() {
         if (!addMandatoryParams || !addMandatoryParamsContainer) return;
@@ -4477,7 +4490,16 @@
         
         addMandatoryParams.style.display = 'block';
         addMandatoryParamsContainer.innerHTML = '';
-        
+
+        // ---- Special case: <input> wizard (Group A) ------------------
+        // 'type' becomes a <select>, and we always render a 'name' row
+        // (required unless type is in the exempt set).
+        if (tag === 'input') {
+            renderInputWizardGroupA();
+            return;
+        }
+        // --------------------------------------------------------------
+
         mandatoryParams.forEach(param => {
             const row = document.createElement('div');
             row.className = 'preview-contextual-form__param-row';
@@ -4512,6 +4534,77 @@
             }
         });
     }
+
+    // ---- Input wizard (Group A, beta.6) ----------------------------
+    // Renders the mandatory-params block for tag=<input>:
+    //   1) 'type' as a <select> populated with INPUT_TYPES_GROUP_A
+    //   2) 'name' as a text field, required unless type is exempt.
+    // Updates the name field's required state on type change.
+    function renderInputWizardGroupA() {
+        // --- type row ---
+        const typeRow = document.createElement('div');
+        typeRow.className = 'preview-contextual-form__param-row';
+        const typeOpts = INPUT_TYPES_GROUP_A
+            .map(t => `<option value="${t}">${t}</option>`)
+            .join('');
+        typeRow.innerHTML = `
+            <label class="preview-contextual-form__param-label" for="add-mandatory-type">type:</label>
+            <div class="preview-contextual-form__param-input-group">
+                <select id="add-mandatory-type"
+                        class="admin-input admin-input--sm preview-contextual-form__param-input">
+                    ${typeOpts}
+                </select>
+            </div>
+        `;
+        addMandatoryParamsContainer.appendChild(typeRow);
+
+        // --- name row ---
+        const nameRow = document.createElement('div');
+        nameRow.className = 'preview-contextual-form__param-row';
+        nameRow.id = 'add-mandatory-name-row';
+        nameRow.innerHTML = `
+            <label class="preview-contextual-form__param-label" for="add-mandatory-name">
+                name<span class="preview-contextual-form__param-required" id="add-mandatory-name-star">*</span>:
+            </label>
+            <div class="preview-contextual-form__param-input-group">
+                <input type="text"
+                       id="add-mandatory-name"
+                       class="admin-input admin-input--sm preview-contextual-form__param-input"
+                       placeholder="${PreviewConfig.i18n.required || 'Required'}">
+            </div>
+            <small class="preview-contextual-form__param-hint" id="add-mandatory-name-hint">
+                ${PreviewConfig.i18n.nameRequiredForInput || 'Required so the field is submitted with the form.'}
+            </small>
+        `;
+        addMandatoryParamsContainer.appendChild(nameRow);
+
+        // Wire dynamic required-state on type change.
+        const typeSelect = typeRow.querySelector('#add-mandatory-type');
+        const nameInput = nameRow.querySelector('#add-mandatory-name');
+        const nameStar = nameRow.querySelector('#add-mandatory-name-star');
+        const nameHint = nameRow.querySelector('#add-mandatory-name-hint');
+
+        const refreshNameRequired = () => {
+            const isExempt = INPUT_TYPES_NAME_EXEMPT.has(typeSelect.value);
+            if (isExempt) {
+                nameStar.style.display = 'none';
+                nameHint.style.display = 'none';
+                nameInput.placeholder = PreviewConfig.i18n.optional || 'Optional';
+                nameInput.classList.remove('admin-input--error');
+            } else {
+                nameStar.style.display = '';
+                nameHint.style.display = '';
+                nameInput.placeholder = PreviewConfig.i18n.required || 'Required';
+            }
+        };
+        typeSelect.addEventListener('change', refreshNameRequired);
+        // Clear error styling once user starts typing
+        nameInput.addEventListener('input', () => {
+            nameInput.classList.remove('admin-input--error');
+        });
+        refreshNameRequired();
+    }
+    // ----------------------------------------------------------------
     
     // Fetch routes and populate a datalist for href suggestions
     async function populateRouteDatalist(datalistId) {
@@ -6267,11 +6360,29 @@
         
         // Collect mandatory params
         const params = {};
-        const mandatoryParamInputs = addMandatoryParamsContainer?.querySelectorAll('input') || [];
-        mandatoryParamInputs.forEach(input => {
-            const paramName = input.id.replace('add-mandatory-', '');
-            if (input.value) params[paramName] = input.value;
+        const mandatoryParamFields = addMandatoryParamsContainer?.querySelectorAll('input, select') || [];
+        mandatoryParamFields.forEach(field => {
+            const paramName = field.id.replace('add-mandatory-', '');
+            if (field.value) params[paramName] = field.value;
         });
+
+        // Input wizard (Group A): client-side validate that 'name' is
+        // present unless the chosen type is in the exempt set.
+        if (tag === 'input') {
+            const typeVal = params.type || '';
+            const nameVal = (params.name || '').trim();
+            if (!INPUT_TYPES_NAME_EXEMPT.has(typeVal) && nameVal === '') {
+                const nameInput = addMandatoryParamsContainer?.querySelector('#add-mandatory-name');
+                if (nameInput) {
+                    nameInput.classList.add('admin-input--error');
+                    nameInput.focus();
+                }
+                throw new Error(
+                    PreviewConfig.i18n.nameRequiredForInput
+                    || "A name is required for input type '" + typeVal + "'."
+                );
+            }
+        }
         
         // Collect custom params
         const customRows = addCustomParamsList?.querySelectorAll('.preview-contextual-form__param-row--custom') || [];

@@ -181,6 +181,32 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
             'description' => 'Show a toast notification message',
             'example' => '{{call:toast:Hello world!,success}}',
             'events' => ['onclick', 'onload', 'onsubmit']
+        ],
+        [
+            'name' => 'fetch',
+            'signature' => 'QS.fetch(target, ...options)',
+            'args' => [
+                ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'HTTP method (GET/POST/PUT/PATCH/DELETE) for direct URL mode, or @apiId/endpointId for registry mode'],
+                ['name' => 'url', 'type' => 'string', 'required' => false, 'description' => 'URL to call (direct URL mode only). Supports {{lang}} placeholder.'],
+                ['name' => 'body', 'type' => 'string', 'required' => false, 'description' => 'body=#formSelector — auto-collects every named input inside the form/container as a JSON payload', 'inputType' => 'selector'],
+                ['name' => 'onSuccess', 'type' => 'string', 'required' => false, 'description' => 'onSuccess=fnName — global function called with the parsed response on success'],
+                ['name' => 'onError', 'type' => 'string', 'required' => false, 'description' => 'onError=fnName — global function called with the error on failure'],
+                ['name' => 'silent', 'type' => 'string', 'required' => false, 'description' => 'silent=1 — suppress the default success/error toast']
+            ],
+            'description' => 'Make an API call. Direct URL mode: pass METHOD, URL, then options. Registry mode: pass @apiId/endpointId. Use body=#form-id to submit every named input inside the selected form/container as a JSON body — the canonical way to wire a form-submit chain after QS.validate.',
+            'example' => '{{call:fetch:POST,/api/contact,body=#contact-form}}',
+            'events' => ['onsubmit', 'onclick', 'onload']
+        ],
+        [
+            'name' => 'validate',
+            'signature' => 'QS.validate(event, formSelector)',
+            'args' => [
+                ['name' => 'event', 'type' => 'event', 'required' => true, 'description' => 'The event object — pass the literal keyword `event` (the renderer forwards it). Used to call preventDefault() on failure.'],
+                ['name' => 'formSelector', 'type' => 'string', 'required' => true, 'description' => 'CSS selector of the <form> to validate', 'inputType' => 'selector']
+            ],
+            'description' => "Validate a form's fields using HTML5 constraints (required, minlength, pattern, type=email, ...). Writes each invalid field's browser error message into a sibling [data-error-for=\"<fieldname>\"] container, clears the container when the field becomes valid, and cancels the rest of the {{call:...}} chain on failure (so a chained fetch only runs when the form is valid).",
+            'example' => '{{call:validate:event,#contact-form}};{{call:fetch:POST,/api/contact,body=#contact-form}}',
+            'events' => ['onsubmit']
         ]
     ];
     

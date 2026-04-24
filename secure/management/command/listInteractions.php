@@ -196,7 +196,11 @@ function __command_listInteractions(array $params = [], array $urlParams = []): 
     
     $tag = $node['tag'] ?? 'div';
     $interactions = extractInteractionsFromNode($node);
-    $availableEvents = getAvailableEventsForTag($tag);
+    $availableEventsBucketed = getAvailableEventsForTag($tag);
+    // Flat list kept for back-compat with the current picker UI;
+    // step 4 of the beta.6 picker rewrite will consume the bucketed
+    // shape directly and this flat field can then be dropped.
+    $availableEvents = flattenAvailableEvents($availableEventsBucketed);
     
     // Group interactions by event for better UI representation
     $groupedByEvent = [];
@@ -218,6 +222,7 @@ function __command_listInteractions(array $params = [], array $urlParams = []): 
             'interactions' => $interactions,
             'groupedByEvent' => $groupedByEvent,
             'availableEvents' => $availableEvents,
+            'availableEventsGrouped' => $availableEventsBucketed,
             'element' => [
                 'tag' => $tag,
                 'nodeId' => $nodeId,

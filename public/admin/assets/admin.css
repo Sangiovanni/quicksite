@@ -10945,6 +10945,39 @@ code.preview-node-panel__value {
     font-style: italic;
 }
 
+/* Function details panel: shown below the function <select> once a
+   function is picked. Holds full description + example. */
+.preview-contextual-js-form-details {
+    margin-top: 6px;
+    padding: 8px 10px;
+    background: var(--admin-bg-subtle, rgba(0, 0, 0, 0.03));
+    border-left: 2px solid var(--admin-accent, #3b82f6);
+    border-radius: 3px;
+    font-size: 0.75rem;
+    color: var(--admin-text);
+    line-height: 1.4;
+}
+.preview-contextual-js-form-details[hidden] { display: none; }
+.preview-contextual-js-form-details__desc { margin: 0 0 6px 0; }
+.preview-contextual-js-form-details__example {
+    margin: 0;
+    padding: 4px 6px;
+    background: var(--admin-bg, rgba(0, 0, 0, 0.05));
+    border-radius: 2px;
+    font-family: var(--admin-mono, ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace);
+    font-size: 0.7rem;
+    word-break: break-all;
+    white-space: pre-wrap;
+}
+.preview-contextual-js-form-details__example-label {
+    display: block;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--admin-text-muted);
+    margin-bottom: 2px;
+}
+
 /* Advanced toggle for optional function params */
 .preview-contextual-js-form-advanced-toggle {
     display: flex;
@@ -11369,6 +11402,23 @@ code.preview-node-panel__value {
     font-weight: 500;
     font-size: 0.75rem;
     color: var(--admin-text);
+}
+
+/* Input wizard (Group A, beta.6): required-star + helper hint + error state */
+.preview-contextual-form__param-required {
+    color: var(--admin-danger, #c0392b);
+    margin-left: 2px;
+    font-weight: 700;
+}
+.preview-contextual-form__param-hint {
+    flex-basis: 100%;
+    font-size: 0.7rem;
+    color: var(--admin-text-muted, #888);
+    margin-top: 2px;
+}
+.admin-input--error {
+    border-color: var(--admin-danger, #c0392b) !important;
+    box-shadow: 0 0 0 2px #c0392b33;
 }
 
 .preview-asset-browse-btn {

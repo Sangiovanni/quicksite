@@ -763,6 +763,97 @@
     // Store last fetch result for direct renderList calls
     QS._lastFetchResult = null;
 
+    /**
+     * Custom error thrown by QS.validate to abort the action chain
+     * (e.g. {{call:validate:event,#form}};{{call:fetch:...}} - the
+     * fetch must NOT run if validation failed). Inline event handlers
+     * naturally stop on the first thrown error, so throwing aborts
+     * the rest of the {{call:...}} chain without extra plumbing.
+     */
+    function QSValidationError(message) {
+        const err = new Error(message || 'QS.validate: form invalid');
+        err.name = 'QSValidationError';
+        return err;
+    }
+
+    /**
+     * Validate a form using HTML5 Constraint Validation API.
+     *
+     * For each input/textarea/select inside formSelector:
+     *   - Calls element.checkValidity().
+     *   - If invalid, writes element.validationMessage into a sibling
+     *     [data-error-for="<name>"] container (or descendant of the
+     *     form with that attribute).
+     *   - If valid, clears the matching [data-error-for] container.
+     *
+     * On any invalid field:
+     *   - Calls event.preventDefault() (if an event was passed).
+     *   - Throws QSValidationError, aborting the rest of the
+     *     {{call:...}} chain.
+     *
+     * Usage in JSON:
+     *   "onsubmit": "{{call:validate:event,#contact-form}};{{call:fetch:POST,/api/contact,body=#contact-form}}"
+     *
+     * @param {Event|string} eventOrFormSelector - Event object OR form CSS selector.
+     * @param {string} [formSelectorIfEvent] - Form CSS selector when first arg is an event.
+     * @returns {boolean} true if all fields valid (chain continues).
+     */
+    QS.validate = function(eventOrFormSelector, formSelectorIfEvent) {
+        let evt = null;
+        let formSelector = eventOrFormSelector;
+
+        // Polymorphic first arg, mirroring QS.filter: event-or-selector.
+        if (eventOrFormSelector && typeof eventOrFormSelector === 'object'
+            && typeof eventOrFormSelector.preventDefault === 'function') {
+            evt = eventOrFormSelector;
+            formSelector = formSelectorIfEvent;
+        }
+
+        if (!formSelector || typeof formSelector !== 'string') {
+            console.warn('[QS] validate: formSelector required');
+            return true; // No-op rather than abort if misconfigured.
+        }
+
+        const form = document.querySelector(formSelector);
+        if (!form) {
+            console.warn('[QS] validate: form not found:', formSelector);
+            return true;
+        }
+
+        const fields = form.querySelectorAll('input, textarea, select');
+        let allValid = true;
+
+        fields.forEach(field => {
+            // Skip non-validatable fields (submit/reset/button etc. via willValidate).
+            if (field.willValidate === false) return;
+
+            const isValid = field.checkValidity();
+            const name = field.getAttribute('name');
+            // Look for the error container by name first, then by id as fallback.
+            let errBox = null;
+            if (name) {
+                errBox = form.querySelector('[data-error-for="' + name + '"]');
+            }
+            if (!errBox && field.id) {
+                errBox = form.querySelector('[data-error-for="' + field.id + '"]');
+            }
+
+            if (isValid) {
+                if (errBox) errBox.textContent = '';
+            } else {
+                allValid = false;
+                if (errBox) errBox.textContent = field.validationMessage || 'Invalid';
+            }
+        });
+
+        if (!allValid) {
+            if (evt) evt.preventDefault();
+            throw QSValidationError();
+        }
+
+        return true;
+    };
+
     // Expose to window
     window.QS = QS;
 

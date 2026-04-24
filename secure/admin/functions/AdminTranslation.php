@@ -203,6 +203,24 @@ class AdminTranslation {
     }
 
     /**
+     * Get a nested translation value as-is (string, array, or null).
+     * Unlike t(), this preserves sub-trees so callers can inject whole
+     * objects (e.g. eventTooltips map) into the JS layer in one go.
+     */
+    public function getRaw(string $key): mixed {
+        $key = $this->applyKeyAlias($key);
+        $keys = explode('.', $key);
+        $value = $this->translations;
+        foreach ($keys as $k) {
+            if (!is_array($value) || !isset($value[$k])) {
+                return null;
+            }
+            $value = $value[$k];
+        }
+        return $value;
+    }
+
+    /**
      * Load translations from a workflow sidecar file and merge into current translations.
      * Sidecar file format: { "en": { "title": "...", ... }, "fr": { ... } }
      * Keys are merged under: workflows.custom.{workflowId}.*

@@ -14,23 +14,34 @@ if (!defined('SECURE_FOLDER_PATH')) {
 // =============================================================================
 // EVENT CONSTANTS - Available events by element type
 // =============================================================================
+//
+// Buckets returned by getAvailableEventsForTag():
+//   - common     : the 3-6 events most likely used on this tag
+//   - lessCommon : remaining standard non-deprecated events
+//   - advanced   : touch / contextmenu / clipboard / focusin-out
+//
+// Removed in beta.6 (deprecated/duplicates - DO NOT re-add):
+//   onkeypress (deprecated), onunload (deprecated),
+//   onmouseover (use onmouseenter), onmouseout (use onmouseleave)
 
 /**
- * Universal events available on all elements
+ * Universal events available on all elements (excluding advanced bucket).
+ * onmouseenter / onmouseleave kept; onmouseover / onmouseout removed.
+ * onkeydown / onkeyup kept; onkeypress removed (deprecated).
  */
 if (!defined('UNIVERSAL_EVENTS')) {
     define('UNIVERSAL_EVENTS', [
-        'onclick', 'ondblclick', 
-        'onmouseover', 'onmouseout', 'onmouseenter', 'onmouseleave', 'onmousemove',
+        'onclick', 'ondblclick',
+        'onmouseenter', 'onmouseleave', 'onmousemove',
         'onmousedown', 'onmouseup',
         'onfocus', 'onblur',
-        'onkeydown', 'onkeyup', 'onkeypress',
-        'ontouchstart', 'ontouchend', 'ontouchmove'
+        'onkeydown', 'onkeyup'
     ]);
 }
 
 /**
- * Events specific to certain tags
+ * Events specific to certain tags (added on top of UNIVERSAL_EVENTS).
+ * onunload removed from body (deprecated; use onbeforeunload / pagehide).
  */
 if (!defined('TAG_SPECIFIC_EVENTS')) {
     define('TAG_SPECIFIC_EVENTS', [
@@ -43,7 +54,58 @@ if (!defined('TAG_SPECIFIC_EVENTS')) {
         'audio' => ['onplay', 'onpause', 'onended', 'onvolumechange', 'ontimeupdate'],
         'img' => ['onload', 'onerror'],
         'iframe' => ['onload'],
-        'body' => ['onload', 'onunload', 'onresize', 'onscroll']
+        'body' => ['onload', 'onresize', 'onscroll']
+    ]);
+}
+
+/**
+ * Curated "Common" event lists per tag.
+ * These appear in the picker first, scoped to the selected element's tag.
+ * Tags not listed fall back to ['onclick', 'onmouseenter', 'onmouseleave'].
+ *
+ * Tag-specific events (TAG_SPECIFIC_EVENTS) are merged in automatically -
+ * they always belong in Common for their tag.
+ */
+if (!defined('COMMON_EVENTS_BY_TAG')) {
+    define('COMMON_EVENTS_BY_TAG', [
+        'button'   => ['onclick', 'ondblclick', 'onmouseenter', 'onmouseleave', 'onfocus', 'onblur'],
+        'a'        => ['onclick', 'onmouseenter', 'onmouseleave', 'onfocus', 'onblur'],
+        'input'    => ['onfocus', 'onblur', 'onkeydown'],
+        'textarea' => ['onfocus', 'onblur'],
+        'select'   => ['onfocus', 'onblur'],
+        'form'     => [],
+        'img'      => ['onclick'],
+        'video'    => [],
+        'audio'    => [],
+        'details'  => [],
+    ]);
+}
+
+/**
+ * Default Common bucket for tags not in COMMON_EVENTS_BY_TAG.
+ * Three truly-generic events keep the Common group meaningful on
+ * <div>, <span>, <p>, <section>, etc.
+ */
+if (!defined('DEFAULT_COMMON_EVENTS')) {
+    define('DEFAULT_COMMON_EVENTS', [
+        'onclick', 'onmouseenter', 'onmouseleave'
+    ]);
+}
+
+/**
+ * Advanced events - hidden by default in the picker.
+ *  - 'universal' bucket is offered on every tag
+ *  - per-tag bucket is added when the element matches
+ */
+if (!defined('ADVANCED_EVENTS')) {
+    define('ADVANCED_EVENTS', [
+        'universal' => [
+            'oncontextmenu',
+            'ontouchstart', 'ontouchend', 'ontouchmove',
+            'onfocusin', 'onfocusout',
+        ],
+        'input'    => ['onpaste', 'oncopy', 'oncut'],
+        'textarea' => ['onpaste', 'oncopy', 'oncut'],
     ]);
 }
 
@@ -52,18 +114,56 @@ if (!defined('TAG_SPECIFIC_EVENTS')) {
 // =============================================================================
 
 /**
- * Get available events for a specific tag
+ * Get available events for a specific tag, bucketed for picker rendering.
+ *
+ * @param string $tag HTML tag name (e.g. 'button', 'input', 'div').
+ * @return array {
+ *     common:     string[] events shown in "Common for {tag}" optgroup,
+ *     lessCommon: string[] events shown in "Less common" optgroup,
+ *     advanced:   string[] events shown in "Advanced" optgroup
+ * }
  */
 if (!function_exists('getAvailableEventsForTag')) {
     function getAvailableEventsForTag(string $tag): array {
-        $events = UNIVERSAL_EVENTS;
-        
-        // Add tag-specific events
-        if (isset(TAG_SPECIFIC_EVENTS[$tag])) {
-            $events = array_merge($events, TAG_SPECIFIC_EVENTS[$tag]);
+        $tagSpecific = TAG_SPECIFIC_EVENTS[$tag] ?? [];
+
+        // 1. Common = curated map (or default) + tag-specific events not already in.
+        $curated = COMMON_EVENTS_BY_TAG[$tag] ?? DEFAULT_COMMON_EVENTS;
+        $common = array_values(array_unique(array_merge($curated, $tagSpecific)));
+
+        // 2. Less common = (UNIVERSAL_EVENTS minus Common).
+        $lessCommon = array_values(array_diff(UNIVERSAL_EVENTS, $common));
+
+        // 3. Advanced = universal advanced + per-tag advanced.
+        $advanced = ADVANCED_EVENTS['universal'];
+        if (isset(ADVANCED_EVENTS[$tag])) {
+            $advanced = array_merge($advanced, ADVANCED_EVENTS[$tag]);
         }
-        
-        return array_values(array_unique($events));
+        $advanced = array_values(array_unique($advanced));
+
+        return [
+            'common'     => $common,
+            'lessCommon' => $lessCommon,
+            'advanced'   => $advanced,
+        ];
+    }
+}
+
+/**
+ * Flatten the bucketed shape returned by getAvailableEventsForTag()
+ * into a single ordered list (common -> lessCommon -> advanced).
+ * Use only for callers that genuinely need a flat list (legacy contracts).
+ *
+ * @param array $bucketed Output of getAvailableEventsForTag().
+ * @return string[] Flat ordered list of event names.
+ */
+if (!function_exists('flattenAvailableEvents')) {
+    function flattenAvailableEvents(array $bucketed): array {
+        return array_values(array_unique(array_merge(
+            $bucketed['common']     ?? [],
+            $bucketed['lessCommon'] ?? [],
+            $bucketed['advanced']   ?? []
+        )));
     }
 }
 
