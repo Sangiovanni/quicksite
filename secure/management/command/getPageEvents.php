@@ -23,7 +23,9 @@ require_once SECURE_FOLDER_PATH . '/src/functions/interactionHelpers.php';
  * @return ApiResponse
  */
 function __command_getPageEvents(array $params = [], array $urlParams = []): ApiResponse {
-    $pageName = $urlParams[0] ?? null;
+    // Support nested page routes: /management/getPageEvents/documentation/commands
+    $segments = array_filter($urlParams, fn($s) => $s !== '');
+    $pageName = !empty($segments) ? implode('/', $segments) : null;
     
     if (!$pageName) {
         return ApiResponse::create(400, 'validation.required')

@@ -216,6 +216,26 @@ embed[data-qs-struct], object[data-qs-struct] {
     line-height: 1;
 }
 
+/* Fallback indicator for void / replaced elements (input, img, br, hr, etc.)
+   where ::after pseudo-elements don't render. Visible amber ring + glow. */
+input.qs-has-interaction,
+img.qs-has-interaction,
+br.qs-has-interaction,
+hr.qs-has-interaction,
+embed.qs-has-interaction,
+iframe.qs-has-interaction,
+source.qs-has-interaction,
+track.qs-has-interaction,
+area.qs-has-interaction,
+col.qs-has-interaction,
+wbr.qs-has-interaction,
+meta.qs-has-interaction,
+link.qs-has-interaction {
+    outline: 2px dashed #f59e0b !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 6px #f59e0b80 !important;
+}
+
 /* Interaction tooltip on hover */
 .qs-interaction-tooltip {
     position: fixed;

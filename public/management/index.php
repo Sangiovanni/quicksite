@@ -4,6 +4,10 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/LoggingManagement.php';
 
+// Prevent browsers from caching ANY API response (including 401/404/error responses).
+// Must be set before any output and before any early exit (auth failure, public command, etc.).
+header('Cache-Control: no-store');
+
 // Track execution start time for logging
 $commandStartTime = microtime(true);
 
@@ -176,9 +180,6 @@ if (!hasPermission($currentTokenInfo, $command)) {
 // ============================================================================
 // Execute Command
 // ============================================================================
-
-// Prevent browsers from caching API responses (ensures fresh data after mutations)
-header('Cache-Control: no-store');
 
 // Parse request body for logging
 $requestBody = json_decode(REQUEST_BODY_RAW, true) ?? [];

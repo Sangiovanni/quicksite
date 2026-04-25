@@ -161,17 +161,26 @@
      * Call from input element's oninput event
      * @param {Event|string} eventOrSelector - Event object OR items selector (for backward compat)
      * @param {string} [itemsSelector] - Selector for items to filter (when event passed)
-     * @param {string} [matchAttr] - Attribute to match against (default: textContent)
+     * @param {string} [matchAttr] - What to match against. One of:
+     *   - 'textContent' (default) → the item's full text
+     *   - 'data-foo' or '[foo]' → an attribute on the item itself
+     *   - a CSS selector starting with '.', '#', ' ', '>' → textContent of the
+     *     first matching child (e.g. '.cmd-name' to match only the name).
      * @param {string} [hideClass] - Class to add/remove (default: 'hidden')
+     * @param {string} [emptyParent] - Optional ancestor selector. Each matched
+     *   ancestor is hidden (with `hideClass`) when none of its descendant items
+     *   (matching `itemsSelector`) are visible, and shown again otherwise.
+     *   Useful for collapsing empty sections (e.g. '.cmd-section').
      * 
-     * Usage in JSON: "oninput": "{{call:filter:event,.card,data-title}}"
+     * Usage in JSON: "oninput": "{{call:filter:event,.card,.card-title,hidden,.cmd-section}}"
      * Pass 'event' as first arg to get input value from the triggering element
      */
-    QS.filter = function(eventOrSelector, itemsSelector, matchAttr, hideClass) {
+    QS.filter = function(eventOrSelector, itemsSelector, matchAttr, hideClass, emptyParent) {
         let searchValue = '';
         let selector = itemsSelector;
         let attr = matchAttr;
         let hideCls = hideClass || DEFAULT_HIDDEN_CLASS;
+        let parentSel = emptyParent;
         
         // Check if first arg is an event or a selector string
         if (eventOrSelector && typeof eventOrSelector === 'object' && eventOrSelector.target) {
@@ -183,6 +192,7 @@
             selector = eventOrSelector;
             attr = itemsSelector;
             hideCls = matchAttr || DEFAULT_HIDDEN_CLASS;
+            parentSel = hideClass;
             const activeEl = document.activeElement;
             searchValue = (activeEl && activeEl.value !== undefined) 
                 ? activeEl.value.toLowerCase() 
@@ -204,7 +214,11 @@
             } else if (attr.startsWith('data-') || attr.startsWith('[')) {
                 // data-* attribute or [attr] selector syntax
                 const attrName = attr.replace(/^\[|\]$/g, ''); // Remove brackets if present
-                matchValue = el.getAttribute(attrName) || el.textContent || '';
+                matchValue = el.getAttribute(attrName) || '';
+            } else if (/^[.#> ]/.test(attr)) {
+                // Child CSS selector → match against that child's textContent
+                const child = el.querySelector(attr);
+                matchValue = child ? (child.textContent || '') : '';
             } else {
                 matchValue = el.getAttribute(attr) || el.textContent || '';
             }
@@ -217,6 +231,18 @@
                 el.classList.add(hideCls);
             }
         });
+
+        // Hide ancestors that no longer have any visible items.
+        if (parentSel) {
+            getElements(parentSel).forEach(parent => {
+                const visible = parent.querySelector(selector + ':not(.' + hideCls + ')');
+                if (visible) {
+                    parent.classList.remove(hideCls);
+                } else {
+                    parent.classList.add(hideCls);
+                }
+            });
+        }
     };
 
     /**

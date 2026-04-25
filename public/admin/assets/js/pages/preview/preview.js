@@ -2381,7 +2381,7 @@
         }
         
         try {
-            const result = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, [editName]);
+            const result = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, ['page', ...editName.split('/')]);
             if (result.ok && result.data?.data?.structure) {
                 const hasIframe = (function check(node) {
                     if (!node) return false;

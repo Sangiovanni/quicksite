@@ -89,8 +89,17 @@ function __command_listInteractions(array $params = [], array $urlParams = []): 
     $nodeId = null;
     
     if ($structType === 'page') {
-        // First segment after structType is page name
-        $pageName = $urlParams[1];
+        // Support nested page paths: /listInteractions/page/documentation/commands/0.1.2
+        // The nodeId is the last segment matching the node_id pattern (digits and dots).
+        // Everything between structType and nodeId is the page name.
+        $tailIdx = count($urlParams) - 1;
+        if ($tailIdx < 2 || !RegexPatterns::match('node_id', $urlParams[$tailIdx])) {
+            return ApiResponse::create(400, 'validation.required')
+                ->withMessage('Missing required parameter: nodeId')
+                ->withErrors([['field' => 'nodeId', 'usage' => 'GET /management/listInteractions/page/{pageName}/{nodeId}']]);
+        }
+        $pageName = implode('/', array_slice($urlParams, 1, $tailIdx - 1));
+        $nodeId = $urlParams[$tailIdx];
         
         // Validate page exists
         $specialPages = ['404', '500', '403', '401'];
@@ -98,15 +107,6 @@ function __command_listInteractions(array $params = [], array $urlParams = []): 
             return ApiResponse::create(404, 'route.not_found')
                 ->withMessage("Page '{$pageName}' does not exist");
         }
-        
-        // Remaining segments form the nodeId
-        if (!isset($urlParams[2])) {
-            return ApiResponse::create(400, 'validation.required')
-                ->withMessage('Missing required parameter: nodeId')
-                ->withErrors([['field' => 'nodeId', 'usage' => 'GET /management/listInteractions/page/{pageName}/{nodeId}']]);
-        }
-        
-        $nodeId = implode('/', array_slice($urlParams, 2));
         
     } elseif ($structType === 'component') {
         // First segment is component name

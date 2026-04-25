@@ -619,6 +619,11 @@
                         input.dispatchEvent(new Event('input'));
                     }
                 });
+                // Close any picker dropdowns that the synthetic input events opened
+                // (they normally open on focus/typing, which we don't want during prefill).
+                jsFormParams.querySelectorAll('.preview-js-picker-dropdown').forEach(dd => {
+                    dd.style.display = 'none';
+                });
             }
             
             updatePreview();
@@ -744,7 +749,7 @@
         row.appendChild(label);
         
         var inputType = arg.inputType || 'text';
-        if (usePicker && (inputType === 'selector' || inputType === 'class')) {
+        if (usePicker && (inputType === 'selector' || inputType === 'class' || inputType === 'matchTarget')) {
             var picker = createSearchablePicker(inputType, arg, paramIndex);
             row.appendChild(picker);
         } else {
@@ -1175,6 +1180,8 @@
             input.placeholder = PreviewConfig.i18n?.selectorOrThis || 'Selector or "this"';
         } else if (inputType === 'class') {
             input.placeholder = PreviewConfig.i18n?.searchClass || 'Search class...';
+        } else if (inputType === 'matchTarget') {
+            input.placeholder = PreviewConfig.i18n?.matchTargetHint || 'textContent, .child-class, or data-attr';
         }
         
         const dropdown = document.createElement('div');
@@ -1247,6 +1254,60 @@
                         seenClasses.add(className);
                     }
                 });
+            } else if (inputType === 'matchTarget') {
+                // Suggestions for QS.filter's matchAttr arg.
+                // 1) Special textContent entry (the default).
+                // 2) Child CSS selectors (.class / #id) — match a child's text.
+                // 3) data-* attributes discovered in the iframe DOM.
+                const seenValues = new Set();
+                items.push({ value: 'textContent', label: 'textContent (full text)', type: 'special' });
+                seenValues.add('textContent');
+                
+                pageStructureClasses.forEach(cls => {
+                    const sel = '.' + cls;
+                    if (!seenValues.has(sel)) {
+                        items.push({ value: sel, label: sel + ' (child text)', type: 'dom' });
+                        seenValues.add(sel);
+                    }
+                });
+                
+                (categorizedSelectors.ids || []).forEach(s => {
+                    var clean = stripPseudoFromSelector(s.selector);
+                    if (clean && !seenValues.has(clean)) {
+                        items.push({ value: clean, label: clean + ' (child text)', type: 'id' });
+                        seenValues.add(clean);
+                    }
+                });
+                
+                (categorizedSelectors.classes || []).forEach(s => {
+                    var clean = stripPseudoFromSelector(s.selector);
+                    if (clean && !seenValues.has(clean)) {
+                        items.push({ value: clean, label: clean + ' (child text)', type: 'class' });
+                        seenValues.add(clean);
+                    }
+                });
+                
+                // Collect data-* attribute names from the iframe DOM (skip qs-internal ones).
+                try {
+                    const iframe = document.getElementById('preview-iframe');
+                    const iframeDoc = iframe && (iframe.contentDocument || iframe.contentWindow?.document);
+                    if (iframeDoc) {
+                        const dataAttrs = new Set();
+                        iframeDoc.querySelectorAll('[data-qs-node]').forEach(el => {
+                            for (const a of el.attributes) {
+                                if (a.name.startsWith('data-') && !a.name.startsWith('data-qs-')) {
+                                    dataAttrs.add(a.name);
+                                }
+                            }
+                        });
+                        Array.from(dataAttrs).sort().forEach(name => {
+                            if (!seenValues.has(name)) {
+                                items.push({ value: name, label: name + ' (attribute)', type: 'attr' });
+                                seenValues.add(name);
+                            }
+                        });
+                    }
+                } catch (e) { /* iframe inaccessible — skip */ }
             }
             
             return items;
@@ -1277,6 +1338,7 @@
                                  item.type === 'class' ? '.' : 
                                  item.type === 'dom' ? '◇' :
                                  item.type === 'common' ? '★' : 
+                                 item.type === 'attr' ? '[ ]' : 
                                  item.type === 'tag' ? '<>' : '';
                 option.innerHTML = `<span class="preview-js-picker-type">${typeIcon}</span><span>${item.label}</span>`;
                 
@@ -1561,7 +1623,10 @@
         if (!currentPageName) return;
         
         try {
-            var url = '/management/getPageEvents/' + encodeURIComponent(currentPageName);
+            // Split nested routes (e.g. "documentation/commands") so each segment
+            // is encoded individually — encoding the whole string would turn "/" into
+            // "%2F", collapsing the path into a single segment the router can't match.
+            var url = '/management/getPageEvents/' + currentPageName.split('/').map(encodeURIComponent).join('/');
             var response = await fetch(url, {
                 method: 'GET',
                 headers: { 'Authorization': 'Bearer ' + PreviewConfig.authToken }

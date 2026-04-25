@@ -116,12 +116,13 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
         ],
         [
             'name' => 'filter',
-            'signature' => 'QS.filter(event, itemsSelector, matchAttr?, hideClass?)',
+            'signature' => 'QS.filter(event, itemsSelector, matchAttr?, hideClass?, emptyParent?)',
             'args' => [
                 ['name' => 'event', 'type' => 'Event', 'required' => true, 'description' => 'Pass "event" keyword to get input value'],
                 ['name' => 'itemsSelector', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for items to filter', 'inputType' => 'selector'],
-                ['name' => 'matchAttr', 'type' => 'string', 'required' => false, 'default' => 'textContent', 'description' => 'Attribute to match against (e.g., data-title)'],
-                ['name' => 'hideClass', 'type' => 'string', 'required' => false, 'default' => 'hidden', 'description' => 'Class for hidden items', 'inputType' => 'class']
+                ['name' => 'matchAttr', 'type' => 'string', 'required' => false, 'default' => 'textContent', 'description' => 'What to match: textContent, data-foo, or a child selector like .cmd-name', 'inputType' => 'matchTarget'],
+                ['name' => 'hideClass', 'type' => 'string', 'required' => false, 'default' => 'hidden', 'description' => 'Class for hidden items', 'inputType' => 'class'],
+                ['name' => 'emptyParent', 'type' => 'string', 'required' => false, 'description' => 'Optional ancestor selector to hide when it has no visible items (e.g. .cmd-section)', 'inputType' => 'selector']
             ],
             'description' => 'Filter elements based on input value. Use on input fields.',
             'example' => '{{call:filter:event,.card,data-title}}',
