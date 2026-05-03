@@ -118,9 +118,9 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
             'name' => 'filter',
             'signature' => 'QS.filter(event, itemsSelector, matchAttr?, hideClass?, emptyParent?)',
             'args' => [
-                ['name' => 'event', 'type' => 'Event', 'required' => true, 'description' => 'Pass "event" keyword to get input value'],
+                ['name' => 'event', 'type' => 'Event', 'required' => true, 'default' => 'event', 'description' => 'Pass "event" keyword to get input value, or a CSS selector to read from a different input', 'inputType' => 'eventArg'],
                 ['name' => 'itemsSelector', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for items to filter', 'inputType' => 'selector'],
-                ['name' => 'matchAttr', 'type' => 'string', 'required' => false, 'default' => 'textContent', 'description' => 'What to match: textContent, data-foo, or a child selector like .cmd-name', 'inputType' => 'matchTarget'],
+                ['name' => 'matchAttr', 'type' => 'string', 'required' => false, 'default' => 'textContent', 'description' => 'What to match: textContent, data-foo, or one or more child selectors like .cmd-name (comma-separated, e.g. ".cmd-name, .cmd-description"); descendant text is concatenated.', 'inputType' => 'matchTarget'],
                 ['name' => 'hideClass', 'type' => 'string', 'required' => false, 'default' => 'hidden', 'description' => 'Class for hidden items', 'inputType' => 'class'],
                 ['name' => 'emptyParent', 'type' => 'string', 'required' => false, 'description' => 'Optional ancestor selector to hide when it has no visible items (e.g. .cmd-section)', 'inputType' => 'selector']
             ],

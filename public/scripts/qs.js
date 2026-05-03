@@ -156,6 +156,72 @@
         }
     };
 
+    // ---- QS.filter: highlight helpers (DOM-walk, XSS-safe) ----
+    // Snapshot/restore an element's original child nodes around <mark> wrapping.
+    var _qsHighlightPerfWarned = false;
+    var _QS_HIGHLIGHT_BUDGET = 500; // items × subelements
+    function _qsCanHighlight(items, attr) {
+        try {
+            if (!items || !items.length) return true;
+            // Sample the first item to estimate descendants per item.
+            // For textContent mode (attr === null), 1 node per item.
+            var sample = attr ? (items[0].querySelectorAll(attr).length || 1) : 1;
+            if (items.length * sample > _QS_HIGHLIGHT_BUDGET) {
+                if (!_qsHighlightPerfWarned) {
+                    console.warn('[QS] filter: highlighting skipped (over ' + _QS_HIGHLIGHT_BUDGET + ' nodes)');
+                    _qsHighlightPerfWarned = true;
+                }
+                return false;
+            }
+        } catch (e) { /* ignore */ }
+        return true;
+    }
+    function _qsRestoreOriginal(el) {
+        if (el && el.__qsOriginalChildren) {
+            var clones = el.__qsOriginalChildren.map(function (n) { return n.cloneNode(true); });
+            el.replaceChildren.apply(el, clones);
+        }
+    }
+    function _qsHighlightIn(el, needle) {
+        if (!el || !needle) return;
+        if (!el.__qsOriginalChildren) {
+            el.__qsOriginalChildren = Array.from(el.childNodes).map(function (n) { return n.cloneNode(true); });
+        } else {
+            // Restore first so we don't mark over previous marks.
+            _qsRestoreOriginal(el);
+        }
+        var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+            acceptNode: function (n) {
+                var p = n.parentNode;
+                if (p && (p.nodeName === 'SCRIPT' || p.nodeName === 'STYLE' || p.nodeName === 'MARK')) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+            }
+        });
+        var textNodes = [];
+        while (walker.nextNode()) textNodes.push(walker.currentNode);
+        textNodes.forEach(function (textNode) {
+            var text = textNode.nodeValue;
+            var lower = text.toLowerCase();
+            var idx = lower.indexOf(needle);
+            if (idx === -1) return;
+            var frag = document.createDocumentFragment();
+            var cursor = 0;
+            while (idx !== -1) {
+                if (idx > cursor) frag.appendChild(document.createTextNode(text.slice(cursor, idx)));
+                var mark = document.createElement('mark');
+                mark.className = 'qs-filter-hit';
+                mark.textContent = text.slice(idx, idx + needle.length);
+                frag.appendChild(mark);
+                cursor = idx + needle.length;
+                idx = lower.indexOf(needle, cursor);
+            }
+            if (cursor < text.length) frag.appendChild(document.createTextNode(text.slice(cursor)));
+            textNode.parentNode.replaceChild(frag, textNode);
+        });
+    }
+
     /**
      * Filter elements based on text input
      * Call from input element's oninput event
@@ -165,7 +231,9 @@
      *   - 'textContent' (default) → the item's full text
      *   - 'data-foo' or '[foo]' → an attribute on the item itself
      *   - a CSS selector starting with '.', '#', ' ', '>' → textContent of the
-     *     first matching child (e.g. '.cmd-name' to match only the name).
+     *     matching descendant(s). Accepts a single selector or a comma-separated
+     *     list (e.g. '.cmd-name, .cmd-description'); the text of every matched
+     *     descendant is concatenated before matching.
      * @param {string} [hideClass] - Class to add/remove (default: 'hidden')
      * @param {string} [emptyParent] - Optional ancestor selector. Each matched
      *   ancestor is hidden (with `hideClass`) when none of its descendant items
@@ -205,30 +273,58 @@
         }
 
         const items = getElements(selector);
-        
+
+        // Decide once whether highlighting participates this call.
+        // - Child-selector mode: highlight inside the matched descendants.
+        // - textContent (or no attr): highlight inside the item element itself.
+        // - data-*/attr modes: no highlighting (match value isn't visible text).
+        const isChildSelectorMode = !!attr && /^[.#> ]/.test(attr);
+        const isTextContentMode = !attr || attr === 'textContent';
+        const highlightEnabled = (isChildSelectorMode || isTextContentMode)
+            && _qsCanHighlight(items, isChildSelectorMode ? attr : null);
+
         items.forEach(el => {
             let matchValue = '';
-            
-            if (!attr || attr === 'textContent') {
+            let matchedChildren = null;
+
+            if (isTextContentMode) {
                 matchValue = el.textContent || '';
             } else if (attr.startsWith('data-') || attr.startsWith('[')) {
                 // data-* attribute or [attr] selector syntax
                 const attrName = attr.replace(/^\[|\]$/g, ''); // Remove brackets if present
                 matchValue = el.getAttribute(attrName) || '';
-            } else if (/^[.#> ]/.test(attr)) {
-                // Child CSS selector → match against that child's textContent
-                const child = el.querySelector(attr);
-                matchValue = child ? (child.textContent || '') : '';
+            } else if (isChildSelectorMode) {
+                // Child CSS selector (single or comma-separated) → concatenate
+                // textContent of every matching descendant. A single selector
+                // returns a 1-element list, so behavior is identical to before.
+                matchedChildren = el.querySelectorAll(attr);
+                matchValue = Array.from(matchedChildren).map(n => n.textContent || '').join(' ');
             } else {
                 matchValue = el.getAttribute(attr) || el.textContent || '';
             }
 
             matchValue = matchValue.toLowerCase();
 
-            if (searchValue === '' || matchValue.includes(searchValue)) {
+            const isHit = searchValue === '' || matchValue.includes(searchValue);
+            if (isHit) {
                 el.classList.remove(hideCls);
             } else {
                 el.classList.add(hideCls);
+            }
+
+            // Highlight management.
+            if (isChildSelectorMode && matchedChildren) {
+                if (isHit && searchValue !== '' && highlightEnabled) {
+                    matchedChildren.forEach(child => _qsHighlightIn(child, searchValue));
+                } else {
+                    matchedChildren.forEach(child => _qsRestoreOriginal(child));
+                }
+            } else if (isTextContentMode) {
+                if (isHit && searchValue !== '' && highlightEnabled) {
+                    _qsHighlightIn(el, searchValue);
+                } else {
+                    _qsRestoreOriginal(el);
+                }
             }
         });
 

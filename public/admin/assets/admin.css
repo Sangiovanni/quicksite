@@ -11218,6 +11218,77 @@ code.preview-node-panel__value {
     text-align: center;
 }
 
+/* Chip strip for matchTarget multi-selector lists */
+.preview-js-picker-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-xs);
+}
+
+/* Tokenfield: bordered container holding chips + the inline typing input */
+.preview-js-picker-tokenfield {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px;
+    min-height: 28px;
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--admin-bg, #1e1e1e);
+    border: 1px solid var(--admin-border, #444);
+    border-radius: var(--radius-sm, 3px);
+    cursor: text;
+}
+
+.preview-js-picker-tokenfield:focus-within {
+    border-color: var(--admin-primary, #4a9eff);
+    outline: none;
+}
+
+.preview-js-picker-typing {
+    flex: 1 1 60px;
+    min-width: 60px;
+    border: none;
+    background: transparent;
+    color: var(--admin-text);
+    font: inherit;
+    padding: 2px 0;
+    outline: none;
+}
+
+.preview-js-picker-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px var(--space-xs);
+    background: var(--admin-bg-secondary, #2a2a2a);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    font-size: 0.7rem;
+    color: var(--admin-text);
+    line-height: 1.2;
+}
+
+.preview-js-picker-chip-label {
+    font-family: var(--font-mono, monospace);
+}
+
+.preview-js-picker-chip-remove {
+    background: transparent;
+    border: none;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 0 2px;
+    line-height: 1;
+}
+
+.preview-js-picker-chip-remove:hover {
+    color: var(--admin-text);
+}
+
 /* ================================================
    ADD Mode Contextual Form Styles
    ================================================ */

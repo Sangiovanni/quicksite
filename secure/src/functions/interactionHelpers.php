@@ -183,13 +183,15 @@ if (!function_exists('parseCallSyntax')) {
             $functionName = $match[1];
             $paramsString = $match[2] ?? '';
             
-            // Parse params (comma-separated, but be careful with selectors)
-            // Simple approach: split by comma, handle common cases
+            // Parse params: split on commas NOT preceded by a backslash
+            // (so a single param can contain a literal comma escaped as "\,"),
+            // and not inside [...] either. Then unescape "\," → ",".
             $params = [];
             if (!empty($paramsString)) {
-                // Split by comma, but not commas inside brackets/quotes
-                $params = preg_split('/,(?![^\[]*\])/', $paramsString);
-                $params = array_map('trim', $params);
+                $params = preg_split('/(?<!\\\\),(?![^\[]*\])/', $paramsString);
+                $params = array_map(function ($p) {
+                    return trim(str_replace('\\,', ',', $p));
+                }, $params);
             }
             
             $interactions[] = [
@@ -211,7 +213,12 @@ if (!function_exists('generateCallSyntax')) {
         if (empty($params)) {
             return "{{call:{$function}}}";
         }
-        return "{{call:{$function}:" . implode(',', $params) . "}}";
+        // Escape commas inside individual params so a single param can contain
+        // a literal comma (e.g. a multi-selector matchAttr like ".a, .b").
+        $encoded = array_map(function ($p) {
+            return str_replace(',', '\\,', (string)$p);
+        }, $params);
+        return "{{call:{$function}:" . implode(',', $encoded) . "}}";
     }
 }
 

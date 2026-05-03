@@ -615,6 +615,19 @@
                 const params = interaction.params || [];
                 paramInputs.forEach((input, i) => {
                     if (params[i] !== undefined) {
+                        // For <select> form inputs (e.g. eventArg picker), if the
+                        // saved value isn't in the options list, inject it as a
+                        // "(legacy)" option so the user can still see/edit it.
+                        if (input.tagName === 'SELECT') {
+                            const v = params[i];
+                            const has = Array.from(input.options).some(o => o.value === v);
+                            if (!has) {
+                                const opt = document.createElement('option');
+                                opt.value = v;
+                                opt.textContent = v + ' (legacy)';
+                                input.appendChild(opt);
+                            }
+                        }
                         input.value = params[i];
                         input.dispatchEvent(new Event('input'));
                     }
@@ -741,14 +754,24 @@
     function _createArgRow(arg, paramIndex, updateFn, usePicker) {
         var row = document.createElement('div');
         row.className = 'preview-contextual-js-form-row';
-        
+
+        var inputType = arg.inputType || 'text';
+
+        // eventArg is auto-injected (no UI). Hide the entire row so it doesn't
+        // take up vertical space; the hidden form-input inside is still picked
+        // up by the param-collection sites at the correct index.
+        if (usePicker && inputType === 'eventArg') {
+            row.style.display = 'none';
+            row.appendChild(createEventArgInput(arg, paramIndex, updateFn));
+            return row;
+        }
+
         var label = document.createElement('label');
         label.className = 'preview-contextual-js-form-label';
         label.textContent = arg.name || ('Param ' + (paramIndex + 1));
         if (arg.required !== false) label.innerHTML += ' <span class="required">*</span>';
         row.appendChild(label);
-        
-        var inputType = arg.inputType || 'text';
+
         if (usePicker && (inputType === 'selector' || inputType === 'class' || inputType === 'matchTarget')) {
             var picker = createSearchablePicker(inputType, arg, paramIndex);
             row.appendChild(picker);
@@ -1155,35 +1178,107 @@
         // Split on first : that's not part of an escaped sequence
         return sel.replace(/::?[a-zA-Z-]+(\([^)]*\))?/g, '').trim() || sel;
     }
+
+    /**
+     * Render the `event` first-arg.
+     *
+     * QS.filter (and similar) need the literal `event` keyword as their first
+     * arg so they can read `event.target.value`. There's no useful alternative
+     * — the string-first-arg path in qs.js shifts all the args and reads from
+     * `document.activeElement`, which doesn't help anyone.
+     *
+     * So we don't expose this arg in the UI at all: just inject a hidden input
+     * carrying the literal `event` so the collection sites (which read all
+     * `.preview-contextual-js-form-input` in DOM order) still see the right
+     * value at the right index.
+     */
+    function createEventArgInput(arg, paramIndex, updateFn) {
+        const wrapper = document.createElement('div');
+        wrapper.style.display = 'none';
+
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.className = 'preview-contextual-js-form-input';
+        hidden.dataset.paramIndex = paramIndex;
+        hidden.dataset.paramName = arg.name || '';
+        hidden.dataset.inputType = 'eventArg';
+        hidden.value = 'event';
+
+        wrapper.appendChild(hidden);
+        return wrapper;
+    }
     
     /**
-     * Create a searchable picker input with dropdown suggestions
+     * Create a searchable picker input with dropdown suggestions.
+     *
+     * For inputType === 'matchTarget', renders a GitHub-style tokenfield:
+     * each committed selector is a chip; the trailing visible <input> is for
+     * typing the next selector. Comma or Enter commits the typed selector as
+     * a chip; Backspace at empty typing area deletes the previous chip. A
+     * hidden <input> carrying the joined value (the saved param) is what
+     * handleSave / updatePreview read via the .preview-contextual-js-form-input
+     * selector.
+     *
+     * For other inputTypes, the visible <input> is itself the form input.
      */
     function createSearchablePicker(inputType, arg, index) {
         const wrapper = document.createElement('div');
         wrapper.className = 'preview-js-picker-wrapper';
-        
+
+        const isTokenMode = inputType === 'matchTarget';
+
+        // ---- Token-mode helpers ----
+        function isSelectorPart(part) { return /^[.#> ]/.test(part); }
+        function parseSelectorList(str) {
+            return (str || '').split(',').map(s => s.trim()).filter(Boolean);
+        }
+        function isSelectorListValue(str) {
+            const parts = parseSelectorList(str);
+            return parts.length > 0 && parts.every(isSelectorPart);
+        }
+
+        // ---- Build the visible "input" element(s). ----
+        // tokenfield: the bordered visual input for matchTarget mode (chips + typing).
+        // input: the actual saved-value field (hidden in token mode, visible otherwise).
+        // typingInput: the inline typing field inside the tokenfield (token mode only).
+        let tokenfield = null;
+        let typingInput = null;
         const input = document.createElement('input');
-        input.type = 'text';
-        input.className = 'preview-contextual-js-form-input preview-js-picker-input';
         input.dataset.paramIndex = index;
         input.dataset.paramName = arg.name || '';
         input.dataset.inputType = inputType;
-        input.placeholder = arg.description || arg.name || '';
         input.autocomplete = 'off';
-        
-        if (arg.default !== undefined && arg.default !== null) {
-            input.value = arg.default;
-        }
-        
-        if (inputType === 'selector') {
+        input.className = 'preview-contextual-js-form-input preview-js-picker-input';
+        input.type = 'text';
+        input.placeholder = arg.description || arg.name || '';
+
+        if (isTokenMode) {
+            // In token mode the form-input element is hidden; the tokenfield is what the user sees.
+            input.type = 'hidden';
+            input.classList.remove('preview-js-picker-input');
+
+            tokenfield = document.createElement('div');
+            tokenfield.className = 'preview-js-picker-tokenfield';
+
+            typingInput = document.createElement('input');
+            typingInput.type = 'text';
+            typingInput.className = 'preview-js-picker-typing';
+            typingInput.autocomplete = 'off';
+            typingInput.placeholder = PreviewConfig.i18n?.matchTargetHint || 'textContent, .child-class, or data-attr';
+        } else if (inputType === 'selector') {
             input.placeholder = PreviewConfig.i18n?.selectorOrThis || 'Selector or "this"';
         } else if (inputType === 'class') {
             input.placeholder = PreviewConfig.i18n?.searchClass || 'Search class...';
-        } else if (inputType === 'matchTarget') {
-            input.placeholder = PreviewConfig.i18n?.matchTargetHint || 'textContent, .child-class, or data-attr';
         }
-        
+
+        // Initial value
+        if (arg.default !== undefined && arg.default !== null) {
+            input.value = arg.default;
+        }
+
+        // The element the user types into (and we attach key/focus events to).
+        const typeEl = isTokenMode ? typingInput : input;
+
         const dropdown = document.createElement('div');
         dropdown.className = 'preview-js-picker-dropdown';
         dropdown.style.display = 'none';
@@ -1342,8 +1437,12 @@
                                  item.type === 'tag' ? '<>' : '';
                 option.innerHTML = `<span class="preview-js-picker-type">${typeIcon}</span><span>${item.label}</span>`;
                 
+                // Prevent input blur on click — otherwise the typing buffer
+                // would be committed as a chip *before* applyPickedValue runs,
+                // resulting in two chips (the typed filter + the picked value).
+                option.addEventListener('mousedown', (e) => { e.preventDefault(); });
                 option.addEventListener('click', () => {
-                    input.value = item.value;
+                    applyPickedValue(item.value, item.type);
                     dropdown.style.display = 'none';
                     updatePreview();
                 });
@@ -1353,17 +1452,151 @@
             
             dropdown.style.display = '';
         }
-        
-        input.addEventListener('focus', () => renderDropdown(input.value));
-        input.addEventListener('input', () => {
-            renderDropdown(input.value);
+
+        // ---- Token-mode state & rendering ----
+        // `chips` is the source of truth for committed selectors. The hidden
+        // input.value is rebuilt from chips (or, when there are no chips, from
+        // the typing buffer for free-text values like textContent / data-foo).
+        // The typing input is purely a buffer until commit (comma, Enter, blur,
+        // or dropdown click for non-selector picks). Dropdown clicks for
+        // selector picks DISCARD the typing buffer (it was being used as a
+        // search filter, not a value).
+        let chips = [];
+
+        function syncHiddenValue() {
+            if (!isTokenMode) return;
+            if (chips.length > 0) {
+                input.value = chips.join(', ');
+            } else {
+                input.value = typingInput.value;
+            }
+        }
+
+        function renderChips() {
+            if (!isTokenMode) return;
+            // Clear all chip elements (keep typingInput).
+            Array.from(tokenfield.querySelectorAll('.preview-js-picker-chip')).forEach(c => c.remove());
+            chips.forEach((part, i) => {
+                const chip = document.createElement('span');
+                chip.className = 'preview-js-picker-chip';
+                const label = document.createElement('span');
+                label.className = 'preview-js-picker-chip-label';
+                label.textContent = part;
+                const close = document.createElement('button');
+                close.type = 'button';
+                close.className = 'preview-js-picker-chip-remove';
+                close.setAttribute('aria-label', 'Remove ' + part);
+                close.textContent = '✕';
+                close.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    chips.splice(i, 1);
+                    syncHiddenValue();
+                    renderChips();
+                    updatePreview();
+                    typingInput.focus();
+                });
+                chip.appendChild(label);
+                chip.appendChild(close);
+                tokenfield.insertBefore(chip, typingInput);
+            });
+        }
+
+        // Push a selector to chips (no duplicates). Returns true if added.
+        function pushChip(value) {
+            if (!value || !isSelectorPart(value)) return false;
+            if (chips.indexOf(value) !== -1) return false;
+            chips.push(value);
+            return true;
+        }
+
+        // Commit the current typing buffer as a chip when it's a selector.
+        // For non-selector text, leave it in the buffer (it stays as the value
+        // through syncHiddenValue). Returns true if a chip was added.
+        function commitTyping() {
+            if (!isTokenMode) return false;
+            const raw = typingInput.value.trim().replace(/,+$/, '').trim();
+            if (!raw) return false;
+            if (isSelectorPart(raw)) {
+                const added = pushChip(raw);
+                typingInput.value = '';
+                syncHiddenValue();
+                renderChips();
+                updatePreview();
+                return added;
+            }
+            // Non-selector: keep as the bare value (no chips).
+            chips = [];
+            // typingInput.value already holds it; just sync.
+            syncHiddenValue();
+            renderChips();
             updatePreview();
+            return false;
+        }
+
+        // Initialize chips from a pre-existing input.value (prefill from edit).
+        function initFromHiddenValue() {
+            if (!isTokenMode) return;
+            const v = input.value || '';
+            if (isSelectorListValue(v)) {
+                chips = parseSelectorList(v);
+                typingInput.value = '';
+            } else {
+                chips = [];
+                typingInput.value = v;
+            }
+            syncHiddenValue();
+            renderChips();
+        }
+
+        function applyPickedValue(value, type) {
+            if (isTokenMode) {
+                if (isSelectorPart(value)) {
+                    // DISCARD the typing buffer (it was a filter, not a value).
+                    pushChip(value);
+                    typingInput.value = '';
+                } else {
+                    // Non-selector pick (textContent / data-attr): exclusive value, clear chips.
+                    chips = [];
+                    typingInput.value = value;
+                }
+                syncHiddenValue();
+                renderChips();
+                typingInput.focus();
+            } else {
+                input.value = value;
+            }
+        }
+        
+        // Wire focus/input/blur/keys on the element the user actually types into.
+        typeEl.addEventListener('focus', () => renderDropdown(typeEl.value));
+        typeEl.addEventListener('input', () => {
+            if (isTokenMode) {
+                // If user typed a comma, commit-and-continue: split, push valid
+                // selector parts to chips, keep the trailing fragment in buffer.
+                if (typingInput.value.indexOf(',') !== -1) {
+                    const segs = typingInput.value.split(',');
+                    const trailing = segs.pop();
+                    segs.map(s => s.trim()).filter(Boolean).forEach(s => pushChip(s));
+                    typingInput.value = trailing;
+                    renderChips();
+                }
+                syncHiddenValue();
+                updatePreview();
+                renderDropdown(typingInput.value);
+            } else {
+                renderDropdown(typeEl.value);
+                updatePreview();
+            }
         });
-        input.addEventListener('blur', () => {
+        typeEl.addEventListener('blur', () => {
+            if (isTokenMode) {
+                commitTyping();
+            }
             setTimeout(() => { dropdown.style.display = 'none'; }, 200);
         });
         
-        input.addEventListener('keydown', (e) => {
+        typeEl.addEventListener('keydown', (e) => {
             const options = dropdown.querySelectorAll('.preview-js-picker-option');
             const current = dropdown.querySelector('.preview-js-picker-option--active');
             
@@ -1384,18 +1617,48 @@
             } else if (e.key === 'Enter') {
                 e.preventDefault();
                 if (current) {
-                    input.value = current.dataset.value;
+                    applyPickedValue(current.dataset.value, current.dataset.type);
                     dropdown.style.display = 'none';
                     updatePreview();
+                } else if (isTokenMode) {
+                    if (commitTyping()) {
+                        dropdown.style.display = 'none';
+                    }
                 }
             } else if (e.key === 'Escape') {
                 dropdown.style.display = 'none';
+            } else if (e.key === 'Backspace' && isTokenMode && typingInput.value === '') {
+                if (chips.length > 0) {
+                    chips.pop();
+                    syncHiddenValue();
+                    renderChips();
+                    updatePreview();
+                    e.preventDefault();
+                }
             }
         });
-        
-        wrapper.appendChild(input);
+
+        // Clicking anywhere on the tokenfield focuses the typing input.
+        if (isTokenMode) {
+            tokenfield.addEventListener('click', (e) => {
+                if (e.target === tokenfield) typingInput.focus();
+            });
+            // editInteraction prefill: when input.value is set programmatically
+            // and 'input' is dispatched on the hidden field, rebuild chips.
+            input.addEventListener('input', initFromHiddenValue);
+        }
+
+        // Final assembly.
+        if (isTokenMode) {
+            tokenfield.appendChild(typingInput);
+            wrapper.appendChild(tokenfield);
+            wrapper.appendChild(input); // hidden form field
+            initFromHiddenValue();
+        } else {
+            wrapper.appendChild(input);
+        }
         wrapper.appendChild(dropdown);
-        
+
         return wrapper;
     }
 
