@@ -1,4 +1,4 @@
-<!-- Keyframe Editor Modal (Phase 9.3) -->
+<!-- Keyframe Editor Modal -->
 <div class="preview-keyframe-modal" id="preview-keyframe-modal">
     <div class="preview-keyframe-modal__backdrop"></div>
     <div class="preview-keyframe-modal__content">

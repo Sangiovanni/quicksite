@@ -6715,7 +6715,7 @@ kbd {
 
 .preview-mobile-section--expanded .preview-mobile-section__content,
 .preview-element-info--expanded .preview-element-info__details,
-.preview-keyframe-modal--visible,
+.preview-keyframe-modal.preview-keyframe-modal--visible,
 .transform-editor__input-group,
 .transition-editor__property:hover .transition-editor__property-actions,
 .preview-contextual-js-page-events__actions,
@@ -8649,7 +8649,7 @@ code.preview-contextual-info__value {
     cursor: pointer;
 }
 
-/* ==================== Animations Tab (Phase 9.2) ==================== */
+/* ==================== Animations Tab ==================== */
 
 /* Animations Panel */
 
@@ -8792,7 +8792,7 @@ code.preview-contextual-info__value {
     background: #ef44441a;
 }
 
-/* Keyframe Editor Modal (Phase 9.3) */
+/* Keyframe Editor Modal */
 .preview-keyframe-modal {
     position: fixed;
     top: 0;
@@ -9083,7 +9083,7 @@ code.preview-contextual-info__value {
     color: var(--admin-text);
 }
 
-/* Phase 9.3.1: Property-Specific Input Types */
+/* Property-Specific Input Types */
 
 /* Range slider (opacity) */
 .preview-keyframe-modal__property-input-group--range {
@@ -9305,7 +9305,7 @@ code.preview-contextual-info__value {
     background: var(--admin-surface);
 }
 
-/* ==================== Transform Editor (Phase 9.3.1 Step 5) ==================== */
+/* ==================== Transform Editor ==================== */
 
 /* Transform input group in property row */
 
@@ -10082,7 +10082,7 @@ code.preview-contextual-info__value {
     transition: all 0.15s ease;
 }
 
-/* ==================== Animation Preview Modal (Phase 9.5) ==================== */
+/* ==================== Animation Preview Modal ==================== */
 
 .animation-preview__content {
     width: 500px;

@@ -296,7 +296,7 @@
             </div>
         </div>
         
-        <!-- Animations Panel (Phase 9.2) -->
+        <!-- Animations Panel -->
         <div class="preview-animations-panel" id="animations-panel" data-tab="animations" style="display: none;">
             <!-- Animations Loading -->
             <div class="preview-animations-loading" id="animations-loading">

@@ -336,6 +336,10 @@ Behaviour is declared **inline in the JSON structure** rather than injected as r
 
 The renderer turns `{{call:fn:arg1,arg2}}` into a namespaced call to a registered function. Only registered functions can be called; arbitrary inline JS is rejected. The keyword `event` passes through unquoted so handlers like `oninput="QS.filter(event, '.card')"` work.
 
+A single argument can contain literal commas by escaping them with `\,`. For example, `{{call:filter:event,.cmd-card,.cmd-name\, .cmd-description,hidden}}` passes `.cmd-name, .cmd-description` as a single `matchAttr` value (a comma-separated child-selector list, see `QS.filter`), not two separate args. Both the JSON-side parser (`interactionHelpers.parseCallSyntax`) and the renderer (`JsonToHtmlRenderer.transformCallSyntax`) honour the escape and unescape it before quoting.
+
+**Reserved class names.** `qs.js` self-injects `<style id="qs-hidden-style">.hidden{display:none!important}</style>` into the document head at script-load time so projects without a `.hidden` rule still get a working hide. This makes `.hidden` a **reserved QuickSite class**: do not redefine it in your CSS — the `!important` will win regardless and the override won't apply. To get animated/custom hide behaviour, define your own class (e.g. `.fade-out`) and pass it as the `hideClass` arg to `QS.show`/`QS.hide`/`QS.toggleHide`/`QS.filter` instead.
+
 The core registry currently exposes 16 built-ins:
 
 | Group | Functions |
@@ -348,6 +352,8 @@ The core registry currently exposes 16 built-ins:
 | Feedback | `QS.toast` |
 
 Use the live `listJsFunctions` command for the authoritative list — it is the registry the visual editor and `addInteraction` validate against.
+
+`QS.filter` accepts a polymorphic `matchAttr` (3rd arg): omit it (or pass `textContent`) to match the element's text; pass a `data-*` name to match an attribute; pass a CSS selector starting with `.`, `#`, `>` or space to match the concatenated `textContent` of one or more **descendant** elements (e.g. `.cmd-name, .cmd-description` for "search across both"). The descendant-text and textContent modes also highlight matches in place via an XSS-safe DOM walk (skipped above a 500-node budget).
 
 > _Roadmap note:_ this list will grow with beta.6 (interactions + search/filter), beta.7 (client-side API) and beta.8 (server-side API). Re-check this section when releasing those versions.
 

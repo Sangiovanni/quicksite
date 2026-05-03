@@ -1,0 +1,102 @@
+{
+    "$schema": "../schema.json",
+    "id": "keyframes-presets",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "🎬",
+        "name": "Keyframe Animation Presets",
+        "description": "Install a starter library of @keyframes animations (fade, slide, pulse, shake, collapse). Existing keyframes with the same name are skipped — your edits are safe.",
+        "category": "style",
+        "tags": ["animation", "keyframes", "css", "presets", "library"],
+        "difficulty": "beginner"
+    },
+    "parameters": [],
+    "staticData": {
+        "presets": [
+            {
+                "name": "qs-fade-in",
+                "frames": {
+                    "0%": "opacity: 0;",
+                    "100%": "opacity: 1;"
+                }
+            },
+            {
+                "name": "qs-fade-out",
+                "frames": {
+                    "0%": "opacity: 1;",
+                    "100%": "opacity: 0; visibility: hidden; pointer-events: none;"
+                }
+            },
+            {
+                "name": "qs-collapse-out",
+                "frames": {
+                    "0%": "opacity: 1; max-height: 500px;",
+                    "100%": "opacity: 0; max-height: 0; padding: 0; margin: 0; visibility: hidden;"
+                }
+            },
+            {
+                "name": "qs-slide-up-in",
+                "frames": {
+                    "0%": "transform: translateY(20px); opacity: 0;",
+                    "100%": "transform: translateY(0); opacity: 1;"
+                }
+            },
+            {
+                "name": "qs-slide-down-in",
+                "frames": {
+                    "0%": "transform: translateY(-20px); opacity: 0;",
+                    "100%": "transform: translateY(0); opacity: 1;"
+                }
+            },
+            {
+                "name": "qs-slide-left-in",
+                "frames": {
+                    "0%": "transform: translateX(20px); opacity: 0;",
+                    "100%": "transform: translateX(0); opacity: 1;"
+                }
+            },
+            {
+                "name": "qs-slide-right-in",
+                "frames": {
+                    "0%": "transform: translateX(-20px); opacity: 0;",
+                    "100%": "transform: translateX(0); opacity: 1;"
+                }
+            },
+            {
+                "name": "qs-pulse",
+                "frames": {
+                    "0%, 100%": "transform: scale(1);",
+                    "50%": "transform: scale(1.05);"
+                }
+            },
+            {
+                "name": "qs-shake",
+                "frames": {
+                    "0%, 100%": "transform: translateX(0);",
+                    "25%": "transform: translateX(-4px);",
+                    "75%": "transform: translateX(4px);"
+                }
+            },
+            {
+                "name": "qs-spin",
+                "frames": {
+                    "0%": "transform: rotate(0deg);",
+                    "100%": "transform: rotate(360deg);"
+                }
+            }
+        ]
+    },
+    "relatedCommands": ["setKeyframes"],
+    "steps": [
+        {
+            "comment": "Install each preset @keyframes. allowOverwrite=false → existing user-edited keyframes are preserved (409 Conflict is non-fatal).",
+            "forEach": "presets",
+            "command": "setKeyframes",
+            "params": {
+                "name": "{{$value.name}}",
+                "frames": "{{$value.frames}}",
+                "allowOverwrite": false
+            }
+        }
+    ]
+}

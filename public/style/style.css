@@ -1611,3 +1611,11 @@ footer, .footer {
     color: var(--text-primary);
     margin-bottom: 0.5rem;
 }
+
+/* QS.filter highlight */
+.qs-filter-hit {
+    background: var(--color-warning-bg, #fff3a3);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 1px;
+}

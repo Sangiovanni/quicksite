@@ -223,7 +223,7 @@
     const styleEditorReset = document.getElementById('style-editor-reset');
     const styleEditorSave = document.getElementById('style-editor-save');
     
-    // Animations panel elements (Phase 9.2)
+    // Animations panel elements
     const animationsPanel = document.getElementById('animations-panel');
     const animationsLoading = document.getElementById('animations-loading');
     const animationsContent = document.getElementById('animations-content');
@@ -237,7 +237,7 @@
     const animationsList = document.getElementById('animations-list');
     const animatedEmpty = document.getElementById('animated-empty');
     
-    // Keyframe Editor Modal elements (Phase 9.3)
+    // Keyframe Editor Modal elements
     const keyframeModal = document.getElementById('preview-keyframe-modal');
     const keyframeModalTitle = document.getElementById('keyframe-modal-title');
     const keyframeModalClose = document.getElementById('keyframe-modal-close');
@@ -383,7 +383,7 @@
     let deletedProperties = [];       // Original properties that have been deleted
     let stylePreviewInjected = false; // Whether live preview style is injected
     
-    // Animations tab state (Phase 9.2)
+    // Animations tab state
     let animationsLoaded = false;     // Whether animations data has been loaded
     let keyframesData = [];           // All @keyframes from CSS
     let animatedSelectorsData = {     // Selectors with transition/animation properties
@@ -393,13 +393,13 @@
     };
     let keyframePreviewActive = null; // Name of keyframe being previewed
     
-    // Keyframe Editor state (Phase 9.3)
+    // Keyframe Editor state
     let keyframeEditorMode = 'edit';  // 'edit' or 'create'
     let editingKeyframeName = null;   // Original name (for rename detection)
     let keyframeFrames = {};          // Current frame data: { '0%': { opacity: '0' }, '100%': { opacity: '1' } }
     let selectedFramePercent = null;  // Currently selected frame in timeline
     
-    // ==================== Property Type Registry (Phase 9.3.1) ====================
+    // ==================== Property Type Registry ====================
     
     /**
      * Property type definitions for keyframe editor
@@ -490,7 +490,7 @@
         'scale': { type: 'text' },  // e.g., "1.5" or "1.2 0.8"
         
         // Complex properties - text input fallback (Phase 2 for specialized editors)
-        'transform': { type: 'transform' },  // Phase 9.3.1 Step 5: Transform Sub-Editor
+        'transform': { type: 'transform' },  // Transform Sub-Editor
         'filter': { type: 'text' },
         'box-shadow': { type: 'text' },
         'text-shadow': { type: 'text' },
@@ -1535,7 +1535,7 @@
         }
     }
     
-    // ==================== Transform Sub-Editor (Phase 9.3.1 Step 5) ====================
+    // ==================== Transform Sub-Editor ====================
     
     /**
      * Transform function definitions
@@ -2000,6 +2000,8 @@
             PreviewTransitionEditor.open(selector, onSave);
         }
     }
+    // Expose for cross-module callers (e.g. preview-style-animations.js animated-selector clicks)
+    window.openTransitionEditor = openTransitionEditor;
     
     /**
      * Close the Transition Editor (delegates to module)
@@ -3132,7 +3134,7 @@
                     loadStyleSelectors();
                 }
                 
-                // Load animations when switching to animations tab (Phase 9.2)
+                // Load animations when switching to animations tab
                 if (tabName === 'animations' && !animationsLoaded) {
                     loadAnimationsTab();
                 }
@@ -3143,7 +3145,7 @@
         initAnimationsGroups();
     }
     
-    // ==================== Animations Tab (Phase 9.2) ====================
+    // ==================== Animations Tab ====================
     // Animation functionality has been extracted to preview-style-animations.js
     // See: /admin/assets/js/pages/preview/preview-style-animations.js
     // Public API: PreviewStyleAnimations.init(), .load(), .isLoaded(), .reset()
@@ -8487,7 +8489,7 @@
             showToast(PreviewConfig.i18n?.enumSaved || 'Enum saved', 'success');
             componentsLoaded = false; // Invalidate component cache
             
-            // Phase 9: Auto-create CSS stubs for class-bound enum values
+            // Auto-create CSS stubs for class-bound enum values
             await createCssStubsForEnumIfNeeded(enumsPanelStructure, currentVarName, map);
             
             reloadPreview();

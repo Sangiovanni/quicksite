@@ -1,4 +1,4 @@
-<!-- Animation Preview Modal (Phase 9.5) -->
+<!-- Animation Preview Modal -->
 <div class="preview-keyframe-modal animation-preview" id="animation-preview-modal">
     <div class="preview-keyframe-modal__backdrop"></div>
     <div class="preview-keyframe-modal__content animation-preview__content">

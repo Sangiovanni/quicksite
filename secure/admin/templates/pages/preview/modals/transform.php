@@ -1,4 +1,4 @@
-<!-- Transform Editor Modal (Phase 9.3.1 Step 5) -->
+<!-- Transform Editor Modal -->
 <div class="preview-keyframe-modal transform-editor" id="transform-editor-modal">
     <div class="preview-keyframe-modal__backdrop"></div>
     <div class="preview-keyframe-modal__content transform-editor__content">

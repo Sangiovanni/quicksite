@@ -105,10 +105,6 @@ if (is_dir($componentsDir)) {
 
 <!-- Legacy Panels (deprecated, kept for compatibility) -->
 <?php include __DIR__ . '/preview/deprecated-panels.php'; ?>
-<?php include __DIR__ . '/preview/modals/keyframe.php'; ?>
-<?php include __DIR__ . '/preview/modals/transform.php'; ?>
-<?php include __DIR__ . '/preview/modals/transition.php'; ?>
-<?php include __DIR__ . '/preview/modals/animation-preview.php'; ?>
 
         </div><!-- End preview-sidebar__options -->
         <div class="preview-sidebar__resize" id="sidebar-resize"></div>
@@ -117,6 +113,12 @@ if (is_dir($componentsDir)) {
     <!-- Main Preview Area -->
     <?php include __DIR__ . '/preview/main-area.php'; ?>
 </div><!-- End preview-workspace -->
+
+<!-- Modals (top-level so position:fixed isn't constrained by any ancestor containing block) -->
+<?php include __DIR__ . '/preview/modals/keyframe.php'; ?>
+<?php include __DIR__ . '/preview/modals/transform.php'; ?>
+<?php include __DIR__ . '/preview/modals/transition.php'; ?>
+<?php include __DIR__ . '/preview/modals/animation-preview.php'; ?>
 
 <script src="<?= $baseUrl ?>/admin/assets/js/components/colorpicker.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/components/colorpicker.js') ?>"></script>
 <?php include __DIR__ . '/preview-config.php'; ?>
