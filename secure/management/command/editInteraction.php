@@ -165,7 +165,15 @@ function __command_editInteraction(array $params = [], array $urlParams = []): A
         return ApiResponse::create(404, 'node.not_found')
             ->withMessage("Node not found: {$nodeId}");
     }
-    
+
+    // Interactions can only live on a tag node. textKey nodes have no
+    // params slot in the renderer (renderTextNode ignores them).
+    if (!isset($node['tag']) && isset($node['textKey'])) {
+        return ApiResponse::create(422, 'node.invalid_target')
+            ->withMessage('Interactions must be attached to a tag node, not a text node. Select the parent element and try again.')
+            ->withData(['nodeId' => $nodeId, 'nodeType' => 'textKey']);
+    }
+
     // ==========================================================================
     // PARSE AND UPDATE INTERACTIONS
     // ==========================================================================

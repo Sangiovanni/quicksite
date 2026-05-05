@@ -23,6 +23,11 @@
     const ctxNavPrev = document.getElementById('ctx-nav-prev');
     const ctxNavNext = document.getElementById('ctx-nav-next');
     const ctxNavChild = document.getElementById('ctx-nav-child');
+    // JS-mode mirror buttons (same behaviour, scoped to JS contextual panel)
+    const jsNavParent = document.getElementById('js-nav-parent');
+    const jsNavPrev = document.getElementById('js-nav-prev');
+    const jsNavNext = document.getElementById('js-nav-next');
+    const jsNavChild = document.getElementById('js-nav-child');
     
     // ==================== State Access ====================
     
@@ -54,6 +59,10 @@
         if (ctxNavPrev) ctxNavPrev.disabled = !state.navHasPrevSibling;
         if (ctxNavNext) ctxNavNext.disabled = !state.navHasNextSibling;
         if (ctxNavChild) ctxNavChild.disabled = !state.navHasChildren;
+        if (jsNavParent) jsNavParent.disabled = !state.navHasParent;
+        if (jsNavPrev) jsNavPrev.disabled = !state.navHasPrevSibling;
+        if (jsNavNext) jsNavNext.disabled = !state.navHasNextSibling;
+        if (jsNavChild) jsNavChild.disabled = !state.navHasChildren;
     }
     
     /**
@@ -158,6 +167,10 @@
     if (ctxNavPrev) ctxNavPrev.addEventListener('click', navigateToPrevSibling);
     if (ctxNavNext) ctxNavNext.addEventListener('click', navigateToNextSibling);
     if (ctxNavChild) ctxNavChild.addEventListener('click', navigateToFirstChild);
+    if (jsNavParent) jsNavParent.addEventListener('click', navigateToParent);
+    if (jsNavPrev) jsNavPrev.addEventListener('click', navigateToPrevSibling);
+    if (jsNavNext) jsNavNext.addEventListener('click', navigateToNextSibling);
+    if (jsNavChild) jsNavChild.addEventListener('click', navigateToFirstChild);
     
     // ==================== Public API ====================
     

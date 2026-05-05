@@ -153,7 +153,16 @@ function __command_addInteraction(array $params = [], array $urlParams = []): Ap
             ->withMessage("Node not found: {$actualNodeId}")
             ->withData(['nodeId' => $actualNodeId, 'structType' => $structType]);
     }
-    
+
+    // Interactions can only live on a tag node. textKey nodes have no
+    // params slot in the renderer (renderTextNode ignores them), so any
+    // onclick written here would be silently dropped at render time.
+    if (!isset($node['tag']) && isset($node['textKey'])) {
+        return ApiResponse::create(422, 'node.invalid_target')
+            ->withMessage('Interactions must be attached to a tag node, not a text node. Select the parent element (e.g. the button or link) and try again.')
+            ->withData(['nodeId' => $actualNodeId, 'nodeType' => 'textKey']);
+    }
+
     // Generate the call syntax
     $callSyntax = generateCallSyntax($function, $functionParams);
     

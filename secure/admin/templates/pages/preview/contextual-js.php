@@ -110,6 +110,29 @@
             <span class="preview-contextual-js-label"><?= __admin('preview.element') ?? 'Element' ?>:</span>
             <code class="preview-contextual-js-value" id="js-element-info">-</code>
         </div>
+        <!-- Navigation Buttons (mirror of select-mode nav, scoped to JS panel) -->
+        <div class="preview-contextual-info__nav" id="js-node-nav">
+            <button type="button" class="preview-nav-btn" id="js-nav-parent" title="<?= __admin('preview.goToParent') ?? 'Go to Parent (↑)' ?>" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="18 15 12 9 6 15"/>
+                </svg>
+            </button>
+            <button type="button" class="preview-nav-btn" id="js-nav-prev" title="<?= __admin('preview.goToPrevSibling') ?? 'Previous Sibling (←)' ?>" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"/>
+                </svg>
+            </button>
+            <button type="button" class="preview-nav-btn" id="js-nav-next" title="<?= __admin('preview.goToNextSibling') ?? 'Next Sibling (→)' ?>" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"/>
+                </svg>
+            </button>
+            <button type="button" class="preview-nav-btn" id="js-nav-child" title="<?= __admin('preview.goToFirstChild') ?? 'First Child (↓)' ?>" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </button>
+        </div>
     </div>
     
     <!-- Interactions List -->

@@ -384,6 +384,15 @@ class JsonToHtmlRenderer {
             return '';
         }
 
+        // Drift detector: text nodes have no `params` slot in the renderer,
+        // so any attribute (typically a stray onclick written by an old
+        // addInteraction call) is silently dropped. Log it so future drift
+        // is visible without changing rendered output.
+        if (!empty($node['params']) && is_array($node['params'])) {
+            error_log('[JsonToHtmlRenderer] textKey node has params (will be ignored): '
+                . $textKey . ' params=' . json_encode(array_keys($node['params'])));
+        }
+
         // Check if it's raw text (not a translation key)
         if (strpos($textKey, '__RAW__') === 0) {
             $rawText = substr($textKey, 7); // Remove __RAW__ prefix

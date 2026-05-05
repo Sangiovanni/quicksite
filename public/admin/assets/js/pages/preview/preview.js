@@ -3502,6 +3502,24 @@
             if (e.data.action === 'interactionSelected') {
                 showJsPanel(e.data);
                 updateGlobalElementInfo(e.data.element);
+                // Mirror the selection into the shared selectedStruct/Node
+                // and PreviewState navigation flags so arrow-key navigation
+                // (PreviewNavigation.handleArrowKey) works in JS mode the
+                // same way it does in select mode.
+                const elInfo = e.data.element || {};
+                selectedStruct = elInfo.struct || null;
+                selectedNode = elInfo.isComponent ? elInfo.componentNode : elInfo.node;
+                if (window.PreviewState) {
+                    PreviewState.set('selectedStruct', selectedStruct);
+                    PreviewState.set('selectedNode', selectedNode);
+                    PreviewState.set('navHasParent', elInfo.hasParent || false);
+                    PreviewState.set('navHasPrevSibling', elInfo.hasPrevSibling || false);
+                    PreviewState.set('navHasNextSibling', elInfo.hasNextSibling || false);
+                    PreviewState.set('navHasChildren', elInfo.hasChildren || false);
+                }
+                if (window.PreviewNavigation) {
+                    PreviewNavigation.updateButtons();
+                }
             }
             if (e.data.action === 'textElementInfo') {
                 updateGlobalElementInfo(e.data.element);
@@ -3826,8 +3844,8 @@
                 if (PreviewDrag.handleKeydown(e)) return;
             }
             
-            // Arrow keys - Navigate selection (only in select mode with a selection)
-            if (currentMode === 'select' && selectedStruct && selectedNode != null) {
+            // Arrow keys - Navigate selection (select mode and JS mode)
+            if ((currentMode === 'select' || currentMode === 'js') && selectedStruct && selectedNode != null) {
                 if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
                     if (window.PreviewNavigation && PreviewNavigation.handleArrowKey(e.key)) {
                         e.preventDefault();

@@ -212,11 +212,25 @@
         clearSelection();
         clearHover();
         selectedElement = el;
+        // In JS mode, mirror the click-mode visual class and emit
+        // the JS-mode event so the JS panel updates instead of the
+        // generic select panel.
+        if (currentMode === 'js') {
+            document.querySelectorAll('.qs-js-selected').forEach(function(n){ n.classList.remove('qs-js-selected'); });
+            el.classList.add('qs-js-selected');
+            const info = getElementInfo(el);
+            window.parent.postMessage({
+                source: 'quicksite-preview',
+                action: 'interactionSelected',
+                element: info
+            }, ALLOWED_ORIGIN);
+            return;
+        }
         el.classList.add('qs-selected');
-        
+
         const info = getElementInfo(el);
-        window.parent.postMessage({ 
-            source: 'quicksite-preview', 
+        window.parent.postMessage({
+            source: 'quicksite-preview',
             action: 'elementSelected',
             ...info
         }, ALLOWED_ORIGIN);
@@ -2331,23 +2345,35 @@
         // JS mode: click on element to manage interactions
         if (currentMode === 'js') {
             e.stopImmediatePropagation();
-            
-            const target = getSelectableTarget(e.target, e.clientX, e.clientY);
+
+            let target = getSelectableTarget(e.target, e.clientX, e.clientY);
+            // Interactions can never live on a text-only node (textKey).
+            // The renderer wraps text in a <span data-qs-textkey data-qs-textonly>
+            // which carries its own data-qs-node, so a naive "closest [data-qs-node]"
+            // walk lands on the span instead of the parent tag. Walk one step up
+            // to the nearest real tag node so the JS panel always targets an
+            // element that actually accepts params.
+            if (target && target.hasAttribute('data-qs-textonly')) {
+                const realTag = target.parentElement
+                    ? target.parentElement.closest('[data-qs-node]:not([data-qs-textonly])')
+                    : null;
+                if (realTag) target = realTag;
+            }
             if (target) {
                 // Remove previous selection
                 document.querySelectorAll('.qs-js-selected').forEach(el => {
                     el.classList.remove('qs-js-selected');
                 });
-                
+
                 selectedElement = target;
                 target.classList.add('qs-js-selected');
-                
+
                 const elementInfo = getElementInfo(target);
-                
+
                 console.log('[QuickSite] JS mode - element selected:', elementInfo);
-                
-                window.parent.postMessage({ 
-                    source: 'quicksite-preview', 
+
+                window.parent.postMessage({
+                    source: 'quicksite-preview',
                     action: 'interactionSelected',
                     element: elementInfo
                 }, ALLOWED_ORIGIN);
@@ -2358,6 +2384,25 @@
     
     // Keyboard handling for text editing and drag mode navigation
     document.addEventListener('keydown', function(e) {
+        // JS mode: arrow keys navigate the current selection (mirror of select mode).
+        // Iframe-side handler is needed because the iframe captures focus after
+        // a click, so the parent-side keydown listener never receives arrow keys.
+        if (currentMode === 'js' && selectedElement && selectedElement.hasAttribute && selectedElement.hasAttribute('data-qs-node')) {
+            // Don't hijack arrows while typing in any input/textarea inside the iframe
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+                // fall through to other handlers below
+            } else {
+                const struct = selectedElement.getAttribute('data-qs-struct');
+                const nodeId = selectedElement.getAttribute('data-qs-node');
+                if (struct && nodeId !== null) {
+                    if (e.key === 'ArrowUp')    { e.preventDefault(); navigateToParent(struct, nodeId); return; }
+                    if (e.key === 'ArrowDown')  { e.preventDefault(); navigateToFirstChild(struct, nodeId); return; }
+                    if (e.key === 'ArrowLeft')  { e.preventDefault(); navigateToPrevSibling(struct, nodeId); return; }
+                    if (e.key === 'ArrowRight') { e.preventDefault(); navigateToNextSibling(struct, nodeId); return; }
+                }
+            }
+        }
+
         // Drag mode: arrow key navigation (Phase 1 only) and Escape
         if (currentMode === 'drag') {
             // Escape cancels active drag or unlocks
