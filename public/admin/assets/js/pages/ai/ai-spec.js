@@ -685,7 +685,16 @@
 
         // -- Send to AI --
         if (els.sendToAiBtn) {
-            els.sendToAiBtn.addEventListener('click', () => sendToAi(config, els, state, aiProvider));
+            els.sendToAiBtn.addEventListener('click', (ev) => {
+                // While a request is streaming, the button morphs into a
+                // Stop control. The dedicated stop handler set on the
+                // button itself (see sendToAi()) handles the abort; we
+                // must NOT start a second request here, otherwise the
+                // first stream's abort kills the visible counter while a
+                // brand-new request keeps streaming silently.
+                if (window.__qsAiInFlight) { ev.preventDefault(); return; }
+                sendToAi(config, els, state, aiProvider);
+            });
         }
 
         // -- Export --
@@ -1464,23 +1473,32 @@
         let lastChars = 0;
         const abortController = new AbortController();
         let userAborted = false;
+        window.__qsAiInFlight = true;
 
-        // Cancel functionality — morph button into Stop.
-        const originalOnClick = els.sendToAiBtn.onclick;
+        // Cancel functionality — morph button into Stop. We replace the
+        // button entirely with a clone so we can attach a single click
+        // listener that aborts — the original delegated `addEventListener`
+        // handler bails when __qsAiInFlight is true, but a fresh listener
+        // is the safest way to ensure abort is the ONLY behaviour while
+        // the request is in flight.
         els.sendToAiBtn.disabled = false;
         els.sendToAiBtn.classList.add('admin-btn--danger');
         if (els.sendToAiText) els.sendToAiText.textContent = '⏹ Stop';
-        els.sendToAiBtn.onclick = () => {
+        const stopHandler = (ev) => {
+            ev.preventDefault();
+            ev.stopImmediatePropagation();
             userAborted = true;
-            abortController.abort();
+            try { abortController.abort(); } catch (_e) {}
         };
+        els.sendToAiBtn.addEventListener('click', stopHandler, { capture: true });
 
         const restoreButton = () => {
+            els.sendToAiBtn.removeEventListener('click', stopHandler, { capture: true });
             els.sendToAiBtn.classList.remove('admin-btn--danger');
-            els.sendToAiBtn.onclick = originalOnClick;
             els.sendToAiBtn.disabled = false;
             if (els.sendToAiText) els.sendToAiText.textContent = originalText;
             if (counterTick) { clearInterval(counterTick); counterTick = null; }
+            window.__qsAiInFlight = false;
         };
 
         try {
