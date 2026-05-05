@@ -21,7 +21,8 @@ window.QuickSiteStorageKeys = Object.freeze({
     apiAuthTokens:       'qs_api_auth_tokens',
 
     // AI provider settings
-    aiKeysV2:            'quicksite_ai_keys_v2',
+    aiKeysV2:            'quicksite_ai_keys_v2',          // deprecated: read-only for v2->v3 migration
+    aiConnectionsV3:     'quicksite_ai_connections_v3',   // current AI connections store
     aiDefaultProvider:   'quicksite_ai_default_provider',
     aiPersist:           'quicksite_ai_persist',
     aiAutoPreview:       'quicksite_ai_auto_preview',

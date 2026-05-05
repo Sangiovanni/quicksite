@@ -122,8 +122,12 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 |---|---|
 | `pages/ai/ai-index.js` | Workflow / spec listing, search, filters → `/admin/api/ai-spec/list`. |
 | `pages/ai/ai-editor.js` | Spec editor (validation, preview, save) → `/admin/api/ai-spec/{get,save,delete}`. |
-| `pages/ai/ai-settings.js` | AI provider setup, BYOK keys → `/admin/api/ai-providers`. |
-| `pages/ai/ai-spec.js` | Workflow execution: resolve → render-prompt → execute → `/admin/api/workflow/*` and `/admin/api/batch/execute`. |
+| `pages/ai/ai-connections.js` | BYOK connection wizard + connection list (cloud + local). Persists to the v3 store; no PHP roundtrip. |
+| `pages/ai/ai-spec.js` | Workflow execution: resolve → render-prompt → execute. AI dispatch goes browser-direct via `QSAiCall`. |
+| `pages/ai/lib/provider-catalog.js` | Pure data + per-provider HTTP helpers (URL / headers / body / parser). Used by `ai-connections.js` and `ai-call.js`. |
+| `pages/ai/lib/connections-store.js` | v3 storage CRUD (`aiConnectionsV3`), `getActive()`, `recordStatus()`. |
+| `pages/ai/lib/ai-call.js` | Browser-direct AI dispatcher (`QSAiCall.call`) with SSE streaming + abort + typed errors. |
+| `pages/ai/lib/local-presets.js` | Prefill values for the local AI wizard (Ollama, LM Studio) including origin-scoped CORS instructions. |
 
 ### 5.5 Preview subsystem (`pages/preview/`)
 
@@ -166,9 +170,10 @@ Every localStorage / sessionStorage key is declared as a constant in `js/core/st
 | `PREFS` | localStorage | `utils.js`, `admin.js`, `settings.js`, `preview-sidebar-resize.js` |
 | `PENDING_MESSAGE` | sessionStorage | `utils.js`, `admin.js` |
 | `API_AUTH_TOKENS` | localStorage | `apis.js` |
-| `AI_KEYS_V2` | localStorage / sessionStorage | `ai-spec.js`, `ai-settings.js`, `settings.js` |
-| `AI_DEFAULT_PROVIDER` | localStorage / sessionStorage | `ai-spec.js`, `ai-settings.js`, `settings.js` |
-| `AI_PERSIST` | localStorage | `ai-spec.js`, `ai-settings.js`, `settings.js` |
+| `AI_CONNECTIONS_V3` | localStorage | `ai-connections.js`, `ai-spec.js`, `connections-store.js` (canonical) |
+| `AI_KEYS_V2` | localStorage / sessionStorage | `ai-spec.js`, `settings.js` (deprecated, read-only fallback) |
+| `AI_DEFAULT_PROVIDER` | localStorage / sessionStorage | `ai-spec.js`, `settings.js` (legacy v2 selector) |
+| `AI_PERSIST` | localStorage | `ai-spec.js`, `settings.js` |
 | `AI_AUTO_PREVIEW` | localStorage | `settings.js`, `ai-spec.js` |
 | `AI_AUTO_EXECUTE` | localStorage | `settings.js`, `ai-spec.js` |
 
@@ -270,7 +275,7 @@ For the full per-command reference see [COMMAND_API.md](COMMAND_API.md).
 | **Sitemap** (`sitemap.js`) | Route tree, reachability, ordering. |
 | **Embed security** (`embed-security.js`) | `getEmbedSecurity` / `setEmbedSecurity`. |
 | **Optimize** (`optimize.js`) | UI for the CSS Refiner library; runs analyzers, presents diffs, applies edits via `editStyles` / `setRootVariables`. |
-| **AI workspace** (`pages/ai/*`) | Listing, editing, executing AI workflow specs against `/admin/api/ai-spec/*`, `/admin/api/ai-providers`, `/admin/api/workflow/*`, `/admin/api/batch/execute`. See [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md). |
+| **AI workspace** (`pages/ai/*`) | Listing, editing, executing AI workflow specs against `/admin/api/ai-spec/*`, `/admin/api/workflow/*`, `/admin/api/batch/execute`. AI dispatch itself is browser-direct (`QSAiCall`). See [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md). |
 
 ---
 

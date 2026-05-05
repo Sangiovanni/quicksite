@@ -19,7 +19,8 @@ class AdminRouter {
         'command',     // Individual command pages
         'settings',    // Settings and configuration
         'workflows',   // Workflows (AI and manual)
-        'ai-settings', // AI Provider Settings (BYOK)
+        'ai-settings', // Legacy alias (redirects to ai-connections)
+        'ai-connections', // AI Connections (cloud BYOK + local AI)
         'embed-security', // Embed Security (iframe sandbox)
         'preview',     // Visual Editor (route kept as 'preview' for URL compatibility)
         'apis',        // External API Registry
@@ -182,10 +183,14 @@ class AdminRouter {
         'assets'         => ['listAssets', 'uploadAsset'],
         'sitemap'        => ['getSiteMap', 'addRoute'],
         'optimize'       => ['getStyles', 'editStyles'],
-        'ai-settings'    => ['listAiProviders'],
+        // 'ai-connections' has no permission gate: it is a UI over
+        // browser-stored data. Any authenticated admin can view it.
+        // (Old 'ai-settings' route 301-redirects to it in dispatch().)
         'apis'           => ['listApiEndpoints'],
         'embed-security' => ['getIframeSandbox'],
-        'workflows'      => ['callAi'],
+        // 'workflows' is no longer gated by callAi: AI calls now happen in
+        // the browser via QSAiCall (no PHP proxy). Any admin user can open
+        // the workflows UI.
     ];
 
     /**
@@ -309,6 +314,11 @@ class AdminRouter {
         if ($this->page === 'logout') {
             $this->clearToken();
             $this->redirect('login');
+        }
+
+        // Legacy: ai-settings -> ai-connections (Phase 3 rename).
+        if ($this->page === 'ai-settings') {
+            $this->redirect('ai-connections');
         }
         
         // Check authentication for protected pages

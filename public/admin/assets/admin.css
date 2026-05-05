@@ -1,4 +1,4 @@
-/* =============================================================================
+﻿/* =============================================================================
    QUICKSITE ADMIN PANEL STYLES
    =============================================================================
    Admin-specific styles with self-contained variables.
@@ -5044,7 +5044,7 @@ kbd {
 }
 
 .admin-details__summary::before {
-    content: '▶';
+    content: 'â–¶';
     display: inline-block;
     margin-right: var(--space-sm);
     transition: transform 0.2s;
@@ -5857,7 +5857,7 @@ kbd {
     display: none !important;
 }
 
-/* Disabled state for restricted commands (shown in search with ≤3 results) */
+/* Disabled state for restricted commands (shown in search with â‰¤3 results) */
 .admin-disabled-permission {
     opacity: 0.5;
     pointer-events: none;
@@ -5865,7 +5865,7 @@ kbd {
 }
 
 .admin-disabled-permission::after {
-    content: '🔒';
+    content: 'ðŸ”’';
     margin-left: var(--space-sm);
     font-size: var(--font-size-xs);
 }
@@ -6350,9 +6350,9 @@ kbd {
     padding: var(--space-xs);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    PREVIEW WORKSPACE LAYOUT - Sidebar + Main Area
-   ═══════════════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .preview-workspace {
     display: flex;
@@ -6598,17 +6598,17 @@ kbd {
     background: transparent;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    PREVIEW RESPONSIVE - Tablet & Mobile Layouts
-   ═══════════════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 /* Tablet: Icon-only sidebar */
 
 /* Mobile: Bottom toolbar, hide sidebar */
 
-/* ═══════════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    MOBILE SECTIONS - Independent collapsible sections for info & actions (mobile only)
-   ═══════════════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .preview-mobile-sections {
     display: none; /* Hidden on desktop, shown on mobile via media query */
@@ -6777,9 +6777,9 @@ kbd {
     padding: var(--space-xs) 0;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    GLOBAL ELEMENT INFO BAR - Bottom of workspace, visible for all tools
-   ═══════════════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .preview-element-info {
     display: flex;
@@ -6898,9 +6898,9 @@ kbd {
 
 /* Adjust preview container for mobile bottom toolbar */
 
-/* ═══════════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    COMPONENT WARNING BANNER - Shown when editing a component template
-   ═══════════════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .preview-component-warning {
     display: flex;
@@ -6985,9 +6985,9 @@ kbd {
     opacity: 1;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    CONTEXTUAL AREA - Phase 8: Dynamic content area between toolbar and preview
-   ═══════════════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .preview-contextual-area {
     position: relative;
@@ -11004,7 +11004,7 @@ code.preview-node-panel__value {
     border-left: 2px solid var(--admin-border, #333);
 }
 
-/* ── Response Bindings UI ── */
+/* â”€â”€ Response Bindings UI â”€â”€ */
 .preview-contextual-js-response-bindings {
     margin: var(--space-sm) 0;
     padding: var(--space-sm);
@@ -13415,6 +13415,141 @@ code.preview-node-panel__value {
     text-align: center;
 }
 
+/* ========================================================================
+   AI Connections page (Phase 3) â€” connection cards, status dots, wizard
+   ======================================================================== */
+.qsac-card {
+    border: 1px solid var(--color-border, #e5e7eb);
+    border-radius: var(--radius-md, 6px);
+    padding: var(--space-md);
+    margin-bottom: var(--space-sm);
+    background: var(--color-bg-elevated, #fff);
+}
+.qsac-card__head { display: flex; align-items: center; gap: var(--space-sm); font-weight: 600; font-size: 1rem; }
+.qsac-card__head .qsac-name { flex: 1; }
+.qsac-card__logo {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; flex: 0 0 28px;
+    color: var(--color-text, #111827);
+}
+.qsac-card__logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.qsac-card__logo-emoji { font-size: 1.25rem; line-height: 1; }
+.qsac-star { cursor: pointer; user-select: none; font-size: 1.1rem; }
+.qsac-status { cursor: pointer; user-select: none; font-size: 1.1rem; }
+.qsac-card__meta {
+    color: var(--color-text-muted, #6b7280);
+    font-size: 0.85rem; margin-top: 4px;
+    display: flex; flex-wrap: wrap; gap: 2px 0;
+}
+.qsac-card__actions { margin-top: var(--space-sm); display: flex; gap: var(--space-xs); flex-wrap: wrap; }
+.qsac-type {
+    display: inline-block; padding: 1px 8px; border-radius: 999px;
+    font-size: 0.75rem; font-weight: 600;
+    background: var(--color-bg-muted, #f3f4f6);
+}
+.qsac-type--local { background: #ecfdf5; color: #047857; }
+.qsac-type--cloud { background: #eff6ff; color: #1d4ed8; }
+.qsac-key-hint {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    background: var(--color-bg-muted, #f3f4f6);
+    padding: 0 6px; border-radius: 3px;
+}
+.qsac-key-hint--none { font-style: italic; opacity: 0.7; background: transparent; }
+
+.qsac-dot { display: inline-block; line-height: 1; }
+.qsac-dot--ok { color: #16a34a; }
+.qsac-dot--stale { color: #ca8a04; }
+.qsac-dot--err { color: #dc2626; }
+.qsac-dot--unknown { color: #9ca3af; }
+
+.qsac-kinds {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-sm); margin-top: var(--space-sm);
+}
+@media (max-width: 800px) { .qsac-kinds { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 600px) { .qsac-kinds { grid-template-columns: repeat(2, 1fr); } }
+.qsac-kinds-heading {
+    margin: var(--space-md) 0 0;
+    font-size: 0.8rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--color-text-muted, #6b7280);
+}
+.qsac-kinds-heading:first-of-type { margin-top: var(--space-sm); }
+.qsac-kind {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 6px; padding: var(--space-md) var(--space-sm);
+    border: 1px solid var(--color-border, #e5e7eb);
+    border-radius: var(--radius-md, 6px);
+    background: var(--color-bg-elevated, #fff);
+    cursor: pointer; transition: border-color 0.15s, background 0.15s, transform 0.1s;
+    text-align: center;
+}
+.qsac-kind:hover { border-color: var(--color-primary, #3b82f6); background: var(--color-bg-hover, #f9fafb); }
+.qsac-kind:active { transform: translateY(1px); }
+.qsac-kind__icon {
+    display: flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px;
+    font-size: 1.6rem; line-height: 1;
+}
+.qsac-kind__logo {
+    max-width: 100%; max-height: 100%;
+    object-fit: contain;
+    /* Some logos ship as currentColor monochrome — give them a sensible default. */
+    color: var(--color-text, #111827);
+}
+.qsac-kind__emoji { font-size: 1.6rem; line-height: 1; }
+.qsac-kind__label { font-weight: 600; font-size: 0.9rem; }
+.qsac-kind__sub { font-size: 0.72rem; color: var(--color-text-muted, #6b7280); }
+
+.qsac-probe {
+    border-radius: var(--radius-md, 6px);
+    padding: var(--space-sm) var(--space-md);
+    margin-top: var(--space-md);
+    background: #f3f4f6;
+    color: #111827;
+    border-left: 3px solid #d1d5db;
+}
+.qsac-probe--idle { background: #f3f4f6; color: #374151; }
+.qsac-probe--busy { border-left-color: #6366f1; background: #eef2ff; color: #1e1b4b; }
+.qsac-probe--ok   { border-left-color: #16a34a; background: #f0fdf4; color: #064e3b; }
+.qsac-probe--err  { border-left-color: #dc2626; background: #fef2f2; color: #7f1d1d; }
+.qsac-probe__msg  { font-size: 0.9rem; color: inherit #16a34a; background: #f0fdf4; color: #064e3b; }
+.qsac-probe--err  { border-left-color: #dc2626; background: #fef2f2; color: #7f1d1d; }
+.qsac-probe__msg  { font-size: 0.9rem; color: inherit; }
+
+.qsac-models { margin-top: var(--space-sm); }
+.qsac-models__head {
+    display: flex; justify-content: space-between;
+    font-size: 0.8rem; font-weight: 600;
+    color: var(--color-text-muted, #6b7280); margin-bottom: 4px;
+}
+.qsac-models__list {
+    max-height: 180px; overflow-y: auto;
+    border: 1px solid var(--color-border, #e5e7eb);
+    border-radius: var(--radius-sm, 4px);
+    padding: 6px 10px; background: #fff;
+}
+.qsac-model { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 0.85rem; }
+.qsac-models__default { margin-top: var(--space-sm); font-size: 0.85rem; }
+.qsac-models__default select { margin-left: 6px; }
+
+.qsac-cors-hint {
+    margin-top: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: #fffbeb; color: #78350f;
+    border-left: 3px solid #f59e0b;
+    border-radius: var(--radius-sm, 4px);
+    font-size: 0.85rem;
+}
+.qsac-cors-hint summary { cursor: pointer; font-weight: 600; color: #78350f; }
+.qsac-cors-cmd {
+    margin-top: 6px; padding: 6px 10px;
+    background: #1f2937; color: #e5e7eb;
+    border-radius: 4px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.8rem; white-space: pre-wrap; word-break: break-all;
+}
+
 .tag-selector__preview-norender span {
     font-size: 0.85rem;
 }
@@ -14646,9 +14781,9 @@ body[data-page="preview"] .global-miniplayer {
     font-size: var(--font-size-xs);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    ASSET MANAGEMENT PAGE
-   ═══════════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 /* --- Dropzone --- */
 .asset-dropzone {
@@ -15212,3 +15347,44 @@ body[data-page="preview"] .global-miniplayer {
 }
 
 /* --- Responsive --- */
+
+
+/* ========== AI Phase 4: streaming counter + error ribbon ========== */
+.ai-stream-counter {
+    position: absolute; right: 10px; bottom: 10px;
+    padding: 3px 8px;
+    background: rgba(31, 41, 55, 0.85); color: #f9fafb;
+    border-radius: 999px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.72rem; line-height: 1.4;
+    pointer-events: none;
+    z-index: 5;
+    transition: opacity 0.3s;
+}
+.ai-error-ribbon {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.88rem;
+    background: #fef2f2; color: #7f1d1d;
+    border-left: 3px solid #dc2626;
+    margin-bottom: 8px;
+}
+.ai-error-ribbon--cors    { background: #fffbeb; color: #78350f; border-left-color: #f59e0b; }
+.ai-error-ribbon--auth    { background: #fef2f2; color: #7f1d1d; border-left-color: #dc2626; }
+.ai-error-ribbon--quota   { background: #fff7ed; color: #7c2d12; border-left-color: #ea580c; }
+.ai-error-ribbon--network { background: #f3f4f6; color: #1f2937; border-left-color: #6b7280; }
+.ai-error-ribbon--timeout { background: #f3f4f6; color: #1f2937; border-left-color: #6b7280; }
+.ai-error-ribbon--provider_error { background: #fef2f2; color: #7f1d1d; border-left-color: #dc2626; }
+.ai-error-ribbon--invalid_request { background: #f3f4f6; color: #1f2937; border-left-color: #9ca3af; }
+.ai-error-ribbon__cat {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.72rem; opacity: 0.75;
+}
+.ai-error-ribbon__hint { color: inherit; opacity: 0.9; }
+.ai-error-ribbon__close {
+    margin-left: auto;
+    background: transparent; border: none;
+    cursor: pointer; font-size: 1.2rem; line-height: 1;
+    color: inherit; padding: 0 4px;
+}

@@ -33,7 +33,7 @@ quicksite/
 │
 ├── secure/                       # Backend (outside web root, not publicly accessible)
 │   ├── management/               # API engine (shared across all projects)
-│   │   ├── command/              # 122 command handler files (one per command)
+│   │   ├── command/              # 118 command handler files (one per command)
 │   │   ├── config/               # API configuration
 │   │   │   ├── target.php        # Active project selector (gitignored)
 │   │   │   ├── auth.php          # Tokens and CORS config (gitignored)

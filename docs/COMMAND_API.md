@@ -24,7 +24,7 @@ The API documents itself. Once installed:
 GET /management/help
 ```
 
-returns full documentation for **all 122 commands** — parameters, examples, validation rules, and error codes. For a specific command:
+returns full documentation for **all 118 commands** — parameters, examples, validation rules, and error codes. For a specific command:
 
 ```
 GET /management/help/addRoute
@@ -67,7 +67,9 @@ There is **no separate error envelope**. A failed call uses the same four fields
 
 ## Command catalogue
 
-The 122 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
+The 118 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
+
+> **AI is browser-direct (BYOK).** As of v1.0.0-beta.6 there is no `callAi` / `testAiKey` / `detectProvider` / `listAiProviders` server command — the admin panel calls AI providers directly from the browser using credentials stored in `aiConnectionsV3` (localStorage). The Management API only handles workflow specs and command execution.
 
 | Category | What it covers |
 |---|---|
@@ -85,7 +87,6 @@ The 122 commands group into the categories below. Use `GET /management/help` for
 | **Export / Import** | Pack a project as a ZIP for portability; import a ZIP back. |
 | **Tokens** | Generate / revoke / list bearer tokens, assign roles. |
 | **Roles** | Define / edit / delete roles and their command permissions. |
-| **AI** | Save AI provider config, manage prompt presets, dispatch AI-driven workflows. |
 | **Snippets** | Manage reusable component snippets (nav, cards, forms…) shared across pages. |
 | **JS functions** | Register named JS functions invoked by Interactions v2 (`{{call:fn:args}}`). |
 | **Interactions** | Bind triggers (click, hover, scroll…) to actions on a node. |
@@ -115,7 +116,7 @@ curl http://local.quicksite/management/help/addRoute
 ## Internals
 
 - Command handlers live in `secure/management/command/<command>.php`, one file per command.
-- The whitelist of valid commands is `secure/management/routes.php` (122 entries — this file is the single source of truth for which commands exist).
+- The whitelist of valid commands is `secure/management/routes.php` (118 entries — this file is the single source of truth for which commands exist).
 - Shared helpers live in `secure/src/functions/utilsManagement.php` (e.g., `varExportNested()`, `SPECIAL_PAGES`, role helpers).
 - Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `secure/src/classes/CommandRunner.php`. CommandRunner currently carries a **hardcoded read-only allowlist** of ~50 `get*` / `list*` commands it will execute internally; this is a tech-debt shortcut and should eventually be replaced by reusing the role/permission helpers in `secure/src/functions/AuthManagement.php` so there is one source of truth for "what is safe to call internally".
 - Workflow execution adds its own role check via `WorkflowManager::setTokenInfo()` so steps respect the calling token's permissions.

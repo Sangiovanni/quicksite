@@ -314,6 +314,7 @@
         "projectSettings": "Project Settings",
         "apiEndpoints": "API Endpoints",
         "aiApiKeys": "AI API Keys",
+        "ai": "AI",
         "embedSecurity": "Embed Security",
         "structure": "Structure",
         "workflows": "Workflows",

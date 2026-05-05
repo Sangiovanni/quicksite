@@ -17,7 +17,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
 | Layer | Folder | Audience | Purpose |
 |---|---|---|---|
 | **Project** | `secure/projects/{name}/` | Site owner | The actual website data: routes, page structures (JSON), translations, components, interactions, styles, assets. |
-| **Management** | `secure/management/` | API client (admin panel, scripts, AI) | The 122 commands that read or mutate project data. Single entry point: `public/management/index.php`. Token + role enforced. |
+| **Management** | `secure/management/` | API client (admin panel, scripts) | The 118 commands that read or mutate project data. Single entry point: `public/management/index.php`. Token + role enforced. AI calls bypass this layer entirely (browser-direct). |
 | **Admin** | `public/admin/` + `secure/admin/` | Human operator | The browser UI that calls Management commands. Includes the visual editor, sitemap, theme editor, AI workspace, workflow runner. |
 
 ```
@@ -169,7 +169,7 @@ ApiResponse::create(201, 'route.created')
     ->send();
 ```
 
-The full list of 122 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
+The full list of 118 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
 
 ### Response shape
 
@@ -188,7 +188,7 @@ Errors include a structured `errors` array with `field` / `value` / `reason`.
 
 Tokens are stored in `secure/management/config/auth.php` and mapped to one of:
 
-| Role | Reads | Mutates content | Mutates style | Build/deploy/AI | Tokens |
+| Role | Reads | Mutates content | Mutates style | Build / deploy | Tokens |
 |---|---|---|---|---|---|
 | `viewer` | ✓ | | | | |
 | `editor` | ✓ | ✓ | | | |
@@ -196,6 +196,8 @@ Tokens are stored in `secure/management/config/auth.php` and mapped to one of:
 | `developer` | ✓ | ✓ | ✓ | ✓ | |
 | `admin` | ✓ | ✓ | ✓ | ✓ | |
 | `*` (superadmin) | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+> AI is no longer a permissioned column: AI calls happen in the browser via `QSAiCall` against per-user credentials in `aiConnectionsV3` (localStorage). Any authenticated admin can use the AI workspace; gating happens at the connection level, not the role level.
 
 Named roles (`viewer`, `editor`, `designer`, `developer`, `admin`) and any custom role live in `secure/management/config/roles.php`. The superadmin `*` is **hardcoded** in `secure/src/functions/AuthManagement.php` (and `AdminRouter.php`) — it bypasses the roles file entirely and gets unconditional access to every command, including token and role management. It is the only role that cannot be created, edited, or deleted at runtime. Permissions are checked before the command file is included.
 
@@ -273,7 +275,7 @@ addRoute.php
   └── ApiResponse::create(201, 'route.created')->send()
 ```
 
-The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 122 commands.
+The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 118 commands.
 
 ---
 

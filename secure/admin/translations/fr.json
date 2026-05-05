@@ -328,6 +328,7 @@
         "projectSettings": "Paramètres du projet",
         "apiEndpoints": "Points d'accès API",
         "aiApiKeys": "Clés API IA",
+        "ai": "IA",
         "embedSecurity": "Sécurité d'intégration",
         "structure": "Structure",
         "workflows": "Workflows",

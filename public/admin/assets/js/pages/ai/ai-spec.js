@@ -309,8 +309,66 @@
         }
 
         initSelector(wrapperEl, selectorEl) {
-            const aiConfig = this.getConfig();
+            // Phase 3: prefer the v3 connections store. Falls back to v2
+            // (legacy aiKeysV2 path) if no v3 connections exist yet — this
+            // happens on a fresh install before the user has added anything.
+            const v3 = window.QSConnectionsStore && window.QSConnectionsStore.loadStore();
+            const conns = (v3 && v3.connections) || [];
 
+            if (conns.length > 0) {
+                if (wrapperEl) wrapperEl.style.display = 'block';
+                if (!selectorEl) return;
+
+                selectorEl.innerHTML = '';
+                const defaultId = v3.defaultConnectionId;
+
+                conns.forEach((conn) => {
+                    const models = (conn.enabledModels && conn.enabledModels.length)
+                        ? conn.enabledModels
+                        : (conn.models && conn.models.length ? conn.models
+                            : (conn.defaultModel ? [conn.defaultModel] : []));
+                    if (models.length === 0) return; // can't pick a model — skip
+                    const dot = conn.type === 'local' ? '🦙' : '☁️';
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = `${dot} ${conn.name}`;
+                    models.forEach((model) => {
+                        const option = document.createElement('option');
+                        // Use connection id (not provider type) so multiple
+                        // connections of the same provider remain distinct.
+                        option.value = `${conn.id}::${model}`;
+                        option.textContent = model;
+                        if (conn.id === defaultId && model === (conn.defaultModel || models[0])) {
+                            option.selected = true;
+                            this.selectedProvider = conn.id;
+                            this.selectedModel = model;
+                        }
+                        optgroup.appendChild(option);
+                    });
+                    selectorEl.appendChild(optgroup);
+                });
+
+                if (!this.selectedProvider && selectorEl.options.length > 0) {
+                    selectorEl.selectedIndex = 0;
+                    const firstValue = selectorEl.value;
+                    if (firstValue) {
+                        [this.selectedProvider, this.selectedModel] = firstValue.split('::');
+                    }
+                }
+
+                selectorEl.addEventListener('change', () => {
+                    const value = selectorEl.value;
+                    if (value && value.includes('::')) {
+                        [this.selectedProvider, this.selectedModel] = value.split('::');
+                        // Promote the picked connection to default so
+                        // sendToAi()'s getActive() returns it.
+                        try { window.QSConnectionsStore.setDefault(this.selectedProvider); } catch (_e) {}
+                    }
+                });
+                return;
+            }
+
+            // ---- legacy v2 fallback ----
+            const aiConfig = this.getConfig();
             if (!aiConfig.configured || !aiConfig.allProviders) {
                 if (wrapperEl) wrapperEl.style.display = 'none';
                 this.selectedProvider = aiConfig.provider;
@@ -374,6 +432,17 @@
         }
         if (initialized) return;
         initialized = true;
+
+        // Phase 1: silent v2 -> v3 connections-store migration. Idempotent.
+        // ai-spec.js still uses the v2 AiProviderManager class for now;
+        // this just ensures v3 is primed for the Phase 3 picker rewrite.
+        try {
+            if (window.QSConnectionsStore) {
+                window.QSConnectionsStore.migrateFromV2();
+            }
+        } catch (e) {
+            console.warn('[ai-spec] v2->v3 migration skipped:', e && e.message);
+        }
 
         // --- 4a. Config from DOM ---
         const container = document.querySelector('.ai-spec');
@@ -1271,11 +1340,102 @@
 
     // -- Send to AI --
 
+    // Phase 4 polish helpers (module-local, no module state).
+
+    /** Map ai-call.js error categories → user-facing one-liner + hint. */
+    function classifyAiError(error) {
+        const cat = error && error.category ? error.category : 'network';
+        const raw = (error && error.message) || String(error || '');
+        const msg = raw.toLowerCase();
+        const presets = {
+            cors: ['CORS blocked.', 'The provider rejected the call from this site. For local AI, set OLLAMA_ORIGINS / enable CORS in LM Studio.'],
+            auth: ['Auth failed.', 'Check the API key on the AI Connections page.'],
+            quota: ['Quota or rate limit reached.', 'Wait a moment, switch model, or top up credits.'],
+            network: ['Network error.', 'Endpoint unreachable. Check that the service is running and the URL is correct.'],
+            timeout: ['Request timed out.', 'The model took too long. Try a smaller model or shorter prompt.'],
+            provider_error: ['Provider error.', 'The AI provider returned an error response.'],
+            invalid_request: ['Invalid request.', 'Something is missing or malformed before sending.'],
+            aborted: ['Stopped.', '']
+        };
+        // Refine: some "network" errors are actually CORS at fetch-level.
+        let resolved = cat;
+        if (cat === 'network' && (msg.includes('cors') || msg.includes('failed to fetch') || msg.includes('networkerror'))) {
+            resolved = 'cors';
+        }
+        const [headline, hint] = presets[resolved] || presets.network;
+        return { category: resolved, headline, hint, raw };
+    }
+
+    /** Show / hide the inline error ribbon above the textarea. */
+    function showErrorRibbon(els, classified) {
+        if (!els.aiResponseError) return;
+        const c = classified;
+        els.aiResponseError.style.display = 'block';
+        els.aiResponseError.innerHTML = `
+            <div class="ai-error-ribbon ai-error-ribbon--${c.category}">
+                <span class="ai-error-ribbon__cat">[${c.category}]</span>
+                <strong>${c.headline}</strong>
+                ${c.hint ? `<span class="ai-error-ribbon__hint"> ${c.hint}</span>` : ''}
+                <button type="button" class="ai-error-ribbon__close" aria-label="Dismiss">×</button>
+            </div>`;
+        const close = els.aiResponseError.querySelector('.ai-error-ribbon__close');
+        if (close) close.addEventListener('click', () => { els.aiResponseError.style.display = 'none'; });
+    }
+    function hideErrorRibbon(els) {
+        if (els.aiResponseError) { els.aiResponseError.style.display = 'none'; els.aiResponseError.innerHTML = ''; }
+    }
+
+    /** Mount / update / dismount the live counter pill at the textarea corner. */
+    function ensureCounter(els) {
+        if (!els.aiResponseInput) return null;
+        let pill = document.getElementById('ai-stream-counter');
+        if (!pill) {
+            pill = document.createElement('div');
+            pill.id = 'ai-stream-counter';
+            pill.className = 'ai-stream-counter';
+            // Anchor relative to the textarea's parent (must be position:relative).
+            const parent = els.aiResponseInput.parentElement;
+            if (parent && getComputedStyle(parent).position === 'static') {
+                parent.style.position = 'relative';
+            }
+            (parent || document.body).appendChild(pill);
+        }
+        pill.style.display = 'block';
+        return pill;
+    }
+    function updateCounter(pill, { seconds, chars, model, suffix }) {
+        if (!pill) return;
+        const tokensApprox = Math.round(chars / 4); // crude; OK for user feedback
+        pill.textContent = `${seconds.toFixed(1)}s · ~${tokensApprox} tokens · ${model || '?'}${suffix ? ' · ' + suffix : ''}`;
+    }
+    function dismissCounter(pill, ms) {
+        if (!pill) return;
+        setTimeout(() => { pill.style.display = 'none'; }, ms == null ? 4000 : ms);
+    }
+
+    /** Typewriter reveal for non-streaming responses. */
+    async function typewriter(textareaEl, fullText, signal, charsPerSec) {
+        const speed = charsPerSec || 80;
+        const totalMs = Math.min(1500, Math.max(200, (fullText.length / speed) * 1000));
+        const start = performance.now();
+        return new Promise((resolve) => {
+            function tick(now) {
+                if (signal && signal.aborted) { textareaEl.value = fullText; return resolve(); }
+                const t = Math.min(1, (now - start) / totalMs);
+                const n = Math.floor(t * fullText.length);
+                textareaEl.value = fullText.slice(0, n);
+                textareaEl.scrollTop = textareaEl.scrollHeight;
+                if (t < 1) requestAnimationFrame(tick); else { textareaEl.value = fullText; resolve(); }
+            }
+            requestAnimationFrame(tick);
+        });
+    }
+
     async function sendToAi(config, els, state, aiProvider) {
         const baseConfig = aiProvider.getConfig();
         if (!baseConfig.configured) {
             if (confirm('No AI API key configured. Would you like to configure it now?')) {
-                window.location.href = config.adminBase + '/ai-settings';
+                window.location.href = config.adminBase + '/ai-connections';
             }
             return;
         }
@@ -1293,69 +1453,91 @@
             if (els.aiResponseInput) els.aiResponseInput.value = '';
         }
         if (els.executionResultsSection) els.executionResultsSection.style.display = 'none';
+        hideErrorRibbon(els);
 
         const originalText = els.sendToAiText?.textContent || 'Send';
         els.sendToAiBtn.disabled = true;
 
-        const maxTimeout = 180;
-        let elapsedSeconds = 0;
+        const startedAt = performance.now();
+        const counterPill = ensureCounter(els);
+        let counterTick = null;
+        let lastChars = 0;
         const abortController = new AbortController();
+        let userAborted = false;
 
-        const timerInterval = setInterval(() => {
-            elapsedSeconds++;
-            if (els.sendToAiText) {
-                els.sendToAiText.textContent = `⏳ ${formatTime(elapsedSeconds)} / ${formatTime(maxTimeout)}`;
-            }
-        }, 1000);
-        if (els.sendToAiText) els.sendToAiText.textContent = `⏳ 0:00 / ${formatTime(maxTimeout)}`;
-
-        // Cancel functionality
+        // Cancel functionality — morph button into Stop.
         const originalOnClick = els.sendToAiBtn.onclick;
         els.sendToAiBtn.disabled = false;
         els.sendToAiBtn.classList.add('admin-btn--danger');
+        if (els.sendToAiText) els.sendToAiText.textContent = '⏹ Stop';
         els.sendToAiBtn.onclick = () => {
+            userAborted = true;
             abortController.abort();
-            clearInterval(timerInterval);
-            if (els.sendToAiText) els.sendToAiText.textContent = originalText;
-            els.sendToAiBtn.disabled = false;
+        };
+
+        const restoreButton = () => {
             els.sendToAiBtn.classList.remove('admin-btn--danger');
             els.sendToAiBtn.onclick = originalOnClick;
+            els.sendToAiBtn.disabled = false;
+            if (els.sendToAiText) els.sendToAiText.textContent = originalText;
+            if (counterTick) { clearInterval(counterTick); counterTick = null; }
         };
 
         try {
-            const response = await fetch(config.managementUrl + 'callAi', {
-                signal: abortController.signal,
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + config.token },
-                body: JSON.stringify({
-                    key: aiConfig.key,
-                    provider: aiConfig.provider,
-                    model: aiProvider.selectedModel || aiConfig.model,
+            // Phase 2: prefer browser-direct streaming via QSAiCall when a
+            // v3 connection exists. Falls back to the PHP proxy if the
+            // connections store hasn't been populated yet.
+            const activeConn = window.QSConnectionsStore && window.QSConnectionsStore.getActive();
+            const useDirect = !!(activeConn && window.QSAiCall && window.QSProviderCatalog);
+
+            if (useDirect) {
+                const modelToUse = aiProvider.selectedModel || activeConn.defaultModel || aiConfig.model;
+                // Mirror current key into the active connection so direct
+                // calls work even if migration was incomplete.
+                const conn = Object.assign({}, activeConn, { key: activeConn.key || aiConfig.key });
+                const willStream = conn.streaming !== false;
+
+                // Live counter — ticks even before first byte arrives.
+                counterTick = setInterval(() => {
+                    const sec = (performance.now() - startedAt) / 1000;
+                    updateCounter(counterPill, { seconds: sec, chars: lastChars, model: modelToUse });
+                }, 100);
+
+                let liveBuffer = '';
+                const result = await window.QSAiCall.call({
+                    connection: conn,
+                    model: modelToUse,
                     messages: [{ role: 'user', content: prompt }],
-                    max_tokens: 16384,
-                    timeout: 180
-                })
-            });
+                    options: { max_tokens: 16384, temperature: 0.7 },
+                    signal: abortController.signal,
+                    onChunk: (deltaText, ctx) => {
+                        liveBuffer = ctx.content;
+                        lastChars = liveBuffer.length;
+                        if (els.aiResponseInput) {
+                            els.aiResponseInput.value = liveBuffer;
+                            els.aiResponseInput.scrollTop = els.aiResponseInput.scrollHeight;
+                        }
+                    }
+                });
 
-            const data = await response.json();
-            clearInterval(timerInterval);
-            els.sendToAiBtn.classList.remove('admin-btn--danger');
-            els.sendToAiBtn.onclick = null;
-
-            const isSuccess = data.status >= 200 && data.status < 300;
-
-            if (isSuccess) {
-                let content = data.data?.content || '';
-                if (!content && data.data?.debug) {
-                    console.warn('AI response parsing issue:', data.data.debug);
-                    content = '/* DEBUG: Content could not be parsed. Raw response: */\n' + (data.data.debug.raw_response_preview || 'N/A');
-                }
-
-                // Strip markdown code fences
-                content = content.trim();
+                let content = (result.content || liveBuffer || '').trim();
                 if (content.startsWith('```')) {
                     content = content.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```\s*$/, '');
                 }
+
+                // Non-streaming responses: typewriter reveal so the textarea
+                // doesn't jump from empty to full.
+                if (!willStream && els.aiResponseInput && content) {
+                    await typewriter(els.aiResponseInput, content, abortController.signal);
+                    lastChars = content.length;
+                }
+
+                // Final counter snapshot.
+                const totalSec = (performance.now() - startedAt) / 1000;
+                updateCounter(counterPill, { seconds: totalSec, chars: content.length || lastChars, model: modelToUse, suffix: result.viaStream ? 'streamed' : 'whole' });
+                dismissCounter(counterPill);
+
+                try { window.QSConnectionsStore.recordStatus(conn.id, { ok: true, used: true, message: result.viaStream ? 'streamed' : 'ok' }); } catch (_e) {}
 
                 if (els.aiResponseInput) {
                     els.aiResponseInput.value = content;
@@ -1363,39 +1545,40 @@
                         els.aiResponseSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }
                     setTimeout(() => triggerAutoFlow(config, els, state), 300);
-                    if (els.sendToAiText) els.sendToAiText.textContent = `✅ ${formatTime(elapsedSeconds)}`;
-                    setTimeout(() => {
-                        if (els.sendToAiText) els.sendToAiText.textContent = originalText;
-                        els.sendToAiBtn.disabled = false;
-                    }, 3000);
+                    if (els.sendToAiText) els.sendToAiText.textContent = `✅ ${formatTime(Math.round(totalSec))}`;
+                    setTimeout(restoreButton, 3000);
                 }
-            } else {
-                const errorMsg = data.error || data.message || 'Failed to get AI response';
-                let helpHint = '';
-                const errLower = errorMsg.toLowerCase();
-                if (errLower.includes('quota') || errLower.includes('exceeded') || errLower.includes('limit')) {
-                    helpHint = '\n\n💡 This usually means:\n• OpenAI: Add billing/credits to your account\n• Google: Try "gemini-1.5-flash" (better free tier)\n• The model you selected may not be available on free tier';
-                } else if (errLower.includes('not found') || errLower.includes('does not exist')) {
-                    helpHint = '\n\n💡 This model may not exist or be available. Try a different model from the dropdown.';
-                } else if (errLower.includes('invalid') && errLower.includes('key')) {
-                    helpHint = '\n\n💡 Your API key appears to be invalid. Check the key in AI Settings.';
-                } else if (errLower.includes('rate')) {
-                    helpHint = '\n\n💡 Rate limit reached. Wait a moment and try again.';
-                }
-                alert('AI Error: ' + errorMsg + helpHint);
-                if (els.sendToAiText) els.sendToAiText.textContent = originalText;
-                els.sendToAiBtn.disabled = false;
-                els.sendToAiBtn.classList.remove('admin-btn--danger');
-                els.sendToAiBtn.onclick = null;
+                return;
             }
+
+            // No connection configured: prompt user to add one.
+            if (counterPill) counterPill.style.display = 'none';
+            showErrorRibbon(els, classifyAiError({ category: 'invalid_request', message: 'No AI connection is active. Open AI Connections to add one.' }));
+            restoreButton();
         } catch (error) {
-            clearInterval(timerInterval);
-            if (error.name === 'AbortError') { console.log('AI request cancelled by user'); return; }
-            alert('Network error: ' + error.message);
-            if (els.sendToAiText) els.sendToAiText.textContent = originalText;
-            els.sendToAiBtn.disabled = false;
-            els.sendToAiBtn.classList.remove('admin-btn--danger');
-            els.sendToAiBtn.onclick = null;
+            // Aborted = leave the partial response in place + mark it.
+            if (userAborted || error.name === 'AbortError' || error.category === 'aborted') {
+                if (els.aiResponseInput) {
+                    const cur = els.aiResponseInput.value;
+                    if (cur && !/\n\[stopped\]\s*$/.test(cur)) {
+                        els.aiResponseInput.value = cur + '\n[stopped]';
+                    }
+                }
+                const totalSec = (performance.now() - startedAt) / 1000;
+                updateCounter(counterPill, { seconds: totalSec, chars: lastChars, model: aiProvider.selectedModel || '', suffix: 'stopped' });
+                dismissCounter(counterPill, 6000);
+                restoreButton();
+                return;
+            }
+            // Real error → ribbon + restore + record status.
+            const classified = classifyAiError(error);
+            showErrorRibbon(els, classified);
+            if (counterPill) counterPill.style.display = 'none';
+            try {
+                const ac = window.QSConnectionsStore && window.QSConnectionsStore.getActive();
+                if (ac) window.QSConnectionsStore.recordStatus(ac.id, { ok: false, message: classified.headline + ' ' + classified.raw });
+            } catch (_e) {}
+            restoreButton();
         }
     }
 

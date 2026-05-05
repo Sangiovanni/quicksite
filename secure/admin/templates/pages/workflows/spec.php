@@ -838,4 +838,12 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
 </div>
 
 
+<?php $libBase = PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/lib/'; ?>
+<!-- Phase 1 lib bundle (silent migration + provider catalog for Phase 2 streaming) -->
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/ai/lib/provider-catalog.js?v=<?= filemtime($libBase . 'provider-catalog.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/ai/lib/local-presets.js?v=<?= filemtime($libBase . 'local-presets.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/ai/lib/connections-store.js?v=<?= filemtime($libBase . 'connections-store.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/ai/lib/stream-parsers.js?v=<?= filemtime($libBase . 'stream-parsers.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/ai/lib/ai-call.js?v=<?= filemtime($libBase . 'ai-call.js') ?>"></script>
+
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/ai/ai-spec.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/ai-spec.js') ?>"></script>
