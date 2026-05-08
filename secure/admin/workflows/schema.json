@@ -58,6 +58,10 @@
           "type": "string",
           "enum": ["beginner", "intermediate", "advanced"],
           "description": "Complexity level for user guidance"
+        },
+        "suppressPinsHeader": {
+          "type": "boolean",
+          "description": "When true, skip the auto-injected ## Pins / ## Warnings prefix even if pins/warnings are declared. Rare; for ultra-tight prompts that lay out their own header."
         }
       },
       "anyOf": [
@@ -294,6 +298,16 @@
       "type": "array",
       "items": { "type": "string" },
       "description": "API commands that will be used in the generated output"
+    },
+    "pins": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional reusable 'pin' block IDs auto-injected at the top of the rendered prompt as a ## Pins section. Each ID resolves to secure/admin/workflows/pins/{id}.md. Use for component / structural reminders that the AI must follow (e.g. 'lang-switch')."
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional reusable 'warning' block IDs auto-injected at the top of the rendered prompt as a ## Warnings section. Each ID resolves to secure/admin/workflows/warnings/{id}.md. Use for output-format constraints (e.g. 'json-only')."
     },
     "promptTemplate": {
       "type": "string",

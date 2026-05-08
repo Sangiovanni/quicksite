@@ -2,20 +2,7 @@
 
 You are redesigning the color scheme and design variables of an existing website. The site uses CSS custom properties (variables) defined in the `:root` selector. Your task is to create a new cohesive design by updating these variables.
 
-## ⚠️ IMPORTANT: Output Rules
-
-1. **OUTPUT JSON ONLY** - No explanations, no questions, no commentary
-2. **DO NOT ASK** for missing information - make reasonable creative choices
-3. **IMAGINE** what the user wants if their request is vague - pick a bold, cohesive theme
-4. Your response must be a valid JSON array and nothing else
-5. **NO previews, NO descriptions, NO "here's what I did"** - ONLY the JSON array
-
-## Output Format
-```json
-[
-  { "command": "setRootVariables", "params": { "variables": { "--var-name": "value" } } }
-]
-```
+{{> output-json-only}}
 
 ---
 
@@ -31,11 +18,7 @@ These are the existing CSS variables used by this website:
 
 ## Available Commands
 
-{{#each commands}}
-{{formatCommand @key this}}
-
----
-{{/each}}
+{{> command.setRootVariables}}
 
 ---
 
@@ -51,26 +34,6 @@ These are the existing CSS variables used by this website:
 
 ## Complete Example Output
 
-```json
-[
-  {
-    "command": "setRootVariables",
-    "params": {
-      "variables": {
-        "--color-primary": "#2563eb",
-        "--color-secondary": "#7c3aed",
-        "--color-accent": "#f59e0b",
-        "--color-text": "#1e293b",
-        "--color-text-muted": "#64748b",
-        "--color-bg": "#ffffff",
-        "--color-bg-alt": "#f8fafc",
-        "--border-radius": "8px",
-        "--shadow": "0 2px 8px rgba(0,0,0,0.08)",
-        "--font-family": "'Inter', sans-serif"
-      }
-    }
-  }
-]
-```
+{{> example.global-design-output}}
 
 **⚠️ Your entire response must look like the example above: a JSON array with one `setRootVariables` command containing ALL the variables. No text before or after the JSON.**

@@ -1,0 +1,1 @@
+**Do NOT invent translation keys** that are not declared in the structures you emit. Every `textKey` reference must have a matching entry in `setTranslationKeys`. Likewise, do not invent component names — only use components defined earlier in the same response or already known to the project.

@@ -28,6 +28,12 @@ class WorkflowManager {
     /** @var array|null Token info for role-based permission checks (optional) */
     private ?array $tokenInfo = null;
     
+    /** @var array Per-render help cache: [commandName => helpData]. Lifetime = one renderPrompt() call. */
+    private array $helpCache = [];
+    
+    /** Max recursion depth for {{> partial}} resolution (cycle/runaway guard). */
+    private const PARTIALS_MAX_DEPTH = 5;
+    
     /** @var array Language name mappings */
     private static array $languageNames = [
         'en' => 'English',
@@ -1085,6 +1091,18 @@ class WorkflowManager {
         // Build commands context from relatedCommands + fetched help data
         $commandsContext = $this->buildCommandsContext($workflow, $fetchedData);
         
+        // Reset per-render help cache and seed it with already-fetched help data
+        $this->helpCache = $commandsContext;
+        
+        // Phase 3 — Auto-inject pins / warnings as partial references at the top of the template,
+        // unless meta.suppressPinsHeader is true. The resolver below inlines them.
+        $template = $this->prependPinsWarnings($template, $workflow);
+        
+        // Phase 1/2/4 — Resolve {{> name}}, {{> command.X}}, {{> command.$relatedCommands}},
+        // {{> pin.X}}, {{> warning.X}}, {{> example.X}} BEFORE conditionals/loops, so the
+        // inlined block content participates in the regular template passes.
+        $template = $this->resolvePartials($template, $workflow);
+        
         // First pass: Handle {{#if}} conditionals
         $template = $this->processConditionals($template, $userParams, $fetchedData);
         
@@ -1496,9 +1514,52 @@ class WorkflowManager {
             }
         }
         
+        // Validate pins / warnings (Phase 3) — must be string arrays whose IDs map to existing files.
+        $warnings = [];
+        foreach (['pins' => 'pins', 'warnings' => 'warnings'] as $field => $folder) {
+            if (!isset($workflow[$field])) continue;
+            if (!is_array($workflow[$field])) {
+                $errors[] = "Field '{$field}' must be an array of string IDs";
+                continue;
+            }
+            foreach ($workflow[$field] as $i => $id) {
+                if (!is_string($id) || $id === '') {
+                    $errors[] = "{$field}[{$i}] must be a non-empty string ID";
+                    continue;
+                }
+                $path = $this->workflowsBasePath . '/' . $folder . '/' . $id . '.md';
+                if (!file_exists($path)) {
+                    $warnings[] = "{$field}[{$i}] references missing file: {$folder}/{$id}.md";
+                }
+            }
+        }
+        
+        // Scan promptTemplate (when it's a .md filename) for {{> name}} references and warn on missing files.
+        if (isset($workflow['promptTemplate']) && preg_match('/\.md$/', (string)$workflow['promptTemplate'])) {
+            $folder = $workflow['_folder'] ?? ($this->workflowsBasePath . '/core');
+            $mdPath = $folder . '/' . $workflow['promptTemplate'];
+            if (!file_exists($mdPath)) {
+                $mdPath = $this->workflowsBasePath . '/custom/' . $workflow['promptTemplate'];
+            }
+            if (file_exists($mdPath)) {
+                $tplContent = (string)@file_get_contents($mdPath);
+                if (preg_match_all('/\{\{>\s+([A-Za-z][\w.\-\$]*)\}\}/', $tplContent, $m)) {
+                    foreach (array_unique($m[1]) as $partialName) {
+                        // Skip command.* — resolved at runtime, not file-backed.
+                        if (str_starts_with($partialName, 'command.')) continue;
+                        $path = $this->partialFilePath($partialName);
+                        if ($path === null || !file_exists($path)) {
+                            $warnings[] = "Template references missing partial: {{> {$partialName}}}";
+                        }
+                    }
+                }
+            }
+        }
+        
         return [
             'valid' => empty($errors),
-            'errors' => $errors
+            'errors' => $errors,
+            'warnings' => $warnings,
         ];
     }
     
@@ -1542,10 +1603,21 @@ class WorkflowManager {
     }
     
     /**
-     * Format helper for commands in prompt (kept for backward compatibility)
+     * Format helper for commands in prompt.
+     *
+     * @deprecated Since 1.0.0-beta.7. Use {{> command.X}} or {{> command.$relatedCommands}} in
+     *             workflow templates instead. The new partial syntax routes to formatCommandFull()
+     *             which produces cleaner markdown. This helper remains for back-compat with custom
+     *             workflows that have not yet migrated; the rendered prompt now carries an HTML
+     *             comment marking it deprecated so reviewers spot it.
+     * @see formatCommandFull()
      */
     public function formatCommand(string $command, array $params): string {
-        $parts = ["### **{$command}**"];
+        error_log("[WorkflowManager] DEPRECATED: formatCommand('$command') called — migrate template to {{> command.$command}}");
+        $parts = [
+            "<!-- DEPRECATED: replace {{formatCommand}} with {{> command.{$command}}} — see docs/WORKFLOW_SYSTEM.md -->",
+            "### **{$command}**",
+        ];
         foreach ($params as $key => $value) {
             $formattedValue = is_array($value) 
                 ? json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
@@ -1553,6 +1625,249 @@ class WorkflowManager {
             $parts[] = "- **{$key}**: {$formattedValue}";
         }
         return implode("\n", $parts);
+    }
+    
+    /**
+     * Format a single command's help data as clean markdown for inclusion in an AI prompt.
+     *
+     * Used by the {{> command.X}} partial resolver. Default `$concise = true` keeps prompts tight;
+     * verbose mode adds error_responses and a fuller example block.
+     *
+     * @param string $command   Command name (used for the heading)
+     * @param array  $helpData  Output of `help` command for this command (description, method,
+     *                          parameters, example, notes, error_responses, ...)
+     * @param bool   $concise   When true (default) drop error_responses and trim the example.
+     * @return string Markdown block (no trailing newline)
+     */
+    public function formatCommandFull(string $command, array $helpData, bool $concise = true): string {
+        $out = ["### **{$command}**"];
+        
+        if (!empty($helpData['description'])) {
+            $out[] = '';
+            $out[] = (string)$helpData['description'];
+        }
+        
+        if (!empty($helpData['method'])) {
+            $out[] = '';
+            $out[] = "- **Method:** `" . (string)$helpData['method'] . "`";
+            if (!empty($helpData['url'])) {
+                $out[] = "- **URL:** `" . (string)$helpData['url'] . "`";
+            }
+        }
+        
+        // Parameters block — table when multiple, bullet list when one.
+        if (!empty($helpData['parameters']) && is_array($helpData['parameters'])) {
+            $out[] = '';
+            $out[] = '**Parameters:**';
+            foreach ($helpData['parameters'] as $pname => $pdef) {
+                if (!is_array($pdef)) { $pdef = ['description' => (string)$pdef]; }
+                $required = !empty($pdef['required']) ? ' *(required)*' : '';
+                $type = isset($pdef['type']) ? " `" . (string)$pdef['type'] . "`" : '';
+                $desc = (string)($pdef['description'] ?? '');
+                $out[] = "- **{$pname}**{$type}{$required} — {$desc}";
+            }
+        }
+        
+        // Example — pick the smallest meaningful one in concise mode.
+        $example = $helpData['example'] ?? ($helpData['examples'][0] ?? null);
+        if ($example !== null) {
+            $out[] = '';
+            $out[] = '**Example:**';
+            if (is_array($example)) {
+                $out[] = '```json';
+                $out[] = json_encode($example, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $out[] = '```';
+            } else {
+                $out[] = '```';
+                $out[] = (string)$example;
+                $out[] = '```';
+            }
+        }
+        
+        if (!empty($helpData['notes'])) {
+            $out[] = '';
+            $out[] = '**Notes:** ' . (is_array($helpData['notes']) ? implode(' ', $helpData['notes']) : (string)$helpData['notes']);
+        }
+        
+        if (!$concise && !empty($helpData['error_responses']) && is_array($helpData['error_responses'])) {
+            $out[] = '';
+            $out[] = '**Error responses:**';
+            foreach ($helpData['error_responses'] as $code => $msg) {
+                $out[] = "- `{$code}` — " . (is_array($msg) ? json_encode($msg) : (string)$msg);
+            }
+        }
+        
+        return implode("\n", $out);
+    }
+    
+    /**
+     * Look up help data for a single command, going through the per-render cache first.
+     * Returns null if neither cache nor live fetch yields data.
+     */
+    private function resolveHelpForCommand(string $command): ?array {
+        if (isset($this->helpCache[$command]) && is_array($this->helpCache[$command])) {
+            return $this->helpCache[$command];
+        }
+        try {
+            $helpData = CommandRunner::extractData('help', [], [$command], 'data');
+            if (is_array($helpData)) {
+                $this->helpCache[$command] = $helpData;
+                return $helpData;
+            }
+        } catch (\Throwable $e) {
+            error_log("[WorkflowManager] resolveHelpForCommand('$command') failed: " . $e->getMessage());
+        }
+        return null;
+    }
+    
+    /**
+     * Prepend ## Pins / ## Warnings sections (as {{> pin.X}} / {{> warning.X}} references)
+     * to the template, when the workflow declares them. The partial resolver inlines the
+     * actual content. Workflows can opt out via meta.suppressPinsHeader = true.
+     */
+    private function prependPinsWarnings(string $template, array $workflow): string {
+        if (!empty($workflow['meta']['suppressPinsHeader'])) {
+            return $template;
+        }
+        $prefix = '';
+        $pins = $workflow['pins'] ?? [];
+        $warnings = $workflow['warnings'] ?? [];
+        
+        if (is_array($pins) && !empty($pins)) {
+            $prefix .= "## Pins\n\n";
+            foreach ($pins as $id) {
+                if (is_string($id) && $id !== '') {
+                    $prefix .= "{{> pin.{$id}}}\n\n";
+                }
+            }
+        }
+        if (is_array($warnings) && !empty($warnings)) {
+            $prefix .= "## Warnings\n\n";
+            foreach ($warnings as $id) {
+                if (is_string($id) && $id !== '') {
+                    $prefix .= "{{> warning.{$id}}}\n\n";
+                }
+            }
+        }
+        if ($prefix !== '') {
+            $prefix .= "---\n\n";
+        }
+        return $prefix . $template;
+    }
+    
+    /**
+     * Resolve {{> name}} partial references.
+     *
+     * Supported forms:
+     *   {{> blockname}}                  → secure/admin/workflows/blocks/blockname.md
+     *   {{> pin.X}}                      → secure/admin/workflows/pins/X.md
+     *   {{> warning.X}}                  → secure/admin/workflows/warnings/X.md
+     *   {{> example.X}}                  → secure/admin/workflows/examples/X.md
+     *   {{> command.X}}                  → formatCommandFull(X, helpCache[X])
+     *   {{> command.$relatedCommands}}   → formatCommandFull for each command in the
+     *                                       workflow's relatedCommands list, joined with ---
+     *
+     * Recursive: inlined block content is itself scanned for further {{> ...}} references
+     * up to PARTIALS_MAX_DEPTH levels deep. Cycles are detected via the $visited set.
+     * Unknown / missing partials are LEFT INTACT in the template (not silently dropped)
+     * and an error_log entry is written so typos are visible.
+     */
+    private function resolvePartials(string $template, array $workflow = [], int $depth = 0, array $visited = []): string {
+        if ($depth >= self::PARTIALS_MAX_DEPTH) {
+            error_log('[WorkflowManager] resolvePartials: max depth reached, leaving remaining placeholders intact');
+            return $template;
+        }
+        
+        $pattern = '/\{\{>\s+([A-Za-z][\w.\-\$]*)\}\}/';
+        
+        return preg_replace_callback($pattern, function($matches) use ($workflow, $depth, $visited) {
+            $name = $matches[1];
+            
+            if (isset($visited[$name])) {
+                error_log("[WorkflowManager] resolvePartials: cycle detected on '{$name}'");
+                return $matches[0];
+            }
+            $visited[$name] = true;
+            
+            $resolved = $this->resolvePartialName($name, $workflow);
+            if ($resolved === null) {
+                // Leave placeholder intact, log already written by resolvePartialName.
+                return $matches[0];
+            }
+            // Recurse so nested {{> ...}} inside the inlined block also resolve.
+            return $this->resolvePartials($resolved, $workflow, $depth + 1, $visited);
+        }, $template);
+    }
+    
+    /**
+     * Resolve a single partial name to its content, or null if not found.
+     */
+    private function resolvePartialName(string $name, array $workflow): ?string {
+        // Namespaced: command.X / command.$relatedCommands
+        if (str_starts_with($name, 'command.')) {
+            $cmd = substr($name, strlen('command.'));
+            
+            if ($cmd === '$relatedCommands') {
+                $list = $workflow['relatedCommands'] ?? [];
+                if (!is_array($list) || empty($list)) {
+                    error_log('[WorkflowManager] {{> command.$relatedCommands}} used but workflow has no relatedCommands');
+                    return '';
+                }
+                $blocks = [];
+                foreach ($list as $cmdName) {
+                    if (!is_string($cmdName)) { continue; }
+                    $help = $this->resolveHelpForCommand($cmdName);
+                    if ($help === null) {
+                        $blocks[] = "### **{$cmdName}**\n\n_(help data unavailable)_";
+                        continue;
+                    }
+                    $blocks[] = $this->formatCommandFull($cmdName, $help, true);
+                }
+                return implode("\n\n---\n\n", $blocks);
+            }
+            
+            $help = $this->resolveHelpForCommand($cmd);
+            if ($help === null) {
+                error_log("[WorkflowManager] {{> command.{$cmd}}} — no help data found");
+                return null;
+            }
+            return $this->formatCommandFull($cmd, $help, true);
+        }
+        
+        // File-backed: pin.X, warning.X, example.X, or bare blockname
+        $path = $this->partialFilePath($name);
+        if ($path === null) {
+            error_log("[WorkflowManager] {{> {$name}}} — invalid partial name");
+            return null;
+        }
+        if (!file_exists($path)) {
+            error_log("[WorkflowManager] {{> {$name}}} — file not found at {$path}");
+            return null;
+        }
+        $content = @file_get_contents($path);
+        return $content === false ? null : rtrim($content, "\r\n");
+    }
+    
+    /**
+     * Map a partial name to its on-disk file path.
+     * Returns null for names that don't map to a file (e.g. command.* — handled separately).
+     */
+    private function partialFilePath(string $name): ?string {
+        $base = $this->workflowsBasePath;
+        if (str_starts_with($name, 'pin.')) {
+            return $base . '/pins/' . substr($name, 4) . '.md';
+        }
+        if (str_starts_with($name, 'warning.')) {
+            return $base . '/warnings/' . substr($name, 8) . '.md';
+        }
+        if (str_starts_with($name, 'example.')) {
+            return $base . '/examples/' . substr($name, 8) . '.md';
+        }
+        if (str_contains($name, '.')) {
+            // Unknown namespace
+            return null;
+        }
+        return $base . '/blocks/' . $name . '.md';
     }
     
     /**

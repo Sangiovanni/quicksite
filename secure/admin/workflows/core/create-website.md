@@ -2,19 +2,7 @@
 
 You are creating a complete multi-page website from a blank QuickSite project.
 
-## ⚠️ IMPORTANT: Output Rules
-
-1. **OUTPUT JSON ONLY** - No explanations, no questions, no commentary
-2. **DO NOT ASK** for missing information - make reasonable assumptions based on context
-3. **IMAGINE** what the user wants if their request is vague (colors, layout, content)
-4. Your response must be a valid JSON array and nothing else
-
-## Output Format
-```json
-[
-  { "command": "commandName", "params": { "key": "value" } }
-]
-```
+{{> output-json-only}}
 
 ---
 
@@ -39,14 +27,9 @@ You are creating a complete multi-page website from a blank QuickSite project.
    - **Repeat for each language:** {{param.languages}}
    - Note: `addRoute` auto-creates `page.titles.$routeName` - set this too!
 
-   **⚠️ REQUIRED for EACH language - include 404 page translations:**
-   ```json
-   "404": {
-     "title": "Page Not Found",
-     "message": "The page you are looking for does not exist.",
-     "backHome": "Back to Home"
-   }
-   ```
+   {{> per-language-404-keys}}
+
+   {{> warning.no-extra-keys}}
 
 4. **Styles LAST** (order matters!):
    - `editStyles` → MUST come BEFORE setRootVariables
@@ -66,6 +49,8 @@ You are creating a complete multi-page website from a blank QuickSite project.
    - Language: {{param.defaultLanguage}}
    - Note: `addRoute` auto-creates `page.titles.$routeName` - set this too!
 
+   {{> warning.no-extra-keys}}
+
 4. **Styles LAST** (order matters!):
    - `editStyles` → MUST come BEFORE setRootVariables
    - `setRootVariables` → AFTER editStyles (optional)
@@ -73,33 +58,7 @@ You are creating a complete multi-page website from a blank QuickSite project.
 
 ---
 
-## Link Format Rules
-
-**⚠️ CRITICAL: Links must follow these formats:**
-
-### Internal Links (Routes)
-Use simple paths matching route names. **NO query strings (?), parameters (&=), or fragments (#).**
-
-| Route Name | Link href |
-|------------|----------|
-| home | `/` or `/home` |
-| about | `/about` |
-| services | `/services` |
-| docs/api | `/docs/api` |
-
-```json
-{ "tag": "a", "params": { "href": "/about" }, "children": [{ "textKey": "menu.about" }] }
-```
-
-### External Links
-For links outside the site, use full URLs with `target="_blank"`:
-
-```json
-{ "tag": "a", "params": { "href": "https://github.com/user/repo", "target": "_blank" }, "children": [{ "textKey": "footer.github" }] }
-```
-
-**❌ NEVER use:** `href="?page=about"`, `href="index.php?route=x"`, `href="#section"`
-**✅ ALWAYS use:** `href="/route-name"` for internal, `href="https://..."` with `target="_blank"` for external
+{{> link-format-rules}}
 
 ---
 
@@ -184,50 +143,14 @@ When using a component, the `data` object maps variable names to their values:
 ---
 
 {{#if param.multilingual === true}}
-## Language Switcher (REQUIRED for Multilingual)
-
-**⚠️ MANDATORY:** You MUST include the `lang-switch` component in your **footer structure**.
-
-The component will be auto-generated with this structure (for styling reference):
-```json
-{
-  "tag": "div",
-  "params": { "class": "lang-switch" },
-  "children": [
-    { "tag": "a", "params": { "href": "{{__current_page;lang=en}}", "class": "lang-btn", "data-lang": "en" }, "children": [{ "textKey": "__RAW__English" }] },
-    { "tag": "a", "params": { "href": "{{__current_page;lang=fr}}", "class": "lang-btn", "data-lang": "fr" }, "children": [{ "textKey": "__RAW__Français" }] }
-  ]
-}
-```
-
-**To include it in your footer, add this child element:**
-```json
-{ "component": "lang-switch", "data": {} }
-```
-
-**Example footer with lang-switch:**
-```json
-{
-  "tag": "footer",
-  "children": [
-    { "tag": "p", "children": [{ "textKey": "footer.copyright" }] },
-    { "component": "lang-switch", "data": {} }
-  ]
-}
-```
-
-**DO NOT recreate this component.** Just include it using the component reference above.
+{{> use-lang-switch-component}}
 
 ---
 {{/if}}
 
 ## Available Commands
 
-{{#each commands}}
-{{formatCommand @key this}}
-
----
-{{/each}}
+{{> command.$relatedCommands}}
 
 ---
 
@@ -413,17 +336,10 @@ Path format: `/assets/{category}/{filename}` (leading slash required).
 ### Starred Assets:
 {{json assetList}}
 
-**Instructions:**
-- Use these assets in `img`, `video`, `audio` tag `params.src` values
-- Match assets to sections by their description (e.g., a "logo" asset belongs in the header/nav, a "hero" image belongs in the hero section)
-- Do NOT force every asset into the page — only use what fits naturally
-- If no asset matches a section, use a solid background color or gradient instead of inventing a filename
-- For fonts: reference font files in editStyles @font-face declarations
+{{> asset-usage-instructions}}
 {{#if param.includeFavicon === true}}
 
-### Favicon
-If an image asset looks suitable as a favicon (square/small, or has "favicon", "icon", or "logo" in its name), add an `editFavicon` command at the end of your response:
-{{json helpEditFavicon}}
+{{> favicon-asset-rule}}
 {{/if}}
 {{/if}}
 

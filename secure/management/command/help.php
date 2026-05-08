@@ -4750,6 +4750,55 @@ $GLOBALS['__help_commands'] = [
             '404.operation.not_found' => 'No rule found for tag+domain'
         ],
         'notes' => 'Removes the sandbox rule for the specified tag and domain.'
+    ],
+
+    'listWorkflowBlocks' => [
+        'description' => 'List reusable prompt blocks (blocks/, pins/, warnings/, examples/) discoverable by the workflow editor. Returns each block ID, its {{> partial}} reference, byte size, and a 120-char preview line. Used by the AI-Editor to populate pin/warning multi-select dropdowns.',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/listWorkflowBlocks',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Workflow blocks listed successfully',
+            'data' => [
+                'categories' => [
+                    'blocks' => [['id' => 'output-json-only', 'partial' => '{{> output-json-only}}', 'size_bytes' => 380, 'preview' => '## ⚠️ IMPORTANT: Output Rules']],
+                    'pins' => [['id' => 'lang-switch', 'partial' => '{{> pin.lang-switch}}', 'size_bytes' => 180, 'preview' => '**MANDATORY:** include the lang-switch component...']],
+                    'warnings' => [['id' => 'json-only', 'partial' => '{{> warning.json-only}}', 'size_bytes' => 220, 'preview' => '**Output JSON ONLY.** No prose...']],
+                    'examples' => [['id' => 'restyle-theme-only', 'partial' => '{{> example.restyle-theme-only}}', 'size_bytes' => 540, 'preview' => 'For a theme change (variables only):']]
+                ],
+                'count' => 4
+            ]
+        ],
+        'notes' => 'Admin-tier; will move to superadmin once that role is introduced (see beta.7 objective 8).'
+    ],
+
+    'lintWorkflows' => [
+        'description' => 'Scan every workflow template for paragraphs that occur in 3+ workflows and report them as candidates for extraction into reusable blocks. Read-only — does NOT modify any file. Skips fenced code blocks, JSON examples, and paragraphs that already use {{> partial}} references.',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/lintWorkflows',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => '2 duplicated paragraph(s) found across 8 workflow template(s)',
+            'data' => [
+                'duplications' => [
+                    [
+                        'hash' => 'a1b2c3d4e5f6',
+                        'occurrences' => 4,
+                        'line_count' => 5,
+                        'preview' => '⚠️ IMPORTANT: Output Rules — OUTPUT JSON ONLY...',
+                        'workflows' => ['create-website', 'create-landing', 'restyle', 'global-design'],
+                        'suggested_block_name' => 'output-json-rules'
+                    ]
+                ],
+                'scanned_files' => 8,
+                'threshold' => 3
+            ]
+        ],
+        'notes' => 'Pure dev tooling. Admin-tier; will move to superadmin once that role is introduced (see beta.7 objective 8).'
     ]
 ];
 

@@ -77,6 +77,10 @@ User fills parameters in admin UI
 | `secure/admin/workflows/core/*.md` | Core markdown templates |
 | `secure/admin/workflows/custom/*.json` | User-created workflow specs |
 | `secure/admin/workflows/custom/*.md` | User-created markdown templates |
+| `secure/admin/workflows/blocks/*.md` | Reusable prompt blocks injected via `{{> name}}` (beta.7) |
+| `secure/admin/workflows/pins/*.md` | Pinned reminders auto-injected at top when listed in `pins: [...]` (beta.7) |
+| `secure/admin/workflows/warnings/*.md` | Warnings auto-injected at top when listed in `warnings: [...]` (beta.7) |
+| `secure/admin/workflows/examples/*.md` | Example fragments referenced via `{{> example.X}}` (beta.7) |
 
 ### Admin UI
 
@@ -348,6 +352,41 @@ Sub-workflows to run before/after. Can be a simple string ID or an object with `
 
 Templates are processed by `WorkflowManager::renderPrompt()` through a **7-pass rendering engine**.
 
+### Pass 0: Pin/Warning Auto-Injection (beta.7)
+
+If the workflow JSON declares `pins: [...]` or `warnings: [...]`, the renderer prepends:
+
+```markdown
+## Pins
+
+{{> pin.lang-switch}}
+
+## Warnings
+
+{{> warning.json-only}}
+
+---
+```
+
+at the top of the template before any other pass. Each ID maps to a file under `secure/admin/workflows/pins/` or `secure/admin/workflows/warnings/`. Set `meta.suppressPinsHeader: true` to opt out (rare).
+
+### Pass 0.5: Partials — `{{> name}}` (beta.7)
+
+Reusable prompt blocks. Resolved BEFORE conditionals/loops, so an inlined block is itself a first-class template fragment (its `{{#if}}`, `{{param.x}}`, etc. all run normally).
+
+| Form | Resolves to |
+|---|---|
+| `{{> blockname}}` | `secure/admin/workflows/blocks/blockname.md` |
+| `{{> pin.X}}` | `secure/admin/workflows/pins/X.md` |
+| `{{> warning.X}}` | `secure/admin/workflows/warnings/X.md` |
+| `{{> example.X}}` | `secure/admin/workflows/examples/X.md` |
+| `{{> command.X}}` | `formatCommandFull(X, helpCache[X])` — inline command docs |
+| `{{> command.$relatedCommands}}` | One `formatCommandFull` per item in the workflow's `relatedCommands` list, joined by `---` |
+
+Recursion is depth-limited (max 5 levels). Cycles are detected and broken. Missing/typo'd partials are LEFT INTACT in the rendered prompt and an entry is written to `secure/logs/` so the typo is visible.
+
+**`relatedCommands` controls permissions; `{{> command.X}}` controls prompt rendering.** Keep the command listed in `relatedCommands` even when you reference it via a partial — otherwise users without that command's permission can trigger a workflow they can't actually run.
+
 ### Pass 1: Conditionals — `{{#if}}`
 
 ```markdown
@@ -371,28 +410,46 @@ Content shown for single-language workflows.
 ### Pass 2: Loops — `{{#each}}`
 
 ```markdown
-{{#each commands}}
-{{formatCommand @key this}}
----
-{{/each}}
-
 {{#each data.languages}}
 - {{@key}}: {{this}}
 {{/each}}
 ```
 
 **Loop sources:**
-- `commands` — the built commands context (from `relatedCommands` + help data)
 - `data.xxx` — any data from `dataRequirements`
 - Bare names — checked in `fetchedData`
+- `commands` — _legacy_, see deprecation below
 
 **Loop variables:**
 - `{{@key}}` — current key (index for arrays, key for objects)
 - `{{this}}` — current value (formatted)
 - `{{this.field}}` — access object property
 
-**Special helper:**
-- `{{formatCommand @key this}}` — formats a command's help data as markdown (### heading + bullet list of params)
+**Deprecated since beta.7:**
+
+```markdown
+{{#each commands}}{{formatCommand @key this}}{{/each}}   <!-- DEPRECATED -->
+```
+
+Use the partial form instead:
+
+```markdown
+{{> command.$relatedCommands}}                            <!-- canonical -->
+```
+
+or for inline insertion of a single command's docs interleaved with prose:
+
+```markdown
+First, add a route:
+
+{{> command.addRoute}}
+
+Then wire styles:
+
+{{> command.editStyles}}
+```
+
+The partial form routes to `formatCommandFull()` which produces cleaner markdown (description, method, parameters with types, one fenced example). The legacy `{{formatCommand}}` helper still works for back-compat but emits an HTML comment marking it deprecated and writes a deprecation notice to `secure/logs/`.
 
 ### Pass 3: JSON Export — `{{json}}`
 
@@ -446,7 +503,7 @@ Fallback: checks `$fetchedData[key]`. Unknown placeholders are left as-is.
 2. **Show the expected format** — `[{ "command": "...", "params": {...} }]`
 3. **Use conditionals** for branches (multilingual vs single-language)
 4. **Include current state** via `{{json dataId}}` so the AI knows what exists
-5. **Show command docs** via `{{#each commands}}{{formatCommand @key this}}{{/each}}`
+5. **Show command docs** via `{{> command.$relatedCommands}}` (legacy form `{{#each commands}}{{formatCommand @key this}}{{/each}}` is deprecated since beta.7)
 6. **Be explicit about order** — AI needs to know command dependency order
 7. **Add examples** — concrete JSON examples help AI accuracy dramatically
 
