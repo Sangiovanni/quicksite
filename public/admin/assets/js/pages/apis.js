@@ -41,6 +41,7 @@
 
         // Endpoint form
         document.getElementById('form-endpoint')?.addEventListener('submit', handleEndpointSubmit);
+        document.getElementById('btn-add-endpoint-param')?.addEventListener('click', () => addParamRow());
 
         // Schema JSON validation & formatting
         document.getElementById('endpoint-request-schema')?.addEventListener('input', (e) => validateJsonField(e.target, 'request-schema-status'));
@@ -65,8 +66,11 @@
         document.getElementById('test-request-body')?.addEventListener('input', syncFormFromRawJson);
         document.getElementById('test-query-params')?.addEventListener('input', syncFormFromRawJson);
 
-        // Import
-        document.getElementById('btn-do-import')?.addEventListener('click', handleImport);
+        // Import (two-step flow: paste → preview → confirm)
+        document.getElementById('btn-import-next')?.addEventListener('click', handleImportNext);
+        document.getElementById('btn-import-back')?.addEventListener('click', handleImportBack);
+        document.getElementById('btn-import-confirm')?.addEventListener('click', handleImportConfirm);
+        document.getElementById('btn-load-example-ours')?.addEventListener('click', () => loadExampleJson('ours'));
 
         // Delete confirmation
         document.getElementById('btn-confirm-delete')?.addEventListener('click', confirmDelete);
@@ -140,9 +144,14 @@
     }
 
     function showLoading(show) {
+        // While loading: hide both empty and list, show spinner.
+        // After loading: hide the spinner only — renderApisList owns
+        // the list/empty toggle so the final view matches the data.
         document.getElementById('apis-loading').style.display = show ? 'block' : 'none';
-        document.getElementById('apis-empty').style.display = 'none';
-        document.getElementById('apis-list').style.display = show ? 'none' : 'block';
+        if (show) {
+            document.getElementById('apis-empty').style.display = 'none';
+            document.getElementById('apis-list').style.display = 'none';
+        }
     }
 
     function updateStats(apis, totalEndpoints) {
@@ -170,6 +179,10 @@
     function renderApisList(apis) {
         const container = document.getElementById('apis-list');
         const apiIds = Object.keys(apis);
+
+        // Always clear stale cards first — without this, deleting the
+        // last API leaves the previous markup behind when we early-return.
+        container.innerHTML = '';
 
         if (apiIds.length === 0) {
             container.style.display = 'none';
@@ -516,6 +529,10 @@
         const apiHasAuth = api?.auth?.type && api.auth.type !== 'none';
         authGroup.style.display = apiHasAuth ? 'block' : 'none';
 
+        // Clear parameter rows; populated either from existing endpoint or left empty.
+        const paramRows = document.getElementById('endpoint-params-rows');
+        if (paramRows) paramRows.innerHTML = '';
+
         if (mode === 'edit' && endpointId && apisData[apiId]) {
             const endpoint = (apisData[apiId].endpoints || []).find(ep => ep.id === endpointId);
             if (endpoint) {
@@ -527,10 +544,12 @@
                 document.getElementById('endpoint-description').value = endpoint.description || '';
                 // No auth property = public (none), like OpenAPI security: []
                 document.getElementById('endpoint-auth').value = endpoint.auth || 'none';
-                document.getElementById('endpoint-request-schema').value = 
+                document.getElementById('endpoint-request-schema').value =
                     endpoint.requestSchema ? JSON.stringify(endpoint.requestSchema, null, 2) : '';
-                document.getElementById('endpoint-response-schema').value = 
+                document.getElementById('endpoint-response-schema').value =
                     endpoint.responseSchema ? JSON.stringify(endpoint.responseSchema, null, 2) : '';
+                // Parameters: array of {name, type?, required?, description?}
+                (endpoint.parameters || []).forEach(p => addParamRow(p));
             }
         } else {
             title.textContent = window.translations?.apis?.addEndpoint || 'Add Endpoint';
@@ -540,6 +559,69 @@
 
         openModal(modal);
         document.getElementById('endpoint-id').focus();
+    }
+
+    // -------------------------------------------------------------------------
+    // Parameter rows (for endpoints with :placeholders or query-string params)
+    // -------------------------------------------------------------------------
+
+    const PARAM_TYPES = ['string', 'number', 'integer', 'boolean'];
+
+    function addParamRow(existing) {
+        const rows = document.getElementById('endpoint-params-rows');
+        if (!rows) return;
+        const row = document.createElement('div');
+        row.className = 'apis-param-row';
+        row.innerHTML = `
+            <input type="text"
+                   class="admin-input apis-param-row__name"
+                   placeholder="${ (window.translations?.apis?.paramName) || 'name' }"
+                   value="${ existing?.name ? escapeAttr(existing.name) : '' }">
+            <select class="admin-input apis-param-row__type">
+                ${PARAM_TYPES.map(t =>
+                    `<option value="${t}"${existing?.type === t ? ' selected' : ''}>${t}</option>`
+                ).join('')}
+            </select>
+            <label class="apis-param-row__required" title="${ (window.translations?.apis?.paramRequired) || 'required' }">
+                <input type="checkbox" class="apis-param-row__required-input"${existing?.required ? ' checked' : ''}>
+                <span>${ (window.translations?.apis?.paramRequired) || 'required' }</span>
+            </label>
+            <button type="button" class="admin-btn admin-btn--ghost admin-btn--xs apis-param-row__delete" title="${ (window.translations?.common?.delete) || 'Remove' }" aria-label="${ (window.translations?.common?.delete) || 'Remove' }">&times;</button>
+        `;
+        rows.appendChild(row);
+    }
+
+    // Delegated click handler — survives any innerHTML rebuilds and
+    // doesn't depend on per-row closure captures (the per-row attach
+    // was unreliable in some browsers when the row was re-inserted).
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.apis-param-row__delete');
+        if (!btn) return;
+        // Guard: only handle clicks inside the endpoint params editor.
+        if (!btn.closest('#endpoint-params-rows')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const row = btn.closest('.apis-param-row');
+        if (row) row.remove();
+    });
+
+    function collectParamRows() {
+        const rows = document.querySelectorAll('#endpoint-params-rows .apis-param-row');
+        const out = [];
+        rows.forEach(r => {
+            const name = r.querySelector('.apis-param-row__name').value.trim();
+            if (!name) return; // empty rows are dropped silently
+            out.push({
+                name,
+                type: r.querySelector('.apis-param-row__type').value,
+                required: r.querySelector('.apis-param-row__required-input').checked
+            });
+        });
+        return out;
+    }
+
+    function escapeAttr(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
     }
 
     async function handleEndpointSubmit(e) {
@@ -580,6 +662,9 @@
             return;
         }
 
+        // Collect parameter rows (name + type + required); skip empty-name rows.
+        const parameters = collectParamRows();
+
         const endpoint = {
             id: endpointId,
             method: method,
@@ -588,6 +673,7 @@
             description: description || undefined,
             // Only save auth if 'inherit' or 'required' (no property = public/none)
             auth: (auth && auth !== 'none') ? auth : undefined,
+            parameters: parameters.length > 0 ? parameters : undefined,
             requestSchema: requestSchema || undefined,
             responseSchema: responseSchema || undefined
         };
@@ -725,7 +811,8 @@
         document.getElementById('test-request-body').value = '';
         document.getElementById('test-query-params').value = '';
 
-        // Generate form fields from schema
+        // Generate inputs for :placeholders in the path, plus form fields from schema
+        generateTestPathParams(endpoint);
         generateTestForm(endpoint, hasBody);
 
         // Pre-fill raw JSON with example from schema
@@ -746,6 +833,77 @@
         openModal(document.getElementById('modal-test'));
     }
     
+    /**
+     * Render an input per :placeholder in the endpoint path so the user
+     * can fill them in before running the test. Inputs sit in the
+     * `#test-path-params-form` container, separate from the schema form.
+     *
+     * Uses `endpoint.parameters` for type / required metadata when the
+     * placeholder name matches a declared parameter. Unknown placeholders
+     * default to string + optional.
+     */
+    function generateTestPathParams(endpoint) {
+        let container = document.getElementById('test-path-params-form');
+        if (!container) {
+            // First time: lazily insert the container above the schema form.
+            const paramsForm = document.getElementById('test-params-form');
+            if (!paramsForm) return;
+            container = document.createElement('div');
+            container.id = 'test-path-params-form';
+            container.className = 'apis-test-path-params';
+            paramsForm.parentNode.insertBefore(container, paramsForm);
+        }
+
+        const path = endpoint.path || '';
+        const placeholders = [...path.matchAll(/:([a-zA-Z][a-zA-Z0-9_]*)/g)].map(m => m[1]);
+
+        if (placeholders.length === 0) {
+            container.innerHTML = '';
+            container.style.display = 'none';
+            return;
+        }
+
+        // Build a map from declared parameters for type / required hints
+        const declared = {};
+        (endpoint.parameters || []).forEach(p => { if (p && p.name) declared[p.name] = p; });
+
+        const heading = window.translations?.apis?.pathParameters || 'Path parameters';
+        let html = `<h4 class="apis-test-section-title">${escapeHtml(heading)}</h4>`;
+        html += '<div class="admin-test-params">';
+        for (const name of placeholders) {
+            const def = declared[name] || {};
+            const type = def.type || 'string';
+            const required = !!def.required;
+            const fieldId = `test-pathparam-${name}`;
+            const requiredMark = required ? ' <span class="admin-text-danger">*</span>' : '';
+            const inputType = (type === 'integer' || type === 'number') ? 'number' : 'text';
+            const step = type === 'integer' ? ' step="1"' : (type === 'number' ? ' step="any"' : '');
+            html += `<div class="admin-form-group admin-form-group--compact">`;
+            html += `<label class="admin-label" for="${fieldId}">:${escapeHtml(name)} <small class="admin-text-muted">(${escapeHtml(type)})</small>${requiredMark}</label>`;
+            html += `<input type="${inputType}"${step} class="admin-input admin-input--sm" id="${fieldId}" data-path-param="${escapeHtml(name)}">`;
+            html += `</div>`;
+        }
+        html += '</div>';
+        container.innerHTML = html;
+        container.style.display = '';
+    }
+
+    /**
+     * Read the path-param inputs back into a plain object.
+     * Empty values are dropped (left as `:name` literals at the server).
+     */
+    function collectTestPathParams() {
+        const out = {};
+        document.querySelectorAll('#test-path-params-form [data-path-param]').forEach(el => {
+            const name = el.dataset.pathParam;
+            const v = el.value;
+            if (v !== '' && v !== null && v !== undefined) {
+                out[name] = v;
+            }
+        });
+        return out;
+    }
+
     /**
      * Generate form fields from endpoint's requestSchema
      */
@@ -987,12 +1145,16 @@
         document.getElementById('test-response-time').textContent = 'Executing...';
         document.getElementById('test-response-body').innerHTML = '<span class="admin-text-muted">Waiting for response...</span>';
 
+        // Collect :placeholder values for path substitution
+        const pathParams = collectTestPathParams();
+
         try {
             const params = {
                 apiId: apiId,
                 endpointId: endpointId,
                 testData: body,
                 queryParams: queryParams,
+                pathParams: Object.keys(pathParams).length > 0 ? pathParams : undefined,
                 authToken: authToken || undefined
             };
 
@@ -1046,72 +1208,320 @@
     }
 
     // =========================================================================
-    // Import / Export
+    // Import / Export — two-step flow (paste → detect+convert → preview → confirm)
     // =========================================================================
 
+    // Holds the parsed/converted payload between the two screens.
+    let _importPending = null;
+
     function openImportModal() {
+        _importPending = null;
         document.getElementById('import-json').value = '';
+        showImportScreen('paste');
         openModal(document.getElementById('modal-import'));
     }
 
-    async function handleImport() {
-        const jsonText = document.getElementById('import-json').value.trim();
-        
-        if (!jsonText) {
-            showToast('Please paste JSON to import', 'error');
-            return;
+    function showImportScreen(which) {
+        const isPaste = which === 'paste';
+        document.getElementById('import-screen-paste').style.display = isPaste ? '' : 'none';
+        document.getElementById('import-screen-preview').style.display = isPaste ? 'none' : '';
+        document.getElementById('btn-import-next').style.display = isPaste ? '' : 'none';
+        document.getElementById('btn-import-back').style.display = isPaste ? 'none' : '';
+        document.getElementById('btn-import-confirm').style.display = isPaste ? 'none' : '';
+        document.getElementById('import-title').textContent = isPaste
+            ? (window.translations?.apis?.importJson || 'Import APIs from JSON')
+            : (window.translations?.apis?.importModal?.previewTitle || 'Preview & confirm');
+        // Clear inline error
+        const errBox = document.getElementById('import-parse-error');
+        if (errBox) { errBox.style.display = 'none'; errBox.textContent = ''; }
+    }
+
+    // Provides a single ready-to-edit example so new users don't face a
+    // blank textarea. The "Load test.api example" button was removed in
+    // Step 6 of API_REGISTRY_DEMO; the *converter* for foreign formats
+    // (incl. test.api) stays in place — paste any recognised foreign JSON
+    // by hand and it still detects + converts on Next.
+    function loadExampleJson(kind) {
+        const ours = {
+            apis: {
+                "main-backend": {
+                    name: "Main Backend",
+                    baseUrl: "https://api.example.com",
+                    description: "Example API in our native format.",
+                    auth: { type: "bearer", tokenSource: "localStorage:authToken" },
+                    endpoints: [
+                        {
+                            id: "list-users",
+                            name: "List Users",
+                            method: "GET",
+                            path: "/users",
+                            description: "Paged user list.",
+                            parameters: [
+                                { name: "page", type: "integer", required: false },
+                                { name: "limit", type: "integer", required: false }
+                            ]
+                        },
+                        {
+                            id: "get-user",
+                            name: "Get User",
+                            method: "GET",
+                            path: "/users/:id",
+                            parameters: [
+                                { name: "id", type: "string", required: true }
+                            ]
+                        }
+                    ]
+                }
+            }
+        };
+        document.getElementById('import-json').value = JSON.stringify(ours, null, 2);
+    }
+
+    /**
+     * Detect the foreign-format signature of a parsed JSON object.
+     * Returns one of: 'ours' | 'testapi-filemanager' | 'unknown'.
+     */
+    function detectImportFormat(data) {
+        if (!data || typeof data !== 'object') return 'unknown';
+        if (data.apis && typeof data.apis === 'object' && !Array.isArray(data.apis)) {
+            return 'ours';
+        }
+        // test.api file-manager shape: top-level endpoints.{public,secured}
+        if (data.endpoints && typeof data.endpoints === 'object' &&
+            (Array.isArray(data.endpoints.public) ||
+             (data.endpoints.secured && Array.isArray(data.endpoints.secured.endpoints)))) {
+            return 'testapi-filemanager';
+        }
+        return 'unknown';
+    }
+
+    /** Build an endpoint id from a name ("List Files" → "list-files"). */
+    function slugifyEndpointId(name) {
+        return String(name || 'endpoint')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .replace(/^([0-9])/, 'x$1')         // mustn't start with a digit
+            || 'endpoint';
+    }
+
+    /**
+     * Given a foreign URL + its parameters list + the API's declared
+     * route_format, produce the path in our native shape where every
+     * parameter that lives in the URL appears as `:name`.
+     *
+     * Three cases handled:
+     *  - URL already has `:name`   → leave it.
+     *  - URL has `/name/` literal  → rewrite as `:name`.
+     *  - Otherwise + route_format = "path segments"
+     *                              → append `/name/:name`.
+     *  - Otherwise (query-string)  → leave the path; QS.fetch routes
+     *                                the leftover to the query string.
+     */
+    function buildOurPath(foreignUrl, params, routeFormat) {
+        let path = String(foreignUrl || '/');
+        if (!Array.isArray(params) || params.length === 0) return path;
+        const pathSegmentMode = (routeFormat || '').toLowerCase().includes('path segment');
+
+        for (const p of params) {
+            const name = p && p.name;
+            if (!name) continue;
+            if (path.indexOf(':' + name) !== -1) continue;  // already templated
+            const literalSeg = new RegExp('(/)' + name + '(/|$)');
+            if (literalSeg.test(path)) {
+                path = path.replace(literalSeg, '$1:' + name + '$2');
+                continue;
+            }
+            if (pathSegmentMode) {
+                path += '/' + name + '/:' + name;
+            }
+            // else: leave; the runtime puts it in the query string.
+        }
+        return path;
+    }
+
+    function convertEndpoint(ep, routeFormat) {
+        const params = Array.isArray(ep.parameters) ? ep.parameters : [];
+        const out = {
+            id: slugifyEndpointId(ep.name),
+            name: ep.name || 'Endpoint',
+            method: (ep.method || 'GET').toUpperCase(),
+            path: buildOurPath(ep.url || '/', params, routeFormat),
+            description: ep.description || undefined
+        };
+        if (params.length > 0) {
+            const cleaned = params.map(p => ({
+                name: p.name,
+                type: p.type || 'string',
+                required: !!p.required,
+                description: p.description || undefined
+            })).filter(p => p.name);
+            if (cleaned.length > 0) out.parameters = cleaned;
+        }
+        return out;
+    }
+
+    /**
+     * Convert a foreign-format payload to our native shape:
+     *   { apis: { "<apiId>": { name, baseUrl, auth, endpoints: [...] } } }
+     *
+     * For the test.api file-manager format, EVERY group under
+     * `endpoints` (public, auth, pagination, secured, ...) becomes its
+     * own API named `test-api-<group>`. Groups can be either a flat
+     * array of endpoints OR an object `{ authentication, endpoints }`
+     * (the bearer-auth shape).
+     */
+    function convertImportPayload(data, format) {
+        if (format === 'ours') return data;
+
+        if (format === 'testapi-filemanager') {
+            const baseUrl = String(data.base_url || '').trim();
+            const routeFormat = data.route_format || '';
+            const apiNameRoot = data.api_name || 'Test API';
+            const apis = {};
+
+            const groups = (data.endpoints && typeof data.endpoints === 'object') ? data.endpoints : {};
+            for (const groupName of Object.keys(groups)) {
+                const group = groups[groupName];
+                let endpoints;
+                let auth = { type: 'none' };
+
+                if (Array.isArray(group)) {
+                    endpoints = group;
+                } else if (group && Array.isArray(group.endpoints)) {
+                    endpoints = group.endpoints;
+                    const authType = (group.authentication?.type || '').toLowerCase();
+                    if (authType.includes('bearer')) {
+                        auth = { type: 'bearer', tokenSource: 'localStorage:authToken' };
+                    } else if (authType.includes('basic')) {
+                        auth = { type: 'basic', tokenSource: 'localStorage:basicAuth' };
+                    } else if (authType.includes('api') && authType.includes('key')) {
+                        auth = { type: 'apiKey', tokenSource: 'header:X-API-Key' };
+                    }
+                } else {
+                    continue;  // unrecognised group shape
+                }
+
+                if (!endpoints.length) continue;
+
+                apis['test-api-' + groupName] = {
+                    name: apiNameRoot + ' (' + groupName + ')',
+                    baseUrl,
+                    description: groupName + ' endpoints.',
+                    auth,
+                    endpoints: endpoints.map(ep => convertEndpoint(ep, routeFormat))
+                };
+            }
+
+            return { apis };
         }
 
-        let importData;
-        try {
-            importData = JSON.parse(jsonText);
-        } catch (err) {
-            showToast('Invalid JSON format', 'error');
+        return null;
+    }
+
+    function summarisePayload(converted, format) {
+        const apis = converted?.apis || {};
+        const apiIds = Object.keys(apis);
+        const totalEndpoints = apiIds.reduce(
+            (n, id) => n + (apis[id].endpoints?.length || 0), 0);
+        const existing = apiIds.filter(id => apisData[id]);
+        const fmtLabel = format === 'ours' ? 'native' :
+            format === 'testapi-filemanager' ? 'test.api file-manager' : 'unknown';
+        const overwriteNote = existing.length > 0
+            ? ` Replaces ${existing.length} existing: ${existing.join(', ')}.`
+            : '';
+        return `Detected format: <strong>${fmtLabel}</strong>. ` +
+            `Will create ${apiIds.length} API${apiIds.length === 1 ? '' : 's'}, ` +
+            `${totalEndpoints} endpoint${totalEndpoints === 1 ? '' : 's'}.` +
+            overwriteNote;
+    }
+
+    /** Screen 1 → Screen 2: parse, detect, convert, render preview. */
+    function handleImportNext() {
+        const errBox = document.getElementById('import-parse-error');
+        const raw = document.getElementById('import-json').value.trim();
+        if (!raw) {
+            errBox.textContent = 'Paste JSON first (or use one of the example buttons).';
+            errBox.style.display = '';
             return;
         }
-
-        // Validate structure
-        if (!importData.apis || typeof importData.apis !== 'object') {
-            showToast('Invalid format: expected {"apis": {...}}', 'error');
+        let data;
+        try { data = JSON.parse(raw); }
+        catch (err) {
+            errBox.textContent = 'Invalid JSON: ' + err.message;
+            errBox.style.display = '';
             return;
         }
+        const fmt = detectImportFormat(data);
+        if (fmt === 'unknown') {
+            errBox.innerHTML = 'Unrecognised format. Expected <code>{"apis": {...}}</code> ' +
+                'or a known foreign format (currently: test.api file-manager).';
+            errBox.style.display = '';
+            return;
+        }
+        const converted = convertImportPayload(data, fmt);
+        if (!converted) {
+            errBox.textContent = 'Converter returned no APIs.';
+            errBox.style.display = '';
+            return;
+        }
+        _importPending = { converted, format: fmt };
+        document.getElementById('import-preview-json').value = JSON.stringify(converted, null, 2);
+        document.getElementById('import-preview-summary').innerHTML = summarisePayload(converted, fmt);
+        showImportScreen('preview');
+    }
 
-        // Import each API
+    function handleImportBack() {
+        _importPending = null;
+        showImportScreen('paste');
+    }
+
+    /** Screen 2 confirm: save APIs + endpoints, then reload list. */
+    async function handleImportConfirm() {
+        if (!_importPending) return;
+        const apis = _importPending.converted?.apis || {};
+        const btn = document.getElementById('btn-import-confirm');
+        btn.disabled = true;
+        const origLabel = btn.textContent;
+        btn.textContent = 'Importing…';
+
         let imported = 0;
         let errors = 0;
 
-        for (const [apiId, apiData] of Object.entries(importData.apis)) {
+        for (const [apiId, apiData] of Object.entries(apis)) {
             try {
-                // Add the API
-                const response = await QuickSiteAdmin.apiRequest('addApi', 'POST', {
-                    apiId: apiId,
+                // If the API already exists, delete it first so we get a clean replace.
+                if (apisData[apiId]) {
+                    await QuickSiteAdmin.apiRequest('deleteApi', 'POST', { apiId });
+                }
+                // Add the API shell (without endpoints — addApi rejects unknown fields).
+                const addRes = await QuickSiteAdmin.apiRequest('addApi', 'POST', {
+                    apiId,
                     name: apiData.name || apiId,
                     baseUrl: apiData.baseUrl,
                     description: apiData.description,
                     auth: apiData.auth
                 });
-
-                if (response.ok) {
-                    // Add endpoints
-                    for (const endpoint of (apiData.endpoints || [])) {
-                        await QuickSiteAdmin.apiRequest('editApi', 'POST', {
-                            apiId: apiId,
-                            addEndpoint: endpoint
-                        });
-                    }
-                    imported++;
-                } else {
-                    errors++;
+                if (!addRes.ok) { errors++; continue; }
+                // Then attach endpoints one by one (validation runs per endpoint).
+                for (const endpoint of (apiData.endpoints || [])) {
+                    await QuickSiteAdmin.apiRequest('editApi', 'POST', {
+                        apiId,
+                        addEndpoint: endpoint
+                    });
                 }
+                imported++;
             } catch (err) {
                 console.error('Import error for', apiId, err);
                 errors++;
             }
         }
 
+        btn.disabled = false;
+        btn.textContent = origLabel;
         closeModal(document.getElementById('modal-import'));
-        loadApis();
-        
+        await loadApis();
+
         if (errors === 0) {
             showToast(`Imported ${imported} API(s) successfully`, 'success');
         } else {

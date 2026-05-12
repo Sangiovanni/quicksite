@@ -65,6 +65,7 @@ function __command_listApiEndpoints(array $params = [], array $urlParams = []): 
                 'fullUrl' => $api['baseUrl'] . $endpoint['path'],
                 'description' => $endpoint['description'] ?? null,
                 'auth' => $endpoint['auth'] ?? null,
+                'parameters' => $endpoint['parameters'] ?? [],
                 'requestSchema' => $endpoint['requestSchema'] ?? null,
                 'responseSchema' => $endpoint['responseSchema'] ?? null,
                 'responseBindings' => $endpoint['responseBindings'] ?? [],

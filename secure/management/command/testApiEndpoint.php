@@ -39,6 +39,7 @@ function __command_testApiEndpoint(array $params = [], array $urlParams = []): A
     $apiId = $params['apiId'] ?? null;
     $testData = $params['testData'] ?? null;
     $queryParams = $params['queryParams'] ?? [];
+    $pathParams = $params['pathParams'] ?? [];  // Step 1: substitute :placeholders
     $extraHeaders = $params['headers'] ?? [];
     $authToken = $params['authToken'] ?? null;
     $timeout = $params['timeout'] ?? 30;
@@ -72,9 +73,24 @@ function __command_testApiEndpoint(array $params = [], array $urlParams = []): A
         }
     }
     
-    // Build URL
+    // Build URL — substitute :placeholders from pathParams first.
+    // Any :name not provided is left literal in the URL so the user
+    // sees what's missing in the response.
     $url = $endpoint['fullUrl'];
-    
+    if (preg_match('/:[a-zA-Z][a-zA-Z0-9_]*/', $url)) {
+        $url = preg_replace_callback(
+            '/:([a-zA-Z][a-zA-Z0-9_]*)/',
+            function ($m) use ($pathParams) {
+                $name = $m[1];
+                if (array_key_exists($name, $pathParams) && $pathParams[$name] !== '' && $pathParams[$name] !== null) {
+                    return rawurlencode((string)$pathParams[$name]);
+                }
+                return $m[0]; // leave literal so test surfaces the omission
+            },
+            $url
+        );
+    }
+
     // Add query params for GET requests
     if (!empty($queryParams)) {
         $url .= (strpos($url, '?') !== false ? '&' : '?') . http_build_query($queryParams);

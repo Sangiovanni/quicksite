@@ -29,6 +29,11 @@ ENV/
 
 # AI agent instructions (local only)
 .github/copilot-instructions.md
+CLAUDE.md
+CLAUDE.local.md
+
+# Claude Code local state (worktrees, session data)
+.claude/
 
 # OS files
 .DS_Store

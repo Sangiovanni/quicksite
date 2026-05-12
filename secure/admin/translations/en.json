@@ -2033,7 +2033,13 @@
             "authInherit": "Inherit from API (default)",
             "authNone": "None (public endpoint)",
             "authRequired": "Required (override if API has none)",
-            "endpointAuthHint": "Override API-level auth for this endpoint"
+            "endpointAuthHint": "Override API-level auth for this endpoint",
+            "parameters": "Parameters",
+            "parametersHint": "Use <code>:name</code> in the path for path-segment params (e.g. <code>/users/:id</code>). Other params go to the query string at fetch time.",
+            "addParameter": "Add parameter",
+            "paramName": "name",
+            "paramRequired": "required",
+            "pathParameters": "Path parameters"
         },
         "auth": {
             "none": "None",

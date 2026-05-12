@@ -270,12 +270,84 @@ For the full per-command reference see [COMMAND_API.md](COMMAND_API.md).
 | **Command form** (`command-form.js`) | Renders a dynamic form for any command from `help` metadata, then executes it. The escape hatch into raw API. |
 | **History** (`history.js`) | Browses `getCommandHistory`; modal with full request/response. |
 | **Settings** (`settings.js`) | User profile, language, theme, AI provider config status. |
-| **APIs** (`apis.js`) | External API registry: `listApiEndpoints`, `addApiDefinition`, `editApiDefinition`, `deleteApiDefinition`, `testApiEndpoint`. |
+| **APIs** (`apis.js`) | External API registry — see §9.1. Commands: `listApiEndpoints`, `addApi`, `editApi`, `deleteApi`, `getApiEndpoint`, `testApiEndpoint`. |
 | **Assets** (`assets.js`) | Asset browser + uploader: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`. |
 | **Sitemap** (`sitemap.js`) | Route tree, reachability, ordering. |
 | **Embed security** (`embed-security.js`) | `getEmbedSecurity` / `setEmbedSecurity`. |
 | **Optimize** (`optimize.js`) | UI for the CSS Refiner library; runs analyzers, presents diffs, applies edits via `editStyles` / `setRootVariables`. |
 | **AI workspace** (`pages/ai/*`) | Listing, editing, executing AI workflow specs against `/admin/api/ai-spec/*`, `/admin/api/workflow/*`, `/admin/api/batch/execute`. AI dispatch itself is browser-direct (`QSAiCall`). See [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md). |
+
+### 9.1 API Registry (/admin/apis)
+
+Per-project registry of external HTTP APIs. The user declares APIs
+once in this admin page; runtime `QS.fetch(...)` on the public site
+resolves them by ID and substitutes parameters at call time.
+
+**Storage**: `secure/projects/<project>/data/api-endpoints.json`,
+managed by `secure/src/classes/ApiEndpointManager.php`.
+
+**Runtime config** (auto-regenerated on every CRUD): the manager
+writes `public/scripts/qs-api-config.js` which exposes
+`window.QS_API_ENDPOINTS = { "<apiId>": { baseUrl, auth, endpoints } }`.
+Pages get this script included automatically when at least one API
+is registered (see `PageManagement::render()`).
+
+**Endpoint schema** (fields the modal exposes):
+
+| Field | Purpose |
+|---|---|
+| `id` | Stable identifier (matches `/^[a-z0-9][a-z0-9\-_]*$/i`). |
+| `name` | Human label shown in the picker. |
+| `method` | `GET / POST / PUT / PATCH / DELETE`. |
+| `path` | Relative to API `baseUrl`. May contain `:placeholders` (see below). |
+| `parameters` | Optional array of `{ name, type, required, description }`. Type ∈ `string / number / integer / boolean`. |
+| `auth` | Per-endpoint override: `none / inherit / required`. Inherits from API-level auth by default. |
+| `requestSchema` | Optional JSON Schema for POST/PUT/PATCH bodies. Drives the test modal's dynamic form. |
+| `responseSchema` | Optional JSON Schema. Drives the response-bindings picker (componentList / count / etc., see beta.7 work). |
+
+**Path templating** — `:name` placeholders in the `path` are
+substituted at fetch time. Example:
+
+```
+path:       /users/:id/posts/:postId
+parameters: [{ name: "id", required: true }, { name: "postId", required: true }]
+call:       QS.fetch('@my-api/get-post', 'id=42', 'postId=7')
+result:     GET <baseUrl>/users/42/posts/7
+```
+
+Validation rules (`ApiEndpointManager::validateEndpoint`):
+- Every `:name` in `path` must appear in `parameters`.
+- Parameter names match `/^[a-zA-Z][a-zA-Z0-9_]*$/`, no duplicates.
+- Unknown types or shapes are rejected with a clear message.
+
+Missing **required** parameters at runtime → `QS.fetch` rejects
+with a toast. Missing **optional** parameters leave the `:name`
+literal in the URL (so the user can see what's empty in the test
+panel and in dev tools).
+
+Non-placeholder `opts` keys (anything not in
+`{body, onSuccess, onError, silent, _auth, _endpoint}`) get appended
+as query-string parameters. Example:
+`QS.fetch('@my-api/users', 'page=2', 'sort=name')` →
+`GET <baseUrl>/users?page=2&sort=name`.
+
+**`baseUrl` cleanup**: trailing `/` or `\` is stripped before
+storage / validation, so a Windows-paste like `"http://test.api\\"`
+round-trips cleanly.
+
+**Import**: two-screen modal (paste → preview → confirm).
+Auto-detects foreign formats (currently: a file-manager-style JSON
+with `endpoints.{public, secured, ...}` groups) and converts to our
+shape before saving. The converter:
+- Iterates **every** top-level group under `endpoints`; each becomes
+  its own API named `<base>-<group>`.
+- Group with `{ authentication: {...}, endpoints: [...] }` shape →
+  bearer/basic/apiKey auth based on `type`.
+- Group as a flat array → no auth.
+- Rebuilds each endpoint's path with `:placeholders` based on its
+  declared parameters and the API's `route_format` hint
+  (`"path segments"` → `/name/:name`; otherwise leaves params as
+  query-string-bound).
 
 ---
 

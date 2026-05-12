@@ -486,7 +486,39 @@
         // Resolve {{lang}} placeholder in URL
         const pageLang = document.documentElement.lang || 'en';
         url = url.replace(/\{\{lang\}\}/g, pageLang);
-        
+
+        // Substitute :placeholders in URL from `opts`. Mirrors server-side
+        // substitution in testApiEndpoint.php. Any opts key whose name
+        // matches a `:name` segment in the URL becomes the path value
+        // (URL-encoded). Required params (per the endpoint's declared
+        // `parameters`) that are missing → reject with a clear error.
+        // Remaining opts go to the query string at the end (below).
+        const RESERVED_OPTS = new Set([
+            'body', 'onSuccess', 'onError', 'silent', '_auth', '_endpoint'
+        ]);
+        if (url.indexOf(':') !== -1) {
+            const placeholders = [];
+            url.replace(/:([a-zA-Z][a-zA-Z0-9_]*)/g, function (_m, n) {
+                placeholders.push(n); return _m;
+            });
+            const paramDefs = (opts._endpoint && opts._endpoint.parameters) || [];
+            for (const name of placeholders) {
+                const val = opts[name];
+                const def = paramDefs.find(p => p && p.name === name);
+                const required = !!(def && def.required);
+                if (val !== undefined && val !== null && val !== '') {
+                    url = url.replace(':' + name, encodeURIComponent(val));
+                    delete opts[name];   // consumed; don't echo into query string
+                } else if (required) {
+                    const msg = '[QS] fetch: missing required parameter: ' + name;
+                    console.warn(msg);
+                    QS.toast('Missing required parameter: ' + name, 'error');
+                    return Promise.reject(new Error(msg));
+                }
+                // Optional + missing → leave `:name` literal (consistent with test panel).
+            }
+        }
+
         // Build request options
         const fetchOpts = { method: method, headers: {} };
         
@@ -506,7 +538,22 @@
                 fetchOpts.headers['Content-Type'] = 'application/json';
             }
         }
-        
+
+        // Any opts not consumed by path substitution and not in the reserved
+        // control set are appended to the query string. This lets callers
+        // pass e.g. `page=2,sort=name` without manually building the URL.
+        const queryParts = [];
+        for (const key in opts) {
+            if (!Object.prototype.hasOwnProperty.call(opts, key)) continue;
+            if (RESERVED_OPTS.has(key)) continue;
+            const val = opts[key];
+            if (val === undefined || val === null || val === '') continue;
+            queryParts.push(encodeURIComponent(key) + '=' + encodeURIComponent(val));
+        }
+        if (queryParts.length > 0) {
+            url += (url.indexOf('?') === -1 ? '?' : '&') + queryParts.join('&');
+        }
+
         // Make the request
         return fetch(url, fetchOpts)
             .then(response => {

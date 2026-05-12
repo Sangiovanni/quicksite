@@ -2050,7 +2050,13 @@
             "authInherit": "Hériter de l'API (par défaut)",
             "authNone": "Aucune (endpoint public)",
             "authRequired": "Requise (remplace si l'API n'en a pas)",
-            "endpointAuthHint": "Remplacer l'auth de l'API pour cet endpoint"
+            "endpointAuthHint": "Remplacer l'auth de l'API pour cet endpoint",
+            "parameters": "Paramètres",
+            "parametersHint": "Utilisez <code>:nom</code> dans le chemin pour les paramètres de segment (ex. <code>/users/:id</code>). Les autres paramètres vont dans la query string au moment de l'appel.",
+            "addParameter": "Ajouter un paramètre",
+            "paramName": "nom",
+            "paramRequired": "requis",
+            "pathParameters": "Paramètres de chemin"
         },
         "auth": {
             "none": "Aucune",

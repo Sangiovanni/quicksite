@@ -5044,7 +5044,7 @@ kbd {
 }
 
 .admin-details__summary::before {
-    content: 'â–¶';
+    content: '\25B6';        /* ▶ (BLACK RIGHT-POINTING TRIANGLE) — unicode escape avoids file-encoding pitfalls */
     display: inline-block;
     margin-right: var(--space-sm);
     transition: transform 0.2s;
@@ -5112,6 +5112,49 @@ kbd {
 
 .apis-auth-token-input {
     margin-top: var(--space-xs);
+}
+
+/* Endpoint parameters editor (path :placeholders + query params) */
+
+.apis-params-editor__rows:empty + .apis-params-editor__add {
+    margin-top: 0;
+}
+
+.apis-params-editor__add {
+    margin-top: var(--space-xs);
+}
+
+.apis-param-row {
+    display: grid;
+    grid-template-columns: 1fr 140px auto auto;
+    gap: var(--space-sm);
+    align-items: center;
+    margin-bottom: var(--space-xs);
+}
+
+.apis-param-row__name,
+.apis-param-row__type {
+    min-width: 0;
+}
+
+.apis-param-row__required {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+.apis-param-row__delete {
+    line-height: 1;
+}
+
+/* Import modal: example loader buttons row */
+.apis-import-examples {
+    display: flex;
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-sm);
 }
 
 /* Errors list styling for command form */

@@ -193,14 +193,16 @@ class ApiEndpointManager {
             ];
         }
         
-        // Validate baseUrl
+        // Validate baseUrl — strip trailing slash/backslash first so Windows-
+        // style paste like "http://test.api\\" round-trips cleanly.
+        $baseUrl = rtrim($baseUrl, "/\\");
         if (!filter_var($baseUrl, FILTER_VALIDATE_URL)) {
             return [
                 'success' => false,
                 'error' => 'Invalid base URL format'
             ];
         }
-        
+
         // Validate auth if provided
         if (!empty($auth)) {
             $authValidation = $this->validateAuth($auth);
@@ -213,12 +215,12 @@ class ApiEndpointManager {
         } else {
             $auth = ['type' => 'none'];
         }
-        
+
         // Build API definition
         $apiDef = [
             'name' => $name,
             'description' => $description,
-            'baseUrl' => rtrim($baseUrl, '/'),
+            'baseUrl' => $baseUrl,
             'auth' => $auth,
             'endpoints' => [],
             'created' => date('Y-m-d H:i:s')
@@ -270,13 +272,15 @@ class ApiEndpointManager {
         }
         
         if (isset($updates['baseUrl'])) {
-            if (!filter_var($updates['baseUrl'], FILTER_VALIDATE_URL)) {
+            // Strip trailing slash/backslash before validation — same rule as addApi.
+            $newBase = rtrim($updates['baseUrl'], "/\\");
+            if (!filter_var($newBase, FILTER_VALIDATE_URL)) {
                 return [
                     'success' => false,
                     'error' => 'Invalid base URL format'
                 ];
             }
-            $api['baseUrl'] = rtrim($updates['baseUrl'], '/');
+            $api['baseUrl'] = $newBase;
         }
         
         if (isset($updates['auth'])) {
@@ -612,10 +616,82 @@ class ApiEndpointManager {
                 'error' => 'Invalid method. Must be one of: ' . implode(', ', $this->validMethods)
             ];
         }
-        
+
+        // Validate `parameters` shape + cross-check against :placeholders in path
+        $paramValidation = $this->validateParameters($endpoint);
+        if (!$paramValidation['valid']) {
+            return $paramValidation;
+        }
+
         return ['valid' => true, 'error' => null];
     }
-    
+
+    /**
+     * Validate the optional `parameters` array on an endpoint and ensure
+     * every :placeholder in `path` is declared.
+     *
+     * Each parameter is { name, type?, required?, description? } where:
+     *  - name: required, must match /^[a-zA-Z][a-zA-Z0-9_]*$/
+     *  - type: optional, one of string|number|integer|boolean
+     *  - required, description: optional, free-form (boolean / string)
+     *
+     * Path placeholders use the `:name` syntax. Every placeholder must
+     * appear in `parameters`, otherwise the user has a hole in their
+     * runtime URL builder.
+     *
+     * @param array $endpoint
+     * @return array ['valid' => bool, 'error' => string|null]
+     */
+    private function validateParameters(array $endpoint): array {
+        $declared = [];
+        $validTypes = ['string', 'number', 'integer', 'boolean'];
+
+        if (isset($endpoint['parameters'])) {
+            if (!is_array($endpoint['parameters'])) {
+                return ['valid' => false, 'error' => "'parameters' must be an array"];
+            }
+            foreach ($endpoint['parameters'] as $idx => $p) {
+                if (!is_array($p)) {
+                    return ['valid' => false, 'error' => "Parameter at index $idx must be an object"];
+                }
+                $name = $p['name'] ?? '';
+                if (!is_string($name) || $name === '') {
+                    return ['valid' => false, 'error' => "Parameter at index $idx is missing 'name'"];
+                }
+                if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_]*$/', $name)) {
+                    return [
+                        'valid' => false,
+                        'error' => "Invalid parameter name '$name'. Use letters, digits, underscores; must start with a letter."
+                    ];
+                }
+                if (in_array($name, $declared, true)) {
+                    return ['valid' => false, 'error' => "Duplicate parameter name '$name'"];
+                }
+                if (isset($p['type']) && !in_array($p['type'], $validTypes, true)) {
+                    return [
+                        'valid' => false,
+                        'error' => "Invalid type '{$p['type']}' for parameter '$name'. Must be one of: " . implode(', ', $validTypes)
+                    ];
+                }
+                $declared[] = $name;
+            }
+        }
+
+        // Every :placeholder in path must be declared
+        if (preg_match_all('/:([a-zA-Z][a-zA-Z0-9_]*)/', $endpoint['path'], $matches)) {
+            foreach ($matches[1] as $placeholder) {
+                if (!in_array($placeholder, $declared, true)) {
+                    return [
+                        'valid' => false,
+                        'error' => "Path placeholder ':$placeholder' is not declared in 'parameters'. Add a parameter named '$placeholder' to use it in the path."
+                    ];
+                }
+            }
+        }
+
+        return ['valid' => true, 'error' => null];
+    }
+
     /**
      * Get valid HTTP methods
      * @return array
@@ -683,6 +759,11 @@ class ApiEndpointManager {
                         // Include response bindings so runtime applyBindings() can use them
                         if (!empty($endpoint['responseBindings'])) {
                             $jsConfig[$apiId]['endpoints'][$endpointId]['responseBindings'] = $endpoint['responseBindings'];
+                        }
+                        // Include parameters so QS.fetch can substitute :placeholders
+                        // and route remaining params to query string (Step 2 wiring).
+                        if (!empty($endpoint['parameters'])) {
+                            $jsConfig[$apiId]['endpoints'][$endpointId]['parameters'] = $endpoint['parameters'];
                         }
                     }
                 }

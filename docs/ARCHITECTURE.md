@@ -361,6 +361,46 @@ Use the live `listJsFunctions` command for the authoritative list — it is the 
 
 A project-scoped "custom JS function" feature existed in earlier betas (`addJsFunction` / `qs-custom.js`); it was removed in beta.3 for security reasons. Custom logic is now expressed by composing the core functions or, for richer client behaviour, registered API endpoints (see `addApi` / `testApiEndpoint`).
 
+### 8.1 External API registry (`QS.fetch`)
+
+`QS.fetch('@<apiId>/<endpointId>', 'name=value', …)` resolves the
+target against `window.QS_API_ENDPOINTS`, a registry compiled
+server-side from per-project `data/api-endpoints.json`.
+
+| Concern | Where |
+|---|---|
+| Storage (per project) | `secure/projects/<project>/data/api-endpoints.json` |
+| Server class | `secure/src/classes/ApiEndpointManager.php` |
+| Public bundle | `public/scripts/qs-api-config.js` (auto-regenerated on every `addApi` / `editApi` / `deleteApi`) |
+| Runtime | `public/scripts/qs.js` → `QS.fetch` |
+| Admin UI | `/admin/apis` — see [ADMIN_PANEL.md §9.1](ADMIN_PANEL.md). |
+
+**Path templating**: endpoint `path` may contain `:placeholder`
+segments. At runtime, `QS.fetch` substitutes each `:name` with
+`opts.name` (URL-encoded). Missing **required** placeholders reject
+with a toast; missing **optional** ones stay literal so the
+omission is visible. Remaining (non-reserved) opts become
+query-string parameters.
+
+**Path templating example**:
+```
+endpoint.path: /users/:id/posts/:postId
+call:          QS.fetch('@my/get-post', 'id=42', 'postId=7', 'expand=author')
+result URL:    GET <baseUrl>/users/42/posts/7?expand=author
+```
+
+**Foreign-format import**: the admin page's import modal accepts
+both our native shape (`{ "apis": {...} }`) and recognised foreign
+formats (currently: a file-manager-style JSON with
+`endpoints.{public, secured, …}` groups). The converter:
+- Treats every top-level group under `endpoints` as its own API
+  (named `<base>-<group>`).
+- Detects bearer/basic/apiKey auth from a group's `authentication.type`.
+- Rewrites each endpoint's `path` to include `:placeholders` based
+  on declared parameters + the source's `route_format` hint
+  (e.g. `"path segments"` → `/name/:name`).
+- Preserves an existing `:placeholder` if one is already present.
+
 ---
 
 ## 9. Style management
