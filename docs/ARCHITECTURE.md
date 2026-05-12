@@ -361,6 +361,18 @@ Use the live `listJsFunctions` command for the authoritative list — it is the 
 
 A project-scoped "custom JS function" feature existed in earlier betas (`addJsFunction` / `qs-custom.js`); it was removed in beta.3 for security reasons. Custom logic is now expressed by composing the core functions or, for richer client behaviour, registered API endpoints (see `addApi` / `testApiEndpoint`).
 
+#### 8.0.1 Chain execution & ordering
+
+Calls in a handler attribute (`{{call:a}};{{call:b}};…`) are compiled by `JsonToHtmlRenderer::transformCallSyntax` with three rules:
+
+1. **Sync prelude** — verbs in `CHAIN_SYNC_PRELUDE` (`validate`) emit first as plain `QS.foo(...)` statements. They run inside the event tick and can still call `event.preventDefault()` or `throw` to abort the rest.
+2. **Async wrap** — if the remaining body contains at least one verb from `CHAIN_AWAITABLE` (`fetch`) AND there is more than one call, the body is wrapped in `(async()=>{await A;await B;…})().catch(e=>console.warn('[QS] chain aborted:',e))`. Every call gets `await`'d, so "fetch then hide" actually waits for the response.
+3. **Backward-compat** — a sole `{{call:fetch:...}}` (or a chain with no awaitable verb) stays as-is. Single-call handlers and pure-sync chains don't pay the microtask cost.
+
+Side channel: `QS.fetch` also dispatches `qs:fetch:loaded` / `qs:fetch:error` DOM events (with `detail.{ref, data}` or `detail.{ref, error}`) and caches the latest result per ref in `QS._fetchCache`. Use this when an action must react to a fetch fired from a different handler/page — see `QS.after(eventSuffix, handler)` and `QS.onceCached(eventSuffix, handler)` in `qs.js`. The chain rules above stay the default UX; events are the escape hatch.
+
+`event.preventDefault()` caveat: after the chain enters its async IIFE, calling preventDefault is a no-op (the default action has already fired). `validate` is in the sync prelude precisely for this reason. Any future verb that needs preventDefault must be added to `CHAIN_SYNC_PRELUDE`.
+
 ### 8.1 External API registry (`QS.fetch`)
 
 `QS.fetch('@<apiId>/<endpointId>', 'name=value', …)` resolves the

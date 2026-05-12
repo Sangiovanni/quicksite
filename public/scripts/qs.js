@@ -444,7 +444,13 @@
         const opts = {};
         let url = null;
         let method = 'GET';
-        
+
+        // `ref` is the public identity of this fetch — used as the cache
+        // key and emitted on the qs:fetch:loaded / qs:fetch:error events
+        // so listeners can filter (e.g. `if (e.detail.ref === '@api/x')`).
+        // Set late in direct-URL mode once we know the URL.
+        let ref = target;
+
         options.forEach(opt => {
             if (opt.includes('=')) {
                 const [key, val] = opt.split('=');
@@ -468,6 +474,7 @@
         else {
             method = target.toUpperCase();
             url = options[0];
+            ref = method + ' ' + (url || '');
             // Re-parse remaining options (skip URL)
             for (let i = 1; i < options.length; i++) {
                 const opt = options[i];
@@ -565,19 +572,30 @@
             .then(data => {
                 // Store for direct renderList access
                 QS._lastFetchResult = data;
-                
+
+                // Cache by ref so late subscribers (QS.onceCached) can
+                // replay the latest result without re-fetching.
+                QS._fetchCache[ref] = data;
+
                 // Apply response bindings if defined
                 if (opts._endpoint && opts._endpoint.responseBindings) {
                     applyBindings(data, opts._endpoint.responseBindings);
                 }
-                
+
                 // Custom success handler
                 if (opts.onSuccess && typeof window[opts.onSuccess] === 'function') {
                     window[opts.onSuccess](data);
                 } else if (!opts.silent) {
                     QS.toast('Success', 'success');
                 }
-                
+
+                // Notify any listener (e.g. cross-page count, post-fetch chains).
+                // Fires AFTER bindings + onSuccess so listeners see a fully
+                // settled DOM if they react to it.
+                document.dispatchEvent(new CustomEvent('qs:fetch:loaded', {
+                    detail: { ref: ref, data: data }
+                }));
+
                 return data;
             })
             .catch(error => {
@@ -587,9 +605,61 @@
                 } else if (!opts.silent) {
                     QS.toast(error.message || 'Request failed', 'error');
                 }
-                
+
+                document.dispatchEvent(new CustomEvent('qs:fetch:error', {
+                    detail: { ref: ref, error: error }
+                }));
+
                 throw error;
             });
+    };
+
+    // Cache of the latest data per ref — populated by QS.fetch on success,
+    // consulted by QS.onceCached for late subscribers.
+    QS._fetchCache = {};
+
+    /**
+     * Subscribe to a QS event (e.g. `fetch:loaded`, `fetch:error`) and
+     * auto-unsubscribe after the first call.
+     *
+     * Use this when you want "after the NEXT fetch lands, do X" without
+     * the lifecycle hassle of addEventListener + removeEventListener.
+     * Does NOT replay cached results — call QS.onceCached for that.
+     *
+     * @param {string} eventSuffix  e.g. 'fetch:loaded'
+     * @param {function} handler    Receives the CustomEvent.
+     */
+    QS.after = function(eventSuffix, handler) {
+        const evt = 'qs:' + eventSuffix;
+        const wrapped = function (e) {
+            document.removeEventListener(evt, wrapped);
+            try { handler(e); } catch (err) { console.warn('[QS] QS.after handler threw:', err); }
+        };
+        document.addEventListener(evt, wrapped);
+    };
+
+    /**
+     * Same as QS.after, BUT if `QS._fetchCache` already has data for any
+     * ref under this event type, fire the handler immediately once per
+     * cached ref (synthetic event with .detail.{ref, data}), AND register
+     * a one-shot listener for future events.
+     *
+     * Use this for "give me the latest result whether it just arrived or
+     * landed earlier" — common pattern for cross-page bindings.
+     */
+    QS.onceCached = function(eventSuffix, handler) {
+        if (eventSuffix === 'fetch:loaded') {
+            const cache = QS._fetchCache || {};
+            for (const ref in cache) {
+                if (!Object.prototype.hasOwnProperty.call(cache, ref)) continue;
+                try {
+                    handler({ type: 'qs:fetch:loaded', detail: { ref: ref, data: cache[ref] } });
+                } catch (err) {
+                    console.warn('[QS] QS.onceCached cached-replay threw:', err);
+                }
+            }
+        }
+        QS.after(eventSuffix, handler);
     };
     
     /**
