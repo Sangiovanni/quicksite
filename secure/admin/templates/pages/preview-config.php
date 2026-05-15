@@ -384,5 +384,21 @@ window.PreviewConfig = {
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-sidebar-resize.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-sidebar-resize.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-drag.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-drag.js') ?>"></script>
 
+<!-- Complex Element wizards (Add Element → Complex tab).
+     Loaded BEFORE preview.js so the Complex-tab handler can call into
+     window.QSComplexWizard during init.
+     Order matters: shared helpers (row editor + textKey picker) before
+     the per-kind `complex-*.js` files (each kind may use them on parse). -->
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/wizard-row-editor.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/contextual-complex/wizard-row-editor.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/text-key-picker.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/contextual-complex/text-key-picker.js') ?>"></script>
+<?php
+    // Auto-include every complex-*.js so adding a new kind is one file drop.
+    foreach (glob(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/contextual-complex/complex-*.js') as $_ceJs) {
+        $_ceBase = basename($_ceJs);
+        echo '<script src="' . rtrim(BASE_URL, '/') . '/admin/assets/js/pages/preview/contextual-complex/' . $_ceBase
+            . '?v=' . filemtime($_ceJs) . '"></script>' . "\n";
+    }
+?>
+
 <!-- Preview JavaScript (Main) -->
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview.js') ?>"></script>

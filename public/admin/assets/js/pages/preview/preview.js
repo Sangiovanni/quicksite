@@ -320,6 +320,14 @@
     const addComponentNoVars = document.getElementById('add-component-no-vars');
     const addCancelBtn = document.getElementById('add-cancel');
     const addConfirmBtn = document.getElementById('add-confirm');
+    // Complex Element tab (added in beta.7) — kind picker + wizard body.
+    // The kind dropdown is populated from window.QSComplexWizard.registry,
+    // and each kind module owns rendering inside addComplexBody via its
+    // own renderWizard(container) factory.
+    const addComplexField = document.getElementById('add-complex-field');
+    const addComplexKindSelect = document.getElementById('add-complex-kind');
+    const addComplexBody = document.getElementById('add-complex-body');
+    let addComplexController = null;  // controller returned by the active kind's renderWizard
     
     // Configuration
     const baseUrl = PreviewConfig.baseUrl;
@@ -4388,7 +4396,8 @@
         
         // Reset form state — use remembered tab or default to 'snippet'
         const rememberedTab = localStorage.getItem('qs-add-last-tab');
-        sidebarAddNodeType = (rememberedTab === 'tag' || rememberedTab === 'component' || rememberedTab === 'snippet') ? rememberedTab : 'snippet';
+        const VALID_TABS = ['tag', 'component', 'snippet', 'complex'];
+        sidebarAddNodeType = VALID_TABS.includes(rememberedTab) ? rememberedTab : 'snippet';
         sidebarAddCustomParamsCount = 0;
         sidebarAddSelectedComponentData = null;
         
@@ -4436,6 +4445,8 @@
             loadSidebarComponentsList();
         } else if (sidebarAddNodeType === 'snippet') {
             loadSidebarSnippetsList();
+        } else if (sidebarAddNodeType === 'complex') {
+            populateComplexKindPicker();
         }
     }
     
@@ -4460,17 +4471,31 @@
         const isTag = sidebarAddNodeType === 'tag';
         const isComponent = sidebarAddNodeType === 'component';
         const isSnippet = sidebarAddNodeType === 'snippet';
-        
+        const isComplex = sidebarAddNodeType === 'complex';
+
         if (addTagField) addTagField.style.display = isTag ? 'block' : 'none';
         if (addComponentField) addComponentField.style.display = isComponent ? 'block' : 'none';
         if (addSnippetField) addSnippetField.style.display = isSnippet ? 'block' : 'none';
         if (addClassField) addClassField.style.display = isTag ? 'block' : 'none';
         if (addAdvancedSection) addAdvancedSection.style.display = isTag ? '' : 'none';
         if (addPreviewSection) addPreviewSection.style.display = isTag ? '' : 'none';
-        
+        // Complex tab — show kind picker; body only shows once a kind is picked.
+        if (addComplexField) addComplexField.style.display = isComplex ? 'block' : 'none';
+        if (addComplexBody) {
+            const hasController = isComplex && addComplexController !== null;
+            addComplexBody.style.display = hasController ? '' : 'none';
+        }
+
+        // Hide the top "Add Element" quick-add button for Complex — it
+        // sits above the kind picker + wizard body, which makes it
+        // visually mid-form and saves a config that hasn't been filled
+        // in yet. For other types, the top button is a useful shortcut.
+        const addTopActions = addConfirmTopBtn ? addConfirmTopBtn.parentElement : null;
+        if (addTopActions) addTopActions.style.display = isComplex ? 'none' : '';
+
         // Update mandatory params visibility
         updateSidebarAddMandatoryParams();
-        
+
         // Component vars
         if (addComponentVars) addComponentVars.style.display = (isComponent && sidebarAddSelectedComponentData) ? 'block' : 'none';
     }
@@ -4816,10 +4841,86 @@
                 loadSidebarComponentsList();
             } else if (sidebarAddNodeType === 'snippet') {
                 loadSidebarSnippetsList();
+            } else if (sidebarAddNodeType === 'complex') {
+                populateComplexKindPicker();
             } else {
                 updateSidebarAddTextKeyPreview();
             }
         });
+    });
+
+    // -------------------------------------------------------------------
+    // Complex Element wizard glue
+    // -------------------------------------------------------------------
+
+    /**
+     * Read window.QSComplexWizard.registry and (re)populate the kind
+     * <select>. Each registry entry must have at least { label,
+     * renderWizard(container) }. Called every time the user opens the
+     * Complex tab so newly-shipped kinds appear without page reload
+     * during development.
+     */
+    function populateComplexKindPicker() {
+        if (!addComplexKindSelect) return;
+        const registry = (window.QSComplexWizard && window.QSComplexWizard.registry) || {};
+        const previous = addComplexKindSelect.value;
+        // Keep the leading "— pick a kind —" placeholder; rebuild the rest.
+        const placeholder = addComplexKindSelect.querySelector('option[value=""]');
+        addComplexKindSelect.innerHTML = '';
+        if (placeholder) addComplexKindSelect.appendChild(placeholder);
+        Object.keys(registry).sort().forEach(kind => {
+            const entry = registry[kind] || {};
+            const opt = document.createElement('option');
+            opt.value = kind;
+            opt.textContent = entry.label || kind;
+            if (entry.description) opt.title = entry.description;
+            addComplexKindSelect.appendChild(opt);
+        });
+        // Restore previous selection if it still exists, else clear.
+        if (previous && registry[previous]) {
+            addComplexKindSelect.value = previous;
+        } else {
+            addComplexKindSelect.value = '';
+            renderComplexWizardBody(null);
+        }
+    }
+
+    /**
+     * Render the wizard body for the picked kind. Tears down any prior
+     * controller first so each kind starts clean.
+     */
+    function renderComplexWizardBody(kind) {
+        if (!addComplexBody) return;
+        // Tear down prior controller
+        if (addComplexController && typeof addComplexController.destroy === 'function') {
+            try { addComplexController.destroy(); } catch (e) { console.warn('[CE] destroy threw:', e); }
+        }
+        addComplexController = null;
+        addComplexBody.innerHTML = '';
+
+        if (!kind) {
+            addComplexBody.style.display = 'none';
+            return;
+        }
+        const registry = (window.QSComplexWizard && window.QSComplexWizard.registry) || {};
+        const entry = registry[kind];
+        if (!entry || typeof entry.renderWizard !== 'function') {
+            addComplexBody.innerHTML = '<p class="admin-hint admin-text-danger">Kind "' + kind + '" has no renderWizard.</p>';
+            addComplexBody.style.display = '';
+            return;
+        }
+        try {
+            addComplexController = entry.renderWizard(addComplexBody) || null;
+        } catch (e) {
+            console.error('[CE] renderWizard for "' + kind + '" threw:', e);
+            addComplexBody.innerHTML = '<p class="admin-hint admin-text-danger">Wizard failed to render. See console.</p>';
+        }
+        addComplexBody.style.display = '';
+    }
+
+    // React to kind changes.
+    addComplexKindSelect?.addEventListener('change', function () {
+        renderComplexWizardBody(this.value);
     });
     
     // ==================== Component Selector ====================
@@ -6355,7 +6456,7 @@
             showToast(PreviewConfig.i18n.selectNodeFirst, 'warning');
             return;
         }
-        
+
         try {
             if (sidebarAddNodeType === 'tag') {
                 await addTagNode();
@@ -6363,12 +6464,70 @@
                 await addComponentNode();
             } else if (sidebarAddNodeType === 'snippet') {
                 await addSnippetNode();
+            } else if (sidebarAddNodeType === 'complex') {
+                await addComplexNode();
             }
         } catch (error) {
             console.error('[Preview] Add node error:', error);
             showToast(error.message || PreviewConfig.i18n.addNodeError, 'error');
         }
     });
+
+    /**
+     * Save the currently-active Complex Element wizard.
+     * The controller (returned by the kind's renderWizard) drives
+     * validation + config extraction; we just dispatch to the
+     * addComplexElement command and refresh the preview iframe.
+     */
+    async function addComplexNode() {
+        if (!addComplexKindSelect || !addComplexController) {
+            showToast(PreviewConfig.i18n.complexPickKindFirst || 'Pick a complex element kind first', 'warning');
+            return;
+        }
+        const kind = addComplexKindSelect.value;
+        if (!kind) {
+            showToast(PreviewConfig.i18n.complexPickKindFirst || 'Pick a complex element kind first', 'warning');
+            return;
+        }
+
+        // Validate via controller (returns a string error or null/undef on OK).
+        if (typeof addComplexController.validate === 'function') {
+            const err = addComplexController.validate();
+            if (err) { showToast(err, 'error'); return; }
+        }
+
+        const config = (typeof addComplexController.getConfig === 'function')
+            ? addComplexController.getConfig() : {};
+
+        // The targetNodeId / structType plumbing mirrors addNode/addComponentNode.
+        const targetNodeId = (selectedNode === 'root') ? 'root' : String(selectedNode);
+        const position = getAddPosition();
+        const body = {
+            kind: kind,
+            config: config,
+            structType: currentEditType,
+            pageName: (currentEditType === 'page' || currentEditType === 'component')
+                ? currentEditName : undefined,
+            targetNodeId: targetNodeId,
+            position: position
+        };
+
+        // Use the shared helper for URL joining + auth header consistency.
+        // (Don't hand-build URLs: managementUrl already ends with '/', so
+        // string concatenation produces "/management//addComplexElement"
+        // which the dispatcher treats as missing command.)
+        const result = await QuickSiteAdmin.apiRequest('addComplexElement', 'POST', body);
+        if (!result || !result.ok) {
+            const msg = (result && result.data && result.data.message)
+                || 'Failed to add complex element';
+            throw new Error(msg);
+        }
+        const data = result.data || {};
+        showToast(data.message || 'Complex element added', 'success');
+        hideSidebarAddForm();
+        // Refresh the iframe so the new subtree appears.
+        if (typeof reloadPreview === 'function') reloadPreview();
+    }
     
     // Add tag node
     async function addTagNode() {

@@ -543,6 +543,10 @@ input.admin-checkbox {
     color: var(--admin-text-light);
 }
 
+.admin-hint a {
+    color: var(--admin-accent);
+}
+
 .admin-error-message {
     margin-top: var(--space-xs);
     font-size: var(--font-size-sm);
@@ -5157,6 +5161,215 @@ kbd {
     margin-bottom: var(--space-sm);
 }
 
+/* ==========================================================================
+   Complex Element wizards — shared row editor (WizardRowEditor primitive)
+   Used by every variable-cardinality kind (Form Scaffold fields,
+   Select options, List items, Radio options, Table cells, …).
+   ========================================================================== */
+
+.qs-wizard-row-editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.qs-wizard-row {
+    display: flex;
+    align-items: stretch;
+    gap: var(--space-xs);
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: var(--radius-sm);
+    padding: var(--space-xs);
+    background: var(--admin-bg-secondary, transparent);
+}
+
+.qs-wizard-row__content {
+    flex: 1;
+    min-width: 0;
+}
+
+.qs-wizard-row__tools {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 0 0 auto;
+}
+
+.qs-wizard-row__tools button {
+    appearance: none;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--admin-text-muted, #888);
+    cursor: pointer;
+    padding: 2px 6px;
+    line-height: 1;
+    font-size: 0.95em;
+    border-radius: var(--radius-sm);
+}
+
+.qs-wizard-row__tools button:hover {
+    background: var(--admin-surface, #f0f0f0);
+    color: var(--admin-text, #222);
+}
+
+.qs-wizard-row__tools .qs-wizard-row__delete:hover {
+    color: var(--admin-danger, #c33);
+}
+
+.qs-wizard-row__add {
+    align-self: flex-start;
+    margin-top: var(--space-xs);
+}
+
+/* TextKey picker (searchable + inline-create) used by every wizard's
+   translation-key fields. Mirrors the variables-panel picker visually. */
+.qs-textkey-picker {
+    position: relative;
+}
+
+.qs-textkey-picker__input {
+    width: 100%;
+}
+
+.qs-textkey-picker__dropdown {
+    position: absolute;
+    top: 100%; left: 0; right: 0;
+    z-index: 10;
+    max-height: 240px;
+    overflow-y: auto;
+    background: var(--admin-bg, #fff);
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    margin-top: 2px;
+}
+
+.qs-textkey-picker__item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 6px var(--space-sm);
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color-light, #eee);
+}
+
+.qs-textkey-picker__item:last-child { border-bottom: none; }
+.qs-textkey-picker__item:hover { background: var(--admin-hover, #f0f0f0); }
+.qs-textkey-picker__item--selected { background: var(--admin-accent-light, #e8f0fe); }
+
+.qs-textkey-picker__item-key {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.85em;
+    color: var(--admin-text, #222);
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.qs-textkey-picker__item-value {
+    font-size: 0.8em;
+    color: var(--admin-text-muted, #888);
+    max-width: 50%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.qs-textkey-picker__create {
+    padding: 8px var(--space-sm);
+    background: var(--admin-bg-secondary, #f7f7f7);
+    border-top: 1px solid var(--border-color, #ddd);
+}
+
+.qs-textkey-picker__create-label {
+    font-size: 0.85em;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.qs-textkey-picker__create-row {
+    display: flex;
+    gap: var(--space-xs);
+    align-items: center;
+}
+
+.qs-textkey-picker__create-value {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Form Scaffold wizard — radio-row + per-field-row layout */
+.qs-radio-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    align-items: center;
+}
+.qs-radio-row > label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+
+.qs-fs-field-row__line {
+    display: flex;
+    gap: var(--space-xs);
+    align-items: center;
+    margin-bottom: 4px;
+}
+.qs-fs-field-row__line:last-child { margin-bottom: 0; }
+
+.qs-fs-field-row__name {
+    flex: 1 1 0;
+    min-width: 0;
+}
+.qs-fs-field-row__type {
+    flex: 0 0 120px;
+}
+.qs-fs-field-row__required {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    font-size: 0.85em;
+}
+.qs-fs-field-row__label-label {
+    flex: 0 0 auto;
+    font-size: 0.85em;
+    color: var(--admin-text-muted, #888);
+}
+.qs-fs-field-row__label-mount {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+/* Select wizard — per-option row (same family as the field row) */
+.qs-sel-option-row__line {
+    display: flex;
+    gap: var(--space-xs);
+    align-items: center;
+    margin-bottom: 4px;
+}
+.qs-sel-option-row__line:last-child { margin-bottom: 0; }
+
+.qs-sel-option-row__value {
+    flex: 1 1 0;
+    min-width: 0;
+}
+.qs-sel-option-row__label-label {
+    flex: 0 0 auto;
+    font-size: 0.85em;
+    color: var(--admin-text-muted, #888);
+}
+.qs-sel-option-row__label-mount {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
 /* Errors list styling for command form */
 
 .admin-error-list li,
@@ -7242,16 +7455,21 @@ code.preview-contextual-info__value {
 .preview-contextual-style-tab,
 .preview-contextual-form__tab {
     flex: 1;
+    /* Icon-over-text so 4 tabs sit comfortably side by side without
+       any one tab's label getting cramped. */
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    padding: var(--space-sm) var(--space-md);
+    gap: 2px;
+    padding: 6px 4px;
+    min-width: 0;
     background: transparent;
     border: none;
     border-radius: var(--radius-sm);
-    font-size: 0.875rem;
+    font-size: 0.7rem;
     font-weight: 600;
+    line-height: 1.1;
     color: var(--admin-text-muted);
     cursor: pointer;
     transition: all 0.2s;
@@ -11478,15 +11696,21 @@ code.preview-node-panel__value {
 }
 
 .preview-contextual-form__tab svg {
-    width: 14px;
-    height: 14px;
+    width: 18px;
+    height: 18px;
     flex-shrink: 0;
 }
 
-@media (min-width: 1200px) {
-    .preview-contextual-form__tab span {
-        display: inline;
-    }
+/* Icon-over-text layout (set above) makes the label always visible
+   regardless of viewport width — the old 1200px media-query trick
+   that hid `.preview-contextual-form__tab span` is no longer needed.
+   Re-show explicitly to override the default rule that hides it. */
+.preview-contextual-form__tab span {
+    display: inline;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
 }
 
 /* Form hint text */

@@ -2619,7 +2619,77 @@ $GLOBALS['__help_commands'] = [
         ],
         'notes' => 'Auto-generates textKey based on structure type: for pages uses {pageName}.item{N}, for components uses component.{componentName}.item{N}, for menu/footer uses {type}.item{N}. Creates empty translation in default.json. Position "inside" moves existing text children into new node. For components, use addComponentToNode. **Component node paths**: For type=component, root is "" (empty) and children are "0", "1", etc. (differs from pages where root elements start at "0").'
     ],
-    
+
+    'addComplexElement' => [
+        'description' => 'Insert a wizard-built subtree (form scaffold, select, list, field row, etc.) atomically — single command dispatches to the right builder by kind, splices the produced subtree under one file lock.',
+        'method' => 'POST',
+        'parameters' => [
+            'kind' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Builder kind to dispatch to. Built-ins: field-row, form-scaffold, select, list. Lowercase + hyphens only.',
+                'example' => 'list'
+            ],
+            'config' => [
+                'required' => true,
+                'type' => 'object',
+                'description' => 'Builder-specific config. Shape depends on kind (see Complex Element wizard docs).',
+                'example' => '{"tag": "ul", "items": [{"labelKey": "menu.home"}, {"labelKey": "menu.about"}]}'
+            ],
+            'structType' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Structure type: menu, footer, page, or component',
+                'example' => 'page'
+            ],
+            'pageName' => [
+                'required' => 'conditional',
+                'type' => 'string',
+                'description' => 'Structure name (required for structType=page/component)',
+                'example' => 'home'
+            ],
+            'targetNodeId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Reference node ID for positioning (dot-notation like "0.2.1") or the literal "root" to splice at the top of the structure.',
+                'example' => '0.2'
+            ],
+            'position' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Where to insert relative to targetNodeId: before, after, or inside. Default "after". Forced to "inside" when targetNodeId="root".',
+                'default' => 'after',
+                'example' => 'inside'
+            ]
+        ],
+        'example_post' => 'POST /management/addComplexElement with body: {"kind": "list", "config": {"tag": "ul", "items": [{"labelKey": "menu.home"}, {"labelKey": "menu.about"}]}, "structType": "page", "pageName": "home", "targetNodeId": "0", "position": "inside"}',
+        'success_response' => [
+            'status' => 201,
+            'code' => 'operation.success',
+            'message' => 'Complex element \'<kind>\' inserted',
+            'data' => [
+                'kind' => 'list',
+                'newNodeId' => '0.0',
+                'newNode' => '{"tag": "ul", "children": [...]}',
+                'targetNodeId' => '0',
+                'position' => 'inside',
+                'structType' => 'page',
+                'pageName' => 'home'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing required parameter (kind, config, structType, targetNodeId)',
+            '400.validation.invalid_format' => 'Invalid kind format or invalid targetNodeId format',
+            '400.validation.invalid_value' => 'Invalid structType / position, or attempt to insert inside a component or text node',
+            '400.complex_element.build_failed' => 'Builder rejected the config (e.g. list with no items, select with duplicate option values)',
+            '404.complex_element.unknown_kind' => 'No builder registered for the requested kind (response includes availableKinds list)',
+            '404.route.not_found' => 'Target page does not exist',
+            '404.node.not_found' => 'Target node not found at the given dot path',
+            '500.complex_element.build_failed' => 'Builder threw unexpectedly or returned a malformed node'
+        ],
+        'notes' => 'After save, the emitted subtree is INDISTINGUISHABLE from a hand-built one — same JSON shape, same renderer, editable with the regular visual-editor tools. Wizard is build-time only; nothing at render time knows the element came from here. Builders live in secure/src/classes/complexElements/*.php as ComplexElementBuilder subclasses and are auto-discovered by the dispatcher. Drop a new builder file + a matching public/admin/.../contextual-complex/complex-<kind>.js wizard to add a kind — zero registration. Reuses addNode\'s insertion helper for non-root targets (same atomicity). For targetNodeId="root", detects page (list-shape root) vs component (object-shape root) and splices accordingly.'
+    ],
+
     'duplicateNode' => [
         'description' => 'Duplicates a node with all its children, generating new unique translation keys to prevent collisions.',
         'method' => 'POST',
@@ -4841,7 +4911,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
             'command_categories' => [
                 'route_management' => ['addRoute', 'deleteRoute', 'setRouteLayout', 'getRoutes', 'getSiteMap', 'analyzeReachability'],
                 'structure_management' => ['getStructure', 'editStructure', 'listComponents', 'getComponent', 'findComponentUsages', 'renameComponent', 'duplicateComponent', 'listPages'],
-                'node_management' => ['moveNode', 'deleteNode', 'addNode', 'editNode', 'addComponentToNode', 'editComponentToNode'],
+                'node_management' => ['moveNode', 'deleteNode', 'addNode', 'editNode', 'addComponentToNode', 'editComponentToNode', 'addComplexElement'],
                 'alias_management' => ['createAlias', 'deleteAlias', 'listAliases'],
                 'translation_management' => ['getTranslation', 'getTranslations', 'setTranslationKeys', 'deleteTranslationKeys', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations'],
                 'language_management' => ['getLangList', 'setMultilingual', 'checkStructureMulti', 'addLang', 'deleteLang', 'setDefaultLang'],

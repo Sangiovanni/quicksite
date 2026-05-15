@@ -73,9 +73,25 @@ class Translator {
             $current = $current[$segment];
         }
 
-        // Convert to string
+        // Defensive: path resolved to a NON-scalar (array of nested keys,
+        // or some other shape). Most i18n systems disallow a key being
+        // both a leaf and a branch; setTranslationKeys rejects writes
+        // that would create the collision, but we can't assume the file
+        // is well-formed — older data + manual edits + foreign imports
+        // can all leave the collision in place. Return missing-marker
+        // so the renderer stays safe (no `(string) $array` → "Array"
+        // crashes, no leaked subtree of keys in the page output).
+        if (!is_scalar($current)) {
+            error_log(
+                "Translator: key '{$key}' resolves to a non-scalar value "
+                . "(likely a string-vs-nested collision in the translation file). "
+                . "Lang: " . self::$lang
+            );
+            return "{translation missing: {$key}}";
+        }
+
         $result = (string) $current;
-        
+
         // Empty string is considered "untranslated" - treat like missing
         if ($result === '') {
             error_log("Empty translation for key: {$key} for language: " . self::$lang);

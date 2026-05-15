@@ -710,11 +710,15 @@ class JsonToHtmlRenderer {
             $parts[] = implode(';', $syncPrelude);
         }
         if (!empty($body)) {
-            // Wrap in async IIFE only when there's something to await AND
-            // more than one body call — a single fetch keeps its old
-            // fire-and-forget shape for backward compatibility, and
-            // pure-sync chains (hide/show/etc.) don't need a microtask hop.
-            if ($hasAwaitable && count($body) > 1) {
+            // Wrap in async IIFE whenever there's an awaitable verb in the
+            // chain — even alone. A single fetch ALSO gets wrapped now so
+            // future post-fetch actions (toast, redirect, hide form, …)
+            // appended via the picker await it correctly without the chain
+            // suddenly changing shape between "fetch only" and "fetch +
+            // more". The wrap cost for a single fetch is one microtask
+            // hop, invisible in practice. Pure-sync chains (hide/show/etc.)
+            // still emit straight statements — no needless wrap.
+            if ($hasAwaitable) {
                 $awaited = array_map(function ($c) { return 'await ' . $c; }, $body);
                 $parts[] = "(async()=>{" . implode(';', $awaited) . "})().catch(e=>console.warn('[QS] chain aborted:',e))";
             } else {

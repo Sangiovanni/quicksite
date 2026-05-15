@@ -201,6 +201,16 @@ Tokens are stored in `secure/management/config/auth.php` and mapped to one of:
 
 Named roles (`viewer`, `editor`, `designer`, `developer`, `admin`) and any custom role live in `secure/management/config/roles.php`. The superadmin `*` is **hardcoded** in `secure/src/functions/AuthManagement.php` (and `AdminRouter.php`) — it bypasses the roles file entirely and gets unconditional access to every command, including token and role management. It is the only role that cannot be created, edited, or deleted at runtime. Permissions are checked before the command file is included.
 
+### Extending one command via builders — `addComplexElement`
+
+Most commands do one thing. `addComplexElement` is the exception: it's a single command that dispatches to a registry of **builders** auto-discovered from `secure/src/classes/complexElements/*.php`. Each builder is a `ComplexElementBuilder` subclass that turns a wizard-supplied config into a node spec (pure: config in → node out, no I/O), which the command then splices into the structure under one file lock by reusing `addNode`'s insertion helper.
+
+The pattern means new wizard kinds (field-row, form-scaffold, select, list — and future radio, checkbox, table, …) ship as a single PHP file drop. No `routes.php` / `roles.php` / `help.php` edits, no new commands. The dispatcher globs the directory at request time and registers every subclass by its declared `kind()`.
+
+After save, the emitted subtree is indistinguishable from a hand-built one — same JSON shape, same renderer, editable with the regular visual-editor tools. The wizard is build-time only; nothing at render time knows the element came from there.
+
+See [ADMIN_PANEL.md §8.7](ADMIN_PANEL.md#87-complex-element-wizard) for the per-kind catalogue, the matching client-side wizard contract, and the full 2-file recipe for adding a new kind.
+
 ---
 
 ## 4. JSON → HTML pipeline

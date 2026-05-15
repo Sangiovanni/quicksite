@@ -42,6 +42,15 @@
                     </svg>
                     <span><?= __admin('preview.component') ?? 'Component' ?></span>
                 </button>
+                <button type="button" class="preview-contextual-form__tab" data-type="complex">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <!-- "form-shape" glyph: a stack of fields -->
+                        <rect x="3" y="4" width="18" height="3" rx="1"/>
+                        <rect x="3" y="10" width="18" height="3" rx="1"/>
+                        <rect x="3" y="16" width="11" height="3" rx="1"/>
+                    </svg>
+                    <span><?= __admin('preview.complex', 'Complex') ?></span>
+                </button>
                 <button type="button" class="preview-contextual-form__tab" data-type="tag">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
@@ -50,6 +59,22 @@
                 </button>
             </div>
             <input type="hidden" id="add-type-input" value="snippet">
+        </div>
+
+        <!-- Complex Element selection (for Complex type) -->
+        <div class="preview-contextual-form__field" id="add-complex-field" style="display: none;">
+            <label for="add-complex-kind"><?= __admin('preview.complexKind', 'Kind') ?>:</label>
+            <select id="add-complex-kind" class="admin-input">
+                <option value=""><?= __admin('preview.complexPickKind', '— pick a kind —') ?></option>
+                <!-- Populated by JS from window.QSComplexWizard.registry -->
+            </select>
+        </div>
+
+        <!-- Container the kind-specific wizard form renders into. Each kind's
+             JS module (contextual-complex/complex-<kind>.js) takes ownership
+             when the user picks its option above. -->
+        <div class="preview-contextual-form__section" id="add-complex-body" style="display: none;">
+            <!-- Populated by the selected kind's wizard renderer. -->
         </div>
 
         <!-- TOP Action Button (quick add with defaults) -->

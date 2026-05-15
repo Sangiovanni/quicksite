@@ -259,6 +259,120 @@ Menu and footer are global — editing them in any page's preview applies site-w
 
 For the full per-command reference see [COMMAND_API.md](COMMAND_API.md).
 
+### 8.7 Complex element wizard
+
+The fourth tab of **Add Element** (alongside HTML Tag, Component,
+Snippet). Builds multi-node subtrees that would be tedious to assemble
+node-by-node — form scaffolds with the validate+fetch chain pre-wired,
+selects with all their options, lists, field rows with the
+`[data-error-for=...]` span already in place.
+
+**Where it lives in the UI**
+
+`secure/admin/templates/pages/preview/contextual-add.php` adds the
+"Complex" tab. When selected, the wizard area shows:
+1. A **kind picker** (dropdown) listing every registered wizard.
+2. The **kind-specific form** rendered by that wizard's
+   `renderWizard(container)`.
+3. The standard footer **Save** button calls the controller's
+   `validate()` then `getConfig()`, then `POST /management/addComplexElement`.
+
+The top-of-page "Add Element" quick-add button is hidden while the
+Complex tab is active — the wizard needs config first, so the
+quick-add doesn't fit.
+
+**Architecture — builder + wizard pairs**
+
+| Side | File pattern | Job |
+|---|---|---|
+| Server | `secure/src/classes/complexElements/<Kind>.php` (class extends `ComplexElementBuilder`) | Pure: config in → node spec out. No I/O. Validates the config, throws `ComplexElementBuilderException` on bad input. |
+| Client | `public/admin/assets/js/pages/preview/contextual-complex/complex-<kind>.js` | Renders the wizard form, returns `{ getConfig, validate, destroy }`, registers itself under `window.QSComplexWizard.registry[<kind>]`. |
+
+After save, the emitted subtree is **indistinguishable** from a
+hand-built one — same JSON shape, same renderer. The wizard is
+build-time only; nothing at render time knows the element came from
+here. You can re-edit any of its nodes with the normal visual-editor
+tools.
+
+**Builder contract** (`ComplexElementBuilder` abstract base)
+
+```php
+abstract public function kind(): string;              // 'list', 'select', etc.
+abstract public function build(array $config): array; // → single root node spec
+public function declaredTextKeys(array $config): array; // → string[] (optional)
+```
+
+Helpers exposed to subclasses: `stripWizardKeys`, `requireField`,
+`validateHtmlId`. The dispatcher (`addComplexElement` command)
+auto-discovers builders by globbing `complexElements/*.php` — drop a
+new file, no registration.
+
+**Wizard contract** (JS)
+
+```js
+window.QSComplexWizard.registry['<kind>'] = {
+    label: 'Human label',
+    description: 'Short HTML-safe description.',
+    renderWizard: function (container) {
+        // Populate `container`. Return:
+        return {
+            getConfig: function () { /* → JSON-serialisable config */ },
+            validate:  function () { /* → null on OK, error string on failure */ },
+            destroy:   function () { /* clean up listeners + DOM */ }
+        };
+    }
+};
+```
+
+Same auto-discovery pattern client-side — `preview-config.php` globs
+`complex-*.js` so dropping a new wizard file is enough.
+
+**Shared primitives** for wizard authors:
+
+| Primitive | What it does |
+|---|---|
+| `QSComplexWizard.createRowEditor` | Variable-cardinality row list with reorder/add/delete + keyboard nav. Used by every wizard that has a "list of N things" section (Select options, FormScaffold fields, List items). |
+| `QSComplexWizard.createTextKeyPicker` | Translation-key picker — searchable list of existing keys + inline "Create" form for new ones. Matches the component-variables panel UX. |
+
+**Built-in kinds** (beta.7)
+
+| Kind | Emits | Notes |
+|---|---|---|
+| `field-row` | `<div class="field"><label/><input/><span data-error-for/></div>` | Single form field, ready for `QS.validate` per-field error wiring. Building block for Form Scaffold. |
+| `form-scaffold` | `<form>` + N field rows + submit button, with `onsubmit` chain pre-wired (validate + fetch + optional post-submit actions) | Headline API-objective integration. Reuses `FieldRow` internally for each field. |
+| `select` | `<div class="field"><label/><select/><span data-error-for/></div>` with N `<option>` children | Same outer shape as field-row so a select sits alongside text inputs in a form-scaffold and picks up the same QS.validate hook. Optional placeholder option + required + multiple. |
+| `list` | `<ul>` or `<ol>` with N `<li><textKey/></li>` children | Simple flat list. `<ol>` supports `start` and `reversed`. |
+
+**Adding a new kind — 2-file recipe**
+
+1. Drop `secure/src/classes/complexElements/<MyKind>.php` declaring a
+   class that extends `ComplexElementBuilder`. Auto-loaded.
+2. Drop `public/admin/assets/js/pages/preview/contextual-complex/complex-<my-kind>.js`
+   that registers itself under `QSComplexWizard.registry['<my-kind>']`.
+   Auto-loaded.
+3. Reload the admin page. The kind appears in the picker, the wizard
+   renders, save dispatches to your builder.
+
+No `routes.php` edits, no `roles.php` edits — those are wired once at
+the `addComplexElement` command level.
+
+**textKey allocation**
+
+When a wizard emits a translatable string (label, placeholder,
+button text, list-item label), the wizard's textKey picker either
+points at an existing translation key OR creates one with an empty
+value on save. The picker uses the standard `setTranslationKeys`
+command, which now also enforces the leaf-vs-branch collision rule
+(can't have both `form.email.label` AND `form.email.label.placeholder`
+in the file — pick a different sibling).
+
+**Atomicity**
+
+The whole subtree is spliced under one file lock by reusing
+`addNode`'s insertion helper. If the builder throws or returns a
+malformed node, nothing is written. Half-built subtrees never reach
+the structure file.
+
 ---
 
 ## 9. Other pages — what they do

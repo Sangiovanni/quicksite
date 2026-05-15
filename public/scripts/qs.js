@@ -537,19 +537,36 @@
             applyAuth(fetchOpts, opts._auth);
         }
         
-        // Build body if specified
+        // GET/HEAD requests can't carry a body — the browser throws
+        // synchronously if we try. So when method is GET/HEAD and a
+        // `body=#form` source is provided, flatten the collected fields
+        // into the query string instead. This matches how HTML form
+        // submission natively encodes GET form bodies, and is what most
+        // users expect for "submit a search form" / "filter list" flows.
+        const isBodyless = (method === 'GET' || method === 'HEAD');
+        const queryParts = [];
+
         if (opts.body) {
             const bodyData = collectBody(opts.body);
             if (bodyData) {
-                fetchOpts.body = JSON.stringify(bodyData);
-                fetchOpts.headers['Content-Type'] = 'application/json';
+                if (isBodyless) {
+                    // Each top-level field → its own query param.
+                    for (const k in bodyData) {
+                        if (!Object.prototype.hasOwnProperty.call(bodyData, k)) continue;
+                        const v = bodyData[k];
+                        if (v === undefined || v === null || v === '') continue;
+                        queryParts.push(encodeURIComponent(k) + '=' + encodeURIComponent(v));
+                    }
+                } else {
+                    fetchOpts.body = JSON.stringify(bodyData);
+                    fetchOpts.headers['Content-Type'] = 'application/json';
+                }
             }
         }
 
         // Any opts not consumed by path substitution and not in the reserved
         // control set are appended to the query string. This lets callers
         // pass e.g. `page=2,sort=name` without manually building the URL.
-        const queryParts = [];
         for (const key in opts) {
             if (!Object.prototype.hasOwnProperty.call(opts, key)) continue;
             if (RESERVED_OPTS.has(key)) continue;
@@ -1025,10 +1042,22 @@
      *     form with that attribute).
      *   - If valid, clears the matching [data-error-for] container.
      *
+     * When called with an event (e.g. `{{call:validate:event,#form}}` on
+     * onsubmit), `event.preventDefault()` fires UPFRONT — regardless of
+     * the validation outcome. Reasoning: handing us the event signals
+     * "I'm handling this submission programmatically, don't let HTML
+     * also submit the form natively". Without this, the form's native
+     * submission races with any subsequent {{call:fetch:...}} in the
+     * chain — page navigates before the fetch completes, leaving an
+     * "NetworkError when attempting to fetch resource" in the console.
+     *
+     * If you want native submission to still happen on valid forms, do
+     * NOT pass the event — call validate with just the selector:
+     * `{{call:validate:#form}}`.
+     *
      * On any invalid field:
-     *   - Calls event.preventDefault() (if an event was passed).
      *   - Throws QSValidationError, aborting the rest of the
-     *     {{call:...}} chain.
+     *     {{call:...}} chain. (preventDefault already done.)
      *
      * Usage in JSON:
      *   "onsubmit": "{{call:validate:event,#contact-form}};{{call:fetch:POST,/api/contact,body=#contact-form}}"
@@ -1046,6 +1075,14 @@
             && typeof eventOrFormSelector.preventDefault === 'function') {
             evt = eventOrFormSelector;
             formSelector = formSelectorIfEvent;
+        }
+
+        // Take over the submit upfront — see jsdoc above for the why.
+        // Must happen BEFORE the misconfig early-return paths, otherwise
+        // a typo in formSelector would silently let the form submit
+        // natively while we returned true.
+        if (evt) {
+            evt.preventDefault();
         }
 
         if (!formSelector || typeof formSelector !== 'string') {
@@ -1086,7 +1123,6 @@
         });
 
         if (!allValid) {
-            if (evt) evt.preventDefault();
             throw QSValidationError();
         }
 

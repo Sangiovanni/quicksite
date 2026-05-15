@@ -182,6 +182,84 @@ function sanitizePlaceholderKeys(array $data): array {
 $newTranslations = sanitizePlaceholderKeys($newTranslations);
 
 /**
+ * Walk the incoming payload against the existing tree to detect
+ * "string-vs-branch" collisions at the same path. Mainstream i18n
+ * systems (i18next, Rails I18n, Symfony Translation, gettext via
+ * context) all disallow a key being both a leaf string AND a parent
+ * of nested keys — the lookup is ambiguous and the rendered output
+ * crashes / shows "Array". We reject the write here so the user is
+ * forced to a sibling structure that every i18n tool can read.
+ *
+ * Returns array of collision descriptors, each with:
+ *   - path          dot-notation key where the clash is
+ *   - existingShape "string" | "nested branch"
+ *   - newShape      "string" | "nested branch"  (the opposite)
+ *   - suggestion    human-readable next-step
+ * Empty array means clean.
+ */
+function detectTranslationCollisions(array $existing, array $new, string $pathPrefix = ''): array {
+    $collisions = [];
+    foreach ($new as $key => $value) {
+        if (!isset($existing[$key])) continue; // brand-new path, no clash
+        $path = $pathPrefix === '' ? (string)$key : ($pathPrefix . '.' . $key);
+
+        $existingIsLeaf = !is_array($existing[$key]);
+        $newIsLeaf      = !is_array($value);
+
+        if ($existingIsLeaf && !$newIsLeaf) {
+            // existing string, new wants a nested branch under same path
+            $childKey = is_array($value) ? array_key_first($value) : '';
+            $newSiblingPath = $pathPrefix === '' ? (string)$childKey : ($pathPrefix . '.' . $childKey);
+            $collisions[] = [
+                'path' => $path,
+                'existingShape' => 'string',
+                'newShape' => 'nested branch',
+                'suggestion' =>
+                    "Key '$path' is already a string. Translation systems can't "
+                    . "make it BOTH a string AND a parent of nested keys at the "
+                    . "same time. Options: (a) rename the new key as a sibling — "
+                    . "e.g. '" . $newSiblingPath . "' instead of '" . $path . "." . $childKey . "'; "
+                    . "or (b) delete the existing string at '$path' first, then re-add it as a branch."
+            ];
+        } elseif (!$existingIsLeaf && $newIsLeaf) {
+            // existing branch (has children), new wants to overwrite with a string
+            $collisions[] = [
+                'path' => $path,
+                'existingShape' => 'nested branch',
+                'newShape' => 'string',
+                'suggestion' =>
+                    "Key '$path' is already a branch with nested sub-keys. "
+                    . "Overwriting it with a string would silently drop those children. "
+                    . "Options: (a) rename the new string to a sibling like '$path.text' or '$path.value'; "
+                    . "or (b) delete the existing branch at '$path' first via deleteTranslationKeys, then re-add the string."
+            ];
+        } elseif (!$existingIsLeaf && !$newIsLeaf) {
+            // Both branches — recurse deeper.
+            foreach (detectTranslationCollisions($existing[$key], $value, $path) as $sub) {
+                $collisions[] = $sub;
+            }
+        }
+        // else: both leaves (string overwrites string) — standard merge, no collision.
+    }
+    return $collisions;
+}
+
+// Run the collision check ONLY for merge mode. In replace mode we're
+// nuking the file entirely, so by definition there's no pre-existing
+// shape to clash with. JSON syntax itself forbids the collision within
+// a single payload, so we don't have to check $new against itself.
+if (!$replaceMode && !empty($existingTranslations)) {
+    $collisions = detectTranslationCollisions($existingTranslations, $newTranslations);
+    if (!empty($collisions)) {
+        ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage($collisions[0]['suggestion'])
+            ->withErrors($collisions)
+            ->withData(['collisions' => $collisions])
+            ->send();
+    }
+}
+
+/**
  * Recursively merge translations (deep merge)
  * New values overwrite existing, but non-specified keys are preserved
  */
