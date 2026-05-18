@@ -586,6 +586,124 @@ runtime is forgiving — a stale binding doesn't break the page.
 **Generation of `qs-enums.js`** is documented in `docs/ARCHITECTURE.md`
 under "Enum sync".
 
+### 9.3 Count binding
+
+A response-binding render mode that writes the count of a fetched
+value into a target element, optionally as a translated sentence with
+zero/one/many branching and `{n}` substitution.
+
+**Where it lives in the UI**
+
+Same picker as component list — when the binding's field is an
+array, the render-mode radio shows three options: `data-bind template`,
+`Component per item`, **`Count`**. Picking Count reveals:
+
+- **Target** — the `selector` field is the element whose
+  `textContent` gets the count. Reuses the same searchable picker
+  as other binding modes.
+- **Format** sub-radio:
+  - `Just the number` — writes the count number verbatim.
+  - `Translated sentence` — picks one of three translation keys
+    based on the count and substitutes `{n}` with the number.
+- **Sentence pickers** (when Format is Translated sentence): three
+  textKey pickers labelled Zero / One / Many. Uses the same shared
+  `QSComplexWizard.createTextKeyPicker` primitive — searchable, with
+  inline "Create" form.
+- **Fallback** — number used when the field resolves to null, missing,
+  or a falsy non-array (0 / "" / false). Defaults to 0.
+
+**Count semantics**
+
+| Value type | Count |
+|---|---|
+| Array | `value.length` |
+| null / undefined | fallback |
+| 0 / "" / false | fallback |
+| any other truthy (object, non-zero number, non-empty string, true) | 1 |
+
+**Persisted shape** (in `secure/projects/<p>/data/api-endpoints.json`)
+
+Just-the-number form:
+
+```json
+{
+  "field":      "data.commandsList",
+  "renderMode": "count",
+  "selector":   "#cmd-counter",
+  "fallback":   0
+}
+```
+
+Translated-sentence form — stores **keys**, not the resolved strings:
+
+```json
+{
+  "field":      "data.commandsList",
+  "renderMode": "count",
+  "selector":   "#cmd-counter",
+  "fallback":   0,
+  "format":     "sentence",
+  "zeroKey":    "home.commandsZero",
+  "oneKey":     "home.commandsOne",
+  "manyKey":    "home.commandsMany"
+}
+```
+
+**Compile-time translation**
+
+`ApiEndpointManager::transformBindingsForCompile()` is called when
+writing `qs-api-config.js`. For each count-sentence binding, it
+resolves `zeroKey` / `oneKey` / `manyKey` to translated strings via
+`Translator::translate(...)` and emits them as `zeroStr` / `oneStr` /
+`manyStr` in the compiled JS. The runtime receives **resolved
+strings**, not keys — PHP stays the only translation engine.
+
+What the runtime sees in `qs-api-config.js`:
+
+```js
+{
+  field:      "data.commandsList",
+  renderMode: "count",
+  selector:   "#cmd-counter",
+  fallback:   0,
+  format:     "sentence",
+  zeroStr:    "No commands",
+  oneStr:     "1 command",
+  manyStr:    "{n} commands"
+}
+```
+
+**Multi-language limitation** (current beta.7)
+
+`qs-api-config.js` is project-scoped, not per-language. Translation
+happens once at `editApi` / `switchProject` / `build` time using
+whatever language is active in that request. Multi-language sites
+should re-trigger one of those after a language switch, OR ship the
+proper fix tracked in [BACKLOG.md](../NOTES/planning/BACKLOG.md)
+("Per-language count bindings via inline translation registry").
+
+**Runtime flow**
+
+```
+QS.fetch resolves                                (public/scripts/qs.js)
+   ↓
+applyBindings(data, responseBindings)
+   ↓  binding.renderMode === 'count'
+renderCount(value, binding)
+   ↓  n = computeCount(value, binding.fallback)
+   ↓  if binding.format === 'sentence':
+   ↓      template = n === 0 ? zeroStr : n === 1 ? oneStr : manyStr
+   ↓      output = template.replace('{n}', String(n))
+   ↓  else:
+   ↓      output = String(n)
+   ↓
+elements.forEach(el => el.textContent = output)
+```
+
+Sentence-mode is forgiving: if the matching string is missing (e.g.
+the translation key didn't resolve), the runtime falls back to the
+raw number and emits a `console.warn`.
+
 ---
 
 ## 10. Risk hotspots

@@ -874,6 +874,17 @@
                 return;
             }
 
+            // Count mode — write the count of an array/value to a
+            // selector, optionally as a translated sentence with
+            // {n} substitution + zero/one/many branching. The
+            // sentence strings (zeroStr / oneStr / manyStr) are
+            // pre-resolved server-side at writeCompiledJs time;
+            // runtime just picks one and substitutes {n}.
+            if (binding.renderMode === 'count') {
+                renderCount(value, binding);
+                return;
+            }
+
             // Scalar binding mode
             const { selector, attribute } = binding;
             if (!selector) return;
@@ -1134,6 +1145,94 @@
             const clone = template.cloneNode(true);
             populateTemplate(clone, mapped, index);
             container.appendChild(clone);
+        });
+    }
+
+    // =========================================================================
+    // COUNT RENDERING
+    // =========================================================================
+
+    /**
+     * Compute a numeric count from an arbitrary value.
+     *   - Array       → array.length
+     *   - null / undefined / falsy (0, '', false) → fallback
+     *   - truthy non-array (object / scalar)      → 1
+     *
+     * `fallback` defaults to 0. Used by both renderCount (binding mode)
+     * and any future direct callers.
+     */
+    function computeCount(value, fallback) {
+        var fb = (fallback === undefined || fallback === null) ? 0 : Number(fallback);
+        if (Number.isNaN(fb)) fb = 0;
+        if (Array.isArray(value)) return value.length;
+        if (value === null || value === undefined) return fb;
+        if (value === 0 || value === '' || value === false) return fb;
+        return 1;
+    }
+
+    /**
+     * Apply a count-mode response binding.
+     *
+     * Binding shape (from qs-api-config.js):
+     *   {
+     *     field:      "data.commands",          // resolved by caller, passed as `value`
+     *     renderMode: "count",
+     *     selector:   "#cmd-counter",
+     *     fallback:   0,                         // optional
+     *     // sentence form (added by writeCompiledJs from KEYS in the
+     *     // saved binding, translated to STRINGS at compile time):
+     *     format:    "sentence",
+     *     zeroStr:   "No commands",
+     *     oneStr:    "1 command",
+     *     manyStr:   "{n} commands"
+     *   }
+     *
+     * Without `format`, the count number is written verbatim.
+     * With `format === "sentence"`, picks zeroStr/oneStr/manyStr per
+     * count, substitutes `{n}` with the actual number.
+     *
+     * Sentence strings are already in the user's language — server
+     * translation happens at qs-api-config.js write time. Bindings on
+     * multi-language sites currently freeze in whatever language was
+     * active when writeCompiledJs ran (filed in BACKLOG.md).
+     */
+    function renderCount(value, binding) {
+        var selector = binding.selector;
+        if (!selector) {
+            console.warn('[QS] count: missing `selector` in binding for field:', binding.field);
+            return;
+        }
+        var elements = getElements(selector);
+        if (elements.length === 0) {
+            console.warn('[QS] count: selector matched no elements:', selector);
+            return;
+        }
+
+        var n = computeCount(value, binding.fallback);
+        var output;
+
+        if (binding.format === 'sentence') {
+            var template;
+            if (n === 0)      template = binding.zeroStr;
+            else if (n === 1) template = binding.oneStr;
+            else              template = binding.manyStr;
+
+            if (typeof template !== 'string' || template === '') {
+                // Sentence mode declared but the matching string is
+                // missing — fall back to the raw number so the page
+                // still shows something useful.
+                console.warn('[QS] count[sentence]: missing template for n=' + n,
+                    '(zero/one/many strings:', binding.zeroStr, binding.oneStr, binding.manyStr, ')');
+                output = String(n);
+            } else {
+                output = template.replace(/\{n\}/g, String(n));
+            }
+        } else {
+            output = String(n);
+        }
+
+        elements.forEach(function(el) {
+            el.textContent = output;
         });
     }
 

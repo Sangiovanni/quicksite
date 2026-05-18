@@ -11463,6 +11463,63 @@ code.preview-node-panel__value {
     font-size: 0.95em;
 }
 
+/* ──────────────────── count mode ──────────────────── */
+.preview-contextual-js-response-bindings__count-block {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+}
+.preview-contextual-js-response-bindings__count-format-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.7rem;
+}
+.preview-contextual-js-response-bindings__count-format-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    color: var(--admin-text-muted);
+}
+.preview-contextual-js-response-bindings__count-format-option input[type="radio"]:checked + span {
+    color: var(--admin-text);
+    font-weight: 500;
+}
+.preview-contextual-js-response-bindings__count-sentence {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 8px;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    background: var(--admin-bg-subtle, transparent);
+}
+.preview-contextual-js-response-bindings__count-sentence-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.preview-contextual-js-response-bindings__count-sentence-label {
+    flex: 0 0 50px;
+    font-size: 0.66rem;
+    color: var(--admin-text-muted);
+    font-family: var(--admin-font-mono, monospace);
+}
+.preview-contextual-js-response-bindings__count-sentence-mount {
+    flex: 1;
+    min-width: 0;  /* lets the picker shrink in narrow panels */
+}
+.preview-contextual-js-response-bindings__count-fallback-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.preview-contextual-js-response-bindings__count-fallback {
+    width: 80px;
+}
+
 .preview-contextual-js-response-bindings__row-delete {
     position: absolute;
     top: 4px;

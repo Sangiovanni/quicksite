@@ -64,6 +64,12 @@ NOTES/
 # Stats files (project metrics)
 stats/
 
+# Dev-time helper: one-shot URL that calls opcache_reset() so changes
+# to routes.php / command files take effect without restarting WAMP
+# or killing php-cgi.exe workers. Its own header says "Remove from
+# public/ before any deploy" — must not ship in commits.
+public/opcache-reset.php
+
 # Projects folder - ignore all except quicksite (starter template)
 secure/projects/*
 !secure/projects/quicksite/

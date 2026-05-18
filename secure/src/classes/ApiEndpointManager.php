@@ -756,9 +756,18 @@ class ApiEndpointManager {
                         if (!empty($endpoint['responseSchema'])) {
                             $jsConfig[$apiId]['endpoints'][$endpointId]['responseSchema'] = $endpoint['responseSchema'];
                         }
-                        // Include response bindings so runtime applyBindings() can use them
+                        // Include response bindings so runtime applyBindings() can use them.
+                        // Some binding shapes need server-side translation here
+                        // (e.g. count-sentence bindings store zeroKey/oneKey/manyKey
+                        // and the runtime needs the resolved strings). The
+                        // transformer below swaps keys → translated strings using
+                        // the current request's language. Multi-language sites:
+                        // qs-api-config.js is project-scoped, not per-language —
+                        // see BACKLOG.md "Per-language count bindings" for the
+                        // proper fix (inline translation registry per page render).
                         if (!empty($endpoint['responseBindings'])) {
-                            $jsConfig[$apiId]['endpoints'][$endpointId]['responseBindings'] = $endpoint['responseBindings'];
+                            $jsConfig[$apiId]['endpoints'][$endpointId]['responseBindings']
+                                = $this->transformBindingsForCompile($endpoint['responseBindings']);
                         }
                         // Include parameters so QS.fetch can substitute :placeholders
                         // and route remaining params to query string (Step 2 wiring).
@@ -778,10 +787,79 @@ class ApiEndpointManager {
         $js .= " * Generated: " . date('Y-m-d H:i:s') . "\n";
         $js .= " */\n";
         $js .= "window.QS_API_ENDPOINTS = " . $jsonConfig . ";\n";
-        
+
         return $js;
     }
-    
+
+    /**
+     * Transform a responseBindings array for runtime consumption.
+     *
+     * The picker writes some bindings with translation KEYS (e.g.
+     * `count` mode + `format: 'sentence'` carries `zeroKey`, `oneKey`,
+     * `manyKey`). The runtime needs resolved STRINGS (no client-side
+     * translation engine per project convention — PHP is the only
+     * translation engine).
+     *
+     * This method walks each binding and swaps keys → translated
+     * strings using the currently-loaded language. Pure: returns a
+     * new array, doesn't mutate the input. Bindings without a
+     * translation rule pass through unchanged.
+     *
+     * Multi-language note: the active language at compile time
+     * "wins" — qs-api-config.js is project-scoped, not per-language.
+     * Filed as a backlog item to fix via a per-page inline
+     * translation registry.
+     */
+    private function transformBindingsForCompile(array $bindings): array {
+        // Lazy-load Translator only when at least one binding actually
+        // needs translation. Avoids a hard coupling on common-case
+        // bindings that ship without any keys.
+        $needsTranslator = false;
+        foreach ($bindings as $b) {
+            if (is_array($b)
+                && ($b['renderMode'] ?? null) === 'count'
+                && ($b['format']     ?? null) === 'sentence') {
+                $needsTranslator = true;
+                break;
+            }
+        }
+        if ($needsTranslator) {
+            require_once __DIR__ . '/Translator.php';
+        }
+
+        $out = [];
+        foreach ($bindings as $binding) {
+            if (!is_array($binding)) {
+                $out[] = $binding;
+                continue;
+            }
+            $copy = $binding;
+
+            // Count + sentence: keys → resolved strings.
+            if (($copy['renderMode'] ?? null) === 'count'
+                && ($copy['format']     ?? null) === 'sentence') {
+
+                foreach ([
+                    'zeroKey' => 'zeroStr',
+                    'oneKey'  => 'oneStr',
+                    'manyKey' => 'manyStr',
+                ] as $keyField => $strField) {
+                    if (isset($copy[$keyField]) && is_string($copy[$keyField]) && $copy[$keyField] !== '') {
+                        $copy[$strField] = Translator::translate($copy[$keyField]);
+                    }
+                }
+                // Drop the *Key fields from the compiled output — the
+                // runtime only reads *Str. Keys stay in api-endpoints.json
+                // so the picker can re-render them on edit and the
+                // re-compile is repeatable.
+                unset($copy['zeroKey'], $copy['oneKey'], $copy['manyKey']);
+            }
+
+            $out[] = $copy;
+        }
+        return $out;
+    }
+
     /**
      * Write compiled JS to a file
      * 

@@ -2667,6 +2667,168 @@
         return div;
     }
 
+    // ---- Count-mode helpers ------------------------------------------
+
+    // Module-scope: textKey pickers per count-mode binding row.
+    // WeakMap so rows can be garbage-collected with their pickers.
+    var _countPickers = new WeakMap();
+
+    /**
+     * One radio label inside a count-format row. Standalone helper so
+     * the markup stays a couple of small DOM ops, not an HTML string.
+     */
+    function _renderCountFormatLabel(name, value, text) {
+        var lbl = document.createElement('label');
+        lbl.className = 'preview-contextual-js-response-bindings__count-format-option';
+        var inp = document.createElement('input');
+        inp.type = 'radio';
+        inp.name = name;
+        inp.value = value;
+        var span = document.createElement('span');
+        span.textContent = text;
+        lbl.appendChild(inp);
+        lbl.appendChild(span);
+        return lbl;
+    }
+
+    /**
+     * One labelled textKey-picker mount for the count-sentence subblock
+     * (zero / one / many).
+     */
+    function _renderSentencePickerSlot(labelText) {
+        var row = document.createElement('div');
+        row.className = 'preview-contextual-js-response-bindings__count-sentence-row';
+
+        var lbl = document.createElement('span');
+        lbl.className = 'preview-contextual-js-response-bindings__count-sentence-label';
+        lbl.textContent = labelText;
+        row.appendChild(lbl);
+
+        var mount = document.createElement('div');
+        mount.className = 'preview-contextual-js-response-bindings__count-sentence-mount';
+        row.appendChild(mount);
+
+        return { row: row, mount: mount };
+    }
+
+    /**
+     * Build the count-mode block: Format radio + (when 'sentence')
+     * three textKey-picker mounts + fallback number input. Pickers
+     * are stored per-row in the module-level WeakMap so
+     * collectBindings can read their current values.
+     *
+     * Returns { root: Element }.
+     */
+    function _buildCountBlock(row, existing) {
+        var root = document.createElement('div');
+        root.className = 'preview-contextual-js-response-bindings__count-block';
+
+        // ── Format radio ──
+        var formatRow = document.createElement('div');
+        formatRow.className = 'preview-contextual-js-response-bindings__count-format-row';
+
+        var formatLabel = document.createElement('span');
+        formatLabel.className = 'preview-contextual-js-response-bindings__row-attr-label';
+        formatLabel.textContent = 'Format:';
+        formatRow.appendChild(formatLabel);
+
+        var formatName = 'count-format-' + Math.random().toString(36).slice(2, 9);
+        var numberLbl   = _renderCountFormatLabel(formatName, 'number',   'Just the number');
+        var sentenceLbl = _renderCountFormatLabel(formatName, 'sentence', 'Translated sentence');
+        formatRow.appendChild(numberLbl);
+        formatRow.appendChild(sentenceLbl);
+        root.appendChild(formatRow);
+
+        // ── Sentence sub-block (3 textKey pickers) ──
+        var sentenceBlock = document.createElement('div');
+        sentenceBlock.className = 'preview-contextual-js-response-bindings__count-sentence';
+        var zeroSlot = _renderSentencePickerSlot('Zero:');
+        var oneSlot  = _renderSentencePickerSlot('One:');
+        var manySlot = _renderSentencePickerSlot('Many:');
+        sentenceBlock.appendChild(zeroSlot.row);
+        sentenceBlock.appendChild(oneSlot.row);
+        sentenceBlock.appendChild(manySlot.row);
+        root.appendChild(sentenceBlock);
+
+        // ── Fallback number input ──
+        var fallbackRow = document.createElement('div');
+        fallbackRow.className = 'preview-contextual-js-response-bindings__count-fallback-row';
+
+        var fbLabel = document.createElement('span');
+        fbLabel.className = 'preview-contextual-js-response-bindings__row-attr-label';
+        fbLabel.textContent = 'Fallback:';
+        fallbackRow.appendChild(fbLabel);
+
+        var fbInput = document.createElement('input');
+        fbInput.type = 'number';
+        fbInput.className = 'preview-contextual-js-response-bindings__count-fallback';
+        fbInput.placeholder = '0';
+        fbInput.title = 'Number to show when the field is missing or falsy.';
+        if (existing && existing.fallback !== undefined && existing.fallback !== null) {
+            fbInput.value = existing.fallback;
+        }
+        fallbackRow.appendChild(fbInput);
+        root.appendChild(fallbackRow);
+
+        // ── Wire up textKey pickers (shared primitive from contextual-complex) ──
+        var pickerFactory = window.QSComplexWizard && window.QSComplexWizard.createTextKeyPicker;
+        var pickers = { zero: null, one: null, many: null };
+        if (typeof pickerFactory === 'function') {
+            pickers.zero = pickerFactory({
+                container:   zeroSlot.mount,
+                placeholder: 'e.g. home.commandsZero',
+                value:       (existing && existing.zeroKey) || '',
+            });
+            pickers.one = pickerFactory({
+                container:   oneSlot.mount,
+                placeholder: 'e.g. home.commandsOne',
+                value:       (existing && existing.oneKey) || '',
+            });
+            pickers.many = pickerFactory({
+                container:   manySlot.mount,
+                placeholder: 'e.g. home.commandsMany',
+                value:       (existing && existing.manyKey) || '',
+            });
+        } else {
+            // Fallback: plain text inputs if the picker primitive isn't
+            // loaded. Saves typing the key by hand instead of breaking.
+            [['zero', zeroSlot, 'home.commandsZero'],
+             ['one',  oneSlot,  'home.commandsOne'],
+             ['many', manySlot, 'home.commandsMany']].forEach(function(triple) {
+                var key = triple[0];
+                var slot = triple[1];
+                var input = document.createElement('input');
+                input.type = 'text';
+                input.placeholder = 'e.g. ' + triple[2];
+                input.value = (existing && existing[key + 'Key']) || '';
+                slot.mount.appendChild(input);
+                pickers[key] = {
+                    getValue: function() { return input.value; },
+                    setValue: function(v) { input.value = v; },
+                    destroy:  function() {}
+                };
+            });
+        }
+        _countPickers.set(row, pickers);
+
+        // ── Reactivity: show/hide the sentence subblock on format change ──
+        function syncSentenceVisibility(format) {
+            sentenceBlock.style.display = (format === 'sentence') ? '' : 'none';
+        }
+        formatRow.addEventListener('change', function(e) {
+            if (e.target && e.target.name === formatName) {
+                syncSentenceVisibility(e.target.value);
+            }
+        });
+
+        // ── Initial state ──
+        var initialFormat = (existing && existing.format === 'sentence') ? 'sentence' : 'number';
+        (initialFormat === 'sentence' ? sentenceLbl : numberLbl).querySelector('input').checked = true;
+        syncSentenceVisibility(initialFormat);
+
+        return { root: root };
+    }
+
     /**
      * The component-picker dropdown (just the <select>; the wrapping
      * row markup lives in the composer below). Options are populated
@@ -3022,8 +3184,11 @@
             'Each item maps to a [data-bind="key"] element inside the container\'s first child.');
         var modeCompLbl = modeLabel('componentList', 'Component per item',
             'Each item clones a hidden component instance. fieldMap controls how API fields map to component vars; enums resolve via QS.enum.');
+        var modeCountLbl = modeLabel('count', 'Count',
+            'Write the count of the array (or 1 for non-empty values, fallback for missing/falsy) to a target selector. Optional translated-sentence format with zero / one / many strings.');
         modeRow.appendChild(modeListLbl);
         modeRow.appendChild(modeCompLbl);
+        modeRow.appendChild(modeCountLbl);
 
         // ── Bottom row: adapts based on field type + render mode ──
         var bottomRow = document.createElement('div');
@@ -3058,25 +3223,32 @@
         listHint.className = 'preview-contextual-js-response-bindings__row-list-hint';
         listHint.textContent = PreviewConfig.i18n?.listModeHint || 'Uses data-bind attributes inside the container\'s first child as item template.';
 
-        // ─ componentList-specific block (built lazily once user picks the mode) ─
+        // ─ Mode-specific blocks (built lazily on first pick) ─
         var compListBlock = null;
         function ensureCompListBlock() {
             if (compListBlock) return compListBlock;
             compListBlock = _buildComponentListBlock(row, fieldsMap, fieldSelect, existing);
             return compListBlock;
         }
+        var countBlock = null;
+        function ensureCountBlock() {
+            if (countBlock) return countBlock;
+            countBlock = _buildCountBlock(row, existing);
+            return countBlock;
+        }
 
         /**
          * Swap bottom row contents based on field type + render mode.
-         *   scalar       → attribute label + input
-         *   array+list   → empty text + hint
-         *   array+compL  → component picker + fieldMap table + empty text
+         *   scalar         → attribute label + input
+         *   array+list     → empty text + hint
+         *   array+compL    → component picker + fieldMap table + empty text
+         *   array+count    → format radio + (optional sentence subblock) + fallback
          */
         function updateRowMode(fieldType, mode) {
             bottomRow.innerHTML = '';
-            // Default row layout is horizontal flex. componentList mode
-            // needs vertical so its (wide) table doesn't squeeze the
-            // empty-text input to the right edge — toggled via a
+            // Default row layout is horizontal flex. componentList and
+            // count modes need vertical so their (wide) inner blocks
+            // don't squeeze the rest to the right edge — toggled via a
             // modifier class kept in admin.css.
             bottomRow.classList.remove('preview-contextual-js-response-bindings__row-bottom--column');
 
@@ -3085,16 +3257,25 @@
                 var resolved = mode || row.dataset.renderMode || 'list';
                 row.dataset.renderMode = resolved;
                 // Sync radio selection
-                (resolved === 'componentList' ? modeCompLbl : modeListLbl)
-                    .querySelector('input').checked = true;
+                var resolvedLbl =
+                    resolved === 'componentList' ? modeCompLbl :
+                    resolved === 'count'         ? modeCountLbl :
+                                                   modeListLbl;
+                resolvedLbl.querySelector('input').checked = true;
 
-                selectorInput.placeholder = PreviewConfig.i18n?.containerSelector || 'Container selector';
-                selectorInput.title = PreviewConfig.i18n?.containerSelectorHint || 'Container element whose first child is the template. Each array item clones it.';
+                if (resolved === 'count') {
+                    // For count, the selector input is the TARGET element
+                    // (textContent recipient), not a container with template.
+                    selectorInput.placeholder = PreviewConfig.i18n?.targetSelector || 'Target selector';
+                    selectorInput.title = 'CSS selector for the element whose textContent gets the count (or the translated sentence).';
+                } else {
+                    selectorInput.placeholder = PreviewConfig.i18n?.containerSelector || 'Container selector';
+                    selectorInput.title = PreviewConfig.i18n?.containerSelectorHint || 'Container element whose first child is the template. Each array item clones it.';
+                }
 
                 if (resolved === 'componentList') {
                     bottomRow.classList.add('preview-contextual-js-response-bindings__row-bottom--column');
-                    var block = ensureCompListBlock();
-                    bottomRow.appendChild(block.root);
+                    bottomRow.appendChild(ensureCompListBlock().root);
                     // Empty-text gets its own horizontal row beneath the
                     // table so the input has room to breathe.
                     var emptyRow = document.createElement('div');
@@ -3102,6 +3283,9 @@
                     emptyRow.appendChild(emptyLabel);
                     emptyRow.appendChild(emptyInput);
                     bottomRow.appendChild(emptyRow);
+                } else if (resolved === 'count') {
+                    bottomRow.classList.add('preview-contextual-js-response-bindings__row-bottom--column');
+                    bottomRow.appendChild(ensureCountBlock().root);
                 } else {
                     bottomRow.appendChild(emptyLabel);
                     bottomRow.appendChild(emptyInput);
@@ -3120,7 +3304,9 @@
         // Determine initial mode
         var initialType = '';
         var initialRenderMode = (existing && existing.renderMode) || null;
-        if (initialRenderMode === 'list' || initialRenderMode === 'componentList') {
+        if (initialRenderMode === 'list'
+            || initialRenderMode === 'componentList'
+            || initialRenderMode === 'count') {
             initialType = 'array';
         } else {
             var selOpt = fieldSelect.options[fieldSelect.selectedIndex];
@@ -3154,9 +3340,7 @@
 
         row.appendChild(modeRow);
         row.appendChild(bottomRow);
-        
-        row.appendChild(bottomRow);
-        
+
         // ── Delete button ──
         var deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
@@ -3201,6 +3385,35 @@
                 };
                 var emptyTxt = row.querySelector('.preview-contextual-js-response-bindings__row-empty-text')?.value?.trim() || '';
                 if (emptyTxt) binding.emptyText = emptyTxt;
+                bindings.push(binding);
+            } else if (renderMode === 'count') {
+                // Count mode: `selector` is the target element (not a
+                // container). Format radio drives whether keys are
+                // collected — only stored when 'sentence' is picked.
+                var binding = { field: field, renderMode: 'count', selector: selectorVal };
+
+                var fbInput = row.querySelector('.preview-contextual-js-response-bindings__count-fallback');
+                if (fbInput && fbInput.value !== '') {
+                    var fbNum = parseInt(fbInput.value, 10);
+                    if (!isNaN(fbNum)) binding.fallback = fbNum;
+                }
+
+                var formatRadios = row.querySelectorAll('input[type="radio"][name^="count-format-"]');
+                var format = 'number';
+                formatRadios.forEach(function(r) { if (r.checked) format = r.value; });
+
+                if (format === 'sentence') {
+                    binding.format = 'sentence';
+                    var pickers = _countPickers.get(row);
+                    if (pickers) {
+                        var zk = pickers.zero ? (pickers.zero.getValue() || '').trim() : '';
+                        var ok = pickers.one  ? (pickers.one.getValue()  || '').trim() : '';
+                        var mk = pickers.many ? (pickers.many.getValue() || '').trim() : '';
+                        if (zk) binding.zeroKey = zk;
+                        if (ok) binding.oneKey  = ok;
+                        if (mk) binding.manyKey = mk;
+                    }
+                }
                 bindings.push(binding);
             } else if (renderMode === 'list') {
                 // List/array binding
