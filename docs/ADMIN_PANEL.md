@@ -704,6 +704,136 @@ Sentence-mode is forgiving: if the matching string is missing (e.g.
 the translation key didn't resolve), the runtime falls back to the
 raw number and emits a `console.warn`.
 
+### 9.4 Fetch picker (Action Type: API Call)
+
+The structured authoring UI for fetch interactions in the JS panel.
+Lives in `contextual-js.php` (template) and
+`preview-js-interactions.js` (behaviour). Reached via Add Interaction
+→ Action Type **API Call**.
+
+**Top-level layout**
+
+```
+Event       [ onsubmit                                    ▼ ]
+Action Type [ API Call                                    ▼ ]
+
+── API ────────────────────────────────────────────────────────
+Mode        ( ) From registry   ( ) Direct URL
+[ registry mode shown ]                | [ direct mode shown ]
+  API       [ test-api-public      ▼ ] |   Method  [ POST  ▼ ]
+  Endpoint  [ GET /listFile        ▼ ] |   URL     [ ...      ]
+  Target    @test-api-public/list-files
+[ Path params (only if path has :placeholders) ]
+  :nameContains  [ value or #selector.value          ]
+Body source       [ #form (hidden on GET / DELETE)   ]
+
+▼ Advanced (collapsed by default)
+  On success   [ form.contact.success    ▼ textKey ]  ☐ silent
+  On error     [ form.contact.error      ▼ textKey ]  ☐ silent
+  Post-fetch actions
+    [ + Add action ]
+      [ verb ▼ ] [ args... ] [×]
+      [ verb ▼ ] [ args... ] [×]
+
+Preview      {{call:fetch:@test-api/help,toastSuccessKey=Saved!}};{{call:hide:#form}}
+```
+
+**Mode toggle**
+
+- **From registry** (default): pick from the project's API + endpoint
+  catalogue. Picker writes `@apiId/endpointId` as the first arg.
+- **Direct URL**: pick a method + type a URL (supports `{{lang}}` and
+  `:placeholders`). Picker writes `METHOD,URL` as the first two args.
+
+Both modes produce the same runtime call shape; QS.fetch handles them
+via its `target.startsWith('@')` branch.
+
+**Path params** (registry mode + direct mode)
+
+When the selected endpoint's path (or the typed URL) contains
+`:placeholders`, the picker auto-renders one row per placeholder. Each
+row is a free-text value input that the user fills (literal value
+like `42` or a runtime selector like `#search-input.value` — the
+runtime decides). Values are emitted as keyword args.
+
+The placeholder substitution happens client-side in `qs.js` (see
+`docs/ADMIN_PANEL.md §9.1` "Path templating"). The picker just
+surfaces the placeholders as configurable inputs.
+
+**Body source**
+
+Hidden when the effective method is GET or DELETE (the browser
+forbids a body on those; qs.js already flattens such bodies to
+query-string args). Otherwise free-text — typically `#form-id`.
+
+**Toast messages** (Advanced fold)
+
+Two textKey pickers (success / error) + per-side silent checkbox.
+Translation happens at compile time via the
+`TRANSLATABLE_KEYWORD_ARGS` table in `JsonToHtmlRenderer` (see
+`docs/ARCHITECTURE.md` for the metadata pattern). The compiled chain
+ships translated **strings**, not keys. Multi-language works for
+free — each page render runs `transformCallSyntax` in the request's
+language.
+
+`silent` opts out of BOTH success and error toasts (matches the
+existing `silent=true` semantics in qs.js). Per-side silent in the
+picker UI is a UX convenience that collapses to the runtime's
+single-flag model — if either side is silent, `silent=true` is
+emitted.
+
+**Post-fetch action list** (Advanced fold)
+
+Authors chain steps that fire AFTER the fetch resolves. The list is
+NOT stored alongside the main interaction — each row is persisted as
+a **sibling interaction** on the same event. The renderer's
+`transformCallSyntax` then compiles the chain in storage order with
+`await` between awaitable steps (see
+`docs/ARCHITECTURE.md §8.0.1`).
+
+Save model is **replace-on-save**: when the user clicks Save, the
+picker deletes any existing sibling interactions for this event
+(those that come AFTER the main fetch's index) and re-adds the
+current state in order. The picker's state is the source of truth.
+
+Adding a row picks a verb from the available functions (excluding
+`fetch` — chained fetches are unusual and easier to author as a
+top-level sibling). Verb-specific arg inputs render via the same
+`_createArgRow` helper used in Function-mode authoring.
+
+**Edit semantics**
+
+Saved interactions don't carry an explicit "authored in API mode"
+marker. The picker detects the mode on edit:
+- First param starts with `@` → registry mode.
+- First param matches a known HTTP method → direct mode.
+
+Kwargs (`body=...`, `toastSuccessKey=...`, `:placeholder=...`, etc.)
+are parsed back from the param tail and populated into the right
+form fields.
+
+**Toast keys on edit**: the saved chain has the *resolved* string
+(PHP translated it at compile time), not the key. The picker's
+textKey picker shows KEYS — so on edit, the toast pickers start
+empty. Re-picking re-emits the key. Documented limitation; the
+"save the key alongside the resolved string in api-endpoints.json"
+fix is filed in BACKLOG.md.
+
+**Compile-time translation pattern (reusable)**
+
+The metadata table for `fetch` is the first consumer:
+
+```php
+private const TRANSLATABLE_KEYWORD_ARGS = [
+    'fetch' => ['toastSuccessKey', 'toastErrorKey'],
+];
+```
+
+Future verbs that introduce translatable kwargs (e.g. `confirm`,
+`prompt`) add one line. `JsonToHtmlRenderer::buildQsCallJs` walks
+each call's args and translates the value whenever the key is in
+the list.
+
 ---
 
 ## 10. Risk hotspots

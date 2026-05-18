@@ -183,23 +183,136 @@
             
             <!-- API section (shown when action type = api, hidden by default) -->
             <div id="js-form-api-section" class="preview-contextual-js-form-api-section">
+                <!-- Mode radio: From registry (default) vs Direct URL.
+                     Toggles which sub-form is visible. Registry mode picks
+                     an API + endpoint from the catalogue; Direct URL lets
+                     the user type any METHOD + URL (with {{lang}} and
+                     :placeholders supported). -->
                 <div class="preview-contextual-js-form-row">
-                    <label class="preview-contextual-js-form-label"><?= __admin('preview.selectApi') ?? 'API' ?></label>
-                    <select class="preview-contextual-js-form-select" id="js-form-api">
-                        <option value=""><?= __admin('preview.selectApiPlaceholder') ?? '-- Select API --' ?></option>
-                    </select>
+                    <label class="preview-contextual-js-form-label"><?= __admin('preview.apiMode') ?? 'Mode' ?></label>
+                    <div class="preview-contextual-js-form-mode">
+                        <label class="preview-contextual-js-form-mode-option">
+                            <input type="radio" name="js-form-api-mode" value="registry" checked>
+                            <span><?= __admin('preview.apiModeRegistry') ?? 'From registry' ?></span>
+                        </label>
+                        <label class="preview-contextual-js-form-mode-option">
+                            <input type="radio" name="js-form-api-mode" value="direct">
+                            <span><?= __admin('preview.apiModeDirect') ?? 'Direct URL' ?></span>
+                        </label>
+                    </div>
                 </div>
-                <div class="preview-contextual-js-form-row">
-                    <label class="preview-contextual-js-form-label"><?= __admin('preview.selectEndpoint') ?? 'Endpoint' ?></label>
-                    <select class="preview-contextual-js-form-select" id="js-form-endpoint" disabled>
-                        <option value=""><?= __admin('preview.selectEndpointPlaceholder') ?? '-- Select endpoint --' ?></option>
-                    </select>
+
+                <!-- Registry-mode fields -->
+                <div id="js-form-api-registry-fields">
+                    <div class="preview-contextual-js-form-row">
+                        <label class="preview-contextual-js-form-label"><?= __admin('preview.selectApi') ?? 'API' ?></label>
+                        <select class="preview-contextual-js-form-select" id="js-form-api">
+                            <option value=""><?= __admin('preview.selectApiPlaceholder') ?? '-- Select API --' ?></option>
+                        </select>
+                    </div>
+                    <div class="preview-contextual-js-form-row">
+                        <label class="preview-contextual-js-form-label"><?= __admin('preview.selectEndpoint') ?? 'Endpoint' ?></label>
+                        <select class="preview-contextual-js-form-select" id="js-form-endpoint" disabled>
+                            <option value=""><?= __admin('preview.selectEndpointPlaceholder') ?? '-- Select endpoint --' ?></option>
+                        </select>
+                    </div>
+                    <!-- Read-only "target" chip showing the resolved
+                         @apiId/endpointId form. Useful for confirming the
+                         compiled call without scrolling to the Preview
+                         section. Hidden until both dropdowns are filled. -->
+                    <div class="preview-contextual-js-form-row preview-contextual-js-form-target-row" id="js-form-target-row" style="display: none;">
+                        <label class="preview-contextual-js-form-label"><?= __admin('preview.target') ?? 'Target' ?></label>
+                        <code class="preview-contextual-js-form-target" id="js-form-target-label">—</code>
+                    </div>
                 </div>
+
+                <!-- Direct-URL-mode fields -->
+                <div id="js-form-api-direct-fields" style="display: none;">
+                    <div class="preview-contextual-js-form-row">
+                        <label class="preview-contextual-js-form-label"><?= __admin('preview.method') ?? 'Method' ?></label>
+                        <select class="preview-contextual-js-form-select" id="js-form-api-method">
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="PATCH">PATCH</option>
+                            <option value="DELETE">DELETE</option>
+                        </select>
+                    </div>
+                    <div class="preview-contextual-js-form-row">
+                        <label class="preview-contextual-js-form-label"><?= __admin('preview.url') ?? 'URL' ?></label>
+                        <input type="text" class="preview-contextual-js-form-input" id="js-form-api-url" placeholder="https://api.example.com/users/:id" autocomplete="off">
+                        <small class="preview-contextual-js-form-hint"><?= __admin('preview.urlHint') ?? 'Supports {{lang}} and :placeholders. e.g. /users/:id/posts becomes /users/42/posts at runtime.' ?></small>
+                    </div>
+                </div>
+
+                <!-- Path params — auto-shown when the picked endpoint's
+                     path has :placeholders. Each placeholder becomes one
+                     row (param name + value or selector). Compiled into
+                     `paramName=value` kwargs on the call. -->
+                <div class="preview-contextual-js-form-row preview-contextual-js-form-path-params" id="js-form-path-params-row" style="display: none;">
+                    <label class="preview-contextual-js-form-label"><?= __admin('preview.pathParams') ?? 'Path params' ?></label>
+                    <div class="preview-contextual-js-form-path-params-rows" id="js-form-path-params-rows"></div>
+                </div>
+
+                <!-- Body source — shared between registry and direct
+                     modes. Hidden when method is GET/DELETE (the browser
+                     forbids a body on those, see qs.js GET/HEAD handling). -->
                 <div class="preview-contextual-js-form-row" id="js-form-api-body-row">
                     <label class="preview-contextual-js-form-label"><?= __admin('preview.requestBody') ?? 'Body source' ?></label>
                     <input type="text" class="preview-contextual-js-form-input" id="js-form-api-body" placeholder="<?= __admin('preview.bodySourcePlaceholder') ?? '#form or CSS selector' ?>">
-                    <small class="preview-contextual-js-form-hint"><?= __admin('preview.bodySourceHint') ?? 'Use #form to collect from a form, or a CSS selector' ?></small>
+                    <small class="preview-contextual-js-form-hint"><?= __admin('preview.bodySourceHint') ?? 'Use #form to collect from a form, or a CSS selector. Ignored on GET/DELETE.' ?></small>
                 </div>
+
+                <!-- Advanced collapsible — hosts toast labels, silent
+                     opt-outs, post-fetch actions, and the JS-function
+                     escape hatch. Collapsed by default to keep the
+                     common-case picker compact. -->
+                <details class="preview-contextual-js-form-advanced" id="js-form-api-advanced">
+                    <summary class="preview-contextual-js-form-advanced-summary">
+                        <?= __admin('preview.advanced') ?? 'Advanced' ?>
+                    </summary>
+                    <div class="preview-contextual-js-form-advanced-body">
+
+                        <!-- Toast messages (Step 4c).
+                             textKey pickers are mounted by JS into the
+                             *-mount slots. Silent checkboxes opt out of
+                             the toast entirely for that side. -->
+                        <div class="preview-contextual-js-form-row">
+                            <label class="preview-contextual-js-form-label"><?= __admin('preview.toastOnSuccess') ?? 'On success' ?></label>
+                            <div class="preview-contextual-js-form-toast-row">
+                                <div class="preview-contextual-js-form-toast-mount" id="js-form-toast-success-mount"></div>
+                                <label class="preview-contextual-js-form-toast-silent">
+                                    <input type="checkbox" id="js-form-toast-success-silent">
+                                    <span><?= __admin('preview.silent') ?? 'silent' ?></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="preview-contextual-js-form-row">
+                            <label class="preview-contextual-js-form-label"><?= __admin('preview.toastOnError') ?? 'On error' ?></label>
+                            <div class="preview-contextual-js-form-toast-row">
+                                <div class="preview-contextual-js-form-toast-mount" id="js-form-toast-error-mount"></div>
+                                <label class="preview-contextual-js-form-toast-silent">
+                                    <input type="checkbox" id="js-form-toast-error-silent">
+                                    <span><?= __admin('preview.silent') ?? 'silent' ?></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Post-fetch actions (Step 5).
+                             Each row is a small verb picker + arg inputs.
+                             Compiled and appended to the chain after the
+                             fetch step. The async wrap in
+                             transformCallSyntax makes them await fetch. -->
+                        <div class="preview-contextual-js-form-row preview-contextual-js-form-actions-row">
+                            <label class="preview-contextual-js-form-label"><?= __admin('preview.postFetchActions') ?? 'Post-fetch actions' ?></label>
+                            <div class="preview-contextual-js-form-actions-list" id="js-form-actions-list"></div>
+                            <button type="button" class="admin-btn admin-btn--xs admin-btn--ghost preview-contextual-js-form-actions-add" id="js-form-actions-add">
+                                + <?= __admin('preview.addAction') ?? 'Add action' ?>
+                            </button>
+                        </div>
+
+                    </div>
+                </details>
             </div>
             <!-- Response bindings for element interactions -->
             <div class="preview-contextual-js-response-bindings" id="js-form-bindings" style="display: none;">

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/TagRegistry.php';
 require_once __DIR__ . '/IframeSandbox.php';
+require_once __DIR__ . '/Translator.php';
 
 /**
  * JsonToHtmlRenderer
@@ -718,6 +719,29 @@ class JsonToHtmlRenderer {
      */
     private const CHAIN_AWAITABLE = ['fetch'];
 
+    /**
+     * Per-verb metadata: which keyword-arg names carry translation KEYS
+     * that should be resolved at compile time. The compiled JS receives
+     * the resolved STRING, never the key — PHP stays the only translation
+     * engine.
+     *
+     * Shape: ['verbName' => ['kwarg1', 'kwarg2', ...]]
+     *
+     * Example: `{{call:fetch:@api/ep,toastSuccessKey=form.contact.success}}`
+     * → `QS.fetch('@api/ep', 'toastSuccessKey=Message sent')` (EN)
+     * → `QS.fetch('@api/ep', 'toastSuccessKey=Message envoyé')` (FR)
+     *
+     * Multi-language works out of the box: each page render runs
+     * transformCallSyntax with the current request's language, so the
+     * compiled chain in the page HTML is always in the right language.
+     *
+     * Future verbs that introduce translatable kwargs (toast direct,
+     * confirm prompts, etc.) add one line here.
+     */
+    private const TRANSLATABLE_KEYWORD_ARGS = [
+        'fetch' => ['toastSuccessKey', 'toastErrorKey'],
+    ];
+
     private function transformCallSyntax(string $value): string {
         // Capture every {{call:...}} in order; non-call text is dropped (the
         // validator below already rejects it, this just makes the boundary
@@ -790,6 +814,26 @@ class JsonToHtmlRenderer {
         $args = array_map(function ($a) {
             return trim(str_replace('\\,', ',', $a));
         }, $args);
+
+        // Translate keyword-arg values whose key is in this verb's
+        // translatable list (see TRANSLATABLE_KEYWORD_ARGS docblock).
+        // Pattern matched: `key=value`. The value is treated as a
+        // translation key and resolved server-side via Translator.
+        // The compiled JS gets the translated string verbatim.
+        $translatableKwargs = self::TRANSLATABLE_KEYWORD_ARGS[$fn] ?? [];
+        if (!empty($translatableKwargs)) {
+            $args = array_map(function ($arg) use ($translatableKwargs) {
+                $eq = strpos($arg, '=');
+                if ($eq === false) return $arg;
+                $key = substr($arg, 0, $eq);
+                $val = substr($arg, $eq + 1);
+                if ($val === '' || !in_array($key, $translatableKwargs, true)) {
+                    return $arg;
+                }
+                return $key . '=' . Translator::translate($val);
+            }, $args);
+        }
+
         $quoted = array_map(function ($arg) use ($jsKeywords) {
             if (in_array($arg, $jsKeywords, true)) return $arg;
             return "'" . str_replace("'", "\\'", $arg) . "'";

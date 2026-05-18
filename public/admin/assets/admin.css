@@ -11354,6 +11354,161 @@ code.preview-node-panel__value {
     font-weight: 500;
 }
 
+/* ──────────────────── fetch picker overhaul (FETCH_PICKER_OVERHAUL) ──────────────────── */
+
+/* Mode radio: "From registry" vs "Direct URL" inside API action. */
+.preview-contextual-js-form-mode {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    font-size: 0.7rem;
+}
+.preview-contextual-js-form-mode-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    color: var(--admin-text-muted);
+}
+.preview-contextual-js-form-mode-option input[type="radio"]:checked + span {
+    color: var(--admin-text);
+    font-weight: 500;
+}
+
+/* Read-only target chip showing @apiId/endpointId after picker resolve. */
+.preview-contextual-js-form-target-row {
+    align-items: center;
+}
+.preview-contextual-js-form-target {
+    background: var(--admin-bg-subtle, rgba(0,0,0,0.04));
+    border: 1px solid var(--admin-border);
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 0.7rem;
+    color: var(--admin-text);
+}
+
+/* Path params section — one row per :placeholder. */
+.preview-contextual-js-form-path-params-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.preview-contextual-js-form-path-param-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.preview-contextual-js-form-path-param-name {
+    flex: 0 0 110px;
+    font-family: var(--admin-font-mono, monospace);
+    font-size: 0.66rem;
+    color: var(--admin-text-muted);
+}
+.preview-contextual-js-form-path-param-value {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Advanced collapsible — hosts toast, post-fetch actions, escape hatch. */
+.preview-contextual-js-form-advanced {
+    margin-top: 8px;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    padding: 6px 8px;
+    background: var(--admin-bg-subtle, transparent);
+}
+.preview-contextual-js-form-advanced-summary {
+    cursor: pointer;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--admin-text-muted);
+    padding: 2px 0;
+    user-select: none;
+}
+.preview-contextual-js-form-advanced[open] .preview-contextual-js-form-advanced-summary {
+    color: var(--admin-text);
+}
+.preview-contextual-js-form-advanced-body {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Toast row (textKey picker + silent checkbox). */
+.preview-contextual-js-form-toast-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+.preview-contextual-js-form-toast-mount {
+    flex: 1;
+    min-width: 0;
+}
+.preview-contextual-js-form-toast-silent {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.66rem;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+    padding-top: 4px;
+    white-space: nowrap;
+}
+
+/* Post-fetch actions list. */
+.preview-contextual-js-form-actions-row {
+    flex-direction: column;
+    align-items: stretch;
+}
+.preview-contextual-js-form-actions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.preview-contextual-js-form-action-row {
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+    padding: 6px;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    background: var(--admin-bg, transparent);
+}
+.preview-contextual-js-form-action-verb {
+    flex: 0 0 130px;
+    font-size: 0.7rem;
+}
+.preview-contextual-js-form-action-args {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.preview-contextual-js-form-action-delete {
+    flex: 0 0 22px;
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: none;
+    color: var(--admin-text-muted);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: color 0.15s, background 0.15s;
+}
+.preview-contextual-js-form-action-delete:hover {
+    color: var(--admin-danger, #ef4444);
+    background: rgba(239, 68, 68, 0.1);
+}
+.preview-contextual-js-form-actions-add {
+    align-self: flex-start;
+    margin-top: 4px;
+}
+
 /* Switch the binding row's bottom area to vertical layout when in
    componentList mode. The default row layout (flex row) would squeeze
    the wide fieldMap table next to the empty-text input. */

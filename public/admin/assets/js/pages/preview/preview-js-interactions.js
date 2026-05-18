@@ -40,6 +40,28 @@
     let jsFormApi = null;
     let jsFormEndpoint = null;
     let jsFormApiBody = null;
+    let jsFormApiBodyRow = null;       // wrapper for show/hide on GET/DELETE
+    let jsFormApiMethod = null;        // direct-URL mode method select
+    let jsFormApiUrl = null;           // direct-URL mode URL input
+    let jsFormApiRegistryFields = null;
+    let jsFormApiDirectFields = null;
+    let jsFormTargetRow = null;        // read-only target chip row
+    let jsFormTargetLabel = null;      // the <code> showing @api/endpoint
+    // Path params (Step 2) — only filled when endpoint has :placeholders.
+    let jsFormPathParamsRow = null;
+    let jsFormPathParamsRows = null;
+    // Advanced fold (Steps 4c, 5, 7).
+    let jsFormToastSuccessMount = null;
+    let jsFormToastErrorMount = null;
+    let jsFormToastSuccessSilent = null;
+    let jsFormToastErrorSilent = null;
+    let jsFormToastSuccessPicker = null;   // textKey picker instance
+    let jsFormToastErrorPicker = null;
+    let jsFormActionsList = null;
+    let jsFormActionsAdd = null;
+    // Post-fetch action state — one entry per row.
+    // { verb: 'hide', paramValues: ['#form'] }
+    let postFetchActionsState = [];
     let jsFormParams = null;
     let jsPreviewCode = null;
     let jsFormSave = null;
@@ -103,6 +125,21 @@
         jsFormApi = document.getElementById('js-form-api');
         jsFormEndpoint = document.getElementById('js-form-endpoint');
         jsFormApiBody = document.getElementById('js-form-api-body');
+        jsFormApiBodyRow = document.getElementById('js-form-api-body-row');
+        jsFormApiMethod = document.getElementById('js-form-api-method');
+        jsFormApiUrl = document.getElementById('js-form-api-url');
+        jsFormApiRegistryFields = document.getElementById('js-form-api-registry-fields');
+        jsFormApiDirectFields = document.getElementById('js-form-api-direct-fields');
+        jsFormTargetRow = document.getElementById('js-form-target-row');
+        jsFormTargetLabel = document.getElementById('js-form-target-label');
+        jsFormPathParamsRow = document.getElementById('js-form-path-params-row');
+        jsFormPathParamsRows = document.getElementById('js-form-path-params-rows');
+        jsFormToastSuccessMount = document.getElementById('js-form-toast-success-mount');
+        jsFormToastErrorMount   = document.getElementById('js-form-toast-error-mount');
+        jsFormToastSuccessSilent = document.getElementById('js-form-toast-success-silent');
+        jsFormToastErrorSilent   = document.getElementById('js-form-toast-error-silent');
+        jsFormActionsList = document.getElementById('js-form-actions-list');
+        jsFormActionsAdd  = document.getElementById('js-form-actions-add');
         jsFormParams = document.getElementById('js-form-params');
         jsPreviewCode = document.getElementById('js-preview-code');
         jsFormSave = document.getElementById('js-form-save');
@@ -173,6 +210,9 @@
         // Endpoint dropdown change
         if (jsFormEndpoint) {
             jsFormEndpoint.addEventListener('change', function() {
+                syncTargetLabel();
+                syncBodyVisibilityForMethod();
+                renderPathParamRows();
                 updatePreview();
                 showBindingsForEndpoint(jsFormEndpoint, elBindingsContainer, elBindingsRows);
             });
@@ -181,6 +221,38 @@
         // Body input change
         if (jsFormApiBody) {
             jsFormApiBody.addEventListener('input', updatePreview);
+        }
+
+        // API mode radio (registry vs direct URL)
+        document.querySelectorAll('input[name="js-form-api-mode"]').forEach(function(r) {
+            r.addEventListener('change', handleApiModeChange);
+        });
+
+        // Direct-URL mode: method + URL inputs
+        if (jsFormApiMethod) {
+            jsFormApiMethod.addEventListener('change', function() {
+                syncBodyVisibilityForMethod();
+                updatePreview();
+            });
+        }
+        if (jsFormApiUrl) {
+            jsFormApiUrl.addEventListener('input', function() {
+                renderPathParamRows();   // re-scan :placeholders in the URL
+                updatePreview();
+            });
+        }
+
+        // Advanced fold: toast silent checkboxes.
+        if (jsFormToastSuccessSilent) jsFormToastSuccessSilent.addEventListener('change', updatePreview);
+        if (jsFormToastErrorSilent)   jsFormToastErrorSilent.addEventListener('change', updatePreview);
+
+        // Post-fetch actions list
+        if (jsFormActionsAdd) {
+            jsFormActionsAdd.addEventListener('click', function() {
+                postFetchActionsState.push({ verb: '', paramValues: [] });
+                renderActionsList();
+                updatePreview();
+            });
         }
         
         // Function dropdown change
@@ -602,62 +674,105 @@
 
         // Saved interactions don't carry an explicit "authored in API
         // mode" marker — both modes serialise identically as
-        //   fnName='fetch', params=['@apiId/endpointId', 'body=...']
-        // Detect API mode by the @-prefixed first param. When detected,
-        // pre-fill the API/endpoint dropdowns + body source instead of
-        // the function dropdown, so the bindings UI is reachable
-        // without the user toggling Action Type back and forth.
-        var isApiModeEdit = (
-            interaction.function === 'fetch' &&
-            Array.isArray(interaction.params) &&
-            typeof interaction.params[0] === 'string' &&
-            interaction.params[0].charAt(0) === '@'
-        );
+        //   fnName='fetch', params=['@apiId/endpointId', 'body=...']  (registry)
+        //   fnName='fetch', params=['POST', '/api/users', 'body=...']  (direct URL)
+        // Detect via the first param: starts with '@' → registry,
+        // matches a known HTTP method → direct URL.
+        var DIRECT_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+        var apiModeDetected = null;  // 'registry' | 'direct' | null
+        if (interaction.function === 'fetch' && Array.isArray(interaction.params)) {
+            var first = typeof interaction.params[0] === 'string' ? interaction.params[0] : '';
+            if (first.charAt(0) === '@') apiModeDetected = 'registry';
+            else if (DIRECT_METHODS.indexOf(first.toUpperCase()) !== -1) apiModeDetected = 'direct';
+        }
 
-        if (isApiModeEdit) {
-            // Parse '@apiId/endpointId' (registry shorthand)
-            var ref = interaction.params[0].substring(1);  // drop '@'
-            var slashIdx = ref.indexOf('/');
-            var apiIdFromRef      = slashIdx > 0 ? ref.substring(0, slashIdx) : '';
-            var endpointIdFromRef = slashIdx > 0 ? ref.substring(slashIdx + 1) : '';
-
-            // Extract body= option if present
-            var bodyVal = '';
-            for (var i = 1; i < interaction.params.length; i++) {
+        if (apiModeDetected) {
+            // Extract all kwargs from the param list. Both modes use the
+            // same "key=value" tail; the leading positional args differ.
+            // For registry mode: skip index 0 (the @api/ep ref).
+            // For direct mode:   skip indices 0-1 (METHOD, URL).
+            var firstKwargIdx = (apiModeDetected === 'direct') ? 2 : 1;
+            var kwargs = {};
+            for (var i = firstKwargIdx; i < interaction.params.length; i++) {
                 var p = interaction.params[i];
-                if (typeof p === 'string' && p.indexOf('body=') === 0) {
-                    bodyVal = p.substring(5);
-                    break;
-                }
+                if (typeof p !== 'string') continue;
+                var eq = p.indexOf('=');
+                if (eq === -1) continue;
+                kwargs[p.substring(0, eq)] = p.substring(eq + 1);
             }
+            var bodyVal = kwargs['body'] || '';
 
-            // Make sure the API list is loaded before we try to set
-            // values on the dropdowns.
+            // Make sure the API list is loaded before we touch dropdowns.
             if (availableApiEndpoints.length === 0) {
                 await fetchApiEndpoints();
             }
 
             if (jsFormActionType) {
                 jsFormActionType.value = 'api';
-                // Trigger the visibility / lazy-load logic. The handler
-                // is async but we don't need to await here — the
-                // dropdown population is sync once endpoints are loaded.
                 jsFormActionType.dispatchEvent(new Event('change'));
             }
             populateApiDropdown();
-            if (jsFormApi) {
-                jsFormApi.value = apiIdFromRef;
-                jsFormApi.dispatchEvent(new Event('change'));  // populates endpoint dropdown
+
+            // Switch the mode radio to the detected mode + sync visibility.
+            document.querySelectorAll('input[name="js-form-api-mode"]').forEach(function(r) {
+                r.checked = (r.value === apiModeDetected);
+            });
+            handleApiModeChange();
+
+            if (apiModeDetected === 'registry') {
+                // Parse '@apiId/endpointId'
+                var ref = interaction.params[0].substring(1);
+                var slashIdx = ref.indexOf('/');
+                var apiIdFromRef      = slashIdx > 0 ? ref.substring(0, slashIdx) : '';
+                var endpointIdFromRef = slashIdx > 0 ? ref.substring(slashIdx + 1) : '';
+                if (jsFormApi) {
+                    jsFormApi.value = apiIdFromRef;
+                    jsFormApi.dispatchEvent(new Event('change'));
+                }
+                if (jsFormEndpoint) {
+                    jsFormEndpoint.value = endpointIdFromRef;
+                    jsFormEndpoint.dispatchEvent(new Event('change'));
+                }
+                // Path params already rendered by the endpoint-change
+                // listener (renderPathParamRows fires there). Re-render
+                // now with the saved kwargs so values pre-fill.
+                renderPathParamRows(kwargs);
+            } else {
+                // Direct URL: params[0] = METHOD, params[1] = URL.
+                var methodFromParams = interaction.params[0].toUpperCase();
+                var urlFromParams = typeof interaction.params[1] === 'string' ? interaction.params[1] : '';
+                if (jsFormApiMethod) {
+                    jsFormApiMethod.value = methodFromParams;
+                }
+                if (jsFormApiUrl) {
+                    jsFormApiUrl.value = urlFromParams;
+                }
+                syncBodyVisibilityForMethod();
+                renderPathParamRows(kwargs);
             }
-            if (jsFormEndpoint) {
-                jsFormEndpoint.value = endpointIdFromRef;
-                // Manually fire showBindingsForEndpoint — setting .value
-                // doesn't dispatch a change event.
-                jsFormEndpoint.dispatchEvent(new Event('change'));
-            }
+
             if (jsFormApiBody) {
                 jsFormApiBody.value = bodyVal;
             }
+
+            // Restore Advanced-fold values from kwargs. Note: the saved
+            // chain stores RESOLVED toast strings (PHP translated them
+            // at compile time), but the picker UI shows KEYS — so on
+            // edit, we only know the displayed key if the user re-picks
+            // it (or if we cache the key alongside in api-endpoints.json,
+            // which we don't today). For now, leave the toast pickers
+            // empty on edit; user re-picks if they want to change.
+            // The `silent` and onSuccess/onError fields ARE the saved
+            // values (no translation), so restore them directly.
+            ensureToastPickersMounted();
+            if (jsFormToastSuccessSilent) jsFormToastSuccessSilent.checked = !!kwargs['silent'];
+            if (jsFormToastErrorSilent)   jsFormToastErrorSilent.checked   = !!kwargs['silent'];
+
+            // Load sibling interactions (same event, after this one) as
+            // post-fetch actions. `index` is the per-event index passed
+            // into editInteraction.
+            _loadActionsForEdit(eventName, index);
+
             updatePreview();
             if (jsFormSave) jsFormSave.disabled = false;
             return;  // skip the function-mode pre-fill block below
@@ -752,6 +867,30 @@
             jsFormEndpoint.disabled = true;
         }
         if (jsFormApiBody) jsFormApiBody.value = '#form';
+        // Reset API mode to registry (default) + clear direct-URL fields.
+        document.querySelectorAll('input[name="js-form-api-mode"]').forEach(function(r) {
+            r.checked = (r.value === 'registry');
+        });
+        if (jsFormApiMethod) jsFormApiMethod.value = 'GET';
+        if (jsFormApiUrl) jsFormApiUrl.value = '';
+        if (jsFormApiRegistryFields) jsFormApiRegistryFields.style.display = '';
+        if (jsFormApiDirectFields)   jsFormApiDirectFields.style.display = 'none';
+        if (jsFormTargetRow) jsFormTargetRow.style.display = 'none';
+        // Reset Advanced fold.
+        if (jsFormToastSuccessSilent) jsFormToastSuccessSilent.checked = false;
+        if (jsFormToastErrorSilent)   jsFormToastErrorSilent.checked   = false;
+        if (jsFormToastSuccessPicker) jsFormToastSuccessPicker.setValue('');
+        if (jsFormToastErrorPicker)   jsFormToastErrorPicker.setValue('');
+        // Reset path params (no endpoint picked yet).
+        if (jsFormPathParamsRow) jsFormPathParamsRow.style.display = 'none';
+        if (jsFormPathParamsRows) {
+            while (jsFormPathParamsRows.firstChild) {
+                jsFormPathParamsRows.removeChild(jsFormPathParamsRows.firstChild);
+            }
+        }
+        // Reset post-fetch actions.
+        postFetchActionsState = [];
+        renderActionsList();
         if (jsFormParams) jsFormParams.innerHTML = '';
         if (jsPreviewCode) jsPreviewCode.textContent = '-';
         if (jsFormSave) jsFormSave.disabled = true;
@@ -792,6 +931,9 @@
             if (jsFormApi && jsFormApi.options.length <= 1) {
                 populateApiDropdown();
             }
+            // Toast pickers live in the Advanced fold — mount them now
+            // that we know API mode is active. Idempotent.
+            ensureToastPickersMounted();
         } else {
             if (jsFormFunctionSection) jsFormFunctionSection.style.display = '';
             if (jsFormApiSection) jsFormApiSection.classList.remove('visible');
@@ -817,7 +959,534 @@
         // Reset bindings when API changes (endpoint is reset)
         if (elBindingsContainer) elBindingsContainer.style.display = 'none';
         if (elBindingsRows) elBindingsRows.innerHTML = '';
+        syncTargetLabel();
         updatePreview();
+    }
+
+    /**
+     * Handle API mode radio change (registry vs direct URL). Just shows
+     * the right sub-fields; the saved interaction shape is decided at
+     * compile time in updatePreview / handleSave.
+     */
+    function handleApiModeChange() {
+        const mode = getApiMode();
+        if (jsFormApiRegistryFields) jsFormApiRegistryFields.style.display = mode === 'direct' ? 'none' : '';
+        if (jsFormApiDirectFields)   jsFormApiDirectFields.style.display   = mode === 'direct' ? '' : 'none';
+        syncBodyVisibilityForMethod();
+        updatePreview();
+    }
+
+    /**
+     * Read the currently-selected API mode ('registry' or 'direct').
+     * Defaults to 'registry' when no radio is checked.
+     */
+    function getApiMode() {
+        const checked = document.querySelector('input[name="js-form-api-mode"]:checked');
+        return checked ? checked.value : 'registry';
+    }
+
+    /**
+     * Update the read-only target label that shows the @apiId/endpointId
+     * the user just picked. Hides itself when either side is empty.
+     * Registry-mode only — direct-URL mode shows the URL field itself.
+     */
+    function syncTargetLabel() {
+        if (!jsFormTargetRow || !jsFormTargetLabel) return;
+        const api = jsFormApi?.value || '';
+        const ep  = jsFormEndpoint?.value || '';
+        if (api && ep) {
+            jsFormTargetLabel.textContent = '@' + api + '/' + ep;
+            jsFormTargetRow.style.display = '';
+        } else {
+            jsFormTargetLabel.textContent = '—';
+            jsFormTargetRow.style.display = 'none';
+        }
+    }
+
+    /**
+     * Hide the body source row when the selected HTTP method forbids a
+     * request body (GET / DELETE). The browser-side QS.fetch already
+     * flattens GET-with-body to a query string, but surfacing it in the
+     * picker as "Body source" is misleading. Direct-URL mode uses the
+     * Method dropdown; registry mode uses the endpoint's declared method.
+     */
+    function syncBodyVisibilityForMethod() {
+        if (!jsFormApiBodyRow) return;
+        const method = getEffectiveMethod();
+        const noBody = method === 'GET' || method === 'DELETE';
+        jsFormApiBodyRow.style.display = noBody ? 'none' : '';
+    }
+
+    /**
+     * Resolve the effective HTTP method for the current form state.
+     * Direct-URL mode: from the Method dropdown.
+     * Registry mode: from the selected endpoint's declared method.
+     * Default: 'POST' (the historic default for API mode).
+     */
+    function getEffectiveMethod() {
+        if (getApiMode() === 'direct') {
+            return (jsFormApiMethod?.value || 'GET').toUpperCase();
+        }
+        const ep = _findEndpointData(jsFormApi, jsFormEndpoint);
+        return (ep?.method || 'POST').toUpperCase();
+    }
+
+    /**
+     * Extract :placeholder names from an endpoint path (or a free URL).
+     * Returns the list in declared order, de-duplicated.
+     */
+    function _extractPathPlaceholders(pathOrUrl) {
+        if (!pathOrUrl || typeof pathOrUrl !== 'string') return [];
+        var seen = {};
+        var out = [];
+        var re = /:([a-zA-Z][a-zA-Z0-9_]*)/g;
+        var m;
+        while ((m = re.exec(pathOrUrl)) !== null) {
+            if (!seen[m[1]]) {
+                seen[m[1]] = true;
+                out.push(m[1]);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Render path-param rows for the currently-selected endpoint (or
+     * URL in direct mode). Each row is a labelled text input; the
+     * `name` of the input becomes the kwarg key in the compiled call.
+     *
+     * Optionally pre-fills values from `existingKwargs` (used on edit).
+     */
+    function renderPathParamRows(existingKwargs) {
+        if (!jsFormPathParamsRow || !jsFormPathParamsRows) return;
+        existingKwargs = existingKwargs || {};
+
+        // Source: registry endpoint's path, or direct URL.
+        var source = '';
+        if (getApiMode() === 'direct') {
+            source = jsFormApiUrl?.value || '';
+        } else {
+            var ep = _findEndpointData(jsFormApi, jsFormEndpoint);
+            source = ep ? (ep.path || '') : '';
+        }
+
+        var names = _extractPathPlaceholders(source);
+
+        // Pull existing values from the rows we're about to discard so
+        // the user doesn't lose typing when the path changes mid-edit.
+        var prior = {};
+        jsFormPathParamsRows.querySelectorAll('input[data-path-param]').forEach(function(inp) {
+            prior[inp.dataset.pathParam] = inp.value;
+        });
+
+        // Clear + rebuild.
+        while (jsFormPathParamsRows.firstChild) {
+            jsFormPathParamsRows.removeChild(jsFormPathParamsRows.firstChild);
+        }
+        if (names.length === 0) {
+            jsFormPathParamsRow.style.display = 'none';
+            return;
+        }
+
+        names.forEach(function(name) {
+            var row = document.createElement('div');
+            row.className = 'preview-contextual-js-form-path-param-row';
+
+            var lbl = document.createElement('span');
+            lbl.className = 'preview-contextual-js-form-path-param-name';
+            lbl.textContent = ':' + name;
+            row.appendChild(lbl);
+
+            var input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'preview-contextual-js-form-input preview-contextual-js-form-path-param-value';
+            input.dataset.pathParam = name;
+            input.placeholder = 'value or #selector.value';
+            input.value = (existingKwargs[name] !== undefined ? existingKwargs[name]
+                : prior[name] !== undefined ? prior[name] : '');
+            input.addEventListener('input', updatePreview);
+            row.appendChild(input);
+
+            jsFormPathParamsRows.appendChild(row);
+        });
+
+        jsFormPathParamsRow.style.display = '';
+    }
+
+    /**
+     * Read the current path-param input values as kwargs. Empty values
+     * are skipped so optional placeholders stay literal (`/path/:opt`
+     * → runtime warns + keeps the `:opt` so the dev sees what's empty).
+     */
+    function _collectPathParamKwargs() {
+        var out = [];
+        if (!jsFormPathParamsRows) return out;
+        jsFormPathParamsRows.querySelectorAll('input[data-path-param]').forEach(function(inp) {
+            var v = (inp.value || '').trim();
+            if (v) out.push([inp.dataset.pathParam, v]);
+        });
+        return out;
+    }
+
+    /**
+     * Lazy-mount the toast textKey pickers into their slots. Uses the
+     * shared `QSComplexWizard.createTextKeyPicker` primitive (loaded by
+     * preview-config.php alongside the Complex Element wizard system).
+     * Idempotent — calls after the first one are no-ops.
+     */
+    function ensureToastPickersMounted() {
+        var factory = window.QSComplexWizard && window.QSComplexWizard.createTextKeyPicker;
+        if (typeof factory !== 'function') return;  // primitive not loaded yet
+        if (!jsFormToastSuccessPicker && jsFormToastSuccessMount) {
+            jsFormToastSuccessPicker = factory({
+                container:   jsFormToastSuccessMount,
+                placeholder: 'e.g. form.contact.success',
+                value:       '',
+                onChange:    updatePreview,
+            });
+        }
+        if (!jsFormToastErrorPicker && jsFormToastErrorMount) {
+            jsFormToastErrorPicker = factory({
+                container:   jsFormToastErrorMount,
+                placeholder: 'e.g. form.contact.error',
+                value:       '',
+                onChange:    updatePreview,
+            });
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Post-fetch actions (Step 5)
+    // -----------------------------------------------------------------
+    // Storage model: each "post-fetch action" is a SIBLING interaction
+    // on the same event. The renderer assembles the chain server-side
+    // (multiple {{call:...}} in the same attribute become an async
+    // chain via transformCallSyntax). The picker tracks them as state
+    // here, saves them sequentially in handleSave after the main fetch.
+
+    /**
+     * Render the post-fetch actions list from `postFetchActionsState`.
+     * Idempotent — fully rebuilds the list each time. Each row contains
+     * a verb dropdown + verb-specific arg inputs (reusing _createArgRow)
+     * + a delete button.
+     */
+    function renderActionsList() {
+        if (!jsFormActionsList) return;
+        while (jsFormActionsList.firstChild) {
+            jsFormActionsList.removeChild(jsFormActionsList.firstChild);
+        }
+        postFetchActionsState.forEach(function(action, idx) {
+            jsFormActionsList.appendChild(_buildActionRow(action, idx));
+        });
+    }
+
+    /**
+     * Build one action row. The row stays bound to its state object;
+     * mutations from inputs update the state in place and call
+     * updatePreview.
+     */
+    function _buildActionRow(action, idx) {
+        var row = document.createElement('div');
+        row.className = 'preview-contextual-js-form-action-row';
+
+        // Verb dropdown
+        var verbSelect = document.createElement('select');
+        verbSelect.className = 'preview-contextual-js-form-action-verb';
+        var blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = '-- pick verb --';
+        verbSelect.appendChild(blank);
+        availableFunctions.forEach(function(fn) {
+            // Skip 'fetch' — fetch-then-fetch is unusual and easier to
+            // author as a separate top-level interaction.
+            if (!fn || !fn.name || fn.name === 'fetch') return;
+            var opt = document.createElement('option');
+            opt.value = fn.name;
+            opt.textContent = fn.name;
+            verbSelect.appendChild(opt);
+        });
+        verbSelect.value = action.verb || '';
+
+        // Args container — re-rendered when verb changes.
+        var argsContainer = document.createElement('div');
+        argsContainer.className = 'preview-contextual-js-form-action-args';
+
+        function rerenderArgs() {
+            while (argsContainer.firstChild) argsContainer.removeChild(argsContainer.firstChild);
+            var fnSpec = availableFunctions.find(function(f) { return f && f.name === verbSelect.value; });
+            if (!fnSpec || !Array.isArray(fnSpec.args)) return;
+            fnSpec.args.forEach(function(arg, i) {
+                var argRow = _createArgRow(arg, i, function() {
+                    // Pull all current values back into state.
+                    action.paramValues = [];
+                    argsContainer.querySelectorAll('input, select').forEach(function(inp) {
+                        var pi = inp.dataset && inp.dataset.paramIndex !== undefined
+                            ? parseInt(inp.dataset.paramIndex, 10) : -1;
+                        if (pi >= 0) action.paramValues[pi] = inp.value;
+                    });
+                    updatePreview();
+                }, true);
+                argsContainer.appendChild(argRow);
+            });
+            // Pre-fill from action.paramValues if present.
+            if (action.paramValues) {
+                argsContainer.querySelectorAll('input, select').forEach(function(inp) {
+                    var pi = inp.dataset && inp.dataset.paramIndex !== undefined
+                        ? parseInt(inp.dataset.paramIndex, 10) : -1;
+                    if (pi >= 0 && action.paramValues[pi] !== undefined) {
+                        inp.value = action.paramValues[pi];
+                    }
+                });
+            }
+        }
+        verbSelect.addEventListener('change', function() {
+            action.verb = verbSelect.value;
+            action.paramValues = [];
+            rerenderArgs();
+            updatePreview();
+        });
+
+        // Delete button
+        var del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'preview-contextual-js-form-action-delete';
+        del.title = 'Remove action';
+        del.textContent = '×';
+        del.addEventListener('click', function() {
+            postFetchActionsState.splice(idx, 1);
+            renderActionsList();
+            updatePreview();
+        });
+
+        row.appendChild(verbSelect);
+        row.appendChild(argsContainer);
+        row.appendChild(del);
+        rerenderArgs();
+
+        // Wire input/change events on every input/select in this row
+        // so the preview updates live as the user types. The selector
+        // picker has its own event handlers that don't fire our
+        // action-row callback, so this is the safety net. Idempotent
+        // via `data-action-wired` guard.
+        function wireRowChangeEvents() {
+            row.querySelectorAll('input, select').forEach(function(inp) {
+                if (inp.dataset.actionWired === '1') return;
+                inp.dataset.actionWired = '1';
+                inp.addEventListener('input', updatePreview);
+                inp.addEventListener('change', updatePreview);
+            });
+        }
+        wireRowChangeEvents();
+        // Re-wire after verb change (rerenderArgs builds new inputs).
+        verbSelect.addEventListener('change', wireRowChangeEvents);
+
+        return row;
+    }
+
+    /**
+     * Read action values from the DOM. Source of truth at preview /
+     * save time — the cached `postFetchActionsState` is only used for
+     * the INITIAL row layout (which rows exist and what verb each
+     * holds on first render). Values come from the inputs themselves.
+     *
+     * Why DOM-source: the selector picker (used for selector/class/
+     * matchTarget args) has its own event handlers that don't fire
+     * the action-row callback, so the cache could go stale. Reading
+     * DOM at use-time avoids that whole class of sync bugs.
+     */
+    function _collectActionsFromDom() {
+        var actions = [];
+        if (!jsFormActionsList) return actions;
+        jsFormActionsList.querySelectorAll('.preview-contextual-js-form-action-row').forEach(function(row) {
+            var verbSelect = row.querySelector('.preview-contextual-js-form-action-verb');
+            var verb = verbSelect ? verbSelect.value : '';
+            if (!verb) return;
+            var paramValues = [];
+            row.querySelectorAll('input[data-param-index], select[data-param-index]').forEach(function(inp) {
+                var pi = parseInt(inp.dataset.paramIndex, 10);
+                if (!isNaN(pi)) paramValues[pi] = inp.value;
+            });
+            actions.push({ verb: verb, paramValues: paramValues });
+        });
+        return actions;
+    }
+
+    /**
+     * Compile the action list into preview-syntax fragments. Reads
+     * from the DOM (source of truth) — see _collectActionsFromDom.
+     */
+    function _previewPostFetchActions() {
+        return _collectActionsFromDom()
+            .filter(function(a) { return a && a.verb; })
+            .map(function(a) {
+                var args = (a.paramValues || [])
+                    .map(function(v) { return (v || '').trim(); })
+                    .filter(function(v) { return v !== ''; })
+                    .join(',');
+                return ';{{call:' + a.verb + (args ? ':' + args : '') + '}}';
+            }).join('');
+    }
+
+    /**
+     * Persist the post-fetch action list as sibling interactions on
+     * the same event. Replace-on-save semantics: existing siblings
+     * after the main interaction are deleted, then the picker's
+     * current state is added in order.
+     *
+     * Why replace-on-save: the picker treats the actions list as the
+     * source of truth. Trying to diff-edit each row would be much
+     * more complex (matching old siblings to new rows by verb/params,
+     * detecting moves, etc.). For a small chain (~2-5 actions),
+     * delete+add is acceptable.
+     *
+     * Indices: deleting from highest-to-lowest keeps the remaining
+     * indices stable. After the main save, the just-saved interaction
+     * sits at some position within its event's list; siblings AFTER it
+     * (higher index) are the "post-fetch" chain.
+     */
+    async function _persistPostFetchActions(ctx) {
+        if (!currentJsContext) return;
+        var eventName = ctx.eventName;
+        var structType = ctx.structType;
+        var nodeId     = ctx.nodeId;
+        var pageName   = ctx.pageName;
+
+        // Refresh interactions list so we work from the latest server state.
+        await loadInteractions();
+        var sameEvent = (currentInteractionsData && Array.isArray(currentInteractionsData.interactions))
+            ? currentInteractionsData.interactions.filter(function(i) { return i.event === eventName; })
+            : [];
+
+        // Where is the main interaction in this event's list?
+        // - On Edit: ctx.mainIndex (caller passes body.index used in PUT).
+        // - On Add:  always the last one (it was just appended).
+        var mainIdx = (ctx.mainIndex !== null && ctx.mainIndex !== undefined)
+            ? ctx.mainIndex
+            : (sameEvent.length - 1);
+
+        // Delete old siblings AFTER mainIdx, highest-first to keep
+        // indices stable as we go.
+        for (var j = sameEvent.length - 1; j > mainIdx; j--) {
+            var delBody = { structType: structType, nodeId: nodeId, event: eventName, index: j };
+            if (pageName) delBody.pageName = pageName;
+            try {
+                await fetch('/management/deleteInteraction', {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': 'Bearer ' + PreviewConfig.authToken,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(delBody),
+                });
+            } catch (e) {
+                console.warn('[PreviewJsInteractions] failed to delete sibling action at index ' + j, e);
+            }
+        }
+
+        // Add new siblings in picker-state order. Read from the DOM
+        // (truth source) instead of the cached state — see
+        // _collectActionsFromDom for the rationale.
+        var actionsToSave = _collectActionsFromDom();
+        for (var k = 0; k < actionsToSave.length; k++) {
+            var action = actionsToSave[k];
+            if (!action || !action.verb) continue;
+            var actionParams = (action.paramValues || [])
+                .map(function(v) { return v == null ? '' : String(v); })
+                .filter(function(v) { return v.trim() !== ''; });
+
+            var addBody = {
+                structType: structType,
+                nodeId:     nodeId,
+                event:      eventName,
+                function:   action.verb,
+                params:     actionParams,
+            };
+            if (pageName) addBody.pageName = pageName;
+
+            try {
+                await fetch('/management/addInteraction', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + PreviewConfig.authToken,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(addBody),
+                });
+            } catch (e) {
+                console.warn('[PreviewJsInteractions] failed to add post-fetch action #' + k, e);
+            }
+        }
+    }
+
+    /**
+     * Read the existing interactions list and pre-fill the action
+     * rows from sibling interactions on the same event that come
+     * AFTER the current one being edited. Only call this on edit.
+     *
+     * Heuristic: any interaction with the same event whose index
+     * is greater than the current one becomes a post-fetch action.
+     * The runtime applies them in storage order anyway.
+     */
+    function _loadActionsForEdit(eventName, currentIndex) {
+        postFetchActionsState = [];
+        if (!currentInteractionsData || !Array.isArray(currentInteractionsData.interactions)) return;
+        var sameEvent = currentInteractionsData.interactions
+            .filter(function(i) { return i.event === eventName; });
+        // currentIndex is the position WITHIN sameEvent. Take everything after.
+        for (var i = currentIndex + 1; i < sameEvent.length; i++) {
+            var it = sameEvent[i];
+            if (!it || !it.function) continue;
+            postFetchActionsState.push({
+                verb: it.function,
+                paramValues: Array.isArray(it.params) ? it.params.slice() : []
+            });
+        }
+        renderActionsList();
+    }
+
+    /**
+     * Read the Advanced-fold state into a plain options object used by
+     * both updatePreview and handleSave. Centralises the parsing so
+     * the two stay in sync.
+     *
+     * Returns: { kwargs: [["key", "value"], ...], errors: [] }
+     */
+    function _collectAdvancedKwargs() {
+        var kwargs = [];
+        var errors = [];
+
+        // Toast keys — silent overrides any picker value.
+        var successSilent = jsFormToastSuccessSilent?.checked;
+        var successKey = jsFormToastSuccessPicker
+            ? (jsFormToastSuccessPicker.getValue() || '').trim()
+            : '';
+        if (successSilent) {
+            kwargs.push(['silent', 'true']);
+        } else if (successKey) {
+            kwargs.push(['toastSuccessKey', successKey]);
+        }
+
+        var errorSilent = jsFormToastErrorSilent?.checked;
+        var errorKey = jsFormToastErrorPicker
+            ? (jsFormToastErrorPicker.getValue() || '').trim()
+            : '';
+        // Note: `silent` in qs.js opts out of BOTH success and error
+        // toasts. Per-side silent would need a separate runtime flag —
+        // for the MVP, "error silent" reuses the same kwarg. If only
+        // one side is silent, the other side's text gets the toast
+        // logic via the explicit Key. If both sides are silent, single
+        // 'silent=true' is enough.
+        if (errorSilent && !successSilent) {
+            // Edge case: error-only silent. Cleanest: still emit
+            // 'silent=true' (suppresses both). The user wanted to
+            // suppress error toast; we may suppress success too. Flag
+            // as a known limitation for now.
+            kwargs.push(['silent', 'true']);
+        } else if (!errorSilent && errorKey) {
+            kwargs.push(['toastErrorKey', errorKey]);
+        }
+
+        return { kwargs: kwargs, errors: errors };
     }
     
     /**
@@ -1746,26 +2415,60 @@
     function updatePreview() {
         const actionType = jsFormActionType?.value || 'function';
         const eventName = jsFormEvent?.value || '';
-        
+
         if (actionType === 'api') {
-            const apiName = jsFormApi?.value || '';
-            const endpointName = jsFormEndpoint?.value || '';
-            const bodySelector = jsFormApiBody?.value || '#form';
-            
-            if (!apiName || !endpointName) {
-                if (jsPreviewCode) jsPreviewCode.textContent = '-';
-                if (jsFormSave) jsFormSave.disabled = true;
-                return;
+            const mode = getApiMode();
+            const method = getEffectiveMethod();
+            const bodyAllowed = method !== 'GET' && method !== 'DELETE';
+            const bodySelector = (jsFormApiBody?.value || '').trim();
+
+            let preview;
+            let saveOk = false;
+
+            // All kwargs that go at the tail of the call.
+            // Order: path params first (semantic — they describe the
+            // request), then Advanced-fold (toast/silent/onSuccess/etc.).
+            const pathKwargs = _collectPathParamKwargs();
+            const advanced = _collectAdvancedKwargs();
+            const allKwargs = pathKwargs.concat(advanced.kwargs);
+            const advancedTail = allKwargs.map(function(kv) {
+                return kv[0] + '=' + kv[1];
+            }).join(',');
+
+            if (mode === 'direct') {
+                const url = (jsFormApiUrl?.value || '').trim();
+                if (!url) {
+                    if (jsPreviewCode) jsPreviewCode.textContent = '-';
+                    if (jsFormSave) jsFormSave.disabled = true;
+                    return;
+                }
+                // Direct URL: {{call:fetch:METHOD,URL[,body=#x][,kwargs]}}
+                preview = '{{call:fetch:' + method + ',' + url;
+                if (bodyAllowed && bodySelector) preview += ',body=' + bodySelector;
+                if (advancedTail) preview += ',' + advancedTail;
+                preview += '}}';
+                saveOk = advanced.errors.length === 0;
+            } else {
+                const apiName = jsFormApi?.value || '';
+                const endpointName = jsFormEndpoint?.value || '';
+                if (!apiName || !endpointName) {
+                    if (jsPreviewCode) jsPreviewCode.textContent = '-';
+                    if (jsFormSave) jsFormSave.disabled = true;
+                    return;
+                }
+                // Registry: {{call:fetch:@api/endpoint[,body=#x][,kwargs]}}
+                preview = '{{call:fetch:@' + apiName + '/' + endpointName;
+                if (bodyAllowed && bodySelector) preview += ',body=' + bodySelector;
+                if (advancedTail) preview += ',' + advancedTail;
+                preview += '}}';
+                saveOk = advanced.errors.length === 0;
             }
-            
-            let preview = '{{call:fetch:@' + apiName + '/' + endpointName;
-            if (bodySelector.trim()) {
-                preview += ',body=' + bodySelector.trim();
-            }
-            preview += '}}';
-            
+
+            // Append post-fetch actions to the preview (each starts with ';').
+            preview += _previewPostFetchActions();
+
             if (jsPreviewCode) jsPreviewCode.textContent = preview;
-            if (jsFormSave) jsFormSave.disabled = !eventName;
+            if (jsFormSave) jsFormSave.disabled = !eventName || !saveOk;
         } else {
             const fnName = jsFormFunction?.value || '';
             
@@ -1804,28 +2507,65 @@
         let fnName, params;
         
         if (actionType === 'api') {
-            const apiName = jsFormApi?.value || '';
-            const endpointName = jsFormEndpoint?.value || '';
-            const bodySelector = jsFormApiBody?.value || '';
-            
-            if (!eventName || !apiName || !endpointName) {
-                if (showToastFn) {
-                    showToastFn(PreviewConfig.i18n?.selectEventApiEndpoint || 'Please select event, API, and endpoint', 'error');
+            const mode = getApiMode();
+            const method = getEffectiveMethod();
+            const bodyAllowed = method !== 'GET' && method !== 'DELETE';
+            const bodySelector = (jsFormApiBody?.value || '').trim();
+
+            fnName = 'fetch';
+            params = [];
+            let apiName = '';
+            let endpointName = '';
+
+            if (mode === 'direct') {
+                const url = (jsFormApiUrl?.value || '').trim();
+                if (!eventName || !url) {
+                    if (showToastFn) {
+                        showToastFn(PreviewConfig.i18n?.selectEventApiUrl || 'Please select event and enter a URL', 'error');
+                    }
+                    return;
                 }
+                params.push(method);
+                params.push(url);
+            } else {
+                apiName = jsFormApi?.value || '';
+                endpointName = jsFormEndpoint?.value || '';
+                if (!eventName || !apiName || !endpointName) {
+                    if (showToastFn) {
+                        showToastFn(PreviewConfig.i18n?.selectEventApiEndpoint || 'Please select event, API, and endpoint', 'error');
+                    }
+                    return;
+                }
+                params.push('@' + apiName + '/' + endpointName);
+            }
+
+            if (bodyAllowed && bodySelector) {
+                params.push('body=' + bodySelector);
+            }
+
+            // Append path-param kwargs (in path-declaration order).
+            _collectPathParamKwargs().forEach(function(kv) {
+                params.push(kv[0] + '=' + kv[1]);
+            });
+
+            // Append Advanced-fold kwargs (toast/silent/onSuccess/onError).
+            const advancedSave = _collectAdvancedKwargs();
+            if (advancedSave.errors.length > 0) {
+                if (showToastFn) showToastFn(advancedSave.errors[0], 'error');
                 return;
             }
-            
-            fnName = 'fetch';
-            params = ['@' + apiName + '/' + endpointName];
-            if (bodySelector.trim()) {
-                params.push('body=' + bodySelector.trim());
-            }
-            
-            // Save response bindings if any
-            var bindings = collectBindings(elBindingsRows);
-            if (bindings.length > 0) {
-                var saved = await saveResponseBindings(apiName, endpointName, bindings);
-                if (!saved) return; // abort if bindings save failed
+            advancedSave.kwargs.forEach(function(kv) {
+                params.push(kv[0] + '=' + kv[1]);
+            });
+
+            // Save response bindings if any (registry mode only — direct
+            // URL has no endpoint to attach them to).
+            if (mode === 'registry') {
+                var bindings = collectBindings(elBindingsRows);
+                if (bindings.length > 0) {
+                    var saved = await saveResponseBindings(apiName, endpointName, bindings);
+                    if (!saved) return; // abort if bindings save failed
+                }
             }
         } else {
             fnName = jsFormFunction?.value || '';
@@ -1900,20 +2640,36 @@
                 throw new Error(result.message || (isEdit ? 'Failed to edit' : 'Failed to add'));
             }
             
+            // Post-fetch actions: only relevant when the main interaction
+            // is a fetch (API mode). Persist them as sibling interactions
+            // on the same event so the renderer compiles them into the
+            // chain. On Edit, the truth is the picker's state — old
+            // siblings are deleted, current state re-added in order.
+            if (actionType === 'api') {
+                await _persistPostFetchActions({
+                    eventName: eventName,
+                    isEdit: isEdit,
+                    structType: body.structType,
+                    nodeId: body.nodeId,
+                    pageName: body.pageName,
+                    mainIndex: isEdit ? body.index : null,
+                });
+            }
+
             if (showToastFn) {
                 showToastFn(
                     isEdit ? (PreviewConfig.i18n?.interactionUpdated || 'Updated') : (PreviewConfig.i18n?.interactionAdded || 'Added'),
                     'success'
                 );
             }
-            
+
             hideAddForm();
             await loadInteractions();
-            
+
             if (reloadPreviewFn) {
                 reloadPreviewFn();
             }
-            
+
         } catch (error) {
             console.error('[PreviewJsInteractions] Save error:', error);
             if (showToastFn) {

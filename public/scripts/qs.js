@@ -433,9 +433,11 @@
      * 
      * Options (comma-separated):
      * - body=#form or body=#selector (form data or JSON from inputs)
-     * - onSuccess=functionName (custom success handler)
-     * - onError=functionName (custom error handler)
-     * 
+     * - silent=1 (suppress the default success/error toast)
+     * - toastSuccessKey / toastErrorKey (translated toast text, resolved
+     *   server-side at compile time via JsonToHtmlRenderer's
+     *   TRANSLATABLE_KEYWORD_ARGS metadata)
+     *
      * @param {string} target - Registry ref (@api/endpoint) or METHOD
      * @param {...string} options - Additional options
      */
@@ -501,7 +503,11 @@
         // `parameters`) that are missing → reject with a clear error.
         // Remaining opts go to the query string at the end (below).
         const RESERVED_OPTS = new Set([
-            'body', 'onSuccess', 'onError', 'silent', '_auth', '_endpoint'
+            'body', 'onSuccess', 'onError', 'silent', '_auth', '_endpoint',
+            // Translatable toast labels — already resolved to strings by
+            // PHP at compile time. They're not path placeholders and
+            // shouldn't leak into the query string.
+            'toastSuccessKey', 'toastErrorKey'
         ]);
         if (url.indexOf(':') !== -1) {
             const placeholders = [];
@@ -599,15 +605,16 @@
                     applyBindings(data, opts._endpoint.responseBindings);
                 }
 
-                // Custom success handler
-                if (opts.onSuccess && typeof window[opts.onSuccess] === 'function') {
-                    window[opts.onSuccess](data);
-                } else if (!opts.silent) {
-                    QS.toast('Success', 'success');
+                // Toast: `toastSuccessKey` (translated server-side at
+                // compile time via TRANSLATABLE_KEYWORD_ARGS in
+                // JsonToHtmlRenderer) overrides the default 'Success'
+                // text. `silent` opts out entirely.
+                if (!opts.silent) {
+                    QS.toast(opts.toastSuccessKey || 'Success', 'success');
                 }
 
                 // Notify any listener (e.g. cross-page count, post-fetch chains).
-                // Fires AFTER bindings + onSuccess so listeners see a fully
+                // Fires AFTER bindings + toast so listeners see a fully
                 // settled DOM if they react to it.
                 document.dispatchEvent(new CustomEvent('qs:fetch:loaded', {
                     detail: { ref: ref, data: data }
@@ -616,11 +623,11 @@
                 return data;
             })
             .catch(error => {
-                // Custom error handler
-                if (opts.onError && typeof window[opts.onError] === 'function') {
-                    window[opts.onError](error);
-                } else if (!opts.silent) {
-                    QS.toast(error.message || 'Request failed', 'error');
+                // Error toast — same precedence as success but using
+                // toastErrorKey: explicit translated key → network
+                // error message → generic fallback. `silent` opts out.
+                if (!opts.silent) {
+                    QS.toast(opts.toastErrorKey || error.message || 'Request failed', 'error');
                 }
 
                 document.dispatchEvent(new CustomEvent('qs:fetch:error', {

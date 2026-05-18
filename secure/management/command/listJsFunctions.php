@@ -190,8 +190,6 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
                 ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'HTTP method (GET/POST/PUT/PATCH/DELETE) for direct URL mode, or @apiId/endpointId for registry mode'],
                 ['name' => 'url', 'type' => 'string', 'required' => false, 'description' => 'URL to call (direct URL mode only). Supports {{lang}} placeholder.'],
                 ['name' => 'body', 'type' => 'string', 'required' => false, 'description' => 'body=#formSelector — auto-collects every named input inside the form/container as a JSON payload', 'inputType' => 'selector'],
-                ['name' => 'onSuccess', 'type' => 'string', 'required' => false, 'description' => 'onSuccess=fnName — global function called with the parsed response on success'],
-                ['name' => 'onError', 'type' => 'string', 'required' => false, 'description' => 'onError=fnName — global function called with the error on failure'],
                 ['name' => 'silent', 'type' => 'string', 'required' => false, 'description' => 'silent=1 — suppress the default success/error toast']
             ],
             'description' => 'Make an API call. Direct URL mode: pass METHOD, URL, then options. Registry mode: pass @apiId/endpointId. Use body=#form-id to submit every named input inside the selected form/container as a JSON body — the canonical way to wire a form-submit chain after QS.validate.',
