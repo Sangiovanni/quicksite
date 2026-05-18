@@ -4901,11 +4901,36 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
         }
     }
 
+    // Build an array-form companion to `commands` for list-rendering
+    // consumers (e.g. response bindings with renderMode:'componentList',
+    // which require an array, not an object map). Keys promoted to a
+    // `name` field; method lowercased so it matches the lowercase keys
+    // most component __enums__ tables declare. Lossy on purpose — the
+    // primary `commands` object map keeps the full per-command schema
+    // for any tool that needs deep details.
+    $commandsList = [];
+    foreach ($commands as $cmdName => $cmdDef) {
+        $methodLower = isset($cmdDef['method']) ? strtolower((string)$cmdDef['method']) : 'get';
+        $exampleStr = '';
+        if (isset($cmdDef['example_post']) && is_string($cmdDef['example_post'])) {
+            $exampleStr = $cmdDef['example_post'];
+        } elseif (isset($cmdDef['example_get']) && is_string($cmdDef['example_get'])) {
+            $exampleStr = $cmdDef['example_get'];
+        }
+        $commandsList[] = [
+            'name'        => $cmdName,
+            'method'      => $methodLower,
+            'description' => $cmdDef['description'] ?? '',
+            'example'     => $exampleStr,
+        ];
+    }
+
     // Return all commands if no specific command requested
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('All command documentation retrieved')
         ->withData([
             'commands' => $commands,
+            'commandsList' => $commandsList,
             'total' => count($commands),
             'base_url' => rtrim(BASE_URL, '/') . '/management',
             'command_categories' => [

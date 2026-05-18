@@ -40,6 +40,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiEndpointManager.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/EnumSyncHelper.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/cascadeCleanupHelpers.php';
 
 /**
@@ -99,7 +100,15 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
     // Regenerate qs-api-config.js for live development
     $apiConfigPath = PUBLIC_CONTENT_PATH . '/scripts/qs-api-config.js';
     $manager->writeCompiledJs($apiConfigPath);
-    
+
+    // Keep qs-enums.js in sync with the new endpoint shape — bindings on
+    // a freshly-edited endpoint might reference enums that weren't in
+    // the registry yet, and bindings that were removed should drop
+    // their unreferenced entries. The sync is forgiving: missing
+    // references become warnings (QS.enum falls back gracefully) so a
+    // bad binding doesn't block the save.
+    $enumSync = EnumSyncHelper::sync();
+
     // Cascade cleanup when an endpoint was deleted
     $cascadeCleanup = null;
     if (isset($updates['deleteEndpoint'])) {
@@ -116,7 +125,12 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
     $responseData = [
         'apiId' => $result['apiId'],
         'api' => $result['api'],
-        'endpointCount' => count($result['api']['endpoints'] ?? [])
+        'endpointCount' => count($result['api']['endpoints'] ?? []),
+        'enumSync' => [
+            'written' => $enumSync['written'] ?? false,
+            'count' => $enumSync['count'] ?? 0,
+            'warnings' => $enumSync['warnings'] ?? [],
+        ],
     ];
     if ($cascadeCleanup) {
         $responseData['cascadeCleanup'] = $cascadeCleanup;

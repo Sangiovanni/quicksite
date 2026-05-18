@@ -4477,7 +4477,15 @@
         if (addComponentField) addComponentField.style.display = isComponent ? 'block' : 'none';
         if (addSnippetField) addSnippetField.style.display = isSnippet ? 'block' : 'none';
         if (addClassField) addClassField.style.display = isTag ? 'block' : 'none';
-        if (addAdvancedSection) addAdvancedSection.style.display = isTag ? '' : 'none';
+        // The "Advanced — custom params" section is shared between the
+        // HTML Tag and the Component tabs. For tags, the entries become
+        // the tag's attributes. For components, they become call-site
+        // `params` on the {component, data, params} node, merged into
+        // the rendered template root by JsonToHtmlRenderer (see
+        // docs/ADMIN_PANEL.md §"Component list binding" — the hidden
+        // template uses this to mark itself with data-list-template /
+        // display:none).
+        if (addAdvancedSection) addAdvancedSection.style.display = (isTag || isComponent) ? '' : 'none';
         if (addPreviewSection) addPreviewSection.style.display = isTag ? '' : 'none';
         // Complex tab — show kind picker; body only shows once a kind is picked.
         if (addComplexField) addComplexField.style.display = isComplex ? 'block' : 'none';
@@ -6652,7 +6660,22 @@
         };
         if (structInfo.name) requestData.name = structInfo.name;
         if (Object.keys(vars).length > 0) requestData.data = vars;
-        
+
+        // Collect any "Advanced — custom params" rows the user added.
+        // These become call-site params on the {component, data, params}
+        // node and get merged into the rendered template root by the
+        // renderer (class/style concatenate, everything else overrides).
+        // Typical use: data-list-template="true" + style="display:none"
+        // to mark a hidden template instance for componentList binding.
+        const callSiteParams = {};
+        const customRows = addCustomParamsList?.querySelectorAll('.preview-contextual-form__param-row--custom') || [];
+        customRows.forEach(row => {
+            const key   = row.querySelector('.preview-contextual-form__param-key')?.value?.trim();
+            const value = row.querySelector('.preview-contextual-form__param-value')?.value?.trim();
+            if (key && value !== undefined && value !== '') callSiteParams[key] = value;
+        });
+        if (Object.keys(callSiteParams).length > 0) requestData.params = callSiteParams;
+
         const response = await QuickSiteAdmin.apiRequest('addComponentToNode', 'POST', requestData);
         
         if (response.ok) {

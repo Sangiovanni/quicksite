@@ -823,34 +823,61 @@
     }
     
     /**
-     * Apply response bindings to DOM
-     * Supports scalar bindings and list rendering (renderMode: 'list')
+     * Apply response bindings to DOM.
+     *
+     * Supported renderModes:
+     *   - 'list'          → data-bind template, items applied directly.
+     *   - 'componentList' → data-bind template (typically a hidden
+     *                       component instance), per-item `fieldMap`
+     *                       maps API fields → template variables,
+     *                       optional `enum: "<component>.<key>"` per
+     *                       field resolves against window.QS_ENUMS.
+     *   - default         → scalar binding (selector + optional attribute).
+     *
      * @param {object} data - Response data
-     * @param {array} bindings - [{selector, field, attribute?, renderMode?, container?, emptyText?}]
+     * @param {array} bindings - binding spec array
      */
     function applyBindings(data, bindings) {
         if (!Array.isArray(bindings)) return;
-        
+
         bindings.forEach(binding => {
             const { field } = binding;
             if (!field) return;
-            
+
             // Get value from data using dot notation
             const value = getNestedValue(data, field);
             if (value === undefined) return;
-            
-            // List rendering mode
+
+            // List rendering mode (simple — items applied directly via data-bind)
             if (binding.renderMode === 'list') {
                 const container = binding.container;
                 if (!container) return;
                 renderList(container, value, binding.emptyText);
                 return;
             }
-            
+
+            // Component-list mode (clone-and-map: each item is mapped
+            // through binding.fieldMap, with optional per-field enum
+            // resolution against window.QS_ENUMS, then applied to the
+            // cloned template via the existing data-bind mechanism).
+            if (binding.renderMode === 'componentList') {
+                const container = binding.container;
+                if (!container) {
+                    console.warn('[QS] componentList: missing `container` in binding for field:', field);
+                    return;
+                }
+                if (!Array.isArray(value)) {
+                    console.warn('[QS] componentList: field did not resolve to an array:', field, value);
+                    return;
+                }
+                renderComponentList(container, value, binding.fieldMap || {}, binding.emptyText);
+                return;
+            }
+
             // Scalar binding mode
             const { selector, attribute } = binding;
             if (!selector) return;
-            
+
             const elements = getElements(selector);
             elements.forEach(el => {
                 if (attribute) {
@@ -1003,6 +1030,153 @@
             el.textContent = String(value);
         }
     }
+
+    /**
+     * Render a list of items into a container using a hidden component
+     * instance as the per-item template. Like renderList, but each item
+     * is mapped through `fieldMap` first: each entry says where the
+     * value comes from in the API item and optionally which enum table
+     * to translate through.
+     *
+     * fieldMap shape:
+     *   {
+     *     "<componentVar>": { from: "<apiField>"[, enum: "<component>.<key>"] },
+     *     ...
+     *   }
+     *
+     * Enum resolution: when `spec.enum` is set, the raw value is run
+     * through QS.enum(name, value, fallback). On miss, falls back to the
+     * raw value so the page stays functional (QS.enum logs a console
+     * warning when the table is missing).
+     *
+     * The template element + cloning logic is shared with renderList —
+     * we just compute the per-item mapped object before calling the
+     * existing populateTemplate.
+     *
+     * @param {string} containerSelector - CSS selector for the container
+     * @param {Array}  items              - API items array
+     * @param {object} fieldMap           - var → { from, enum? } map
+     * @param {string} [emptyText]        - Message shown when items is empty
+     */
+    function renderComponentList(containerSelector, items, fieldMap, emptyText) {
+        const container = document.querySelector(containerSelector);
+        if (!container) {
+            console.warn('[QS] renderComponentList: container not found:', containerSelector);
+            return;
+        }
+
+        if (!Array.isArray(items)) items = [items];
+
+        // Reuse renderList's template cache: same container, same
+        // template-discovery rules. The cache key is the selector, so
+        // a container is either a 'list' template or a 'componentList'
+        // template — switching modes for the same container would
+        // require clearing _listTemplates[containerSelector] first.
+        if (!_listTemplates[containerSelector]) {
+            const tplEl = container.querySelector('[data-list-template]') || container.firstElementChild;
+            if (!tplEl) {
+                console.warn('[QS] renderComponentList: no template element found in', containerSelector);
+                return;
+            }
+            const cached = tplEl.cloneNode(true);
+            cached.removeAttribute('data-list-template');
+            // The hidden template usually carries `style="display:none"`
+            // so it doesn't show before fetch. Drop that inline style on
+            // the clone — rendered items must be visible. If the author
+            // composed more styles into the inline style, only `display:
+            // none` is removed; the rest stays.
+            if (cached.style && cached.style.display === 'none') {
+                cached.style.removeProperty('display');
+                // If style attribute is now empty, drop it entirely
+                // so the rendered HTML stays clean.
+                if (cached.getAttribute('style') === '') {
+                    cached.removeAttribute('style');
+                }
+            }
+            _listTemplates[containerSelector] = cached;
+        }
+
+        const template = _listTemplates[containerSelector];
+
+        // Clear container
+        container.innerHTML = '';
+
+        // Empty state
+        if (items.length === 0) {
+            if (emptyText) {
+                const emptyEl = document.createElement('p');
+                emptyEl.className = 'qs-list-empty';
+                emptyEl.textContent = emptyText;
+                container.appendChild(emptyEl);
+            }
+            return;
+        }
+
+        // Per-item: walk fieldMap → build mapped object → clone +
+        // populate. populateTemplate already handles [data-bind] /
+        // [data-bind-attr] in the cloned template, so the per-item
+        // mapped object can use any keys the template expects.
+        const mapEntries = Object.keys(fieldMap || {});
+        items.forEach((item, index) => {
+            const mapped = { _index: index };
+            mapEntries.forEach(targetVar => {
+                const spec = fieldMap[targetVar];
+                if (!spec || typeof spec !== 'object') return;
+                const fromKey = spec.from || targetVar;
+                const rawValue = getNestedValue(item, fromKey);
+                if (spec.enum) {
+                    mapped[targetVar] = QS.enum(spec.enum, rawValue, rawValue);
+                } else {
+                    mapped[targetVar] = rawValue;
+                }
+            });
+
+            const clone = template.cloneNode(true);
+            populateTemplate(clone, mapped, index);
+            container.appendChild(clone);
+        });
+    }
+
+    // =========================================================================
+    // ENUM REGISTRY (`window.QS_ENUMS` populated by qs-enums.js)
+    // =========================================================================
+
+    /**
+     * Resolve a value through a global enum table.
+     *
+     * The registry (`window.QS_ENUMS`) is generated by the PHP
+     * `EnumSyncHelper` from each component's `__enums__` block. Each
+     * entry is a flat `{ key: value }` map. Names are fully-qualified
+     * (e.g. `component-command-card.method_text`).
+     *
+     * Forgiving by design:
+     *  - missing table          → warn + return fallback (or value).
+     *  - value not in table     → return fallback (or value).
+     *
+     * Used by renderComponentList; also callable from interaction
+     * chains via {{call:setEnumValue:...}} once that verb is wired.
+     *
+     * @param {string} name      - Fully-qualified enum name
+     * @param {*}      value     - Lookup key
+     * @param {*}      [fallback] - Value to return on miss (default: `value`)
+     */
+    QS.enum = function(name, value, fallback) {
+        const table = (window.QS_ENUMS || {})[name];
+        if (!table) {
+            console.warn('[QS] enum table not found:', name,
+                '(is qs-enums.js loaded? does any binding reference this name?)');
+            return fallback !== undefined ? fallback : value;
+        }
+        return Object.prototype.hasOwnProperty.call(table, value)
+            ? table[value]
+            : (fallback !== undefined ? fallback : value);
+    };
+
+    // Expose applyBindings publicly so a caller with raw response data
+    // can apply a binding spec without going through QS.fetch. Useful
+    // for: testing, pre-cached data scenarios, manual rebinding after
+    // a DOM mutation.
+    QS.applyBindings = applyBindings;
 
     // Expose renderList publicly so it can also be called directly via {{call:renderList:...}}
     QS.renderList = function(containerSelector, dataOrField, emptyText) {

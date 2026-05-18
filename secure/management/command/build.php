@@ -578,6 +578,19 @@ if (!$apiManager->writeCompiledJs($apiConfigPath)) {
         ->send();
 }
 
+// Write qs-enums.js for the build. The runtime QS.enum() (and the
+// componentList render mode) reads from window.QS_ENUMS, populated by
+// this file. Built sites still need it — without it, any binding with
+// enum-resolved fields would fall back to raw values + console-warn.
+require_once SECURE_FOLDER_PATH . '/src/classes/EnumSyncHelper.php';
+$enumsSyncResult = EnumSyncHelper::sync(PROJECT_PATH, $scriptsDir);
+if (!($enumsSyncResult['ok'] ?? false)) {
+    release_build_lock();
+    ApiResponse::create(500, 'server.file_write_failed')
+        ->withMessage("Failed to write qs-enums.js: " . ($enumsSyncResult['error'] ?? 'unknown'))
+        ->send();
+}
+
 // Copy qs.js (required for all interaction/event functionality)
 $qsJsSource = PUBLIC_CONTENT_PATH . '/scripts/qs.js';
 if (file_exists($qsJsSource)) {

@@ -172,7 +172,20 @@ function __command_switchProject(array $params = [], array $urlParams = []): Api
     $apiConfigPath = PUBLIC_CONTENT_PATH . '/scripts/qs-api-config.js';
     $apiConfigWritten = $apiManager->writeCompiledJs($apiConfigPath);
     $result['api_config_regenerated'] = $apiConfigWritten;
-    
+
+    // Regenerate qs-enums.js for the NEW project's components +
+    // bindings. The previous project's registry would be stale (it
+    // referenced components that may not exist here, or values that
+    // changed). Sync rebuilds from scratch against the now-active
+    // project's files.
+    require_once SECURE_FOLDER_PATH . '/src/classes/EnumSyncHelper.php';
+    $enumSync = EnumSyncHelper::sync($projectPath);
+    $result['enum_registry_regenerated'] = $enumSync['written'] ?? false;
+    $result['enum_registry_count']       = $enumSync['count']   ?? 0;
+    if (!empty($enumSync['warnings'])) {
+        $result['enum_registry_warnings'] = $enumSync['warnings'];
+    }
+
     return ApiResponse::create(200, 'operation.success')
         ->withMessage("Switched to project '$projectName'")
         ->withData($result);

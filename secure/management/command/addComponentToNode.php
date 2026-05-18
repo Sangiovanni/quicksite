@@ -326,10 +326,32 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
     $newNode = [
         'component' => $componentName
     ];
-    
+
     // Only add data if there are bindings
     if (!empty($finalData)) {
         $newNode['data'] = $finalData;
+    }
+
+    // Optional call-site `params` (Advanced — custom params section in
+    // the editor). Merged into the rendered template root by
+    // JsonToHtmlRenderer (class/style concatenate, everything else
+    // overrides). Used to mark a hidden template instance
+    // (`data-list-template="true"` + `style="display:none"`) for the
+    // componentList response-binding mode, or to add per-instance
+    // class/id/aria-* etc.
+    $callSiteParams = $params['params'] ?? null;
+    if (is_array($callSiteParams) && !empty($callSiteParams)) {
+        $sanitized = [];
+        foreach ($callSiteParams as $k => $v) {
+            // Keys must be non-empty string. Values may be string,
+            // bool, or numeric (rendered as attribute strings).
+            if (!is_string($k) || $k === '') continue;
+            if (is_array($v) || is_object($v)) continue;
+            $sanitized[$k] = $v;
+        }
+        if (!empty($sanitized)) {
+            $newNode['params'] = $sanitized;
+        }
     }
     
     // Insert the node

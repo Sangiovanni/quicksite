@@ -596,18 +596,81 @@
             await fetchJsFunctions();
         }
         populateFunctionDropdown();
-        
+
         // Pre-fill event dropdown
         if (jsFormEvent) jsFormEvent.value = interaction.event;
-        
-        // Pre-fill function dropdown
+
+        // Saved interactions don't carry an explicit "authored in API
+        // mode" marker — both modes serialise identically as
+        //   fnName='fetch', params=['@apiId/endpointId', 'body=...']
+        // Detect API mode by the @-prefixed first param. When detected,
+        // pre-fill the API/endpoint dropdowns + body source instead of
+        // the function dropdown, so the bindings UI is reachable
+        // without the user toggling Action Type back and forth.
+        var isApiModeEdit = (
+            interaction.function === 'fetch' &&
+            Array.isArray(interaction.params) &&
+            typeof interaction.params[0] === 'string' &&
+            interaction.params[0].charAt(0) === '@'
+        );
+
+        if (isApiModeEdit) {
+            // Parse '@apiId/endpointId' (registry shorthand)
+            var ref = interaction.params[0].substring(1);  // drop '@'
+            var slashIdx = ref.indexOf('/');
+            var apiIdFromRef      = slashIdx > 0 ? ref.substring(0, slashIdx) : '';
+            var endpointIdFromRef = slashIdx > 0 ? ref.substring(slashIdx + 1) : '';
+
+            // Extract body= option if present
+            var bodyVal = '';
+            for (var i = 1; i < interaction.params.length; i++) {
+                var p = interaction.params[i];
+                if (typeof p === 'string' && p.indexOf('body=') === 0) {
+                    bodyVal = p.substring(5);
+                    break;
+                }
+            }
+
+            // Make sure the API list is loaded before we try to set
+            // values on the dropdowns.
+            if (availableApiEndpoints.length === 0) {
+                await fetchApiEndpoints();
+            }
+
+            if (jsFormActionType) {
+                jsFormActionType.value = 'api';
+                // Trigger the visibility / lazy-load logic. The handler
+                // is async but we don't need to await here — the
+                // dropdown population is sync once endpoints are loaded.
+                jsFormActionType.dispatchEvent(new Event('change'));
+            }
+            populateApiDropdown();
+            if (jsFormApi) {
+                jsFormApi.value = apiIdFromRef;
+                jsFormApi.dispatchEvent(new Event('change'));  // populates endpoint dropdown
+            }
+            if (jsFormEndpoint) {
+                jsFormEndpoint.value = endpointIdFromRef;
+                // Manually fire showBindingsForEndpoint — setting .value
+                // doesn't dispatch a change event.
+                jsFormEndpoint.dispatchEvent(new Event('change'));
+            }
+            if (jsFormApiBody) {
+                jsFormApiBody.value = bodyVal;
+            }
+            updatePreview();
+            if (jsFormSave) jsFormSave.disabled = false;
+            return;  // skip the function-mode pre-fill block below
+        }
+
+        // Function-mode edit: pre-fill function dropdown + params.
         if (jsFormFunction) jsFormFunction.value = interaction.function;
-        
+
         // Trigger function change to populate params
         if (jsFormFunction) {
             jsFormFunction.dispatchEvent(new Event('change'));
         }
-        
+
         // Pre-fill params after a short delay
         setTimeout(() => {
             if (jsFormParams) {
@@ -708,14 +771,27 @@
     /**
      * Handle action type change (function vs API)
      */
-    function handleActionTypeChange() {
+    async function handleActionTypeChange() {
         const actionType = jsFormActionType?.value;
-        
+
         if (actionType === 'api') {
             if (jsFormFunctionSection) jsFormFunctionSection.style.display = 'none';
             if (jsFormApiSection) jsFormApiSection.classList.add('visible');
             if (jsFormFunction) jsFormFunction.value = '';
             if (jsFormParams) jsFormParams.innerHTML = '';
+
+            // Lazy-load the API dropdown if it hasn't been populated yet
+            // (the Edit flow doesn't proactively call populateApiDropdown
+            // the way Add does, so switching mode mid-edit found the
+            // dropdown empty). Idempotent: skips refetch when already loaded.
+            if (availableApiEndpoints.length === 0) {
+                await fetchApiEndpoints();
+            }
+            // Only repopulate when the dropdown is empty (has just the
+            // placeholder option). Avoids stomping a user-mid-pick.
+            if (jsFormApi && jsFormApi.options.length <= 1) {
+                populateApiDropdown();
+            }
         } else {
             if (jsFormFunctionSection) jsFormFunctionSection.style.display = '';
             if (jsFormApiSection) jsFormApiSection.classList.remove('visible');
@@ -2264,26 +2340,513 @@
         }
     }
     
+    // ====================================================================
+    // ComponentList binding helpers (see docs/ADMIN_PANEL.md "Component
+    // list binding"). The picker lets the user wire an array response
+    // field to a hidden component template, mapping each item's fields
+    // to the component's data-bind slots, with optional enum resolution.
+    //
+    // Code organisation:
+    //   - Data loading: _loadComponentListOnce + _loadComponentMeta
+    //   - Pure walkers: _collect* / _build* / _itemFieldsFor / _flattenSchema
+    //   - DOM helpers : _render* (each returns ONE Element, no innerHTML)
+    //   - Composer    : _buildComponentListBlock (orchestrates the above)
+    // ====================================================================
+
+    // ---- Data loading -------------------------------------------------
+
+    // Module-scope cache. Single fetch per session for the whole list;
+    // meta lookups derive from this cache (no second round trip).
+    var _componentListCache  = null;       // Promise<Array<componentEntry>>
+
+    function _loadComponentListOnce() {
+        if (_componentListCache) return _componentListCache;
+        _componentListCache = fetch('/management/listComponents', {
+            headers: { 'Authorization': 'Bearer ' + PreviewConfig.authToken }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(j) {
+            return (j && j.data && Array.isArray(j.data.components)) ? j.data.components : [];
+        })
+        .catch(function() { return []; });
+        return _componentListCache;
+    }
+
     /**
-     * Add a single binding row as a mini-card:
-     * Row 1: [field dropdown] [selector searchable picker]
-     * Row 2: [attribute label + input]
-     * Delete button floats top-right on hover.
+     * Resolve a component's metadata for picker-side use. Derives
+     * everything from the cached listComponents response — no extra
+     * round trip (each list entry already carries `structure` +
+     * `variables`).
+     *
+     * Returns:
+     *   {
+     *     name,
+     *     structure,           // raw template (with __enums__)
+     *     placeholderKeys,     // every {{varname}} found in the template
+     *     dataBindKeys,        // every data-bind="varname" in the template
+     *     enumKeys,            // short keys declared in __enums__
+     *     enumQualified,       // shortKey → '<componentName>.<shortKey>'
+     *                          //   (same convention as EnumSyncHelper)
+     *   }
      */
+    function _loadComponentMeta(name) {
+        return _loadComponentListOnce().then(function(list) {
+            var entry = (list || []).find(function(c) { return c && c.name === name; });
+            var structure = (entry && entry.structure) || {};
+            return {
+                name: name,
+                structure: structure,
+                placeholderKeys: _collectPlaceholderKeys(structure),
+                dataBindKeys:    _collectDataBindKeys(structure),
+                enumKeys:        _collectEnumShortKeys(structure),
+                enumQualified:   _buildEnumQualifiedMap(name, structure),
+            };
+        });
+    }
+
+    // ---- Pure walkers (no DOM, no I/O) --------------------------------
+
+    function _collectPlaceholderKeys(node) {
+        var keys = {};
+        (function walk(n) {
+            if (n == null) return;
+            if (typeof n === 'string') {
+                var re = /\{\{(\$?[\w-]+)\}\}/g, m;
+                while ((m = re.exec(n)) !== null) {
+                    var k = m[1].replace(/^\$/, '');
+                    keys[k] = true;
+                }
+            } else if (Array.isArray(n)) {
+                n.forEach(walk);
+            } else if (typeof n === 'object') {
+                for (var k in n) if (Object.prototype.hasOwnProperty.call(n, k)) walk(n[k]);
+            }
+        })(node);
+        return Object.keys(keys).sort();
+    }
+
+    function _collectDataBindKeys(node) {
+        var keys = {};
+        (function walk(n) {
+            if (!n || typeof n !== 'object') return;
+            if (Array.isArray(n)) { n.forEach(walk); return; }
+            if (n.params && typeof n.params === 'object' && n.params['data-bind']) {
+                keys[String(n.params['data-bind'])] = true;
+            }
+            if (Array.isArray(n.children)) n.children.forEach(walk);
+        })(node);
+        return Object.keys(keys).sort();
+    }
+
+    function _collectEnumShortKeys(structure) {
+        if (!structure || typeof structure !== 'object') return [];
+        var enums = structure.__enums__;
+        if (!enums || typeof enums !== 'object') return [];
+        return Object.keys(enums).sort();
+    }
+
+    function _buildEnumQualifiedMap(componentName, structure) {
+        var out = {};
+        _collectEnumShortKeys(structure).forEach(function(k) {
+            out[k] = componentName + '.' + k;
+        });
+        return out;
+    }
+
+    /**
+     * Item field names for an array response field. Falls back to []
+     * when the schema doesn't declare items.properties.
+     */
+    function _itemFieldsFor(fieldName, fieldsMap) {
+        var schema = fieldsMap[fieldName];
+        if (!schema || schema.type !== 'array') return [];
+        var items = schema.items;
+        if (!items || items.type !== 'object' || !items.properties) return [];
+        return Object.keys(items.properties);
+    }
+
+    /**
+     * Flatten a JSON-Schema-like `properties` map into dot-path keys so
+     * the binding's field dropdown can target nested fields like
+     * `data.commandsList`. Mostly real-world API responses wrap their
+     * payload (`{status, message, data: {...}}`); without this, the
+     * picker can only target the wrapper object.
+     *
+     * Recursion only descends into `type: object` (with declared
+     * `properties`). Arrays are returned as-is — their `items.properties`
+     * drive the componentList fieldMap, not separate field dropdown
+     * entries.
+     */
+    function _flattenSchema(properties, prefix) {
+        var out = {};
+        if (!properties || typeof properties !== 'object') return out;
+        prefix = prefix || '';
+        for (var key in properties) {
+            if (!Object.prototype.hasOwnProperty.call(properties, key)) continue;
+            var schema = properties[key];
+            if (!schema || typeof schema !== 'object') continue;
+            var fullPath = prefix ? prefix + '.' + key : key;
+            out[fullPath] = schema;
+            if (schema.type === 'object' && schema.properties) {
+                var nested = _flattenSchema(schema.properties, fullPath);
+                for (var nk in nested) {
+                    if (Object.prototype.hasOwnProperty.call(nested, nk)) {
+                        out[nk] = nested[nk];
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    // ---- DOM helpers (each returns ONE Element, zero innerHTML) -------
+
+    /**
+     * The "From API field" <select> for one fieldMap row. Auto-defaults
+     * to a name-match against the array's item-field schema; falls back
+     * to the value the user previously set (if any).
+     */
+    function _renderFromSelect(targetKey, spec, itemFields) {
+        var sel = document.createElement('select');
+        sel.className = 'preview-contextual-js-response-bindings__cl-from';
+
+        var blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = '-- skip --';
+        sel.appendChild(blank);
+
+        itemFields.forEach(function(f) {
+            var opt = document.createElement('option');
+            opt.value = f;
+            opt.textContent = f;
+            sel.appendChild(opt);
+        });
+
+        var defaultFrom = (spec && spec.from)
+            ? spec.from
+            : (itemFields.indexOf(targetKey) !== -1 ? targetKey : '');
+
+        // Preserve a previously-set "From" that the current schema no
+        // longer declares — keeps the user's choice visible instead of
+        // silently dropping it.
+        if (defaultFrom && itemFields.indexOf(defaultFrom) === -1) {
+            var custom = document.createElement('option');
+            custom.value = defaultFrom;
+            custom.textContent = defaultFrom + ' (custom)';
+            sel.appendChild(custom);
+        }
+        sel.value = defaultFrom;
+        return sel;
+    }
+
+    /**
+     * The "Enum" checkbox for one fieldMap row (only used when the
+     * target var has an __enums__ entry). Default-checked on first
+     * render so enum resolution is opt-out, not opt-in.
+     */
+    function _renderEnumCheckbox(qualifiedName, spec) {
+        var lbl = document.createElement('label');
+        lbl.className = 'preview-contextual-js-response-bindings__cl-enum';
+
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'preview-contextual-js-response-bindings__cl-enum-cb';
+        cb.dataset.qualified = qualifiedName;
+        cb.checked = spec ? (spec.enum === qualifiedName) : true;
+        lbl.appendChild(cb);
+
+        var span = document.createElement('span');
+        span.textContent = qualifiedName;
+        lbl.appendChild(span);
+        return lbl;
+    }
+
+    /**
+     * One <tr> in the fieldMap table: target var name | From select |
+     * Enum checkbox (or em-dash when the var has no enum).
+     */
+    function _renderFieldMapRow(key, meta, spec, itemFields) {
+        var tr = document.createElement('tr');
+        tr.className = 'preview-contextual-js-response-bindings__cl-fieldmap-row';
+        tr.dataset.targetVar = key;
+
+        var tdName = document.createElement('td');
+        tdName.textContent = key;
+        tr.appendChild(tdName);
+
+        var tdFrom = document.createElement('td');
+        tdFrom.appendChild(_renderFromSelect(key, spec, itemFields));
+        tr.appendChild(tdFrom);
+
+        var tdEnum = document.createElement('td');
+        if (meta.enumKeys.indexOf(key) !== -1) {
+            tdEnum.appendChild(_renderEnumCheckbox(meta.enumQualified[key], spec));
+        } else {
+            tdEnum.textContent = '—';
+            tdEnum.className = 'preview-contextual-js-response-bindings__cl-enum-none';
+        }
+        tr.appendChild(tdEnum);
+        return tr;
+    }
+
+    /**
+     * The full fieldMap <table> (header + body). One row per target var.
+     */
+    function _renderFieldMapTable(keys, meta, prefill, itemFields) {
+        var table = document.createElement('table');
+        table.className = 'preview-contextual-js-response-bindings__cl-fieldmap';
+
+        var thead = document.createElement('thead');
+        var trh = document.createElement('tr');
+        ['Component var', 'From API field', 'Enum'].forEach(function(t) {
+            var th = document.createElement('th');
+            th.textContent = t;
+            trh.appendChild(th);
+        });
+        thead.appendChild(trh);
+        table.appendChild(thead);
+
+        var tbody = document.createElement('tbody');
+        keys.forEach(function(k) {
+            var spec = (prefill && prefill[k]) || null;
+            tbody.appendChild(_renderFieldMapRow(k, meta, spec, itemFields));
+        });
+        table.appendChild(tbody);
+        return table;
+    }
+
+    /**
+     * Yellow banner shown when the selected component's template lacks
+     * a data-bind attribute for one or more fieldMap target vars. Built
+     * with createElement + textNodes — no innerHTML, no string-glued
+     * HTML.
+     */
+    function _renderWarningBanner(missingKeys, componentName) {
+        var div = document.createElement('div');
+        div.className = 'preview-contextual-js-response-bindings__cl-warn';
+
+        var strong = document.createElement('strong');
+        strong.textContent = 'Warning: ';
+        div.appendChild(strong);
+
+        div.appendChild(document.createTextNode(
+            'the component template has no data-bind attribute for: '
+        ));
+        missingKeys.forEach(function(k, i) {
+            if (i > 0) div.appendChild(document.createTextNode(', '));
+            var code = document.createElement('code');
+            code.textContent = k;
+            div.appendChild(code);
+        });
+        div.appendChild(document.createTextNode('. Add '));
+
+        var dbCode = document.createElement('code');
+        dbCode.textContent = 'data-bind="<var>"';
+        div.appendChild(dbCode);
+
+        div.appendChild(document.createTextNode(' to the matching element in '));
+
+        var fileCode = document.createElement('code');
+        fileCode.textContent = componentName + '.json';
+        div.appendChild(fileCode);
+
+        div.appendChild(document.createTextNode(
+            ' for the runtime binding to apply.'
+        ));
+        return div;
+    }
+
+    /**
+     * The "component has no {{placeholders}} or __enums__ to bind"
+     * empty-state message.
+     */
+    function _renderEmptyComponentMessage() {
+        var div = document.createElement('div');
+        div.className = 'preview-contextual-js-response-bindings__cl-empty';
+        div.textContent = 'Component has no {{placeholders}} or __enums__ to bind.';
+        return div;
+    }
+
+    /**
+     * The component-picker dropdown (just the <select>; the wrapping
+     * row markup lives in the composer below). Options are populated
+     * asynchronously once the list cache resolves.
+     */
+    function _renderComponentSelect() {
+        var sel = document.createElement('select');
+        sel.className = 'preview-contextual-js-response-bindings__cl-component';
+        var placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = '-- select component --';
+        sel.appendChild(placeholder);
+        return sel;
+    }
+
+    /**
+     * Compose the componentList-specific block: a component-picker +
+     * the dynamic fieldMap table + the data-bind coverage warning.
+     *
+     * All visual chunks come from the _render* helpers above — this
+     * function only handles structure and reactivity (which child gets
+     * re-rendered when which input changes).
+     *
+     * collectBindings reads back via the class names baked into the
+     * helpers:
+     *   - row.querySelector('.preview-contextual-js-response-bindings__cl-component')
+     *   - row.querySelectorAll('.preview-contextual-js-response-bindings__cl-fieldmap-row')
+     */
+    function _buildComponentListBlock(row, fieldsMap, fieldSelect, existing) {
+        var root = document.createElement('div');
+        root.className = 'preview-contextual-js-response-bindings__cl-block';
+
+        // ── Component picker row ──
+        var compRow = document.createElement('div');
+        compRow.className = 'preview-contextual-js-response-bindings__cl-comp-row';
+        var compLabel = document.createElement('span');
+        compLabel.className = 'preview-contextual-js-response-bindings__row-attr-label';
+        compLabel.textContent = 'Component:';
+        var compSelect = _renderComponentSelect();
+        compRow.appendChild(compLabel);
+        compRow.appendChild(compSelect);
+        root.appendChild(compRow);
+
+        // ── FieldMap area + warning slot ──
+        // Both are placeholder containers; the actual content is
+        // assembled by renderFieldMap below whenever a component is
+        // picked (or the API field changes).
+        var fmWrap = document.createElement('div');
+        fmWrap.className = 'preview-contextual-js-response-bindings__cl-fieldmap-wrap';
+        fmWrap.style.display = 'none';
+        root.appendChild(fmWrap);
+
+        var warnSlot = document.createElement('div');
+        warnSlot.className = 'preview-contextual-js-response-bindings__cl-warn-slot';
+        root.appendChild(warnSlot);
+
+        // ── Populate the component dropdown asynchronously ──
+        _loadComponentListOnce().then(function(list) {
+            list.forEach(function(c) {
+                if (!c || !c.name) return;
+                var opt = document.createElement('option');
+                opt.value = c.name;
+                opt.textContent = c.name;
+                compSelect.appendChild(opt);
+            });
+            // Pre-fill from existing binding (if loading an edit).
+            if (existing && existing.component) {
+                compSelect.value = existing.component;
+                renderFieldMap(existing.component, existing.fieldMap || {});
+            }
+        });
+
+        // ── Reactivity ──
+        compSelect.addEventListener('change', function() {
+            renderFieldMap(compSelect.value, {});
+        });
+        fieldSelect.addEventListener('change', function() {
+            // Keep the user's mapping choices when only the API field
+            // changes (e.g. they realised it was the wrong array).
+            if (compSelect.value) {
+                var preserved = _collectCurrentFieldMap(fmWrap);
+                renderFieldMap(compSelect.value, preserved);
+            }
+        });
+
+        /**
+         * Inner renderer — clears the slots, loads meta, builds the
+         * table + warning (or the empty-state message).
+         */
+        function renderFieldMap(componentName, prefill) {
+            // Clear via DOM API rather than innerHTML='' — safer when
+            // listeners or refs point into the old subtree.
+            while (fmWrap.firstChild)   fmWrap.removeChild(fmWrap.firstChild);
+            while (warnSlot.firstChild) warnSlot.removeChild(warnSlot.firstChild);
+
+            if (!componentName) {
+                fmWrap.style.display = 'none';
+                return;
+            }
+
+            _loadComponentMeta(componentName).then(function(meta) {
+                fmWrap.style.display = '';
+
+                // Target vars = union of {{placeholder}} keys + __enums__
+                // keys. This is what the runtime needs slot-by-slot.
+                var targetVars = {};
+                meta.placeholderKeys.forEach(function(k) { targetVars[k] = true; });
+                meta.enumKeys.forEach(function(k) { targetVars[k] = true; });
+                var keys = Object.keys(targetVars).sort();
+
+                if (keys.length === 0) {
+                    fmWrap.appendChild(_renderEmptyComponentMessage());
+                    return;
+                }
+
+                var itemFields = _itemFieldsFor(fieldSelect.value, fieldsMap);
+                fmWrap.appendChild(
+                    _renderFieldMapTable(keys, meta, prefill, itemFields)
+                );
+
+                // ── data-bind coverage warning ──
+                // Template needs `<… data-bind="<k>">` for each target var
+                // that should be updated at clone-time. `{{<k>}}`
+                // placeholders are server-resolved once (when the hidden
+                // template is rendered) and don't help on cloned items.
+                var missing = keys.filter(function(k) {
+                    return meta.dataBindKeys.indexOf(k) === -1;
+                });
+                if (missing.length > 0) {
+                    warnSlot.appendChild(_renderWarningBanner(missing, componentName));
+                }
+            });
+        }
+
+        return { root: root };
+    }
+
+    /**
+     * Read back the current fieldMap state from a built block. Used when
+     * the user changes the API field after picking a component — we
+     * preserve their choices wherever they still make sense.
+     */
+    function _collectCurrentFieldMap(fmWrap) {
+        var out = {};
+        if (!fmWrap) return out;
+        var rows = fmWrap.querySelectorAll('.preview-contextual-js-response-bindings__cl-fieldmap-row');
+        rows.forEach(function(tr) {
+            var key = tr.dataset.targetVar;
+            if (!key) return;
+            var fromSel = tr.querySelector('.preview-contextual-js-response-bindings__cl-from');
+            var enumCb  = tr.querySelector('.preview-contextual-js-response-bindings__cl-enum-cb');
+            var spec = {};
+            if (fromSel && fromSel.value) spec.from = fromSel.value;
+            if (enumCb && enumCb.checked && enumCb.dataset.qualified) {
+                spec.enum = enumCb.dataset.qualified;
+            }
+            if (Object.keys(spec).length > 0) out[key] = spec;
+        });
+        return out;
+    }
+
     /**
      * Add a single binding row as a mini-card.
-     * For scalar fields: [field dropdown] [selector picker] [attribute input]
-     * For array fields:  [field dropdown] [container picker] [empty text input]
+     * For scalar fields:        [field] [selector]   [attribute input]
+     * For array fields (list):  [field] [container]  [empty text + hint]
+     * For array fields (compL): [field] [container]  [component + fieldMap + warnings + empty]
      * Delete button floats top-right on hover.
      */
     function addBindingRow(rowsEl, apiSelect, endpointSelect, existing) {
         if (!rowsEl) return;
-        
+
         var epData = _findEndpointData(apiSelect, endpointSelect);
         var fieldsMap = {};
         var fieldNames = [];
         if (epData && epData.responseSchema && epData.responseSchema.properties) {
-            fieldsMap = epData.responseSchema.properties;
+            // Flatten so the dropdown can target nested paths like
+            // `data.commandsList`. Most real APIs wrap their payload
+            // under a top-level `data` (or similar); without this, the
+            // picker can only see the wrapper.
+            fieldsMap = _flattenSchema(epData.responseSchema.properties);
             fieldNames = Object.keys(fieldsMap);
         }
         
@@ -2330,7 +2893,13 @@
         
         // Pre-fill from existing binding
         if (existing) {
-            if (existing.renderMode === 'list' && existing.container) {
+            // Both list and componentList store the container under
+            // `container`; scalar mode uses `selector`. Without the
+            // componentList branch, edit reopened the row with an
+            // empty container input → save serialised an incomplete
+            // binding the next time round.
+            if ((existing.renderMode === 'list' || existing.renderMode === 'componentList')
+                && existing.container) {
                 selectorInput.value = existing.container;
             } else if (existing.selector) {
                 selectorInput.value = existing.selector;
@@ -2426,56 +2995,120 @@
         
         row.appendChild(topRow);
         
-        // ── Bottom row: adapts based on field type ──
+        // ── Render-mode radio (only visible when field is array) ──
+        // Two modes today: `list` (data-bind template) and `componentList`
+        // (per-item, fieldMap-mapped, optional enum resolution). Count mode
+        // is a separate concern (LIVE_COUNT) and not yet wired.
+        var modeRow = document.createElement('div');
+        modeRow.className = 'preview-contextual-js-response-bindings__row-mode';
+        modeRow.style.display = 'none';  // shown only when field is array
+
+        var modeName = 'binding-mode-' + Math.random().toString(36).slice(2, 9);
+        function modeLabel(value, text, title) {
+            var lbl = document.createElement('label');
+            lbl.className = 'preview-contextual-js-response-bindings__row-mode-option';
+            lbl.title = title || '';
+            var inp = document.createElement('input');
+            inp.type = 'radio';
+            inp.name = modeName;
+            inp.value = value;
+            var span = document.createElement('span');
+            span.textContent = text;
+            lbl.appendChild(inp);
+            lbl.appendChild(span);
+            return lbl;
+        }
+        var modeListLbl = modeLabel('list', 'data-bind template',
+            'Each item maps to a [data-bind="key"] element inside the container\'s first child.');
+        var modeCompLbl = modeLabel('componentList', 'Component per item',
+            'Each item clones a hidden component instance. fieldMap controls how API fields map to component vars; enums resolve via QS.enum.');
+        modeRow.appendChild(modeListLbl);
+        modeRow.appendChild(modeCompLbl);
+
+        // ── Bottom row: adapts based on field type + render mode ──
         var bottomRow = document.createElement('div');
         bottomRow.className = 'preview-contextual-js-response-bindings__row-bottom';
-        
+
         // Scalar mode elements
         var attrLabel = document.createElement('span');
         attrLabel.className = 'preview-contextual-js-response-bindings__row-attr-label';
         attrLabel.textContent = PreviewConfig.i18n?.targetAttribute || 'Attribute:';
-        
+
         var attrInput = document.createElement('input');
         attrInput.type = 'text';
         attrInput.className = 'preview-contextual-js-response-bindings__row-attr';
         attrInput.placeholder = 'e.g. src, href  (blank = textContent)';
         attrInput.title = PreviewConfig.i18n?.targetAttribute || 'Attribute to set (e.g. src, href). Leave blank to set text content.';
         if (existing && existing.attribute) attrInput.value = existing.attribute;
-        
-        // Array/list mode elements
+
+        // Array/list mode shared elements
         var emptyLabel = document.createElement('span');
         emptyLabel.className = 'preview-contextual-js-response-bindings__row-attr-label';
         emptyLabel.textContent = PreviewConfig.i18n?.emptyText || 'Empty text:';
-        
+
         var emptyInput = document.createElement('input');
         emptyInput.type = 'text';
         emptyInput.className = 'preview-contextual-js-response-bindings__row-empty-text';
         emptyInput.placeholder = PreviewConfig.i18n?.emptyTextPlaceholder || 'e.g. No items found  (optional)';
         emptyInput.title = PreviewConfig.i18n?.emptyTextHint || 'Text shown when the array is empty';
         if (existing && existing.emptyText) emptyInput.value = existing.emptyText;
-        
+
         // List mode hint
         var listHint = document.createElement('span');
         listHint.className = 'preview-contextual-js-response-bindings__row-list-hint';
         listHint.textContent = PreviewConfig.i18n?.listModeHint || 'Uses data-bind attributes inside the container\'s first child as item template.';
-        
+
+        // ─ componentList-specific block (built lazily once user picks the mode) ─
+        var compListBlock = null;
+        function ensureCompListBlock() {
+            if (compListBlock) return compListBlock;
+            compListBlock = _buildComponentListBlock(row, fieldsMap, fieldSelect, existing);
+            return compListBlock;
+        }
+
         /**
-         * Swap bottom row contents based on field type.
-         * Scalar: attribute label + input
-         * Array:  empty text label + input + hint
+         * Swap bottom row contents based on field type + render mode.
+         *   scalar       → attribute label + input
+         *   array+list   → empty text + hint
+         *   array+compL  → component picker + fieldMap table + empty text
          */
-        function updateRowMode(fieldType) {
+        function updateRowMode(fieldType, mode) {
             bottomRow.innerHTML = '';
+            // Default row layout is horizontal flex. componentList mode
+            // needs vertical so its (wide) table doesn't squeeze the
+            // empty-text input to the right edge — toggled via a
+            // modifier class kept in admin.css.
+            bottomRow.classList.remove('preview-contextual-js-response-bindings__row-bottom--column');
+
             if (fieldType === 'array') {
-                // Array/list mode
-                row.dataset.renderMode = 'list';
+                modeRow.style.display = '';
+                var resolved = mode || row.dataset.renderMode || 'list';
+                row.dataset.renderMode = resolved;
+                // Sync radio selection
+                (resolved === 'componentList' ? modeCompLbl : modeListLbl)
+                    .querySelector('input').checked = true;
+
                 selectorInput.placeholder = PreviewConfig.i18n?.containerSelector || 'Container selector';
                 selectorInput.title = PreviewConfig.i18n?.containerSelectorHint || 'Container element whose first child is the template. Each array item clones it.';
-                bottomRow.appendChild(emptyLabel);
-                bottomRow.appendChild(emptyInput);
-                bottomRow.appendChild(listHint);
+
+                if (resolved === 'componentList') {
+                    bottomRow.classList.add('preview-contextual-js-response-bindings__row-bottom--column');
+                    var block = ensureCompListBlock();
+                    bottomRow.appendChild(block.root);
+                    // Empty-text gets its own horizontal row beneath the
+                    // table so the input has room to breathe.
+                    var emptyRow = document.createElement('div');
+                    emptyRow.className = 'preview-contextual-js-response-bindings__cl-empty-row';
+                    emptyRow.appendChild(emptyLabel);
+                    emptyRow.appendChild(emptyInput);
+                    bottomRow.appendChild(emptyRow);
+                } else {
+                    bottomRow.appendChild(emptyLabel);
+                    bottomRow.appendChild(emptyInput);
+                    bottomRow.appendChild(listHint);
+                }
             } else {
-                // Scalar mode
+                modeRow.style.display = 'none';
                 delete row.dataset.renderMode;
                 selectorInput.placeholder = PreviewConfig.i18n?.targetSelector || 'Target selector';
                 selectorInput.title = PreviewConfig.i18n?.targetSelector || 'CSS selector to inject data into';
@@ -2483,31 +3116,44 @@
                 bottomRow.appendChild(attrInput);
             }
         }
-        
+
         // Determine initial mode
         var initialType = '';
-        if (existing && existing.renderMode === 'list') {
+        var initialRenderMode = (existing && existing.renderMode) || null;
+        if (initialRenderMode === 'list' || initialRenderMode === 'componentList') {
             initialType = 'array';
         } else {
-            // Check fieldType from the selected option (works for both new and existing rows)
             var selOpt = fieldSelect.options[fieldSelect.selectedIndex];
             if (selOpt) initialType = selOpt.dataset.fieldType || '';
-            
-            // Auto-detect: if loading an existing scalar binding but the field is actually
-            // an array type, force list mode (handles pre-list-mode bindings)
+
+            // Backward-compat: scalar binding loaded but the field is actually
+            // array → upgrade to list mode (existing behavior preserved).
             if (existing && !existing.renderMode && initialType === 'array') {
                 existing.container = existing.selector;
                 delete existing.selector;
+                initialRenderMode = 'list';
             }
         }
-        updateRowMode(initialType);
-        
+        updateRowMode(initialType, initialRenderMode);
+
         // Switch mode when field selection changes
         fieldSelect.addEventListener('change', function() {
             var opt = fieldSelect.options[fieldSelect.selectedIndex];
             var fType = opt ? (opt.dataset.fieldType || '') : '';
-            updateRowMode(fType);
+            updateRowMode(fType, null);  // null → preserve current renderMode if still applicable
         });
+
+        // Switch mode when user clicks a radio
+        modeRow.addEventListener('change', function(e) {
+            if (e.target && e.target.name === modeName) {
+                var opt = fieldSelect.options[fieldSelect.selectedIndex];
+                var fType = opt ? (opt.dataset.fieldType || '') : '';
+                updateRowMode(fType, e.target.value);
+            }
+        });
+
+        row.appendChild(modeRow);
+        row.appendChild(bottomRow);
         
         row.appendChild(bottomRow);
         
@@ -2526,8 +3172,10 @@
     /**
      * Collect binding data from a bindings rows container.
      * Returns an array of binding objects:
-     * - Scalar: {field, selector, attribute?}
-     * - List:   {field, renderMode:'list', container, emptyText?}
+     * - Scalar:          {field, selector, attribute?}
+     * - List:            {field, renderMode:'list', container, emptyText?}
+     * - ComponentList:   {field, renderMode:'componentList', container, component,
+     *                    fieldMap: { <var>: {from, enum?}, ... }, emptyText?}
      */
     function collectBindings(rowsEl) {
         if (!rowsEl) return [];
@@ -2537,8 +3185,24 @@
             var field = row.querySelector('.preview-contextual-js-response-bindings__row-field')?.value || '';
             var selectorVal = row.querySelector('.preview-contextual-js-response-bindings__row-selector')?.value?.trim() || '';
             if (!field || !selectorVal) return; // skip incomplete rows
-            
-            if (row.dataset.renderMode === 'list') {
+
+            var renderMode = row.dataset.renderMode;
+            if (renderMode === 'componentList') {
+                var componentName = row.querySelector('.preview-contextual-js-response-bindings__cl-component')?.value || '';
+                if (!componentName) return; // skip — must pick a component first
+                var fmWrap = row.querySelector('.preview-contextual-js-response-bindings__cl-fieldmap-wrap');
+                var fieldMap = _collectCurrentFieldMap(fmWrap);
+                var binding = {
+                    field: field,
+                    renderMode: 'componentList',
+                    container: selectorVal,
+                    component: componentName,
+                    fieldMap: fieldMap
+                };
+                var emptyTxt = row.querySelector('.preview-contextual-js-response-bindings__row-empty-text')?.value?.trim() || '';
+                if (emptyTxt) binding.emptyText = emptyTxt;
+                bindings.push(binding);
+            } else if (renderMode === 'list') {
                 // List/array binding
                 var binding = { field: field, renderMode: 'list', container: selectorVal };
                 var emptyTxt = row.querySelector('.preview-contextual-js-response-bindings__row-empty-text')?.value?.trim() || '';

@@ -156,6 +156,16 @@ class PageManagement {
             $body .= '<script src="' . BASE_URL . '/scripts/qs-api-config.js"></script>';
         }
 
+        // Include enum registry alongside qs-api-config.js. Generated
+        // by EnumSyncHelper on editApi / switchProject. Loaded
+        // unconditionally when it exists — even an empty registry
+        // (window.QS_ENUMS = {}) avoids "table not loaded" warnings
+        // from QS.enum at runtime.
+        $enumsPath = PUBLIC_CONTENT_PATH . '/scripts/qs-enums.js';
+        if (file_exists($enumsPath)) {
+            $body .= '<script src="' . BASE_URL . '/scripts/qs-enums.js"></script>';
+        }
+
         // Include additional scripts
         if (!empty($this->scripts)) {
             foreach ($this->scripts as $script) {

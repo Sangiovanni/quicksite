@@ -463,6 +463,129 @@ shape before saving. The converter:
   (`"path segments"` → `/name/:name`; otherwise leaves params as
   query-string-bound).
 
+### 9.2 Component list binding
+
+A response-binding render mode that fills a container with one cloned
+component instance per item of an array response field. The component
+template acts as the per-item shape; a `fieldMap` says which API field
+feeds which template variable, with optional enum resolution.
+
+**Where it lives in the UI**
+
+The picker is part of the **JS Interactions** modal (per-element
+event handler authoring). Component-list mode appears when:
+- The interaction is in **Action Type: API Call** (not Function — see
+  the discoverability note in [BACKLOG.md](../NOTES/planning/BACKLOG.md)
+  → "fetch Function-vs-API-mode unification").
+- The selected endpoint has a `responseSchema`.
+- The selected field is an `array`.
+
+Then a **render-mode radio** appears below the field picker:
+`( ) data-bind template   ( ) Component per item`.
+Picking "Component per item" reveals: component selector + fieldMap
+table + data-bind coverage warning + empty-text input.
+
+**Picker mechanics**
+
+| UI | Behaviour |
+|---|---|
+| Field dropdown | Dot-paths now supported. Recurses into `type: object` properties (`data.commandsList` etc.). Arrays terminate recursion — their item shape drives the fieldMap. |
+| Component dropdown | Populated from `listComponents`. |
+| FieldMap table | One row per target var. Target vars = union of `{{placeholder}}` keys + `__enums__` short keys in the component template. "From" column auto-defaults to name-match against the array's `items.properties`; user can override. "Enum" column shows a checkbox for vars declared in `__enums__`, pre-checked with the fully-qualified `<componentName>.<shortKey>` name. |
+| Warning banner | Yellow banner when one or more fieldMap target vars are missing a `data-bind="<var>"` attribute on the component template. The `{{<var>}}` placeholders are server-resolved once at hidden-template render time; the runtime needs `data-bind` to know which DOM nodes to update on each cloned item. |
+| Empty-text input | Optional. Rendered as a `<p class="qs-list-empty">` in the container when the API returns an empty array. |
+
+**Persisted shape**
+
+The picker writes to the endpoint's `responseBindings` array via
+`editApi`. Component-list bindings have this shape:
+
+```json
+{
+  "field":      "data.commandsList",
+  "renderMode": "componentList",
+  "container":  "#commands-list",
+  "component":  "component-command-card",
+  "fieldMap": {
+    "name":         { "from": "name" },
+    "desc":         { "from": "description" },
+    "method_text":  { "from": "method", "enum": "component-command-card.method_text" },
+    "method_class": { "from": "method", "enum": "component-command-card.method_class" }
+  },
+  "emptyText": "No commands found"
+}
+```
+
+**Page-side setup**
+
+The page needs three things:
+
+1. A **container** with a stable id matching `binding.container`
+   (e.g. `<div id="commands-list">`).
+2. **Inside it**, a **hidden component instance** marked as the
+   template via call-site `params`:
+   ```json
+   {
+     "component": "component-command-card",
+     "data": { "name": "—", "method": "get", ... },
+     "params": { "data-list-template": "true", "style": "display:none" }
+   }
+   ```
+   The renderer (`JsonToHtmlRenderer`) merges these call-site params
+   into the rendered template root — class concatenates, style
+   concatenates, everything else overrides. This is what makes the
+   first child of `#commands-list` discoverable by `qs.js`'s
+   `[data-list-template]` lookup AND invisible until cloned.
+3. The component template must declare `data-bind="<varName>"` on the
+   elements the runtime should update. The picker warns when a
+   fieldMap target lacks a matching `data-bind` — the binding will
+   save fine, but the runtime won't be able to find the slot.
+
+**Authoring `data-bind` on a component**
+
+The picker scope intentionally stops at writing the binding. Adding
+`data-bind` attributes to a component template is currently a manual
+edit of the component JSON (or via the regular visual editor's
+attribute UI, with the component opened for editing). When both
+text content AND an attribute need to be bound on the same conceptual
+element, use a nested element pair (outer = attribute via
+`data-bind` + `data-bind-attr`, inner = text via `data-bind`).
+See `component-command-card.json` for a worked example.
+
+**Runtime flow**
+
+```
+QS.fetch resolves the endpoint                  (public/scripts/qs.js)
+   ↓
+applyBindings(data, responseBindings)
+   ↓  binding.renderMode === 'componentList'
+renderComponentList(container, items, fieldMap, emptyText)
+   ↓  per item: walk fieldMap → build mapped object
+           if spec.enum: mapped[var] = QS.enum(spec.enum, raw, raw)
+           else:         mapped[var] = raw
+   ↓
+clone the cached [data-list-template] node, drop the marker + display:none
+   ↓
+populateTemplate(clone, mapped) — existing data-bind walker
+   ↓
+container.appendChild(clone)
+```
+
+The hidden template is cloned once (cached per container) and
+populated per item. The clone has the `data-list-template` attribute
+removed and inline `display:none` stripped before insertion.
+
+**Enum resolution**
+
+`spec.enum` names a fully-qualified entry in `window.QS_ENUMS`
+(populated by `qs-enums.js`). `QS.enum(name, value, fallback)`
+returns the mapped value if found, else the fallback, else the raw
+value (with a `console.warn` when the named table is missing). The
+runtime is forgiving — a stale binding doesn't break the page.
+
+**Generation of `qs-enums.js`** is documented in `docs/ARCHITECTURE.md`
+under "Enum sync".
+
 ---
 
 ## 10. Risk hotspots

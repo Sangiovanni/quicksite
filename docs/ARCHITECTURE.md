@@ -423,6 +423,77 @@ formats (currently: a file-manager-style JSON with
   (e.g. `"path segments"` → `/name/:name`).
 - Preserves an existing `:placeholder` if one is already present.
 
+### 8.2 Enum sync (`qs-enums.js`)
+
+A small runtime registry keeps client-side `componentList` bindings
+type-aware without re-fetching component templates. The picker UX is
+documented in [ADMIN_PANEL.md §9.2](ADMIN_PANEL.md#92-component-list-binding);
+this section covers the back-end synchronisation.
+
+**The invariant**
+
+```
+binding references  ⊆  qs-enums.js contents  ⊆  union of all components' __enums__
+```
+
+- Components' `__enums__` blocks (in `<project>/templates/model/json/components/*.json`) are the source of truth. Each entry: `{ source, map: {key: '__RAW__VALUE' | '__LIT__VALUE' | ...} }`.
+- `public/scripts/qs-enums.js` is a project-scoped runtime registry. Contains **exactly** the enums that at least one binding references — no more, no less. Loaded by every page (when present) as `window.QS_ENUMS`.
+- Bindings reference enums by fully-qualified name: `<componentFilename>.<shortKey>` (e.g. `component-command-card.method_text`). Resolved at runtime via `QS.enum(name, value, fallback)`.
+
+**The helper**
+
+`secure/src/classes/EnumSyncHelper.php` exposes one method:
+
+```php
+EnumSyncHelper::sync($projectPath = null, $publicScriptsPath = null)
+```
+
+Algorithm (per call):
+1. Scan all endpoints' `responseBindings.fieldMap.*.enum` → set of referenced fully-qualified names.
+2. Scan every `<project>/templates/model/json/components/*.json` for `__enums__` → map of available names.
+3. Validate: every referenced name has a definition. Missing references become **warnings**, not errors — the runtime gracefully degrades via `QS.enum`'s fallback (`fallback ?? value`).
+4. Build output: only entries that are BOTH available AND referenced. Sort keys for stable diffs.
+5. Strip `__RAW__` / `__LIT__` markers from values (renderer-only prefixes; the runtime reads plain strings).
+6. Write `public/scripts/qs-enums.js` with:
+   ```js
+   window.QS_ENUMS = { "component-command-card.method_text": { post: "POST", get: "GET", ... }, ... };
+   ```
+
+Forgiving by design: a bad binding doesn't block the save. The
+helper returns `{ ok, written, count, warnings, unreferenced }` so
+the calling command can surface warnings in the API response.
+
+**Hooks**
+
+| Caller | When | Effect |
+|---|---|---|
+| `editApi` | after `writeCompiledJs` | Resyncs on every endpoint add/edit/delete. Response includes `enumSync` block. |
+| `switchProject` | after qs-api-config regeneration | Rebuilds the registry against the new project's components + bindings (the previous project's registry would be stale). |
+| `build` | after `writeCompiledJs` to the build folder | Writes `qs-enums.js` into the build's `scripts/` so deployed sites have the registry. |
+
+No component CRUD commands exist today, so changes to a component's
+`__enums__` only refresh on the next binding edit / project switch.
+Documented; not a blocker.
+
+**Naming convention**
+
+`<componentFilename>.<shortKey>` is the rule, enforced by the helper
+(it prefixes on write). Filenames are unique within a project, so
+two components can't collide on the same qualified name even if they
+declare `__enums__` keys with the same short string.
+
+Components keep declaring `__enums__` with **short** keys:
+
+```json
+"__enums__": {
+  "method_text":  { "source": "method", "map": { ... } },
+  "method_class": { "source": "method", "map": { ... } }
+}
+```
+
+The runtime `QS.enum` lookup uses the **long** (qualified) name —
+bindings store the qualified form; the helper provides the prefix.
+
 ---
 
 ## 9. Style management

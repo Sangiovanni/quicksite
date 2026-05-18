@@ -345,7 +345,54 @@ class JsonToHtmlRenderer {
             
             // Replace placeholders with data
             $processedTemplate = $this->processComponentTemplate($componentTemplate, $componentData);
-            
+
+            // Merge call-site `params` into the processed template's root.
+            // Without this, a page that writes
+            //   {component: "x", data: {...}, params: {"class": "extra", "data-list-template": true}}
+            // sees the params silently dropped — the rendered root carries only
+            // what the component template declared. That's wrong: `params` on a
+            // {component:...} call-site is the documented escape hatch for "this
+            // instance of the component is a bit different" (hidden template
+            // marker, extra class, custom style, etc.).
+            //
+            // Merge rules (kept narrow on purpose — broader merging would mask
+            // template bugs):
+            //   - `class`: concatenate (space-separated, dedupe via single-pass).
+            //   - `style`: concatenate (semicolon-separated, trim stray semis).
+            //   - everything else (incl. `data-*`, `id`, `aria-*`, etc.): the
+            //     call-site value overrides the template value. This is the
+            //     usual "instance wins over default" expectation.
+            $callSiteParams = isset($node['params']) && is_array($node['params'])
+                ? $node['params'] : [];
+            if (!empty($callSiteParams) && is_array($processedTemplate)) {
+                if (!isset($processedTemplate['params']) || !is_array($processedTemplate['params'])) {
+                    $processedTemplate['params'] = [];
+                }
+                foreach ($callSiteParams as $pk => $pv) {
+                    if ($pk === 'class' && isset($processedTemplate['params']['class'])
+                        && $processedTemplate['params']['class'] !== ''
+                    ) {
+                        $existing = preg_split('/\s+/', trim((string)$processedTemplate['params']['class']));
+                        $added    = preg_split('/\s+/', trim((string)$pv));
+                        $merged   = [];
+                        foreach (array_merge($existing, $added) as $cls) {
+                            if ($cls !== '' && !in_array($cls, $merged, true)) {
+                                $merged[] = $cls;
+                            }
+                        }
+                        $processedTemplate['params']['class'] = implode(' ', $merged);
+                    } elseif ($pk === 'style' && isset($processedTemplate['params']['style'])
+                        && $processedTemplate['params']['style'] !== ''
+                    ) {
+                        $existing = rtrim(trim((string)$processedTemplate['params']['style']), ';');
+                        $added    = ltrim(trim((string)$pv), ';');
+                        $processedTemplate['params']['style'] = $existing . '; ' . $added;
+                    } else {
+                        $processedTemplate['params'][$pk] = $pv;
+                    }
+                }
+            }
+
             // Render the processed template (mark as component root)
             $html = $this->renderNode($processedTemplate, true);
             
