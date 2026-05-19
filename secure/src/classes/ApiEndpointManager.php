@@ -32,7 +32,10 @@ class ApiEndpointManager {
     private array $validMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
     
     /** @var array Valid auth types */
-    private array $validAuthTypes = ['none', 'bearer', 'apiKey', 'basic'];
+    // 'cookie' = browser-managed session cookie (Pattern X). The
+    // server's Set-Cookie does everything; runtime just adds
+    // `credentials: 'include'` to fetch options. No tokenSource needed.
+    private array $validAuthTypes = ['none', 'bearer', 'apiKey', 'basic', 'cookie'];
     
     /**
      * Constructor
@@ -551,7 +554,10 @@ class ApiEndpointManager {
             ];
         }
         
-        if ($type !== 'none' && empty($auth['tokenSource'])) {
+        // tokenSource is required for everything that reads a stored
+        // value (bearer, apiKey, basic). 'cookie' delegates to the
+        // browser (no tokenSource). 'none' is obvious.
+        if ($type !== 'none' && $type !== 'cookie' && empty($auth['tokenSource'])) {
             return [
                 'valid' => false,
                 'error' => "Auth type '$type' requires tokenSource"

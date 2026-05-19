@@ -11354,6 +11354,31 @@ code.preview-node-panel__value {
     font-weight: 500;
 }
 
+/* ──────────────────── auth helper hint (AUTH_FLOWS Tier 1) ──────────────────── */
+.preview-contextual-js-form-auth-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 6px 10px;
+    margin: 4px 0;
+    border-radius: var(--radius-sm);
+    background: var(--admin-info-bg, rgba(59, 130, 246, 0.08));
+    border: 1px solid var(--admin-info-border, rgba(59, 130, 246, 0.25));
+    font-size: 0.7rem;
+    color: var(--admin-text);
+}
+.preview-contextual-js-form-auth-hint__msg code {
+    background: rgba(0, 0, 0, 0.08);
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-family: var(--admin-font-mono, monospace);
+    font-size: 0.95em;
+}
+.preview-contextual-js-form-auth-hint__btn {
+    font-size: 0.66rem;
+}
+
 /* ──────────────────── fetch picker overhaul (FETCH_PICKER_OVERHAUL) ──────────────────── */
 
 /* Mode radio: "From registry" vs "Direct URL" inside API action. */

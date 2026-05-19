@@ -162,6 +162,7 @@ $baseUrl = rtrim(BASE_URL, '/');
                             <option value="bearer"><?= __admin('apis.auth.bearer') ?></option>
                             <option value="apiKey"><?= __admin('apis.auth.apiKey') ?></option>
                             <option value="basic"><?= __admin('apis.auth.basic') ?></option>
+                            <option value="cookie"><?= __admin('apis.auth.cookie') ?? 'Cookie (browser-managed)' ?></option>
                         </select>
                     </div>
                     

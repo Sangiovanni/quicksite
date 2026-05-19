@@ -206,6 +206,29 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
             'description' => "Validate a form's fields using HTML5 constraints (required, minlength, pattern, type=email, ...). Writes each invalid field's browser error message into a sibling [data-error-for=\"<fieldname>\"] container, clears the container when the field becomes valid, and cancels the rest of the {{call:...}} chain on failure (so a chained fetch only runs when the form is valid).",
             'example' => '{{call:validate:event,#contact-form}};{{call:fetch:POST,/api/contact,body=#contact-form}}',
             'events' => ['onsubmit']
+        ],
+        [
+            'name' => 'saveToken',
+            'signature' => 'QS.saveToken(storage, key, path)',
+            'args' => [
+                ['name' => 'storage', 'type' => 'string', 'required' => true, 'description' => 'Where to store the token: localStorage (persists across browser restarts) or sessionStorage (clears on tab close).', 'inputType' => 'enum', 'options' => ['localStorage', 'sessionStorage']],
+                ['name' => 'key', 'type' => 'string', 'required' => true, 'description' => 'Storage key name (e.g. authToken). Matches the auth.tokenSource configured for downstream API calls.'],
+                ['name' => 'path', 'type' => 'string', 'required' => true, 'description' => 'Dot-notation path into the last fetch result (e.g. token, data.access_token).']
+            ],
+            'description' => 'Read a value from the last fetch response (QS._lastFetchResult) and stash it in localStorage / sessionStorage. Typical use: chain after a login fetch to persist the returned token so subsequent calls pick it up via the endpoint\'s auth.tokenSource. Fires `qs:auth:saved` on document with detail.{storage, key, tokenKey, value}.',
+            'example' => '{{call:fetch:@auth-api/login,body=#login-form}};{{call:saveToken:localStorage,authToken,token}}',
+            'events' => ['onsubmit', 'onclick']
+        ],
+        [
+            'name' => 'clearToken',
+            'signature' => 'QS.clearToken(storage, key)',
+            'args' => [
+                ['name' => 'storage', 'type' => 'string', 'required' => true, 'description' => 'Storage to clear from: localStorage or sessionStorage.', 'inputType' => 'enum', 'options' => ['localStorage', 'sessionStorage']],
+                ['name' => 'key', 'type' => 'string', 'required' => true, 'description' => 'Storage key to remove.']
+            ],
+            'description' => 'Remove a stored token (logout). Fires `qs:auth:cleared` on document with detail.{storage, key, tokenKey} so login-state badges can re-render.',
+            'example' => '{{call:clearToken:localStorage,authToken}};{{call:redirect:/}}',
+            'events' => ['onclick']
         ]
     ];
     

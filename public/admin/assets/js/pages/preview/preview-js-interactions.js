@@ -59,6 +59,9 @@
     let jsFormToastErrorPicker = null;
     let jsFormActionsList = null;
     let jsFormActionsAdd = null;
+    // Auth helper hint (AUTH_FLOWS Tier 1) — shown when endpoint
+    // responseSchema declares a token-shaped field.
+    let jsFormAuthHint = null;
     // Post-fetch action state — one entry per row.
     // { verb: 'hide', paramValues: ['#form'] }
     let postFetchActionsState = [];
@@ -140,6 +143,7 @@
         jsFormToastErrorSilent   = document.getElementById('js-form-toast-error-silent');
         jsFormActionsList = document.getElementById('js-form-actions-list');
         jsFormActionsAdd  = document.getElementById('js-form-actions-add');
+        jsFormAuthHint    = document.getElementById('js-form-auth-hint');
         jsFormParams = document.getElementById('js-form-params');
         jsPreviewCode = document.getElementById('js-preview-code');
         jsFormSave = document.getElementById('js-form-save');
@@ -213,6 +217,7 @@
                 syncTargetLabel();
                 syncBodyVisibilityForMethod();
                 renderPathParamRows();
+                renderAuthHint();
                 updatePreview();
                 showBindingsForEndpoint(jsFormEndpoint, elBindingsContainer, elBindingsRows);
             });
@@ -702,10 +707,14 @@
             }
             var bodyVal = kwargs['body'] || '';
 
-            // Make sure the API list is loaded before we touch dropdowns.
-            if (availableApiEndpoints.length === 0) {
-                await fetchApiEndpoints();
-            }
+            // ALWAYS refetch the endpoint catalogue on edit so newly-
+            // saved responseSchema / responseBindings / auth changes
+            // surface immediately. Module-level cache survives the
+            // admin's round-trips otherwise (admin edits api-endpoints.json
+            // → preview page already loaded → cache stale). Cost is
+            // one round trip (~50ms); cheap given the alternative is
+            // "user has to hard-reload" for any admin change to land.
+            await fetchApiEndpoints();
 
             if (jsFormActionType) {
                 jsFormActionType.value = 'api';
@@ -850,11 +859,11 @@
         }
         populateFunctionDropdown();
         
-        if (availableApiEndpoints.length === 0) {
-            await fetchApiEndpoints();
-        }
+        // Always refetch on form open so admin-side changes (auth /
+        // responseSchema / responseBindings) surface immediately.
+        await fetchApiEndpoints();
         populateApiDropdown();
-        
+
         // Reset form
         if (jsFormEvent) jsFormEvent.value = '';
         if (jsFormActionType) jsFormActionType.value = 'function';
@@ -888,9 +897,10 @@
                 jsFormPathParamsRows.removeChild(jsFormPathParamsRows.firstChild);
             }
         }
-        // Reset post-fetch actions.
+        // Reset post-fetch actions + auth hint.
         postFetchActionsState = [];
         renderActionsList();
+        if (jsFormAuthHint) jsFormAuthHint.style.display = 'none';
         if (jsFormParams) jsFormParams.innerHTML = '';
         if (jsPreviewCode) jsPreviewCode.textContent = '-';
         if (jsFormSave) jsFormSave.disabled = true;
@@ -973,6 +983,14 @@
         if (jsFormApiRegistryFields) jsFormApiRegistryFields.style.display = mode === 'direct' ? 'none' : '';
         if (jsFormApiDirectFields)   jsFormApiDirectFields.style.display   = mode === 'direct' ? '' : 'none';
         syncBodyVisibilityForMethod();
+        // Auth-token detection only applies to registry mode (direct
+        // URL has no schema). Re-render so switching back from direct
+        // restores the banner.
+        if (mode === 'direct' && jsFormAuthHint) {
+            jsFormAuthHint.style.display = 'none';
+        } else {
+            renderAuthHint();
+        }
         updatePreview();
     }
 
@@ -1153,6 +1171,90 @@
                 onChange:    updatePreview,
             });
         }
+    }
+
+    // -----------------------------------------------------------------
+    // Auth helper hint (AUTH_FLOWS Tier 1)
+    // -----------------------------------------------------------------
+    // When the endpoint's responseSchema declares a token-shaped field,
+    // surface a one-click "+ Add saveToken" button that drops a pre-
+    // filled saveToken row into the post-fetch actions list. The user
+    // can then edit storage/key/path or remove it like any other row.
+
+    var TOKEN_LIKE_FIELDS = ['token', 'accessToken', 'refreshToken', 'jwt'];
+
+    /**
+     * Walk a flattened response schema and return dot-paths whose
+     * leaf segment matches one of the known token-shaped names.
+     */
+    function _detectTokenFields(endpointData) {
+        if (!endpointData || !endpointData.responseSchema) return [];
+        var props = endpointData.responseSchema.properties;
+        if (!props) return [];
+        var flat = _flattenSchema(props);
+        var found = [];
+        for (var path in flat) {
+            if (!Object.prototype.hasOwnProperty.call(flat, path)) continue;
+            var lastSeg = path.split('.').pop();
+            if (TOKEN_LIKE_FIELDS.indexOf(lastSeg) !== -1) {
+                found.push(path);
+            }
+        }
+        return found;
+    }
+
+    /**
+     * Re-render the auth helper hint banner. Called on endpoint change.
+     * Shows nothing when no token-shaped fields are declared.
+     */
+    function renderAuthHint() {
+        if (!jsFormAuthHint) return;
+        while (jsFormAuthHint.firstChild) {
+            jsFormAuthHint.removeChild(jsFormAuthHint.firstChild);
+        }
+        var epData = _findEndpointData(jsFormApi, jsFormEndpoint);
+        var detected = _detectTokenFields(epData);
+        if (detected.length === 0) {
+            jsFormAuthHint.style.display = 'none';
+            return;
+        }
+        jsFormAuthHint.style.display = '';
+
+        var msg = document.createElement('span');
+        msg.className = 'preview-contextual-js-form-auth-hint__msg';
+        msg.appendChild(document.createTextNode(
+            (detected.length > 1 ? 'Token fields detected: ' : 'Token field detected: ')
+        ));
+        detected.forEach(function(path, i) {
+            if (i > 0) msg.appendChild(document.createTextNode(', '));
+            var code = document.createElement('code');
+            code.textContent = path;
+            msg.appendChild(code);
+        });
+        jsFormAuthHint.appendChild(msg);
+
+        // One quick-add button per detected field. Click → push a
+        // pre-filled saveToken row into postFetchActionsState and
+        // re-render. The user can tune storage / key / path or
+        // remove the row.
+        detected.forEach(function(path) {
+            var leaf = path.split('.').pop();
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'admin-btn admin-btn--xs admin-btn--ghost preview-contextual-js-form-auth-hint__btn';
+            btn.textContent = '+ saveToken("' + leaf + '")';
+            btn.title = 'Add a saveToken action that stores response.' + path
+                + ' into localStorage as "' + leaf + '".';
+            btn.addEventListener('click', function() {
+                postFetchActionsState.push({
+                    verb: 'saveToken',
+                    paramValues: ['localStorage', leaf, path]
+                });
+                renderActionsList();
+                updatePreview();
+            });
+            jsFormAuthHint.appendChild(btn);
+        });
     }
 
     // -----------------------------------------------------------------

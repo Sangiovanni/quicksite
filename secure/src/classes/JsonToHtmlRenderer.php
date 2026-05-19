@@ -852,7 +852,9 @@ class JsonToHtmlRenderer {
         return [
             'show', 'hide', 'toggle', 'toggleHide', 'addClass', 'removeClass',
             'setValue', 'redirect', 'filter', 'scrollTo', 'focus', 'blur', 'fetch',
-            'renderList', 'toast', 'validate'
+            'renderList', 'toast', 'validate',
+            // Auth flows Tier 1: token persistence verbs.
+            'saveToken', 'clearToken'
         ];
     }
 

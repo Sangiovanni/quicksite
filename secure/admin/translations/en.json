@@ -2060,7 +2060,8 @@
             "none": "None",
             "bearer": "Bearer Token",
             "apiKey": "API Key",
-            "basic": "Basic Auth"
+            "basic": "Basic Auth",
+            "cookie": "Cookie (browser-managed)"
         },
         "test": {
             "request": "Request",

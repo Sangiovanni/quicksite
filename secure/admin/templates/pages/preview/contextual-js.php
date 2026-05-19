@@ -254,6 +254,13 @@
                     <div class="preview-contextual-js-form-path-params-rows" id="js-form-path-params-rows"></div>
                 </div>
 
+                <!-- Auth helper hint (AUTH_FLOWS Tier 1).
+                     Detected when the endpoint's responseSchema has a
+                     token-shaped field. Click the button to drop a
+                     pre-filled saveToken row into the post-fetch
+                     actions list. -->
+                <div class="preview-contextual-js-form-auth-hint" id="js-form-auth-hint" style="display: none;"></div>
+
                 <!-- Body source — shared between registry and direct
                      modes. Hidden when method is GET/DELETE (the browser
                      forbids a body on those, see qs.js GET/HEAD handling). -->

@@ -762,6 +762,18 @@
             if (token) {
                 fetchOpts.headers['Authorization'] = 'Basic ' + token;
             }
+        } else if (auth.type === 'cookie') {
+            // Pattern X: same-origin session cookie. The browser owns
+            // the cookie; we just need to ask fetch to send it. No
+            // tokenSource plumbing — the server's Set-Cookie header is
+            // self-contained, and the browser sends it automatically.
+            // `credentials: 'include'` ALSO works cross-origin if the
+            // server sets the right CORS headers (Access-Control-
+            // Allow-Credentials + a concrete Origin). Documented limit:
+            // no built-in CSRF token helper; if the API needs a CSRF
+            // token echoed in a header, configure it manually via a
+            // separate interaction (filed as a future concern).
+            fetchOpts.credentials = 'include';
         }
     }
     
@@ -1298,6 +1310,93 @@
 
     // Store last fetch result for direct renderList calls
     QS._lastFetchResult = null;
+
+    // =========================================================================
+    // AUTH TOKEN PERSISTENCE  (BETA7_AUTH_FLOWS Tier 1)
+    // =========================================================================
+    // Read a value from QS._lastFetchResult (last successful fetch's data)
+    // and stash it in localStorage / sessionStorage, so subsequent
+    // QS.fetch calls pick it up via the endpoint's auth.tokenSource
+    // config. Pairs with QS.clearToken for logout flows.
+
+    /**
+     * Save a value from the last fetch's response into browser storage.
+     *
+     * @param {string} storage  'localStorage' or 'sessionStorage'
+     * @param {string} key       Storage key (e.g. 'authToken')
+     * @param {string} path      Dot-notation path into the fetch result
+     *                           (e.g. 'token', 'data.access_token')
+     *
+     * Fires `qs:auth:saved` CustomEvent on document with
+     *   detail: { storage, key, tokenKey: key, value }
+     * so cross-page UI (login-state badges, etc.) can re-render.
+     *
+     * Forgiving by design: invalid storage type, missing fetch result,
+     * empty path resolution, or storage write failure → console.warn +
+     * no-op. Doesn't throw, so an auth-save step in a chain doesn't
+     * abort the rest of the chain.
+     */
+    QS.saveToken = function(storage, key, path) {
+        if (storage !== 'localStorage' && storage !== 'sessionStorage') {
+            console.warn('[QS] saveToken: invalid storage type:', storage,
+                '(must be localStorage or sessionStorage)');
+            return;
+        }
+        if (typeof key !== 'string' || key === '') {
+            console.warn('[QS] saveToken: key is required');
+            return;
+        }
+        if (typeof path !== 'string' || path === '') {
+            console.warn('[QS] saveToken: path is required (e.g. "token" or "data.access_token")');
+            return;
+        }
+        var src = QS._lastFetchResult;
+        if (src == null) {
+            console.warn('[QS] saveToken: no fetch result to read from (call after a QS.fetch)');
+            return;
+        }
+        var value = getNestedValue(src, path);
+        if (value === undefined || value === null || value === '') {
+            console.warn('[QS] saveToken: path resolved to empty value:', path);
+            return;
+        }
+        try {
+            window[storage].setItem(key, String(value));
+        } catch (e) {
+            console.warn('[QS] saveToken: storage write failed:', e);
+            return;
+        }
+        document.dispatchEvent(new CustomEvent('qs:auth:saved', {
+            detail: { storage: storage, key: key, tokenKey: key, value: String(value) }
+        }));
+    };
+
+    /**
+     * Remove a stored token from localStorage / sessionStorage. Fires
+     * `qs:auth:cleared` on document with detail.{ storage, key, tokenKey }.
+     *
+     * @param {string} storage  'localStorage' or 'sessionStorage'
+     * @param {string} key       Storage key to remove
+     */
+    QS.clearToken = function(storage, key) {
+        if (storage !== 'localStorage' && storage !== 'sessionStorage') {
+            console.warn('[QS] clearToken: invalid storage type:', storage);
+            return;
+        }
+        if (typeof key !== 'string' || key === '') {
+            console.warn('[QS] clearToken: key is required');
+            return;
+        }
+        try {
+            window[storage].removeItem(key);
+        } catch (e) {
+            console.warn('[QS] clearToken: storage write failed:', e);
+            return;
+        }
+        document.dispatchEvent(new CustomEvent('qs:auth:cleared', {
+            detail: { storage: storage, key: key, tokenKey: key }
+        }));
+    };
 
     /**
      * Custom error thrown by QS.validate to abort the action chain

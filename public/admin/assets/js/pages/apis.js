@@ -437,8 +437,13 @@
     function updateAuthFields() {
         const authType = document.getElementById('api-auth-type').value;
         const tokenGroup = document.getElementById('auth-token-source-group');
-        
-        if (authType === 'none') {
+
+        // 'cookie' (Pattern X — same-origin session cookies) doesn't
+        // need a tokenSource; the browser owns the cookie. Treat it
+        // like 'none' for the storage-location group's purposes.
+        const needsTokenSource = authType !== 'none' && authType !== 'cookie';
+
+        if (!needsTokenSource) {
             tokenGroup.style.display = 'none';
         } else {
             tokenGroup.style.display = 'block';
@@ -466,9 +471,10 @@
         const description = document.getElementById('api-description').value.trim();
         const authType = document.getElementById('api-auth-type').value;
         
-        // Build auth config
+        // Build auth config. 'cookie' goes as { type: 'cookie' } only —
+        // no tokenSource, since the browser owns the session cookie.
         let auth = { type: authType };
-        if (authType !== 'none') {
+        if (authType !== 'none' && authType !== 'cookie') {
             const prefix = document.getElementById('api-token-source-prefix').value;
             const key = document.getElementById('api-token-source-key').value.trim();
             auth.tokenSource = key ? `${prefix}:${key}` : `${prefix}:token`;

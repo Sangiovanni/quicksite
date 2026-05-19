@@ -834,6 +834,80 @@ Future verbs that introduce translatable kwargs (e.g. `confirm`,
 each call's args and translates the value whenever the key is in
 the list.
 
+### 9.5 Auth flows — Tier 1 (token persistence) + cookie pattern
+
+Two complementary token-flow primitives. See
+`NOTES/planning/BACKLOG.md` for the deferred Tiers 2 (refresh on 401)
+and 3 (reserved `/auth/*` routes for magic-link / OAuth).
+
+#### `QS.saveToken(storage, key, path)` / `QS.clearToken(storage, key)`
+
+Runtime verbs (qs.js) that move a value from the last fetch's
+response into browser storage — and back out on logout.
+
+| Verb | Args | What it does |
+|---|---|---|
+| `saveToken` | `storage` (`localStorage`/`sessionStorage`), `key` (storage key name), `path` (dot-notation into `QS._lastFetchResult`) | Reads the value, writes to `window[storage].setItem(key, value)`, fires `qs:auth:saved` on `document`. |
+| `clearToken` | `storage`, `key` | Removes from storage, fires `qs:auth:cleared`. |
+
+Events carry `detail: { storage, key, tokenKey, value? }`. UI components
+that change with login state can listen on `qs:auth:saved` /
+`qs:auth:cleared` and re-render.
+
+Forgiving by design: invalid storage type, missing fetch result,
+empty path resolution, or storage write failure → `console.warn` +
+no-op. Doesn't throw. A failing saveToken in a chain doesn't abort
+the subsequent steps.
+
+**Typical login chain** (authored via the picker):
+
+```
+onsubmit:
+  {{call:validate:event,#login-form}};
+  {{call:fetch:@auth-api/login,body=#login-form}};
+  {{call:saveToken:localStorage,authToken,token}};
+  {{call:redirect:/dashboard}}
+```
+
+#### Picker auth-helper hint
+
+The fetch picker auto-detects token-shaped fields in the selected
+endpoint's `responseSchema` (`token`, `accessToken`, `refreshToken`,
+`jwt`) and surfaces a one-click banner above the body source:
+
+> Token field detected: `token`  &nbsp; **[+ saveToken("token")]**
+
+Clicking pushes a pre-filled `saveToken` row into the post-fetch
+actions list (`localStorage` / `<leaf-name>` / `<path>`). The user
+can then edit the storage / key / path or remove the row.
+
+The hint only shows in **Registry mode** (Direct URL has no
+schema). Nested paths are supported — e.g. a response with
+`data.access_token` surfaces the button as `[+ saveToken("access_token")]`
+and the action's `path` arg is `data.access_token`.
+
+#### Cookie auth type (Pattern X)
+
+New value for `auth.type` in the API admin form: **`cookie`** —
+**Cookie (browser-managed)**. Use when the API and the web app
+share an origin and the API sets a session cookie on login
+(legacy PHP/Rails/Django apps, internal admin tools).
+
+What it does: `QS.fetch` adds `credentials: 'include'` to the
+underlying browser `fetch()` call. The browser owns the cookie;
+no `tokenSource` plumbing, no `saveToken` call, no `Authorization`
+header. The server's `Set-Cookie` header on login is
+self-contained.
+
+What it doesn't do: CSRF token handling. If your API expects
+a CSRF token echoed in a header (e.g. `X-CSRF-Token` from a cookie),
+that's currently manual via a separate interaction. Documented
+limit; filed in BACKLOG for a future CSRF helper.
+
+`credentials: 'include'` also works cross-origin if the server sets
+the right CORS headers (`Access-Control-Allow-Credentials: true`
+plus a concrete `Access-Control-Allow-Origin` — not `*`).
+
 ---
 
 ## 10. Risk hotspots

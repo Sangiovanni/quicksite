@@ -2077,7 +2077,8 @@
             "none": "Aucune",
             "bearer": "Token Bearer",
             "apiKey": "Clé API",
-            "basic": "Auth Basic"
+            "basic": "Auth Basic",
+            "cookie": "Cookie (géré par le navigateur)"
         },
         "test": {
             "request": "Requête",
