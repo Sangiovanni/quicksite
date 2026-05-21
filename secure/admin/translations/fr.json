@@ -2071,7 +2071,20 @@
             "addParameter": "Ajouter un paramètre",
             "paramName": "nom",
             "paramRequired": "requis",
-            "pathParameters": "Paramètres de chemin"
+            "pathParameters": "Paramètres de chemin",
+            "refreshSection": "Rafraîchissement (optionnel)",
+            "refreshEndpoint": "Endpoint de rafraîchissement",
+            "refreshEndpointHint": "Endpoint qui émet un nouveau token d'accès quand l'actuel expire. Appelé automatiquement sur une réponse 401.",
+            "refreshNone": "(aucun — rafraîchissement non configuré)",
+            "refreshTokenStorage": "Stockage du refresh token",
+            "refreshTokenKey": "Nom de la clé du refresh token",
+            "refreshTokenKeyHint": "Emplacement où le refresh token est stocké à l'exécution. Limité au stockage navigateur — 'config' publierait le token à tous les visiteurs.",
+            "refreshBodyField": "Nom du champ du body pour le refresh token",
+            "refreshBodyFieldHint": "Le champ du body POST de l'endpoint de rafraîchissement qui transporte le refresh token (envoyé comme <code>{&lt;champ&gt;: &lt;valeur&gt;}</code>).",
+            "refreshResponseTokenPath": "Chemin réponse : nouveau token d'accès",
+            "refreshResponseTokenPathHint": "Chemin pointé dans la réponse de rafraîchissement où se trouve le nouveau token d'accès (ex. <code>token</code> ou <code>data.access_token</code>).",
+            "refreshResponseRefreshTokenPath": "Chemin réponse : nouveau refresh token (optionnel)",
+            "refreshResponseRefreshTokenPathHint": "Chemin pointé pour le refresh token renouvelé, si votre endpoint en retourne un. Laisser vide pour conserver le refresh token existant."
         },
         "auth": {
             "none": "Aucune",

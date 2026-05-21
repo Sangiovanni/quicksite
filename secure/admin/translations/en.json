@@ -2054,7 +2054,20 @@
             "addParameter": "Add parameter",
             "paramName": "name",
             "paramRequired": "required",
-            "pathParameters": "Path parameters"
+            "pathParameters": "Path parameters",
+            "refreshSection": "Refresh (optional)",
+            "refreshEndpoint": "Refresh endpoint",
+            "refreshEndpointHint": "Endpoint that issues a new access token when the current one expires. Called automatically on a 401 response.",
+            "refreshNone": "(none — no refresh configured)",
+            "refreshTokenStorage": "Refresh token storage",
+            "refreshTokenKey": "Refresh token key name",
+            "refreshTokenKeyHint": "Where the refresh token is stored at runtime. Restricted to browser storage — 'config' would publish the token to every visitor.",
+            "refreshBodyField": "Body field name for refresh token",
+            "refreshBodyFieldHint": "The field in the refresh endpoint's POST body that carries the stored refresh token (sent as <code>{&lt;field&gt;: &lt;value&gt;}</code>).",
+            "refreshResponseTokenPath": "Response path: new access token",
+            "refreshResponseTokenPathHint": "Dot-path in the refresh response where the new access token lives (e.g. <code>token</code> or <code>data.access_token</code>).",
+            "refreshResponseRefreshTokenPath": "Response path: new refresh token (optional)",
+            "refreshResponseRefreshTokenPathHint": "Dot-path for the rotated refresh token, if your endpoint returns one. Leave blank to keep the existing refresh token."
         },
         "auth": {
             "none": "None",

@@ -834,11 +834,12 @@ Future verbs that introduce translatable kwargs (e.g. `confirm`,
 each call's args and translates the value whenever the key is in
 the list.
 
-### 9.5 Auth flows — Tier 1 (token persistence) + cookie pattern
+### 9.5 Auth flows — Tier 1 (token persistence), cookie pattern, Tier 2 (refresh on 401)
 
-Two complementary token-flow primitives. See
-`NOTES/planning/BACKLOG.md` for the deferred Tiers 2 (refresh on 401)
-and 3 (reserved `/auth/*` routes for magic-link / OAuth).
+Token-flow primitives across two shipped tiers (persistence + refresh)
+plus the cookie auth type. Tier 3 (reserved `/auth/*` routes for
+magic-link / OAuth) is still planned — see
+`NOTES/planning/BETA7_AUTH_FLOWS.md`.
 
 #### `QS.saveToken(storage, key, path)` / `QS.clearToken(storage, key)`
 
@@ -907,6 +908,93 @@ limit; filed in BACKLOG for a future CSRF helper.
 `credentials: 'include'` also works cross-origin if the server sets
 the right CORS headers (`Access-Control-Allow-Credentials: true`
 plus a concrete `Access-Control-Allow-Origin` — not `*`).
+
+#### Tier 2 — Refresh on 401
+
+When a bearer-authed endpoint returns **401**, `QS.fetch`
+transparently obtains a fresh access token and retries the original
+request once — no toast, no chain change. Configured per-API in the
+**Refresh (optional)** section of the API admin auth form (shown only
+when auth type is `bearer`). The `auth` config grows five optional
+fields — the first four move together (all-or-nothing), the last is
+truly optional:
+
+| Field | Meaning |
+|---|---|
+| `refreshEndpoint` | `@apiId/endpointId` of the endpoint that issues new tokens |
+| `refreshTokenSource` | `localStorage:key` / `sessionStorage:key` where the refresh token lives |
+| `refreshTokenBodyField` | body field name carrying the refresh token in the refresh request |
+| `responseTokenPath` | dot-path in the refresh response to the new access token |
+| `responseRefreshTokenPath` | (optional) dot-path to a rotated refresh token to store back |
+
+Runtime flow (`qs.js`) on a 401 from an endpoint whose auth declares
+`refreshEndpoint`:
+
+1. Read the refresh token from `refreshTokenSource`. If absent, skip
+   refresh — the 401 flows to the normal error path.
+2. POST to `refreshEndpoint` (resolved from the registry, running with
+   **its own** configured auth) with a body of the refresh token under
+   `refreshTokenBodyField`. The refresh call uses plain `fetch`, so it
+   can never recurse into another refresh.
+3. On success: write the new access token (`responseTokenPath`) to
+   `tokenSource`; if `responseRefreshTokenPath` is set and present in
+   the response, rotate the stored refresh token. Then retry the
+   original request once with the new bearer.
+4. On failure (refresh token rejected, or no token in the response):
+   clear **both** stored tokens — firing `qs:auth:cleared` so a
+   listener can redirect to login — then let the original 401 surface.
+
+Notes:
+- **401 only.** Refresh triggers on 401 (the convention for an
+  expired/invalid access token), not 403 (forbidden). APIs should
+  return 401 for expired tokens.
+- **Retry once.** A second 401 after the refresh flows to the error
+  path — no refresh loop.
+- **Concurrency.** Concurrent 401s sharing a `refreshTokenSource`
+  collapse to a single in-flight refresh request (`QS._refreshInFlight`).
+- The token write reuses the same `setStoredToken` helper as
+  `QS.saveToken`, so a refresh also fires `qs:auth:saved`.
+- Validation (`ApiEndpointManager::validateAuth`) enforces bearer-only,
+  the all-or-nothing rule for the first four fields, and restricts the
+  refresh-token store to `localStorage` / `sessionStorage` (never
+  `config`, which would publish the refresh token to every visitor).
+
+#### Auth-state UI primitives
+
+With tokens persisting (Tier 1) and refreshing (Tier 2), the runtime
+offers declarative, *authorable* ways to react to login / storage state —
+enough to build login / logout / status UIs without hand-written JS. All
+bindings re-apply on page load and on `qs:auth:saved` / `qs:auth:cleared`
+(`saveToken` / `clearToken` / `refresh` emit those).
+
+**Verbs**
+
+| Verb | Use |
+|---|---|
+| `QS.isAuthed("localStorage:key")` | boolean — is a non-empty value stored at that source |
+| `QS.refresh("@apiId")` | manually run the Tier 2 refresh for an API (button-friendly). Resolves the API's auth config and reuses the auto-refresh flow. A raw fetch can't replace it — only this injects the stored refresh token. |
+| `QS.applyAuthState()` | re-scan the bindings below after injecting DOM dynamically |
+
+`refresh` is in the interaction picker (`listJsFunctions`); `applyAuthState`
+is allowlisted for hand-authoring but not surfaced (niche).
+
+**Declarative bindings** — plain `data-*` (NOT `data-qs-*`, which the editor
+reserves for its own markers and strips from user params):
+
+| Attribute | Effect |
+|---|---|
+| `data-auth-show="in"` / `"out"` | show only when logged in / out. Token source from `data-auth-source` on the element or any ancestor (set once on a wrapper). |
+| `data-storage-show="has:localStorage:key"` / `"missing:localStorage:key"` | generic presence show/hide for any storage key |
+| `data-storage-value="localStorage:key"` | sets the element's text to the stored value |
+
+`data-auth-show` is auth sugar over "is the token present"; the
+`data-storage-*` pair is the general form (any key, auth or not).
+**Gotcha**: the show/hide elements must be **siblings**, not nested — a
+hidden parent hides its children regardless of their own state.
+
+A scaffold workflow that emits this structure correctly, plus a generic
+`QS.store` verb (+ `qs:storage:changed` event) for non-auth writes, are
+filed in `BACKLOG.md` as the ergonomic follow-up.
 
 ---
 

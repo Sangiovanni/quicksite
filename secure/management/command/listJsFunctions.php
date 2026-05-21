@@ -229,6 +229,16 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
             'description' => 'Remove a stored token (logout). Fires `qs:auth:cleared` on document with detail.{storage, key, tokenKey} so login-state badges can re-render.',
             'example' => '{{call:clearToken:localStorage,authToken}};{{call:redirect:/}}',
             'events' => ['onclick']
+        ],
+        [
+            'name' => 'refresh',
+            'signature' => 'QS.refresh(apiRef)',
+            'args' => [
+                ['name' => 'apiRef', 'type' => 'string', 'required' => true, 'description' => 'API to refresh as @apiId (must have a Refresh config in /admin/apis). It reads that API\'s stored refresh token, requests a new access token, stores it back, and rotates the refresh token if configured.']
+            ],
+            'description' => 'Manually run the Tier 2 token refresh for an API (same flow as the automatic refresh-on-401). Reads the refresh token from the API\'s refreshTokenSource, POSTs to its refreshEndpoint, and stores the new access token. A raw fetch to the refresh endpoint will NOT work — only this verb can inject the stored refresh token. Fires `qs:auth:saved` on success. Use for a "Refresh session" button.',
+            'example' => '{{call:refresh:@auth-api}}',
+            'events' => ['onclick']
         ]
     ];
     

@@ -425,8 +425,26 @@
                 document.getElementById('api-token-source-prefix').value = parts[0] || 'localStorage';
                 document.getElementById('api-token-source-key').value = parts.slice(1).join(':') || '';
             }
+
+            populateRefreshEndpointDropdown(api.auth?.refreshEndpoint || '');
+            if (api.auth?.refreshEndpoint) {
+                document.getElementById('api-refresh-endpoint').value = api.auth.refreshEndpoint;
+            }
+            if (api.auth?.refreshTokenSource) {
+                const rParts = api.auth.refreshTokenSource.split(':');
+                document.getElementById('api-refresh-token-source-prefix').value = rParts[0] || 'localStorage';
+                document.getElementById('api-refresh-token-source-key').value = rParts.slice(1).join(':') || '';
+            }
+            document.getElementById('api-refresh-body-field').value = api.auth?.refreshTokenBodyField || '';
+            document.getElementById('api-refresh-response-token-path').value = api.auth?.responseTokenPath || '';
+            document.getElementById('api-refresh-response-refresh-token-path').value = api.auth?.responseRefreshTokenPath || '';
+            // Open the <details> when any refresh field is wired, so the
+            // existing config is visible at a glance on edit.
+            document.getElementById('auth-refresh-group').open = !!api.auth?.refreshEndpoint;
         } else {
             title.textContent = window.translations?.apis?.addApi || 'Add API';
+            populateRefreshEndpointDropdown('');
+            document.getElementById('auth-refresh-group').open = false;
         }
 
         updateAuthFields();
@@ -437,6 +455,7 @@
     function updateAuthFields() {
         const authType = document.getElementById('api-auth-type').value;
         const tokenGroup = document.getElementById('auth-token-source-group');
+        const refreshGroup = document.getElementById('auth-refresh-group');
 
         // 'cookie' (Pattern X — same-origin session cookies) doesn't
         // need a tokenSource; the browser owns the cookie. Treat it
@@ -448,6 +467,56 @@
         } else {
             tokenGroup.style.display = 'block';
             updateStorageWarning();
+        }
+
+        // Refresh is meaningful only for bearer auth; collapse + hide
+        // for any other type so the form stays uncluttered.
+        if (refreshGroup) {
+            refreshGroup.style.display = authType === 'bearer' ? 'block' : 'none';
+            if (authType !== 'bearer') refreshGroup.open = false;
+        }
+    }
+
+    /**
+     * Build the refresh-endpoint <select> from apisData (all registered
+     * @apiId/endpointId pairs). Called on form open so the list always
+     * reflects the current registry.
+     */
+    function populateRefreshEndpointDropdown(selected) {
+        const select = document.getElementById('api-refresh-endpoint');
+        if (!select) return;
+
+        const noneText = window.translations?.apis?.form?.refreshNone || '(none — no refresh configured)';
+        // Drop existing dynamic options but keep the empty default.
+        while (select.firstChild) select.removeChild(select.firstChild);
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = noneText;
+        select.appendChild(placeholder);
+
+        const refs = [];
+        for (const apiId in apisData) {
+            if (!Object.prototype.hasOwnProperty.call(apisData, apiId)) continue;
+            const endpoints = (apisData[apiId] && apisData[apiId].endpoints) || [];
+            for (const ep of endpoints) {
+                if (ep && ep.id) refs.push('@' + apiId + '/' + ep.id);
+            }
+        }
+        refs.sort();
+        for (const ref of refs) {
+            const opt = document.createElement('option');
+            opt.value = ref;
+            opt.textContent = ref;
+            select.appendChild(opt);
+        }
+
+        // If the saved value isn't in the current registry (e.g. endpoint
+        // was deleted), still surface it so the user sees the staleness.
+        if (selected && !refs.includes(selected)) {
+            const stale = document.createElement('option');
+            stale.value = selected;
+            stale.textContent = selected + ' (missing)';
+            select.appendChild(stale);
         }
     }
     
@@ -480,13 +549,49 @@
             auth.tokenSource = key ? `${prefix}:${key}` : `${prefix}:token`;
         }
 
-        // Prepare command params
+        // Refresh config (Tier 2). Only collected when type === 'bearer'.
+        // Symmetric requirement: the four primary fields move together.
+        // responseRefreshTokenPath is optional (only set when the endpoint
+        // rotates the refresh token).
+        if (authType === 'bearer') {
+            const rEndpoint = document.getElementById('api-refresh-endpoint').value.trim();
+            const rPrefix = document.getElementById('api-refresh-token-source-prefix').value;
+            const rKey = document.getElementById('api-refresh-token-source-key').value.trim();
+            const rBody = document.getElementById('api-refresh-body-field').value.trim();
+            const rPath = document.getElementById('api-refresh-response-token-path').value.trim();
+            const rRefreshPath = document.getElementById('api-refresh-response-refresh-token-path').value.trim();
+
+            const anyRefresh = rEndpoint || rKey || rBody || rPath || rRefreshPath;
+            if (anyRefresh) {
+                const missing = [];
+                if (!rEndpoint) missing.push('endpoint');
+                if (!rKey) missing.push('storage key');
+                if (!rBody) missing.push('body field');
+                if (!rPath) missing.push('response token path');
+                if (missing.length) {
+                    showToast('Refresh config incomplete. Missing: ' + missing.join(', '), 'error');
+                    return;
+                }
+                auth.refreshEndpoint = rEndpoint;
+                auth.refreshTokenSource = `${rPrefix}:${rKey}`;
+                auth.refreshTokenBodyField = rBody;
+                auth.responseTokenPath = rPath;
+                if (rRefreshPath) auth.responseRefreshTokenPath = rRefreshPath;
+            }
+        }
+
+        // Prepare command params. Always send `auth` — even { type: 'none' }.
+        // editApi treats an OMITTED auth as "leave unchanged", so sending
+        // undefined on None made a previously-set bearer/apiKey/etc stick
+        // (you couldn't switch an API back to None). auth is always built
+        // as { type: authType } above, and editApi does a full replacement,
+        // so this also drops stale tokenSource/refresh fields on downgrade.
         const params = {
             apiId: apiId,
             name: name,
             baseUrl: baseUrl,
-            description: description || undefined,
-            auth: authType !== 'none' ? auth : undefined
+            description: description,
+            auth: auth
         };
 
         try {
@@ -671,30 +776,39 @@
         // Collect parameter rows (name + type + required); skip empty-name rows.
         const parameters = collectParamRows();
 
+        // Send explicit empties (not undefined) for the managed optional
+        // fields. JSON.stringify keeps '' and [] but strips undefined —
+        // dropping the key was what hid clears before (the backend then
+        // merged and the old value survived). The backend treats an empty
+        // value as "remove the key" (absent = default/none), so clearing
+        // a field in the editor now actually clears it.
         const endpoint = {
             id: endpointId,
             method: method,
             name: name,
             path: path,
-            description: description || undefined,
-            // Only save auth if 'inherit' or 'required' (no property = public/none)
-            auth: (auth && auth !== 'none') ? auth : undefined,
-            parameters: parameters.length > 0 ? parameters : undefined,
-            requestSchema: requestSchema || undefined,
-            responseSchema: responseSchema || undefined
+            description: description,
+            // '' = public/none (backend drops the key); 'inherit'/'required' kept.
+            auth: (auth && auth !== 'none') ? auth : '',
+            parameters: parameters,
+            requestSchema: requestSchema || '',
+            responseSchema: responseSchema || ''
         };
 
         // Build editApi params
         const params = { apiId: apiId };
         
         if (mode === 'edit') {
+            const { id, ...updates } = endpoint;
             if (originalId !== endpointId) {
-                // ID changed - delete old and add new
-                params.deleteEndpoint = originalId;
-                params.addEndpoint = endpoint;
+                // ID changed → atomic server-side rename. The backend preserves
+                // the endpoint's own fields (unmanaged kept via merge, managed
+                // overlaid from `updates`) AND re-points every external reference
+                // (interactions, page events, refreshEndpoint) from the old id
+                // to the new one — no delete+add, no data loss.
+                params.renameEndpoint = { from: originalId, to: endpointId, updates: updates };
             } else {
-                // Same ID - use editEndpoint with updates format
-                const { id, ...updates } = endpoint;
+                // Same ID - field edit only.
                 params.editEndpoint = { id: endpointId, updates: updates };
             }
         } else {

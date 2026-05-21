@@ -264,7 +264,12 @@ class ApiEndpointManager {
         }
         
         $api = $config['apis'][$apiId];
-        
+
+        // Tracks an endpoint id rename (['from'=>.., 'to'=>..]) so the caller
+        // can run the reference cascade (interactions + page events). null
+        // when no rename happened this call.
+        $renamed = null;
+
         // Update allowed fields
         if (isset($updates['name'])) {
             $api['name'] = $updates['name'];
@@ -314,7 +319,7 @@ class ApiEndpointManager {
         
         // Handle single endpoint add
         if (isset($updates['addEndpoint'])) {
-            $endpoint = $updates['addEndpoint'];
+            $endpoint = $this->normalizeEndpointOptionalFields($updates['addEndpoint']);
             $validation = $this->validateEndpoint($endpoint);
             if (!$validation['valid']) {
                 return [
@@ -352,19 +357,24 @@ class ApiEndpointManager {
             $found = false;
             foreach ($api['endpoints'] as $idx => $existing) {
                 if ($existing['id'] === $endpointId) {
-                    // Merge updates
-                    $api['endpoints'][$idx] = array_merge($existing, $endpointUpdates);
-                    $api['endpoints'][$idx]['updated'] = date('Y-m-d H:i:s');
-                    
+                    // Merge updates over the existing endpoint — this keeps
+                    // UNMANAGED fields (headers, responseBindings, queryParams,
+                    // created) intact — then drop any MANAGED field the editor
+                    // cleared (sent as an empty value).
+                    $merged = array_merge($existing, $endpointUpdates);
+                    $merged = $this->normalizeEndpointOptionalFields($merged);
+                    $merged['updated'] = date('Y-m-d H:i:s');
+
                     // Validate the result
-                    $validation = $this->validateEndpoint($api['endpoints'][$idx]);
+                    $validation = $this->validateEndpoint($merged);
                     if (!$validation['valid']) {
                         return [
                             'success' => false,
                             'error' => "Invalid endpoint after update: " . $validation['error']
                         ];
                     }
-                    
+
+                    $api['endpoints'][$idx] = $merged;
                     $found = true;
                     break;
                 }
@@ -399,20 +409,82 @@ class ApiEndpointManager {
             }
         }
         
+        // Handle endpoint rename (id change). Atomic + in-place: preserves all
+        // fields (managed overlaid from the form, unmanaged kept via merge),
+        // validates the new id, and guards against collisions. External
+        // references (interactions / page events) are re-pointed by the
+        // editApi command after save; refreshEndpoint refs (which live in this
+        // same config file) are rewritten just below.
+        if (isset($updates['renameEndpoint'])) {
+            $fromId = $updates['renameEndpoint']['from'] ?? null;
+            $toId = $updates['renameEndpoint']['to'] ?? null;
+            $endpointUpdates = $updates['renameEndpoint']['updates'] ?? [];
+
+            if (!$fromId || !$toId) {
+                return ['success' => false, 'error' => 'renameEndpoint requires "from" and "to"'];
+            }
+            if (!preg_match('/^[a-z0-9][a-z0-9\-_]*$/i', $toId)) {
+                return ['success' => false, 'error' => 'Invalid endpoint ID format. Use alphanumeric, dashes, underscores.'];
+            }
+            if ($toId !== $fromId) {
+                foreach ($api['endpoints'] as $ep) {
+                    if ($ep['id'] === $toId) {
+                        return ['success' => false, 'error' => "Endpoint ID '$toId' already exists in this API"];
+                    }
+                }
+            }
+
+            $found = false;
+            foreach ($api['endpoints'] as $idx => $existing) {
+                if ($existing['id'] === $fromId) {
+                    $merged = array_merge($existing, $endpointUpdates);
+                    $merged['id'] = $toId; // the new id always wins
+                    $merged = $this->normalizeEndpointOptionalFields($merged);
+                    $merged['updated'] = date('Y-m-d H:i:s');
+
+                    $validation = $this->validateEndpoint($merged);
+                    if (!$validation['valid']) {
+                        return ['success' => false, 'error' => "Invalid endpoint after rename: " . $validation['error']];
+                    }
+
+                    $api['endpoints'][$idx] = $merged;
+                    $found = true;
+                    break;
+                }
+            }
+            if (!$found) {
+                return ['success' => false, 'error' => "Endpoint '$fromId' not found"];
+            }
+            $renamed = ['from' => $fromId, 'to' => $toId];
+        }
+
         $api['updated'] = date('Y-m-d H:i:s');
         $config['apis'][$apiId] = $api;
-        
+
+        // Re-point refreshEndpoint references (Tier 2 auth config) that pointed
+        // at the renamed endpoint, across every API in the registry.
+        if ($renamed && $renamed['from'] !== $renamed['to']) {
+            $oldRef = '@' . $apiId . '/' . $renamed['from'];
+            $newRef = '@' . $apiId . '/' . $renamed['to'];
+            foreach ($config['apis'] as $aid => $aDef) {
+                if (($aDef['auth']['refreshEndpoint'] ?? null) === $oldRef) {
+                    $config['apis'][$aid]['auth']['refreshEndpoint'] = $newRef;
+                }
+            }
+        }
+
         if (!$this->saveConfig($config)) {
             return [
                 'success' => false,
                 'error' => 'Failed to save configuration'
             ];
         }
-        
+
         return [
             'success' => true,
             'apiId' => $apiId,
-            'api' => $api
+            'api' => $api,
+            'renamed' => $renamed
         ];
     }
     
@@ -568,7 +640,7 @@ class ApiEndpointManager {
         if (!empty($auth['tokenSource'])) {
             $validPrefixes = ['localStorage', 'sessionStorage', 'config', 'header'];
             $parts = explode(':', $auth['tokenSource'], 2);
-            
+
             if (count($parts) !== 2 || !in_array($parts[0], $validPrefixes)) {
                 return [
                     'valid' => false,
@@ -576,10 +648,89 @@ class ApiEndpointManager {
                 ];
             }
         }
-        
+
+        // Refresh-token config (Tier 2). All four primary fields move
+        // together — partial config is rejected so the runtime never
+        // sees a half-wired refresh path. responseRefreshTokenPath is
+        // truly optional (only set when the endpoint rotates).
+        $refreshKeys = ['refreshEndpoint', 'refreshTokenSource', 'refreshTokenBodyField', 'responseTokenPath'];
+        $refreshSet = array_filter($refreshKeys, fn($k) => !empty($auth[$k]));
+        if (!empty($refreshSet)) {
+            if ($type !== 'bearer') {
+                return [
+                    'valid' => false,
+                    'error' => "Refresh config is only supported for auth type 'bearer'"
+                ];
+            }
+            $missing = array_diff($refreshKeys, $refreshSet);
+            if (!empty($missing)) {
+                return [
+                    'valid' => false,
+                    'error' => 'Refresh config requires all of: ' . implode(', ', $refreshKeys) . '. Missing: ' . implode(', ', $missing)
+                ];
+            }
+            if (!preg_match('/^@[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$/', $auth['refreshEndpoint'])) {
+                return [
+                    'valid' => false,
+                    'error' => "Invalid refreshEndpoint format. Use: @apiId/endpointId"
+                ];
+            }
+            // Refresh token storage: restricted to browser stores. 'config'
+            // would publish the refresh token to every visitor; 'header'
+            // is for sent-on-every-request keys, not stored values.
+            $refreshStoragePrefixes = ['localStorage', 'sessionStorage'];
+            $rParts = explode(':', $auth['refreshTokenSource'], 2);
+            if (count($rParts) !== 2 || !in_array($rParts[0], $refreshStoragePrefixes)) {
+                return [
+                    'valid' => false,
+                    'error' => 'Invalid refreshTokenSource format. Use: localStorage:key or sessionStorage:key'
+                ];
+            }
+        }
+
         return ['valid' => true, 'error' => null];
     }
-    
+
+    /**
+     * Drop managed optional endpoint fields whose value is empty.
+     *
+     * The admin editor fully controls these fields and submits an empty
+     * value ('' / [] / {}) to mean "cleared". Our storage convention is
+     * "absent = default/none", so an empty value removes the key rather
+     * than persisting an empty stub. Crucially this lets editEndpoint's
+     * array_merge keep UNMANAGED fields (headers, responseBindings,
+     * queryParams, created) while still allowing the editor to clear the
+     * managed ones — previously impossible, since merge can't delete keys
+     * and the frontend dropped empties as `undefined` (so a cleared
+     * description / schema / endpoint-auth silently kept its old value).
+     *
+     * @param array $endpoint
+     * @return array
+     */
+    private function normalizeEndpointOptionalFields(array $endpoint): array {
+        $managedOptional = ['description', 'auth', 'parameters', 'requestSchema', 'responseSchema'];
+        foreach ($managedOptional as $field) {
+            if (array_key_exists($field, $endpoint) && $this->isEmptyEndpointValue($endpoint[$field])) {
+                unset($endpoint[$field]);
+            }
+        }
+        return $endpoint;
+    }
+
+    /**
+     * @param mixed $value
+     * @return bool True when null, '', or an empty array/object.
+     */
+    private function isEmptyEndpointValue($value): bool {
+        if ($value === null || $value === '') {
+            return true;
+        }
+        if (is_array($value) && count($value) === 0) {
+            return true;
+        }
+        return false;
+    }
+
     /**
      * Validate endpoint definition
      * @param array $endpoint

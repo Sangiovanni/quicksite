@@ -352,7 +352,7 @@ A single argument can contain literal commas by escaping them with `\,`. For exa
 
 **Reserved class names.** `qs.js` self-injects `<style id="qs-hidden-style">.hidden{display:none!important}</style>` into the document head at script-load time so projects without a `.hidden` rule still get a working hide. This makes `.hidden` a **reserved QuickSite class**: do not redefine it in your CSS — the `!important` will win regardless and the override won't apply. To get animated/custom hide behaviour, define your own class (e.g. `.fade-out`) and pass it as the `hideClass` arg to `QS.show`/`QS.hide`/`QS.toggleHide`/`QS.filter` instead.
 
-The core registry currently exposes 16 built-ins:
+The core registry currently exposes 19 built-ins:
 
 | Group | Functions |
 |---|---|
@@ -362,8 +362,11 @@ The core registry currently exposes 16 built-ins:
 | Navigation | `QS.redirect`, `QS.scrollTo` |
 | Data | `QS.filter`, `QS.fetch`, `QS.renderList` |
 | Feedback | `QS.toast` |
+| Auth / storage | `QS.saveToken`, `QS.clearToken`, `QS.refresh` |
 
-Use the live `listJsFunctions` command for the authoritative list — it is the registry the visual editor and `addInteraction` validate against.
+Use the live `listJsFunctions` command for the authoritative list — it is the registry the visual editor and `addInteraction` validate against. (The renderer allowlist also accepts `applyAuthState` for hand-authored manual re-scans; it is intentionally not surfaced in the picker.)
+
+Beyond the `{{call:…}}` verbs, the auth-flows runtime adds **declarative bindings** read by `qs.js` on load + on `qs:auth:*` events — `data-auth-show` / `data-auth-source` (login-state show/hide) and the generic `data-storage-show` / `data-storage-value` (any storage key) — plus the `QS.isAuthed(source)` query. These are documented in `ADMIN_PANEL.md §9.5`.
 
 `QS.filter` accepts a polymorphic `matchAttr` (3rd arg): omit it (or pass `textContent`) to match the element's text; pass a `data-*` name to match an attribute; pass a CSS selector starting with `.`, `#`, `>` or space to match the concatenated `textContent` of one or more **descendant** elements (e.g. `.cmd-name, .cmd-description` for "search across both"). The descendant-text and textContent modes also highlight matches in place via an XSS-safe DOM walk (skipped above a 500-node budget).
 

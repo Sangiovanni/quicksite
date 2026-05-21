@@ -584,8 +584,23 @@
             url += (url.indexOf('?') === -1 ? '?' : '&') + queryParts.join('&');
         }
 
-        // Make the request
-        return fetch(url, fetchOpts)
+        // Make the request. Tier 2: on a 401 from an endpoint whose auth
+        // declares a refreshEndpoint, transparently refresh the access token
+        // and retry the original request exactly once. The refresh call uses
+        // plain fetch (not QS.fetch), so it can't recurse into another refresh.
+        const issueRequest = () => fetch(url, fetchOpts);
+        return issueRequest()
+            .then(response => {
+                if (response.status === 401 && opts._auth && opts._auth.refreshEndpoint) {
+                    return refreshAuthToken(opts._auth).then(refreshed => {
+                        if (!refreshed) return response; // let the 401 fall through to onError
+                        const t = getTokenValue(opts._auth.tokenSource);
+                        if (t) fetchOpts.headers['Authorization'] = 'Bearer ' + t;
+                        return issueRequest(); // retry once with the new token
+                    });
+                }
+                return response;
+            })
             .then(response => {
                 if (!response.ok) {
                     throw new Error('HTTP ' + response.status);
@@ -797,7 +812,111 @@
         
         return null;
     }
-    
+
+    /**
+     * Parse a "localStorage:key" / "sessionStorage:key" reference.
+     * @param {string} ref
+     * @returns {{storage:string, key:string}|null}
+     */
+    function parseStorageRef(ref) {
+        if (!ref || ref.indexOf(':') === -1) return null;
+        const idx = ref.indexOf(':');
+        return { storage: ref.slice(0, idx), key: ref.slice(idx + 1) };
+    }
+
+    /**
+     * Write a token value to browser storage and fire qs:auth:saved.
+     * Shared by QS.saveToken and the Tier 2 refresh flow.
+     * @returns {boolean} success
+     */
+    function setStoredToken(storage, key, value) {
+        if (storage !== 'localStorage' && storage !== 'sessionStorage') return false;
+        try {
+            window[storage].setItem(key, String(value));
+        } catch (e) {
+            return false;
+        }
+        document.dispatchEvent(new CustomEvent('qs:auth:saved', {
+            detail: { storage: storage, key: key, tokenKey: key, value: String(value) }
+        }));
+        return true;
+    }
+
+    // Tier 2: one in-flight refresh per refresh-token storage location, so a
+    // burst of concurrent 401s collapses to a single refresh POST.
+    QS._refreshInFlight = QS._refreshInFlight || {};
+
+    /**
+     * Refresh the access token for an endpoint's auth config (Tier 2).
+     *
+     * Reads the refresh token from `auth.refreshTokenSource`, POSTs it to
+     * `auth.refreshEndpoint` (resolved from the registry — it runs with its
+     * OWN configured auth), then stores the new access token at
+     * `auth.tokenSource` (path `auth.responseTokenPath`) and rotates the
+     * refresh token when `auth.responseRefreshTokenPath` is set and present.
+     * On ANY failure (no refresh token, endpoint error, missing token in the
+     * response) it clears BOTH stored tokens — firing qs:auth:cleared so a
+     * listener can redirect to login — and resolves false.
+     *
+     * @param {object} auth Endpoint auth config
+     * @returns {Promise<boolean>} true when a new access token was stored
+     */
+    function refreshAuthToken(auth) {
+        const lockKey = auth.refreshTokenSource || auth.refreshEndpoint || '@';
+        if (QS._refreshInFlight[lockKey]) return QS._refreshInFlight[lockKey];
+
+        const refreshToken = getTokenValue(auth.refreshTokenSource);
+        const resolved = auth.refreshEndpoint ? resolveEndpoint(auth.refreshEndpoint.replace(/^@/, '')) : null;
+        if (!refreshToken || !resolved) {
+            return Promise.resolve(false);
+        }
+
+        const method = (resolved.method || 'POST').toUpperCase();
+        const refreshOpts = { method: method, headers: { 'Content-Type': 'application/json' } };
+        // The refresh endpoint runs with its own configured auth (typically
+        // none); we don't special-case the expired bearer.
+        applyAuth(refreshOpts, resolved.auth);
+        if (method !== 'GET' && method !== 'HEAD') {
+            const body = {};
+            body[auth.refreshTokenBodyField] = refreshToken;
+            refreshOpts.body = JSON.stringify(body);
+        }
+
+        const promise = fetch(resolved.url, refreshOpts)
+            .then(r => r.ok ? r.json().catch(() => ({})) : Promise.reject(new Error('refresh HTTP ' + r.status)))
+            .then(refreshData => {
+                const newToken = getNestedValue(refreshData, auth.responseTokenPath);
+                if (newToken === undefined || newToken === null || newToken === '') {
+                    throw new Error('refresh: no token at "' + auth.responseTokenPath + '"');
+                }
+                const dst = parseStorageRef(auth.tokenSource);
+                if (dst) setStoredToken(dst.storage, dst.key, newToken);
+
+                // Rotate the refresh token if the endpoint returned a new one.
+                if (auth.responseRefreshTokenPath) {
+                    const newRefresh = getNestedValue(refreshData, auth.responseRefreshTokenPath);
+                    if (newRefresh !== undefined && newRefresh !== null && newRefresh !== '') {
+                        const rdst = parseStorageRef(auth.refreshTokenSource);
+                        if (rdst) setStoredToken(rdst.storage, rdst.key, newRefresh);
+                    }
+                }
+                return true;
+            })
+            .catch(() => {
+                // Refresh failed → clear both tokens so the app lands in a clean
+                // logged-out state; qs:auth:cleared listeners can redirect.
+                const at = parseStorageRef(auth.tokenSource);
+                const rt = parseStorageRef(auth.refreshTokenSource);
+                if (at) QS.clearToken(at.storage, at.key);
+                if (rt) QS.clearToken(rt.storage, rt.key);
+                return false;
+            })
+            .finally(() => { delete QS._refreshInFlight[lockKey]; });
+
+        QS._refreshInFlight[lockKey] = promise;
+        return promise;
+    }
+
     /**
      * Collect body data from a form or input elements
      * @param {string} selector - Form selector (#form) or inputs selector
@@ -1360,15 +1479,9 @@
             console.warn('[QS] saveToken: path resolved to empty value:', path);
             return;
         }
-        try {
-            window[storage].setItem(key, String(value));
-        } catch (e) {
-            console.warn('[QS] saveToken: storage write failed:', e);
-            return;
+        if (!setStoredToken(storage, key, String(value))) {
+            console.warn('[QS] saveToken: storage write failed');
         }
-        document.dispatchEvent(new CustomEvent('qs:auth:saved', {
-            detail: { storage: storage, key: key, tokenKey: key, value: String(value) }
-        }));
     };
 
     /**
@@ -1507,6 +1620,124 @@
 
         return true;
     };
+
+    // =========================================================================
+    // AUTH STATE (UI helpers)
+    // =========================================================================
+    // Declarative reactions to login state, building on the Tier 1/2 token
+    // verbs. Everything re-applies on load and whenever qs:auth:saved /
+    // qs:auth:cleared fire (saveToken / clearToken / refresh all emit those).
+
+    /**
+     * Is there a non-empty value at the given storage source? Shared presence
+     * check behind QS.isAuthed and the data-*-show bindings.
+     * @param {string} source "localStorage:key" / "sessionStorage:key"
+     * @returns {boolean}
+     */
+    function _hasValue(source) {
+        const v = getTokenValue(source);
+        return v !== null && v !== undefined && v !== '';
+    }
+
+    /**
+     * Is there a non-empty token at the given storage source? Auth-facing
+     * alias of _hasValue.
+     * @param {string} source "localStorage:key" / "sessionStorage:key"
+     * @returns {boolean}
+     */
+    QS.isAuthed = function(source) {
+        return _hasValue(source);
+    };
+
+    /**
+     * Manually trigger a token refresh for an API, reusing the Tier 2 flow.
+     * Handy for a "Refresh" button. Resolves true if a new token was stored;
+     * fires qs:auth:saved on success (so auth-state bindings re-render).
+     * @param {string} apiRef "@apiId" (or "@apiId/endpointId")
+     * @returns {Promise<boolean>}
+     */
+    QS.refresh = function(apiRef) {
+        const ref = String(apiRef || '').replace(/^@/, '');
+        const apiId = ref.split('/')[0];
+        const registry = window.QS_API_ENDPOINTS || {};
+        const api = registry[apiId];
+        if (!api || !api.auth || !api.auth.refreshEndpoint) {
+            console.warn('[QS] refresh: no refresh config for', apiRef);
+            return Promise.resolve(false);
+        }
+        return refreshAuthToken(api.auth);
+    };
+
+    /**
+     * Resolve the storage source for an auth-state element: its own
+     * data-auth-source, else the nearest ancestor's, else null.
+     */
+    function _resolveAuthSource(el) {
+        let node = el;
+        while (node && node.nodeType === 1) {
+            const s = node.getAttribute('data-auth-source');
+            if (s) return s;
+            node = node.parentElement;
+        }
+        return null;
+    }
+
+    /**
+     * Apply declarative auth/storage-state bindings across the document:
+     *   data-auth-show="in" | "out"          → show by login state (auth sugar)
+     *   data-storage-show="has:loc:key"      → show when a storage key is present
+     *   data-storage-show="missing:loc:key"  → show when it is absent
+     *   data-storage-value="loc:key"         → element text = the stored value
+     * data-auth-show resolves its source from data-auth-source on the element
+     * or any ancestor (set it once on a wrapper); the data-storage-* attrs
+     * carry their source inline. Plain data-* namespace (NOT data-qs-*, which
+     * the editor reserves and strips) so these stay user-authorable.
+     * Re-applies on load + qs:auth:saved / qs:auth:cleared. Exposed as
+     * QS.applyAuthState to re-scan after injecting DOM or a non-auth store.
+     */
+    function applyAuthState() {
+        // Auth sugar: login-state show/hide (source from data-auth-source).
+        document.querySelectorAll('[data-auth-show]').forEach(function (el) {
+            const mode = el.getAttribute('data-auth-show');
+            if (mode !== 'in' && mode !== 'out') return;
+            const source = _resolveAuthSource(el);
+            if (!source) {
+                console.warn('[QS] data-auth-show: no data-auth-source on element or ancestors', el);
+                return;
+            }
+            const present = _hasValue(source);
+            el.style.display = ((mode === 'in') ? present : !present) ? '' : 'none';
+        });
+
+        // Generic presence show/hide: "has:<source>" / "missing:<source>".
+        document.querySelectorAll('[data-storage-show]').forEach(function (el) {
+            const spec = el.getAttribute('data-storage-show') || '';
+            const idx = spec.indexOf(':');
+            const mode = idx === -1 ? '' : spec.slice(0, idx);
+            const source = idx === -1 ? '' : spec.slice(idx + 1);
+            if ((mode !== 'has' && mode !== 'missing') || !source) {
+                console.warn('[QS] data-storage-show: expected "has:loc:key" or "missing:loc:key", got', spec);
+                return;
+            }
+            const present = _hasValue(source);
+            el.style.display = ((mode === 'has') ? present : !present) ? '' : 'none';
+        });
+
+        // Generic value display: element text = the stored value.
+        document.querySelectorAll('[data-storage-value]').forEach(function (el) {
+            const v = getTokenValue(el.getAttribute('data-storage-value'));
+            el.textContent = (v === null || v === undefined) ? '' : v;
+        });
+    }
+    QS.applyAuthState = applyAuthState;
+
+    document.addEventListener('qs:auth:saved', applyAuthState);
+    document.addEventListener('qs:auth:cleared', applyAuthState);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyAuthState);
+    } else {
+        applyAuthState();
+    }
 
     // Expose to window
     window.QS = QS;

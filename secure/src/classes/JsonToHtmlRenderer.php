@@ -854,7 +854,9 @@ class JsonToHtmlRenderer {
             'setValue', 'redirect', 'filter', 'scrollTo', 'focus', 'blur', 'fetch',
             'renderList', 'toast', 'validate',
             // Auth flows Tier 1: token persistence verbs.
-            'saveToken', 'clearToken'
+            'saveToken', 'clearToken',
+            // Auth flows Tier 2 / auth-state UI: manual refresh + re-scan.
+            'refresh', 'applyAuthState'
         ];
     }
 

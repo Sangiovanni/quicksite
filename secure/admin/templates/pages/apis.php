@@ -174,13 +174,56 @@ $baseUrl = rtrim(BASE_URL, '/');
                             <option value="config"><?= __admin('apis.form.storageConfig') ?></option>
                         </select>
                         <label class="admin-label apis-auth-token-label"><?= __admin('apis.form.storageKeyName') ?></label>
-                        <input type="text" class="admin-input apis-auth-token-input" id="api-token-source-key" 
+                        <input type="text" class="admin-input apis-auth-token-input" id="api-token-source-key"
                                placeholder="authToken">
                         <p class="admin-hint"><?= __admin('apis.form.storageKeyHint') ?></p>
                         <div id="auth-config-warning" class="admin-alert admin-alert--warning apis-auth-config-warning" style="display: none;">
                             <small><?= __admin('apis.form.configWarning') ?></small>
                         </div>
                     </div>
+
+                    <!-- Refresh (optional) — bearer-only. The collapsible
+                         <details>/<summary> is dependency-free and keeps the
+                         section out of the way until needed. -->
+                    <details class="admin-collapsible" id="auth-refresh-group" style="display: none;">
+                        <summary class="admin-collapsible__summary"><?= __admin('apis.form.refreshSection') ?></summary>
+                        <div class="admin-form-group">
+                            <label class="admin-label" for="api-refresh-endpoint"><?= __admin('apis.form.refreshEndpoint') ?></label>
+                            <select class="admin-select" id="api-refresh-endpoint">
+                                <option value=""><?= __admin('apis.form.refreshNone') ?></option>
+                            </select>
+                            <p class="admin-hint"><?= __admin('apis.form.refreshEndpointHint') ?></p>
+                        </div>
+                        <div class="admin-form-group">
+                            <label class="admin-label"><?= __admin('apis.form.refreshTokenStorage') ?></label>
+                            <select class="admin-select" id="api-refresh-token-source-prefix">
+                                <option value="localStorage"><?= __admin('apis.form.storageLocalStorage') ?></option>
+                                <option value="sessionStorage"><?= __admin('apis.form.storageSessionStorage') ?></option>
+                            </select>
+                            <label class="admin-label apis-auth-token-label"><?= __admin('apis.form.refreshTokenKey') ?></label>
+                            <input type="text" class="admin-input apis-auth-token-input" id="api-refresh-token-source-key"
+                                   placeholder="refreshToken">
+                            <p class="admin-hint"><?= __admin('apis.form.refreshTokenKeyHint') ?></p>
+                        </div>
+                        <div class="admin-form-group">
+                            <label class="admin-label" for="api-refresh-body-field"><?= __admin('apis.form.refreshBodyField') ?></label>
+                            <input type="text" class="admin-input" id="api-refresh-body-field"
+                                   placeholder="refreshToken">
+                            <p class="admin-hint"><?= __admin('apis.form.refreshBodyFieldHint') ?></p>
+                        </div>
+                        <div class="admin-form-group">
+                            <label class="admin-label" for="api-refresh-response-token-path"><?= __admin('apis.form.refreshResponseTokenPath') ?></label>
+                            <input type="text" class="admin-input" id="api-refresh-response-token-path"
+                                   placeholder="token">
+                            <p class="admin-hint"><?= __admin('apis.form.refreshResponseTokenPathHint') ?></p>
+                        </div>
+                        <div class="admin-form-group">
+                            <label class="admin-label" for="api-refresh-response-refresh-token-path"><?= __admin('apis.form.refreshResponseRefreshTokenPath') ?></label>
+                            <input type="text" class="admin-input" id="api-refresh-response-refresh-token-path"
+                                   placeholder="refreshToken">
+                            <p class="admin-hint"><?= __admin('apis.form.refreshResponseRefreshTokenPathHint') ?></p>
+                        </div>
+                    </details>
                 </fieldset>
             </div>
             <div class="admin-modal__footer">

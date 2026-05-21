@@ -19,7 +19,8 @@
  *     // Endpoint operations (use ONE of these):
  *     "endpoints": [...],                // Full replacement of all endpoints
  *     "addEndpoint": { ... },            // Add a single endpoint
- *     "editEndpoint": { "id": "...", "updates": {...} },  // Edit endpoint
+ *     "editEndpoint": { "id": "...", "updates": {...} },  // Edit endpoint (same id)
+ *     "renameEndpoint": { "from": "...", "to": "...", "updates": {...} },  // Rename id + re-point references
  *     "deleteEndpoint": "endpoint-id"    // Delete endpoint by ID
  * }
  * 
@@ -82,7 +83,10 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
     if (isset($params['deleteEndpoint'])) {
         $updates['deleteEndpoint'] = $params['deleteEndpoint'];
     }
-    
+    if (isset($params['renameEndpoint'])) {
+        $updates['renameEndpoint'] = $params['renameEndpoint'];
+    }
+
     if (empty($updates)) {
         return ApiResponse::create(400, 'api.error.missing_parameter')
             ->withMessage('No updates provided. Specify at least one field to update.');
@@ -121,6 +125,25 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
             'modifiedFiles' => $interactionsCleanup['modifiedFiles']
         ];
     }
+
+    // Cascade rename when an endpoint id changed — re-point references
+    // (interactions + page events) from the old id to the new one instead of
+    // dropping them. refreshEndpoint refs were already rewritten in-config by
+    // ApiEndpointManager::editApi.
+    $cascadeRename = null;
+    if (!empty($result['renamed'])) {
+        $from = $result['renamed']['from'];
+        $to = $result['renamed']['to'];
+        $pageEventsRename = renamePageEventsForApiEndpoint($apiId, $from, $to);
+        $interactionsRename = renameInteractionsForApiEndpoint($apiId, $from, $to);
+        $cascadeRename = [
+            'from' => $from,
+            'to' => $to,
+            'pageEventsUpdated' => count($pageEventsRename['renamedCalls']),
+            'interactionsUpdated' => count($interactionsRename['renamedInteractions']),
+            'modifiedFiles' => $interactionsRename['modifiedFiles']
+        ];
+    }
     
     $responseData = [
         'apiId' => $result['apiId'],
@@ -134,6 +157,9 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
     ];
     if ($cascadeCleanup) {
         $responseData['cascadeCleanup'] = $cascadeCleanup;
+    }
+    if ($cascadeRename) {
+        $responseData['cascadeRename'] = $cascadeRename;
     }
     
     return ApiResponse::create(200, 'operation.success')
