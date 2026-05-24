@@ -11041,6 +11041,80 @@ code.preview-node-panel__value {
     word-break: break-all;
 }
 
+/* ---- State stores (sidebar section; reuses the page-events shell) ---- */
+.preview-contextual-js-form-checkbox {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: 0.8rem;
+    color: var(--admin-text);
+    cursor: pointer;
+    margin-bottom: var(--space-sm);
+}
+
+.preview-contextual-js-state-stores__fields {
+    margin-bottom: var(--space-sm);
+}
+
+.preview-contextual-js-state-stores__fields-rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xs);
+}
+
+.preview-contextual-js-state-stores__field {
+    padding: var(--space-sm);
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.preview-contextual-js-state-stores__field .preview-contextual-js-form-row {
+    margin-bottom: 0;
+}
+
+.preview-contextual-js-state-stores__field-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.preview-contextual-js-state-stores__field-head .ss-field-name {
+    flex: 1;
+}
+
+/* Remove button lives in the wizard (not an __item), so keep it visible. */
+.ss-field-remove {
+    opacity: 0.6 !important;
+}
+
+.ss-field-init-row,
+.ss-field-from-row {
+    display: flex;
+    gap: var(--space-xs);
+    align-items: center;
+}
+
+.ss-field-init-row .preview-contextual-js-form-input,
+.ss-field-from-row .preview-contextual-js-form-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.ss-field-append {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    color: var(--admin-text-secondary);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
 /* JS Interaction Card */
 
 .preview-js-event-header {
@@ -11164,6 +11238,7 @@ code.preview-node-panel__value {
 .preview-contextual-js-form-select,
 .preview-contextual-js-form-input {
     width: 100%;
+    box-sizing: border-box;
     padding: var(--space-xs) var(--space-sm);
     border: 1px solid var(--admin-border);
     border-radius: var(--radius-sm);

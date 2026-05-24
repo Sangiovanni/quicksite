@@ -166,6 +166,24 @@ class PageManagement {
             $body .= '<script src="' . BASE_URL . '/scripts/qs-enums.js"></script>';
         }
 
+        // Inject this page's state-store definitions for the client runtime
+        // (qs.js reads window.QS_STATE_STORES). Per-page, sourced from
+        // data/state-stores.json keyed by route path. Emitted after
+        // qs-api-config (the store endpoints resolve against QS_API_ENDPOINTS)
+        // and before the page-events script (so onload fetchState sees the
+        // stores). Skipped in editor mode, like page events.
+        if (!$editorMode) {
+            $storesFile = PROJECT_PATH . '/data/state-stores.json';
+            if (file_exists($storesFile)) {
+                $storesContent = @file_get_contents($storesFile);
+                $storesAll = $storesContent !== false ? json_decode($storesContent, true) : [];
+                $currentStores = is_array($storesAll) ? ($storesAll[$trimParameters->routePath()] ?? []) : [];
+                if (!empty($currentStores)) {
+                    $body .= '<script>window.QS_STATE_STORES=' . json_encode($currentStores, JSON_UNESCAPED_SLASHES) . ';</script>';
+                }
+            }
+        }
+
         // Include additional scripts
         if (!empty($this->scripts)) {
             foreach ($this->scripts as $script) {

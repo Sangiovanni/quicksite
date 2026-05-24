@@ -215,6 +215,27 @@ window.PreviewConfig = {
         targetSelector: <?= json_encode(__admin('preview.targetSelector', 'Target selector')) ?>,
         thisElement: <?= json_encode(__admin('preview.thisElement', 'this element')) ?>,
 
+        // ── State stores panel (preview-js-interactions.js) ──
+        noStateStores: <?= json_encode(__admin('preview.noStateStores', 'No state stores yet.')) ?>,
+        stateStoreSaved: <?= json_encode(__admin('preview.stateStoreSaved', 'State store saved')) ?>,
+        stateStoreDeleted: <?= json_encode(__admin('preview.stateStoreDeleted', 'State store deleted')) ?>,
+        confirmDeleteStateStore: <?= json_encode(__admin('preview.confirmDeleteStateStore', 'Delete state store "%s"?')) ?>,
+        stateStoreInvalidId: <?= json_encode(__admin('preview.stateStoreInvalidId', 'Invalid store id (use letters, digits, _ or -)')) ?>,
+        selectApiEndpoint: <?= json_encode(__admin('preview.selectApiEndpoint', 'Select an API and endpoint')) ?>,
+        stateStoreNoFields: <?= json_encode(__admin('preview.stateStoreNoFields', 'Add at least one field')) ?>,
+        stateStoreIdExists: <?= json_encode(__admin('preview.stateStoreIdExists', 'A store named "%s" already exists')) ?>,
+        stateStoreFieldName: <?= json_encode(__admin('preview.stateStoreFieldName', 'field name')) ?>,
+        stateStoreInitPlaceholder: <?= json_encode(__admin('preview.stateStoreInitPlaceholder', 'literal, query:x, localStorage:x')) ?>,
+        stateStoreDefaultPlaceholder: <?= json_encode(__admin('preview.stateStoreDefaultPlaceholder', 'default')) ?>,
+        stateStoreFromPlaceholder: <?= json_encode(__admin('preview.stateStoreFromPlaceholder', 'response path, e.g. data.items')) ?>,
+        stateStoreAppend: <?= json_encode(__admin('preview.stateStoreAppend', 'append (grow list)')) ?>,
+        stateStoreNonePage: <?= json_encode(__admin('preview.stateStoreNonePage', 'No stores on this page')) ?>,
+        stateStoreDirRequest: <?= json_encode(__admin('preview.stateStoreDirRequest', 'request (sent)')) ?>,
+        stateStoreDirResponse: <?= json_encode(__admin('preview.stateStoreDirResponse', 'response (received)')) ?>,
+        stateStoreDirBoth: <?= json_encode(__admin('preview.stateStoreDirBoth', 'both (sent + received)')) ?>,
+        selectApiPlaceholder: <?= json_encode(__admin('preview.selectApiPlaceholder', '-- Select API --')) ?>,
+        selectEndpointPlaceholder: <?= json_encode(__admin('preview.selectEndpointPlaceholder', '-- Select endpoint --')) ?>,
+
         // ── Drag tool ──
         dragLock: <?= json_encode(__admin('preview.dragLock', 'Lock')) ?>,
         dragUndo: <?= json_encode(__admin('preview.dragUndo', 'Undo')) ?>,

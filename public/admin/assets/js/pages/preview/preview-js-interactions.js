@@ -101,7 +101,28 @@
     let elBindingsContainer = null;
     let elBindingsRows = null;
     let elBindingsAdd = null;
-    
+
+    // State stores DOM references + state
+    let ssContainer = null;
+    let ssBody = null;
+    let ssList = null;
+    let ssCount = null;
+    let ssToggle = null;
+    let ssAddBtn = null;
+    let ssForm = null;
+    let ssFormId = null;
+    let ssFormApi = null;
+    let ssFormEndpoint = null;
+    let ssFormFetchOnLoad = null;
+    let ssFieldsRows = null;
+    let ssFieldAddBtn = null;
+    let ssFormPreview = null;
+    let ssFormSave = null;
+    let ssFormCancel = null;
+    let ssExpanded = false;
+    let ssCurrentStores = {};   // { storeId => def } for the current page
+    let ssEditingId = null;     // null = creating; otherwise the id being edited
+
     // Callback references for cross-module communication
     let showToastFn = null;
     let sendToIframeFn = null;
@@ -180,7 +201,25 @@
         elBindingsContainer = document.getElementById('js-form-bindings');
         elBindingsRows = document.getElementById('js-form-bindings-rows');
         elBindingsAdd = document.getElementById('js-form-bindings-add');
-        
+
+        // State stores DOM references
+        ssContainer = document.getElementById('js-state-stores');
+        ssBody = document.getElementById('js-state-stores-body');
+        ssList = document.getElementById('js-state-stores-list');
+        ssCount = document.getElementById('js-state-stores-count');
+        ssToggle = document.getElementById('js-state-stores-toggle');
+        ssAddBtn = document.getElementById('js-state-store-add');
+        ssForm = document.getElementById('js-state-store-form');
+        ssFormId = document.getElementById('js-state-store-id');
+        ssFormApi = document.getElementById('js-state-store-api');
+        ssFormEndpoint = document.getElementById('js-state-store-endpoint');
+        ssFormFetchOnLoad = document.getElementById('js-state-store-fetch-on-load');
+        ssFieldsRows = document.getElementById('js-state-store-fields-rows');
+        ssFieldAddBtn = document.getElementById('js-state-store-field-add');
+        ssFormPreview = document.getElementById('js-state-store-preview');
+        ssFormSave = document.getElementById('js-state-store-save');
+        ssFormCancel = document.getElementById('js-state-store-cancel');
+
         // Initialize event handlers
         initEventHandlers();
     }
@@ -337,6 +376,33 @@
         if (elBindingsAdd) {
             elBindingsAdd.addEventListener('click', function() {
                 addBindingRow(elBindingsRows, jsFormApi, jsFormEndpoint);
+            });
+        }
+
+        // ---- State stores handlers ----
+
+        // Toggle expand/collapse (click on header)
+        if (ssContainer) {
+            var ssHeader = ssContainer.querySelector('.preview-contextual-js-page-events__header');
+            if (ssHeader) ssHeader.addEventListener('click', toggleStateStores);
+        }
+        // New store button
+        if (ssAddBtn) ssAddBtn.addEventListener('click', handleStateStoreAdd);
+        // Cancel wizard
+        if (ssFormCancel) ssFormCancel.addEventListener('click', hideStateStoreForm);
+        // Save wizard
+        if (ssFormSave) ssFormSave.addEventListener('click', handleStateStoreSave);
+        // Store id input → re-validate
+        if (ssFormId) ssFormId.addEventListener('input', updateStateStorePreview);
+        // API select → populate endpoints
+        if (ssFormApi) ssFormApi.addEventListener('change', handleSsApiChange);
+        // Endpoint select → auto-seed fields from schema + re-validate
+        if (ssFormEndpoint) ssFormEndpoint.addEventListener('change', handleSsEndpointChange);
+        // Add field row
+        if (ssFieldAddBtn) {
+            ssFieldAddBtn.addEventListener('click', function() {
+                if (ssFieldsRows) ssFieldsRows.appendChild(_renderSsFieldRow());
+                updateStateStorePreview();
             });
         }
     }
@@ -1619,7 +1685,10 @@
         if (arg.required !== false) label.innerHTML += ' <span class="required">*</span>';
         row.appendChild(label);
 
-        if (usePicker && (inputType === 'selector' || inputType === 'class' || inputType === 'matchTarget')) {
+        if (inputType === 'store') {
+            // State-store arg: a dropdown of the current page's stores.
+            row.appendChild(_renderStoreArgSelect(arg, paramIndex, updateFn));
+        } else if (usePicker && (inputType === 'selector' || inputType === 'class' || inputType === 'matchTarget')) {
             var picker = createSearchablePicker(inputType, arg, paramIndex);
             row.appendChild(picker);
         } else {
@@ -1635,8 +1704,44 @@
             input.addEventListener('input', updateFn);
             row.appendChild(input);
         }
-        
+
         return row;
+    }
+
+    /** Store ids defined on the current page (for setState/fetchState args). */
+    function _pageStoreIds() {
+        return (ssCurrentStores && typeof ssCurrentStores === 'object') ? Object.keys(ssCurrentStores) : [];
+    }
+
+    /**
+     * Render the `store` arg as a <select> of the page's stores. Carries the
+     * `.preview-contextual-js-form-input` class so the param collectors pick it
+     * up positionally. Auto-selects the first store so the arg is never empty.
+     */
+    function _renderStoreArgSelect(arg, paramIndex, updateFn) {
+        var sel = document.createElement('select');
+        sel.className = 'preview-contextual-js-form-input';
+        sel.dataset.paramIndex = paramIndex;
+        sel.dataset.paramName = arg.name || '';
+        sel.dataset.ssRole = 'store';
+        var ids = _pageStoreIds();
+        if (ids.length === 0) {
+            var none = document.createElement('option');
+            none.value = '';
+            none.textContent = PreviewConfig.i18n?.stateStoreNonePage || 'No stores on this page';
+            sel.appendChild(none);
+            sel.disabled = true;
+        } else {
+            ids.forEach(function(id) {
+                var o = document.createElement('option');
+                o.value = id;
+                o.textContent = id;
+                sel.appendChild(o);
+            });
+            sel.value = ids[0];
+        }
+        sel.addEventListener('change', updateFn);
+        return sel;
     }
 
     /**
@@ -2798,8 +2903,13 @@
         if (peContainer) {
             peContainer.style.display = pageName ? '' : 'none';
         }
-        // Reset form when page changes
+        // State stores are page-scoped too — hide on components.
+        if (ssContainer) {
+            ssContainer.style.display = pageName ? '' : 'none';
+        }
+        // Reset forms when page changes
         hidePageEventForm();
+        hideStateStoreForm();
     }
     
     /**
@@ -3150,6 +3260,535 @@
         }
     }
     
+    // ==================== State Stores ====================
+
+    // Direction options for a store field (glyphs match the §8 UX sketch;
+    // the words are translatable via PreviewConfig.i18n).
+    var SS_DIRECTIONS = [
+        { value: 'request',  label: '→ ' + (PreviewConfig.i18n?.stateStoreDirRequest  || 'request (sent)') },
+        { value: 'response', label: '← ' + (PreviewConfig.i18n?.stateStoreDirResponse || 'response (received)') },
+        { value: 'both',     label: '⇄ ' + (PreviewConfig.i18n?.stateStoreDirBoth     || 'both (sent + received)') }
+    ];
+
+    /**
+     * Toggle expand/collapse of the state stores section.
+     */
+    function toggleStateStores() {
+        ssExpanded = !ssExpanded;
+        if (ssBody) ssBody.style.display = ssExpanded ? '' : 'none';
+        if (ssContainer) {
+            ssContainer.classList.toggle('preview-contextual-js-page-events--expanded', ssExpanded);
+        }
+    }
+
+    function _ssEmpty(text) {
+        var p = document.createElement('p');
+        p.className = 'preview-contextual-js-empty';
+        p.textContent = text;
+        return p;
+    }
+
+    /**
+     * Load the current page's state stores from the API and render them.
+     */
+    async function loadStateStores() {
+        if (!currentPageName) return;
+        try {
+            var response = await fetch('/management/getStateStores', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + PreviewConfig.authToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ route: currentPageName })
+            });
+            if (!response.ok) throw new Error('Failed to fetch state stores');
+            var result = await response.json();
+            // getForRoute returns [] (array) when empty, or an object map otherwise.
+            var stores = (result.data && result.data.stores) || {};
+            ssCurrentStores = (stores && typeof stores === 'object' && !Array.isArray(stores)) ? stores : {};
+            displayStateStores(ssCurrentStores);
+        } catch (error) {
+            console.error('[PreviewJsInteractions] Failed to load state stores:', error);
+            if (ssList) { ssList.textContent = ''; ssList.appendChild(_ssEmpty('Failed to load state stores')); }
+            if (ssCount) ssCount.textContent = '0';
+        }
+    }
+
+    /**
+     * Render the store list (one card per store).
+     */
+    function displayStateStores(stores) {
+        if (!ssList) return;
+        var ids = Object.keys(stores || {});
+        if (ssCount) ssCount.textContent = String(ids.length);
+        ssList.textContent = '';
+        if (ids.length === 0) {
+            ssList.appendChild(_ssEmpty(PreviewConfig.i18n?.noStateStores || 'No state stores yet.'));
+            return;
+        }
+        ids.forEach(function(id) {
+            ssList.appendChild(_renderStoreCard(id, stores[id]));
+        });
+    }
+
+    /**
+     * One store summary card: id badge + endpoint/field summary + edit/delete.
+     */
+    function _renderStoreCard(id, def) {
+        var card = document.createElement('div');
+        card.className = 'preview-contextual-js-page-events__item preview-contextual-js-state-stores__card';
+
+        var badge = document.createElement('span');
+        badge.className = 'preview-contextual-js-page-events__event-badge';
+        badge.textContent = id;
+        card.appendChild(badge);
+
+        var code = document.createElement('code');
+        code.className = 'preview-contextual-js-page-events__code';
+        var fieldCount = (def && def.fields) ? Object.keys(def.fields).length : 0;
+        var summary = (def && def.endpoint ? def.endpoint : '?') + ' · ' + fieldCount + 'f';
+        if (def && def.fetchOnLoad) summary += ' · onload';
+        code.textContent = summary;
+        card.appendChild(code);
+
+        var editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'preview-contextual-js-page-events__delete';
+        editBtn.title = PreviewConfig.i18n?.edit || 'Edit';
+        editBtn.innerHTML = QuickSiteUtils.iconEdit(12);
+        editBtn.addEventListener('click', function(e) { e.stopPropagation(); handleStateStoreEdit(id); });
+        card.appendChild(editBtn);
+
+        var delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'preview-contextual-js-page-events__delete';
+        delBtn.title = PreviewConfig.i18n?.delete || 'Delete';
+        delBtn.innerHTML = QuickSiteUtils.iconClose(12);
+        delBtn.addEventListener('click', function(e) { e.stopPropagation(); deleteStore(id); });
+        card.appendChild(delBtn);
+
+        return card;
+    }
+
+    /**
+     * Delete one store (read-modify-write: send the route's full set minus it).
+     */
+    async function deleteStore(id) {
+        if (!currentPageName) return;
+        if (!confirm((PreviewConfig.i18n?.confirmDeleteStateStore || 'Delete state store "%s"?').replace('%s', id))) return;
+        var stores = Object.assign({}, ssCurrentStores);
+        delete stores[id];
+        try {
+            var response = await fetch('/management/setStateStores', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + PreviewConfig.authToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ route: currentPageName, stores: stores })
+            });
+            var result = await response.json();
+            if (!response.ok) throw new Error(result.message || 'Failed to delete');
+            if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreDeleted || 'State store deleted', 'success');
+            await loadStateStores();
+            if (reloadPreviewFn) reloadPreviewFn();
+        } catch (error) {
+            console.error('[PreviewJsInteractions] Delete state store error:', error);
+            if (showToastFn) showToastFn('Error: ' + error.message, 'error');
+        }
+    }
+
+    /**
+     * Rebuild the wizard's API <select> from the loaded endpoint catalogue.
+     */
+    function _populateSsApiSelect() {
+        if (!ssFormApi) return;
+        ssFormApi.textContent = '';
+        var ph = document.createElement('option');
+        ph.value = '';
+        ph.textContent = PreviewConfig.i18n?.selectApiPlaceholder || '-- Select API --';
+        ssFormApi.appendChild(ph);
+        var uniqueApis = [...new Set(availableApiEndpoints.map(function(ep) { return ep.api; }))];
+        uniqueApis.forEach(function(apiName) {
+            var o = document.createElement('option');
+            o.value = apiName;
+            o.textContent = apiName;
+            ssFormApi.appendChild(o);
+        });
+    }
+
+    /**
+     * Populate the wizard's endpoint <select> for the chosen API.
+     */
+    function handleSsApiChange() {
+        var apiName = ssFormApi ? ssFormApi.value : '';
+        if (!ssFormEndpoint) return;
+        ssFormEndpoint.textContent = '';
+        var ph = document.createElement('option');
+        ph.value = '';
+        ph.textContent = PreviewConfig.i18n?.selectEndpointPlaceholder || '-- Select endpoint --';
+        ssFormEndpoint.appendChild(ph);
+        if (!apiName) {
+            ssFormEndpoint.disabled = true;
+            updateStateStorePreview();
+            return;
+        }
+        var eps = availableApiEndpoints.filter(function(ep) { return ep.api === apiName; });
+        eps.forEach(function(ep) {
+            var o = document.createElement('option');
+            o.value = ep.endpoint;
+            o.textContent = ep.endpoint + ' (' + ep.method + ')';
+            ssFormEndpoint.appendChild(o);
+        });
+        ssFormEndpoint.disabled = eps.length === 0;
+        updateStateStorePreview();
+    }
+
+    /** The availableApiEndpoints entry for the wizard's current API+endpoint. */
+    function _selectedSsEndpointData() {
+        var api = ssFormApi ? ssFormApi.value : '';
+        var ep = ssFormEndpoint ? ssFormEndpoint.value : '';
+        if (!api || !ep) return null;
+        return availableApiEndpoints.find(function(e) { return e.api === api && e.endpoint === ep; }) || null;
+    }
+
+    /**
+     * Build a seed field set from the endpoint's declared schemas:
+     *   request properties → request fields (carry schema default),
+     *   response leaves     → response fields (from = dot-path),
+     *   a name in both      → both.
+     * Non-exhaustive + fully editable — a starting point, never an assumption.
+     */
+    function _seedFieldsFromEndpoint(epData) {
+        var seeded = [];
+        var byName = {};
+        var VALID = /^[a-zA-Z_][\w-]*$/;
+
+        var reqProps = (epData && epData.requestSchema && epData.requestSchema.properties) || {};
+        Object.keys(reqProps).forEach(function(name) {
+            if (!VALID.test(name)) return;
+            var d = reqProps[name] || {};
+            var entry = { name: name, dir: 'request' };
+            if (d.default !== undefined) entry.default = d.default;
+            byName[name] = entry;
+            seeded.push(entry);
+        });
+
+        var respProps = (epData && epData.responseSchema && epData.responseSchema.properties) || {};
+        var flat = _flattenSchema(respProps);
+        Object.keys(flat).forEach(function(path) {
+            var s = flat[path] || {};
+            if (s.type === 'object' && s.properties) return;   // skip containers
+            var leaf = path.split('.').pop();
+            if (!VALID.test(leaf)) return;
+            if (byName[leaf]) {
+                byName[leaf].dir = 'both';
+                byName[leaf].from = path;
+                if (s.type === 'array') byName[leaf].append = false;
+            } else {
+                var entry = { name: leaf, dir: 'response', from: path };
+                byName[leaf] = entry;
+                seeded.push(entry);
+            }
+        });
+
+        return seeded;
+    }
+
+    /**
+     * Auto-seed the fields table from the selected endpoint's schema — but
+     * only when the user hasn't entered any named field yet (never clobbers).
+     */
+    function _maybeAutoSeedFields() {
+        if (!ssFieldsRows) return;
+        if (Object.keys(collectSsFields()).length > 0) return;
+        var ep = _selectedSsEndpointData();
+        if (!ep) return;
+        var seeded = _seedFieldsFromEndpoint(ep);
+        if (seeded.length === 0) return;
+        ssFieldsRows.textContent = '';
+        seeded.forEach(function(f) { ssFieldsRows.appendChild(_renderSsFieldRow(f.name, f)); });
+    }
+
+    /** Endpoint select changed: seed fields from schema (if empty) + re-validate. */
+    function handleSsEndpointChange() {
+        _maybeAutoSeedFields();
+        updateStateStorePreview();
+    }
+
+    /**
+     * Build one editable field card (createElement; no innerHTML except icons).
+     * `def` pre-fills the row when editing an existing store.
+     */
+    function _renderSsFieldRow(name, def) {
+        def = def || {};
+        var row = document.createElement('div');
+        row.className = 'preview-contextual-js-state-stores__field';
+
+        // Head: name + remove
+        var head = document.createElement('div');
+        head.className = 'preview-contextual-js-state-stores__field-head';
+        var nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'preview-contextual-js-form-input ss-field-name';
+        nameInput.placeholder = PreviewConfig.i18n?.stateStoreFieldName || 'field name';
+        if (name) nameInput.value = name;
+        nameInput.addEventListener('input', updateStateStorePreview);
+        head.appendChild(nameInput);
+        var removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'preview-contextual-js-page-events__delete ss-field-remove';
+        removeBtn.title = PreviewConfig.i18n?.delete || 'Remove';
+        removeBtn.innerHTML = QuickSiteUtils.iconClose(12);
+        removeBtn.addEventListener('click', function() { row.remove(); updateStateStorePreview(); });
+        head.appendChild(removeBtn);
+        row.appendChild(head);
+
+        // Direction
+        var dirRow = document.createElement('div');
+        dirRow.className = 'preview-contextual-js-form-row';
+        var dirSelect = document.createElement('select');
+        dirSelect.className = 'preview-contextual-js-form-select ss-field-dir';
+        SS_DIRECTIONS.forEach(function(d) {
+            var o = document.createElement('option');
+            o.value = d.value;
+            o.textContent = d.label;
+            dirSelect.appendChild(o);
+        });
+        dirSelect.value = def.dir || 'request';
+        dirRow.appendChild(dirSelect);
+        row.appendChild(dirRow);
+
+        // init + default (request / both)
+        var initRow = document.createElement('div');
+        initRow.className = 'preview-contextual-js-form-row ss-field-init-row';
+        var initInput = document.createElement('input');
+        initInput.type = 'text';
+        initInput.className = 'preview-contextual-js-form-input ss-field-init';
+        initInput.placeholder = PreviewConfig.i18n?.stateStoreInitPlaceholder || 'init: literal · query:x · localStorage:x';
+        if (def.init !== undefined && def.init !== null) initInput.value = String(def.init);
+        initInput.addEventListener('input', updateStateStorePreview);
+        var defaultInput = document.createElement('input');
+        defaultInput.type = 'text';
+        defaultInput.className = 'preview-contextual-js-form-input ss-field-default';
+        defaultInput.placeholder = PreviewConfig.i18n?.stateStoreDefaultPlaceholder || 'default';
+        if (def.default !== undefined && def.default !== null) defaultInput.value = String(def.default);
+        defaultInput.addEventListener('input', updateStateStorePreview);
+        initRow.appendChild(initInput);
+        initRow.appendChild(defaultInput);
+        row.appendChild(initRow);
+
+        // from + append (response / both)
+        var fromRow = document.createElement('div');
+        fromRow.className = 'preview-contextual-js-form-row ss-field-from-row';
+        var fromInput = document.createElement('input');
+        fromInput.type = 'text';
+        fromInput.className = 'preview-contextual-js-form-input ss-field-from';
+        fromInput.placeholder = PreviewConfig.i18n?.stateStoreFromPlaceholder || 'from: response path e.g. data.items';
+        if (def.from) fromInput.value = String(def.from);
+        fromInput.addEventListener('input', updateStateStorePreview);
+        var appendLabel = document.createElement('label');
+        appendLabel.className = 'ss-field-append';
+        var appendCb = document.createElement('input');
+        appendCb.type = 'checkbox';
+        appendCb.className = 'ss-field-append-cb';
+        if (def.append) appendCb.checked = true;
+        appendCb.addEventListener('change', updateStateStorePreview);
+        var appendSpan = document.createElement('span');
+        appendSpan.textContent = PreviewConfig.i18n?.stateStoreAppend || 'append (grow list)';
+        appendLabel.appendChild(appendCb);
+        appendLabel.appendChild(appendSpan);
+        fromRow.appendChild(fromInput);
+        fromRow.appendChild(appendLabel);
+        row.appendChild(fromRow);
+
+        // Direction toggles which sub-rows are visible.
+        function syncRow() {
+            var dir = dirSelect.value;
+            initRow.style.display = (dir === 'request' || dir === 'both') ? '' : 'none';
+            fromRow.style.display = (dir === 'response' || dir === 'both') ? '' : 'none';
+        }
+        dirSelect.addEventListener('change', function() { syncRow(); updateStateStorePreview(); });
+        syncRow();
+
+        return row;
+    }
+
+    /**
+     * Coerce a default value typed as text into the natural JSON scalar
+     * (number / boolean) so `page: default 1` stores 1, not "1".
+     */
+    function _coerceScalar(str) {
+        if (/^-?\d+$/.test(str)) return parseInt(str, 10);
+        if (/^-?\d*\.\d+$/.test(str)) return parseFloat(str);
+        if (str === 'true') return true;
+        if (str === 'false') return false;
+        return str;
+    }
+
+    /**
+     * Read every field card into the { name => def } map the backend expects.
+     */
+    function collectSsFields() {
+        var fields = {};
+        if (!ssFieldsRows) return fields;
+        var rows = ssFieldsRows.querySelectorAll('.preview-contextual-js-state-stores__field');
+        rows.forEach(function(row) {
+            var name = (row.querySelector('.ss-field-name')?.value || '').trim();
+            if (!name) return;
+            var dir = row.querySelector('.ss-field-dir')?.value || 'request';
+            var fdef = { dir: dir };
+            if (dir === 'request' || dir === 'both') {
+                var init = (row.querySelector('.ss-field-init')?.value || '').trim();
+                if (init !== '') fdef.init = init;
+                var dflt = (row.querySelector('.ss-field-default')?.value || '').trim();
+                if (dflt !== '') fdef.default = _coerceScalar(dflt);
+            }
+            if (dir === 'response' || dir === 'both') {
+                var from = (row.querySelector('.ss-field-from')?.value || '').trim();
+                if (from !== '') fdef.from = from;
+                if (row.querySelector('.ss-field-append-cb')?.checked) fdef.append = true;
+            }
+            fields[name] = fdef;
+        });
+        return fields;
+    }
+
+    /**
+     * Refresh the one-line preview and the Save button's enabled state.
+     */
+    function updateStateStorePreview() {
+        var id = (ssFormId?.value || '').trim();
+        var api = ssFormApi?.value || '';
+        var ep = ssFormEndpoint?.value || '';
+        var fieldCount = Object.keys(collectSsFields()).length;
+        var idValid = /^[a-zA-Z][\w-]*$/.test(id);
+        var valid = idValid && !!api && !!ep && fieldCount > 0;
+        if (ssFormPreview) {
+            ssFormPreview.textContent = valid
+                ? (id + ': @' + api + '/' + ep + ' · ' + fieldCount + ' field' + (fieldCount === 1 ? '' : 's'))
+                : '-';
+        }
+        if (ssFormSave) ssFormSave.disabled = !valid;
+    }
+
+    /**
+     * Open the wizard to create a new store.
+     */
+    async function handleStateStoreAdd() {
+        ssEditingId = null;
+        // Always refetch so admin-side API edits surface immediately (avoids
+        // the stale module-cache bug fixed for the interaction forms in Tier 1).
+        await fetchApiEndpoints();
+        _populateSsApiSelect();
+        if (ssFormId) ssFormId.value = '';
+        if (ssFormApi) ssFormApi.value = '';
+        handleSsApiChange();   // resets endpoint select to placeholder/disabled
+        if (ssFormFetchOnLoad) ssFormFetchOnLoad.checked = false;
+        if (ssFieldsRows) { ssFieldsRows.textContent = ''; ssFieldsRows.appendChild(_renderSsFieldRow()); }
+        if (ssForm) ssForm.style.display = '';
+        if (ssAddBtn?.parentElement) ssAddBtn.parentElement.style.display = 'none';
+        updateStateStorePreview();
+    }
+
+    /**
+     * Open the wizard pre-filled to edit an existing store.
+     */
+    async function handleStateStoreEdit(id) {
+        var def = ssCurrentStores[id];
+        if (!def) return;
+        ssEditingId = id;
+        await fetchApiEndpoints();   // always refresh (see handleStateStoreAdd note)
+        _populateSsApiSelect();
+        if (ssFormId) ssFormId.value = id;
+        var m = /^@([^/]+)\/(.+)$/.exec(def.endpoint || '');
+        if (m && ssFormApi) {
+            ssFormApi.value = m[1];
+            handleSsApiChange();
+            if (ssFormEndpoint) ssFormEndpoint.value = m[2];
+        }
+        if (ssFormFetchOnLoad) ssFormFetchOnLoad.checked = !!def.fetchOnLoad;
+        if (ssFieldsRows) {
+            ssFieldsRows.textContent = '';
+            var fields = def.fields || {};
+            var names = Object.keys(fields);
+            names.forEach(function(fname) { ssFieldsRows.appendChild(_renderSsFieldRow(fname, fields[fname])); });
+            if (names.length === 0) ssFieldsRows.appendChild(_renderSsFieldRow());
+        }
+        if (ssForm) ssForm.style.display = '';
+        if (ssAddBtn?.parentElement) ssAddBtn.parentElement.style.display = 'none';
+        updateStateStorePreview();
+    }
+
+    /**
+     * Hide the wizard and restore the New store button.
+     */
+    function hideStateStoreForm() {
+        if (ssForm) ssForm.style.display = 'none';
+        if (ssAddBtn?.parentElement) ssAddBtn.parentElement.style.display = '';
+        ssEditingId = null;
+    }
+
+    /**
+     * Save the store (create / edit / rename). setStateStores replaces the
+     * whole route store-set, so we send the loaded set with this store applied.
+     */
+    async function handleStateStoreSave() {
+        if (!currentPageName) return;
+        var id = (ssFormId?.value || '').trim();
+        if (!/^[a-zA-Z][\w-]*$/.test(id)) {
+            if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreInvalidId || 'Invalid store id (letters, digits, _ or -)', 'error');
+            return;
+        }
+        var api = ssFormApi?.value || '';
+        var ep = ssFormEndpoint?.value || '';
+        if (!api || !ep) {
+            if (showToastFn) showToastFn(PreviewConfig.i18n?.selectApiEndpoint || 'Select an API and endpoint', 'error');
+            return;
+        }
+        var fields = collectSsFields();
+        if (Object.keys(fields).length === 0) {
+            if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreNoFields || 'Add at least one field', 'error');
+            return;
+        }
+
+        var stores = Object.assign({}, ssCurrentStores);
+        if (!ssEditingId && stores[id]) {
+            if (showToastFn) showToastFn((PreviewConfig.i18n?.stateStoreIdExists || 'A store named "%s" already exists').replace('%s', id), 'error');
+            return;
+        }
+        if (ssEditingId && ssEditingId !== id) delete stores[ssEditingId];   // rename
+        stores[id] = {
+            endpoint: '@' + api + '/' + ep,
+            fetchOnLoad: !!(ssFormFetchOnLoad && ssFormFetchOnLoad.checked),
+            fields: fields
+        };
+
+        try {
+            if (ssFormSave) { ssFormSave.disabled = true; ssFormSave.textContent = PreviewConfig.i18n?.saving || 'Saving...'; }
+            var response = await fetch('/management/setStateStores', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + PreviewConfig.authToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ route: currentPageName, stores: stores })
+            });
+            var result = await response.json();
+            if (!response.ok) throw new Error(result.message || 'Failed to save');
+            if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreSaved || 'State store saved', 'success');
+            hideStateStoreForm();
+            await loadStateStores();
+            if (reloadPreviewFn) reloadPreviewFn();
+        } catch (error) {
+            console.error('[PreviewJsInteractions] Save state store error:', error);
+            if (showToastFn) showToastFn('Error: ' + error.message, 'error');
+        } finally {
+            if (ssFormSave) { ssFormSave.disabled = false; ssFormSave.textContent = PreviewConfig.i18n?.saveStateStore || 'Save store'; }
+        }
+    }
+
     // ==================== Response Bindings Helpers ====================
     
     /**
@@ -4408,6 +5047,9 @@
         // Page events
         setCurrentPage: setCurrentPage,
         loadPageEvents: loadPageEvents,
+
+        // State stores
+        loadStateStores: loadStateStores,
         
         // Get current context
         getContext: function() { return currentJsContext; },

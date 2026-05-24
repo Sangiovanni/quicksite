@@ -4054,6 +4054,89 @@ $GLOBALS['__help_commands'] = [
     ],
 
     // =========================================================================
+    // STATE STORE COMMANDS
+    // =========================================================================
+
+    'getStateStores' => [
+        'description' => 'Reads per-page state-store definitions. A state store is a named, endpoint-bound client view-model that gives interactions memory (pagination, search, filters, infinite scroll, auth state). Returns the store-set for a single route, or every route when "route" is omitted.',
+        'method' => 'POST',
+        'parameters' => [
+            'route' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Page/route name. Omit (or send empty) to retrieve stores for ALL routes. "pageName" is accepted as an alias.',
+                'example' => 'home',
+                'alias' => 'pageName'
+            ]
+        ],
+        'example_post' => 'POST /management/getStateStores with body: {"route": "home"} (single route) or {} (all routes)',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'State stores retrieved',
+            'data' => [
+                'route' => 'home',
+                'stores' => [
+                    'commandsList' => [
+                        'endpoint' => '@help-api/list',
+                        'fetchOnLoad' => true,
+                        'fields' => [
+                            'page' => ['dir' => 'request', 'init' => 'query:page', 'default' => 1],
+                            'items' => ['dir' => 'response', 'from' => 'data', 'append' => false]
+                        ]
+                    ]
+                ]
+            ]
+        ],
+        'error_responses' => [],
+        'notes' => 'Read-only. When "route" is provided the "stores" object holds only that route\'s stores ({storeId => def}); when omitted it is keyed by route ({route => {storeId => def}}). Definitions live in the per-project data/state-stores.json sidecar and are emitted to the client as window.QS_STATE_STORES for the qs.js runtime (QS.getState / QS.setState / QS.fetchState). Permission: editStructure.'
+    ],
+
+    'setStateStores' => [
+        'description' => 'Replaces a page\'s state-store definitions (read-modify-write: the admin panel sends the route\'s FULL store-set). An empty "stores" object clears the route\'s entry. Each store binds ONE endpoint and declares fields with a direction, an init source, and/or a response path.',
+        'method' => 'POST',
+        'parameters' => [
+            'route' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Page/route name to write stores for. Must be an existing route (special pages 404/500/403/401 are also allowed). "pageName" is accepted as an alias.',
+                'example' => 'home',
+                'alias' => 'pageName'
+            ],
+            'stores' => [
+                'required' => true,
+                'type' => 'object',
+                'description' => 'Map of {storeId => storeDefinition} that REPLACES the route\'s entire store-set. Send {} to clear the route. Store id must start with a letter, then letters/digits/underscore/hyphen.',
+                'example' => '{"commandsList": {"endpoint": "@help-api/list", "fetchOnLoad": true, "fields": {"page": {"dir": "request", "init": "query:page", "default": 1}, "items": {"dir": "response", "from": "data", "append": false}}}}'
+            ]
+        ],
+        'example_post' => 'POST /management/setStateStores with body: {"route": "home", "stores": {"results": {"endpoint": "@search-api/query", "fields": {"q": {"dir": "request", "init": "query:q", "default": ""}, "items": {"dir": "response", "from": "data.results"}}}}}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'State stores saved',
+            'data' => [
+                'route' => 'home',
+                'stores' => [
+                    'results' => [
+                        'endpoint' => '@search-api/query',
+                        'fields' => [
+                            'q' => ['dir' => 'request', 'init' => 'query:q', 'default' => ''],
+                            'items' => ['dir' => 'response', 'from' => 'data.results']
+                        ]
+                    ]
+                ]
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'Missing/invalid "route", or "stores" is not an object',
+            '400.validation.invalid_value' => 'A store failed validation (bad store id; endpoint not "@apiId/endpointId"; no fields; bad field name; dir not request|response|both; or missing "from" for a response/both field)',
+            '404.route.not_found' => 'Route does not exist'
+        ],
+        'notes' => 'Store definition shape — endpoint: "@apiId/endpointId" (required); fetchOnLoad: bool (optional); fields: {name => {dir, init?, default?, from?, append?}} (at least one field). Field directions: "request" (sent only), "response" (set from the response only — requires "from"), "both" (sent from its current value, then updated from the response — requires "from"). init (for sent fields): a literal, or "query:<param>" | "localStorage:<key>" | "sessionStorage:<key>". from (for received fields): a response dot-path (e.g. "data" or "meta.total"). append: true makes a list field grow (infinite scroll) instead of replacing. The definition is runtime-agnostic JSON; beta.8\'s server-side data-resolver reads the same shape. Permission: editStructure.'
+    ],
+
+    // =========================================================================
     // API REGISTRY COMMANDS
     // =========================================================================
     

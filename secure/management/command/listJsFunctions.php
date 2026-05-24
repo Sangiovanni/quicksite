@@ -239,6 +239,28 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
             'description' => 'Manually run the Tier 2 token refresh for an API (same flow as the automatic refresh-on-401). Reads the refresh token from the API\'s refreshTokenSource, POSTs to its refreshEndpoint, and stores the new access token. A raw fetch to the refresh endpoint will NOT work — only this verb can inject the stored refresh token. Fires `qs:auth:saved` on success. Use for a "Refresh session" button.',
             'example' => '{{call:refresh:@auth-api}}',
             'events' => ['onclick']
+        ],
+        [
+            'name' => 'setState',
+            'signature' => 'QS.setState(storeId, field, value)',
+            'args' => [
+                ['name' => 'storeId', 'type' => 'string', 'required' => true, 'description' => 'State store to update (defined in the State stores panel)', 'inputType' => 'store'],
+                ['name' => 'field', 'type' => 'string', 'required' => true, 'description' => 'Field name within the store'],
+                ['name' => 'value', 'type' => 'string', 'required' => true, 'description' => 'Literal value, or a #id / .class selector to read that element\'s current value']
+            ],
+            'description' => 'Set a state store field — to a literal value, or to the live value of a #/. selector (e.g. a search box). Pair with fetchState to send it to the bound endpoint.',
+            'example' => '{{call:setState:results,q,#searchBox}}',
+            'events' => ['onclick', 'oninput', 'onchange', 'onkeyup']
+        ],
+        [
+            'name' => 'fetchState',
+            'signature' => 'QS.fetchState(storeId)',
+            'args' => [
+                ['name' => 'storeId', 'type' => 'string', 'required' => true, 'description' => 'State store to fetch (defined in the State stores panel)', 'inputType' => 'store']
+            ],
+            'description' => 'Run the store\'s bound endpoint with its current field values, apply the response back into the store, and re-render its bound DOM (data-state-value / data-state-list). Use after setState, or on scroll for infinite lists.',
+            'example' => '{{call:fetchState:commandsList}}',
+            'events' => ['onclick', 'onscroll', 'onload', 'onsubmit', 'oninput']
         ]
     ];
     

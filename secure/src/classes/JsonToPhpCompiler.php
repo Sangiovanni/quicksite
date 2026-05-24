@@ -17,7 +17,7 @@ class JsonToPhpCompiler {
      * @param bool $showFooter Whether to show the footer (default: true)
      * @return string The compiled PHP code
      */
-    public function compilePage(array $structure, string $pageTitle, bool $showMenu = true, bool $showFooter = true, array $pageEvents = []): string {
+    public function compilePage(array $structure, string $pageTitle, bool $showMenu = true, bool $showFooter = true, array $pageEvents = [], array $stateStores = []): string {
         $output = "<?php\n\n";
         $output .= "require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';\n";
         $output .= "\$trimParameters = new TrimParameters();\n";
@@ -40,22 +40,41 @@ class JsonToPhpCompiler {
         
         // Compile page-level events (onload, onresize, onscroll) into a script tag
         $pageEventsScript = $this->compilePageEvents($pageEvents);
-        
+        // Compile this route's state-store defs into a window.QS_STATE_STORES tag
+        $stateStoresScript = $this->compileStateStores($stateStores);
+
         // Pass layout settings to Page constructor
         $showMenuStr = $showMenu ? 'true' : 'false';
         $showFooterStr = $showFooter ? 'true' : 'false';
         $pageEventsScriptStr = addcslashes($pageEventsScript, "'\\");
-        
+        $stateStoresScriptStr = addcslashes($stateStoresScript, "'\\");
+
         $output .= "\nrequire_once SECURE_FOLDER_PATH . '/src/classes/Page.php';\n";
-        $output .= "\$page = new Page(\$pageTitle, \$content, \$lang, {$showMenuStr}, {$showFooterStr}, '{$pageEventsScriptStr}');\n";
+        $output .= "\$page = new Page(\$pageTitle, \$content, \$lang, {$showMenuStr}, {$showFooterStr}, '{$pageEventsScriptStr}', '{$stateStoresScriptStr}');\n";
         $output .= "\$page->render();\n";
         
         return $output;
     }
     
     /**
+     * Compile a route's state-store definitions into a window.QS_STATE_STORES
+     * <script> tag. Mirrors the live emit in PageManagement.php so built pages
+     * feed the same qs.js runtime (QS.getState / setState / fetchState).
+     * Returns '' when the route has no stores.
+     *
+     * @param array $stores The stores for one route ({storeId => def})
+     * @return string The compiled <script> tag, or '' if none
+     */
+    public function compileStateStores(array $stores): string {
+        if (empty($stores)) {
+            return '';
+        }
+        return '<script>window.QS_STATE_STORES=' . json_encode($stores, JSON_UNESCAPED_SLASHES) . ';</script>';
+    }
+
+    /**
      * Compile page-level events into a <script> tag
-     * 
+     *
      * Converts page-events.json entries for a single route into JavaScript event listeners.
      * - onload → document.addEventListener("DOMContentLoaded", ...)
      * - onresize → window.addEventListener("resize", ...)

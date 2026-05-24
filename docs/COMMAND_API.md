@@ -24,7 +24,7 @@ The API documents itself. Once installed:
 GET /management/help
 ```
 
-returns full documentation for **all 120 commands** — parameters, examples, validation rules, and error codes. For a specific command:
+returns full documentation for **all 123 commands** — parameters, examples, validation rules, and error codes. For a specific command:
 
 ```
 GET /management/help/addRoute
@@ -67,7 +67,7 @@ There is **no separate error envelope**. A failed call uses the same four fields
 
 ## Command catalogue
 
-The 120 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
+The 123 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
 
 > **AI is browser-direct (BYOK).** As of v1.0.0-beta.6 there is no `callAi` / `testAiKey` / `detectProvider` / `listAiProviders` server command — the admin panel calls AI providers directly from the browser using credentials stored in `aiConnectionsV3` (localStorage). The Management API only handles workflow specs and command execution.
 
@@ -92,6 +92,7 @@ The 120 commands group into the categories below. Use `GET /management/help` for
 | **Interactions** | Bind triggers (click, hover, scroll…) to actions on a node. |
 | **Page events** | Page-level lifecycle hooks (on load, on enter, etc.). |
 | **API endpoints** | Manage external API integrations callable from page interactions. |
+| **State stores** | Per-page named client state bound to one API endpoint — fields with direction (request/response/both), init source, and response path. Gives interactions memory (pagination, search, filters, infinite scroll). Read/write via `getStateStores` / `setStateStores`. |
 | **System updates** | Pull updates, run migrations, inspect engine version. |
 | **Workflow tooling** | `listWorkflowBlocks` enumerates the reusable prompt blocks in `secure/admin/workflows/{blocks,pins,warnings,examples}/` for the editor's multi-select dropdowns; `lintWorkflows` reports paragraphs that occur in 3+ workflow templates as candidates for extraction. Both are admin-tier (will move to superadmin once that role lands — beta.7 sub-task). |
 
@@ -117,7 +118,7 @@ curl http://local.quicksite/management/help/addRoute
 ## Internals
 
 - Command handlers live in `secure/management/command/<command>.php`, one file per command.
-- The whitelist of valid commands is `secure/management/routes.php` (120 entries — this file is the single source of truth for which commands exist).
+- The whitelist of valid commands is `secure/management/routes.php` (123 entries — this file is the single source of truth for which commands exist).
 - Shared helpers live in `secure/src/functions/utilsManagement.php` (e.g., `varExportNested()`, `SPECIAL_PAGES`, role helpers).
 - Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `secure/src/classes/CommandRunner.php`. CommandRunner currently carries a **hardcoded read-only allowlist** of ~50 `get*` / `list*` commands it will execute internally; this is a tech-debt shortcut and should eventually be replaced by reusing the role/permission helpers in `secure/src/functions/AuthManagement.php` so there is one source of truth for "what is safe to call internally".
 - Workflow execution adds its own role check via `WorkflowManager::setTokenInfo()` so steps respect the calling token's permissions.

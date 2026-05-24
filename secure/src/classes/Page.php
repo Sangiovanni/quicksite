@@ -7,14 +7,16 @@ class Page {
     private $showMenu;
     private $showFooter;
     private $pageEventsScript;
+    private $stateStoresScript;
 
-    public function __construct($title, $content, $lang, $showMenu = true, $showFooter = true, $pageEventsScript = '') {
+    public function __construct($title, $content, $lang, $showMenu = true, $showFooter = true, $pageEventsScript = '', $stateStoresScript = '') {
         $this->title = $title;
         $this->content = $content;
         $this->lang = $lang;
         $this->showMenu = $showMenu;
         $this->showFooter = $showFooter;
         $this->pageEventsScript = $pageEventsScript;
+        $this->stateStoresScript = $stateStoresScript;
     }
 
     public function render() {
@@ -24,6 +26,7 @@ class Page {
         $showMenu = $this->showMenu;
         $showFooter = $this->showFooter;
         $pageEventsScript = $this->pageEventsScript;
+        $stateStoresScript = $this->stateStoresScript;
         $spacePrefix = PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '';
         $stylePath = (defined('PUBLIC_CONTENT_PATH') ? PUBLIC_CONTENT_PATH : dirname(__DIR__, 3) . '/' . (defined('PUBLIC_FOLDER_NAME') ? PUBLIC_FOLDER_NAME : 'public')) . '/style/style.css';
         $cssVersion = file_exists($stylePath) ? filemtime($stylePath) : time();
@@ -119,6 +122,9 @@ class Page {
     $enumsPath = PUBLIC_CONTENT_PATH . '/scripts/qs-enums.js';
     if (file_exists($enumsPath)): ?>
     <script src="/<?= PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '' ?>scripts/qs-enums.js"></script>
+    <?php endif; ?>
+    <?php if (!empty($stateStoresScript)): ?>
+    <?= $stateStoresScript ?>
     <?php endif; ?>
     <?php if (!empty($pageEventsScript)): ?>
     <?= $pageEventsScript ?>

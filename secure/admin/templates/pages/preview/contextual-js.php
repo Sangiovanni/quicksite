@@ -97,6 +97,81 @@
         </div>
     </div>
 
+    <!-- State stores section (always visible, independent of element selection) -->
+    <div class="preview-contextual-js-page-events preview-contextual-js-state-stores" id="js-state-stores">
+        <div class="preview-contextual-js-page-events__header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="preview-contextual-js-page-events__icon">
+                <ellipse cx="12" cy="5" rx="8" ry="3"/>
+                <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/>
+                <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/>
+            </svg>
+            <span class="preview-contextual-js-page-events__title"><?= __admin('preview.stateStores') ?? 'State stores' ?></span>
+            <span class="preview-contextual-js-page-events__count" id="js-state-stores-count" title="<?= __admin('preview.stateStoresCount') ?? 'Number of state stores on this page' ?>">0</span>
+            <button type="button" class="preview-contextual-js-page-events__toggle" id="js-state-stores-toggle" title="<?= __admin('preview.expandCollapse') ?? 'Expand / Collapse' ?>">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="preview-contextual-js-page-events__chevron">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </button>
+        </div>
+        <div class="preview-contextual-js-page-events__body" id="js-state-stores-body" style="display: none;">
+            <div class="preview-contextual-js-page-events__list" id="js-state-stores-list">
+                <p class="preview-contextual-js-empty"><?= __admin('preview.noStateStores') ?? 'No state stores yet.' ?></p>
+            </div>
+            <div class="preview-contextual-js-page-events__actions">
+                <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="js-state-store-add">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                        <line x1="12" y1="5" x2="12" y2="19"/>
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    <?= __admin('preview.addStateStore') ?? 'New store' ?>
+                </button>
+            </div>
+            <!-- New / edit store wizard -->
+            <div class="preview-contextual-js-page-events__form" id="js-state-store-form" style="display: none;">
+                <div class="preview-contextual-js-form-row">
+                    <label class="preview-contextual-js-form-label"><?= __admin('preview.stateStoreId') ?? 'Store id' ?></label>
+                    <input type="text" class="preview-contextual-js-form-input" id="js-state-store-id" placeholder="commandsList" autocomplete="off">
+                </div>
+                <div class="preview-contextual-js-form-row">
+                    <label class="preview-contextual-js-form-label"><?= __admin('preview.selectApi') ?? 'API' ?></label>
+                    <select class="preview-contextual-js-form-select" id="js-state-store-api">
+                        <option value=""><?= __admin('preview.selectApiPlaceholder') ?? '-- Select API --' ?></option>
+                    </select>
+                </div>
+                <div class="preview-contextual-js-form-row">
+                    <label class="preview-contextual-js-form-label"><?= __admin('preview.selectEndpoint') ?? 'Endpoint' ?></label>
+                    <select class="preview-contextual-js-form-select" id="js-state-store-endpoint" disabled>
+                        <option value=""><?= __admin('preview.selectEndpointPlaceholder') ?? '-- Select endpoint --' ?></option>
+                    </select>
+                </div>
+                <label class="preview-contextual-js-form-checkbox">
+                    <input type="checkbox" id="js-state-store-fetch-on-load">
+                    <span><?= __admin('preview.stateStoreFetchOnLoad') ?? 'Fetch on page load' ?></span>
+                </label>
+                <div class="preview-contextual-js-state-stores__fields">
+                    <label class="preview-contextual-js-form-label"><?= __admin('preview.stateStoreFields') ?? 'Fields' ?></label>
+                    <p class="preview-contextual-js-response-bindings__hint"><?= __admin('preview.stateStoreFieldsHint') ?? 'init (sent): literal · query:x · localStorage:x · sessionStorage:x — from (received): response path e.g. data.items' ?></p>
+                    <div class="preview-contextual-js-state-stores__fields-rows" id="js-state-store-fields-rows"></div>
+                    <button type="button" class="admin-btn admin-btn--xs admin-btn--ghost" id="js-state-store-field-add">
+                        + <?= __admin('preview.stateStoreAddField') ?? 'Add field' ?>
+                    </button>
+                </div>
+                <div class="preview-contextual-js-form-preview">
+                    <span class="preview-contextual-js-form-label"><?= __admin('preview.previewCode') ?? 'Preview' ?>:</span>
+                    <code class="preview-contextual-js-form-code" id="js-state-store-preview">-</code>
+                </div>
+                <div class="preview-contextual-js-form-actions">
+                    <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="js-state-store-cancel">
+                        <?= __admin('common.cancel') ?? 'Cancel' ?>
+                    </button>
+                    <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="js-state-store-save" disabled>
+                        <?= __admin('preview.saveStateStore') ?? 'Save store' ?>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="preview-contextual-default" id="contextual-js-default">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>

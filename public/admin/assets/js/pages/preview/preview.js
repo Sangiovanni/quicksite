@@ -2747,6 +2747,7 @@
             if (currentEditType === 'page') {
                 PreviewJsInteractions.setCurrentPage(currentEditName);
                 PreviewJsInteractions.loadPageEvents();
+                PreviewJsInteractions.loadStateStores();
             } else {
                 PreviewJsInteractions.setCurrentPage(null);
             }
@@ -3467,6 +3468,7 @@
                             if (currentEditType === 'page') {
                                 PreviewJsInteractions.setCurrentPage(currentEditName);
                                 PreviewJsInteractions.loadPageEvents();
+                                PreviewJsInteractions.loadStateStores();
                             } else {
                                 PreviewJsInteractions.setCurrentPage(null);
                             }

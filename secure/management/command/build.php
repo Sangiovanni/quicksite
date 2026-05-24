@@ -612,6 +612,16 @@ if (file_exists($pageEventsFile)) {
     }
 }
 
+// Load per-page state stores for compilation into pages (window.QS_STATE_STORES)
+$stateStoresFile = PROJECT_PATH . '/data/state-stores.json';
+$allStateStores = [];
+if (file_exists($stateStoresFile)) {
+    $stateStoresContent = @file_get_contents($stateStoresFile);
+    if ($stateStoresContent !== false) {
+        $allStateStores = json_decode($stateStoresContent, true) ?? [];
+    }
+}
+
 // Step 5: Compile all pages based on ROUTES
 $compiledPages = [];
 
@@ -634,7 +644,8 @@ if ($page404JsonPath !== null && file_exists($page404JsonPath)) {
     // Get layout for 404 page (inherits from root)
     $layout404 = $layoutManager->getEffectiveLayout('404');
     $page404Events = $allPageEvents['404'] ?? [];
-    $page404Php = $compiler->compilePage($page404Json, '404', $layout404['menu'], $layout404['footer'], $page404Events);
+    $page404Stores = $allStateStores['404'] ?? [];
+    $page404Php = $compiler->compilePage($page404Json, '404', $layout404['menu'], $layout404['footer'], $page404Events, $page404Stores);
     // Create folder structure in build
     @mkdir($buildFullPath . '/' . $buildSecureName . '/templates/pages/404', 0755, true);
     $page404FilePath = $buildFullPath . '/' . $buildSecureName . '/templates/pages/404/404.php';
@@ -676,7 +687,8 @@ foreach ($allRoutes as $route) {
     // Get layout settings (with inheritance)
     $pageLayout = $layoutManager->getEffectiveLayout($route);
     $routeEvents = $allPageEvents[$route] ?? [];
-    $pagePhp = $compiler->compilePage($pageJson, $route, $pageLayout['menu'], $pageLayout['footer'], $routeEvents);
+    $routeStores = $allStateStores[$route] ?? [];
+    $pagePhp = $compiler->compilePage($pageJson, $route, $pageLayout['menu'], $pageLayout['footer'], $routeEvents, $routeStores);
     
     // Create folder structure in build: route/route.php
     $buildPageDir = $buildFullPath . '/' . $buildSecureName . '/templates/pages/' . $route;

@@ -17,7 +17,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
 | Layer | Folder | Audience | Purpose |
 |---|---|---|---|
 | **Project** | `secure/projects/{name}/` | Site owner | The actual website data: routes, page structures (JSON), translations, components, interactions, styles, assets. |
-| **Management** | `secure/management/` | API client (admin panel, scripts) | The 120 commands that read or mutate project data. Single entry point: `public/management/index.php`. Token + role enforced. AI calls bypass this layer entirely (browser-direct). |
+| **Management** | `secure/management/` | API client (admin panel, scripts) | The 123 commands that read or mutate project data. Single entry point: `public/management/index.php`. Token + role enforced. AI calls bypass this layer entirely (browser-direct). |
 | **Admin** | `public/admin/` + `secure/admin/` | Human operator | The browser UI that calls Management commands. Includes the visual editor, sitemap, theme editor, AI workspace, workflow runner. |
 
 ```
@@ -169,7 +169,7 @@ ApiResponse::create(201, 'route.created')
     ->send();
 ```
 
-The full list of 120 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
+The full list of 123 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
 
 ### Response shape
 
@@ -285,7 +285,7 @@ addRoute.php
   └── ApiResponse::create(201, 'route.created')->send()
 ```
 
-The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 120 commands.
+The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 123 commands.
 
 ---
 
@@ -352,7 +352,7 @@ A single argument can contain literal commas by escaping them with `\,`. For exa
 
 **Reserved class names.** `qs.js` self-injects `<style id="qs-hidden-style">.hidden{display:none!important}</style>` into the document head at script-load time so projects without a `.hidden` rule still get a working hide. This makes `.hidden` a **reserved QuickSite class**: do not redefine it in your CSS — the `!important` will win regardless and the override won't apply. To get animated/custom hide behaviour, define your own class (e.g. `.fade-out`) and pass it as the `hideClass` arg to `QS.show`/`QS.hide`/`QS.toggleHide`/`QS.filter` instead.
 
-The core registry currently exposes 19 built-ins:
+The core registry currently exposes 21 built-ins:
 
 | Group | Functions |
 |---|---|
@@ -363,6 +363,7 @@ The core registry currently exposes 19 built-ins:
 | Data | `QS.filter`, `QS.fetch`, `QS.renderList` |
 | Feedback | `QS.toast` |
 | Auth / storage | `QS.saveToken`, `QS.clearToken`, `QS.refresh` |
+| State stores | `QS.setState`, `QS.fetchState` |
 
 Use the live `listJsFunctions` command for the authoritative list — it is the registry the visual editor and `addInteraction` validate against. (The renderer allowlist also accepts `applyAuthState` for hand-authored manual re-scans; it is intentionally not surfaced in the picker.)
 
@@ -496,6 +497,74 @@ Components keep declaring `__enums__` with **short** keys:
 
 The runtime `QS.enum` lookup uses the **long** (qualified) name —
 bindings store the qualified form; the helper provides the prefix.
+
+### 8.3 State stores (`QS.setState` / `QS.fetchState`)
+
+Interactions are otherwise stateless — a fetch fires, a response renders, nothing
+is remembered. A **state store** gives them memory: a named, **page-scoped** client
+view-model bound to **one** endpoint, whose fields seed from somewhere, mutate on
+triggers, and update from responses. It underpins pagination, search, filters and
+infinite scroll, and is the client half of beta.8's planned server-side data
+resolver (the definition is runtime-agnostic JSON — one shape, two executors).
+
+| Concern | Where |
+|---|---|
+| Storage (per project, keyed by route then store id) | `secure/projects/<project>/data/state-stores.json` |
+| Server class | `secure/src/classes/StateStoreManager.php` |
+| Read / write commands | `getStateStores` (read) / `setStateStores` (editStructure) |
+| Runtime | `public/scripts/qs.js` → `QS._stores`, `QS.setState`, `QS.getState`, `QS.fetchState` |
+| Page emit — live | `secure/src/classes/PageManagement.php` → `window.QS_STATE_STORES` |
+| Page emit — built | `secure/src/classes/JsonToPhpCompiler.php` → `Page.php` (baked inline at build) |
+| Admin UI | `/admin` visual editor → JS mode → "State stores" — see [ADMIN_PANEL.md §9.6](ADMIN_PANEL.md). |
+
+Definition shape:
+
+```json
+{
+  "home": {
+    "commandsList": {
+      "endpoint": "@help-api/list",
+      "fetchOnLoad": true,
+      "fields": {
+        "page":  { "dir": "request",  "init": "query:page", "default": 1 },
+        "total": { "dir": "response", "from": "meta.total" },
+        "items": { "dir": "response", "from": "data", "append": false }
+      }
+    }
+  }
+}
+```
+
+Each **field** declares a **direction** vs the endpoint — `request` (sent only),
+`response` (set from the response only), or `both` (sent from its current value,
+then updated from the response). Sent fields (`request` / `both`) carry an **init**
+(a literal, or a `query:`, `localStorage:` or `sessionStorage:` source) and a
+**default** fallback for when that source is missing. Received fields (`response` /
+`both`) carry a **from** response dot-path plus an optional **append** flag so a
+list field grows (infinite scroll) instead of replacing. The field name *is* the
+request parameter key. `both` is the canonical pagination cursor (`init` 0, `from`
+the response's next-cursor field).
+
+Verbs:
+- `QS.setState(storeId, field, value)` — set a field to a literal, or to the live
+  value of a `#id` / `.class` selector (e.g. a search box); re-renders the store.
+- `QS.fetchState(storeId)` — build the request from the store's `request` / `both`
+  fields, call the bound endpoint (reusing `QS.fetch`, so auth / refresh-on-401 /
+  path templating all apply), apply the response into the `response` / `both` fields
+  (appending where flagged), then re-render. Compose them for real flows, e.g.
+  `{{call:setState:results,q,#searchBox}};{{call:fetchState:results}}`.
+
+DOM bindings (store → DOM, re-applied on init / `setState` / `fetchState`):
+- `data-state-value="storeId.field"` — element text = the scalar field.
+- `data-state-list="storeId.field"` — container whose first child is the per-item
+  template (`data-bind` on descendants; primitive arrays bind through the template
+  root), with optional `data-state-empty` text. Because the store holds the full
+  (appended) array, one whole re-render covers both replace and append.
+
+**The store owns rendering.** `fetchState` passes a `noBindings` opt to `QS.fetch`
+so the endpoint's own `responseBindings` are skipped on store fetches — otherwise an
+append would flicker (bindings replace, then the store appends). Drive a store's
+list via `data-state-list`, not via that endpoint's `responseBindings`.
 
 ---
 

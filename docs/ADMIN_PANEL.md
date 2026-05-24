@@ -998,6 +998,58 @@ filed in `BACKLOG.md` as the ergonomic follow-up.
 
 ---
 
+### 9.6 State stores
+
+State stores give page interactions memory — named, page-scoped client state
+bound to one API endpoint. The runtime and definition shape live in
+[ARCHITECTURE.md §8.3](ARCHITECTURE.md); this section covers the editor UX.
+
+**Where.** Visual editor → **JS mode** → the **"State stores"** area, a collapsible
+section directly under **Page Events** (both are page-level, independent of the
+selected element). It lists the current page's stores and opens the wizard.
+
+**Store card.** Each store is a row: the store id, its `@apiId/endpointId` + field
+count (plus an "onload" marker when `fetchOnLoad` is set), with edit and delete
+actions. Delete is read-modify-write — it re-saves the route's remaining stores
+(clearing the route entirely when the last store goes).
+
+**Wizard (new / edit).**
+- **Store id** — starts with a letter, then letters / digits / `_` / `-`.
+- **Endpoint** — an API `<select>` + endpoint `<select>` from the registry.
+- **Fetch on page load** — fire the store once on load.
+- **Fields** — one card per field: name, **direction** (`→ request` / `← response`
+  / `⇄ both`), then conditional rows that toggle with direction — **init** +
+  **default** for request/both, **from** + **append** for response/both. **`init`
+  is the initial value** (leave it blank to use the default); the field *name* is
+  the request parameter key, not `init`.
+- **Auto-seed** — picking an endpoint that declares request/response schemas
+  pre-fills the fields (request properties → `request`, response leaves →
+  `response`, a name in both → `both`). It seeds only when no field has been entered
+  yet (never clobbers) and is a no-op when the endpoint has no schema — a
+  non-binding, fully editable starting point.
+
+**Triggering.** `setState` and `fetchState` appear in the interaction picker's
+**Function** dropdown (both the element form and the page-event form). Their `store`
+argument is a dropdown of the page's stores; `setState` adds `field` and `value` (a
+literal, or a `#id` / `.class` selector read live). They compile to
+`{{call:setState:store,field,value}}` / `{{call:fetchState:store}}` — chain them for
+"go to page N", search-as-you-type, or scroll-to-load-more.
+
+**Rendering.** The store updates elements carrying `data-state-value="store.field"`
+(scalars) and `data-state-list="store.field"` (arrays — the container's first child
+is the item template, `data-bind` on descendants, optional `data-state-empty`).
+These bindings are authored in the page structure: the wizard defines the *data*,
+not the render target.
+
+| Concern | Where |
+|---|---|
+| Panel + wizard markup | `secure/admin/templates/pages/preview/contextual-js.php` |
+| Panel + wizard logic | `public/admin/assets/js/pages/preview/preview-js-interactions.js` (State Stores section) |
+| Verbs in the picker | `listJsFunctions` (`setState` / `fetchState`, `store` inputType) |
+| Read / write | `getStateStores` / `setStateStores` → `StateStoreManager` |
+
+---
+
 ## 10. Risk hotspots
 
 These are the live concerns to keep in mind when touching the panel.

@@ -507,7 +507,11 @@
             // Translatable toast labels — already resolved to strings by
             // PHP at compile time. They're not path placeholders and
             // shouldn't leak into the query string.
-            'toastSuccessKey', 'toastErrorKey'
+            'toastSuccessKey', 'toastErrorKey',
+            // Suppress the endpoint's responseBindings for this call — used by
+            // QS.fetchState so a state store owns its own rendering (otherwise
+            // append/infinite would flicker: bindings replace, store appends).
+            'noBindings'
         ]);
         if (url.indexOf(':') !== -1) {
             const placeholders = [];
@@ -615,8 +619,9 @@
                 // replay the latest result without re-fetching.
                 QS._fetchCache[ref] = data;
 
-                // Apply response bindings if defined
-                if (opts._endpoint && opts._endpoint.responseBindings) {
+                // Apply response bindings if defined (unless the caller opts
+                // out via noBindings — e.g. QS.fetchState renders via the store).
+                if (opts._endpoint && opts._endpoint.responseBindings && !opts.noBindings) {
                     applyBindings(data, opts._endpoint.responseBindings);
                 }
 
@@ -1737,6 +1742,180 @@
         document.addEventListener('DOMContentLoaded', applyAuthState);
     } else {
         applyAuthState();
+    }
+
+    // =========================================================================
+    // STATE STORES (stateful, endpoint-bound interaction state)
+    // =========================================================================
+    // Per-page definitions arrive in window.QS_STATE_STORES (emitted by the
+    // page render). Each store:
+    //   { endpoint:"@api/ep", fetchOnLoad?:bool,
+    //     fields: { <name>: { dir, init?, default?, from?, append? } } }
+    //   dir    : "request" (sent) | "response" (received) | "both"
+    //   init   : initial value for sent fields — a literal, or
+    //            "query:x" / "localStorage:x" / "sessionStorage:x"
+    //   default: fallback when init's source is missing
+    //   from   : response dot-path for received fields
+    //   append : received list fields append instead of replace
+    // Live values live in QS._stores[id].state. Runtime-agnostic by design:
+    // beta.8's server data-resolver will read the same definition shape.
+
+    QS._stores = {};
+
+    // Resolve a field's initial value from its init source (or the default).
+    function _resolveInit(init, def) {
+        var fallback = (def !== undefined ? def : null);
+        if (init === undefined || init === null) return fallback;
+        if (typeof init === 'string') {
+            var ci = init.indexOf(':');
+            if (ci !== -1) {
+                var prefix = init.slice(0, ci);
+                var key = init.slice(ci + 1);
+                if (prefix === 'query') {
+                    var qv = new URLSearchParams(location.search).get(key);
+                    return (qv === null || qv === '') ? fallback : qv;
+                }
+                if (prefix === 'localStorage' || prefix === 'sessionStorage') {
+                    var sv = window[prefix].getItem(key);
+                    return (sv === null || sv === '') ? fallback : sv;
+                }
+            }
+        }
+        return init; // literal
+    }
+
+    // DOM ← store: set the text of [data-state-value="storeId.field"] elements.
+    function _renderStore(storeId) {
+        var store = QS._stores[storeId];
+        if (!store) return;
+        document.querySelectorAll('[data-state-value]').forEach(function (el) {
+            var ref = el.getAttribute('data-state-value') || '';
+            var dot = ref.indexOf('.');
+            if (dot === -1 || ref.slice(0, dot) !== storeId) return;
+            var v = store.state[ref.slice(dot + 1)];
+            el.textContent = (v === null || v === undefined) ? ''
+                : (typeof v === 'object' ? JSON.stringify(v) : String(v));
+        });
+        // List fields: a [data-state-list="storeId.field"] container renders the
+        // field's array via renderList (template = its first child /
+        // [data-list-template]). store.state holds the FULL (appended) array, so
+        // re-rendering the whole array covers both replace (offset) and append
+        // (infinite) modes. Optional data-state-empty = empty-state text.
+        document.querySelectorAll('[data-state-list]').forEach(function (el) {
+            var ref = el.getAttribute('data-state-list') || '';
+            var dot = ref.indexOf('.');
+            if (dot === -1 || ref.slice(0, dot) !== storeId) return;
+            var arr = store.state[ref.slice(dot + 1)];
+            renderList('[data-state-list="' + ref + '"]',
+                Array.isArray(arr) ? arr : (arr === undefined || arr === null ? [] : [arr]),
+                el.getAttribute('data-state-empty') || undefined);
+        });
+    }
+
+    /**
+     * Set a store field. `value` is a literal, or a "#id"/".class" selector
+     * whose element value (or textContent) is read. Re-renders the store.
+     */
+    QS.setState = function (storeId, field, value) {
+        var store = QS._stores[storeId];
+        if (!store) { console.warn('[QS] setState: unknown store', storeId); return; }
+        if (!store.def.fields || !(field in store.def.fields)) {
+            console.warn('[QS] setState: unknown field "' + field + '" on store', storeId); return;
+        }
+        var v = value;
+        if (typeof value === 'string' && (value.charAt(0) === '#' || value.charAt(0) === '.')) {
+            var el = document.querySelector(value);
+            v = el ? (el.value !== undefined && el.value !== null ? el.value : el.textContent) : '';
+        }
+        store.state[field] = v;
+        _renderStore(storeId);
+    };
+
+    /** Read a store field, or the whole state object when `field` is omitted. */
+    QS.getState = function (storeId, field) {
+        var store = QS._stores[storeId];
+        if (!store) return undefined;
+        return field === undefined ? store.state : store.state[field];
+    };
+
+    /**
+     * Fire a store's endpoint using its request/both fields, then apply the
+     * response into its response/both fields (append where flagged) and
+     * re-render. Reuses QS.fetch (auth, refresh-on-401, responseBindings).
+     */
+    QS.fetchState = function (storeId) {
+        var store = QS._stores[storeId];
+        if (!store) { console.warn('[QS] fetchState: unknown store', storeId); return Promise.resolve(); }
+        var fields = store.def.fields || {};
+        var opts = [];
+        for (var name in fields) {
+            if (!Object.prototype.hasOwnProperty.call(fields, name)) continue;
+            var dir = fields[name].dir;
+            if (dir === 'request' || dir === 'both') {
+                var val = store.state[name];
+                if (val !== undefined && val !== null && val !== '') {
+                    opts.push(name + '=' + val);
+                }
+            }
+        }
+        // The store renders its own DOM (data-state-value / data-state-list),
+        // so suppress the endpoint's responseBindings for this call.
+        opts.push('noBindings=1');
+        return QS.fetch.apply(QS, [store.def.endpoint].concat(opts)).then(function (data) {
+            for (var n in fields) {
+                if (!Object.prototype.hasOwnProperty.call(fields, n)) continue;
+                var f = fields[n];
+                if ((f.dir === 'response' || f.dir === 'both') && f.from) {
+                    var rv = getNestedValue(data, f.from);
+                    if (f.append) {
+                        var cur = Array.isArray(store.state[n]) ? store.state[n] : [];
+                        store.state[n] = cur.concat(
+                            Array.isArray(rv) ? rv : (rv === undefined || rv === null ? [] : [rv])
+                        );
+                    } else {
+                        store.state[n] = rv;
+                    }
+                }
+            }
+            _renderStore(storeId);
+            return data;
+        });
+    };
+
+    // Build live stores from the per-page definitions, seed initial values,
+    // render scalars, and fire fetchOnLoad stores.
+    function _initStores() {
+        var defs = window.QS_STATE_STORES || {};
+        for (var storeId in defs) {
+            if (!Object.prototype.hasOwnProperty.call(defs, storeId)) continue;
+            var def = defs[storeId];
+            var fields = def.fields || {};
+            var state = {};
+            for (var name in fields) {
+                if (!Object.prototype.hasOwnProperty.call(fields, name)) continue;
+                var f = fields[name];
+                if (f.dir === 'response') {
+                    state[name] = ('default' in f) ? f.default : (f.append ? [] : null);
+                } else {
+                    state[name] = _resolveInit(f.init, f.default);
+                }
+            }
+            QS._stores[storeId] = { def: def, state: state };
+            _renderStore(storeId);
+            if (def.fetchOnLoad) {
+                QS.fetchState(storeId).catch(function () { /* QS.fetch already surfaced the error */ });
+            }
+        }
+    }
+
+    // Exposed so callers can (re)build stores after setting QS_STATE_STORES
+    // dynamically (and for console testing before the admin UI exists).
+    QS.initStores = _initStores;
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _initStores);
+    } else {
+        _initStores();
     }
 
     // Expose to window
