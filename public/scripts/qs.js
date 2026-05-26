@@ -1843,6 +1843,10 @@
             v = el ? (el.value !== undefined && el.value !== null ? el.value : el.textContent) : '';
         }
         store.state[field] = v;
+        // A user-driven setState (resetting page / search query / cursor)
+        // signals intent to re-fetch — clear the exhausted flag so scroll
+        // triggers re-arm. See QS.onScrollFetchState below.
+        store._exhausted = false;
         _renderStore(storeId);
     };
 
@@ -1861,8 +1865,17 @@
     QS.fetchState = function (storeId) {
         var store = QS._stores[storeId];
         if (!store) { console.warn('[QS] fetchState: unknown store', storeId); return Promise.resolve(); }
+        // Skip if a previous fetchState for this store is still in flight —
+        // prevents overlapping fetches when a trigger fires faster than the
+        // network (scroll bursts especially).
+        if (store._inFlight) return Promise.resolve();
+        store._inFlight = true;
+
         var fields = store.def.fields || {};
         var opts = [];
+        // Capture pre-fetch values of `both`-direction fields so we can detect
+        // a stalled cursor (response cursor === request cursor → no advance).
+        var preCursor = {};
         for (var name in fields) {
             if (!Object.prototype.hasOwnProperty.call(fields, name)) continue;
             var dir = fields[name].dir;
@@ -1872,29 +1885,107 @@
                     opts.push(name + '=' + val);
                 }
             }
+            if (dir === 'both') preCursor[name] = store.state[name];
         }
         // The store renders its own DOM (data-state-value / data-state-list),
         // so suppress the endpoint's responseBindings for this call.
         opts.push('noBindings=1');
-        return QS.fetch.apply(QS, [store.def.endpoint].concat(opts)).then(function (data) {
-            for (var n in fields) {
-                if (!Object.prototype.hasOwnProperty.call(fields, n)) continue;
-                var f = fields[n];
-                if ((f.dir === 'response' || f.dir === 'both') && f.from) {
-                    var rv = getNestedValue(data, f.from);
-                    if (f.append) {
-                        var cur = Array.isArray(store.state[n]) ? store.state[n] : [];
-                        store.state[n] = cur.concat(
-                            Array.isArray(rv) ? rv : (rv === undefined || rv === null ? [] : [rv])
-                        );
-                    } else {
-                        store.state[n] = rv;
+
+        return QS.fetch.apply(QS, [store.def.endpoint].concat(opts))
+            .then(function (data) {
+                // Apply response / both fields into the store's state.
+                for (var n in fields) {
+                    if (!Object.prototype.hasOwnProperty.call(fields, n)) continue;
+                    var f = fields[n];
+                    if ((f.dir === 'response' || f.dir === 'both') && f.from) {
+                        var rv = getNestedValue(data, f.from);
+                        if (f.append) {
+                            var cur = Array.isArray(store.state[n]) ? store.state[n] : [];
+                            store.state[n] = cur.concat(
+                                Array.isArray(rv) ? rv : (rv === undefined || rv === null ? [] : [rv])
+                            );
+                        } else {
+                            store.state[n] = rv;
+                        }
                     }
                 }
-            }
-            _renderStore(storeId);
-            return data;
-        });
+                // Exhausted heuristic — set true so scroll triggers stop firing.
+                // Cleared by any QS.setState (user-driven re-query). One of:
+                //   - explicit `hasMore: false` in the response (fast path),
+                //   - any append-mode field returned 0 items,
+                //   - any `both` cursor came back unchanged (no advance).
+                if (data && data.hasMore === false) {
+                    store._exhausted = true;
+                } else {
+                    var exhausted = false;
+                    for (var n2 in fields) {
+                        if (!Object.prototype.hasOwnProperty.call(fields, n2)) continue;
+                        var f2 = fields[n2];
+                        if (f2.append) {
+                            var rv2 = getNestedValue(data, f2.from);
+                            if (!Array.isArray(rv2) || rv2.length === 0) { exhausted = true; break; }
+                        }
+                        if (f2.dir === 'both' && preCursor[n2] === store.state[n2]) {
+                            exhausted = true; break;
+                        }
+                    }
+                    if (exhausted) store._exhausted = true;
+                }
+                _renderStore(storeId);
+                store._inFlight = false;
+                return data;
+            }, function (err) {
+                // Treat any fetch failure (4xx/5xx/network) as end-of-stream
+                // so scroll triggers don't keep hammering a broken endpoint.
+                store._exhausted = true;
+                store._inFlight = false;
+                throw err;
+            });
+    };
+
+    // Per-store registration guard for QS.onScrollFetchState (idempotent).
+    var _ssScrollRegistered = {};
+
+    /**
+     * Register (once per store) a debounced window-scroll listener that fires
+     * QS.fetchState(storeId) when the viewport bottom is within `triggerPx`
+     * of the page bottom — and STOPS firing once the store is marked
+     * `_exhausted` (HTTP error, response items empty, or a `both` cursor that
+     * didn't advance). Use as a page-event `onload` action for the
+     * infinite-scroll pattern; pair with an `append:true` list field for the
+     * classic "load more on scroll" UX:
+     *   onload: {{call:onScrollFetchState:scrollingStore,200,100}}
+     *           args = storeId, triggerPx (default 200), debounceMs (default 100).
+     */
+    QS.onScrollFetchState = function (storeId, triggerPx, debounceMs) {
+        if (_ssScrollRegistered[storeId]) return;
+        var store = QS._stores[storeId];
+        if (!store) { console.warn('[QS] onScrollFetchState: unknown store', storeId); return; }
+
+        var px = parseInt(triggerPx, 10);
+        if (!isFinite(px) || px < 0) px = 200;
+        var debounce = parseInt(debounceMs, 10);
+        if (!isFinite(debounce) || debounce < 0) debounce = 100;
+
+        var timer = null;
+        var trigger = function () {
+            if (store._inFlight || store._exhausted) return;
+            var docHeight = document.documentElement.scrollHeight;
+            var viewportEnd = window.scrollY + window.innerHeight;
+            if (docHeight - viewportEnd > px) return;
+            QS.fetchState(storeId).catch(function () { /* QS.fetch already surfaced */ });
+        };
+        var schedule = function () {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(trigger, debounce);
+        };
+
+        window.addEventListener('scroll', schedule, { passive: true });
+        _ssScrollRegistered[storeId] = true;
+        // Fire once after fetchOnLoad settles — handles the "list shorter than
+        // viewport, can't scroll" case so the user still gets auto-load-more
+        // until the page is scrollable (or exhausted).
+        setTimeout(trigger, 200);
     };
 
     // Build live stores from the per-page definitions, seed initial values,
@@ -1915,7 +2006,7 @@
                     state[name] = _resolveInit(f.init, f.default);
                 }
             }
-            QS._stores[storeId] = { def: def, state: state };
+            QS._stores[storeId] = { def: def, state: state, _inFlight: false, _exhausted: false };
             _renderStore(storeId);
             if (def.fetchOnLoad) {
                 QS.fetchState(storeId).catch(function () { /* QS.fetch already surfaced the error */ });

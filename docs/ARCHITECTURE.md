@@ -352,7 +352,7 @@ A single argument can contain literal commas by escaping them with `\,`. For exa
 
 **Reserved class names.** `qs.js` self-injects `<style id="qs-hidden-style">.hidden{display:none!important}</style>` into the document head at script-load time so projects without a `.hidden` rule still get a working hide. This makes `.hidden` a **reserved QuickSite class**: do not redefine it in your CSS — the `!important` will win regardless and the override won't apply. To get animated/custom hide behaviour, define your own class (e.g. `.fade-out`) and pass it as the `hideClass` arg to `QS.show`/`QS.hide`/`QS.toggleHide`/`QS.filter` instead.
 
-The core registry currently exposes 21 built-ins:
+The core registry currently exposes 22 built-ins:
 
 | Group | Functions |
 |---|---|
@@ -363,7 +363,7 @@ The core registry currently exposes 21 built-ins:
 | Data | `QS.filter`, `QS.fetch`, `QS.renderList` |
 | Feedback | `QS.toast` |
 | Auth / storage | `QS.saveToken`, `QS.clearToken`, `QS.refresh` |
-| State stores | `QS.setState`, `QS.fetchState` |
+| State stores | `QS.setState`, `QS.fetchState`, `QS.onScrollFetchState` |
 
 Use the live `listJsFunctions` command for the authoritative list — it is the registry the visual editor and `addInteraction` validate against. (The renderer allowlist also accepts `applyAuthState` for hand-authored manual re-scans; it is intentionally not surfaced in the picker.)
 
@@ -548,11 +548,25 @@ the response's next-cursor field).
 Verbs:
 - `QS.setState(storeId, field, value)` — set a field to a literal, or to the live
   value of a `#id` / `.class` selector (e.g. a search box); re-renders the store.
+  Also clears the store's exhausted flag (see below) — a fresh search re-arms
+  scroll triggers.
 - `QS.fetchState(storeId)` — build the request from the store's `request` / `both`
   fields, call the bound endpoint (reusing `QS.fetch`, so auth / refresh-on-401 /
   path templating all apply), apply the response into the `response` / `both` fields
-  (appending where flagged), then re-render. Compose them for real flows, e.g.
-  `{{call:setState:results,q,#searchBox}};{{call:fetchState:results}}`.
+  (appending where flagged), then re-render. Skipped while a previous call for
+  the same store is in flight (`_inFlight` guard) — overlapping triggers are a
+  no-op until the first settles. After settle, marks the store **exhausted**
+  if any of: explicit `hasMore:false` in the response · any append-mode field
+  returned 0 items · a `both` cursor came back unchanged. Compose them for real
+  flows, e.g. `{{call:setState:results,q,#searchBox}};{{call:fetchState:results}}`.
+- `QS.onScrollFetchState(storeId, triggerPx=200, debounceMs=100)` — register
+  (once per store) a debounced window-scroll listener that fires `fetchState`
+  only when the viewport is within `triggerPx` of the page bottom — and STOPS
+  once the store is exhausted. Used as a page-event `onload` action for
+  infinite scroll: `{{call:onScrollFetchState:list,200,100}}`. Raw
+  `onscroll → fetchState` thrashes the API (one call per scroll tick); this
+  verb is the safe equivalent. Also fires once 200ms after register to handle
+  the "list shorter than viewport, can't scroll" case.
 
 DOM bindings (store → DOM, re-applied on init / `setState` / `fetchState`):
 - `data-state-value="storeId.field"` — element text = the scalar field.

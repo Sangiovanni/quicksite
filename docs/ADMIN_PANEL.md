@@ -1148,8 +1148,17 @@ forward cursor (`nextId` / `nextCursor`). Store fields:
 | `items` | response | — | — | `items` | ☑ ON (grow) |
 
 Trigger via a page event in JS mode → Page Events → **Add Page Event** →
-`onscroll` → `fetchState:list`. The runtime fires near scroll updates; debouncing
-is a polish item.
+`onload` → `onScrollFetchState:list,200,100`. That registers (once) a debounced
+window-scroll listener that fires `fetchState(list)` only when the viewport is
+within 200px of the page bottom (debounced 100ms), and **stops** firing once
+the store is exhausted (HTTP error, response items empty, or a `both` cursor
+that didn't advance). A subsequent `setState` (e.g. new search query) clears
+the exhausted flag and re-arms the trigger.
+
+> Don't wire a raw `onscroll` → `fetchState` page event for infinite scroll:
+> the runtime fires the handler on every scroll tick (many per second) and the
+> store has no built-in stopping condition there — it will thrash the API and
+> loop past end-of-list. `onScrollFetchState` is the safe equivalent.
 
 Both patterns are demonstrated in the test pages `test/paged` (offset) and
 `test/state` (cursor) — see `BETA7_ORDER.md` for the full beta.7 context.

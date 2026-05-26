@@ -258,9 +258,21 @@ function __command_listJsFunctions(array $params = [], array $urlParams = []): A
             'args' => [
                 ['name' => 'storeId', 'type' => 'string', 'required' => true, 'description' => 'State store to fetch (defined in the State stores panel)', 'inputType' => 'store']
             ],
-            'description' => 'Run the store\'s bound endpoint with its current field values, apply the response back into the store, and re-render its bound DOM (data-state-value / data-state-list). Use after setState, or on scroll for infinite lists.',
+            'description' => 'Run the store\'s bound endpoint with its current field values, apply the response back into the store, and re-render its bound DOM (data-state-value / data-state-list). Use after setState, or for one-shot loads. For infinite-scroll triggers, prefer onScrollFetchState — it adds debounce + in-flight + exhausted guards (raw onscroll → fetchState thrashes the API).',
             'example' => '{{call:fetchState:commandsList}}',
-            'events' => ['onclick', 'onscroll', 'onload', 'onsubmit', 'oninput']
+            'events' => ['onclick', 'onload', 'onsubmit', 'oninput']
+        ],
+        [
+            'name' => 'onScrollFetchState',
+            'signature' => 'QS.onScrollFetchState(storeId, triggerPx?, debounceMs?)',
+            'args' => [
+                ['name' => 'storeId', 'type' => 'string', 'required' => true, 'description' => 'State store to refresh on scroll-near-bottom (defined in the State stores panel)', 'inputType' => 'store'],
+                ['name' => 'triggerPx', 'type' => 'number', 'required' => false, 'default' => 200, 'description' => 'Fire when the viewport bottom is within this many pixels of the page bottom (default 200)'],
+                ['name' => 'debounceMs', 'type' => 'number', 'required' => false, 'default' => 100, 'description' => 'Debounce window between scroll bursts in milliseconds (default 100)']
+            ],
+            'description' => 'Register (once per store) a debounced window-scroll listener that calls fetchState only when the viewport is near the page bottom — and STOPS firing once the store is marked exhausted (HTTP error, response items empty, or a both-direction cursor that did not advance). Use as a page-event ONLOAD action to set up infinite scroll without API thrashing; pair with an append:true list field for "load more on scroll". setState clears the exhausted flag (e.g. fresh search re-arms the trigger).',
+            'example' => '{{call:onScrollFetchState:scrollingStore,200,100}}',
+            'events' => ['onload']
         ]
     ];
     
