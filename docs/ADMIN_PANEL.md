@@ -373,6 +373,59 @@ The whole subtree is spliced under one file lock by reusing
 malformed node, nothing is written. Half-built subtrees never reach
 the structure file.
 
+### 8.8 Text authoring (Add → Text tab, inline edit, RAW + key)
+
+Text in a page lives in `{ "textKey": "…" }` nodes. There are two flavours:
+a **translation key** (looked up against the language file at render time, e.g.
+`home.greeting`) and a **RAW literal** (`__RAW__`-prefixed, rendered verbatim —
+for separators / one-off labels like `" / "`, `"—"`). Both are first-class.
+
+**Tag elements add EMPTY.** The legacy auto-generated placeholder textKey on
+`addNode` was removed — it used to attach a translation-key child to every new
+tag to give zero-dimension elements a clickable footprint, but it produced
+span-in-span nesting when authoring bound elements (`data-state-*`, `data-bind`)
+and is no longer needed (empty elements get their own editor footprint). To add
+text to a tag, use **Add → Text** (below) or **Text mode** inline.
+
+**Add → "Text" tab.** A 5th tab in the Add panel (alongside Snippet / Component /
+Complex / HTML Tag). Pick the type:
+- **Translation key** — opens a searchable picker (the same
+  `QSComplexWizard.createTextKeyPicker` the variables panel uses): type to
+  filter existing keys; if your query doesn't match an existing key, an inline
+  "Create '<query>'" form appears with a value input. Saving creates the key
+  (via `setTranslationKeys`) with the value in the current language (empty in
+  others) and the picker carries the new key.
+- **RAW (literal)** — a plain value input. Stored as the node's `textKey` =
+  `"__RAW__"+value`, rendered verbatim in every language.
+
+The Add button (bottom Cancel / Add — the legacy top quick-add button was
+removed) posts `addNode` with `nodeKind:"text"` plus either `textRaw:true + textValue`
+(RAW) or the picked `textKey` (key). Default position respects the radio
+(`after` / `inside` / `before`).
+
+**Text mode — inline editing of both flavours.** The Text-mode tool clicks any
+text node in the preview and makes it `contenteditable`. On commit:
+- For a translation-key node, the new value is saved via `setTranslationKeys`
+  to the current-language translation file.
+- For a `__RAW__`/`__LIT__` literal, the new value is saved via `editStructure`
+  by updating the node's `textKey` to `"__RAW__"+value` — *not* a translation
+  entry (literals don't have one).
+
+In the renderer (`JsonToHtmlRenderer::renderText`), editor mode now wraps both
+key-based AND `__RAW__`/`__LIT__` text in the `data-qs-textkey` selection span
+(with a `data-qs-raw="true"` marker on literals). Without that, RAW text had
+no selection handle — that's why before this change, pages with literal
+separators were unselectable in Text mode.
+
+| Concern | Where |
+|---|---|
+| Add Text tab markup | `secure/admin/templates/pages/preview/contextual-add.php` |
+| Add Text dispatch + picker mount | `public/admin/assets/js/pages/preview/preview.js` (`addTextNode`, `ensureAddTextKeyPicker`) |
+| TextKey picker primitive | `public/admin/assets/js/pages/preview/contextual-complex/text-key-picker.js` |
+| Inline RAW-vs-key save branch | `preview.js` `handleTextEdited` + `saveRawTextEdit` |
+| Renderer editor wrapping | `secure/src/classes/JsonToHtmlRenderer.php` `renderText()` |
+| Backend insert | `secure/management/command/addNode.php` (`nodeKind:'text'` mode) |
+
 ---
 
 ## 9. Other pages — what they do

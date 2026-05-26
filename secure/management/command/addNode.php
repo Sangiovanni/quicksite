@@ -31,91 +31,6 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 // HELPER FUNCTIONS
 // =============================================================================
 
-function getTagCategory(string $tag): string {
-    return TagRegistry::getCategory($tag);
-}
-
-function tagRequiresTextKey(string $tag, array $params): bool {
-    $category = getTagCategory($tag);
-    if ($category === 'self-closing') return false;
-    if ($category === 'inline') return true;
-    return empty($params['class']); // Block: required if no class
-}
-
-function generateAutoTextKey(string $structureType, ?string $structureName): string {
-    // For pages and components with name, use name-based prefix
-    // For menu/footer, use type as prefix
-    if (($structureType === 'page' || $structureType === 'component') && $structureName) {
-        $prefix = $structureType === 'component' 
-            ? 'component.' . $structureName  // component.feature-card.item1
-            : $structureName;                 // home.item1
-    } else {
-        $prefix = $structureType;             // menu.item1, footer.item1
-    }
-    
-    $translationFile = PROJECT_PATH . '/translate/default.json';
-    $existingKeys = [];
-    
-    if (file_exists($translationFile)) {
-        $content = @file_get_contents($translationFile);
-        if ($content !== false) {
-            $translations = json_decode($content, true);
-            if (is_array($translations)) {
-                $existingKeys = flattenTranslationKeys_addNode($translations);
-            }
-        }
-    }
-    
-    $pattern = '/^' . preg_quote($prefix, '/') . '\.item(\d+)$/';
-    $maxN = 0;
-    foreach ($existingKeys as $key) {
-        if (preg_match($pattern, $key, $matches)) {
-            $maxN = max($maxN, (int)$matches[1]);
-        }
-    }
-    
-    return $prefix . '.item' . ($maxN + 1);
-}
-
-function flattenTranslationKeys_addNode(array $arr, string $prefix = ''): array {
-    $keys = [];
-    foreach ($arr as $key => $value) {
-        $fullKey = $prefix === '' ? $key : $prefix . '.' . $key;
-        if (is_array($value)) {
-            $keys = array_merge($keys, flattenTranslationKeys_addNode($value, $fullKey));
-        } else {
-            $keys[] = $fullKey;
-        }
-    }
-    return $keys;
-}
-
-function createEmptyTranslation(string $textKey): bool {
-    $translationFile = PROJECT_PATH . '/translate/default.json';
-    
-    $translations = [];
-    if (file_exists($translationFile)) {
-        $content = @file_get_contents($translationFile);
-        if ($content !== false) {
-            $translations = json_decode($content, true) ?? [];
-        }
-    }
-    
-    $keys = explode('.', $textKey);
-    $ref = &$translations;
-    foreach ($keys as $i => $key) {
-        if ($i === count($keys) - 1) {
-            if (!isset($ref[$key])) $ref[$key] = '';
-        } else {
-            if (!isset($ref[$key]) || !is_array($ref[$key])) $ref[$key] = [];
-            $ref = &$ref[$key];
-        }
-    }
-    
-    $json = json_encode($translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    return file_put_contents($translationFile, $json, LOCK_EX) !== false;
-}
-
 function isComponentNode(array $node): bool {
     return isset($node['component']);
 }
@@ -144,19 +59,29 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
         return ApiResponse::create(400, 'validation.required')
             ->withErrors([['field' => 'targetNodeId', 'reason' => 'missing']]);
     }
-    if (!isset($params['tag'])) {
+    // nodeKind selects what we're adding: a tag element (default) or a bare
+    // text node ({textKey: ...}). Text nodes get their textKey from
+    // textValue (raw → "__RAW__"+value, key → generated key + value written
+    // as the translation), and skip the tag-required check below.
+    $nodeKind = $params['nodeKind'] ?? 'tag';
+    if ($nodeKind === 'tag' && !isset($params['tag'])) {
         return ApiResponse::create(400, 'validation.required')
-            ->withMessage("tag is required. For components, use addComponentToNode command.")
+            ->withMessage("tag is required for nodeKind='tag'. For components use addComponentToNode; for bare text nodes set nodeKind='text' + textValue.")
             ->withErrors([['field' => 'tag', 'reason' => 'missing']]);
     }
-    
+
     $type = $params['type'];
     $name = $params['name'] ?? null;
     $targetNodeId = $params['targetNodeId'];
     $position = $params['position'] ?? 'after';
-    $tag = $params['tag'];
+    $tag = $params['tag'] ?? '';
     $nodeParams = $params['params'] ?? [];
     $textKey = $params['textKey'] ?? null;
+    // Text-node mode params (only used when nodeKind === 'text'). When
+    // textRaw is false, the textKey is provided by the client (the text-key
+    // picker handles key creation + translation write itself).
+    $textValue = isset($params['textValue']) ? (string) $params['textValue'] : '';
+    $textRaw = !empty($params['textRaw']);
     
     // Filter out reserved params (translatable attributes) from nodeParams
     // These are auto-managed and cannot be set manually
@@ -208,16 +133,20 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
             ->withErrors([['field' => 'position', 'value' => $position]]);
     }
     
-    // Validate tag — security check first
-    if (TagRegistry::isBlocked($tag)) {
-        return ApiResponse::create(400, 'validation.blocked_tag')
-            ->withMessage("Tag '{$tag}' is blocked for security reasons.")
-            ->withErrors([['field' => 'tag', 'value' => $tag]]);
-    }
-    if (!TagRegistry::isAllowed($tag)) {
-        return ApiResponse::create(400, 'validation.invalid_value')
-            ->withMessage("Invalid tag '{$tag}'.")
-            ->withErrors([['field' => 'tag', 'value' => $tag]]);
+    // Validate tag — security check first (only for tag nodes; text nodes
+    // have no tag). MANDATORY_PARAMS / TAGS_WITH_ALT / input-wizard below
+    // are tag-keyed and naturally skip when $tag is empty.
+    if ($nodeKind === 'tag') {
+        if (TagRegistry::isBlocked($tag)) {
+            return ApiResponse::create(400, 'validation.blocked_tag')
+                ->withMessage("Tag '{$tag}' is blocked for security reasons.")
+                ->withErrors([['field' => 'tag', 'value' => $tag]]);
+        }
+        if (!TagRegistry::isAllowed($tag)) {
+            return ApiResponse::create(400, 'validation.invalid_value')
+                ->withMessage("Invalid tag '{$tag}'.")
+                ->withErrors([['field' => 'tag', 'value' => $tag]]);
+        }
     }
     
     // Validate mandatory params for tag
@@ -261,13 +190,11 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
         }
     }
 
-    // TextKey handling
-    $autoGeneratedTextKey = false;
-    if (tagRequiresTextKey($tag, $nodeParams) && empty($textKey)) {
-        $textKey = generateAutoTextKey($type, $name);
-        $autoGeneratedTextKey = true;
-    }
-    
+    // (Removed) auto-generated textKey on add. Tag elements come in empty;
+    // an explicit params.textKey is still honoured as a tag child below. The
+    // dedicated Text-node mode (nodeKind === 'text') handles text inserts.
+
+
     // Load structure file
     if ($type === 'page') {
         $json_file = resolvePageJsonPath($name);
@@ -322,27 +249,47 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
         }
     }
     
-    // Check if we'll be moving existing textKey children (for "inside" position)
+    // Check if we'll be moving existing textKey children (for "inside" position).
+    // Only applies to tag/container inserts — irrelevant when inserting a bare
+    // text node (the new node has no children to move into).
     $movedTextKeys = [];
     $willMoveTextKeys = false;
-    if ($position === 'inside' && isset($targetNode['children']) && is_array($targetNode['children'])) {
+    if ($nodeKind !== 'text' && $position === 'inside' && isset($targetNode['children']) && is_array($targetNode['children'])) {
         $movedTextKeys = findDirectTextKeyChildren($targetNode['children']);
         $willMoveTextKeys = !empty($movedTextKeys);
     }
     
-    // Build new node
-    $newNode = ['tag' => $tag];
-    if (!empty($nodeParams)) $newNode['params'] = $nodeParams;
-    
-    // For container tags, initialize children array
-    // If textKey is set, add it as a child node (NOT at same level as tag)
-    // BUT: Don't add auto-generated textKey if we're moving existing textKey children
-    if (TagRegistry::isContainer($tag)) {
-        $newNode['children'] = [];
-        if (!empty($textKey) && !$willMoveTextKeys) {
-            // textKey goes INSIDE children as a separate node
-            // Only if we're NOT moving existing text children
-            $newNode['children'][] = ['textKey' => $textKey];
+    // Build new node — tag element (default) or bare text node.
+    if ($nodeKind === 'text') {
+        if ($textRaw) {
+            // Raw literal — no translation entry, the value lives in the key.
+            $finalTextKey = '__RAW__' . $textValue;
+        } else {
+            // Translation key — the client picks or creates it via the
+            // text-key picker (which calls setTranslationKeys itself to write
+            // the value). We just receive the chosen textKey and insert it;
+            // no server-side key-gen / translation write is needed.
+            $clientTextKey = isset($params['textKey']) ? (string) $params['textKey'] : '';
+            if ($clientTextKey === '') {
+                return ApiResponse::create(400, 'validation.required')
+                    ->withMessage("textKey is required for nodeKind='text' when textRaw is false (provided by the text-key picker on the client).")
+                    ->withErrors([['field' => 'textKey', 'reason' => 'missing_for_text_key']]);
+            }
+            $finalTextKey = $clientTextKey;
+        }
+        $newNode = ['textKey' => $finalTextKey];
+    } else {
+        $newNode = ['tag' => $tag];
+        if (!empty($nodeParams)) $newNode['params'] = $nodeParams;
+
+        // For container tags, initialize children array. If textKey is set,
+        // add it as a child node (NOT at same level as tag), unless we're
+        // moving existing textKey children.
+        if (TagRegistry::isContainer($tag)) {
+            $newNode['children'] = [];
+            if (!empty($textKey) && !$willMoveTextKeys) {
+                $newNode['children'][] = ['textKey' => $textKey];
+            }
         }
     }
     
@@ -381,12 +328,6 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
     
     $structure = $insertResult['structure'];
     $newNodeId = $insertResult['newNodeId'];
-    
-    // Create translation if auto-generated AND we didn't move existing text
-    $translationCreated = false;
-    if ($autoGeneratedTextKey && !empty($textKey) && !$willMoveTextKeys) {
-        $translationCreated = createEmptyTranslation($textKey);
-    }
     
     // Write back
     $json_content = json_encode($structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -429,12 +370,6 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
         'file' => $json_file,
         'html' => $renderedHtml
     ];
-    
-    if ($autoGeneratedTextKey && !$willMoveTextKeys) {
-        $responseData['textKeyGenerated'] = true;
-        $responseData['textKey'] = $textKey;
-        $responseData['translationCreated'] = $translationCreated;
-    }
     
     if ($autoGeneratedAltKey) {
         $responseData['altKeyGenerated'] = true;

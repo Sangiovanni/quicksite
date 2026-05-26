@@ -1528,22 +1528,27 @@
         const newText = editingElement.textContent.trim();
         const textKey = editingTextKey;
         const struct = editingElement.closest('[data-qs-struct]')?.getAttribute('data-qs-struct') || '';
-        
+        // Node path of the edited text node — needed to update RAW/LIT literals
+        // directly in the structure (those aren't translation keys).
+        const node = editingElement.getAttribute('data-qs-node')
+            || editingElement.closest('[data-qs-node]')?.getAttribute('data-qs-node') || '';
+
         // Clean up editing state
         editingElement.classList.remove('qs-text-editing');
         editingElement.setAttribute('contenteditable', 'false');
-        
+
         // Only save if text actually changed
         if (newText !== originalText) {
             console.log('[QuickSite] Text changed:', textKey, originalText, '->', newText);
-            
-            window.parent.postMessage({ 
-                source: 'quicksite-preview', 
+
+            window.parent.postMessage({
+                source: 'quicksite-preview',
                 action: 'textEdited',
                 textKey: textKey,
                 newValue: newText,
                 oldValue: originalText,
-                structure: struct
+                structure: struct,
+                node: node
             }, ALLOWED_ORIGIN);
         } else {
             console.log('[QuickSite] Text unchanged, not saving');

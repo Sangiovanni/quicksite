@@ -441,16 +441,22 @@ class JsonToHtmlRenderer {
                 . $textKey . ' params=' . json_encode(array_keys($node['params'])));
         }
 
-        // Check if it's raw text (not a translation key)
-        if (strpos($textKey, '__RAW__') === 0) {
-            $rawText = substr($textKey, 7); // Remove __RAW__ prefix
-            return htmlspecialchars($rawText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        }
-
-        // Check if it's a literal value (used as-is, same as raw for textKeys)
-        if (strpos($textKey, '__LIT__') === 0) {
-            $litText = substr($textKey, 7); // Remove __LIT__ prefix
-            return htmlspecialchars($litText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        // Raw text (__RAW__) / literal (__LIT__): rendered verbatim, no
+        // translation lookup. In editor mode we STILL wrap it in the
+        // data-qs-textkey span (with a data-qs-raw marker) so the Text tool can
+        // select + edit it — it reads the prefix to edit it as raw rather than
+        // as a translation key. Without this, raw text has no selection handle.
+        if (strpos($textKey, '__RAW__') === 0 || strpos($textKey, '__LIT__') === 0) {
+            $rawText = substr($textKey, 7); // strip the 7-char __RAW__/__LIT__ prefix
+            $escapedRaw = htmlspecialchars($rawText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($this->editorMode) {
+                $escapedKey = htmlspecialchars($textKey, ENT_QUOTES);
+                $nodePath = implode('.', $this->currentNodePath);
+                $struct = htmlspecialchars($this->currentStructure, ENT_QUOTES);
+                $inComponent = $this->inComponent ? ' data-qs-in-component' : '';
+                return '<span data-qs-textkey="' . $escapedKey . '" data-qs-raw="true" data-qs-node="' . $nodePath . '" data-qs-struct="' . $struct . '" data-qs-textonly="true"' . $inComponent . '>' . $escapedRaw . '</span>';
+            }
+            return $escapedRaw;
         }
 
         // Check if it's a variable placeholder (e.g., {{varName}} or {{$varName}}) - display as-is

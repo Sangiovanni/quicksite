@@ -296,7 +296,11 @@
     const addAdvancedSection = document.getElementById('add-advanced-section');
     const addPreviewSection = document.getElementById('add-preview-section');
     const addPositionSection = document.getElementById('add-position-section');
-    const addConfirmTopBtn = document.getElementById('add-confirm-top');
+    // Text-node UI: value input (RAW) + key picker container (Translation key) + their wrapper fields
+    const addTextValueField = document.getElementById('add-text-value-field');
+    const addTextKeyField = document.getElementById('add-text-key-field');
+    const addTextKeyPickerHost = document.getElementById('add-text-key-picker');
+    let addTextKeyPickerInst = null;   // QSComplexWizard.createTextKeyPicker instance (lazy)
     
     // Helper to get position from radio picker
     function getAddPosition() {
@@ -312,6 +316,9 @@
     const addCustomParamsList = document.getElementById('add-custom-params-list');
     const addAnotherParamBtn = document.getElementById('add-another-param');
     const addTextKeyInfo = document.getElementById('add-textkey-info');
+    // Text-node tab refs (Text-authoring concern, 2026-05-25)
+    const addTextField = document.getElementById('add-text-field');
+    const addTextValueInput = document.getElementById('add-text-value');
     const addGeneratedTextKeyPreview = document.getElementById('add-generated-textkey-preview');
     const addAltKeyInfo = document.getElementById('add-altkey-info');
     const addGeneratedAltKeyPreview = document.getElementById('add-generated-altkey-preview');
@@ -3620,7 +3627,13 @@
             showToast('Cannot edit unresolved component variable', 'warning');
             return;
         }
-        
+
+        // RAW / LIT literals are NOT translation keys — update the node's textKey
+        // in the structure directly instead of writing a (bogus) translation.
+        if (textKey.startsWith('__RAW__') || textKey.startsWith('__LIT__')) {
+            return saveRawTextEdit(data);
+        }
+
         // Get current language from the preview selector
         const lang = getCurrentLang();
         
@@ -3675,7 +3688,55 @@
             }
         }
     }
-    
+
+    /**
+     * Save a RAW/LIT literal text edit. Literals have no translation entry, so we
+     * update the node's textKey in the structure (editStructure) to
+     * "__RAW__" + newValue instead of writing a translation.
+     */
+    async function saveRawTextEdit(data) {
+        const struct = data.structure;
+        const node = data.node;
+        if (!struct || !node) {
+            console.error('[Preview] Raw text edit missing struct/node:', data);
+            showToast(PreviewConfig.i18n.error + ': missing node info', 'error');
+            return;
+        }
+        const info = parseStruct(struct);
+        if (!info || !info.type) {
+            showToast(PreviewConfig.i18n.error + ': invalid structure', 'error');
+            return;
+        }
+
+        const params = {
+            type: info.type,
+            nodeId: node,
+            action: 'update',
+            structure: { textKey: '__RAW__' + data.newValue }
+        };
+        if (info.name) params.name = info.name;
+
+        try {
+            const result = await QuickSiteAdmin.apiRequest('editStructure', 'PATCH', params);
+            if (!result.ok) {
+                throw new Error(result.data?.message || result.data?.data?.message || 'Failed to save text');
+            }
+            showToast(PreviewConfig.i18n.textSaved, 'success');
+            // The inline contenteditable already shows the new text; the stale
+            // data-qs-textkey on the span refreshes on the next reload.
+        } catch (error) {
+            console.error('[Preview] Raw text save error:', error);
+            showToast(PreviewConfig.i18n.error + ': ' + error.message, 'error');
+            try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                const textEl = iframeDoc.querySelector(`[data-qs-textkey="${data.textKey}"]`);
+                if (textEl) textEl.textContent = data.oldValue;
+            } catch (e) {
+                console.error('[Preview] Could not restore text:', e);
+            }
+        }
+    }
+
     // ==================== Utility Functions ====================
     
     /**
@@ -4474,11 +4535,14 @@
         const isComponent = sidebarAddNodeType === 'component';
         const isSnippet = sidebarAddNodeType === 'snippet';
         const isComplex = sidebarAddNodeType === 'complex';
+        const isText = sidebarAddNodeType === 'text';
 
         if (addTagField) addTagField.style.display = isTag ? 'block' : 'none';
         if (addComponentField) addComponentField.style.display = isComponent ? 'block' : 'none';
         if (addSnippetField) addSnippetField.style.display = isSnippet ? 'block' : 'none';
         if (addClassField) addClassField.style.display = isTag ? 'block' : 'none';
+        // Text node tab — value input + Raw/Translation-key toggle.
+        if (addTextField) addTextField.style.display = isText ? 'block' : 'none';
         // The "Advanced — custom params" section is shared between the
         // HTML Tag and the Component tabs. For tags, the entries become
         // the tag's attributes. For components, they become call-site
@@ -4496,12 +4560,8 @@
             addComplexBody.style.display = hasController ? '' : 'none';
         }
 
-        // Hide the top "Add Element" quick-add button for Complex — it
-        // sits above the kind picker + wizard body, which makes it
-        // visually mid-form and saves a config that hasn't been filled
-        // in yet. For other types, the top button is a useful shortcut.
-        const addTopActions = addConfirmTopBtn ? addConfirmTopBtn.parentElement : null;
-        if (addTopActions) addTopActions.style.display = isComplex ? 'none' : '';
+        // (Removed) The "top Add Element" quick-add button is gone — the
+        // bottom Cancel/Add pair is the single submit affordance.
 
         // Update mandatory params visibility
         updateSidebarAddMandatoryParams();
@@ -4821,20 +4881,12 @@
         row.appendChild(container);
     }
     
-    // Update text key preview
+    // Update text key preview.
+    // Auto-textKey generation on add was removed — elements are now added EMPTY,
+    // so there is no key to preview. Always hide the info row. (Adding text to an
+    // element is a separate Text-mode action — see the Text-authoring follow-up.)
     function updateSidebarAddTextKeyPreview() {
-        if (!addTextKeyInfo || !addGeneratedTextKeyPreview) return;
-        
-        const tag = addTagSelect?.value;
-        // Only show for text-bearing tags
-        const textBearingTags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'a', 'button', 'li', 'label', 'strong', 'em', 'small', 'blockquote'];
-        
-        if (sidebarAddNodeType === 'tag' && textBearingTags.includes(tag)) {
-            addTextKeyInfo.style.display = 'flex';
-            addGeneratedTextKeyPreview.textContent = `${selectedNode}_${tag}_text`;
-        } else {
-            addTextKeyInfo.style.display = 'none';
-        }
+        if (addTextKeyInfo) addTextKeyInfo.style.display = 'none';
     }
     
 
@@ -4853,10 +4905,36 @@
                 loadSidebarSnippetsList();
             } else if (sidebarAddNodeType === 'complex') {
                 populateComplexKindPicker();
+            } else if (sidebarAddNodeType === 'text') {
+                updateAddTextFieldsForType();
             } else {
                 updateSidebarAddTextKeyPreview();
             }
         });
+    });
+
+    // Text tab: swap value-input vs key-picker visibility on type-radio change,
+    // and lazy-mount the QSComplexWizard textKey picker on first use.
+    function ensureAddTextKeyPicker() {
+        if (addTextKeyPickerInst || !addTextKeyPickerHost) return;
+        if (!window.QSComplexWizard || !window.QSComplexWizard.createTextKeyPicker) {
+            console.warn('[Preview] textKey picker module (QSComplexWizard.createTextKeyPicker) not available');
+            return;
+        }
+        addTextKeyPickerInst = window.QSComplexWizard.createTextKeyPicker({
+            container: addTextKeyPickerHost,
+            value: '',
+            placeholder: PreviewConfig.i18n?.variablesPlaceholderTranslation || 'Search or type a translation key'
+        });
+    }
+    function updateAddTextFieldsForType() {
+        const isRaw = document.querySelector('input[name="add-text-type"]:checked')?.value === 'raw';
+        if (addTextValueField) addTextValueField.style.display = isRaw ? '' : 'none';
+        if (addTextKeyField) addTextKeyField.style.display = isRaw ? 'none' : '';
+        if (!isRaw) ensureAddTextKeyPicker();
+    }
+    document.querySelectorAll('input[name="add-text-type"]').forEach(r => {
+        r.addEventListener('change', updateAddTextFieldsForType);
     });
 
     // -------------------------------------------------------------------
@@ -6429,11 +6507,6 @@
         }
     });
     
-    // Top confirm button — same as bottom confirm
-    addConfirmTopBtn?.addEventListener('click', function() {
-        addConfirmBtn?.click();
-    });
-    
     // Add another param
     addAnotherParamBtn?.addEventListener('click', function() {
         if (!addCustomParamsList) return;
@@ -6476,6 +6549,8 @@
                 await addSnippetNode();
             } else if (sidebarAddNodeType === 'complex') {
                 await addComplexNode();
+            } else if (sidebarAddNodeType === 'text') {
+                await addTextNode();
             }
         } catch (error) {
             console.error('[Preview] Add node error:', error);
@@ -6628,7 +6703,81 @@
             throw new Error(response.data?.message || 'Failed to add element');
         }
     }
-    
+
+    /**
+     * Add a bare text node ({textKey:...}) to the selected element.
+     * Posts to addNode with nodeKind='text'. RAW writes "__RAW__"+value into
+     * the textKey; Translation key generates a fresh key and writes the value
+     * as its translation in the current language. The resulting text node is
+     * editable inline in Text mode.
+     */
+    async function addTextNode() {
+        const isRaw = document.querySelector('input[name="add-text-type"]:checked')?.value === 'raw';
+
+        // Per-type input + request shape:
+        //   raw → text input → backend builds {textKey: '__RAW__'+textValue}.
+        //   key → textKey picker → picker handles key creation + translation
+        //         write itself (setTranslationKeys), we just send the chosen
+        //         textKey to addNode which inserts {textKey: ...}.
+        let textPayload;
+        if (isRaw) {
+            const value = addTextValueInput?.value || '';
+            if (value.trim() === '') {
+                showToast(PreviewConfig.i18n?.textValueRequired || 'Please enter the text', 'warning');
+                if (addTextValueInput) addTextValueInput.focus();
+                return;
+            }
+            textPayload = { textRaw: true, textValue: value };
+        } else {
+            const pickedKey = (addTextKeyPickerInst && addTextKeyPickerInst.getValue()) || '';
+            if (!pickedKey) {
+                showToast(PreviewConfig.i18n?.textKeyRequired || 'Pick or create a translation key', 'warning');
+                return;
+            }
+            textPayload = { textRaw: false, textKey: pickedKey };
+        }
+
+        const position = getAddPosition();
+        const structInfo = parseStruct(selectedStruct);
+        if (!structInfo || !structInfo.type) {
+            throw new Error('Invalid structure type');
+        }
+        const isRoot = !selectedNode && selectedNode !== 0;
+
+        const requestData = Object.assign({
+            type: structInfo.type,
+            targetNodeId: isRoot ? 'root' : String(selectedNode),
+            nodeKind: 'text',
+            position: isRoot ? 'inside' : position
+        }, textPayload);
+        if (structInfo.name) requestData.name = structInfo.name;
+
+        const response = await QuickSiteAdmin.apiRequest('addNode', 'POST', requestData);
+
+        if (response.ok) {
+            const data = response.data?.data || {};
+            const targetStruct = selectedStruct;
+            const targetNode = selectedNode;
+
+            showToast(PreviewConfig.i18n?.nodeAdded || 'Text added', 'success');
+            hideSidebarAddForm();
+
+            if (data.html && targetNode) {
+                sendToIframe('insertNode', {
+                    struct: targetStruct,
+                    targetNode: targetNode,
+                    position: position,
+                    html: data.html,
+                    newNodeId: data.newNodeId
+                });
+            } else {
+                reloadPreview();
+            }
+        } else {
+            throw new Error(response.data?.message || 'Failed to add text');
+        }
+    }
+
     // Add component node
     async function addComponentNode() {
         const componentName = addComponentSelect?.value;

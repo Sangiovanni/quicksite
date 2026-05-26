@@ -57,6 +57,14 @@
                     </svg>
                     <span><?= __admin('preview.htmlTag') ?? 'HTML Tag' ?></span>
                 </button>
+                <button type="button" class="preview-contextual-form__tab" data-type="text">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="4 7 4 4 20 4 20 7"/>
+                        <line x1="9" y1="20" x2="15" y2="20"/>
+                        <line x1="12" y1="4" x2="12" y2="20"/>
+                    </svg>
+                    <span><?= __admin('preview.textTab') ?? 'Text' ?></span>
+                </button>
             </div>
             <input type="hidden" id="add-type-input" value="snippet">
         </div>
@@ -77,17 +85,39 @@
             <!-- Populated by the selected kind's wizard renderer. -->
         </div>
 
-        <!-- TOP Action Button (quick add with defaults) -->
-        <div class="preview-contextual-form__actions preview-contextual-form__actions--top">
-            <button type="button" class="admin-btn admin-btn--success admin-btn--full" id="add-confirm-top">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                    <line x1="12" y1="5" x2="12" y2="19"/>
-                    <line x1="5" y1="12" x2="19" y2="12"/>
-                </svg>
-                <?= __admin('preview.addElement') ?? 'Add Element' ?>
-            </button>
+        <!-- Text node fields (shown for Text type). The value is sent to addNode
+             with nodeKind='text'; RAW writes "__RAW__"+value into the node's
+             textKey, Translation key generates a key and writes the value as
+             its translation in the current language. -->
+        <div class="preview-contextual-form__section" id="add-text-field" style="display: none;">
+            <label class="preview-contextual-form__section-label">
+                <?= __admin('preview.textTypeLabel') ?? 'Text type' ?>:
+            </label>
+            <div class="preview-contextual-form__field">
+                <label class="admin-radio">
+                    <input type="radio" name="add-text-type" value="key" checked>
+                    <span><?= __admin('preview.textTypeKey') ?? 'Translation key' ?></span>
+                </label>
+                <label class="admin-radio">
+                    <input type="radio" name="add-text-type" value="raw">
+                    <span><?= __admin('preview.textTypeRaw') ?? 'RAW (literal)' ?></span>
+                </label>
+            </div>
+            <!-- Translation-key picker (shown when type=key): reuses the variables
+                 panel's searchable picker. Picking an existing key uses its
+                 translation; typing a new query reveals an inline create form
+                 (the picker writes the value via setTranslationKeys itself). -->
+            <div class="preview-contextual-form__field" id="add-text-key-field">
+                <label><?= __admin('preview.textKey') ?? 'Text key' ?>:</label>
+                <div id="add-text-key-picker"></div>
+            </div>
+            <!-- RAW literal value (shown when type=raw). -->
+            <div class="preview-contextual-form__field" id="add-text-value-field" style="display: none;">
+                <label for="add-text-value"><?= __admin('preview.textValueLabel') ?? 'Text' ?>:</label>
+                <input type="text" id="add-text-value" class="admin-input" placeholder="<?= __admin('preview.textValuePlaceholder') ?? 'Type the text…' ?>" autocomplete="off">
+            </div>
         </div>
-        
+
         <!-- Tag Selection (for HTML Tag type) -->
         <div class="preview-contextual-form__field" id="add-tag-field" style="display: none;">
             <label><?= __admin('preview.selectTag') ?? 'Tag' ?>:</label>

@@ -2551,7 +2551,7 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'addNode' => [
-        'description' => 'Adds a new HTML tag node to a structure with automatic textKey generation and mandatory parameter validation.',
+        'description' => 'Adds a node to a structure. Two modes: TAG (default, nodeKind=tag) inserts an HTML tag element with its params; TEXT (nodeKind=text) inserts a bare text node — either a RAW literal or a translation key picked/created by the client. Validates mandatory params per tag.',
         'method' => 'POST',
         'parameters' => [
             'type' => [
@@ -2569,55 +2569,77 @@ $GLOBALS['__help_commands'] = [
             'targetNodeId' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Reference node ID for positioning',
+                'description' => 'Reference node ID for positioning (or "root" for the structure root)',
                 'example' => '0.2'
             ],
             'position' => [
-                'required' => true,
+                'required' => false,
                 'type' => 'string',
-                'description' => 'Where to insert: before, after, or inside',
-                'example' => 'after'
+                'description' => 'Where to insert: before, after, or inside (default after; forced inside when targetNodeId="root")',
+                'example' => 'after',
+                'default' => 'after'
+            ],
+            'nodeKind' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'What to add: "tag" (default — HTML tag element) or "text" (bare text node).',
+                'example' => 'text',
+                'allowed_values' => ['tag', 'text'],
+                'default' => 'tag'
             ],
             'tag' => [
-                'required' => true,
+                'required' => 'conditional',
                 'type' => 'string',
-                'description' => 'HTML tag name',
+                'description' => 'HTML tag name. REQUIRED when nodeKind=tag (default); omit for nodeKind=text.',
                 'example' => 'div'
             ],
             'params' => [
                 'required' => false,
                 'type' => 'object',
-                'description' => 'Tag attributes including mandatory ones (href for <a>, src/alt for <img>, etc.)',
+                'description' => 'Tag attributes including mandatory ones (href for <a>, src/alt for <img>, etc.). Ignored for nodeKind=text.',
                 'example' => '{"class": "card", "href": "/contact"}'
             ],
             'textKey' => [
-                'required' => false,
+                'required' => 'conditional',
                 'type' => 'string',
-                'description' => 'Translation key (auto-generated if not provided for inline/block tags)',
+                'description' => 'For nodeKind=tag: an OPTIONAL explicit translation key to attach as a text child of the new tag (the legacy auto-generated placeholder textKey was removed — tag elements now come in empty). For nodeKind=text + textRaw=false: REQUIRED — the translation key picked/created by the client (the client text-key picker calls setTranslationKeys to write the value, then passes the key here).',
                 'example' => 'home.greeting'
+            ],
+            'textValue' => [
+                'required' => 'conditional',
+                'type' => 'string',
+                'description' => 'For nodeKind=text + textRaw=true: the literal text. Stored as the new node\'s textKey = "__RAW__"+textValue (rendered verbatim, no translation lookup).',
+                'example' => 'Hello world'
+            ],
+            'textRaw' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'For nodeKind=text: when true, textValue becomes a __RAW__ literal; when false, the client-provided textKey is inserted as-is.',
+                'example' => true,
+                'default' => false
             ]
         ],
-        'example_post' => 'POST /management/addNode with body: {"type": "page", "name": "home", "targetNodeId": "0.2", "position": "after", "tag": "a", "params": {"href": "/contact", "class": "btn"}}',
+        'example_post' => 'TAG mode: {"type":"page","name":"home","targetNodeId":"0.2","position":"after","tag":"a","params":{"href":"/contact","class":"btn"}}. TEXT RAW: {"type":"page","name":"home","targetNodeId":"0.2","position":"inside","nodeKind":"text","textRaw":true,"textValue":" — "}. TEXT key: {"type":"page","name":"home","targetNodeId":"0.2","position":"inside","nodeKind":"text","textKey":"home.greeting"}.',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
             'message' => 'Node added successfully',
             'data' => [
-                'nodeId' => '0.3',
-                'tag' => 'a',
-                'textKeyGenerated' => true,
-                'textKey' => 'home.item1',
-                'translationCreated' => true
+                'newNodeId' => '0.3',
+                'newNode' => ['tag' => 'a', 'params' => ['href' => '/contact']],
+                'position' => 'after',
+                'targetNodeId' => '0.2',
+                'html' => '<a href="/contact" data-qs-node="0.3" ...>...</a>'
             ]
         ],
         'error_responses' => [
-            '400.validation.required' => 'Missing required parameter',
-            '400.validation.invalid_value' => 'Invalid tag or position',
+            '400.validation.required' => 'Missing required parameter (e.g., tag for nodeKind=tag; textKey for nodeKind=text + textRaw=false)',
+            '400.validation.invalid_value' => 'Invalid tag, position, or nodeKind',
             '400.validation.missing_params' => 'Missing mandatory params (e.g., href for <a>)',
             '400.operation.denied' => 'Cannot insert inside component node',
             '404.resource.not_found' => 'Target node not found'
         ],
-        'notes' => 'Auto-generates textKey based on structure type: for pages uses {pageName}.item{N}, for components uses component.{componentName}.item{N}, for menu/footer uses {type}.item{N}. Creates empty translation in default.json. Position "inside" moves existing text children into new node. For components, use addComponentToNode. **Component node paths**: For type=component, root is "" (empty) and children are "0", "1", etc. (differs from pages where root elements start at "0").'
+        'notes' => 'TAG mode adds a tag element that comes in EMPTY by default; the legacy auto-generated placeholder textKey was removed (it was the cause of span-in-span nesting when authoring bound elements). Pass an explicit `textKey` to attach a translation-key text child at add-time, or leave empty and use the dedicated TEXT mode + the Text-mode inline editor (Text tool) afterwards. TEXT mode adds a bare `{textKey:...}` text node — set `textRaw=true` + `textValue` for a literal, or pass an explicit `textKey` (the visual editor\'s text-key picker handles key creation + translation write via setTranslationKeys before calling addNode). Position "inside" moves existing text children of the target into the new tag node; this move logic is skipped for TEXT inserts. For components, use addComponentToNode. **Component node paths**: For type=component, root is "" (empty) and children are "0", "1", etc. (differs from pages where root elements start at "0").'
     ],
 
     'addComplexElement' => [
