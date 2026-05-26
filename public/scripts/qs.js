@@ -1810,6 +1810,21 @@
                 Array.isArray(arr) ? arr : (arr === undefined || arr === null ? [] : [arr]),
                 el.getAttribute('data-state-empty') || undefined);
         });
+        // Conditional visibility: [data-state-show="storeId.field"] shows the
+        // element when the field is truthy, hides it otherwise. Falsy = null,
+        // undefined, '', 0, false, or [] (empty array). Toggles the standard
+        // `hidden` attribute (CSS-overridable). Typical use:
+        //   <button data-state-show="people.nextPage">Next</button>  (hides at last page)
+        //   <p data-state-show="people.total">Found <span ...>total</span></p>
+        document.querySelectorAll('[data-state-show]').forEach(function (el) {
+            var ref = el.getAttribute('data-state-show') || '';
+            var dot = ref.indexOf('.');
+            if (dot === -1 || ref.slice(0, dot) !== storeId) return;
+            var v = store.state[ref.slice(dot + 1)];
+            var truthy = !(v === null || v === undefined || v === '' || v === 0 || v === false
+                || (Array.isArray(v) && v.length === 0));
+            el.hidden = !truthy;
+        });
     }
 
     /**

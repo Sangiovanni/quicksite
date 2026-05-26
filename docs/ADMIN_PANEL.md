@@ -1089,10 +1089,12 @@ literal, or a `#id` / `.class` selector read live). They compile to
 "go to page N", search-as-you-type, or scroll-to-load-more.
 
 **Rendering.** The store updates elements carrying `data-state-value="store.field"`
-(scalars) and `data-state-list="store.field"` (arrays — the container's first child
-is the item template, `data-bind` on descendants, optional `data-state-empty`).
-These bindings are authored in the page structure: the wizard defines the *data*,
-not the render target.
+(scalars), `data-state-list="store.field"` (arrays — the container's first child
+is the item template, `data-bind` on descendants, optional `data-state-empty`),
+and `data-state-show="store.field"` (toggles the standard `hidden` attribute on
+truthiness — handy for hiding a Next button when `nextPage` is null at the last
+page, hiding "Load more" when `hasMore` is false, etc.). These bindings are
+authored in the page structure: the wizard defines the *data*, not the render target.
 
 | Concern | Where |
 |---|---|
@@ -1100,6 +1102,57 @@ not the render target.
 | Panel + wizard logic | `public/admin/assets/js/pages/preview/preview-js-interactions.js` (State Stores section) |
 | Verbs in the picker | `listJsFunctions` (`setState` / `fetchState`, `store` inputType) |
 | Read / write | `getStateStores` / `setStateStores` → `StateStoreManager` |
+
+#### Pagination patterns (state-store configs, no extra runtime)
+
+Pagination is **configuration of a State store**, not a separate engine. The
+common patterns:
+
+**Offset (replace, with prev / next / numbered buttons)** — endpoint returns
+`page` / `limit` (request echoes), `total` / `totalPages`, and `prevPage` /
+`nextPage` (integers, null at the ends). Store fields:
+
+| name | dir | init | default | from | append |
+|---|---|---|---|---|---|
+| `page` | request | `query:page` | `1` | — | — |
+| `limit` | request | — | `10` | — | — |
+| `q` | request | — | — | — | — |
+| `total` / `totalPages` | response | — | — | echo | — |
+| `nextPage` / `prevPage` | response | — | — | echo | — |
+| `items` | response | — | — | `items` | ☐ off (replace) |
+
+The Next/Prev buttons read the rendered cursor via a hidden span — no client-
+side increment needed (`setState` can't add 1, but reading `#np`'s textContent
+works):
+
+```html
+<span hidden id="np" data-state-value="people.nextPage"></span>
+<span hidden id="pp" data-state-value="people.prevPage"></span>
+<button data-state-show="people.prevPage"
+        onclick="{{call:setState:people,page,#pp}} {{call:fetchState:people}}">Prev</button>
+<button data-state-show="people.nextPage"
+        onclick="{{call:setState:people,page,#np}} {{call:fetchState:people}}">Next</button>
+```
+
+`data-state-show` on Prev/Next gates them on the cursors so the buttons disappear
+at the ends. The numbered-button navigator (1 2 3 … N from `totalPages`) is the
+**paged-navigator complex element** in `BACKLOG.md` / Complex Elements (#11).
+
+**Cursor / infinite (append, on scroll or load-more)** — endpoint returns a
+forward cursor (`nextId` / `nextCursor`). Store fields:
+
+| name | dir | init | default | from | append |
+|---|---|---|---|---|---|
+| `startId` (or cursor) | both | `query:startId` | `0` | `nextId` | — |
+| `count` | request | — | `20` | — | — |
+| `items` | response | — | — | `items` | ☑ ON (grow) |
+
+Trigger via a page event in JS mode → Page Events → **Add Page Event** →
+`onscroll` → `fetchState:list`. The runtime fires near scroll updates; debouncing
+is a polish item.
+
+Both patterns are demonstrated in the test pages `test/paged` (offset) and
+`test/state` (cursor) — see `BETA7_ORDER.md` for the full beta.7 context.
 
 ---
 

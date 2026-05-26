@@ -560,6 +560,11 @@ DOM bindings (store → DOM, re-applied on init / `setState` / `fetchState`):
   template (`data-bind` on descendants; primitive arrays bind through the template
   root), with optional `data-state-empty` text. Because the store holds the full
   (appended) array, one whole re-render covers both replace and append.
+- `data-state-show="storeId.field"` — toggles the standard `hidden` attribute
+  based on the field's truthiness (falsy: `null` / `undefined` / `''` / `0` /
+  `false` / `[]`). Use it to hide a "Next" button when the response's
+  `nextPage` / `nextId` cursor is null at the last page, hide a "Load more"
+  trigger when `hasMore` is false, gate a counter on `total > 0`, etc.
 
 **The store owns rendering.** `fetchState` passes a `noBindings` opt to `QS.fetch`
 so the endpoint's own `responseBindings` are skipped on store fetches — otherwise an
