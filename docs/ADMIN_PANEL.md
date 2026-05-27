@@ -1075,11 +1075,31 @@ actions. Delete is read-modify-write — it re-saves the route's remaining store
   **default** for request/both, **from** + **append** for response/both. **`init`
   is the initial value** (leave it blank to use the default); the field *name* is
   the request parameter key, not `init`.
+- **`init` source kind** — a `<select>` (literal · URL query · localStorage ·
+  sessionStorage) paired with a key input whose placeholder swaps to match the
+  kind ("value" for literal, "URL param name" for query, "key name" for the
+  storage kinds). On save the wizard composes the canonical storage string
+  (`literal "Hello"` → `init: "Hello"`; `localStorage "authToken"` → `init:
+  "localStorage:authToken"`; etc.). On edit it parses the stored string back
+  into the pair, so existing `state-stores.json` files round-trip unchanged.
+  Replaces the older free-text input that required the user to know the
+  `query:` / `localStorage:` / `sessionStorage:` prefix syntax.
 - **Auto-seed** — picking an endpoint that declares request/response schemas
   pre-fills the fields (request properties → `request`, response leaves →
   `response`, a name in both → `both`). It seeds only when no field has been entered
   yet (never clobbers) and is a no-op when the endpoint has no schema — a
   non-binding, fully editable starting point.
+
+**Import from another page.** Next to **New store** there's an **Import**
+button that clones an existing store from a different route into the current
+page. Click → inline picker lists every other-route store as `<route> ▸
+<storeId>`. Pick → if the storeId already exists on this page, an inline
+rename input appears (seeded with `<id>_copy`); otherwise Import is enabled
+immediately. The import is an **independent duplicate** (deep-clone of the
+def via JSON round-trip); future edits to the source don't propagate. The
+live-shared cross-page store variant — one store referenced from multiple
+pages — is intentionally out of scope (touches the runtime emit + sidecar
+schema + lifecycle questions; deferred).
 
 **Triggering.** `setState` and `fetchState` appear in the interaction picker's
 **Function** dropdown (both the element form and the page-event form). Their `store`

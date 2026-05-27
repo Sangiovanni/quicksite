@@ -125,6 +125,32 @@
                     </svg>
                     <?= __admin('preview.addStateStore') ?? 'New store' ?>
                 </button>
+                <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="js-state-store-import" title="<?= __admin('preview.stateStoreImportPick') ?? 'Pick a store from another page' ?>">
+                    <!-- "download / import" arrow into a tray -->
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                        <path d="M12 3v12"/>
+                        <polyline points="6 11 12 17 18 11"/>
+                        <line x1="4" y1="21" x2="20" y2="21"/>
+                    </svg>
+                    <?= __admin('preview.stateStoreImport') ?? 'Import' ?>
+                </button>
+            </div>
+            <!-- Import picker (populated by getStateStores with no route → all routes) -->
+            <div class="preview-contextual-js-page-events__form" id="js-state-store-import-picker" style="display: none;">
+                <div class="preview-contextual-js-form-row">
+                    <label class="preview-contextual-js-form-label"><?= __admin('preview.stateStoreImportPick') ?? 'Pick a store from another page' ?></label>
+                    <select class="preview-contextual-js-form-select" id="js-state-store-import-select">
+                        <option value="">--</option>
+                    </select>
+                </div>
+                <div class="preview-contextual-js-form-row" id="js-state-store-import-rename-row" style="display: none;">
+                    <label class="preview-contextual-js-form-label"><?= __admin('preview.stateStoreImportRename') ?? 'Rename (store id already exists on this page):' ?></label>
+                    <input type="text" class="preview-contextual-js-form-input" id="js-state-store-import-rename-input" autocomplete="off">
+                </div>
+                <div class="preview-contextual-js-form-actions">
+                    <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="js-state-store-import-cancel"><?= __admin('common.cancel') ?? 'Cancel' ?></button>
+                    <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="js-state-store-import-confirm" disabled><?= __admin('preview.stateStoreImportConfirm') ?? 'Import' ?></button>
+                </div>
             </div>
             <!-- New / edit store wizard -->
             <div class="preview-contextual-js-page-events__form" id="js-state-store-form" style="display: none;">
@@ -150,7 +176,7 @@
                 </label>
                 <div class="preview-contextual-js-state-stores__fields">
                     <label class="preview-contextual-js-form-label"><?= __admin('preview.stateStoreFields') ?? 'Fields' ?></label>
-                    <p class="preview-contextual-js-response-bindings__hint"><?= __admin('preview.stateStoreFieldsHint') ?? 'init (sent): literal · query:x · localStorage:x · sessionStorage:x — from (received): response path e.g. data.items' ?></p>
+                    <p class="preview-contextual-js-response-bindings__hint"><?= __admin('preview.stateStoreFieldsHint') ?? 'The field name is the request key. init = initial value (pick a source kind + key). from = response path, e.g. data.items.' ?></p>
                     <div class="preview-contextual-js-state-stores__fields-rows" id="js-state-store-fields-rows"></div>
                     <button type="button" class="admin-btn admin-btn--xs admin-btn--ghost" id="js-state-store-field-add">
                         + <?= __admin('preview.stateStoreAddField') ?? 'Add field' ?>

@@ -125,6 +125,15 @@
     let ssFormPreview = null;
     let ssFormSave = null;
     let ssFormCancel = null;
+    // Import-from-another-page picker (BETA7_STORE_WIZARD_POLISH item 3):
+    // duplicate (not link) an existing store from a different route.
+    let ssImportBtn = null;
+    let ssImportPicker = null;
+    let ssImportSelect = null;
+    let ssImportRenameRow = null;
+    let ssImportRenameInput = null;
+    let ssImportCancel = null;
+    let ssImportConfirm = null;
     let ssExpanded = false;
     let ssCurrentStores = {};   // { storeId => def } for the current page
     let ssEditingId = null;     // null = creating; otherwise the id being edited
@@ -225,6 +234,13 @@
         ssFormPreview = document.getElementById('js-state-store-preview');
         ssFormSave = document.getElementById('js-state-store-save');
         ssFormCancel = document.getElementById('js-state-store-cancel');
+        ssImportBtn = document.getElementById('js-state-store-import');
+        ssImportPicker = document.getElementById('js-state-store-import-picker');
+        ssImportSelect = document.getElementById('js-state-store-import-select');
+        ssImportRenameRow = document.getElementById('js-state-store-import-rename-row');
+        ssImportRenameInput = document.getElementById('js-state-store-import-rename-input');
+        ssImportCancel = document.getElementById('js-state-store-import-cancel');
+        ssImportConfirm = document.getElementById('js-state-store-import-confirm');
 
         // Initialize event handlers
         initEventHandlers();
@@ -398,6 +414,12 @@
         if (ssFormCancel) ssFormCancel.addEventListener('click', hideStateStoreForm);
         // Save wizard
         if (ssFormSave) ssFormSave.addEventListener('click', handleStateStoreSave);
+        // Import-from-another-page picker
+        if (ssImportBtn)     ssImportBtn.addEventListener('click', handleStateStoreImportOpen);
+        if (ssImportSelect)  ssImportSelect.addEventListener('change', handleStateStoreImportPickChange);
+        if (ssImportRenameInput) ssImportRenameInput.addEventListener('input', handleStateStoreImportPickChange);
+        if (ssImportCancel)  ssImportCancel.addEventListener('click', hideStateStoreImportPicker);
+        if (ssImportConfirm) ssImportConfirm.addEventListener('click', handleStateStoreImportConfirm);
         // Store id input → re-validate
         if (ssFormId) ssFormId.addEventListener('input', updateStateStorePreview);
         // API select → populate endpoints
@@ -3458,6 +3480,53 @@
         { value: 'both',     label: '⇄ ' + (PreviewConfig.i18n?.stateStoreDirBoth     || 'both (sent + received)') }
     ];
 
+    // Init source kinds for a store field. The wizard now exposes a kind
+    // select + key input pair (was a single free-text input). On save the
+    // canonical string is composed below; on edit the stored string is
+    // parsed back into the pair. Order matters for the prefix scan in
+    // _parseSsInit — list the longer prefix names FIRST so e.g.
+    // "localStorage" doesn't get eaten by a (hypothetical) "local" prefix.
+    var SS_INIT_KINDS = [
+        { value: 'literal',        label: PreviewConfig.i18n?.stateStoreInitKindLiteral        || 'literal',        prefix: null },
+        { value: 'query',          label: PreviewConfig.i18n?.stateStoreInitKindQuery          || 'URL query',      prefix: 'query:' },
+        { value: 'localStorage',   label: PreviewConfig.i18n?.stateStoreInitKindLocalStorage   || 'localStorage',   prefix: 'localStorage:' },
+        { value: 'sessionStorage', label: PreviewConfig.i18n?.stateStoreInitKindSessionStorage || 'sessionStorage', prefix: 'sessionStorage:' }
+    ];
+
+    /**
+     * Parse a stored `init` string back into a {kind, key} pair for the
+     * wizard's edit prefill. Strings without a recognised `kind:` prefix
+     * round-trip as literal. Null / undefined → {kind: 'literal', key: ''}.
+     *
+     * @param {string|null|undefined} stored
+     * @returns {{kind: string, key: string}}
+     */
+    function _parseSsInit(stored) {
+        if (stored === null || stored === undefined) return { kind: 'literal', key: '' };
+        var s = String(stored);
+        for (var i = 0; i < SS_INIT_KINDS.length; i++) {
+            var k = SS_INIT_KINDS[i];
+            if (k.prefix && s.indexOf(k.prefix) === 0) {
+                return { kind: k.value, key: s.substring(k.prefix.length) };
+            }
+        }
+        return { kind: 'literal', key: s };
+    }
+
+    /**
+     * Compose a stored `init` string from the wizard's {kind, key} pair.
+     * Literal kind is stored as the raw key (no prefix). Empty key on a
+     * non-literal kind composes as the prefix alone (e.g. "query:") — the
+     * caller decides whether to keep or omit; collectSsFields treats an
+     * empty key as "no init", same as today's empty free-text behaviour.
+     */
+    function _composeSsInit(kind, key) {
+        if (kind === 'literal' || !kind) return key;
+        var def = SS_INIT_KINDS.find(function (k) { return k.value === kind; });
+        var prefix = (def && def.prefix) || '';
+        return prefix + key;
+    }
+
     /**
      * Toggle expand/collapse of the state stores section.
      */
@@ -3748,23 +3817,80 @@
         dirRow.appendChild(dirSelect);
         row.appendChild(dirRow);
 
-        // init + default (request / both)
+        // init + default (request / both).
+        // The init input used to be a single free-text field where the user
+        // had to know the `query:x` / `localStorage:x` prefix syntax — easy
+        // to mistype a literal as a prefix or vice-versa. It is now a kind
+        // <select> + key <input> pair, composed on save by _composeSsInit
+        // and parsed on edit by _parseSsInit. Storage format on disk is
+        // unchanged (still `query:x` etc.) so existing state-stores.json
+        // files round-trip cleanly.
+        //
+        // Layout: the kind <select> sits on its own line at full width so
+        // longer labels (e.g. "sessionStorage") aren't cropped; the key
+        // input + default input share a flex row below it. The outer
+        // `initRow` is the syncRow target (show/hide on direction change).
         var initRow = document.createElement('div');
-        initRow.className = 'preview-contextual-js-form-row ss-field-init-row';
-        var initInput = document.createElement('input');
-        initInput.type = 'text';
-        initInput.className = 'preview-contextual-js-form-input ss-field-init';
-        initInput.placeholder = PreviewConfig.i18n?.stateStoreInitPlaceholder || 'init: literal · query:x · localStorage:x';
-        if (def.init !== undefined && def.init !== null) initInput.value = String(def.init);
-        initInput.addEventListener('input', updateStateStorePreview);
+        // Vertical stack via inline styles — keeps the parent container free
+        // of `preview-contextual-js-form-row` (which is horizontal flex)
+        // without needing a new CSS class for a one-off layout.
+        initRow.style.display = 'flex';
+        initRow.style.flexDirection = 'column';
+        initRow.style.gap = 'var(--space-xs)';
+
+        var parsedInit = _parseSsInit(def.init);
+
+        var initKindSelect = document.createElement('select');
+        initKindSelect.className = 'preview-contextual-js-form-select ss-field-init-kind';
+        SS_INIT_KINDS.forEach(function (k) {
+            var o = document.createElement('option');
+            o.value = k.value;
+            o.textContent = k.label;
+            initKindSelect.appendChild(o);
+        });
+        initKindSelect.value = parsedInit.kind;
+
+        var initKeyInput = document.createElement('input');
+        initKeyInput.type = 'text';
+        initKeyInput.className = 'preview-contextual-js-form-input ss-field-init-key';
+        initKeyInput.value = parsedInit.key;
+
+        // Per-kind placeholder so the input meaning is unambiguous.
+        function _syncInitKeyPlaceholder() {
+            var kind = initKindSelect.value;
+            var p;
+            if (kind === 'literal')      p = PreviewConfig.i18n?.stateStoreInitKeyLiteralPlaceholder || 'value (e.g. Hello)';
+            else if (kind === 'query')   p = PreviewConfig.i18n?.stateStoreInitKeyQueryPlaceholder   || 'URL param name (e.g. page)';
+            else                          p = PreviewConfig.i18n?.stateStoreInitKeyStoragePlaceholder || 'key name (e.g. authToken)';
+            initKeyInput.placeholder = p;
+        }
+        _syncInitKeyPlaceholder();
+
+        initKindSelect.addEventListener('change', function () {
+            _syncInitKeyPlaceholder();
+            updateStateStorePreview();
+        });
+        initKeyInput.addEventListener('input', updateStateStorePreview);
+
         var defaultInput = document.createElement('input');
         defaultInput.type = 'text';
         defaultInput.className = 'preview-contextual-js-form-input ss-field-default';
         defaultInput.placeholder = PreviewConfig.i18n?.stateStoreDefaultPlaceholder || 'default';
         if (def.default !== undefined && def.default !== null) defaultInput.value = String(def.default);
         defaultInput.addEventListener('input', updateStateStorePreview);
-        initRow.appendChild(initInput);
-        initRow.appendChild(defaultInput);
+
+        // Sub-row 1: kind select alone, takes full width via parent's stretch
+        // default. The class on the select itself sets the appearance.
+        initRow.appendChild(initKindSelect);
+
+        // Sub-row 2: key + default, side-by-side via the existing
+        // `.ss-field-init-row` styling (display:flex; gap; inputs flex:1).
+        var initKeyDefaultRow = document.createElement('div');
+        initKeyDefaultRow.className = 'ss-field-init-row';
+        initKeyDefaultRow.appendChild(initKeyInput);
+        initKeyDefaultRow.appendChild(defaultInput);
+        initRow.appendChild(initKeyDefaultRow);
+
         row.appendChild(initRow);
 
         // from + append (response / both)
@@ -3828,8 +3954,14 @@
             var dir = row.querySelector('.ss-field-dir')?.value || 'request';
             var fdef = { dir: dir };
             if (dir === 'request' || dir === 'both') {
-                var init = (row.querySelector('.ss-field-init')?.value || '').trim();
-                if (init !== '') fdef.init = init;
+                // Compose `init` from the kind <select> + key <input> pair.
+                // Empty key is treated as "no init" (matches the prior
+                // empty-free-text-input behaviour). For non-literal kinds,
+                // an empty key means the user picked a source but never
+                // typed a key — also "no init" rather than e.g. "query:".
+                var initKind = row.querySelector('.ss-field-init-kind')?.value || 'literal';
+                var initKey = (row.querySelector('.ss-field-init-key')?.value || '').trim();
+                if (initKey !== '') fdef.init = _composeSsInit(initKind, initKey);
                 var dflt = (row.querySelector('.ss-field-default')?.value || '').trim();
                 if (dflt !== '') fdef.default = _coerceScalar(dflt);
             }
@@ -3865,6 +3997,11 @@
      * Open the wizard to create a new store.
      */
     async function handleStateStoreAdd() {
+        // Wizard inputs are reset HERE (on open) rather than in
+        // hideStateStoreForm (on close), so the edit-then-cancel flow keeps
+        // its values until the user explicitly starts a new Add. Result:
+        // each "New store" click starts from a clean form — no carry-over
+        // between consecutive Adds. (Don't move this reset to close.)
         ssEditingId = null;
         // Always refetch so admin-side API edits surface immediately (avoids
         // the stale module-cache bug fixed for the interaction forms in Tier 1).
@@ -3916,6 +4053,213 @@
         if (ssForm) ssForm.style.display = 'none';
         if (ssAddBtn?.parentElement) ssAddBtn.parentElement.style.display = '';
         ssEditingId = null;
+    }
+
+    // ==================== Import store from another page ====================
+    // The Import picker is a thin alternative to the New-store wizard: it
+    // *duplicates* an existing store from another route into this page
+    // (independent copy — future edits don't propagate). The "live-shared
+    // cross-page store" variant is bigger (runtime emit + sidecar schema +
+    // lifecycle questions) and stays out of beta.7. The picker uses the
+    // existing setStateStores command (read-modify-write); zero backend
+    // changes.
+
+    /**
+     * Open the Import picker. Fetches every project route's stores via
+     * getStateStores (no `route` → all routes), excludes the current page,
+     * populates the <select> as `<route> ▸ <storeId>`, and shows the form.
+     */
+    async function handleStateStoreImportOpen() {
+        if (!currentPageName) return;
+        // Hide the wizard if it was open (mutually exclusive UI).
+        if (ssForm) ssForm.style.display = 'none';
+        // Reset picker state.
+        if (ssImportSelect) ssImportSelect.innerHTML = '';
+        if (ssImportRenameRow) ssImportRenameRow.style.display = 'none';
+        if (ssImportRenameInput) ssImportRenameInput.value = '';
+        if (ssImportConfirm) ssImportConfirm.disabled = true;
+
+        var allStores = {};
+        try {
+            var response = await fetch('/management/getStateStores', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + PreviewConfig.authToken,
+                    'Content-Type': 'application/json'
+                },
+                // No `route` → backend returns the full map: {<route>: {<storeId>: def}, ...}.
+                body: JSON.stringify({})
+            });
+            if (!response.ok) throw new Error('Failed to fetch state stores');
+            var result = await response.json();
+            allStores = (result.data && result.data.stores) || {};
+        } catch (error) {
+            console.error('[PreviewJsInteractions] Import: fetch failed:', error);
+            if (showToastFn) showToastFn('Error: ' + error.message, 'error');
+            return;
+        }
+
+        // Build the option list: skip the current page; sort by route then storeId.
+        var options = [];
+        Object.keys(allStores).forEach(function (route) {
+            if (route === currentPageName) return;
+            var storesForRoute = allStores[route];
+            if (!storesForRoute || typeof storesForRoute !== 'object' || Array.isArray(storesForRoute)) return;
+            Object.keys(storesForRoute).forEach(function (storeId) {
+                options.push({ route: route, storeId: storeId, def: storesForRoute[storeId] });
+            });
+        });
+        options.sort(function (a, b) {
+            return (a.route + '' + a.storeId).localeCompare(b.route + '' + b.storeId);
+        });
+
+        if (ssImportSelect) {
+            if (options.length === 0) {
+                var noneOpt = document.createElement('option');
+                noneOpt.value = '';
+                noneOpt.textContent = PreviewConfig.i18n?.stateStoreImportNone || 'No stores on other pages to import';
+                noneOpt.disabled = true;
+                noneOpt.selected = true;
+                ssImportSelect.appendChild(noneOpt);
+            } else {
+                var placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = '-- ' + (PreviewConfig.i18n?.stateStoreImportPick || 'Pick a store') + ' --';
+                ssImportSelect.appendChild(placeholder);
+                options.forEach(function (opt) {
+                    var o = document.createElement('option');
+                    // Encode as "route|storeId" — both are file-path-safe enough
+                    // that '|' is a safe separator (routes can't contain '|').
+                    o.value = opt.route + '|' + opt.storeId;
+                    o.textContent = opt.route + ' ▸ ' + opt.storeId;
+                    ssImportSelect.appendChild(o);
+                });
+            }
+        }
+
+        if (ssImportPicker) ssImportPicker.style.display = '';
+        if (ssAddBtn?.parentElement) ssAddBtn.parentElement.style.display = 'none';
+
+        // Stash the option list on the select so the confirm handler can find
+        // the matching def without a second round-trip.
+        if (ssImportSelect) ssImportSelect._importOptions = options;
+    }
+
+    /**
+     * Toggle the rename row + enable/disable Import based on the current
+     * selection and (if rename is shown) whether the renamed id is valid +
+     * collision-free. Fires on select change AND rename input.
+     */
+    function handleStateStoreImportPickChange() {
+        var raw = ssImportSelect?.value || '';
+        if (!raw) {
+            if (ssImportRenameRow) ssImportRenameRow.style.display = 'none';
+            if (ssImportConfirm) ssImportConfirm.disabled = true;
+            return;
+        }
+        var sep = raw.indexOf('|');
+        var storeId = sep > 0 ? raw.substring(sep + 1) : raw;
+
+        var collision = !!ssCurrentStores[storeId];
+        if (ssImportRenameRow) ssImportRenameRow.style.display = collision ? '' : 'none';
+
+        if (collision) {
+            // On a brand-new collision, seed the rename input with `<id>_copy`
+            // so the user has a sensible starting point but can edit freely.
+            if (ssImportRenameInput && !ssImportRenameInput.value) {
+                ssImportRenameInput.value = storeId + '_copy';
+            }
+            var newId = (ssImportRenameInput?.value || '').trim();
+            var idValid = /^[a-zA-Z][\w-]*$/.test(newId);
+            var stillColliding = !!ssCurrentStores[newId];
+            if (ssImportConfirm) ssImportConfirm.disabled = !(idValid && !stillColliding);
+        } else {
+            // No collision — clear any stale rename text so a future collision
+            // gets a fresh seed.
+            if (ssImportRenameInput) ssImportRenameInput.value = '';
+            if (ssImportConfirm) ssImportConfirm.disabled = false;
+        }
+    }
+
+    /**
+     * Clone the selected store's def into the current page's state-stores
+     * via setStateStores (read-modify-write of the route's map). Uses the
+     * renamed id if the rename row is showing, otherwise the original id.
+     */
+    async function handleStateStoreImportConfirm() {
+        if (!currentPageName || !ssImportSelect) return;
+        var raw = ssImportSelect.value || '';
+        if (!raw) return;
+        var options = ssImportSelect._importOptions || [];
+        var match = null;
+        for (var i = 0; i < options.length; i++) {
+            if (options[i].route + '|' + options[i].storeId === raw) { match = options[i]; break; }
+        }
+        if (!match) {
+            if (showToastFn) showToastFn('Import: option not found', 'error');
+            return;
+        }
+
+        var collision = !!ssCurrentStores[match.storeId];
+        var targetId = match.storeId;
+        if (collision) {
+            targetId = (ssImportRenameInput?.value || '').trim();
+            if (!/^[a-zA-Z][\w-]*$/.test(targetId)) {
+                if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreInvalidId || 'Invalid store id', 'error');
+                return;
+            }
+            if (ssCurrentStores[targetId]) {
+                if (showToastFn) showToastFn((PreviewConfig.i18n?.stateStoreIdExists || 'A store named "%s" already exists').replace('%s', targetId), 'error');
+                return;
+            }
+        }
+
+        // Deep-clone via JSON round-trip so future edits to the source store
+        // don't accidentally propagate through shared object references.
+        // (Defs are plain JSON — no functions, no cycles — so JSON is safe.)
+        var clonedDef;
+        try {
+            clonedDef = JSON.parse(JSON.stringify(match.def));
+        } catch (e) {
+            console.error('[PreviewJsInteractions] Import: clone failed:', e);
+            if (showToastFn) showToastFn('Import: malformed source def', 'error');
+            return;
+        }
+
+        var stores = Object.assign({}, ssCurrentStores);
+        stores[targetId] = clonedDef;
+
+        try {
+            if (ssImportConfirm) ssImportConfirm.disabled = true;
+            var response = await fetch('/management/setStateStores', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + PreviewConfig.authToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ route: currentPageName, stores: stores })
+            });
+            var result = await response.json();
+            if (!response.ok) throw new Error(result.message || 'Failed to save');
+            if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreImported || 'Store imported', 'success');
+            hideStateStoreImportPicker();
+            await loadStateStores();
+            if (reloadPreviewFn) reloadPreviewFn();
+        } catch (error) {
+            console.error('[PreviewJsInteractions] Import: save failed:', error);
+            if (showToastFn) showToastFn('Error: ' + error.message, 'error');
+            if (ssImportConfirm) ssImportConfirm.disabled = false;
+        }
+    }
+
+    /**
+     * Hide the Import picker and restore the action-buttons row.
+     */
+    function hideStateStoreImportPicker() {
+        if (ssImportPicker) ssImportPicker.style.display = 'none';
+        if (ssAddBtn?.parentElement) ssAddBtn.parentElement.style.display = '';
+        if (ssImportRenameRow) ssImportRenameRow.style.display = 'none';
+        if (ssImportRenameInput) ssImportRenameInput.value = '';
     }
 
     /**
