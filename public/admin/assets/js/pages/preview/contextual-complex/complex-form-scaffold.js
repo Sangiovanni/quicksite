@@ -37,7 +37,12 @@
             try {
                 const r = await adminApi.apiRequest('listApiEndpoints', 'GET');
                 const payload = (r && r.data && (r.data.data || r.data)) || {};
-                // Response shape: { apis: [{ apiId, name, endpoints: [{id, method, name, path}, ...] }, ...] }
+                // Response shape: { apis: [{ apiId, name, endpoints: [{id, method, name, path,
+                //   requestSchema, responseSchema, ...}, ...] }, ...] }.
+                // The wizard's UI only uses id/method/name/path for the
+                // dropdown — `requestSchema` (and its `required` array) is
+                // kept on each endpoint entry so the autoseed button below
+                // can read it without a second round-trip.
                 _apisCache = Array.isArray(payload.apis) ? payload.apis : [];
             } catch (err) {
                 console.warn('[FormScaffold] failed to load APIs:', err);
@@ -249,6 +254,218 @@
                 };
             }
         });
+
+        // ===== auto-seed from endpoint request schema =====================
+        // When the picked endpoint declares a requestSchema.properties, we
+        // surface a single button + hint inside the API group letting the
+        // user pre-fill every field row from the schema. "Never clobber":
+        // the button is disabled while any field has a name typed (user
+        // must clear first to overwrite). All createElement-based per
+        // CLAUDE.md HTML-in-JS hygiene (the surrounding wizard still uses
+        // innerHTML — pre-existing tech debt filed in BACKLOG).
+        const autoseedGroup = document.createElement('div');
+        autoseedGroup.style.marginTop = '8px';
+        autoseedGroup.style.padding = '6px 8px';
+        autoseedGroup.style.background = 'var(--admin-surface-2, rgba(0,0,0,0.03))';
+        autoseedGroup.style.borderRadius = '4px';
+        autoseedGroup.style.display = 'none';
+
+        const autoseedHint = document.createElement('div');
+        autoseedHint.className = 'admin-hint';
+        autoseedHint.style.margin = '0 0 4px';
+        autoseedGroup.appendChild(autoseedHint);
+
+        const autoseedBtn = document.createElement('button');
+        autoseedBtn.type = 'button';
+        autoseedBtn.className = 'admin-btn admin-btn--sm';
+        autoseedBtn.textContent = '⤓ Pre-fill from request schema';  // ⤓ glyph
+        autoseedGroup.appendChild(autoseedBtn);
+
+        apiGroup.appendChild(autoseedGroup);
+
+        // ---- helpers ------------------------------------------------------
+
+        function _getPickedEndpointData() {
+            const apiId = apiEl.value;
+            const epId = endpointEl.value;
+            if (!apiId || !epId || !_apisCache) return null;
+            const api = _apisCache.find(a => a.apiId === apiId);
+            if (!api) return null;
+            return (api.endpoints || []).find(ep => ep.id === epId) || null;
+        }
+
+        // Type inference per the BETA7_FORM_SCAFFOLD_AUTOSEED.md table.
+        // Returns one of INPUT_TYPES; defaults to 'text' for unknown shapes
+        // (arrays / objects render as text so the user gets a visible
+        // field they can then manually convert via the type dropdown).
+        //
+        // Resolution order:
+        //   A. Standard JSON Schema types we know how to map:
+        //      - boolean              → checkbox
+        //      - number / integer     → number
+        //   B. QuickSite-permissive aliasing: if `type` itself names an
+        //      HTML5 input type that the form-scaffold supports
+        //      (`password`, `email`, `tel`, `url`, `date`, `color`, …),
+        //      use it directly. Non-standard per JSON Schema spec, but
+        //      matches what users intuitively type into a free-text
+        //      schema editor ("I want a password field, so type=password").
+        //      Filed in BACKLOG: improve the API schema editor to push
+        //      users toward `type: string, format: password` (standard
+        //      JSON Schema); this branch is the autoseed reader's
+        //      backstop until then.
+        //   C. Standard string + format / signals:
+        //      Password detection (strongest → weakest):
+        //        1. `format: 'password'` — OpenAPI 3 extension; explicit.
+        //        2. `writeOnly: true`    — JSON Schema flag for
+        //                                  client-sent / server-never-
+        //                                  echoed values; almost always
+        //                                  a password or secret.
+        //        3. property name matches /password/i — last-resort
+        //                                  heuristic. Catches
+        //                                  `password`, `oldPassword`,
+        //                                  `password_confirmation`.
+        //                                  False positive risk:
+        //                                  `passwordless` would match.
+        //      Other formats: email / tel / url / date / time /
+        //      date-time / color.
+        //      Strings with no signal → text.
+        //   D. Unknown shapes (arrays / objects / null) → text fallback.
+        function _inferInputType(prop, propName) {
+            if (!prop || typeof prop !== 'object') return 'text';
+            const t = prop.type;
+            // A: standard JSON Schema types.
+            if (t === 'boolean') return 'checkbox';
+            if (t === 'number' || t === 'integer') return 'number';
+            // B: permissive aliasing — accept any supported HTML5
+            // input name typed directly into `type` (non-standard but
+            // intuitive). Order matters: comes AFTER (A) so JSON
+            // Schema's `number` stays a number, not "fall through to
+            // INPUT_TYPES check"; comes BEFORE (C) so `type=password`
+            // wins without needing format/writeOnly/name signals.
+            if (typeof t === 'string' && INPUT_TYPES.indexOf(t) !== -1) return t;
+            // C: standard string + format / signals.
+            if (t === 'string') {
+                const f = (prop.format || '').toLowerCase();
+                if (f === 'password') return 'password';
+                if (prop.writeOnly === true) return 'password';
+                if (f === 'email') return 'email';
+                if (f === 'tel') return 'tel';
+                if (f === 'url') return 'url';
+                if (f === 'date') return 'date';
+                if (f === 'time') return 'time';
+                if (f === 'date-time' || f === 'datetime') return 'datetime-local';
+                if (f === 'color') return 'color';
+                if (/password/i.test(propName)) return 'password';
+                return 'text';
+            }
+            // D: unknown shape → text. The user can manually escalate
+            // (e.g. to a Select complex element) after save.
+            return 'text';
+        }
+
+        function _currentNamedFieldCount() {
+            return fieldsEditor.getRows().filter(f => f.name && f.name.trim()).length;
+        }
+
+        // Refresh the auto-seed group visibility + button label. Called on:
+        //  (a) endpoint change (count may go from 0 → N or N → 0),
+        //  (b) fields editor change (named-field count → label flip),
+        //  (c) form id change (the generated labelKey embeds the id — when
+        //      it changes, regenerating an empty picker is harmless, but
+        //      we don't auto-regenerate already-seeded keys; user clears
+        //      + re-pre-fills if they renamed the form).
+        //
+        // The button is ALWAYS clickable when the auto-seed group is
+        // visible (Flavor B from the design discussion). When fields are
+        // already populated, the label flips to a destructive-style "Reset"
+        // and the click handler prompts for confirmation before clobbering.
+        function _syncAutoSeedUI() {
+            const ep = _getPickedEndpointData();
+            const props = (ep && ep.requestSchema && ep.requestSchema.properties) || {};
+            const propNames = Object.keys(props);
+            if (propNames.length === 0) {
+                autoseedGroup.style.display = 'none';
+                return;
+            }
+            autoseedGroup.style.display = '';
+            autoseedHint.textContent = 'Endpoint declares ' + propNames.length
+                + ' request field' + (propNames.length === 1 ? '' : 's') + '.';
+
+            const namedCount = _currentNamedFieldCount();
+            if (namedCount > 0) {
+                autoseedBtn.textContent = '⤴ Reset to schema fields (clears ' + namedCount + ')';
+                autoseedBtn.title = 'Replaces the ' + namedCount + ' current field(s) with schema defaults. Confirmation required.';
+            } else {
+                autoseedBtn.textContent = '⤓ Pre-fill from request schema';
+                autoseedBtn.title = '';
+            }
+            autoseedBtn.disabled = false;   // always clickable when group is visible
+        }
+
+        function _autoseedNow() {
+            // Destructive-replace confirmation when there's anything to clobber.
+            // `window.confirm` matches how `deletePageEvent` already prompts
+            // for destructive actions in the same admin layer — keeps the
+            // wizard zero-dependency. A pretty modal is in BACKLOG.
+            const namedCount = _currentNamedFieldCount();
+            if (namedCount > 0) {
+                const ok = window.confirm(
+                    'Replace ' + namedCount + ' current field(s) with schema defaults?\n\n'
+                    + 'This can\'t be undone.'
+                );
+                if (!ok) return;
+            }
+
+            const ep = _getPickedEndpointData();
+            const props = (ep && ep.requestSchema && ep.requestSchema.properties) || {};
+            const reqList = Array.isArray(ep && ep.requestSchema && ep.requestSchema.required)
+                ? ep.requestSchema.required : [];
+            const VALID = /^[a-zA-Z_][\w-]*$/;
+            const formId = (idEl.value.trim() || 'form').toLowerCase().replace(/[^a-z0-9]/g, '-');
+
+            const seeded = [];
+            Object.keys(props).forEach(function (name) {
+                if (!VALID.test(name)) return;  // skip schema entries we can't safely emit
+                seeded.push({
+                    name: name,
+                    type: _inferInputType(props[name], name),
+                    required: reqList.indexOf(name) !== -1,
+                    // Generate the labelKey the same way the per-field
+                    // userTouchedLabel auto-suggest does, so the picker
+                    // shows a consistent shape if the user wants to find
+                    // / create the key from there. The key may NOT exist
+                    // yet — that's intentional, the picker shows an
+                    // unresolved key and lets the user create it.
+                    labelKey: 'form.' + formId + '.' + name.toLowerCase().replace(/[^a-z0-9]/g, '-') + '.label'
+                });
+            });
+
+            if (seeded.length === 0) return;
+            fieldsEditor.clear();
+            seeded.forEach(function (f) { fieldsEditor.addRow(f); });
+            _syncAutoSeedUI();   // refresh the label (now showing "Reset…")
+        }
+
+        autoseedBtn.addEventListener('click', _autoseedNow);
+        endpointEl.addEventListener('change', _syncAutoSeedUI);
+        apiEl.addEventListener('change', function () {
+            // populateEndpointDropdown also fires from the earlier
+            // listener — by then the endpoint value has reset to '',
+            // so this just hides the auto-seed group cleanly.
+            _syncAutoSeedUI();
+        });
+        // Field edits should re-check the never-clobber gate too. The row
+        // editor doesn't expose a granular per-input change event, but its
+        // onChange covers add/remove/reorder. For per-character typing in
+        // the name input, listen via delegation on the fields container.
+        fieldsContainer.addEventListener('input', function (e) {
+            if (e.target && e.target.classList && e.target.classList.contains('qs-fs-field-row__name')) {
+                _syncAutoSeedUI();
+            }
+        });
+        // Initial sync — endpoint may already be picked when the wizard
+        // re-mounts (shouldn't happen today, but defensive).
+        _syncAutoSeedUI();
 
         // ===== controller =================================================
         function getConfig() {
