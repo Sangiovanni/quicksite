@@ -92,6 +92,18 @@
                 </svg>
                 <span><?= __admin('preview.emulation') ?? 'Emulation' ?></span>
             </button>
+            <!-- Translate from CSV button (complex-element only — currently
+                 only Table; shown when selected node has data-qs-complex='table').
+                 Opens the translate-csv modal. See BETA7_TABLE_TRANSLATION_CSV.md. -->
+            <button type="button" class="admin-btn admin-btn--secondary" id="ctx-node-translate-csv" title="<?= __admin('preview.translateCsv', 'Translate from CSV') ?>" style="display: none;">
+                <!-- "language / translate" icon: two stacked horizontal text-lines + a tiny arrow hint -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 5h12"/><path d="M9 3v2"/>
+                    <path d="M5 9c0 4 3 6 6 6"/><path d="M13 9c0 4-3 6-6 6"/>
+                    <path d="M21 21l-4-9-4 9"/><path d="M14.5 17h5"/>
+                </svg>
+                <span><?= __admin('preview.translateCsv', 'Translate from CSV') ?></span>
+            </button>
         </div>
     </div>
     

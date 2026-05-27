@@ -4144,6 +4144,74 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'When newEvent differs from event, the interaction is spliced out of the source event and pushed onto the new event (empty event/page entries are cleaned up). When newEvent is omitted or equal, the call is replaced in-place at the same index. Counterpart to editInteraction (which edits element-level events on a node).'
     ],
 
+    'importStructureTranslations' => [
+        'description' => 'Bulk-write translation values for a complex-element subtree (currently: Table) by submitting a CSV-shaped grid in another language. Translation-only — no JSON structure change. Validates that the target structure exists on the named page AND that the pasted grid dimensions match exactly; refuses partial writes on mismatch.',
+        'method' => 'POST',
+        'parameters' => [
+            'route' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Page route containing the target structure',
+                'example' => 'test/complex-element'
+            ],
+            'kind' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Complex-element kind. Currently only "table" is supported.',
+                'example' => 'table'
+            ],
+            'structureId' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'The data-qs-complex-id attribute value on the target structure (matches the table id stamped by the Table builder).',
+                'example' => 'q1Sales'
+            ],
+            'language' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Target language code (must be in the project LANGUAGES_SUPPORTED config).',
+                'example' => 'fr'
+            ],
+            'header' => [
+                'required' => false,
+                'type' => 'array',
+                'description' => 'Header row cell values (one per column). Empty array [] when the table has no <thead>.',
+                'example' => '["Trimestre", "Ventes", "Notes"]'
+            ],
+            'rows' => [
+                'required' => true,
+                'type' => 'array',
+                'description' => 'Body rows — array of arrays of cell values. Width must match the existing table\'s column count.',
+                'example' => '[["Q1", "100", "..."], ["Q2", "150", "..."]]'
+            ]
+        ],
+        'example_post' => 'POST /management/importStructureTranslations with body: {"route": "test/complex-element", "kind": "table", "structureId": "q1Sales", "language": "fr", "header": ["Trimestre","Ventes","Notes"], "rows": [["Q1","100","..."]]}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Translations imported for "q1Sales" (fr).',
+            'data' => [
+                'route' => 'test/complex-element',
+                'kind' => 'table',
+                'structureId' => 'q1Sales',
+                'language' => 'fr',
+                'keysWritten' => 6,
+                'dimensions' => ['hasHead' => true, 'headerCols' => 3, 'bodyRows' => 1, 'cols' => 3]
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'route, kind, structureId, language, and rows are required',
+            '400.validation.invalid_value' => 'unsupported kind, language not in project config, or rows malformed',
+            '400.validation.invalid_format' => 'structureId does not match HTML id format',
+            '404.route.not_found' => 'page JSON file does not exist for the route',
+            '404.structure.not_found' => 'no <table data-qs-complex-id=X> found on the page (table may pre-date the marker — see BETA7_TABLE_TRANSLATION_CSV.md)',
+            '422.validation.dimension_mismatch' => 'pasted grid dimensions do not match the existing table — response data carries the expected vs got diff',
+            '500.server.file_read_failed' => 'page JSON file unreadable',
+            '500.server.file_write_failed' => 'translation file write failed'
+        ],
+        'notes' => 'Counterpart to the Table wizard\'s Translatable paste mode (which CREATES + writes the FIRST language\'s values). This command is for adding additional languages to an existing structure. Empty cells in the pasted grid become empty translation values (NOT skipped — the key must exist after this write or the renderer falls back to the raw key text).'
+    ],
+
     // =========================================================================
     // STATE STORE COMMANDS
     // =========================================================================

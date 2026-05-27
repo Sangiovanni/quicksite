@@ -16098,3 +16098,66 @@ body[data-page="preview"] .global-miniplayer {
     cursor: pointer; font-size: 1.2rem; line-height: 1;
     color: inherit; padding: 0 4px;
 }
+
+/* Translate-from-CSV modal (BETA7_TABLE_TRANSLATION_CSV.md).
+   Mirrors .preview-add-node-modal layout — same fixed overlay + centered
+   card pattern. The inner form uses the project's shared .admin-* classes
+   so visual styling stays consistent with every other admin form. */
+.preview-translate-csv-modal {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 10000;
+    display: flex; align-items: center; justify-content: center;
+}
+.preview-translate-csv-modal__backdrop {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    /* #00000080 + blur matches the existing add-node / keyframe modal
+       pattern — without the blur the content fights for visibility
+       against whatever's behind in the editor. */
+    background: #00000080;
+    backdrop-filter: blur(2px);
+}
+.preview-translate-csv-modal__content {
+    position: relative;
+    /* Explicit z-index defends against flex+position-absolute stacking
+       quirks where the backdrop could land on top. */
+    z-index: 1;
+    /* `--admin-card-bg` referenced by other modals is not actually
+       defined as a CSS variable anywhere in this stylesheet — it
+       falls back to transparent, which is why modal contents look
+       washed-out against the editor behind them. Use the actual
+       defined surface var (`--admin-bg-secondary`) with a hard
+       opaque fallback so the modal is guaranteed solid even when
+       the theme overrides change. */
+    background: var(--admin-bg-secondary, #1f1f1f);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    width: 90%; max-width: 640px; max-height: 90vh;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+}
+.preview-translate-csv-modal__header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--admin-border);
+}
+.preview-translate-csv-modal__header h3 {
+    margin: 0; font-size: 1.1rem; font-weight: 600;
+    color: var(--admin-text);
+}
+.preview-translate-csv-modal__close {
+    background: transparent; border: none;
+    padding: var(--space-xs); cursor: pointer;
+    color: var(--admin-text-muted);
+    border-radius: var(--radius-sm);
+}
+.preview-translate-csv-modal__close svg { width: 18px; height: 18px; }
+.preview-translate-csv-modal__body {
+    padding: var(--space-md) var(--space-lg);
+    overflow-y: auto;
+    flex: 1;
+}
+.preview-translate-csv-modal__footer {
+    display: flex; justify-content: flex-end; gap: var(--space-sm);
+    padding: var(--space-md) var(--space-lg);
+    border-top: 1px solid var(--admin-border);
+}

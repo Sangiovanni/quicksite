@@ -342,6 +342,14 @@ Same auto-discovery pattern client-side — `preview-config.php` globs
 | `form-scaffold` | `<form>` + N field rows + submit button, with `onsubmit` chain pre-wired (validate + fetch + optional post-submit actions) | Headline API-objective integration. Reuses `FieldRow` internally for each field. **Auto-seed from request schema**: when the picked API endpoint declares a `requestSchema.properties`, a `⤓ Pre-fill from request schema` button appears in the API group — click to populate every field row with `{name, type, required, labelKey}` inferred from the schema. Type inference: standard JSON Schema (`boolean` → checkbox; `number` / `integer` → number); QuickSite-permissive aliasing — any HTML5 input name typed directly into `type` (`password` / `email` / `tel` / `url` / `date` / `color` / …) maps to that input type; `format` on a `string` (email / tel / url / date / time / date-time / color / **password**) → matching HTML5 type; `writeOnly: true` → password; property name matches `/password/i` → password (last-resort); else `text`. **Reset behaviour**: with fields already populated, the button label flips to `⤴ Reset to schema fields (clears N)` and prompts for confirmation before the destructive replace — useful after picking the wrong endpoint or to recover from typos. |
 | `select` | `<div class="field"><label/><select/><span data-error-for/></div>` with N `<option>` children | Same outer shape as field-row so a select sits alongside text inputs in a form-scaffold and picks up the same QS.validate hook. Optional placeholder option + required + multiple. |
 | `list` | `<ul>` or `<ol>` with N `<li><textKey/></li>` children | Simple flat list. `<ol>` supports `start` and `reversed`. |
+| `radio-group` | `<fieldset class="field">` + `<legend>` + N (`<label><input type="radio">`) + `<span data-error-for>` | All radios share one `name`. Layout `inline` / `stacked` (adds `field--inline` class). Optional default-selected value (a `<select>` rebuilt from the live option values). |
+| `checkbox-group` | Same as radio-group with `type="checkbox"` | Optional `arraySubmit` toggle emits `name="<name>[]"` for PHP-style array submission (error span still uses the bare name). Multi-select default values. |
+| `table` | `<table>` + optional `<caption>` + optional `<thead>` + `<tbody>` of M rows × N columns of `<td>` | Spreadsheet paste (TSV/CSV) with hybrid mode radio — **RAW** (`__RAW__`-prefixed literals, same in every language) or **Translatable** (auto-generated keys `table.<id>.head.<col>` + `table.<id>.body.<r>.<c>` written via `setTranslationKeys` for a user-picked language). Empty pasted cells skipped (no orphan keys). When `id` is set the `<table>` is stamped with `data-qs-complex="table"` + `data-qs-complex-id="<id>"` so the **Translate from CSV** workflow (see below) can find it. |
+| `definition-list` | `<dl>` with N (`<dt>`, `<dd>`) pairs | One translation key per term and per description. MVP is 1:1 (single `<dt>` per `<dd>`). |
+| `accordion` | `<div class="accordion">` with N native `<details>` / `<summary>` disclosure items | No JS or ARIA wiring — browser handles toggling. Per-item `openByDefault` adds the `open` attribute. |
+| `nav-menu` | `<nav>` / `<ul>` with N `<li><a href="…">` items | Per-item **external** toggle adds `target="_blank" rel="noopener"`. Each `href` input attaches the shared routes datalist for autocomplete (external URLs still work). |
+| `breadcrumb` | `<nav aria-label="Breadcrumb">` / `<ol class="breadcrumb">` with N `<li>` | Last item auto-renders as plain text with `aria-current="page"` (no link); its href input is auto-greyed-out in the wizard. Same routes datalist as nav-menu for intermediate hrefs. |
+| `tab-set` | `<div class="tabset" id="<setId>">` + `<div role="tablist">` + N `<button role="tab">` + N `<div role="tabpanel">` | ARIA-correct tab semantics. Click-to-switch wired via existing QS verbs (`removeClass` / `addClass` / `hide` / `show` chain in each tab's `onclick`) — no new runtime needed. User-provided `setId` scopes the per-tab click chain so multiple tab sets coexist on one page. Each panel content is a single `<p>` with a `textKey` — edit further via the regular editor after save. Arrow-key keyboard nav between tabs is filed in BACKLOG. |
 
 **Adding a new kind — 2-file recipe**
 
@@ -372,6 +380,27 @@ The whole subtree is spliced under one file lock by reusing
 `addNode`'s insertion helper. If the builder throws or returns a
 malformed node, nothing is written. Half-built subtrees never reach
 the structure file.
+
+**Translate from CSV** (currently: Table only)
+
+Complex-element builders that opt in by stamping the
+`data-qs-complex="<kind>"` + `data-qs-complex-id="<id>"` attribute pair
+on their root node become **translatable in bulk**: select the rendered
+element in Select mode, click **Translate from CSV** in the action
+toolbar (button auto-shows when the marker is present), paste a CSV
+in another language, pick the target language, click Apply. The
+`POST /management/importStructureTranslations` command validates that
+the existing structure's dimensions match the pasted grid exactly
+(returns a 422 with a diff on mismatch — no partial writes) and writes
+the values into the picked language's translation file for every key
+the element references. The page JSON is **not modified** — this is a
+translation-only workflow.
+
+Today only the Table builder stamps the markers. Future complex
+elements opt in by emitting the same two attributes on their root and
+either reusing the `kind: 'table'` handler in `importStructureTranslations`
+or adding a `case 'their-kind':` branch with the equivalent dimension
+scanner. See `BETA7_TABLE_TRANSLATION_CSV.md` for the design rationale.
 
 ### 8.8 Text authoring (Add → Text tab, inline edit, RAW + key)
 

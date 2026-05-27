@@ -63,7 +63,24 @@
     const ctxNodeStyle = document.getElementById('ctx-node-style');
     const ctxNodeSaveSnippet = document.getElementById('ctx-node-save-snippet');
     const ctxNodeVariables = document.getElementById('ctx-node-variables');
-    
+    // Translate-from-CSV: button + modal refs. Shown when the selected
+    // node has data-qs-complex='table'. See BETA7_TABLE_TRANSLATION_CSV.md.
+    const ctxNodeTranslateCsv = document.getElementById('ctx-node-translate-csv');
+    const translateCsvModal       = document.getElementById('preview-translate-csv-modal');
+    const translateCsvClose       = document.getElementById('translate-csv-modal-close');
+    const translateCsvCancel      = document.getElementById('translate-csv-cancel');
+    const translateCsvApply       = document.getElementById('translate-csv-apply');
+    const translateCsvLang        = document.getElementById('translate-csv-lang');
+    const translateCsvHasHead     = document.getElementById('translate-csv-has-head');
+    const translateCsvExpectedDims= document.getElementById('translate-csv-expected-dims');
+    const translateCsvPasteArea   = document.getElementById('translate-csv-paste');
+    const translateCsvStatus      = document.getElementById('translate-csv-status');
+    const translateCsvStructIdEl  = document.getElementById('translate-csv-structure-id');
+    // Per-open context for the modal: which table is being translated +
+    // its expected dimensions (measured from the iframe DOM at button-click
+    // time so we don't carry stale data around).
+    let translateCsvContext = null;  // { structureId, route, dims: {hasHead, headerCols, bodyRows, cols} }
+
     // Save as Snippet form elements
     const saveSnippetForm = document.getElementById('contextual-save-snippet-form');
     const saveSnippetClose = document.getElementById('save-snippet-close');
@@ -3349,10 +3366,393 @@
         
         // Phase 8: Update contextual area info
         showContextualInfo(data);
-        
+
+        // Toggle the Translate-from-CSV button (visible only for tables
+        // stamped with data-qs-complex='table'). Queries the iframe DOM
+        // for the selected node to read its data attrs + measure dims.
+        _updateTranslateCsvButton(data);
+
         // (deprecated) nodePanel.classList.add('preview-node-panel--visible');
     }
-    
+
+    // ============================================================
+    // Translate-from-CSV (BETA7_TABLE_TRANSLATION_CSV.md)
+    // ============================================================
+    // Translate an existing complex-element subtree (currently only
+    // Table) to another language by pasting a CSV-shaped grid. UI:
+    // button in the select-mode toolbar (visible only for tables
+    // stamped with data-qs-complex='table') → modal → POST to
+    // /management/importStructureTranslations.
+    //
+    // The button + modal are wired here rather than spreading across
+    // multiple files because the entire flow is small and tightly
+    // coupled to selection state.
+
+    function _measureTableDimsFromDom(tableEl) {
+        if (!tableEl || tableEl.tagName !== 'TABLE') return null;
+        const thead = tableEl.querySelector(':scope > thead');
+        const tbody = tableEl.querySelector(':scope > tbody');
+        const hasHead = !!thead;
+        let headerCols = 0;
+        if (thead) {
+            const headTr = thead.querySelector(':scope > tr');
+            if (headTr) headerCols = headTr.querySelectorAll(':scope > th, :scope > td').length;
+        }
+        const bodyRowEls = tbody ? tbody.querySelectorAll(':scope > tr') : [];
+        const bodyRows = bodyRowEls.length;
+        let bodyCols = 0;
+        if (bodyRows > 0) {
+            bodyCols = bodyRowEls[0].querySelectorAll(':scope > td, :scope > th').length;
+        }
+        return {
+            hasHead: hasHead,
+            headerCols: headerCols,
+            bodyRows: bodyRows,
+            cols: Math.max(headerCols, bodyCols),
+        };
+    }
+
+    function _updateTranslateCsvButton(data) {
+        if (!ctxNodeTranslateCsv) return;
+        // Default: hide. Recompute every selection so stale state can't linger.
+        ctxNodeTranslateCsv.style.display = 'none';
+        translateCsvContext = null;
+
+        if (!data || !data.node) return;
+        const iframeDoc = iframe && (iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document));
+        if (!iframeDoc) return;
+
+        // selectedNode = data-qs-node id of the clicked element.
+        const safeNode = String(data.node).replace(/"/g, '\\"');
+        const el = iframeDoc.querySelector('[data-qs-node="' + safeNode + '"]');
+        if (!el) return;
+
+        const kind = el.getAttribute('data-qs-complex');
+        const sid = el.getAttribute('data-qs-complex-id');
+        if (kind !== 'table' || !sid) return;
+
+        const dims = _measureTableDimsFromDom(el);
+        if (!dims) return;
+
+        // The route to pass to the backend is the current page name. The
+        // selection's struct field shape is `page-<route>` for pages;
+        // strip the prefix to get the route as the backend expects.
+        let route = data.struct || '';
+        if (route.indexOf('page-') === 0) route = route.substring('page-'.length);
+
+        translateCsvContext = {
+            structureId: sid,
+            kind: kind,
+            route: route,
+            dims: dims,
+        };
+        ctxNodeTranslateCsv.style.display = '';
+    }
+
+    // Mini TSV/CSV parser — same heuristic as complex-table.js
+    // (tabs win when present on the first non-empty line; otherwise
+    // comma split). Quoted cells with embedded delimiters are NOT
+    // supported in this MVP — user can fix individual cells after
+    // pasting if it bites.
+    function _parseTabularBlob(text) {
+        const lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
+        while (lines.length && lines[lines.length - 1] === '') lines.pop();
+        if (lines.length === 0) return [];
+        const firstNonEmpty = lines.find(l => l.trim() !== '') || '';
+        const sep = firstNonEmpty.indexOf('\t') !== -1 ? '\t' : ',';
+        return lines.map(l => l.split(sep).map(c => c.trim()));
+    }
+
+    // Populate the language picker the FIRST time the modal opens. Result
+    // is cached on the select element itself so subsequent opens reuse it.
+    function _ensureTranslateCsvLangsLoaded() {
+        if (!translateCsvLang) return Promise.resolve();
+        if (translateCsvLang._loaded) return Promise.resolve();
+        const api = window.QuickSiteAdmin;
+        if (!api) return Promise.resolve();
+        return api.apiRequest('getLangList', 'GET').then(function (res) {
+            // res shape: {ok, status, data: <envelope>}; envelope = {status, code, data: {languages, ...}}
+            const payload = (res && res.data && (res.data.data || res.data)) || {};
+            const langs = Array.isArray(payload.languages) ? payload.languages : ['en'];
+            const currentEditorLang = (function () {
+                const sel = document.getElementById('preview-lang-select');
+                return sel && sel.value ? sel.value : (window.PreviewConfig && window.PreviewConfig.defaultLang) || 'en';
+            })();
+            translateCsvLang.innerHTML = '';
+            langs.forEach(function (lang) {
+                const opt = document.createElement('option');
+                opt.value = lang;
+                opt.textContent = lang;
+                if (lang === currentEditorLang) opt.selected = true;
+                translateCsvLang.appendChild(opt);
+            });
+            translateCsvLang._loaded = true;
+        }).catch(function () { /* leave (loading…) — user picks at submit time */ });
+    }
+
+    // Live-validate the pasted grid against the expected dimensions.
+    //
+    // Severity model:
+    //   - HARD ERROR (blocks Apply): header presence/count mismatch,
+    //     body row count mismatch. These would silently corrupt the
+    //     translation namespace or lose data the user thinks is being
+    //     written.
+    //   - WARNING (allows Apply): per-row column count mismatch. The
+    //     backend handles jagged grids safely — short rows get padded
+    //     with empty strings, over-long rows get truncated — so the
+    //     user should be told but not blocked. They can fix individual
+    //     cells via the translation editor after applying.
+    //
+    // Returns { ok, severity, message, hasContent }:
+    //   ok=true  → Apply allowed (green ✓ or yellow ⚠)
+    //   ok=false → Apply blocked (red ✕)
+    //   hasContent=false → neutral empty state (Apply still disabled)
+    function _validateTranslateCsvPaste() {
+        if (!translateCsvContext) return { ok: false, severity: 'empty', message: '', hasContent: false };
+        const ctx = translateCsvContext;
+        const raw = translateCsvPasteArea ? translateCsvPasteArea.value : '';
+        if (!raw.trim()) return { ok: false, severity: 'empty', message: '', hasContent: false };
+
+        const grid = _parseTabularBlob(raw);
+        if (grid.length === 0) return { ok: false, severity: 'empty', message: '', hasContent: false };
+
+        const hasHead = translateCsvHasHead ? translateCsvHasHead.checked : false;
+        let header = [];
+        let rows = grid;
+        if (hasHead) {
+            header = grid[0] || [];
+            rows = grid.slice(1);
+        }
+
+        const expectedHeader = ctx.dims.hasHead ? ctx.dims.headerCols : 0;
+        const expectedBody = ctx.dims.bodyRows;
+        const expectedCols = ctx.dims.cols;
+
+        const pastedHeader = hasHead ? header.length : 0;
+        const pastedBody = rows.length;
+
+        // ---- HARD errors ------------------------------------------------
+        const hardErrs = [];
+        if (pastedHeader !== expectedHeader) {
+            hardErrs.push('header cells: expected ' + expectedHeader + ', got ' + pastedHeader
+                + (!ctx.dims.hasHead && hasHead ? ' (table has no <thead> — untick "Include header row")' : '')
+                + (ctx.dims.hasHead && !hasHead ? ' (table has a <thead> — tick "Include header row")' : ''));
+        }
+        if (pastedBody !== expectedBody) {
+            hardErrs.push('body rows: expected ' + expectedBody + ', got ' + pastedBody);
+        }
+        if (hardErrs.length > 0) {
+            return {
+                ok: false,
+                severity: 'error',
+                hasContent: true,
+                message: '✕ ' + hardErrs.join('; ') + '.',
+            };
+        }
+
+        // ---- per-row WARNINGS -------------------------------------------
+        // Identify rows whose cell count doesn't match expected. Separate
+        // "too few" and "too many" so the message tells the user what'll
+        // happen at write time (pad with empty / drop extras).
+        const tooFew = [];   // row indices (1-based for user)
+        const tooMany = [];
+        rows.forEach(function (row, i) {
+            if (row.length < expectedCols) tooFew.push(i + 1);
+            else if (row.length > expectedCols) tooMany.push(i + 1);
+        });
+        // Also flag a header that has fewer/more cells than expected.
+        // Edge case: hasHead match check above caught the count mismatch
+        // for the GROUP, but if the user pasted an all-empty cell at the
+        // end of the header row, it still parsed as one cell — handled
+        // by the header check, no extra logic here.
+
+        if (tooFew.length === 0 && tooMany.length === 0) {
+            const summary = [];
+            if (ctx.dims.hasHead) summary.push('header ' + expectedHeader);
+            summary.push('body ' + expectedBody + '×' + expectedCols);
+            return {
+                ok: true,
+                severity: 'ok',
+                hasContent: true,
+                message: '✓ Matches existing table (' + summary.join(' + ') + '). Ready to apply.',
+            };
+        }
+
+        // Build the warning sentence — keep it short when only one
+        // category is in play.
+        const warnParts = [];
+        if (tooFew.length > 0) {
+            warnParts.push('row' + (tooFew.length === 1 ? '' : 's') + ' ' + tooFew.join(', ')
+                + ' too short (missing cells will be written as empty)');
+        }
+        if (tooMany.length > 0) {
+            warnParts.push('row' + (tooMany.length === 1 ? '' : 's') + ' ' + tooMany.join(', ')
+                + ' too long (extra cells beyond column ' + expectedCols + ' will be dropped)');
+        }
+        return {
+            ok: true,   // allow Apply — backend handles jagged grids safely
+            severity: 'warning',
+            hasContent: true,
+            message: '⚠ ' + warnParts.join('; ') + '. You can still apply, or fix the paste first.',
+        };
+    }
+
+    // Re-validate the paste + update the status line + Apply button on
+    // every keystroke / hasHead toggle. Cheap (sub-ms for typical grids).
+    function _refreshTranslateCsvValidation() {
+        const v = _validateTranslateCsvPaste();
+        if (translateCsvStatus) {
+            translateCsvStatus.textContent = v.message;
+            // Color hints — three states: green (ok), amber (warning,
+            // Apply still allowed), red (hard error, Apply blocked).
+            // Empty/neutral state clears the colour entirely.
+            let color = '';
+            if (v.severity === 'ok')        color = 'var(--admin-success, #2c7a3f)';
+            else if (v.severity === 'warning') color = 'var(--admin-warning, #b3691e)';
+            else if (v.severity === 'error')   color = 'var(--admin-danger, #b3261e)';
+            translateCsvStatus.style.color = color;
+        }
+        if (translateCsvApply) {
+            translateCsvApply.disabled = !v.ok;
+        }
+    }
+
+    function openTranslateCsvModal() {
+        if (!translateCsvModal || !translateCsvContext) return;
+        const ctx = translateCsvContext;
+
+        if (translateCsvStructIdEl) translateCsvStructIdEl.textContent = '"' + ctx.structureId + '"';
+        if (translateCsvExpectedDims) {
+            const parts = [];
+            if (ctx.dims.hasHead) parts.push('header ' + ctx.dims.headerCols);
+            parts.push('body ' + ctx.dims.bodyRows + '×' + ctx.dims.cols);
+            translateCsvExpectedDims.textContent = 'Expected: ' + parts.join(' + ') + '.';
+        }
+        if (translateCsvHasHead) translateCsvHasHead.checked = !!ctx.dims.hasHead;
+        if (translateCsvPasteArea) translateCsvPasteArea.value = '';
+        if (translateCsvStatus) {
+            translateCsvStatus.textContent = '';
+            translateCsvStatus.style.color = '';
+        }
+        // Apply button starts disabled — validation enables it once a
+        // dimension-matching grid is pasted.
+        if (translateCsvApply) translateCsvApply.disabled = true;
+
+        _ensureTranslateCsvLangsLoaded();
+        translateCsvModal.style.display = '';
+        if (translateCsvPasteArea) translateCsvPasteArea.focus();
+    }
+
+    function closeTranslateCsvModal() {
+        if (translateCsvModal) translateCsvModal.style.display = 'none';
+    }
+
+    async function submitTranslateCsv() {
+        if (!translateCsvContext) return;
+        const ctx = translateCsvContext;
+        if (!translateCsvStatus) return;
+
+        const grid = _parseTabularBlob(translateCsvPasteArea ? translateCsvPasteArea.value : '');
+        if (grid.length === 0) {
+            translateCsvStatus.textContent = 'Nothing pasted.';
+            return;
+        }
+        const hasHead = translateCsvHasHead ? translateCsvHasHead.checked : false;
+        let header = [];
+        let rows = grid;
+        if (hasHead) {
+            header = grid[0] || [];
+            rows = grid.slice(1);
+            if (rows.length === 0) {
+                translateCsvStatus.textContent = 'You ticked "Include header row" but pasted only one line.';
+                return;
+            }
+        }
+        const lang = translateCsvLang ? translateCsvLang.value : '';
+        if (!lang) {
+            translateCsvStatus.textContent = 'Pick a target language.';
+            return;
+        }
+
+        const api = window.QuickSiteAdmin;
+        if (!api) {
+            translateCsvStatus.textContent = 'Admin API unavailable.';
+            return;
+        }
+        if (translateCsvApply) translateCsvApply.disabled = true;
+        translateCsvStatus.textContent = 'Writing translations to "' + lang + '"…';
+
+        try {
+            const res = await api.apiRequest('importStructureTranslations', 'POST', {
+                route:       ctx.route,
+                kind:        ctx.kind,
+                structureId: ctx.structureId,
+                language:    lang,
+                header:      header,
+                rows:        rows,
+            });
+            const payload = (res && res.data && (res.data.data || res.data)) || {};
+            const envelope = res && res.data;
+            const ok = res && res.ok;
+
+            if (!ok) {
+                // 422 dimension mismatch — show the diff if present.
+                const code = envelope && envelope.code;
+                const msg = (envelope && envelope.message) || ('Request failed (HTTP ' + (res && res.status) + ')');
+                if (code === 'validation.dimension_mismatch' && payload.diffs) {
+                    translateCsvStatus.textContent = msg + ' — Adjust your CSV and try again.';
+                } else {
+                    translateCsvStatus.textContent = msg;
+                }
+                if (translateCsvApply) translateCsvApply.disabled = false;
+                return;
+            }
+
+            const written = payload.keysWritten || 0;
+            translateCsvStatus.textContent = 'Wrote ' + written + ' translation key(s) for "' + ctx.structureId + '" (' + lang + ').';
+            // Close after a short pause so the user sees the success.
+            setTimeout(function () {
+                closeTranslateCsvModal();
+                // Reload the iframe so the rendered table shows the new
+                // translations immediately (if the editor language matches
+                // the just-translated language).
+                if (iframe && iframe.contentWindow) {
+                    try { iframe.contentWindow.location.reload(); } catch (e) {}
+                }
+            }, 800);
+
+        } catch (err) {
+            console.error('[translate-csv] submit failed:', err);
+            translateCsvStatus.textContent = 'Request failed — see console.';
+            if (translateCsvApply) translateCsvApply.disabled = false;
+        }
+    }
+
+    // Wire button + modal listeners (once on init).
+    if (ctxNodeTranslateCsv) {
+        ctxNodeTranslateCsv.addEventListener('click', openTranslateCsvModal);
+    }
+    if (translateCsvClose)  translateCsvClose.addEventListener('click', closeTranslateCsvModal);
+    if (translateCsvCancel) translateCsvCancel.addEventListener('click', closeTranslateCsvModal);
+    if (translateCsvApply)  translateCsvApply.addEventListener('click', submitTranslateCsv);
+    // Live validation — re-runs on every keystroke (`input` covers both
+    // typing and the paste event) and on hasHead toggle (which changes
+    // how we split header vs body).
+    if (translateCsvPasteArea) {
+        translateCsvPasteArea.addEventListener('input', _refreshTranslateCsvValidation);
+    }
+    if (translateCsvHasHead) {
+        translateCsvHasHead.addEventListener('change', _refreshTranslateCsvValidation);
+    }
+    // Dismiss on backdrop click.
+    if (translateCsvModal) {
+        translateCsvModal.addEventListener('click', function (e) {
+            if (e.target && e.target.classList && e.target.classList.contains('preview-translate-csv-modal__backdrop')) {
+                closeTranslateCsvModal();
+            }
+        });
+    }
+
     function hideNodePanel() {
         // (deprecated) nodePanel.classList.remove('preview-node-panel--visible');
         selectedStruct = null;
