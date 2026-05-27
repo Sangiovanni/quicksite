@@ -1,8 +1,10 @@
 <?php
 
+require_once __DIR__ . '/../functions/qsVerbCatalog.php';
+
 /**
  * JsonToPhpCompiler
- * 
+ *
  * Compiles JSON page structures into static PHP code for production builds.
  * Converts JSON nodes into PHP string concatenation with translator calls.
  */
@@ -102,8 +104,11 @@ class JsonToPhpCompiler {
                 $calls = [];
                 foreach ($events[$eventName] as $callSyntax) {
                     $transformed = $this->transformCallSyntax($callSyntax);
-                    // Only include valid transformed QS calls (skip unchanged or invalid)
-                    if ($transformed && $transformed !== $callSyntax && strpos($transformed, '/* invalid') === false) {
+                    // Include any transformed result (real QS.* call OR a
+                    // console.warn for an unknown verb — see
+                    // transformCallSyntax). Only skip when nothing was
+                    // actually transformed.
+                    if ($transformed && $transformed !== $callSyntax) {
                         $calls[] = $transformed;
                     }
                 }
@@ -585,7 +590,13 @@ class JsonToPhpCompiler {
                 $allowedFunctions = $this->getAllowedJsFunctions();
                 
                 if (!in_array($functionName, $allowedFunctions, true)) {
-                    return '/* invalid function */';
+                    // Loud failure: emit a console.warn into the compiled
+                    // output instead of swallowing the call as a comment.
+                    // $functionName is `[a-zA-Z][a-zA-Z0-9]*` (matched
+                    // above) so safe to inline into a single-quoted JS
+                    // string with no escaping.
+                    error_log("Unknown QS function at compile: {$functionName}");
+                    return "console.warn('[QS] unknown verb {{call:{$functionName}:...}} dropped at compile — verb missing from secure/src/functions/qsVerbCatalog.php')";
                 }
                 
                 if (empty($argsString)) {
@@ -617,12 +628,12 @@ class JsonToPhpCompiler {
      * @return array
      */
     private function getAllowedJsFunctions(): array {
-        // Core functions from qs.js (always available)
-        return [
-            'show', 'hide', 'toggle', 'toggleHide', 'addClass', 'removeClass',
-            'setValue', 'redirect', 'filter', 'scrollTo', 'focus', 'blur', 'fetch',
-            'renderList', 'toast'
-        ];
+        // Source of truth: secure/src/functions/qsVerbCatalog.php
+        // (also consumed by listJsFunctions command + JsonToHtmlRenderer).
+        // `applyAuthState` is not yet in the catalog but is exposed in qs.js;
+        // keep the temporary local addition until it's promoted to the
+        // catalog with full args/example/events metadata.
+        return array_merge(qsVerbNames(), ['applyAuthState']);
     }
 
     /**

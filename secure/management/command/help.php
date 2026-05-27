@@ -4075,6 +4075,75 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'If index is omitted, ALL interactions on that event are removed (the event param is deleted entirely). If index is provided, only that specific interaction is removed and others are preserved.'
     ],
 
+    'editPageEvent' => [
+        'description' => 'Edits an existing page-level event interaction (onload/onresize/onscroll). Replaces the call at the given index, optionally moving it to a different page-level event.',
+        'method' => 'PUT',
+        'parameters' => [
+            'pageName' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Page/route name as stored in data/page-events.json',
+                'example' => 'test/scrolling'
+            ],
+            'event' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Current page-level event holding the interaction: onload, onresize, or onscroll',
+                'example' => 'onload'
+            ],
+            'index' => [
+                'required' => true,
+                'type' => 'integer',
+                'description' => '0-based index of the interaction within the event array',
+                'example' => 0
+            ],
+            'function' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'New QS.* function name (must be in qsVerbCatalog)',
+                'example' => 'onScrollFetchState'
+            ],
+            'params' => [
+                'required' => false,
+                'type' => 'array',
+                'description' => 'New function parameters (positional)',
+                'example' => '["scrollingStore", "200", "100"]'
+            ],
+            'newEvent' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Move the interaction to a different page-level event (onload/onresize/onscroll). Omit to keep on the current event.',
+                'example' => 'onscroll'
+            ]
+        ],
+        'example_put' => 'PUT /management/editPageEvent with body: {"pageName": "test/scrolling", "event": "onload", "index": 0, "function": "onScrollFetchState", "params": ["scrollingStore", "200", "100"]}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Page event updated successfully',
+            'data' => [
+                'pageName' => 'test/scrolling',
+                'event' => 'onload',
+                'index' => 0,
+                'oldCallSyntax' => '{{call:onScrollFetchState:scrollingStore,50,100}}',
+                'newInteraction' => [
+                    'function' => 'onScrollFetchState',
+                    'params' => ['scrollingStore', '200', '100'],
+                    'raw' => '{{call:onScrollFetchState:scrollingStore,200,100}}'
+                ]
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'pageName, event, index, and function are required',
+            '400.validation.invalid_value' => 'event/newEvent not in [onload, onresize, onscroll], or index negative',
+            '400.validation.invalid_format' => 'function name does not match identifier pattern',
+            '404.route.not_found' => 'pageName does not exist in routes',
+            '404.data.not_found' => 'page-events.json file is missing',
+            '404.interaction.not_found' => 'No interaction at the given (event, index) for this page'
+        ],
+        'notes' => 'When newEvent differs from event, the interaction is spliced out of the source event and pushed onto the new event (empty event/page entries are cleaned up). When newEvent is omitted or equal, the call is replaced in-place at the same index. Counterpart to editInteraction (which edits element-level events on a node).'
+    ],
+
     // =========================================================================
     // STATE STORE COMMANDS
     // =========================================================================

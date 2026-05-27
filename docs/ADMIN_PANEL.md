@@ -209,7 +209,7 @@ The sidebar exposes one action button (Refresh) plus five editing modes — six 
 | **Drag** | Mode | Drag elements to reorder within parent (`preview-drag.js`). |
 | **Text** | Mode | Inline-edit a text node's translation **for the currently selected language**. Intentionally primitive: no rich text, no line breaks. Edits the value, never the key. |
 | **CSS** | Mode | Click an element → CSS panel; edits apply to the element's selector with full pseudo-state support. |
-| **Interactions** | Mode | Element-level event editor (`preview-js-interactions.js`); binds `{{call:fn:args}}` handlers using QS.* functions. |
+| **Interactions** | Mode | Event editor (`preview-js-interactions.js`). Three CRUD-capable panels: **per-element interactions** (the selected node's `onclick`/`oninput`/etc.), **Page Events** (page-level `onload`/`onresize`/`onscroll`), and **State Stores** (page-scoped state). Each interaction is a `{{call:fn:args}}` chain using a QS.* verb from the catalog. |
 
 ### 8.2 Context selectors
 

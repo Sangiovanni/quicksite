@@ -25,6 +25,12 @@
     let currentInteractionsData = null;
     let currentPageName = null;
     let pageEventsExpanded = false;
+    // Page-event edit state (mirrors editingInteraction for element-level
+    // interactions). Set by editPageEventEntry, read by handlePageEventSave
+    // to dispatch PUT /editPageEvent vs POST /addPageEvent, cleared by
+    // hidePageEventForm / handlePageEventAdd.
+    let editingPageEvent = null;
+    let currentPageEventsData = null;
     
     // DOM element references (cached on init)
     let jsDefault = null;
@@ -2941,8 +2947,9 @@
             
             if (!response.ok) throw new Error('Failed to fetch page events');
             var result = await response.json();
+            currentPageEventsData = result.data;
             displayPageEvents(result.data);
-            
+
         } catch (error) {
             console.error('[PreviewJsInteractions] Failed to load page events:', error);
             if (peList) peList.innerHTML = '<p class="preview-contextual-js-empty">Failed to load page events</p>';
@@ -2968,20 +2975,38 @@
         var html = '';
         interactions.forEach(function(interaction) {
             var label = interaction.function + '(' + (interaction.params?.join(', ') || '') + ')';
+            // Edit + Delete buttons share the existing `__delete` class for
+            // consistent sizing/positioning; a `--edit` modifier lets future
+            // styling distinguish them if needed without breaking layout.
             html += '<div class="preview-contextual-js-page-events__item">' +
                 '<span class="preview-contextual-js-page-events__event-badge">' + interaction.event + '</span>' +
                 '<code class="preview-contextual-js-page-events__code">' + label + '</code>' +
+                '<button type="button" class="preview-contextual-js-page-events__delete preview-contextual-js-page-events__edit" ' +
+                    'data-event="' + interaction.event + '" data-index="' + interaction.index + '" ' +
+                    'title="' + (PreviewConfig.i18n?.edit || 'Edit') + '">' +
+                    QuickSiteUtils.iconEdit(14) +
+                '</button>' +
                 '<button type="button" class="preview-contextual-js-page-events__delete" ' +
                     'data-event="' + interaction.event + '" data-index="' + interaction.index + '" ' +
                     'title="' + (PreviewConfig.i18n?.delete || 'Delete') + '">' +
                     QuickSiteUtils.iconClose(14) +
                 '</button></div>';
         });
-        
+
         peList.innerHTML = html;
-        
-        // Attach delete handlers
+
+        // Attach edit handlers (must run BEFORE the delete-handler selector so
+        // the more-specific `--edit` selector wins).
+        peList.querySelectorAll('.preview-contextual-js-page-events__edit').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                editPageEventEntry(btn.dataset.event, parseInt(btn.dataset.index));
+            });
+        });
+
+        // Attach delete handlers — skip the edit button by checking the modifier.
         peList.querySelectorAll('.preview-contextual-js-page-events__delete').forEach(function(btn) {
+            if (btn.classList.contains('preview-contextual-js-page-events__edit')) return;
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();
                 deletePageEvent(btn.dataset.event, parseInt(btn.dataset.index));
@@ -3018,23 +3043,150 @@
             if (showToastFn) showToastFn('Error: ' + error.message, 'error');
         }
     }
-    
+
+    /**
+     * Edit an existing page event. Opens the same form `handlePageEventAdd`
+     * uses, pre-filled from the saved interaction. Mirrors editInteraction
+     * (which does the same for element-level interactions). Mode detection
+     * matches editInteraction: a `fetch` call whose first param starts with
+     * `@` is API/registry mode; everything else is function mode.
+     *
+     * @param {string} eventName  current page-level event ('onload'/'onresize'/'onscroll')
+     * @param {number} index      0-based index of the interaction within that event
+     */
+    async function editPageEventEntry(eventName, index) {
+        if (!currentPageName || !currentPageEventsData) return;
+
+        var interactions = currentPageEventsData.interactions || [];
+        var entry = null;
+        for (var i = 0; i < interactions.length; i++) {
+            if (interactions[i].event === eventName && interactions[i].index === index) {
+                entry = interactions[i];
+                break;
+            }
+        }
+        if (!entry) {
+            if (showToastFn) showToastFn(PreviewConfig.i18n?.interactionNotFound || 'Interaction not found', 'error');
+            return;
+        }
+
+        // Ensure dropdown data is loaded before we try to pre-select values.
+        if (availableFunctions.length === 0) await fetchJsFunctions();
+        if (availableApiEndpoints.length === 0) await fetchApiEndpoints();
+
+        editingPageEvent = { event: eventName, index: index, interaction: entry };
+
+        // Populate dropdowns (same as handlePageEventAdd does for new entries).
+        _populateFnSelect(peFormFunction);
+        _populateApiSelects(peFormApi, peFormEndpoint);
+
+        // Show form, hide add button.
+        if (peForm) peForm.style.display = '';
+        if (peAddBtn?.parentElement) peAddBtn.parentElement.style.display = 'none';
+
+        // Switch the Save button label so the action is unambiguous.
+        if (peFormSave) {
+            peFormSave.textContent = PreviewConfig.i18n?.save || 'Save';
+            peFormSave.disabled = false;
+        }
+
+        // Prefill the page-level event select.
+        if (peFormEvent) peFormEvent.value = eventName;
+
+        // Detect API vs function mode from the saved call (mirrors the
+        // detection in editInteraction). Page events only support API
+        // *registry* mode today (no direct-URL form fields), so we only
+        // check for `@` prefix.
+        var isApiMode = (entry.function === 'fetch'
+            && Array.isArray(entry.params)
+            && typeof entry.params[0] === 'string'
+            && entry.params[0].charAt(0) === '@');
+
+        if (isApiMode) {
+            if (peFormActionType) {
+                peFormActionType.value = 'api';
+                peFormActionType.dispatchEvent(new Event('change'));
+            }
+
+            // Parse '@apiId/endpointId' (same shape stored by handlePageEventSave).
+            var ref = entry.params[0].substring(1);
+            var slashIdx = ref.indexOf('/');
+            var apiIdFromRef      = slashIdx > 0 ? ref.substring(0, slashIdx) : '';
+            var endpointIdFromRef = slashIdx > 0 ? ref.substring(slashIdx + 1) : '';
+
+            if (peFormApi) {
+                peFormApi.value = apiIdFromRef;
+                // Fires handlePeApiChange → populates the endpoint dropdown
+                // synchronously (endpoints already in availableApiEndpoints).
+                peFormApi.dispatchEvent(new Event('change'));
+            }
+            if (peFormEndpoint) {
+                peFormEndpoint.value = endpointIdFromRef;
+                peFormEndpoint.dispatchEvent(new Event('change'));
+            }
+            updatePageEventPreview();
+        } else {
+            // Function mode.
+            if (peFormActionType) {
+                peFormActionType.value = 'function';
+                peFormActionType.dispatchEvent(new Event('change'));
+            }
+            if (peFormFunction) {
+                peFormFunction.value = entry.function;
+                // Fires handlePeFunctionChange → renders the per-arg input rows.
+                peFormFunction.dispatchEvent(new Event('change'));
+            }
+
+            // Pre-fill param inputs after the change handler has rendered them.
+            // 100ms matches the delay editInteraction uses for the same reason.
+            setTimeout(function () {
+                if (!peFormParams) return;
+                var paramInputs = peFormParams.querySelectorAll('.preview-contextual-js-form-input');
+                var savedParams = entry.params || [];
+                paramInputs.forEach(function (input, idx) {
+                    if (savedParams[idx] === undefined) return;
+                    // For <select> inputs whose options were built from a
+                    // catalogue (e.g. 'store' inputType): if the saved
+                    // value isn't an option, inject a (legacy) row so the
+                    // user can still see and edit it.
+                    if (input.tagName === 'SELECT') {
+                        var v = savedParams[idx];
+                        var has = Array.from(input.options).some(function (o) { return o.value === v; });
+                        if (!has) {
+                            var opt = document.createElement('option');
+                            opt.value = v;
+                            opt.textContent = v + ' (legacy)';
+                            input.appendChild(opt);
+                        }
+                    }
+                    input.value = savedParams[idx];
+                    input.dispatchEvent(new Event('input'));
+                });
+                updatePageEventPreview();
+            }, 100);
+        }
+    }
+
     /**
      * Show the add page event form
      */
     async function handlePageEventAdd() {
+        // Entering Add mode — clear any leftover edit state from a prior
+        // Edit-then-Cancel sequence so the save handler hits POST /addPageEvent.
+        editingPageEvent = null;
+
         // Ensure functions/APIs are loaded
         if (availableFunctions.length === 0) await fetchJsFunctions();
         if (availableApiEndpoints.length === 0) await fetchApiEndpoints();
-        
+
         // Populate function dropdown
         _populateFnSelect(peFormFunction);
         _populateApiSelects(peFormApi, peFormEndpoint);
-        
+
         // Show form, hide add button
         if (peForm) peForm.style.display = '';
         if (peAddBtn?.parentElement) peAddBtn.parentElement.style.display = 'none';
-        
+
         // Reset form fields
         if (peFormEvent) peFormEvent.value = 'onload';
         if (peFormActionType) peFormActionType.value = 'function';
@@ -3043,7 +3195,10 @@
         if (peFormFunction) peFormFunction.value = '';
         if (peFormParams) peFormParams.innerHTML = '';
         if (peFormPreview) peFormPreview.textContent = '-';
-        if (peFormSave) peFormSave.disabled = true;
+        if (peFormSave) {
+            peFormSave.disabled = true;
+            peFormSave.textContent = PreviewConfig.i18n?.addPageEvent || 'Add';
+        }
     }
     
     /**
@@ -3054,6 +3209,12 @@
         if (peAddBtn?.parentElement) peAddBtn.parentElement.style.display = '';
         if (peBindingsContainer) peBindingsContainer.style.display = 'none';
         if (peBindingsRows) peBindingsRows.innerHTML = '';
+        // Drop any in-progress edit so the next form open starts clean and
+        // handlePageEventSave routes to POST /addPageEvent (the default).
+        editingPageEvent = null;
+        if (peFormSave) {
+            peFormSave.textContent = PreviewConfig.i18n?.addPageEvent || 'Add';
+        }
     }
     
     /**
@@ -3221,41 +3382,68 @@
             });
         }
         
+        var isEdit = !!editingPageEvent;
+
         try {
             if (peFormSave) {
                 peFormSave.disabled = true;
                 peFormSave.textContent = PreviewConfig.i18n?.saving || 'Saving...';
             }
-            
-            var response = await fetch('/management/addPageEvent', {
-                method: 'POST',
+
+            var endpoint = isEdit ? '/management/editPageEvent' : '/management/addPageEvent';
+            var method = isEdit ? 'PUT' : 'POST';
+            var body = {
+                pageName: currentPageName,
+                event: isEdit ? editingPageEvent.event : eventName,
+                function: fnName,
+                params: params
+            };
+            if (isEdit) {
+                body.index = editingPageEvent.index;
+                // If the user changed the page-level event in the picker,
+                // signal a move via newEvent (matches editInteraction's
+                // contract). Same-event edits omit newEvent.
+                if (eventName !== editingPageEvent.event) {
+                    body.newEvent = eventName;
+                }
+            }
+
+            var response = await fetch(endpoint, {
+                method: method,
                 headers: {
                     'Authorization': 'Bearer ' + PreviewConfig.authToken,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    pageName: currentPageName,
-                    event: eventName,
-                    function: fnName,
-                    params: params
-                })
+                body: JSON.stringify(body)
             });
-            
+
             var result = await response.json();
-            if (!response.ok) throw new Error(result.message || 'Failed to add');
-            
-            if (showToastFn) showToastFn(PreviewConfig.i18n?.interactionAdded || 'Added', 'success');
+            if (!response.ok) throw new Error(result.message || (isEdit ? 'Failed to edit' : 'Failed to add'));
+
+            if (showToastFn) {
+                showToastFn(
+                    isEdit ? (PreviewConfig.i18n?.interactionUpdated || 'Updated')
+                           : (PreviewConfig.i18n?.interactionAdded   || 'Added'),
+                    'success'
+                );
+            }
             hidePageEventForm();
             await loadPageEvents();
             if (reloadPreviewFn) reloadPreviewFn();
-            
+
         } catch (error) {
             console.error('[PreviewJsInteractions] Save page event error:', error);
             if (showToastFn) showToastFn('Error: ' + error.message, 'error');
         } finally {
             if (peFormSave) {
                 peFormSave.disabled = false;
-                peFormSave.textContent = PreviewConfig.i18n?.addInteraction || 'Add';
+                // Restore the contextual label. hidePageEventForm clears
+                // editingPageEvent on success, so by the time we re-enable
+                // the button after a failed save we keep the original label
+                // the user saw (Add vs Save).
+                peFormSave.textContent = editingPageEvent
+                    ? (PreviewConfig.i18n?.save || 'Save')
+                    : (PreviewConfig.i18n?.addPageEvent || 'Add');
             }
         }
     }

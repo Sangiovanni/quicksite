@@ -2,6 +2,7 @@
 require_once __DIR__ . '/TagRegistry.php';
 require_once __DIR__ . '/IframeSandbox.php';
 require_once __DIR__ . '/Translator.php';
+require_once __DIR__ . '/../functions/qsVerbCatalog.php';
 
 /**
  * JsonToHtmlRenderer
@@ -766,7 +767,12 @@ class JsonToHtmlRenderer {
             $argsString = isset($m[2]) ? substr($m[2], 1) : '';
 
             if (!in_array($fn, $allowedFunctions, true)) {
+                // Loud failure: surface to the browser console so
+                // misconfigurations don't disappear into PHP's error log.
+                // $fn is `[a-zA-Z][a-zA-Z0-9]*` (matched above) so safe to
+                // inline into a single-quoted JS string with no escaping.
                 error_log("Unknown QS function: {$fn}");
+                $syncPrelude[] = "console.warn('[QS] unknown verb {{call:{$fn}:...}} dropped at render — verb missing from secure/src/functions/qsVerbCatalog.php')";
                 continue;
             }
 
@@ -854,18 +860,12 @@ class JsonToHtmlRenderer {
      * @return array
      */
     private function getAllowedJsFunctions(): array {
-        // Core functions from qs.js (always available)
-        return [
-            'show', 'hide', 'toggle', 'toggleHide', 'addClass', 'removeClass',
-            'setValue', 'redirect', 'filter', 'scrollTo', 'focus', 'blur', 'fetch',
-            'renderList', 'toast', 'validate',
-            // Auth flows Tier 1: token persistence verbs.
-            'saveToken', 'clearToken',
-            // Auth flows Tier 2 / auth-state UI: manual refresh + re-scan.
-            'refresh', 'applyAuthState',
-            // State stores: mutate a field / fire the store's endpoint.
-            'setState', 'fetchState'
-        ];
+        // Source of truth: secure/src/functions/qsVerbCatalog.php
+        // (also consumed by listJsFunctions command + JsonToPhpCompiler).
+        // `applyAuthState` is not yet in the catalog but is exposed in qs.js;
+        // keep the temporary local addition until it's promoted to the catalog
+        // with full args/example/events metadata.
+        return array_merge(qsVerbNames(), ['applyAuthState']);
     }
 
     /**
