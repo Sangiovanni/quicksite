@@ -453,6 +453,11 @@
             ${t('openPage', 'Open page')}
         </button>`;
 
+        items += `<button class="sitemap-ctx__item" data-ctx-action="edit-title" data-route="${esc(route)}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            ${t('editTitle', 'Edit title')}
+        </button>`;
+
         if (!isHome) {
             items += `<div class="sitemap-ctx__divider"></div>`;
             items += `<button class="sitemap-ctx__item sitemap-ctx__item--danger" data-ctx-action="delete" data-route="${esc(route)}" data-has-children="${hasChildren}">
@@ -686,6 +691,253 @@
             case 'delete':
                 deleteRoute(route, element?.dataset?.hasChildren === 'true');
                 break;
+            case 'edit-title':
+                openEditTitleModal(route);
+                break;
+        }
+    }
+
+    // ========================================================================
+    // Edit page title (modal triggered from context menu)
+    // ========================================================================
+    // The `page.titles.<route>` translation lives in the per-language
+    // translation files. To fix missing/wrong titles without digging into
+    // the translation editor, this modal shows ONE input per configured
+    // language pre-filled with the current value (empty when missing).
+    // Save writes only the languages the user actually changed.
+
+    // Module-scoped cache of full per-language translation trees. Keyed
+    // by language code. Populated lazily on first modal open, reused on
+    // subsequent opens within the same page session. Invalidated locally
+    // after a successful save so re-opening the same route shows the
+    // just-written values.
+    const _editTitleTranslationsCache = {};
+
+    // DOM refs cached on first call.
+    let _editTitleRefs = null;
+    function _ensureEditTitleRefs() {
+        if (_editTitleRefs) return _editTitleRefs;
+        _editTitleRefs = {
+            modal:  document.getElementById('sitemap-edit-title-modal'),
+            close:  document.getElementById('sitemap-edit-title-close'),
+            cancel: document.getElementById('sitemap-edit-title-cancel'),
+            save:   document.getElementById('sitemap-edit-title-save'),
+            route:  document.getElementById('sitemap-edit-title-route'),
+            rows:   document.getElementById('sitemap-edit-title-rows'),
+            status: document.getElementById('sitemap-edit-title-status'),
+        };
+        // Wire one-time listeners.
+        if (_editTitleRefs.close)  _editTitleRefs.close.addEventListener('click', closeEditTitleModal);
+        if (_editTitleRefs.cancel) _editTitleRefs.cancel.addEventListener('click', closeEditTitleModal);
+        if (_editTitleRefs.save)   _editTitleRefs.save.addEventListener('click', submitEditTitleModal);
+        if (_editTitleRefs.modal) {
+            _editTitleRefs.modal.addEventListener('click', (e) => {
+                if (e.target && e.target.classList && e.target.classList.contains('sitemap-edit-title-modal__backdrop')) {
+                    closeEditTitleModal();
+                }
+            });
+            // Stop click + mousedown bubbling on the CONTENT card so the
+            // event can't reach a higher-up handler somewhere in the
+            // admin chrome that triggers a page reload (observed during
+            // testing: clicking inputs caused the sitemap to reload
+            // before this guard was added). The actual offender isn't
+            // identified — see BACKLOG "Mystery admin click handler
+            // navigates on clicks inside fixed-position panels". The
+            // backdrop sits OUTSIDE the content, so backdrop clicks
+            // still close the modal (via the listener above).
+            const content = _editTitleRefs.modal.querySelector('.sitemap-edit-title-modal__content');
+            if (content) {
+                content.addEventListener('click',     (e) => e.stopPropagation());
+                content.addEventListener('mousedown', (e) => e.stopPropagation());
+            }
+        }
+        return _editTitleRefs;
+    }
+
+    // Walk a nested translation object via dot-notation. Returns the
+    // resolved string OR null when any segment is missing or not a
+    // string (e.g. a parent that's a branch object).
+    function _readDotKey(tree, dotPath) {
+        if (!tree || typeof tree !== 'object') return null;
+        const parts = dotPath.split('.');
+        let cursor = tree;
+        for (let i = 0; i < parts.length; i++) {
+            if (!cursor || typeof cursor !== 'object') return null;
+            cursor = cursor[parts[i]];
+        }
+        return (typeof cursor === 'string') ? cursor : null;
+    }
+
+    async function _fetchLanguageTranslations(lang) {
+        if (_editTitleTranslationsCache[lang] !== undefined) {
+            return _editTitleTranslationsCache[lang];
+        }
+        try {
+            const res = await QuickSiteAdmin.apiRequest('getTranslation', 'GET', null, [lang]);
+            // apiRequest returns {ok, status, data:envelope}; envelope is
+            // {status, code, data:{language, translations, file}}. Use the
+            // defensive unwrap pattern that other admin code uses.
+            const payload = (res && res.data && (res.data.data || res.data)) || {};
+            const tree = (payload && typeof payload.translations === 'object') ? payload.translations : {};
+            _editTitleTranslationsCache[lang] = tree;
+            return tree;
+        } catch (err) {
+            console.warn('[sitemap] getTranslation failed for', lang, err);
+            _editTitleTranslationsCache[lang] = {};
+            return {};
+        }
+    }
+
+    async function openEditTitleModal(route) {
+        const refs = _ensureEditTitleRefs();
+        if (!refs.modal) {
+            console.warn('[sitemap] Edit-title modal markup not found in DOM');
+            return;
+        }
+        const langs = (sitemapData && Array.isArray(sitemapData.languages))
+            ? sitemapData.languages
+            : (sitemapData && sitemapData.defaultLang ? [sitemapData.defaultLang] : ['en']);
+        const titleKey = 'page.titles.' + route;
+
+        // Reset modal UI.
+        refs.route.textContent = '"' + route + '"';
+        refs.rows.innerHTML = '';
+        refs.status.textContent = 'Loading…';
+        refs.status.style.color = '';
+        refs.save.disabled = true;
+        refs.modal.style.display = '';
+
+        // Fetch every language's tree in parallel (cached after first call).
+        const trees = await Promise.all(langs.map(_fetchLanguageTranslations));
+
+        // Build one input row per language. Marked --missing when the
+        // key resolves to null/empty in that language so the user
+        // immediately sees which need filling.
+        //
+        // createElement throughout: the project's escapeHtml is a
+        // text-node escaper (textContent→innerHTML), not an attribute
+        // escaper — it does NOT encode `"`, so passing a value
+        // containing a double-quote into a `value="${esc(v)}"`
+        // template would close the attribute early and corrupt the
+        // row markup (the user could end up with phantom links /
+        // unexpected click behaviour, e.g. page-reloading clicks).
+        // createElement + setAttribute / property assignment defers
+        // quoting to the browser, which is always correct.
+        refs.rows.textContent = '';
+        langs.forEach((lang, idx) => {
+            const value = _readDotKey(trees[idx], titleKey);
+            const hasValue = (typeof value === 'string' && value.length > 0);
+            const row = document.createElement('div');
+            row.className = 'sitemap-edit-title-row' + (hasValue ? '' : ' sitemap-edit-title-row--missing');
+
+            const langSpan = document.createElement('span');
+            langSpan.className = 'sitemap-edit-title-row__lang';
+            langSpan.textContent = lang;
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'admin-input sitemap-edit-title-row__input';
+            input.setAttribute('data-lang', lang);
+            input.setAttribute('data-original', hasValue ? value : '');
+            input.value = hasValue ? value : '';
+            input.placeholder = 'Title in ' + lang + '…';
+
+            row.appendChild(langSpan);
+            row.appendChild(input);
+            refs.rows.appendChild(row);
+        });
+
+        refs.status.textContent = '';
+        refs.save.disabled = false;
+        // Focus the first input for fast keyboard editing.
+        const firstInput = refs.rows.querySelector('input');
+        if (firstInput) firstInput.focus();
+    }
+
+    function closeEditTitleModal() {
+        if (_editTitleRefs && _editTitleRefs.modal) {
+            _editTitleRefs.modal.style.display = 'none';
+        }
+    }
+
+    async function submitEditTitleModal() {
+        const refs = _ensureEditTitleRefs();
+        if (!refs.modal) return;
+        const inputs = refs.rows.querySelectorAll('input.sitemap-edit-title-row__input');
+        if (inputs.length === 0) return;
+
+        // Read which route the modal was opened on from the displayed id
+        // (no separate state variable needed — the modal is single-instance
+        // and the route shows as a literal in the header).
+        const routeTxt = refs.route.textContent || '';
+        const route = routeTxt.replace(/^"|"$/g, '');
+        if (!route) {
+            refs.status.textContent = 'Could not determine target route — close and try again.';
+            refs.status.style.color = 'var(--admin-danger, #b3261e)';
+            return;
+        }
+
+        // Gather changes: per-language new value WHEN the input differs
+        // from its `data-original`. Untouched languages are NOT written
+        // (keeps the translation files clean).
+        const changes = [];
+        inputs.forEach(input => {
+            const lang = input.getAttribute('data-lang');
+            const original = input.getAttribute('data-original') || '';
+            const value = input.value;
+            if (value !== original) changes.push({ lang, value });
+        });
+        if (changes.length === 0) {
+            refs.status.textContent = 'No changes to save.';
+            refs.status.style.color = '';
+            return;
+        }
+
+        refs.save.disabled = true;
+        refs.status.textContent = 'Saving (' + changes.length + ' language' + (changes.length === 1 ? '' : 's') + ')…';
+        refs.status.style.color = '';
+
+        // Build the nested translation tree for `page.titles.<route>`
+        // once per language and dispatch setTranslationKeys in parallel.
+        const titleKey = 'page.titles.' + route;
+        const parts = titleKey.split('.');
+        const promises = changes.map(({ lang, value }) => {
+            // Build a fresh nested object per call (don't share refs).
+            const translations = {};
+            let cursor = translations;
+            for (let i = 0; i < parts.length - 1; i++) {
+                cursor[parts[i]] = {};
+                cursor = cursor[parts[i]];
+            }
+            cursor[parts[parts.length - 1]] = value;
+            return QuickSiteAdmin.apiRequest('setTranslationKeys', 'POST', {
+                language: lang,
+                translations,
+            });
+        });
+
+        try {
+            const results = await Promise.all(promises);
+            const failures = results.filter(r => !(r && r.ok));
+            if (failures.length > 0) {
+                refs.status.textContent = 'Saved ' + (results.length - failures.length) + '/' + results.length + ' — see console.';
+                refs.status.style.color = 'var(--admin-warning, #b3691e)';
+                console.warn('[sitemap] Some edit-title saves failed:', failures);
+                refs.save.disabled = false;
+                return;
+            }
+            // Success — invalidate the cache for changed langs so a
+            // subsequent re-open of the same route shows fresh values.
+            changes.forEach(({ lang }) => { delete _editTitleTranslationsCache[lang]; });
+            refs.status.textContent = '✓ Saved ' + changes.length + ' translation' + (changes.length === 1 ? '' : 's') + '.';
+            refs.status.style.color = 'var(--admin-success, #2c7a3f)';
+            // Close after a short pause so the user sees the confirmation.
+            setTimeout(closeEditTitleModal, 700);
+        } catch (err) {
+            console.error('[sitemap] edit-title save failed:', err);
+            refs.status.textContent = 'Save failed — see console.';
+            refs.status.style.color = 'var(--admin-danger, #b3261e)';
+            refs.save.disabled = false;
         }
     }
 

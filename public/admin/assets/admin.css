@@ -16173,6 +16173,73 @@ body[data-page="preview"] .global-miniplayer {
     border-top: 1px solid var(--admin-border);
 }
 
+/* Sitemap edit-title modal — same layout pattern as the translate-csv
+   modal (BETA7 pre-release polish). Inner form uses .admin-* shared
+   classes. */
+.sitemap-edit-title-modal {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 10000;
+    display: flex; align-items: center; justify-content: center;
+}
+.sitemap-edit-title-modal__backdrop {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: #00000080;
+    backdrop-filter: blur(2px);
+}
+.sitemap-edit-title-modal__content {
+    position: relative;
+    z-index: 1;
+    background: var(--admin-bg-secondary, #1f1f1f);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    width: 90%; max-width: 560px; max-height: 90vh;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+}
+.sitemap-edit-title-modal__header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--admin-border);
+}
+.sitemap-edit-title-modal__header h3 {
+    margin: 0; font-size: 1.1rem; font-weight: 600;
+    color: var(--admin-text);
+}
+.sitemap-edit-title-modal__close {
+    background: transparent; border: none;
+    padding: var(--space-xs); cursor: pointer;
+    color: var(--admin-text-muted);
+    border-radius: var(--radius-sm);
+}
+.sitemap-edit-title-modal__close svg { width: 18px; height: 18px; }
+.sitemap-edit-title-modal__body {
+    padding: var(--space-md) var(--space-lg);
+    overflow-y: auto;
+    flex: 1;
+}
+.sitemap-edit-title-modal__footer {
+    display: flex; justify-content: flex-end; gap: var(--space-sm);
+    padding: var(--space-md) var(--space-lg);
+    border-top: 1px solid var(--admin-border);
+}
+/* Per-language input row inside the modal. */
+.sitemap-edit-title-row {
+    display: flex; gap: var(--space-sm); align-items: center;
+    margin-bottom: var(--space-sm);
+}
+.sitemap-edit-title-row__lang {
+    flex: 0 0 60px;
+    font-weight: 600;
+    color: var(--admin-text);
+    text-transform: uppercase;
+    font-size: 0.85rem;
+}
+.sitemap-edit-title-row__input { flex: 1; }
+.sitemap-edit-title-row--missing .sitemap-edit-title-row__lang::after {
+    content: ' ●';
+    color: var(--admin-warning, #b3691e);
+}
+
 /* Paged-navigator complex element (BETA7 #11, beta.7 close).
    Bound at runtime to a state-store via [data-state-pagenav]; the
    <nav>'s children are rebuilt by qs.js whenever the store updates.

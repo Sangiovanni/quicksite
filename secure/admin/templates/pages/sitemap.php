@@ -12,6 +12,8 @@ $baseUrl = rtrim(BASE_URL, '/');
 
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/sitemap.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/sitemap.js') ?>"></script>
 
+<?php include __DIR__ . '/sitemap-edit-title.php'; ?>
+
 <div class="admin-page-header">
     <div class="admin-page-header__row">
         <div>
