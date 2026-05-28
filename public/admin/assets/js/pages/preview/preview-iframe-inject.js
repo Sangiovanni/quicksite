@@ -2239,7 +2239,16 @@
         if (isEditorMode() && navTarget(e.target)) {
             e.preventDefault();
             e.stopPropagation();
-            e.stopImmediatePropagation();
+            // In TEXT mode, don't stop immediate propagation — the
+            // second click listener below dispatches startTextEdit on
+            // [data-qs-textkey] spans, and we want that to fire for
+            // text nodes nested inside <a> / <button type="submit">
+            // (otherwise anchor text is unreachable in Text mode while
+            // button text in non-form contexts works — confusing
+            // asymmetry the user hit during beta.7 #11 testing).
+            if (currentMode !== 'text') {
+                e.stopImmediatePropagation();
+            }
         }
     }, true);
     document.addEventListener('auxclick', function(e) {

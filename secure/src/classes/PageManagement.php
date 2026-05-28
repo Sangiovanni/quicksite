@@ -58,7 +58,18 @@ class PageManagement {
         $header .= '<html lang="' . htmlspecialchars($this->lang) . '"' . $themeAttr . '>';
         $header .="<head>";
         $header .= "<title>" . htmlspecialchars($this->title) . "</title>";
-        $header .= '<link rel="icon" type="image/png" href="' . BASE_URL . '/assets/images/favicon.png">';
+        // Favicon: prefer CONFIG['FAVICON_PATH'] (project-configurable).
+        // Accepts an absolute URL (https?:// or data:) emitted as-is, or a
+        // root-relative path (joined with BASE_URL). Default falls back to
+        // the project's conventional assets path. Kept in sync with the
+        // built-page renderer in src/classes/Page.php.
+        $faviconPath = (defined('CONFIG') && isset(CONFIG['FAVICON_PATH']) && CONFIG['FAVICON_PATH'] !== '')
+            ? CONFIG['FAVICON_PATH']
+            : '/assets/images/favicon.png';
+        $faviconHref = preg_match('#^(https?:)?//|^data:#i', $faviconPath)
+            ? $faviconPath
+            : (BASE_URL . '/' . ltrim($faviconPath, '/'));
+        $header .= '<link rel="icon" href="' . htmlspecialchars($faviconHref, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '">';
         $stylePath = PUBLIC_CONTENT_PATH . '/style/style.css';
         $cssVersion = file_exists($stylePath) ? filemtime($stylePath) : time();
         $header .= '<link rel="stylesheet" href="' . BASE_URL . '/style/style.css?v=' . $cssVersion . '">';

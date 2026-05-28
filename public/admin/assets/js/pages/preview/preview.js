@@ -4068,9 +4068,35 @@
             
             showToast(PreviewConfig.i18n.textSaved, 'success');
             console.log('[Preview] Translation saved successfully');
-            
-            // Update the span in iframe to reflect saved state (already has the new text)
-            // No action needed - the contenteditable already shows the new text
+
+            // Update the span the user just edited — the contenteditable
+            // already shows the new text, no action needed there.
+            // BUT: sweep the iframe for OTHER spans referencing the same
+            // textKey + update their textContent in place. Without this
+            // sweep, the editor shows the new text only on the edited
+            // span while siblings stay stale (looks like inconsistent
+            // state until the iframe reloads). The rendered page is
+            // always correct — this is purely an editor-view sync.
+            // Discovered during beta.7 #11 testing.
+            try {
+                const iframeDoc = iframe && (iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document));
+                if (iframeDoc) {
+                    const safeKey = String(textKey).replace(/"/g, '\\"');
+                    iframeDoc.querySelectorAll('[data-qs-textkey="' + safeKey + '"]').forEach(function (span) {
+                        // Skip the actively-editing element so we don't
+                        // clobber an in-progress contenteditable cursor
+                        // — the user can see their edits already.
+                        if (span.getAttribute('contenteditable') === 'true') return;
+                        if (span.textContent !== newValue) span.textContent = newValue;
+                    });
+                }
+            } catch (sweepErr) {
+                // Iframe access can throw cross-origin in pathological
+                // setups; don't fail the save just because we couldn't
+                // sync the sibling spans. The next iframe reload will
+                // refresh everything.
+                console.warn('[Preview] textKey sibling sweep failed:', sweepErr);
+            }
             
         } catch (error) {
             console.error('[Preview] Text save error:', error);

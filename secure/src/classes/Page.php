@@ -63,7 +63,25 @@ class Page {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($title, ENT_QUOTES | ENT_HTML5, 'UTF-8') ?></title>
-    <link rel="icon" type="image/png" href="/<?= $spacePrefix ?>assets/favicon.png">
+    <?php
+    // Favicon: prefer CONFIG['FAVICON_PATH'] (project-configurable).
+    // Accepts: an absolute URL (https?:// or data:) emitted as-is,
+    // or a path starting with `/` (treated as relative to the
+    // site root; respects PUBLIC_FOLDER_SPACE via $spacePrefix).
+    // Default falls back to the project's conventional assets path
+    // (the old hardcoded path here was buggy — missing `images/`
+    // — which caused fresh pages to 404 on /assets/favicon.png).
+    $faviconPath = (defined('CONFIG') && isset(CONFIG['FAVICON_PATH']) && CONFIG['FAVICON_PATH'] !== '')
+        ? CONFIG['FAVICON_PATH']
+        : '/assets/images/favicon.png';
+    if (preg_match('#^(https?:)?//|^data:#i', $faviconPath)) {
+        $faviconHref = $faviconPath;
+    } else {
+        // Treat as root-relative; honour the optional PUBLIC_FOLDER_SPACE.
+        $faviconHref = '/' . $spacePrefix . ltrim($faviconPath, '/');
+    }
+    ?>
+    <link rel="icon" href="<?= htmlspecialchars($faviconHref, ENT_QUOTES | ENT_HTML5, 'UTF-8') ?>">
     <link rel="stylesheet" href="/<?= $spacePrefix ?>style/style.css?v=<?= $cssVersion ?>">
     <?= $themeScript ?>
 </head>

@@ -39,6 +39,17 @@
     --admin-bg: #1a1612;
     --admin-bg-secondary: #252019;
     --admin-bg-tertiary: #2f2820;
+    /* Card surface — referenced by 10+ rules across this stylesheet
+       (modals, cards, etc.) but was never defined as a CSS variable
+       before, so all those rules silently fell back to transparent.
+       Aliased to --admin-bg-secondary so cards keep the same visual
+       weight as the existing card backgrounds; project CSS can
+       override for a distinct shade if needed.
+       Discovered during BETA7_TABLE_TRANSLATION_CSV testing — the
+       Translate-from-CSV modal looked washed-out against the editor
+       behind it. Fixing this root variable repairs every other
+       modal (add-node, keyframe, transform, …) in one stroke. */
+    --admin-card-bg: var(--admin-bg-secondary);
     --admin-surface: #3a322a;
     --admin-surface-hover: #453c32;
     --admin-border: rgba(250, 246, 241, 0.1);
