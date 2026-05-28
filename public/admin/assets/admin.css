@@ -16161,3 +16161,42 @@ body[data-page="preview"] .global-miniplayer {
     padding: var(--space-md) var(--space-lg);
     border-top: 1px solid var(--admin-border);
 }
+
+/* Paged-navigator complex element (BETA7 #11, beta.7 close).
+   Bound at runtime to a state-store via [data-state-pagenav]; the
+   <nav>'s children are rebuilt by qs.js whenever the store updates.
+   Styling kept minimal + theme-agnostic; project CSS can override. */
+.paged-nav {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+}
+.paged-nav__btn {
+    background: transparent;
+    border: 1px solid currentColor;
+    color: inherit;
+    padding: 4px 10px;
+    min-width: 2em;
+    border-radius: 4px;
+    font: inherit;
+    cursor: pointer;
+    line-height: 1;
+}
+.paged-nav__btn[disabled] {
+    opacity: 0.4;
+    cursor: default;
+}
+.paged-nav__btn--current {
+    /* Inverted state: solid text-colour fill, page-bg-coloured text.
+       Both pulled from the admin theme vars (with hard fallbacks).
+       Project CSS can override for a branded active state. */
+    background: var(--admin-text, #1a1612);
+    color: var(--admin-bg, #fff);
+    border-color: var(--admin-text, #1a1612);
+    font-weight: 600;
+}
+.paged-nav__gap {
+    padding: 0 4px;
+    opacity: 0.6;
+}

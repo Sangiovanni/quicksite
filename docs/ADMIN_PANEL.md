@@ -350,6 +350,7 @@ Same auto-discovery pattern client-side — `preview-config.php` globs
 | `nav-menu` | `<nav>` / `<ul>` with N `<li><a href="…">` items | Per-item **external** toggle adds `target="_blank" rel="noopener"`. Each `href` input attaches the shared routes datalist for autocomplete (external URLs still work). |
 | `breadcrumb` | `<nav aria-label="Breadcrumb">` / `<ol class="breadcrumb">` with N `<li>` | Last item auto-renders as plain text with `aria-current="page"` (no link); its href input is auto-greyed-out in the wizard. Same routes datalist as nav-menu for intermediate hrefs. |
 | `tab-set` | `<div class="tabset" id="<setId>">` + `<div role="tablist">` + N `<button role="tab">` + N `<div role="tabpanel">` | ARIA-correct tab semantics. Click-to-switch wired via existing QS verbs (`removeClass` / `addClass` / `hide` / `show` chain in each tab's `onclick`) — no new runtime needed. User-provided `setId` scopes the per-tab click chain so multiple tab sets coexist on one page. Each panel content is a single `<p>` with a `textKey` — edit further via the regular editor after save. Arrow-key keyboard nav between tabs is filed in BACKLOG. |
+| `paged-navigator` | `<nav class="paged-nav" data-state-pagenav="<storeId>" …>` (empty at build time; runtime populates buttons) | Numbered-page navigator bound to a state store. Reads the store's `totalPages` field to size itself, marks the current `page` with `aria-current="page"`. Smart-ellipsis windowing (`1 … 4 5 [6] 7 8 … 100`). Optional ‹ Prev / Next › chevrons. Hides itself when `totalPages` is missing or ≤ 1. Click delegation: one listener attached to the `<nav>` (via WeakSet guard) survives re-renders — calls `setState(storeId, pageField, N)` then `fetchState(storeId)`. Pair with an offset-pagination store (see §9.6). |
 
 **Adding a new kind — 2-file recipe**
 
@@ -1184,8 +1185,13 @@ works):
 ```
 
 `data-state-show` on Prev/Next gates them on the cursors so the buttons disappear
-at the ends. The numbered-button navigator (1 2 3 … N from `totalPages`) is the
-**paged-navigator complex element** in `BACKLOG.md` / Complex Elements (#11).
+at the ends.
+
+For a **numbered navigator** (1 2 3 … N from `totalPages`) — add a
+**paged-navigator** complex element via the Add → Complex tab. Pick the store
+above, leave `page` / `totalPages` as the field names, set window size + Prev/Next
+toggle. The navigator hides itself until the first fetch settles, then renders +
+re-renders on every store update with smart-ellipsis layout.
 
 **Cursor / infinite (append, on scroll or load-more)** — endpoint returns a
 forward cursor (`nextId` / `nextCursor`). Store fields:

@@ -1784,6 +1784,14 @@
         return init; // literal
     }
 
+    // WeakSet of <nav data-state-pagenav> elements that have already had
+    // their delegated click listener attached. Used by the paged-navigator
+    // block inside _renderStore to avoid re-binding on every re-render
+    // (every store update calls _renderStore, which rebuilds the nav's
+    // children — but the parent listener is on the <nav> itself, not the
+    // buttons, so it survives the rebuild).
+    var _pageNavBound = new WeakSet();
+
     // DOM ← store: set the text of [data-state-value="storeId.field"] elements.
     function _renderStore(storeId) {
         var store = QS._stores[storeId];
@@ -1824,6 +1832,136 @@
             var truthy = !(v === null || v === undefined || v === '' || v === 0 || v === false
                 || (Array.isArray(v) && v.length === 0));
             el.hidden = !truthy;
+        });
+
+        // Paged-navigator binding: [data-state-pagenav="storeId"] is a
+        // <nav> whose numbered buttons are rendered (and re-rendered)
+        // every time the bound store updates. Reads the configured
+        // `totalPages` field to size itself, marks the current page
+        // (`page` field) with aria-current. Hides itself when
+        // totalPages is missing or <= 1.
+        //
+        // Click handling: a single delegated listener is attached the
+        // FIRST time a navigator is rendered (tracked via a WeakSet
+        // so we don't double-bind across re-renders). Buttons carry
+        // data-page="N"; the listener reads it + dispatches
+        // QS.setState(storeId, pageField, N) → QS.fetchState(storeId).
+        document.querySelectorAll('[data-state-pagenav]').forEach(function (nav) {
+            if (nav.getAttribute('data-state-pagenav') !== storeId) return;
+            var pageField = nav.getAttribute('data-state-pagenav-page-field') || 'page';
+            var totalField = nav.getAttribute('data-state-pagenav-totalpages-field') || 'totalPages';
+            var win = parseInt(nav.getAttribute('data-state-pagenav-window') || '2', 10);
+            if (!isFinite(win) || win < 0) win = 2;
+            var includePrevNext = nav.getAttribute('data-state-pagenav-prev-next') === 'true';
+
+            var totalPages = parseInt(store.state[totalField], 10);
+            var current = parseInt(store.state[pageField], 10);
+            if (!isFinite(current) || current < 1) current = 1;
+
+            // No / one-page navigation — hide entirely.
+            if (!isFinite(totalPages) || totalPages <= 1) {
+                nav.hidden = true;
+                return;
+            }
+            nav.hidden = false;
+
+            // Compute the visible page set with smart ellipsis. Always
+            // include first + last + current ± window; insert '...'
+            // wherever there's a gap > 1.
+            var pageSet = {};
+            pageSet[1] = true;
+            pageSet[totalPages] = true;
+            for (var i = Math.max(1, current - win); i <= Math.min(totalPages, current + win); i++) {
+                pageSet[i] = true;
+            }
+            var sorted = Object.keys(pageSet).map(function (n) { return parseInt(n, 10); }).sort(function (a, b) { return a - b; });
+            var visible = []; // entries: number OR the string '...'
+            for (var j = 0; j < sorted.length; j++) {
+                if (j > 0) {
+                    var gap = sorted[j] - sorted[j - 1];
+                    // Gap of exactly 2 = one page missing; render that
+                    // page literally (an ellipsis would take the same
+                    // horizontal space without the affordance to click).
+                    // Gap > 2 = multiple pages skipped → real ellipsis.
+                    if (gap === 2) visible.push(sorted[j - 1] + 1);
+                    else if (gap > 2) visible.push('...');
+                }
+                visible.push(sorted[j]);
+            }
+
+            // Rebuild children. createElement + textContent only — no
+            // innerHTML, per CLAUDE.md HTML-in-JS hygiene.
+            nav.textContent = '';
+            if (includePrevNext) {
+                var prev = document.createElement('button');
+                prev.type = 'button';
+                prev.className = 'paged-nav__btn paged-nav__btn--prev';
+                prev.textContent = '‹';   // ‹
+                prev.setAttribute('aria-label', 'Previous page');
+                prev.setAttribute('data-page', String(Math.max(1, current - 1)));
+                if (current <= 1) {
+                    prev.disabled = true;
+                    prev.setAttribute('aria-disabled', 'true');
+                }
+                nav.appendChild(prev);
+            }
+            visible.forEach(function (entry) {
+                if (entry === '...') {
+                    var gap = document.createElement('span');
+                    gap.className = 'paged-nav__gap';
+                    gap.textContent = '…';   // …
+                    gap.setAttribute('aria-hidden', 'true');
+                    nav.appendChild(gap);
+                    return;
+                }
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'paged-nav__btn';
+                if (entry === current) {
+                    btn.className += ' paged-nav__btn--current';
+                    btn.setAttribute('aria-current', 'page');
+                }
+                btn.textContent = String(entry);
+                btn.setAttribute('data-page', String(entry));
+                btn.setAttribute('aria-label', 'Go to page ' + entry);
+                nav.appendChild(btn);
+            });
+            if (includePrevNext) {
+                var next = document.createElement('button');
+                next.type = 'button';
+                next.className = 'paged-nav__btn paged-nav__btn--next';
+                next.textContent = '›';   // ›
+                next.setAttribute('aria-label', 'Next page');
+                next.setAttribute('data-page', String(Math.min(totalPages, current + 1)));
+                if (current >= totalPages) {
+                    next.disabled = true;
+                    next.setAttribute('aria-disabled', 'true');
+                }
+                nav.appendChild(next);
+            }
+
+            // Attach the delegated click listener ONCE per nav element.
+            // _pageNavBound is a WeakSet so removed navs don't pin entries.
+            if (!_pageNavBound.has(nav)) {
+                _pageNavBound.add(nav);
+                nav.addEventListener('click', function (e) {
+                    var target = e.target;
+                    while (target && target !== nav && (!target.classList || !target.classList.contains('paged-nav__btn'))) {
+                        target = target.parentNode;
+                    }
+                    if (!target || target === nav || target.disabled) return;
+                    var pageStr = target.getAttribute('data-page');
+                    var page = parseInt(pageStr, 10);
+                    if (!isFinite(page) || page < 1) return;
+                    // Same store-id captured at render time. Re-read attrs
+                    // in case the user swapped the binding to a different
+                    // store on the fly (unusual but harmless to support).
+                    var sid = nav.getAttribute('data-state-pagenav');
+                    var pf = nav.getAttribute('data-state-pagenav-page-field') || 'page';
+                    if (typeof QS.setState === 'function') QS.setState(sid, pf, page);
+                    if (typeof QS.fetchState === 'function') QS.fetchState(sid).catch(function () {});
+                });
+            }
         });
     }
 

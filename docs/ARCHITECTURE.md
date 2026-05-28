@@ -579,6 +579,13 @@ DOM bindings (store → DOM, re-applied on init / `setState` / `fetchState`):
   `false` / `[]`). Use it to hide a "Next" button when the response's
   `nextPage` / `nextId` cursor is null at the last page, hide a "Load more"
   trigger when `hasMore` is false, gate a counter on `total > 0`, etc.
+- `data-state-pagenav="storeId"` (+ `data-state-pagenav-page-field` /
+  `-totalpages-field` / `-window` / `-prev-next`) — a `<nav>` whose numbered-
+  page buttons are rendered + re-rendered every store update. Reads the
+  configured `totalPages` field to size itself, writes the `page` field on
+  click then re-fetches. Smart-ellipsis layout with the configured window
+  size; optional Prev/Next chevrons. Emitted by the `paged-navigator`
+  complex element; see `ADMIN_PANEL.md §8.7`.
 
 **The store owns rendering.** `fetchState` passes a `noBindings` opt to `QS.fetch`
 so the endpoint's own `responseBindings` are skipped on store fetches — otherwise an
