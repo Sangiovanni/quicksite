@@ -1138,13 +1138,31 @@ literal, or a `#id` / `.class` selector read live). They compile to
 `{{call:setState:store,field,value}}` / `{{call:fetchState:store}}` — chain them for
 "go to page N", search-as-you-type, or scroll-to-load-more.
 
-**Rendering.** The store updates elements carrying `data-state-value="store.field"`
-(scalars), `data-state-list="store.field"` (arrays — the container's first child
-is the item template, `data-bind` on descendants, optional `data-state-empty`),
-and `data-state-show="store.field"` (toggles the standard `hidden` attribute on
-truthiness — handy for hiding a Next button when `nextPage` is null at the last
-page, hiding "Load more" when `hasMore` is false, etc.). These bindings are
-authored in the page structure: the wizard defines the *data*, not the render target.
+**Rendering.** The store updates elements carrying these bindings on every
+init / `setState` / `fetchState`:
+
+- `data-state-value="store.field"` — scalar; sets `textContent` to the field
+  value.
+- `data-state-list="store.field"` — array container. The container's first child
+  is the **item template** that gets cloned per array item.
+  - Template descendants with `data-bind="fieldName"` get `textContent` set to
+    the matching field on each item; `data-bind-attr="attr"` sets an attribute
+    instead. *This is the same `data-bind` mechanism used by componentList
+    bindings — see §9.2 for the full template-population reference.*
+  - An optional `data-state-empty="some text"` on the container provides the
+    text shown when the array is empty (replaces the empty container content
+    with that string).
+- `data-state-show="store.field"` — toggles the standard `hidden` attribute
+  on truthiness (falsy = `null` / `undefined` / `''` / `0` / `false` / `[]`).
+  Handy for hiding Next at the last page, "Load more" when `hasMore` is
+  false, etc.
+- `data-state-pagenav="storeId"` (+ optional `-page-field` / `-totalpages-field`
+  / `-window` / `-prev-next` companion attributes — see `ARCHITECTURE.md §8`)
+  — runtime-rendered numbered-page navigator. Emitted by the `paged-navigator`
+  complex element wizard; hand-author the bindings if you want a custom shape.
+
+These bindings are authored in the page structure: the State-stores wizard
+defines the *data*, not the render target.
 
 | Concern | Where |
 |---|---|

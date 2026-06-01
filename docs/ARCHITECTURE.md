@@ -579,13 +579,26 @@ DOM bindings (store → DOM, re-applied on init / `setState` / `fetchState`):
   `false` / `[]`). Use it to hide a "Next" button when the response's
   `nextPage` / `nextId` cursor is null at the last page, hide a "Load more"
   trigger when `hasMore` is false, gate a counter on `total > 0`, etc.
-- `data-state-pagenav="storeId"` (+ `data-state-pagenav-page-field` /
-  `-totalpages-field` / `-window` / `-prev-next`) — a `<nav>` whose numbered-
-  page buttons are rendered + re-rendered every store update. Reads the
-  configured `totalPages` field to size itself, writes the `page` field on
-  click then re-fetches. Smart-ellipsis layout with the configured window
-  size; optional Prev/Next chevrons. Emitted by the `paged-navigator`
-  complex element; see `ADMIN_PANEL.md §8.7`.
+- `data-state-pagenav="storeId"` — a `<nav>` whose numbered-page buttons are
+  rendered + re-rendered on every store update. Reads the configured
+  `totalPages` field to size itself; writes the `page` field on click then
+  re-fetches. Smart-ellipsis layout with the configured window size;
+  optional Prev/Next chevrons. Emitted by the `paged-navigator` complex
+  element, but the binding itself is hand-authorable. Companion attributes
+  (all optional, defaults shown):
+  - `data-state-pagenav-page-field="page"` — store field that holds the
+    current page number (written on click).
+  - `data-state-pagenav-totalpages-field="totalPages"` — store field that
+    holds the page count (read to size the navigator). When this field is
+    missing or `≤ 1`, the navigator hides itself.
+  - `data-state-pagenav-window="2"` — how many sibling pages to show on
+    each side of the current page before ellipsing. `0` collapses to just
+    `1 … current … N`.
+  - `data-state-pagenav-prev-next="true"` — adds `‹ Prev` / `Next ›`
+    chevrons. Omit (or set to anything other than the literal string
+    `"true"`) to hide them.
+  See `ADMIN_PANEL.md §8.7` for the wizard that builds the nav; see §9.6
+  for using it with an offset-pagination store.
 
 **The store owns rendering.** `fetchState` passes a `noBindings` opt to `QS.fetch`
 so the endpoint's own `responseBindings` are skipped on store fetches — otherwise an
