@@ -1197,7 +1197,40 @@ $GLOBALS['__help_commands'] = [
         ],
         'notes' => 'Only available when MULTILINGUAL_SUPPORT = true. Cannot delete default language or last remaining language.'
     ],
-    
+
+    'cleanOrphanTranslations' => [
+        'description' => 'Deletes translation files for languages no longer declared in LANGUAGES_SUPPORTED. Preserves default.json. Used by fresh-start to keep disk in sync with config.',
+        'method' => 'DELETE',
+        'parameters' => [
+            'dry_run' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'If true, list orphans that WOULD be deleted without actually deleting them',
+                'example' => 'true',
+                'default' => false
+            ]
+        ],
+        'example_delete' => 'DELETE /management/cleanOrphanTranslations with body: {}',
+        'example_dry_run' => 'DELETE /management/cleanOrphanTranslations with body: {"dry_run": true}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Deleted N orphan translation file(s)',
+            'data' => [
+                'cleaned' => ['fr'],
+                'kept' => ['default', 'en'],
+                'orphans_found' => 1,
+                'dry_run' => false,
+                'project' => 'test'
+            ]
+        ],
+        'error_responses' => [
+            '200.operation.partial_success' => 'Some files could not be deleted (errors array lists the failures); the rest succeeded',
+            '500.server.internal_error' => 'PROJECT_PATH or CONFIG not loaded, or glob failure'
+        ],
+        'notes' => 'Orphan = a `<lang>.json` file present on disk whose base name is NOT in CONFIG[LANGUAGES_SUPPORTED] (excluding default.json, which is always preserved). Safe to run on any project; idempotent (running twice is a no-op).'
+    ],
+
     'setDefaultLang' => [
         'description' => 'Sets the default language for the site. The language must already exist in LANGUAGES_SUPPORTED.',
         'method' => 'PATCH',

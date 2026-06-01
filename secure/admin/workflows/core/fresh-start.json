@@ -115,6 +115,12 @@
             }
         },
         {
+            "comment": "=== PHASE 4b: DELETE ORPHAN TRANSLATION FILES (files on disk not in LANGUAGES_SUPPORTED) ===",
+            "condition": "param.keepLanguages !== true",
+            "command": "cleanOrphanTranslations",
+            "params": {}
+        },
+        {
             "comment": "=== PHASE 5: RESET STRUCTURES ===",
             "command": "editStructure",
             "params": {
