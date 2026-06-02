@@ -310,25 +310,61 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
     
     // Insert node
     if ($isRootTarget) {
-        // Direct insertion into root's children (mimics normal 'inside' behavior)
-        if (!isset($structure['children'])) $structure['children'] = [];
-        
-        // Move existing textKey children into the new node (same as normal inside insertion)
-        if (!empty($movedTextKeys) && isset($newNode['children'])) {
-            rsort($movedTextKeys);
-            $movedChildren = [];
-            foreach ($movedTextKeys as $idx) {
-                if (isset($structure['children'][$idx])) {
-                    array_unshift($movedChildren, $structure['children'][$idx]);
-                    array_splice($structure['children'], $idx, 1);
+        // The page JSON root is naturally one of two shapes:
+        //   (a) LIST  — top-level array of sibling nodes: [ {tag:main, …}, {tag:footer, …} ]
+        //   (b) NODE  — single top-level node object: { tag:main, children:[…] }
+        // For (a), 'root' insertion means PREPEND a new sibling at the top
+        //          of the array. WRONG: writing to $structure['children']
+        //          here promotes the sequential array to an associative one
+        //          → JSON serialises as `{"0": main, "children": […]}` and
+        //          every subsequent NodeNavigator lookup is broken
+        //          (this was a latent bug filed in BACKLOG; finally hit
+        //          via a CLI smoke test on 2026-06-03 — fixing now).
+        // For (b), prepend into $structure['children'] as before.
+        //
+        // Same detection pattern as addComplexElement.php (its inline
+        // comment explains the same scar).
+        $isListShapeRoot = is_array($structure)
+            && array_keys($structure) === range(0, count($structure) - 1);
+
+        if ($isListShapeRoot) {
+            // Move existing textKey children into the new node — same
+            // intent as the NODE-shape branch below, but the moved
+            // children live as top-level array items here. Rare path
+            // (textKey-children at root is unusual) but kept for parity.
+            if (!empty($movedTextKeys) && isset($newNode['children'])) {
+                rsort($movedTextKeys);
+                $movedChildren = [];
+                foreach ($movedTextKeys as $idx) {
+                    if (isset($structure[$idx])) {
+                        array_unshift($movedChildren, $structure[$idx]);
+                        array_splice($structure, $idx, 1);
+                    }
                 }
+                $newNode['children'] = array_merge($movedChildren, $newNode['children']);
             }
-            // Prepend moved children to new node's children
-            $newNode['children'] = array_merge($movedChildren, $newNode['children']);
+            array_unshift($structure, $newNode);
+        } else {
+            // NODE-shape root: original behavior.
+            if (!isset($structure['children'])) $structure['children'] = [];
+
+            // Move existing textKey children into the new node (same as normal inside insertion)
+            if (!empty($movedTextKeys) && isset($newNode['children'])) {
+                rsort($movedTextKeys);
+                $movedChildren = [];
+                foreach ($movedTextKeys as $idx) {
+                    if (isset($structure['children'][$idx])) {
+                        array_unshift($movedChildren, $structure['children'][$idx]);
+                        array_splice($structure['children'], $idx, 1);
+                    }
+                }
+                // Prepend moved children to new node's children
+                $newNode['children'] = array_merge($movedChildren, $newNode['children']);
+            }
+
+            // Prepend new node (insert at beginning, like normal 'inside')
+            array_unshift($structure['children'], $newNode);
         }
-        
-        // Prepend new node (insert at beginning, like normal 'inside')
-        array_unshift($structure['children'], $newNode);
         $newNodeId = '0';
         $insertResult = ['success' => true, 'structure' => $structure, 'newNodeId' => $newNodeId];
     } else {

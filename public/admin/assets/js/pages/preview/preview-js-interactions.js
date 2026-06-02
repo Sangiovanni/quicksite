@@ -3649,6 +3649,15 @@
             if (!response.ok) throw new Error(result.message || 'Failed to delete');
             if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreDeleted || 'State store deleted', 'success');
             await loadStateStores();
+            // Tell the data-attribute picker its cached store list is
+            // stale — next pick of a store-field attribute (data-state-*)
+            // will refetch and see the just-written change. Otherwise
+            // the user has to hard-refresh the editor to see a new /
+            // imported / deleted store in the picker dropdown.
+            // (Late beta.7 polish, 2026-06-03.)
+            if (window.QSComplexWizard && window.QSComplexWizard.invalidateDataAttrStoresCache) {
+                window.QSComplexWizard.invalidateDataAttrStoresCache();
+            }
             if (reloadPreviewFn) reloadPreviewFn();
         } catch (error) {
             console.error('[PreviewJsInteractions] Delete state store error:', error);
@@ -4244,6 +4253,15 @@
             if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreImported || 'Store imported', 'success');
             hideStateStoreImportPicker();
             await loadStateStores();
+            // Tell the data-attribute picker its cached store list is
+            // stale — next pick of a store-field attribute (data-state-*)
+            // will refetch and see the just-written change. Otherwise
+            // the user has to hard-refresh the editor to see a new /
+            // imported / deleted store in the picker dropdown.
+            // (Late beta.7 polish, 2026-06-03.)
+            if (window.QSComplexWizard && window.QSComplexWizard.invalidateDataAttrStoresCache) {
+                window.QSComplexWizard.invalidateDataAttrStoresCache();
+            }
             if (reloadPreviewFn) reloadPreviewFn();
         } catch (error) {
             console.error('[PreviewJsInteractions] Import: save failed:', error);
@@ -4312,6 +4330,15 @@
             if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreSaved || 'State store saved', 'success');
             hideStateStoreForm();
             await loadStateStores();
+            // Tell the data-attribute picker its cached store list is
+            // stale — next pick of a store-field attribute (data-state-*)
+            // will refetch and see the just-written change. Otherwise
+            // the user has to hard-refresh the editor to see a new /
+            // imported / deleted store in the picker dropdown.
+            // (Late beta.7 polish, 2026-06-03.)
+            if (window.QSComplexWizard && window.QSComplexWizard.invalidateDataAttrStoresCache) {
+                window.QSComplexWizard.invalidateDataAttrStoresCache();
+            }
             if (reloadPreviewFn) reloadPreviewFn();
         } catch (error) {
             console.error('[PreviewJsInteractions] Save state store error:', error);
