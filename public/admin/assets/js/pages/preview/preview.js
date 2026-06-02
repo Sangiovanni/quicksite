@@ -6940,12 +6940,12 @@
         const row = document.createElement('div');
         row.className = 'preview-contextual-form__param-row preview-contextual-form__param-row--custom';
         row.innerHTML = `
-            <input type="text" 
-                   class="admin-input admin-input--sm preview-contextual-form__param-key" 
-                   placeholder="${PreviewConfig.i18n.paramName || 'name'}" 
+            <input type="text"
+                   class="admin-input admin-input--sm preview-contextual-form__param-key"
+                   placeholder="${PreviewConfig.i18n.paramName || 'name'}"
                    data-param-index="${sidebarAddCustomParamsCount}">
-            <input type="text" 
-                   class="admin-input admin-input--sm preview-contextual-form__param-value" 
+            <input type="text"
+                   class="admin-input admin-input--sm preview-contextual-form__param-value"
                    placeholder="${PreviewConfig.i18n.paramValue || 'value'}"
                    data-param-index="${sidebarAddCustomParamsCount}">
             <button type="button" class="preview-contextual-form__remove-param" title="${PreviewConfig.i18n.remove || 'Remove'}">
@@ -6954,6 +6954,16 @@
         `;
         row.querySelector('.preview-contextual-form__remove-param').addEventListener('click', () => row.remove());
         addCustomParamsList.appendChild(row);
+
+        // Wire the data-* autocomplete on the new row's KEY input.
+        // Shared helper from contextual-complex/data-attr-picker.js — opens
+        // a dropdown of catalog entries when the user types "data-".
+        // No-op if the helper failed to load (graceful degradation).
+        const keyInput = row.querySelector('.preview-contextual-form__param-key');
+        const valueInput = row.querySelector('.preview-contextual-form__param-value');
+        if (window.QSComplexWizard && window.QSComplexWizard.attachDataAttrPicker) {
+            window.QSComplexWizard.attachDataAttrPicker(keyInput, valueInput);
+        }
     });
     
     // Cancel button

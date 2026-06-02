@@ -1,5 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
@@ -233,6 +234,28 @@ function __command_editComponentToNode(array $params = [], array $urlParams = []
         }
         
         // param-type variable - can be edited
+        // SECURITY: reject reserved-namespace storage keys. The
+        // variable binds to a param placeholder in the component
+        // template; if the template uses it in a data-storage-* /
+        // data-auth-source param, the substituted value would leak
+        // into the rendered page. Check any string value that
+        // PARSES as a storage spec — non-storage-spec values are
+        // unaffected (extractor returns null). (Slice 5b.)
+        if (is_string($value) && $value !== '') {
+            $rkExtracted = extractStorageKeyFromValue($value);
+            if ($rkExtracted !== null && isReservedStorageKey($rkExtracted)) {
+                $errors[] = [
+                    'field' => "data.{$varName}",
+                    'reason' => 'reserved_storage_key',
+                    'value' => $value,
+                    'reservedKey' => $rkExtracted,
+                    'hint' => RESERVED_STORAGE_KEY_MESSAGE,
+                    'message' => "Variable '{$varName}' value carries a reserved admin storage key — would let the rendered page access admin state."
+                ];
+                continue;
+            }
+        }
+
         $oldValue = $currentData[$varName] ?? null;
         if ($oldValue !== $value) {
             $updatedData[$varName] = $value;

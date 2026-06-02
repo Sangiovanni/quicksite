@@ -163,7 +163,7 @@ function getCommandCategories(): array {
         'js_functions' => [
             'label' => 'JavaScript Functions / Interactions',
             'icon' => 'zap',
-            'commands' => ['listJsFunctions', 'listInteractions', 'addInteraction', 'editInteraction', 'deleteInteraction']
+            'commands' => ['listJsFunctions', 'listDataBindings', 'listInteractions', 'addInteraction', 'editInteraction', 'deleteInteraction']
         ],
         'api_registry' => [
             'label' => 'API Registry',

@@ -413,6 +413,7 @@ window.PreviewConfig = {
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/wizard-row-editor.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/contextual-complex/wizard-row-editor.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/text-key-picker.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/contextual-complex/text-key-picker.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/route-input.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/contextual-complex/route-input.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/data-attr-picker.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/contextual-complex/data-attr-picker.js') ?>"></script>
 <?php
     // Auto-include every complex-*.js so adding a new kind is one file drop.
     foreach (glob(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/contextual-complex/complex-*.js') as $_ceJs) {

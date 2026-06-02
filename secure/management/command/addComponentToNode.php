@@ -5,6 +5,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
 
 /**
  * addComponentToNode - Add a component instance to a structure
@@ -348,6 +349,16 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
             if (!is_string($k) || $k === '') continue;
             if (is_array($v) || is_object($v)) continue;
             $sanitized[$k] = $v;
+        }
+        // SECURITY: Reject reserved-namespace storage keys in
+        // data-storage-* / data-auth-source values (slice 5b — admin-
+        // token theft prevention). Mirrors the JS picker; defence in
+        // depth against direct POSTs that bypass the picker.
+        $rkErrors = findReservedKeysInParams($sanitized);
+        if (!empty($rkErrors)) {
+            return ApiResponse::create(400, 'validation.reserved_key')
+                ->withMessage(RESERVED_STORAGE_KEY_MESSAGE)
+                ->withErrors(formatReservedKeyErrors($rkErrors));
         }
         if (!empty($sanitized)) {
             $newNode['params'] = $sanitized;

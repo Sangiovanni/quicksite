@@ -5,6 +5,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/IframeSandbox.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
 
 // SECURITY: Blocked tags are defined in TagRegistry::BLOCKED_TAGS
 
@@ -183,6 +184,20 @@ if (!isset($params['structure']) && $action !== 'delete') {
 
 $type = $params['type'];
 $structure = $params['structure'] ?? null;
+
+// SECURITY: walk the incoming structure recursively for reserved-namespace
+// storage keys in data-storage-* / data-auth-source values (slice 5b —
+// admin-token theft prevention). Each command that writes structure params
+// has its own hook; this is the catch-all for whole-tree writes.
+if ($structure !== null && is_array($structure)) {
+    $rkErrors = findReservedKeysInStructure($structure);
+    if (!empty($rkErrors)) {
+        ApiResponse::create(400, 'validation.reserved_key')
+            ->withMessage(RESERVED_STORAGE_KEY_MESSAGE)
+            ->withErrors(formatReservedKeyErrors($rkErrors))
+            ->send();
+    }
+}
 
 // Type validation - type must be string
 if (!is_string($type)) {

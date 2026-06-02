@@ -3852,6 +3852,46 @@ $GLOBALS['__help_commands'] = [
         ],
         'notes' => 'Returns 15 core functions built into the QS namespace (show, hide, toggle, toggleHide, addClass, removeClass, setValue, redirect, filter, scrollTo, focus, blur, fetch, renderList, toast). Use {{call:functionName:arg1,arg2}} syntax in structure params like onclick, oninput.'
     ],
+
+    'listDataBindings' => [
+        'description' => 'Lists the QuickSite-runtime `data-*` attribute catalog — what each attribute does, what value shape it expects, which attrs it pairs with. Consumed by the in-editor autocomplete in the Add Element wizard so users can discover which data-* attributes the runtime recognises (data-state-*, data-auth-*, data-storage-*, data-bind, data-error-for, data-qs-complex, …). Single source of truth lives in secure/src/functions/qsDataAttributeCatalog.php — mirrors the qsVerbCatalog.php pattern from beta.7.',
+        'method' => 'GET',
+        'parameters' => [],
+        'url_segments' => [
+            'all' => '(optional) Pass /all as the first URL segment to include editor-chrome entries (`internal: true`) like data-qs-textkey, data-qs-node, data-qs-struct — normally hidden from the user-facing picker.'
+        ],
+        'example_get' => 'GET /management/listDataBindings',
+        'example_get_all' => 'GET /management/listDataBindings/all',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'N data-* attribute(s) in the catalog',
+            'data' => [
+                'entries' => [
+                    [
+                        'name' => 'data-state-show',
+                        'description' => 'Toggle the standard `hidden` attribute on truthiness of a state-store field…',
+                        'category' => 'state',
+                        'valueShape' => 'store-field-ref',
+                        'valuePlaceholder' => 'storeId.fieldName',
+                        'tagsAllowed' => ['*'],
+                        'docAnchor' => 'ADMIN_PANEL.md#96-state-stores',
+                        'examplePayload' => '<button data-state-show="people.nextPage">Next</button>',
+                        'since' => 'v1.0.0-beta.7'
+                    ]
+                ],
+                'by_category' => '{state: [...], auth: [...], storage: [...], template: [...], form: [...], complex: [...]}',
+                'count' => 19,
+                'include_internal' => false,
+                'names' => ['data-state-value', 'data-state-list', '…'],
+                'categories' => ['state', 'auth', 'storage', 'template', 'form', 'complex'],
+            ]
+        ],
+        'error_responses' => [
+            '500.server.internal_error' => 'Catalog file missing or malformed'
+        ],
+        'notes' => 'Returns 19 user-facing data-* entries by default (state / auth / storage / template / form / complex categories). Pass /all to also include 5 editor-chrome entries (data-qs-textkey / -raw / -textonly / -node / -struct). Each entry carries `valueShape` to drive smart widget UI, optional `companion` for paired attrs (e.g. data-auth-show ↔ data-auth-source), and `docAnchor` linking to the deep-dive section in ADMIN_PANEL.md or ARCHITECTURE.md.'
+    ],
     
     // ==========================================
     // INTERACTION MANAGEMENT COMMANDS

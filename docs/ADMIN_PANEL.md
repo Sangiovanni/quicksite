@@ -1238,7 +1238,162 @@ Both patterns are demonstrated in the test pages `test/paged` (offset) and
 
 ---
 
-## 10. Risk hotspots
+## 10. Data attribute reference
+
+QuickSite's runtime understands a small set of `data-*` attributes that
+turn plain HTML elements into bindings (state-store readers, auth-state
+toggles, storage value displays, complex-element markers, …). Every
+attribute on this page is **catalogued in
+`secure/src/functions/qsDataAttributeCatalog.php`** — the single source
+of truth read by `GET /management/listDataBindings` and (late beta.7+)
+by the in-editor autocomplete in the Add Element wizard's Advanced
+custom-params section.
+
+This section is the task-oriented index for those attributes. For
+per-feature deep-dives (semantics, edge cases, full examples), see the
+existing feature sections — each table row links to its canonical
+deep-dive.
+
+### 10.1 Scannable reference
+
+| Attribute | Category | Value shape | What it does | Deep dive |
+|---|---|---|---|---|
+| `data-state-value` | state | `storeId.field` | Element text = scalar field of a state store | §9.6 |
+| `data-state-list` | state | `storeId.field` | Container becomes a list — first child is the per-item template | §9.6 |
+| `data-state-empty` | state | text | Text shown when `data-state-list`'s array is empty | §9.6 |
+| `data-state-show` | state | `storeId.field` | Toggles `hidden` on truthiness — gate Next/Prev on cursors, "Load more" on hasMore, etc. | §9.6 |
+| `data-state-pagenav` | state | `storeId` | Runtime-rendered numbered-page navigator. Companion attrs: `-page-field`, `-totalpages-field`, `-window`, `-prev-next` | §8.7 (paged-navigator) |
+| `data-auth-show` | auth | `in` / `out` | Show only when logged in / out. Needs `data-auth-source` on element or ancestor | §9.5 |
+| `data-auth-source` | auth | `localStorage:key` | Where the token lives for `data-auth-show` resolution | §9.5 |
+| `data-storage-show` | storage | `has:loc:key` / `missing:loc:key` | Generic show/hide on any storage key presence | §9.5 |
+| `data-storage-value` | storage | `localStorage:key` | Element text = the stored value | §9.5 |
+| `data-bind` | template | field name | Per-item template field (inside `data-state-list` OR componentList) | §9.2 |
+| `data-bind-attr` | template | attribute name | Variant of `data-bind` — sets the named attribute instead of textContent | §9.2 |
+| `data-list-template` | template | `true` | Marks a hidden element as the per-item template for componentList | §9.2 |
+| `data-error-for` | form | field `name` | Container for `QS.validate` error messages — set value to the input's `name` | §8.7 (field-row / form-scaffold) |
+| `data-qs-complex` | complex | `table` (today) | Marks a complex-element subtree root — enables Translate-from-CSV | §8.7 (Translate from CSV) |
+| `data-qs-complex-id` | complex | identifier | Companion to `data-qs-complex` — identifies the structure for cross-language lookup | §8.7 |
+
+**Editor-only chrome** (auto-emitted by the renderer in editor mode;
+users should NOT author these): `data-qs-textkey`, `data-qs-raw`,
+`data-qs-textonly`, `data-qs-node`, `data-qs-struct`. The picker
+hides these by default. Pass `GET /management/listDataBindings/all`
+to see them.
+
+### 10.2 How to author these — admin-panel click paths
+
+Three common scenarios, end-to-end. Each is reachable from the visual
+editor with no JSON editing.
+
+#### Scenario A — Hide a Next button at the last page (`data-state-show`)
+
+```
+Admin Panel → Visual Editor → Select mode (cursor icon in sidebar)
+  → Click the "Next" button in the iframe to select it
+  → Sidebar action panel → Advanced → "+ Add custom param"
+  → KEY field: type "data-"
+    Autocomplete dropdown opens, grouped by category. Pick data-state-show.
+    Description appears above the value field:
+      data-state-show — toggles the standard hidden attribute on
+      truthiness. Use to gate Prev/Next on cursors, Load-more on
+      hasMore, counters on total > 0.
+  → VALUE field: type "people.nextPage" (or pick from the smart widget
+    when slice-5 ships — store picker → field picker)
+  → Save → Button hides automatically when people.nextPage is null
+```
+
+#### Scenario B — Logout button visible only when logged in (`data-auth-show`)
+
+```
+Admin Panel → Visual Editor → Select mode
+  → Click empty area in the page to add at root → "+ Add"
+  → Add Element → HTML Tag tab → tag = button, text = "Logout"
+  → Advanced → "+ Add custom param"
+  → type "data-" → pick data-auth-show
+    Description: "show only when logged in (in) or out (out). Needs
+    data-auth-source on element or ancestor."
+  → VALUE field: select widget shows [in | out] (the catalog declares
+    valueShape: enum). Pick "in".
+  → Companion hint (slice-7): "No data-auth-source found on element
+    or ancestors. + Add to <body>?"
+  → Click "Add to <body>" → wires the source automatically
+  → Done. Logout button shows only when localStorage.authToken is set.
+```
+
+#### Scenario C — Hand-author a form field error span (`data-error-for`)
+
+The Form Scaffold + Field Row complex elements do this for you. This
+walkthrough is for users who hand-author forms or add custom error
+spans to a generated form.
+
+```
+Admin Panel → Visual Editor → Select mode
+  → Click a <span> placed after an <input name="email">
+  → "+ Add custom param"
+  → type "data-" → pick data-error-for
+    Description: "Container for QS.validate error messages. Set the
+    value to the input's name attribute."
+  → VALUE field: text input, placeholder "fieldName"
+  → Type "email" → done
+```
+
+### 10.3 Companion attributes
+
+Several attributes are designed to pair with another:
+
+| If you use… | You'll usually need… |
+|---|---|
+| `data-state-list` | `data-bind` on descendants (per-field display) + optional `data-state-empty` |
+| `data-state-pagenav` | (Optional companions) `-page-field`, `-totalpages-field`, `-window`, `-prev-next` |
+| `data-auth-show` | `data-auth-source` on element or ancestor |
+| `data-qs-complex` | `data-qs-complex-id` |
+| `data-bind` | A surrounding `data-state-list` OR `data-list-template` container |
+
+The catalog encodes these in each entry's `companion` field; the
+autocomplete (slice-7) surfaces them as "+ Add companion" hints.
+
+### 10.4 Tldr by family
+
+- **`data-state-*`** = bind to a state store (live data flow). See §9.6.
+- **`data-auth-*`** / **`data-storage-*`** = bind to localStorage / sessionStorage
+  (auth + storage UI). See §9.5.
+- **`data-qs-complex*`** = mark a structure as bulk-translatable. See §8.7.
+- **`data-bind`** / **`data-bind-attr`** / **`data-list-template`** = template-clone
+  mechanics shared by `data-state-list` AND componentList rendering. See §9.2.
+- **`data-error-for`** = `QS.validate` per-field error target. See §8.7.
+- **`data-qs-textkey`** / **`-raw`** / **`-textonly`** / **`-node`** / **`-struct`** = editor-only
+  selection chrome — do not author by hand.
+
+### 10.5 Catalog file conventions
+
+| Field | Purpose |
+|---|---|
+| `name` | The attribute (e.g. `data-state-show`) |
+| `description` | One-sentence English; rendered as the autocomplete tooltip |
+| `category` | `state` / `auth` / `storage` / `template` / `form` / `complex` / `internal` — drives optgroup grouping in the picker |
+| `valueShape` | `store-field-ref` / `selector` / `enum` / `storage-spec` / `plain-string` / `boolean-string` — drives the value-field widget |
+| `valueOptions` | (enum only) allowed values list |
+| `companion` | Names of attributes commonly paired — surfaces a "+ Add companion" hint |
+| `internal` | `true` for editor chrome (hidden from user picker by default) |
+| `docAnchor` | Link target for "Full reference" in the picker |
+| `examplePayload` | Short usage snippet |
+| `since` | Version the attribute was introduced |
+
+To add a new data-* attribute: implement the runtime hook (in `qs.js`
+or wherever), then add one entry to the catalog. The picker, this
+section, and any future renderer-side validation pick it up
+automatically. Same pattern as `qsVerbCatalog.php` (the verb catalog
+that shipped beta.7 commit `142c277`).
+
+_Maintainers note: the canonical attribute list lives in
+`secure/src/functions/qsDataAttributeCatalog.php`. If you add /
+rename / remove an entry there, re-check the table in §10.1 above and
+the cross-references in §8.7 / §9.5 / §9.6. The CLAUDE.md
+doc-maintenance trigger table also lists the catalog file._
+
+---
+
+## 11. Risk hotspots
 
 These are the live concerns to keep in mind when touching the panel.
 
@@ -1256,7 +1411,7 @@ These are the live concerns to keep in mind when touching the panel.
 
 ---
 
-## 11. PHP integration files
+## 12. PHP integration files
 
 | File | Role |
 |---|---|
