@@ -309,6 +309,116 @@
         hideDropdown();
     }
 
+    // ─── Companion quick-add (slice 7) ──────────────────────────────
+    //
+    // Programmatically add a new custom-param row pre-picked with the
+    // given attribute name. Triggered from "+ data-X" buttons in the
+    // description box's companion list (showDescriptionBox).
+    //
+    // Flow:
+    //   1. Snapshot the current param-list element (where new rows go).
+    //   2. Click the "+ Add another param" button — its handler in
+    //      preview.js creates a fresh row AND calls attachPicker on it.
+    //   3. Find the newly-appended row (last child of the list).
+    //   4. Resolve the companion's catalog entry, then act as if the
+    //      user picked it from the dropdown: set context, set value,
+    //      call pickEntry → widget renders + description box re-renders
+    //      for the companion.
+    //
+    // If the catalog doesn't know about the companion (e.g. someone
+    // typoed a companion name in a catalog entry), we still create the
+    // row + set the key; the user can edit / re-pick manually.
+
+    function addCompanionRow(companionName) {
+        // Find the "+ Add another param" button. Sidebar add-element
+        // form is the only active surface today (modal/add-node.php is
+        // dead code per the slice-6 audit), so this getElementById is
+        // unambiguous.
+        var addBtn = document.getElementById('add-another-param');
+        if (!addBtn) {
+            console.warn('[data-attr-picker] add-another-param button not found; cannot add companion row');
+            return;
+        }
+        // Snapshot the param list from currentRow (the list the
+        // companion was picked under). Falls back to document lookup if
+        // currentRow context is stale.
+        var list = (currentRow && currentRow.parentNode) ||
+                   document.getElementById('add-custom-params-list');
+        if (!list) return;
+
+        // Dedup: if the companion attribute already exists in this list,
+        // FOCUS the existing row + flash it instead of creating a
+        // duplicate. JSON serialisation deduplicates last-wins anyway —
+        // having two rows with the same key is a confusing UI state.
+        var existingRow = findRowWithKey(list, companionName);
+        if (existingRow) {
+            flashRow(existingRow);
+            var existingKey = existingRow.querySelector('.preview-contextual-form__param-key');
+            if (existingKey) {
+                existingKey.focus();
+                existingKey.select();  // hint that this is the row they meant
+            }
+            return;
+        }
+
+        // Trigger preview.js's add-row handler — creates a new row and
+        // calls attachDataAttrPicker on its key input automatically.
+        addBtn.click();
+
+        var newRow = list.lastElementChild;
+        if (!newRow) return;
+        var keyInput = newRow.querySelector('.preview-contextual-form__param-key');
+        var valueInput = newRow.querySelector('.preview-contextual-form__param-value');
+        if (!keyInput) return;
+
+        // Resolve the catalog entry; if found, auto-pick (one-click UX).
+        // If not, just leave the row with the key set so the user can
+        // edit / search for the right attr.
+        keyInput.value = companionName;
+        fetchCatalog().then(function (catalog) {
+            var entry = (catalog.entries || []).find(function (e) {
+                return e.name === companionName;
+            });
+            if (!entry) {
+                // Unknown companion — open the dropdown for the user to
+                // search by dispatching input. Better than failing silent.
+                keyInput.dispatchEvent(new Event('input', { bubbles: true }));
+                return;
+            }
+            // Set picker context to the new row, then pick the entry.
+            // pickEntry handles widget install + description box render.
+            currentInput = keyInput;
+            currentRow = newRow;
+            currentValueInput = valueInput || null;
+            pickEntry(entry);
+        });
+    }
+
+    // Scan a param-list for a row whose KEY input matches the given
+    // attribute name. Used by the companion-button dedup logic.
+    function findRowWithKey(list, attrName) {
+        if (!list || !attrName) return null;
+        var rows = list.querySelectorAll('.preview-contextual-form__param-row--custom');
+        for (var i = 0; i < rows.length; i++) {
+            var k = rows[i].querySelector('.preview-contextual-form__param-key');
+            if (k && k.value === attrName) return rows[i];
+        }
+        return null;
+    }
+
+    // Visual cue when focusing an already-existing row: a brief
+    // outline pulse so the user notices the focus shift. Pure inline
+    // CSS — no stylesheet changes needed.
+    function flashRow(row) {
+        if (!row) return;
+        var original = row.style.boxShadow;
+        row.style.transition = 'box-shadow 0.2s';
+        row.style.boxShadow = '0 0 0 2px var(--admin-accent, #5a9fd4)';
+        setTimeout(function () {
+            row.style.boxShadow = original || '';
+        }, 700);
+    }
+
     // ─── In-row widget install / teardown ───────────────────────────
     var WIDGET_CLASS = 'qs-data-attr-widget';
 
@@ -347,13 +457,39 @@
 
         var box = document.createElement('div');
         box.className = DESC_CLASS;
+        box.style.position = 'relative';   // anchors the dismiss × in the top-right
         box.style.margin = '4px 0 8px';
-        box.style.padding = '8px 12px';
+        box.style.padding = '8px 28px 8px 12px';  // right padding leaves room for ×
         box.style.background = 'var(--admin-bg-tertiary, #2a2a2a)';
         box.style.border = '1px solid var(--admin-border, #444)';
         box.style.borderLeft = '3px solid var(--admin-accent, #5a9fd4)';
         box.style.borderRadius = '3px';
         box.style.fontSize = '0.8rem';
+
+        // Dismiss × — lets the user hide the hint without removing the
+        // row (e.g. once they've read the description and want screen
+        // space back). The row's own × (preview.js handler) still does
+        // double-duty via the capture-phase hook in attachPicker.
+        // Slice 7 polish, 2026-06-02.
+        var dismiss = document.createElement('button');
+        dismiss.type = 'button';
+        dismiss.setAttribute('aria-label', 'Dismiss hint');
+        dismiss.setAttribute('title', 'Hide this hint');
+        dismiss.style.position = 'absolute';
+        dismiss.style.top = '4px';
+        dismiss.style.right = '4px';
+        dismiss.style.background = 'transparent';
+        dismiss.style.border = 'none';
+        dismiss.style.color = 'var(--admin-text-muted, #888)';
+        dismiss.style.cursor = 'pointer';
+        dismiss.style.fontSize = '1rem';
+        dismiss.style.lineHeight = '1';
+        dismiss.style.padding = '2px 6px';
+        dismiss.textContent = '×';
+        dismiss.addEventListener('mouseenter', function () { dismiss.style.color = 'var(--admin-text, #ddd)'; });
+        dismiss.addEventListener('mouseleave', function () { dismiss.style.color = 'var(--admin-text-muted, #888)'; });
+        dismiss.addEventListener('click', function () { box.remove(); });
+        box.appendChild(dismiss);
 
         // Description text
         var desc = document.createElement('div');
@@ -377,23 +513,44 @@
             box.appendChild(vh);
         }
 
-        // Companion hint (light version — slice 7 will add an action button)
+        // Companion quick-add buttons (slice 7). Each "+ data-X" button
+        // adds a new custom-param row pre-picked with the companion
+        // attribute, so the user can wire pairs (data-auth-show +
+        // data-auth-source, data-state-list + data-bind, etc.) in two
+        // clicks instead of typing + searching.
         if (entry.companion && entry.companion.length) {
             var ch = document.createElement('div');
             ch.style.marginTop = '6px';
-            ch.style.color = 'var(--admin-text-muted, #aaa)';
+            ch.style.display = 'flex';
+            ch.style.flexWrap = 'wrap';
+            ch.style.alignItems = 'center';
+            ch.style.gap = '6px';
             ch.style.fontSize = '0.75rem';
+
             var chLabel = document.createElement('span');
             chLabel.style.color = 'var(--admin-text-muted, #888)';
-            chLabel.textContent = 'Often paired with: ';
+            chLabel.textContent = 'Often paired with:';
             ch.appendChild(chLabel);
-            var first = true;
+
             entry.companion.forEach(function (n) {
-                if (!first) ch.appendChild(document.createTextNode(', '));
-                first = false;
-                var code = document.createElement('code');
-                code.textContent = n;
-                ch.appendChild(code);
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'admin-btn admin-btn--sm admin-btn--ghost qs-data-attr-companion-btn';
+                btn.style.fontFamily = 'monospace';
+                btn.style.fontSize = '0.75rem';
+                btn.style.padding = '2px 8px';
+                btn.setAttribute('title', 'Add ' + n + ' as a new custom param');
+                // "+ data-foo" — leading + signals add-action
+                var plus = document.createElement('span');
+                plus.textContent = '+ ';
+                plus.style.color = 'var(--admin-accent, #5a9fd4)';
+                plus.style.fontWeight = '600';
+                btn.appendChild(plus);
+                btn.appendChild(document.createTextNode(n));
+                btn.addEventListener('click', function () {
+                    addCompanionRow(n);
+                });
+                ch.appendChild(btn);
             });
             box.appendChild(ch);
         }
@@ -802,6 +959,22 @@
 
         // Find the row this input lives in (for description-box placement)
         var row = keyInput.closest('.preview-contextual-form__param-row');
+
+        // Capture-phase listener on the row's remove button: when the
+        // user removes the row via its ×, also remove the orphaned
+        // description box that sits below it. Capture-phase so we run
+        // BEFORE preview.js's `() => row.remove()` handler (otherwise
+        // the row is already gone and row.nextElementSibling is null).
+        // Slice 7 polish, 2026-06-02.
+        if (row) {
+            var removeBtn = row.querySelector('.preview-contextual-form__remove-param');
+            if (removeBtn && removeBtn.dataset.dataAttrPickerRemoveHook !== '1') {
+                removeBtn.dataset.dataAttrPickerRemoveHook = '1';
+                removeBtn.addEventListener('click', function () {
+                    removeDescriptionBoxAfter(row);
+                }, true);
+            }
+        }
 
         function openIfRelevant() {
             var v = keyInput.value || '';
