@@ -1,6 +1,6 @@
 # QuickSite Admin Panel
 
-_Last updated: 2026-04-23._
+_Last updated: 2026-06-03._
 
 > Canonical reference for the admin panel's JS architecture, boot flow, and module map. See [ARCHITECTURE.md](ARCHITECTURE.md) for the system-level overview, [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) for the workflow engine, and [COMMAND_API.md](COMMAND_API.md) for the API commands the panel calls.
 
@@ -205,7 +205,7 @@ The sidebar exposes one action button (Refresh) plus five editing modes — six 
 | Button | Type | What it does |
 |---|---|---|
 | **Refresh** | Action | Reloads the preview iframe. |
-| **Select** | Mode | Click an element → inspect node, add before/after/inside, delete or duplicate. |
+| **Select** | Mode | Click an element → inspect node, add a sibling/child, **edit its params + class + mandatory attrs in place** (via the Edit Params button), delete, duplicate, or save as snippet / component. |
 | **Drag** | Mode | Drag elements to reorder within parent (`preview-drag.js`). |
 | **Text** | Mode | Inline-edit a text node's translation **for the currently selected language**. Intentionally primitive: no rich text, no line breaks. Edits the value, never the key. |
 | **CSS** | Mode | Click an element → CSS panel; edits apply to the element's selector with full pseudo-state support. |
@@ -1246,8 +1246,13 @@ toggles, storage value displays, complex-element markers, …). Every
 attribute on this page is **catalogued in
 `secure/src/functions/qsDataAttributeCatalog.php`** — the single source
 of truth read by `GET /management/listDataBindings` and (late beta.7+)
-by the in-editor autocomplete in the Add Element wizard's Advanced
-custom-params section.
+by the in-editor autocomplete + smart widgets, available on **both** the
+Add Element wizard's Advanced custom-params section AND the Edit Params
+surface (action panel button next to Add / Duplicate). The same picker —
+autocomplete dropdown, per-attribute description box, smart widgets
+(store/field cascader, enum select, storage-spec composer), reserved-
+storage-key blocking — applies whether you're authoring a new element OR
+editing an existing one's bindings.
 
 This section is the task-oriented index for those attributes. For
 per-feature deep-dives (semantics, edge cases, full examples), see the
@@ -1336,6 +1341,33 @@ Admin Panel → Visual Editor → Select mode
   → VALUE field: text input, placeholder "fieldName"
   → Type "email" → done
 ```
+
+#### Scenario D — Change an existing element's binding (`Edit Params`)
+
+Same picker, applied to existing elements instead of authoring new ones.
+The autocomplete, smart widgets, reserved-key blocking, and companion
+hints all behave the same as in Scenarios A–C.
+
+```
+Admin Panel → Visual Editor → Select mode
+  → Click any element that already has data-* attrs (or a class, or a
+    mandatory attr like src/href)
+  → Sidebar action panel → "Edit Params" button (primary blue, between
+    Add and Duplicate)
+  → Form opens pre-populated:
+    - Class tokens land in the CSS Class combobox as chips
+    - Per-tag mandatory attrs (src for img, href for a, …) fill their widgets
+    - All other params become custom rows — the picker auto-attaches and
+      smart widgets render under the value field for known catalog entries
+  → Edit any value → Save
+    `editNode` receives a diff (addParams = new + changed, removeParams =
+    keys removed from the form); the iframe updates in place, no full reload
+  → Cancel or Back prompts before discarding if the form is dirty
+```
+
+**Out of scope on this surface**: tag swap (`<div>` → `<section>`),
+editing component-call params, editing pure text nodes. For tag swap,
+delete + recreate; BACKLOG carries the broader "Edit Element" entry.
 
 ### 10.3 Companion attributes
 

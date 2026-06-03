@@ -9,14 +9,16 @@
     </div>
     
     <div class="preview-contextual-form" id="contextual-add-form" style="display: none;">
-        <!-- Mode Header with Back Button -->
+        <!-- Mode Header with Back Button. Title text is wrapped in a span
+             so the Edit-Params flow can swap it to "Edit Params: <tag>"
+             without losing the icon. -->
         <div class="preview-contextual-form__mode-header">
             <span class="preview-contextual-form__mode-title">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="12" y1="5" x2="12" y2="19"/>
                     <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
-                <?= __admin('preview.addElement') ?? 'Add Element' ?>
+                <span id="add-form-title-text"><?= __admin('preview.addElement') ?? 'Add Element' ?></span>
             </span>
             <button type="button" class="preview-contextual-form__back-btn" id="add-back-to-select" title="<?= __admin('preview.backToSelect') ?? 'Back to Select' ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -26,8 +28,9 @@
             </button>
         </div>
         
-        <!-- Element Type Selection: Tabs -->
-        <div class="preview-contextual-form__field">
+        <!-- Element Type Selection: Tabs. Wrapper carries an id so the
+             Edit-Params flow can hide the whole tab strip in one go. -->
+        <div class="preview-contextual-form__field" id="add-type-field">
             <div class="preview-contextual-form__tabs" id="add-type-tabs">
                 <button type="button" class="preview-contextual-form__tab active" data-type="snippet">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -288,7 +291,7 @@
                     <line x1="12" y1="5" x2="12" y2="19"/>
                     <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
-                <?= __admin('preview.addElement') ?? 'Add Element' ?>
+                <span id="add-confirm-label"><?= __admin('preview.addElement') ?? 'Add Element' ?></span>
             </button>
         </div>
     </div>

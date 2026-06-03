@@ -2868,10 +2868,13 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Missing required parameter',
             '400.validation.invalid_value' => 'Invalid tag type',
             '400.validation.mandatory_params' => 'Cannot remove mandatory params',
+            '400.validation.empty_value' => 'addParams contains keys with empty/null values — use removeParams to drop a key',
+            '400.validation.reserved_key' => 'addParams contains a reserved admin-namespace storage key (qs_/qs-/quicksite_/quicksite-)',
+            '400.validation.reserved_attribute' => 'addParams contains a reserved data-qs-* attribute (auto-managed by QuickSite)',
             '400.operation.denied' => 'Cannot edit component node (use editComponentToNode)',
             '404.resource.not_found' => 'Node not found'
         ],
-        'notes' => 'Does NOT edit translation values (use setTranslationKeys). Cannot edit component nodes or pure text nodes. After tag change, validates mandatory params are present. Returns rendered HTML for live DOM updates. **Component node paths**: For type=component, root is "" and children are "0", "1", etc.'
+        'notes' => 'Does NOT edit translation values (use setTranslationKeys). Cannot edit component nodes or pure text nodes. After tag change, validates mandatory params are present. Returns rendered HTML for live DOM updates. **Component node paths**: For type=component, root is "" and children are "0", "1", etc. **addParams**: empty/null values are rejected — use removeParams to drop a key.'
     ],
     
     'addComponentToNode' => [

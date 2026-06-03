@@ -58,6 +58,7 @@
     const ctxNodeTextKeyRow = document.getElementById('ctx-node-textkey-row');
     const ctxNodeTextKey = document.getElementById('ctx-node-textkey');
     const ctxNodeAdd = document.getElementById('ctx-node-add');
+    const ctxNodeEditParams = document.getElementById('ctx-node-edit-params');
     const ctxNodeDelete = document.getElementById('ctx-node-delete');
     const ctxNodeDuplicate = document.getElementById('ctx-node-duplicate');
     const ctxNodeStyle = document.getElementById('ctx-node-style');
@@ -169,6 +170,7 @@
     const mobileCtxComponentRow = document.getElementById('mobile-ctx-component-row');
     const mobileCtxComponent = document.getElementById('mobile-ctx-component');
     const mobileCtxAdd = document.getElementById('mobile-ctx-add');
+    const mobileCtxEditParams = document.getElementById('mobile-ctx-edit-params');
     const mobileCtxDuplicate = document.getElementById('mobile-ctx-duplicate');
     const mobileCtxDelete = document.getElementById('mobile-ctx-delete');
     
@@ -344,6 +346,12 @@
     const addComponentNoVars = document.getElementById('add-component-no-vars');
     const addCancelBtn = document.getElementById('add-cancel');
     const addConfirmBtn = document.getElementById('add-confirm');
+    // Edit-Params mode wiring: type-tab wrapper (hidden in edit mode),
+    // header text span (swapped to "Edit Params: <tag>"), bottom-button
+    // text span (swapped to "Save").
+    const addTypeField = document.getElementById('add-type-field');
+    const addFormTitleText = document.getElementById('add-form-title-text');
+    const addConfirmLabel = document.getElementById('add-confirm-label');
     // Complex Element tab (added in beta.7) — kind picker + wizard body.
     // The kind dropdown is populated from window.QSComplexWizard.registry,
     // and each kind module owns rendering inside addComplexBody via its
@@ -4647,10 +4655,26 @@
                 showSidebarAddForm();
             });
         }
-        
-        // Back to Select button (from Add mode)
+
+        // Edit Params button — opens the Add Element form in 'edit' mode,
+        // pre-populated from the selected node's saved params. Reuses the
+        // Mandatory / Class / Advanced sections (the picker shipped in
+        // late beta.7 auto-attaches to pre-populated custom rows too).
+        if (ctxNodeEditParams) {
+            ctxNodeEditParams.addEventListener('click', function() {
+                showSidebarEditParamsForm();
+            });
+        }
+
+        // Back to Select button (from Add mode). In Edit mode this is also
+        // a "discard" path — prompt if the form has unsaved changes.
         if (addBackToSelect) {
             addBackToSelect.addEventListener('click', function() {
+                if (_isEditModeDirty()) {
+                    const msg = PreviewConfig.i18n.discardUnsavedParams
+                        || 'You have unsaved param changes. Discard?';
+                    if (!confirm(msg)) return;
+                }
                 setMode('select');
             });
         }
@@ -4814,6 +4838,12 @@
             });
         }
         
+        if (mobileCtxEditParams) {
+            mobileCtxEditParams.addEventListener('click', function() {
+                showSidebarEditParamsForm();
+            });
+        }
+
         if (mobileCtxDuplicate) {
             mobileCtxDuplicate.addEventListener('click', duplicateSelectedNode);
         }
@@ -4838,6 +4868,19 @@
     let sidebarAddNodeType = 'tag';
     let sidebarAddCustomParamsCount = 0;
     let sidebarAddSelectedComponentData = null;
+    // Edit-Params reuses the Add Element form in an "edit" mode. When
+    // 'edit', certain sections (type tabs, tag selector, position
+    // picker) are hidden, the form is pre-populated from the selected
+    // node's saved params, and the Confirm button becomes Save. The
+    // snapshot lets slice 3 compute the addParams/removeParams diff.
+    let contextualAddMode = 'add';            // 'add' | 'edit'
+    let contextualAddOriginalParams = null;   // snapshot of params on edit-open
+    let contextualAddOriginalTag = null;      // locked tag of the node being edited
+    // Selection snapshot — captured at edit-open so saving uses the
+    // element the user actually opened, even if the canvas-selection
+    // moves while the form is up (race-free Save).
+    let contextualAddOriginalStruct = null;
+    let contextualAddOriginalNode = null;
     
     // Initialize collapsible sections (read stored state from localStorage)
     function initCollapsibleSections() {
@@ -4882,7 +4925,12 @@
         // Show form, hide default
         contextualAddDefault.style.display = 'none';
         contextualAddForm.style.display = '';
-        
+
+        // Reset any leftover Edit-Params state (header label, hidden
+        // tab-strip + position section). Safe even if we were already
+        // in 'add' mode — it's a no-op then.
+        _resetContextualAddMode();
+
         // Reset form state — use remembered tab or default to 'snippet'
         const rememberedTab = localStorage.getItem('qs-add-last-tab');
         const VALID_TABS = ['tag', 'component', 'snippet', 'complex'];
@@ -4945,7 +4993,379 @@
         if (contextualAddForm) contextualAddForm.style.display = 'none';
         setMode('select');
     }
-    
+
+    // ---------- Edit Params (form-reuse in 'edit' mode) ----------
+
+    /**
+     * Restore Add-Element visuals: type-tab strip, position section,
+     * default header text + Confirm button label, mode flag. Called at
+     * the top of showSidebarAddForm() so a prior Edit-Params open never
+     * leaks state into the next Add Element open.
+     */
+    function _resetContextualAddMode() {
+        contextualAddMode = 'add';
+        contextualAddOriginalParams = null;
+        contextualAddOriginalTag = null;
+        contextualAddOriginalStruct = null;
+        contextualAddOriginalNode = null;
+        if (contextualAddForm) contextualAddForm.classList.remove('preview-contextual-form--edit-mode');
+        if (addTypeField) addTypeField.style.display = '';
+        if (addPositionSection) addPositionSection.style.display = '';
+        // Confirm button reverts to the success-coloured "Add Element" affordance.
+        if (addConfirmBtn) {
+            addConfirmBtn.classList.remove('admin-btn--primary');
+            addConfirmBtn.classList.add('admin-btn--success');
+        }
+        const defaultTitle = PreviewConfig.i18n.addElement || 'Add Element';
+        if (addFormTitleText) addFormTitleText.textContent = defaultTitle;
+        if (addConfirmLabel) addConfirmLabel.textContent = defaultTitle;
+    }
+
+    /**
+     * Open the Add Element form in 'edit' mode, pre-populated from the
+     * currently-selected node's saved params. Fetches the structure via
+     * getStructure (same path Save as Snippet uses), partitions params
+     * into class / mandatory-for-tag / custom, and hands each partition
+     * to its existing widget. Custom rows go through _renderCustomParamRow
+     * so the data-attr picker auto-attaches.
+     *
+     * Slice 2: pre-populate only. The Confirm button shows a toast
+     * pointing at slice 3 and does NOT call editNode yet.
+     */
+    async function showSidebarEditParamsForm() {
+        if (!contextualAddForm || !contextualAddDefault) return;
+        if (selectedStruct == null || selectedNode == null) {
+            showToast(PreviewConfig.i18n.selectNodeFirst, 'warning');
+            return;
+        }
+
+        // Fetch the node's saved structure. allowRoot=true so editing
+        // the page's <main> root works (Save Snippet refuses root, but
+        // editing its class/data-* is a legitimate use case).
+        let nodeData;
+        try {
+            const result = await extractSelectedNodeStructure({ allowRoot: true });
+            nodeData = result.nodeData;
+        } catch (err) {
+            showToast(err.message || 'Failed to load element', 'error');
+            return;
+        }
+
+        // List-shape page root (the whole structure is an array) cannot
+        // be edited as a single node — the user should pick a child.
+        if (Array.isArray(nodeData)) {
+            showToast('Select a child element — the page root is a list and has no editable params on its own', 'warning');
+            return;
+        }
+        // Component reference + text nodes: no slice-2 support yet.
+        if (!nodeData.tag) {
+            if (nodeData.component) {
+                showToast('Editing component-call params lands in a later slice', 'info');
+            } else if (nodeData.textKey !== undefined) {
+                showToast('Text nodes have no editable params', 'info');
+            } else {
+                showToast('This element has no editable params', 'warning');
+            }
+            return;
+        }
+
+        const tag = nodeData.tag;
+        const params = nodeData.params || {};
+
+        // Snapshot for slice 3's diff calculation + safe Save target.
+        // Selection-on-canvas can shift while the form is open; using a
+        // live read of selectedStruct/Node at Save-time would write to
+        // the wrong node. Snapshots resolve that race.
+        contextualAddOriginalParams = JSON.parse(JSON.stringify(params));
+        contextualAddOriginalTag = tag;
+        contextualAddOriginalStruct = selectedStruct;
+        contextualAddOriginalNode = selectedNode;
+
+        // Switch the contextual area to the add-section (where the form
+        // lives) and flip our internal mode flag.
+        setMode('add');
+        contextualAddMode = 'edit';
+
+        // Reveal the form, hide the default hint.
+        contextualAddDefault.style.display = 'none';
+        contextualAddForm.style.display = '';
+
+        // Form behaves as a Tag form (mandatory + class + advanced),
+        // but with type tabs / tag picker / position locked away.
+        sidebarAddNodeType = 'tag';
+        sidebarAddCustomParamsCount = 0;
+        if (addTypeInput) addTypeInput.value = 'tag';
+
+        // Lock the tag selection internally (drives mandatory-params
+        // logic) without showing the picker.
+        if (addTagSelector) addTagSelector.selectTag(tag);
+        else if (addTagSelect) addTagSelect.value = tag;
+
+        // Reset the three target widgets before pre-populating.
+        if (classCombobox) classCombobox.reset();
+        else if (addClassInput) addClassInput.value = '';
+        if (addCustomParamsList) addCustomParamsList.innerHTML = '';
+
+        // Explicit edit-mode visibility — DON'T call
+        // updateSidebarAddNodeTypeUI(); it would un-hide things we want
+        // hidden (it's wired for Add Element's tab-driven UX).
+        if (addTypeField) addTypeField.style.display = 'none';        // tabs
+        if (addTagField) addTagField.style.display = 'none';          // tag picker
+        if (addPositionSection) addPositionSection.style.display = 'none';
+        if (addPreviewSection) addPreviewSection.style.display = 'none';
+        if (addTextField) addTextField.style.display = 'none';
+        if (addSnippetField) addSnippetField.style.display = 'none';
+        if (addComponentField) addComponentField.style.display = 'none';
+        if (addComplexField) addComplexField.style.display = 'none';
+        if (addComponentVars) addComponentVars.style.display = 'none';
+        if (addClassField) addClassField.style.display = 'block';
+        if (addAdvancedSection) addAdvancedSection.style.display = '';
+
+        // Build mandatory-param widgets for this tag (the helper reads
+        // addTagSelect.value, which we just set). Must run BEFORE we
+        // fill in the mandatory values, since the inputs don't exist
+        // until this builds them.
+        updateSidebarAddMandatoryParams();
+
+        // Swap header + bottom-button text.
+        const headerLabel = PreviewConfig.i18n.editParamsHeader || PreviewConfig.i18n.editParams || 'Edit Params';
+        if (addFormTitleText) addFormTitleText.textContent = headerLabel + ': <' + tag + '>';
+        if (addConfirmLabel) addConfirmLabel.textContent = PreviewConfig.i18n.save || 'Save';
+
+        // Edit-mode visual cues: form gets a class for the header accent
+        // strip (admin.css), and the Save button switches from
+        // admin-btn--success (creation green) to admin-btn--primary (the
+        // same blue as the Edit Params button — chains the two visually).
+        if (contextualAddForm) contextualAddForm.classList.add('preview-contextual-form--edit-mode');
+        if (addConfirmBtn) {
+            addConfirmBtn.classList.remove('admin-btn--success');
+            addConfirmBtn.classList.add('admin-btn--primary');
+        }
+
+        // Pre-populate from the saved params.
+        _prepopulateEditForm(params, tag);
+    }
+
+    /**
+     * Walk the saved params dict and route each entry to its widget:
+     *  - 'class' tokens -> classCombobox.addClass() each
+     *  - tag's mandatory params -> the matching #add-mandatory-<name> input
+     *  - everything else -> a custom row (with picker auto-attached)
+     */
+    function _prepopulateEditForm(params, tag) {
+        const mandatoryNames = (TAG_INFO && TAG_INFO.MANDATORY_PARAMS && TAG_INFO.MANDATORY_PARAMS[tag]) || [];
+        const mandatorySet = new Set(mandatoryNames);
+        // For <input> the wizard uses 'type' + always-rendered 'name' as
+        // mandatory, even though MANDATORY_PARAMS['input'] only lists 'type'.
+        if (tag === 'input') mandatorySet.add('name');
+
+        Object.keys(params).forEach(key => {
+            const value = params[key];
+            if (key === 'class') {
+                if (classCombobox && typeof value === 'string') {
+                    value.split(/\s+/).forEach(cls => {
+                        const trimmed = cls.trim();
+                        if (trimmed) classCombobox.addClass(trimmed);
+                    });
+                } else if (addClassInput) {
+                    addClassInput.value = String(value || '');
+                }
+            } else if (mandatorySet.has(key)) {
+                const input = document.getElementById('add-mandatory-' + key);
+                if (input) {
+                    input.value = String(value);
+                    // For <input type=...>, the wizard re-renders when type
+                    // changes — dispatch change so dependent widgets refresh.
+                    if (tag === 'input' && key === 'type') {
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                } else {
+                    // Mandatory widget not present (e.g., unknown tag config).
+                    // Fall through to custom row so the user doesn't lose data.
+                    sidebarAddCustomParamsCount++;
+                    const row = _renderCustomParamRow({
+                        key: key,
+                        value: String(value),
+                        index: sidebarAddCustomParamsCount
+                    });
+                    if (addCustomParamsList) addCustomParamsList.appendChild(row);
+                }
+            } else {
+                sidebarAddCustomParamsCount++;
+                const row = _renderCustomParamRow({
+                    key: key,
+                    value: String(value),
+                    index: sidebarAddCustomParamsCount
+                });
+                if (addCustomParamsList) addCustomParamsList.appendChild(row);
+                // Pre-fill via the picker's dedicated edit-mode entry
+                // point: installs the smart widget for known data-*
+                // entries (store/field cascader, enum select, storage
+                // composer) but does NOT open the dropdown. Unknown
+                // keys silently no-op — row stays as plain text inputs.
+                const keyInput = row.querySelector('.preview-contextual-form__param-key');
+                const valueInput = row.querySelector('.preview-contextual-form__param-value');
+                if (keyInput && window.QSComplexWizard && window.QSComplexWizard.prefillDataAttrRow) {
+                    window.QSComplexWizard.prefillDataAttrRow(keyInput, valueInput);
+                }
+            }
+        });
+    }
+
+    /**
+     * Read the edit-form widgets back into a params dict, with the same
+     * semantics addTagNode uses to collect Add-Element params:
+     *  - class combobox flushed + read into `class` (omitted if empty)
+     *  - mandatory widgets read by id pattern (omitted if empty)
+     *  - custom rows: empty key OR empty value → row is ignored
+     *
+     * Empty-value === "I don't want this attr set" — to actually keep an
+     * attr with empty string the user has to type a single space (HTML
+     * boolean attrs like `disabled` accept any non-empty value, and JSON
+     * trimming makes `value=" "` become real empty anyway, so this is a
+     * known limitation matching Add Element's behaviour).
+     */
+    function _collectEditFormParams() {
+        const params = {};
+
+        // Class combobox — commit any uncommitted text first
+        if (classCombobox) classCombobox.flush();
+        const classes = (addClassInput?.value || '').trim();
+        if (classes) params.class = classes;
+
+        // Mandatory params (per-tag widgets keyed by id "add-mandatory-<name>")
+        const mandatoryFields = addMandatoryParamsContainer?.querySelectorAll('input, select') || [];
+        mandatoryFields.forEach(field => {
+            const name = field.id.replace('add-mandatory-', '');
+            const value = (field.value || '').trim();
+            if (value) params[name] = value;
+        });
+
+        // Custom params rows — same empty-row rule as Add Element
+        const customRows = addCustomParamsList?.querySelectorAll('.preview-contextual-form__param-row--custom') || [];
+        customRows.forEach(row => {
+            const key   = row.querySelector('.preview-contextual-form__param-key')?.value?.trim();
+            const value = row.querySelector('.preview-contextual-form__param-value')?.value?.trim();
+            if (key && value) params[key] = value;
+        });
+
+        return params;
+    }
+
+    /**
+     * Compute the editNode diff between the snapshot taken at
+     * Edit-Params-open and the form's current state.
+     *  - removeParams: keys in original missing from current
+     *  - addParams:    keys new in current OR with a different value
+     * Stringified comparison so 1 vs "1" doesn't read as a change.
+     */
+    function _diffParams(original, current) {
+        const addParams = {};
+        const removeParams = [];
+
+        Object.keys(current).forEach(key => {
+            if (!(key in original) || String(original[key]) !== String(current[key])) {
+                addParams[key] = current[key];
+            }
+        });
+        Object.keys(original).forEach(key => {
+            if (!(key in current)) removeParams.push(key);
+        });
+
+        return { addParams, removeParams };
+    }
+
+    /**
+     * "Are we in edit mode with unsaved changes?" — used by Cancel + Back
+     * handlers to prompt before discarding. Returns false in Add mode (Add
+     * has never had an unsaved-changes prompt; keeping that behaviour
+     * unchanged so this slice 4 polish doesn't bleed into Add).
+     */
+    function _isEditModeDirty() {
+        if (contextualAddMode !== 'edit') return false;
+        if (!contextualAddOriginalParams) return false;
+        const current = _collectEditFormParams();
+        const { addParams, removeParams } = _diffParams(contextualAddOriginalParams, current);
+        return Object.keys(addParams).length > 0 || removeParams.length > 0;
+    }
+
+    /**
+     * Save the Edit-Params form: diff the current widgets against the
+     * snapshot, POST to /editNode, refresh the iframe. Uses snapshotted
+     * struct + nodeId (not live selectedStruct/Node) so a canvas
+     * reselection mid-edit can't cross-write to a different node.
+     *
+     * Server validations we propagate as toasts:
+     *  - Reserved data-qs-* / admin-namespace storage keys (slice 5b)
+     *  - Cannot remove a mandatory param
+     *  - Missing mandatory param after the diff applies
+     * On any 4xx/5xx the form stays open so the user can correct.
+     */
+    async function editParamsNode() {
+        // Edit-mode state sanity
+        if (contextualAddOriginalParams == null
+            || contextualAddOriginalStruct == null
+            || contextualAddOriginalNode == null) {
+            throw new Error('Edit-mode state lost — reopen Edit Params');
+        }
+        if (contextualAddOriginalNode === '') {
+            throw new Error(PreviewConfig.i18n.cannotEditRoot
+                || 'Cannot edit the page root — select a child element');
+        }
+
+        const structInfo = parseStruct(contextualAddOriginalStruct);
+        if (!structInfo || !structInfo.type) {
+            throw new Error('Invalid structure type');
+        }
+
+        const currentParams = _collectEditFormParams();
+        const { addParams, removeParams } = _diffParams(contextualAddOriginalParams, currentParams);
+
+        // No-op short-circuit: just close without hitting the server.
+        if (Object.keys(addParams).length === 0 && removeParams.length === 0) {
+            showToast(PreviewConfig.i18n.noParamChanges || 'No changes to save', 'info');
+            hideSidebarAddForm();
+            return;
+        }
+
+        const body = {
+            type: structInfo.type,
+            nodeId: String(contextualAddOriginalNode),
+            addParams: addParams,
+            removeParams: removeParams
+        };
+        if (structInfo.name) body.name = structInfo.name;
+
+        const response = await QuickSiteAdmin.apiRequest('editNode', 'POST', body);
+        if (!response.ok) {
+            const msg = (response.data && response.data.message)
+                || (PreviewConfig.i18n.editParamsError || 'Failed to save params');
+            throw new Error(msg);
+        }
+
+        const data = response.data?.data || {};
+
+        // Cache snapshot targets BEFORE hideSidebarAddForm clears them
+        // (hideSidebarAddForm doesn't currently call _reset, but be defensive).
+        const targetStruct = contextualAddOriginalStruct;
+        const targetNode = contextualAddOriginalNode;
+
+        showToast(PreviewConfig.i18n.paramsSaved || 'Params saved', 'success');
+        hideSidebarAddForm();
+
+        // Live DOM update if the server returned the re-rendered HTML;
+        // otherwise full reload as fallback. Mirrors addTagNode's pattern.
+        if (data.html) {
+            sendToIframe('updateNode', {
+                struct: targetStruct,
+                nodeId: targetNode,
+                html: data.html
+            });
+        } else {
+            if (typeof reloadPreview === 'function') reloadPreview();
+        }
+    }
+
     // Update add form tabs UI
     function updateSidebarAddTypeTabs(type) {
         if (!addTypeTabs) return;
@@ -6933,46 +7353,89 @@
         }
     });
     
+    // Build one custom-param row (key + value + remove button) with the
+    // data-attr picker wired on the key input. Returns the Element.
+    // Used by both the "+ Add another" button (empty row) and the
+    // Edit-Params pre-populate path (filled row).
+    function _renderCustomParamRow(opts) {
+        const key   = opts && opts.key   != null ? String(opts.key)   : '';
+        const value = opts && opts.value != null ? String(opts.value) : '';
+        const index = opts && opts.index != null ? String(opts.index) : '';
+
+        const row = document.createElement('div');
+        row.className = 'preview-contextual-form__param-row preview-contextual-form__param-row--custom';
+
+        const keyInput = document.createElement('input');
+        keyInput.type = 'text';
+        keyInput.className = 'admin-input admin-input--sm preview-contextual-form__param-key';
+        keyInput.placeholder = PreviewConfig.i18n.paramName || 'name';
+        if (index) keyInput.dataset.paramIndex = index;
+        if (key) keyInput.value = key;
+
+        const valueInput = document.createElement('input');
+        valueInput.type = 'text';
+        valueInput.className = 'admin-input admin-input--sm preview-contextual-form__param-value';
+        valueInput.placeholder = PreviewConfig.i18n.paramValue || 'value';
+        if (index) valueInput.dataset.paramIndex = index;
+        if (value) valueInput.value = value;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'preview-contextual-form__remove-param';
+        removeBtn.title = PreviewConfig.i18n.remove || 'Remove';
+        // Small SVG icon snippet — exempt from the createElement rule.
+        removeBtn.innerHTML = QuickSiteUtils.iconClose(14);
+        removeBtn.addEventListener('click', () => row.remove());
+
+        row.appendChild(keyInput);
+        row.appendChild(valueInput);
+        row.appendChild(removeBtn);
+
+        // Wire the data-* autocomplete on the row's KEY input. Shared
+        // helper from contextual-complex/data-attr-picker.js — opens
+        // a dropdown of catalog entries when the user types "data-",
+        // and renders a smart widget under the value when the key
+        // resolves. No-op if the helper failed to load.
+        if (window.QSComplexWizard && window.QSComplexWizard.attachDataAttrPicker) {
+            window.QSComplexWizard.attachDataAttrPicker(keyInput, valueInput);
+        }
+
+        return row;
+    }
+
     // Add another param
     addAnotherParamBtn?.addEventListener('click', function() {
         if (!addCustomParamsList) return;
         sidebarAddCustomParamsCount++;
-        const row = document.createElement('div');
-        row.className = 'preview-contextual-form__param-row preview-contextual-form__param-row--custom';
-        row.innerHTML = `
-            <input type="text"
-                   class="admin-input admin-input--sm preview-contextual-form__param-key"
-                   placeholder="${PreviewConfig.i18n.paramName || 'name'}"
-                   data-param-index="${sidebarAddCustomParamsCount}">
-            <input type="text"
-                   class="admin-input admin-input--sm preview-contextual-form__param-value"
-                   placeholder="${PreviewConfig.i18n.paramValue || 'value'}"
-                   data-param-index="${sidebarAddCustomParamsCount}">
-            <button type="button" class="preview-contextual-form__remove-param" title="${PreviewConfig.i18n.remove || 'Remove'}">
-                ${QuickSiteUtils.iconClose(14)}
-            </button>
-        `;
-        row.querySelector('.preview-contextual-form__remove-param').addEventListener('click', () => row.remove());
+        const row = _renderCustomParamRow({ index: sidebarAddCustomParamsCount });
         addCustomParamsList.appendChild(row);
-
-        // Wire the data-* autocomplete on the new row's KEY input.
-        // Shared helper from contextual-complex/data-attr-picker.js — opens
-        // a dropdown of catalog entries when the user types "data-".
-        // No-op if the helper failed to load (graceful degradation).
-        const keyInput = row.querySelector('.preview-contextual-form__param-key');
-        const valueInput = row.querySelector('.preview-contextual-form__param-value');
-        if (window.QSComplexWizard && window.QSComplexWizard.attachDataAttrPicker) {
-            window.QSComplexWizard.attachDataAttrPicker(keyInput, valueInput);
-        }
     });
     
-    // Cancel button
-    addCancelBtn?.addEventListener('click', hideSidebarAddForm);
+    // Cancel button — in edit mode, prompt if the form has unsaved changes.
+    addCancelBtn?.addEventListener('click', function() {
+        if (_isEditModeDirty()) {
+            const msg = PreviewConfig.i18n.discardUnsavedParams
+                || 'You have unsaved param changes. Discard?';
+            if (!confirm(msg)) return;
+        }
+        hideSidebarAddForm();
+    });
     
-    // Confirm button - add the element
+    // Confirm button - add the element (or save params, in edit mode)
     addConfirmBtn?.addEventListener('click', async function() {
         if (selectedStruct == null || selectedNode == null) {
             showToast(PreviewConfig.i18n.selectNodeFirst, 'warning');
+            return;
+        }
+
+        // Edit Params: collect form → diff against snapshot → editNode.
+        if (contextualAddMode === 'edit') {
+            try {
+                await editParamsNode();
+            } catch (error) {
+                console.error('[Preview] Edit params error:', error);
+                showToast(error.message || PreviewConfig.i18n.editParamsError || 'Failed to save', 'error');
+            }
             return;
         }
 
@@ -7382,15 +7845,21 @@
 
     /**
      * Extract the selected node's structure from the current selection.
-     * Shared helper for Save as Snippet and Save as Component.
+     * Shared helper for Save as Snippet, Save as Component, and Edit Params.
      * Returns { nodeData, structInfo } or throws on error.
+     *
+     * opts.allowRoot: Save-Snippet / Save-Component refuse to operate on
+     * the page root (a snippet of the whole page is meaningless), but
+     * Edit Params legitimately edits the root node's class + custom
+     * attrs — pass { allowRoot: true } to relax the guard.
      */
-    async function extractSelectedNodeStructure() {
+    async function extractSelectedNodeStructure(opts) {
+        const allowRoot = !!(opts && opts.allowRoot);
         // Must have selection
         if (selectedStruct == null || selectedNode == null) {
             throw new Error(PreviewConfig.i18n.selectNodeFirst || 'Select an element first');
         }
-        if (selectedNode === '' && currentEditType !== 'component') {
+        if (!allowRoot && selectedNode === '' && currentEditType !== 'component') {
             throw new Error(PreviewConfig.i18n?.cannotModifyRoot || 'Cannot save the root. Select a child element.');
         }
 

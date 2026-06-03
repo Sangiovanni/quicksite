@@ -158,7 +158,33 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
             ->withMessage(RESERVED_STORAGE_KEY_MESSAGE)
             ->withErrors($errs);
     }
-    
+
+    // Reject empty-value addParams entries — defence in depth for the
+    // "client cleared a value but kept the key in addParams" bug class.
+    // Empty values are ambiguous: do you mean "set to empty string" or
+    // did the client serializer glitch? Either way, the explicit
+    // removeParams field is the right surface for "drop this key".
+    // Mirrors the client-side `_collectEditFormParams` convention
+    // (empty value = ignore the row). Slice 3 add-on, 2026-06-03.
+    $emptyValueParams = [];
+    foreach ($addParams as $key => $value) {
+        if ($value === '' || $value === null) {
+            $emptyValueParams[] = $key;
+        }
+    }
+    if (!empty($emptyValueParams)) {
+        $errs = array_map(function ($k) {
+            return ['field' => 'addParams.' . $k, 'reason' => 'empty_value'];
+        }, $emptyValueParams);
+        return ApiResponse::create(400, 'validation.empty_value')
+            ->withMessage(
+                "Empty values are not allowed in addParams. To remove a param, "
+                . "use removeParams instead. Empty keys: "
+                . implode(', ', $emptyValueParams)
+            )
+            ->withErrors($errs);
+    }
+
     // Validate structure type
     $allowed_types = ['menu', 'footer', 'page', 'component'];
     if (!in_array($type, $allowed_types, true)) {

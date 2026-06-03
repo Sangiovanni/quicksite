@@ -12024,6 +12024,15 @@ code.preview-node-panel__value {
     border-radius: var(--radius-sm);
 }
 
+/* Edit-mode cue: left accent strip on the header so the user can tell at
+   a glance that they're editing existing params, not authoring a new
+   element. Pairs with the JS-side Save button color swap (success → primary)
+   and the header text swap to "Edit Params: <tag>". */
+.preview-contextual-form--edit-mode .preview-contextual-form__mode-header {
+    border-left: 3px solid var(--admin-primary);
+    padding-left: calc(var(--space-md) - 3px);
+}
+
 .preview-contextual-form__mode-title {
     display: flex;
     align-items: center;

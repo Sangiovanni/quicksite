@@ -848,15 +848,18 @@
         }
 
         function compose() {
-            var ok = applyValidation();
-            // For blocked keys: clear the composed value so the form doesn't
-            // carry a dangerous reference even if the user saves. The key
-            // input still shows what they typed (so they can correct it).
-            if (!ok) {
-                valueInput.value = '';
-                valueInput.dispatchEvent(new Event('input', { bubbles: true }));
-                return;
-            }
+            // Always run validation to keep the warning UI in sync, but
+            // ALWAYS compose the value too — even when the key is
+            // reserved. The server-side check (slice 5b,
+            // reservedStorageKeys.php) is the real defence; clearing
+            // valueInput here used to cause a silent-delete bug in the
+            // Edit-Params flow (the diff read the cleared value as "the
+            // user removed this param" and the server happily applied
+            // the removal, bypassing the reserved-key check entirely).
+            // Letting the bad value through means the server rejects
+            // with a clear 400, the form stays open, and the saved data
+            // is preserved untouched.
+            applyValidation();
             var v;
             if (hasMode) {
                 v = modeSel.value + ':' + storageSel.value + ':' + keyInp.value;
@@ -1032,6 +1035,55 @@
         });
     }
 
+    // ─── Pre-fill (Edit-Params flow) ────────────────────────────────
+    //
+    // When the Edit-Params form pre-populates rows from a node's saved
+    // params, we want the SAME smart widget UX as a fresh pick (store/
+    // field cascader, enum select, storage-spec composer, …) — but
+    // WITHOUT opening the dropdown (the user already has the key; they
+    // didn't ask to browse the catalog).
+    //
+    // Description box is also suppressed: showing a full description +
+    // companion buttons under every pre-filled row turns the form into
+    // a tutorial, which fights the user's intent (edit, not learn).
+    //
+    // Unknown keys (not in the catalog) are left as plain text inputs;
+    // the row still works, just without the widget.
+
+    function prefillRow(keyInput, valueInput) {
+        if (!keyInput) return;
+        var v = keyInput.value;
+        if (!v || v.indexOf('data-') !== 0) return;
+
+        var row = keyInput.closest('.preview-contextual-form__param-row');
+        if (!row) return;
+
+        fetchCatalog().then(function (catalog) {
+            var entry = (catalog.entries || []).find(function (e) {
+                return e.name === v;
+            });
+            if (!entry) return; // unknown attr — leave as plain text input
+
+            // Mark this row as picked so openIfRelevant's edit-detection
+            // (tears down widget when user types away from the picked
+            // name) behaves identically to a real pick.
+            row.dataset.dataAttrPicked = entry.name;
+
+            if (!valueInput) return;
+
+            if (entry.valuePlaceholder) {
+                valueInput.setAttribute('placeholder', entry.valuePlaceholder);
+            }
+            // renderValueWidget reads valueInput.value to pre-select
+            // store/field/enum option from the saved value. No dropdown
+            // is ever shown.
+            var widget = renderValueWidget(entry, valueInput);
+            if (widget) {
+                installWidgetInRow(row, valueInput, widget);
+            }
+        });
+    }
+
     // ─── Public API registration ────────────────────────────────────
     window.QSComplexWizard = window.QSComplexWizard || {};
     window.QSComplexWizard.attachDataAttrPicker = attachPicker;
@@ -1043,4 +1095,7 @@
     // stores panel (preview-js-interactions.js) should call this after
     // any setStateStores write so subsequent picks see fresh stores.
     window.QSComplexWizard.invalidateDataAttrStoresCache = invalidateStoresCache;
+    // Edit-Params (slice 2 polish): install widget + placeholder for a
+    // pre-populated row without opening the dropdown.
+    window.QSComplexWizard.prefillDataAttrRow = prefillRow;
 })();
