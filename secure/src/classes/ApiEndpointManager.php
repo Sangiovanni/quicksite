@@ -36,6 +36,62 @@ class ApiEndpointManager {
     // server's Set-Cookie does everything; runtime just adds
     // `credentials: 'include'` to fetch options. No tokenSource needed.
     private array $validAuthTypes = ['none', 'bearer', 'apiKey', 'basic', 'cookie'];
+
+    /** @var array Valid `callableFrom` values (beta.8 Track A4). */
+    // The marker declares whether an endpoint can be invoked from
+    // the client (browser via QS.fetch), the server (PHP via the
+    // future data resolver from BETA8_DATA_RESOLVER.md), or both.
+    // When absent on an endpoint, the effective value is auto-derived
+    // from the auth type by deriveCallableFrom() below.
+    public const VALID_CALLABLE_FROM = ['client', 'server', 'both'];
+
+    /**
+     * Auto-derive callableFrom from an auth type (beta.8 Track A4).
+     *
+     * Rationale: most auth shapes carry no server-side secret —
+     * bearer tokens live in client storage, cookies are
+     * browser-managed, basic auth credentials usually come from a
+     * client form, none means no secrets at all. Those default to
+     * 'both'. apiKey is the one shape that implies a server-side
+     * secret (the key is meant to live in api-secrets.php, never in
+     * client config); it defaults to 'server' only.
+     *
+     * Explicit `callableFrom` on the endpoint always wins over this
+     * derived value (see effectiveCallableFrom() below). Use this
+     * helper only when the endpoint has no explicit value.
+     *
+     * Locked design 2026-06-04 in BETA8_DATA_RESOLVER.md "callableFrom
+     * marker (Track A4)".
+     */
+    public static function deriveCallableFrom(string $authType): string {
+        // apiKey is the only shape whose secret needs server-side
+        // storage by convention; everything else is client-friendly
+        // by default.
+        if ($authType === 'apiKey') return 'server';
+        return 'both';
+    }
+
+    /**
+     * Resolve the effective callableFrom for an endpoint, taking
+     * into account: (a) the endpoint's explicit value if set,
+     * (b) the endpoint's own auth override if present, (c) the
+     * parent API's auth type as the fallback.
+     *
+     * Returns one of 'client' | 'server' | 'both'.
+     */
+    public static function effectiveCallableFrom(array $api, array $endpoint): string {
+        // Endpoint-level explicit value always wins.
+        if (isset($endpoint['callableFrom'])
+            && in_array($endpoint['callableFrom'], self::VALID_CALLABLE_FROM, true)) {
+            return $endpoint['callableFrom'];
+        }
+        // Otherwise derive from the effective auth type — endpoint
+        // override takes precedence over API-level auth.
+        $authType = $endpoint['auth']['type']
+            ?? $api['auth']['type']
+            ?? 'none';
+        return self::deriveCallableFrom($authType);
+    }
     
     /**
      * Constructor
@@ -708,7 +764,10 @@ class ApiEndpointManager {
      * @return array
      */
     private function normalizeEndpointOptionalFields(array $endpoint): array {
-        $managedOptional = ['description', 'auth', 'parameters', 'requestSchema', 'responseSchema'];
+        // 'callableFrom' is managed (cleared via empty string in the
+        // form to mean "go back to auto-derive"). Same handling as
+        // other managed-optional fields.
+        $managedOptional = ['description', 'auth', 'parameters', 'requestSchema', 'responseSchema', 'callableFrom'];
         foreach ($managedOptional as $field) {
             if (array_key_exists($field, $endpoint) && $this->isEmptyEndpointValue($endpoint[$field])) {
                 unset($endpoint[$field]);
@@ -771,6 +830,17 @@ class ApiEndpointManager {
             return [
                 'valid' => false,
                 'error' => 'Invalid method. Must be one of: ' . implode(', ', $this->validMethods)
+            ];
+        }
+
+        // Validate callableFrom (beta.8 Track A4) — optional; when
+        // present, must be one of client/server/both. Absent = auto-
+        // derived at read time from auth type.
+        if (isset($endpoint['callableFrom'])
+            && !in_array($endpoint['callableFrom'], self::VALID_CALLABLE_FROM, true)) {
+            return [
+                'valid' => false,
+                'error' => 'Invalid callableFrom. Must be one of: ' . implode(', ', self::VALID_CALLABLE_FROM) . ' (or omit for auto-derive).'
             ];
         }
 
@@ -886,56 +956,88 @@ class ApiEndpointManager {
         $jsConfig = [];
         
         foreach ($config['apis'] as $apiId => $api) {
-            $jsConfig[$apiId] = [
-                'name' => $api['name'] ?? $apiId,
-                'baseUrl' => $api['baseUrl'] ?? '',
-                'auth' => $api['auth'] ?? ['type' => 'none'],
-                'endpoints' => []
-            ];
-            
+            $apiEndpoints = [];
+
             // Convert endpoints to keyed object for quick lookup
             if (!empty($api['endpoints'])) {
                 foreach ($api['endpoints'] as $endpoint) {
                     $endpointId = $endpoint['id'] ?? null;
-                    if ($endpointId) {
-                        $jsConfig[$apiId]['endpoints'][$endpointId] = [
-                            'id' => $endpointId,
-                            'name' => $endpoint['name'] ?? $endpointId,
-                            'path' => $endpoint['path'] ?? '/',
-                            'method' => $endpoint['method'] ?? 'GET',
-                            'description' => $endpoint['description'] ?? ''
-                        ];
-                        
-                        // Include schema if defined (for visual editor hints)
-                        if (!empty($endpoint['requestSchema'])) {
-                            $jsConfig[$apiId]['endpoints'][$endpointId]['requestSchema'] = $endpoint['requestSchema'];
-                        }
-                        if (!empty($endpoint['responseSchema'])) {
-                            $jsConfig[$apiId]['endpoints'][$endpointId]['responseSchema'] = $endpoint['responseSchema'];
-                        }
-                        // Include response bindings so runtime applyBindings() can use them.
-                        // Some binding shapes need server-side translation here
-                        // (e.g. count-sentence bindings store zeroKey/oneKey/manyKey
-                        // and the runtime needs the resolved strings). The
-                        // transformer below swaps keys → translated strings using
-                        // the current request's language. Multi-language sites:
-                        // qs-api-config.js is project-scoped, not per-language —
-                        // see BACKLOG.md "Per-language count bindings" for the
-                        // proper fix (inline translation registry per page render).
-                        if (!empty($endpoint['responseBindings'])) {
-                            $jsConfig[$apiId]['endpoints'][$endpointId]['responseBindings']
-                                = $this->transformBindingsForCompile($endpoint['responseBindings']);
-                        }
-                        // Include parameters so QS.fetch can substitute :placeholders
-                        // and route remaining params to query string (Step 2 wiring).
-                        if (!empty($endpoint['parameters'])) {
-                            $jsConfig[$apiId]['endpoints'][$endpointId]['parameters'] = $endpoint['parameters'];
-                        }
+                    if (!$endpointId) continue;
+
+                    // beta.8 Track A4 — callableFrom filter. Endpoints
+                    // whose effective callableFrom is 'server' never reach
+                    // the client config (would either leak a secret-keyed
+                    // endpoint's path OR mislead QS.fetch into thinking
+                    // the endpoint is callable from the browser). The
+                    // future data resolver (BETA8_DATA_RESOLVER.md) reads
+                    // the raw config server-side and respects the same
+                    // marker — so server-only endpoints stay reachable
+                    // server-side without ever appearing here.
+                    if (self::effectiveCallableFrom($api, $endpoint) === 'server') {
+                        continue;
+                    }
+
+                    $apiEndpoints[$endpointId] = [
+                        'id' => $endpointId,
+                        'name' => $endpoint['name'] ?? $endpointId,
+                        'path' => $endpoint['path'] ?? '/',
+                        'method' => $endpoint['method'] ?? 'GET',
+                        'description' => $endpoint['description'] ?? ''
+                    ];
+
+                    // Include schema if defined (for visual editor hints)
+                    if (!empty($endpoint['requestSchema'])) {
+                        $apiEndpoints[$endpointId]['requestSchema'] = $endpoint['requestSchema'];
+                    }
+                    if (!empty($endpoint['responseSchema'])) {
+                        $apiEndpoints[$endpointId]['responseSchema'] = $endpoint['responseSchema'];
+                    }
+                    // Include response bindings so runtime applyBindings() can use them.
+                    // Some binding shapes need server-side translation here
+                    // (e.g. count-sentence bindings store zeroKey/oneKey/manyKey
+                    // and the runtime needs the resolved strings). The
+                    // transformer below swaps keys → translated strings using
+                    // the current request's language. Multi-language sites:
+                    // qs-api-config.js is project-scoped, not per-language —
+                    // see BACKLOG.md "Per-language count bindings" for the
+                    // proper fix (inline translation registry per page render).
+                    if (!empty($endpoint['responseBindings'])) {
+                        $apiEndpoints[$endpointId]['responseBindings']
+                            = $this->transformBindingsForCompile($endpoint['responseBindings']);
+                    }
+                    // Include parameters so QS.fetch can substitute :placeholders
+                    // and route remaining params to query string (Step 2 wiring).
+                    if (!empty($endpoint['parameters'])) {
+                        $apiEndpoints[$endpointId]['parameters'] = $endpoint['parameters'];
                     }
                 }
             }
+
+            // If EVERY endpoint of this API is server-only, the API's
+            // auth config + baseUrl have no client-side purpose and
+            // shouldn't be emitted. Skip the API entry entirely.
+            if (empty($apiEndpoints)) {
+                continue;
+            }
+
+            $jsConfig[$apiId] = [
+                'name' => $api['name'] ?? $apiId,
+                'baseUrl' => $api['baseUrl'] ?? '',
+                'auth' => $api['auth'] ?? ['type' => 'none'],
+                'endpoints' => $apiEndpoints
+            ];
         }
-        
+
+        // If every API ended up filtered (all endpoints server-only),
+        // emit the same "{}" shape the no-APIs-configured early-return
+        // above uses — empty PHP array would JSON-encode as "[]"
+        // (an empty array literal), which is technically valid JS but
+        // breaks the contract clients rely on
+        // (window.QS_API_ENDPOINTS is always an object keyed by apiId).
+        if (empty($jsConfig)) {
+            return "/**\n * QuickSite API Endpoints (qs-api-config.js)\n * All endpoints are server-only (callableFrom='server'). No client-side config.\n */\nwindow.QS_API_ENDPOINTS = {};\n";
+        }
+
         $jsonConfig = json_encode($jsConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         
         $js = "/**\n";

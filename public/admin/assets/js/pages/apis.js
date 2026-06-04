@@ -42,6 +42,7 @@
         // Endpoint form
         document.getElementById('form-endpoint')?.addEventListener('submit', handleEndpointSubmit);
         document.getElementById('btn-add-endpoint-param')?.addEventListener('click', () => addParamRow());
+        document.getElementById('endpoint-callable-from')?.addEventListener('change', updateCallableFromAutoPreview);
 
         // Schema JSON validation & formatting
         document.getElementById('endpoint-request-schema')?.addEventListener('input', (e) => validateJsonField(e.target, 'request-schema-status'));
@@ -653,6 +654,8 @@
                 document.getElementById('endpoint-name').value = endpoint.name || '';
                 document.getElementById('endpoint-path').value = endpoint.path;
                 document.getElementById('endpoint-description').value = endpoint.description || '';
+                // beta.8 Track A4 — explicit callableFrom value, or empty for auto-derive
+                document.getElementById('endpoint-callable-from').value = endpoint.callableFrom || '';
                 // No auth property = public (none), like OpenAPI security: []
                 document.getElementById('endpoint-auth').value = endpoint.auth || 'none';
                 document.getElementById('endpoint-request-schema').value =
@@ -666,10 +669,47 @@
             title.textContent = window.translations?.apis?.addEndpoint || 'Add Endpoint';
             // Default to 'inherit' for new endpoints when API has auth
             document.getElementById('endpoint-auth').value = 'inherit';
+            // beta.8 Track A4 — new endpoints default to auto-derive
+            document.getElementById('endpoint-callable-from').value = '';
         }
+
+        // Sync the auto-derive preview with the API's current auth type
+        // so the user immediately sees what "Auto" would resolve to.
+        updateCallableFromAutoPreview();
 
         openModal(modal);
         document.getElementById('endpoint-id').focus();
+    }
+
+    /**
+     * Refresh the "Auto resolves to: <value>" hint shown when the
+     * callableFrom select is set to the empty (Auto) option. Reads
+     * the parent API's SAVED auth type from apisData[apiId] (not the
+     * API edit form, which is a separate modal and not open while
+     * the endpoint modal is) and applies the same derivation rule as
+     * ApiEndpointManager::deriveCallableFrom server-side: 'apiKey' →
+     * 'server'; everything else → 'both'. Per the locked design
+     * 2026-06-04 (BETA8_DATA_RESOLVER.md "callableFrom marker").
+     * Beta.8 Track A4.
+     */
+    function updateCallableFromAutoPreview() {
+        const select  = document.getElementById('endpoint-callable-from');
+        const preview = document.getElementById('callable-from-auto-preview');
+        const valueEl = document.getElementById('callable-from-auto-value');
+        if (!select || !preview || !valueEl) return;
+
+        // Read from the parent API's STORED auth type. The endpoint
+        // modal carries the parent API id in a hidden field — read it
+        // and look up the saved auth.type. Fallback to 'none' when the
+        // API has no auth declared (matches server-side default).
+        const apiId = document.getElementById('endpoint-api-id')?.value;
+        const apiAuth = (apiId && apisData && apisData[apiId]) ? apisData[apiId].auth : null;
+        const authType = apiAuth?.type || 'none';
+        const derived  = (authType === 'apiKey') ? 'server' : 'both';
+        valueEl.textContent = derived;
+
+        // Show the preview only when the select is on "Auto" (empty value).
+        preview.style.display = (select.value === '') ? '' : 'none';
     }
 
     // -------------------------------------------------------------------------
@@ -792,7 +832,10 @@
             auth: (auth && auth !== 'none') ? auth : '',
             parameters: parameters,
             requestSchema: requestSchema || '',
-            responseSchema: responseSchema || ''
+            responseSchema: responseSchema || '',
+            // beta.8 Track A4 — empty string = auto-derive (backend
+            // drops the key); explicit 'client'/'server'/'both' persists.
+            callableFrom: document.getElementById('endpoint-callable-from').value || ''
         };
 
         // Build editApi params

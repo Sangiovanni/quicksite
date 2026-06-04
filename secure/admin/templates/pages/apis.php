@@ -286,7 +286,28 @@ $baseUrl = rtrim(BASE_URL, '/');
                     <textarea class="admin-input" id="endpoint-description" name="description" rows="2"
                               placeholder=""></textarea>
                 </div>
-                
+
+                <!-- beta.8 Track A4 — callableFrom marker. Auto-derive
+                     defaults from the API's auth type; explicit override
+                     wins. Server-only endpoints never appear in
+                     qs-api-config.js (filtered at build emit time). -->
+                <div class="admin-form-group">
+                    <label class="admin-label" for="endpoint-callable-from"><?= __admin('apis.form.callableFrom') ?? 'Callable from' ?></label>
+                    <select class="admin-select" id="endpoint-callable-from" name="callableFrom">
+                        <option value=""><?= __admin('apis.form.callableFromAuto') ?? 'Auto (derive from auth type)' ?></option>
+                        <option value="client"><?= __admin('apis.form.callableFromClient') ?? 'Client only (browser)' ?></option>
+                        <option value="server"><?= __admin('apis.form.callableFromServer') ?? 'Server only (hidden from clients)' ?></option>
+                        <option value="both"><?= __admin('apis.form.callableFromBoth') ?? 'Both (browser + server)' ?></option>
+                    </select>
+                    <p class="admin-hint">
+                        <?= __admin('apis.form.callableFromHint') ?? "Server-only endpoints are filtered out of qs-api-config.js — the browser can’t call them. Use for endpoints with secrets that must stay server-side." ?>
+                        <span id="callable-from-auto-preview" style="display:none;">
+                            <?= __admin('apis.form.callableFromAutoPreview') ?? 'Auto resolves to:' ?>
+                            <strong id="callable-from-auto-value">both</strong>
+                        </span>
+                    </p>
+                </div>
+
                 <div class="admin-form-group" id="endpoint-auth-group" style="display: none;">
                     <label class="admin-label" for="endpoint-auth"><?= __admin('apis.form.endpointAuth') ?></label>
                     <select class="admin-input" id="endpoint-auth" name="auth">

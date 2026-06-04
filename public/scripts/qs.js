@@ -464,6 +464,21 @@
         if (target.startsWith('@')) {
             const resolved = resolveEndpoint(target.substring(1));
             if (!resolved) {
+                // beta.8 Track A4 — a missing endpoint here can mean:
+                //   (a) typo in the @api/endpoint reference,
+                //   (b) the endpoint is callableFrom:'server' and was
+                //       filtered out of qs-api-config.js by design
+                //       (server-only endpoints never reach client config),
+                //   (c) qs-api-config.js is stale and a rebuild is needed.
+                // Give devs the hint via console; users still get the
+                // friendly toast (they shouldn't see this in healthy
+                // configurations).
+                console.warn(
+                    '[QS] fetch: endpoint ' + target + ' not in client config. '
+                    + 'Likely causes: typo, the endpoint is marked '
+                    + "callableFrom:'server' (won't appear here by design), "
+                    + 'or qs-api-config.js is stale (rebuild).'
+                );
                 QS.toast('API endpoint not found: ' + target, 'error');
                 return Promise.reject(new Error('Endpoint not found'));
             }
@@ -471,7 +486,7 @@
             method = resolved.method;
             opts._auth = resolved.auth;
             opts._endpoint = resolved.endpoint;
-        } 
+        }
         // Direct URL mode: METHOD is first arg, URL is second
         else {
             method = target.toUpperCase();

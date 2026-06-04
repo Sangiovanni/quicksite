@@ -499,6 +499,7 @@ is registered (see `PageManagement::render()`).
 | `path` | Relative to API `baseUrl`. May contain `:placeholders` (see below). |
 | `parameters` | Optional array of `{ name, type, required, description }`. Type ∈ `string / number / integer / boolean`. |
 | `auth` | Per-endpoint override: `none / inherit / required`. Inherits from API-level auth by default. |
+| `callableFrom` | Beta.8 A4 marker — `client` / `server` / `both`, or absent for auto-derive. Server-only endpoints are **filtered out of `qs-api-config.js`** at build emit time (clients literally can't call them). Auto-derive rule: `apiKey → server`; everything else → `both`. Set explicitly in the form via the "Callable from" select; "Auto" shows a live preview of the derived value. |
 | `requestSchema` | Optional JSON Schema for POST/PUT/PATCH bodies. Drives the test modal's dynamic form. |
 | `responseSchema` | Optional JSON Schema. Drives the response-bindings picker (componentList / count / etc., see beta.7 work). |
 

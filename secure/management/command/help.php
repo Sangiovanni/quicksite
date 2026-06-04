@@ -4572,13 +4572,13 @@ $GLOBALS['__help_commands'] = [
             'addEndpoint' => [
                 'required' => false,
                 'type' => 'object',
-                'description' => 'Add a single endpoint: {id, name, path, method, description?, requestSchema?, responseSchema?, headers?, queryParams?, responseBindings?}',
+                'description' => 'Add a single endpoint: {id, name, path, method, description?, requestSchema?, responseSchema?, headers?, queryParams?, responseBindings?, callableFrom?}. callableFrom (beta.8 A4): "client" | "server" | "both". Absent = auto-derived from auth type (apiKey → server; others → both). Server-only endpoints are filtered out of qs-api-config.js.',
                 'example' => '{"id": "contact", "name": "Contact Form", "path": "/contact", "method": "POST"}'
             ],
             'editEndpoint' => [
                 'required' => false,
                 'type' => 'object',
-                'description' => 'Edit existing endpoint: {id: "endpoint-to-edit", updates: {...}}',
+                'description' => 'Edit existing endpoint: {id: "endpoint-to-edit", updates: {...}}. Updates accept the same fields as addEndpoint, including callableFrom (clear with empty string to revert to auto-derive).',
                 'example' => '{"id": "contact", "updates": {"name": "New Name", "path": "/new-path"}}'
             ],
             'deleteEndpoint' => [
@@ -4601,10 +4601,10 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.api.error.missing_parameter' => 'Missing apiId or no updates provided',
-            '400.api.error.invalid_parameter' => 'Endpoint already exists (when adding) or invalid update operation',
+            '400.api.error.invalid_parameter' => 'Endpoint already exists (when adding), invalid update operation, or invalid callableFrom value (must be client/server/both or omitted for auto-derive)',
             '404.api.error.not_found' => 'API or endpoint not found'
         ],
-        'notes' => 'Use ONE endpoint operation per request: endpoints (full replace), addEndpoint, editEndpoint, or deleteEndpoint. Regenerates qs-api-config.js automatically.'
+        'notes' => 'Use ONE endpoint operation per request: endpoints (full replace), addEndpoint, editEndpoint, or deleteEndpoint. Regenerates qs-api-config.js automatically (server-only endpoints are filtered out). **callableFrom** (beta.8 A4): per-endpoint marker — "client"/"server"/"both", or absent for auto-derive (apiKey → server, others → both).'
     ],
     
     'deleteApi' => [
