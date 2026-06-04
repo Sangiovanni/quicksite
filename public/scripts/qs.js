@@ -1869,7 +1869,7 @@
     //     fields: { <name>: { dir, init?, default?, from?, append? } } }
     //   dir    : "request" (sent) | "response" (received) | "both"
     //   init   : initial value for sent fields — a literal, or
-    //            "query:x" / "localStorage:x" / "sessionStorage:x"
+    //            "query:x" / "param:x" / "localStorage:x" / "sessionStorage:x"
     //   default: fallback when init's source is missing
     //   from   : response dot-path for received fields
     //   append : received list fields append instead of replace
@@ -1890,6 +1890,10 @@
                 if (prefix === 'query') {
                     var qv = new URLSearchParams(location.search).get(key);
                     return (qv === null || qv === '') ? fallback : qv;
+                }
+                if (prefix === 'param') {
+                    var pv = QS.routeParams ? QS.routeParams[key] : undefined;
+                    return (pv === undefined || pv === null || pv === '') ? fallback : pv;
                 }
                 if (prefix === 'localStorage' || prefix === 'sessionStorage') {
                     var sv = window[prefix].getItem(key);

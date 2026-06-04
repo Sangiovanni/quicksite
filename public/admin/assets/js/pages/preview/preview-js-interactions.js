@@ -3489,6 +3489,7 @@
     var SS_INIT_KINDS = [
         { value: 'literal',        label: PreviewConfig.i18n?.stateStoreInitKindLiteral        || 'literal',        prefix: null },
         { value: 'query',          label: PreviewConfig.i18n?.stateStoreInitKindQuery          || 'URL query',      prefix: 'query:' },
+        { value: 'param',          label: PreviewConfig.i18n?.stateStoreInitKindPathParam      || 'URL path param', prefix: 'param:' },
         { value: 'localStorage',   label: PreviewConfig.i18n?.stateStoreInitKindLocalStorage   || 'localStorage',   prefix: 'localStorage:' },
         { value: 'sessionStorage', label: PreviewConfig.i18n?.stateStoreInitKindSessionStorage || 'sessionStorage', prefix: 'sessionStorage:' }
     ];
@@ -3870,6 +3871,7 @@
             var p;
             if (kind === 'literal')      p = PreviewConfig.i18n?.stateStoreInitKeyLiteralPlaceholder || 'value (e.g. Hello)';
             else if (kind === 'query')   p = PreviewConfig.i18n?.stateStoreInitKeyQueryPlaceholder   || 'URL param name (e.g. page)';
+            else if (kind === 'param')   p = PreviewConfig.i18n?.stateStoreInitKeyParamPlaceholder   || 'param name (e.g. slug)';
             else                          p = PreviewConfig.i18n?.stateStoreInitKeyStoragePlaceholder || 'key name (e.g. authToken)';
             initKeyInput.placeholder = p;
         }
