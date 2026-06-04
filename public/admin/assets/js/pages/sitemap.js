@@ -370,11 +370,28 @@
 
         nameInput?.focus();
 
+        // Beta.8 A1 — segment validation matches the server-side rules in
+        // addRoute.php. Two valid shapes:
+        //   1. Literal: lowercase letters / digits / hyphens (no leading/
+        //      trailing hyphen).
+        //   2. Param: ':' followed by a lowercase identifier
+        //      ([a-z_][a-z0-9_]*). Captures URL path-segment values into
+        //      the matched route at request time.
+        // Final / leading slash + empty segments are not accepted.
+        const isLiteralSeg = (s) => /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(s);
+        const isParamSeg   = (s) => /^:[a-z_][a-z0-9_]*$/.test(s);
+
         const doCreate = async () => {
             const name = nameInput.value.trim();
             if (!name) return;
-            if (!/^[a-z0-9-]+(?:\/[a-z0-9-]+)*$/.test(name)) {
-                document.getElementById('sitemap-add-error').textContent = 'Only lowercase letters, numbers, hyphens, and / for nesting';
+
+            // Split + validate each segment. Empty segments (e.g. leading
+            // or trailing slash, double slash) fail both checks → invalid.
+            const segments = name.split('/');
+            const badSeg = segments.find(s => !isLiteralSeg(s) && !isParamSeg(s));
+            if (badSeg !== undefined) {
+                document.getElementById('sitemap-add-error').textContent =
+                    'Invalid segment "' + badSeg + '". Use lowercase letters, numbers, hyphens (no leading/trailing hyphens), or ":name" for a path parameter, separated by /.';
                 return;
             }
 
@@ -388,14 +405,33 @@
 
                 const result = await QuickSiteAdmin.apiRequest('addRoute', 'POST', body);
                 if (result.ok) {
+                    // The server's ApiResponse envelope is
+                    //   {status, code, message, data: {…inner payload…}}
+                    // so the addRoute response data (cascade_created, warnings,
+                    // route, etc.) lives at result.data.data — NOT result.data,
+                    // which is the envelope itself.
+                    const payload = result.data?.data || {};
+
                     // Remember expanded state + expand parent
                     saveExpandedState();
                     if (parentRoute) expandedNodes.add(parentRoute);
                     // Also expand any cascade-created parents
-                    if (result.data?.cascade_created) {
-                        result.data.cascade_created.forEach(r => expandedNodes.add(r));
+                    if (Array.isArray(payload.cascade_created)) {
+                        payload.cascade_created.forEach(r => expandedNodes.add(r));
                     }
                     QuickSiteAdmin.showToast(t('routeCreated', 'Route created successfully'), 'success');
+
+                    // Beta.8 A1 — surface server-side conflict warnings as
+                    // toasts. Each warning carries 'type' (i18n key for future
+                    // localisation) + EN 'message' fallback we display today.
+                    // Future polish could render inline beneath the form.
+                    if (Array.isArray(payload.warnings) && payload.warnings.length > 0) {
+                        payload.warnings.forEach((w) => {
+                            const msg = w.message || w.type || 'Route warning';
+                            QuickSiteAdmin.showToast(msg, 'warning');
+                        });
+                    }
+
                     await refreshAll();
                 } else {
                     document.getElementById('sitemap-add-error').textContent = result.data?.message || 'Error';
