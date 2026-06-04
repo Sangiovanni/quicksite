@@ -3,6 +3,8 @@ require_once __DIR__ . '/TagRegistry.php';
 require_once __DIR__ . '/IframeSandbox.php';
 require_once __DIR__ . '/Translator.php';
 require_once __DIR__ . '/../functions/qsVerbCatalog.php';
+// Beta.8 A1 — paramRoutePathToFs for sanitising ':slug' → '__slug' in file lookup
+require_once __DIR__ . '/../functions/routeHelpers.php';
 
 /**
  * JsonToHtmlRenderer
@@ -69,25 +71,31 @@ class JsonToHtmlRenderer {
      * @return string Rendered HTML
      */
     public function renderPage(string $pageName): string {
-        // Set structure context for editor mode
+        // Set structure context for editor mode — uses the unsanitised
+        // pattern (':slug') so client-side selectors map back to routes.php
+        // keys correctly. Only the file lookup below uses the sanitised form.
         $this->currentStructure = 'page-' . $pageName;
         $this->currentNodePath = [];
         $this->inComponent = false;
-        
+
         // Support both flat name ('home') and path ('guides/getting-started')
         // Convention: ALL pages use folder structure - page/page.json
         $routePath = trim($pageName, '/');
-        $segments = explode('/', $routePath);
+        // Beta.8 A1 — param-route segments (':slug') sanitised to '__slug'
+        // for filesystem lookup. Routes.php key stays ':slug' (matches
+        // doc URL syntax). See routeHelpers.php for the canonical helper.
+        $fsRoutePath = paramRoutePathToFs($routePath);
+        $segments = explode('/', $fsRoutePath);
         $leafName = end($segments);
-        
+
         // Try folder structure first: path/name/name.json
-        $folderPath = "/templates/model/json/pages/{$routePath}/{$leafName}.json";
+        $folderPath = "/templates/model/json/pages/{$fsRoutePath}/{$leafName}.json";
         if (file_exists(PROJECT_PATH . $folderPath)) {
             return $this->renderJsonFile($folderPath);
         }
-        
+
         // Fallback to flat structure for backward compat: path/name.json
-        return $this->renderJsonFile("/templates/model/json/pages/{$routePath}.json");
+        return $this->renderJsonFile("/templates/model/json/pages/{$fsRoutePath}.json");
     }
 
     /**
@@ -426,6 +434,32 @@ class JsonToHtmlRenderer {
      * @param array $node Text node with 'textKey'
      * @return string Escaped translated text
      */
+    /**
+     * Substitute `{{param:NAME}}` placeholders with values from
+     * $this->context['routeParams']. Beta.8 A1 — text-level template
+     * substitution for URL path-params (e.g., :slug from /products/:slug).
+     *
+     * - Fast path: returns unchanged when no routeParams in context OR
+     *   when the text doesn't contain '{{param:'.
+     * - Unknown param names: left as the literal placeholder so the
+     *   author can spot the typo.
+     * - Caller is responsible for htmlspecialchars after substitution
+     *   so the substituted value is properly escaped.
+     */
+    private function applyRouteParams(string $text): string {
+        if (empty($this->context['routeParams']) || strpos($text, '{{param:') === false) {
+            return $text;
+        }
+        $routeParams = $this->context['routeParams'];
+        return preg_replace_callback(
+            '/\{\{param:([a-zA-Z_][a-zA-Z0-9_]*)\}\}/',
+            function ($m) use ($routeParams) {
+                return $routeParams[$m[1]] ?? $m[0];
+            },
+            $text
+        );
+    }
+
     private function renderTextNode(array $node): string {
         $textKey = $node['textKey'];
         
@@ -449,6 +483,10 @@ class JsonToHtmlRenderer {
         // as a translation key. Without this, raw text has no selection handle.
         if (strpos($textKey, '__RAW__') === 0 || strpos($textKey, '__LIT__') === 0) {
             $rawText = substr($textKey, 7); // strip the 7-char __RAW__/__LIT__ prefix
+            // Beta.8 A1 — substitute `{{param:NAME}}` placeholders from the
+            // captured URL path-params (e.g., :slug from /products/:slug)
+            // BEFORE htmlspecialchars so the substituted value gets escaped.
+            $rawText = $this->applyRouteParams($rawText);
             $escapedRaw = htmlspecialchars($rawText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
             if ($this->editorMode) {
                 $escapedKey = htmlspecialchars($textKey, ENT_QUOTES);
@@ -475,7 +513,12 @@ class JsonToHtmlRenderer {
         }
 
         // Get translated text
-        $translatedText = htmlspecialchars($this->translator->translate($textKey), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        // Beta.8 A1 — substitute `{{param:NAME}}` placeholders from the
+        // captured URL path-params AFTER translation lookup, BEFORE
+        // htmlspecialchars. Translations can author the placeholder; e.g.
+        // an EN string "Welcome, {{param:slug}}!" renders as the URL value.
+        $translatedRaw = $this->applyRouteParams($this->translator->translate($textKey));
+        $translatedText = htmlspecialchars($translatedRaw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         
         // In editor mode, wrap in span with data-qs-textkey for inline editing
         if ($this->editorMode) {

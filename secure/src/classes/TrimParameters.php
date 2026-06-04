@@ -25,7 +25,12 @@ class TrimParameters {
     
     /** @var array Remaining URL segments after route resolution */
     private array $params = [];
-    
+
+    /** @var array Beta.8 A1 — captured URL path-param values for `:name` route segments.
+     *             E.g., for route 'products/:slug' matched against URL '/products/red-vase':
+     *             routeParams === ['slug' => 'red-vase']. Empty when no `:` segments matched. */
+    private array $routeParams = [];
+
     /** @var bool Whether the route was found in routes.php */
     private bool $routeFound = false;
     
@@ -98,6 +103,7 @@ class TrimParameters {
             $this->route = $resolved['route'];
             $this->routePath = implode('/', $resolved['route']);
             $this->params = $resolved['params'];
+            $this->routeParams = $resolved['routeParams'] ?? [];
             $this->routeFound = $resolved['found'];
         }
     }
@@ -117,37 +123,74 @@ class TrimParameters {
         $remaining = $urlParts;
         $current = $routes;
         $depth = 0;
-        
+        $routeParams = [];
+
         while (!empty($remaining) && $depth < self::MAX_DEPTH) {
             $segment = $remaining[0];
-            
+
+            // Specificity rule (locked 2026-06-04, BETA8_PARAMETERISED_ROUTES.md
+            // slice 2): exact literal match wins over any `:name` param sibling.
+            // Try exact first; fall back to the first `:name` key at this level
+            // when no literal match exists. Declaration order in routes.php
+            // breaks ties between multiple `:name` siblings (associative array
+            // iteration follows insertion order in PHP).
             if (isset($current[$segment])) {
                 array_shift($remaining);
                 $matched[] = $segment;
                 $current = $current[$segment];
                 $depth++;
-            } else {
-                // Segment not found - this is a 404
-                // Don't partially match (e.g., /about/you should NOT resolve to /about)
-                break;
+                continue;
             }
+
+            $paramKey = self::findParamKey($current);
+            if ($paramKey !== null) {
+                array_shift($remaining);
+                $matched[] = $paramKey;                          // pattern key e.g. ':slug'
+                $paramName = substr($paramKey, 1);               // strip leading ':'
+                // urldecode in the matcher per locked Q2 — consumers see
+                // 'red vase', not 'red%20vase'.
+                $routeParams[$paramName] = urldecode($segment);
+                $current = $current[$paramKey];
+                $depth++;
+                continue;
+            }
+
+            // Segment not found - this is a 404
+            // Don't partially match (e.g., /about/you should NOT resolve to /about)
+            break;
         }
-        
+
         // Route is only found if we matched ALL segments
         // If there are remaining unmatched segments, it's a 404
         if (empty($matched) || !empty($remaining)) {
             return [
                 'route' => ['404'],
                 'params' => $urlParts,
+                'routeParams' => [],
                 'found' => false
             ];
         }
-        
+
         return [
             'route' => $matched,
-            'params' => [],  // All segments matched, no remaining params
+            'params' => [],            // all segments matched
+            'routeParams' => $routeParams,
             'found' => true
         ];
+    }
+
+    /**
+     * Find the first `:name` key at a routes-tree level. Returns the key
+     * (with leading colon, e.g., ':slug') or null when no param sibling
+     * exists. Beta.8 A1.
+     */
+    private static function findParamKey(array $level): ?string {
+        foreach (array_keys($level) as $key) {
+            if (is_string($key) && strlen($key) > 1 && $key[0] === ':') {
+                return $key;
+            }
+        }
+        return null;
     }
     
     /**
@@ -180,6 +223,19 @@ class TrimParameters {
      */
     public function params(): array {
         return $this->params;
+    }
+
+    /**
+     * Get captured URL path-param values (beta.8 A1).
+     *
+     * For a route like 'products/:slug' matched against URL '/products/red-vase',
+     * returns ['slug' => 'red-vase']. Empty array when the matched route has no
+     * `:name` segments. Values are urldecoded.
+     *
+     * @return array
+     */
+    public function routeParams(): array {
+        return $this->routeParams;
     }
     
     /**

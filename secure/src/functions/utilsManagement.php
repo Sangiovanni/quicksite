@@ -1,5 +1,9 @@
 <?php
 
+// Beta.8 A1 — paramRoutePathToFs / paramRouteSegmentToFs live here.
+// utilsManagement uses them in resolvePageJsonPath / resolvePagePhpPath.
+require_once __DIR__ . '/routeHelpers.php';
+
 /**
  * Special pages that exist as templates but are NOT managed as routes.
  * Used in addRoute (guard) and editStructure (validation bypass).
@@ -264,23 +268,26 @@ function loadJsonStructure(string $filePath): ?array {
 function resolvePageJsonPath(string $routePath, ?string $projectPath = null): ?string {
     $projectPath = $projectPath ?? PROJECT_PATH;
     $basePath = $projectPath . '/templates/model/json/pages';
-    
+
     $routePath = trim($routePath, '/');
-    $segments = explode('/', $routePath);
+    // Beta.8 A1 — sanitise ':slug' → '__slug' for filesystem lookup.
+    // See routeHelpers.php for the canonical helper used everywhere.
+    $fsPath = paramRoutePathToFs($routePath);
+    $segments = explode('/', $fsPath);
     $leafName = end($segments);
-    
+
     // Try folder structure first: path/name/name.json
-    $folderPath = $basePath . '/' . $routePath . '/' . $leafName . '.json';
+    $folderPath = $basePath . '/' . $fsPath . '/' . $leafName . '.json';
     if (file_exists($folderPath)) {
         return $folderPath;
     }
-    
+
     // Fallback to flat structure: path/name.json
-    $flatPath = $basePath . '/' . $routePath . '.json';
+    $flatPath = $basePath . '/' . $fsPath . '.json';
     if (file_exists($flatPath)) {
         return $flatPath;
     }
-    
+
     return null;
 }
 
@@ -296,23 +303,25 @@ function resolvePageJsonPath(string $routePath, ?string $projectPath = null): ?s
 function resolvePagePhpPath(string $routePath, ?string $projectPath = null): ?string {
     $projectPath = $projectPath ?? PROJECT_PATH;
     $basePath = $projectPath . '/templates/pages';
-    
+
     $routePath = trim($routePath, '/');
-    $segments = explode('/', $routePath);
+    // Beta.8 A1 — same `:slug` → `__slug` sanitisation as resolvePageJsonPath.
+    $fsPath = paramRoutePathToFs($routePath);
+    $segments = explode('/', $fsPath);
     $leafName = end($segments);
-    
+
     // Try folder structure first: path/name/name.php
-    $folderPath = $basePath . '/' . $routePath . '/' . $leafName . '.php';
+    $folderPath = $basePath . '/' . $fsPath . '/' . $leafName . '.php';
     if (file_exists($folderPath)) {
         return $folderPath;
     }
-    
+
     // Fallback to flat structure: path/name.php
-    $flatPath = $basePath . '/' . $routePath . '.php';
+    $flatPath = $basePath . '/' . $fsPath . '.php';
     if (file_exists($flatPath)) {
         return $flatPath;
     }
-    
+
     return null;
 }
 
@@ -369,7 +378,7 @@ function scanAllPageJsonFiles(?string $projectPath = null): array {
             // For folder structure: guides/getting-started/getting-started.json → guides/getting-started
             // For flat structure: home.json → home
             $route = preg_replace('/\.json$/', '', $relativePath);
-            
+
             // If folder structure, the last segment is duplicated: guides/getting-started/getting-started
             // Remove the duplicate leaf
             $segments = explode('/', $route);
@@ -380,7 +389,13 @@ function scanAllPageJsonFiles(?string $projectPath = null): array {
                     $route = implode('/', $segments);
                 }
             }
-            
+
+            // Beta.8 A1 — reverse the `:slug` → `__slug` sanitisation so the
+            // route identity returned matches what's in routes.php (and what
+            // the admin UI / URL pattern expect). E.g., disk 'test/__slug'
+            // becomes route 'test/:slug'.
+            $route = fsRoutePathToParam($route);
+
             $results[] = [
                 'path' => $fullPath,
                 'route' => $route,

@@ -105,8 +105,15 @@ class PageManagement {
             'lang' => MULTILINGUAL_SUPPORT ? $trimParameters->lang() : '',
             // New nested route properties
             'route' => $trimParameters->route(),           // ['guides', 'installation']
-            'routePath' => $trimParameters->routePath(),   // 'guides/installation'
+            'routePath' => $trimParameters->routePath(),   // 'guides/installation' OR 'products/:slug' for param routes
             'params' => $trimParameters->params(),
+            // Beta.8 A1 — captured URL path-param values for `:name` route segments.
+            // E.g., for /products/red-vase matching route 'products/:slug':
+            //   routeParams === ['slug' => 'red-vase']
+            // Empty when the matched route has no `:name` segments.
+            // JsonToHtmlRenderer substitutes `{{param:NAME}}` placeholders in
+            // textKey / RAW text using this dict.
+            'routeParams' => $trimParameters->routeParams(),
             // Legacy compatibility (deprecated)
             'page' => $trimParameters->page(),             // Last segment for backward compat
             'id' => $trimParameters->id(),                 // First param for backward compat

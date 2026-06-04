@@ -680,20 +680,29 @@ foreach ($allRoutes as $route) {
             ->send();
     }
     
-    // Use route name as title (capitalize first letter of last segment)
+    // Use route name as title (capitalize first letter of last segment).
+    // Beta.8 A1 — `:slug` segment as the leaf would give a useless title
+    // like ':slug'; titles for param routes are handled at request time
+    // anyway (the per-route .php file looks up page.titles.<routePath>).
     $routeName = basename($route);
-    $pageTitle = ucfirst(str_replace('-', ' ', $routeName));
-    
+    $pageTitle = ucfirst(str_replace('-', ' ', ltrim($routeName, ':')));
+
     // Get layout settings (with inheritance)
     $pageLayout = $layoutManager->getEffectiveLayout($route);
     $routeEvents = $allPageEvents[$route] ?? [];
     $routeStores = $allStateStores[$route] ?? [];
     $pagePhp = $compiler->compilePage($pageJson, $route, $pageLayout['menu'], $pageLayout['footer'], $routeEvents, $routeStores);
-    
+
     // Create folder structure in build: route/route.php
-    $buildPageDir = $buildFullPath . '/' . $buildSecureName . '/templates/pages/' . $route;
+    // Beta.8 A1 — sanitise `:slug` → `__slug` for the build output path
+    // (NTFS reserves ':'). Matches the source-side convention used by
+    // resolvePageJsonPath. Helper in routeHelpers.php (already required
+    // via utilsManagement.php which build.php depends on).
+    $fsRoute = paramRoutePathToFs($route);
+    $fsRouteName = paramRouteSegmentToFs($routeName);
+    $buildPageDir = $buildFullPath . '/' . $buildSecureName . '/templates/pages/' . $fsRoute;
     @mkdir($buildPageDir, 0755, true);
-    $pageFilePath = $buildPageDir . '/' . $routeName . '.php';
+    $pageFilePath = $buildPageDir . '/' . $fsRouteName . '.php';
     
     if (file_put_contents($pageFilePath, $pagePhp) === false) {
         release_build_lock();

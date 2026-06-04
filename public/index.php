@@ -166,6 +166,12 @@ if (!$routeFound || $routePath === '404') {
 // Convention:
 //   - Route without children: guides/installation → guides/installation.php
 //   - Route with children: guides → guides/guides.php (because it has children)
+//
+// Beta.8 A1 — param-route segments live in routes.php as ':name' for
+// readability + URL pattern match, but NTFS reserves ':' in path
+// components. paramRouteSegmentToFs / paramRoutePathToFs (canonical
+// helpers in routeHelpers.php) sanitise to '__name' for filesystem use.
+require_once SECURE_FOLDER_PATH . '/src/functions/routeHelpers.php';
 
 /**
  * Resolve route path to template file
@@ -173,23 +179,23 @@ if (!$routeFound || $routePath === '404') {
  */
 function resolveTemplateFile(array $route, string $projectPath): string {
     $basePath = $projectPath . '/templates/pages/';
-    $routeName = end($route);
-    
-    // All routes use folder structure: guides → guides/guides.php
-    return $basePath . implode('/', $route) . '/' . $routeName . '.php';
+    $fsRoute = array_map('paramRouteSegmentToFs', $route);
+    $routeName = end($fsRoute);
+    return $basePath . implode('/', $fsRoute) . '/' . $routeName . '.php';
 }
 
 $templateFile = resolveTemplateFile($route, PROJECT_PATH);
 
 // Fallback: try flat structure (for backward compatibility during migration)
 if (!file_exists($templateFile)) {
+    $fsRoutePath = paramRoutePathToFs($routePath);
     // Try simple flat file: routePath.php (e.g., guides.php)
-    $flatFile = PROJECT_PATH . '/templates/pages/' . $routePath . '.php';
+    $flatFile = PROJECT_PATH . '/templates/pages/' . $fsRoutePath . '.php';
     if (file_exists($flatFile)) {
         $templateFile = $flatFile;
     } else {
-        // Try legacy single-segment fallback
-        $legacyFile = PROJECT_PATH . '/templates/pages/' . $route[0] . '.php';
+        // Try legacy single-segment fallback (root segment, sanitised)
+        $legacyFile = PROJECT_PATH . '/templates/pages/' . paramRouteSegmentToFs($route[0]) . '.php';
         if (file_exists($legacyFile)) {
             $templateFile = $legacyFile;
         }
