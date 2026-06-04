@@ -101,12 +101,20 @@ foreach ($segments as $index => $segment) {
             ->withErrors([['field' => 'route', 'segment' => $segment, 'max_length' => MAX_SEGMENT_LENGTH]])
             ->send();
     }
-    
-    // Format check (lowercase, numbers, hyphens only)
-    if (!preg_match('/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/', $segment)) {
+
+    // Format check. Two valid shapes (beta.8 A1):
+    //   1. Literal segment: lowercase letters / digits / hyphens
+    //      (no leading or trailing hyphen). Existing convention.
+    //   2. Param segment: ':' + lowercase identifier
+    //      ([a-z_][a-z0-9_]*). Lowercase-only matches the literal-
+    //      segment convention; mixed-case param names get rejected
+    //      so the route author and URL author share the same rule.
+    $isLiteral = (bool) preg_match('/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/', $segment);
+    $isParam   = (bool) preg_match('/^:[a-z_][a-z0-9_]*$/', $segment);
+    if (!$isLiteral && !$isParam) {
         ApiResponse::create(400, 'route.invalid_segment')
-            ->withMessage("Invalid segment '$segment'. Use lowercase letters, numbers, and hyphens (no leading/trailing hyphens)")
-            ->withErrors([['field' => 'route', 'segment' => $segment, 'pattern' => 'a-z, 0-9, hyphens']])
+            ->withMessage("Invalid segment '$segment'. Use lowercase letters, numbers, hyphens for literals (no leading/trailing hyphens), or ':name' for a path parameter (lowercase identifier).")
+            ->withErrors([['field' => 'route', 'segment' => $segment, 'pattern' => "a-z 0-9 - OR :name"]])
             ->send();
     }
 }
@@ -137,6 +145,15 @@ if (routePathExists($segments, $currentRoutes)) {
         ->withData(['route' => $routePath])
         ->send();
 }
+
+// ============================================================================
+// CONFLICT DETECTION (beta.8 A1)
+// Detects param-route sibling situations BEFORE saving so the warnings
+// reference the original routes structure (not one that includes the
+// new segment as its own sibling). Non-blocking — route still saves.
+// ============================================================================
+
+$conflictWarnings = detectRouteConflicts($segments, $currentRoutes);
 
 // ============================================================================
 // FILE PATH RESOLUTION
@@ -275,6 +292,14 @@ if (!empty($cascadeCreated)) {
     $responseData['cascade_created'] = $cascadeCreated;
 }
 
+// Beta.8 A1 — surface non-blocking conflict warnings to the caller.
+// Each warning carries a `type` (i18n key for client localisation) plus
+// machine-readable details + an EN `message` fallback. Slice 3 (admin
+// form) will render these inline.
+if (!empty($conflictWarnings)) {
+    $responseData['warnings'] = $conflictWarnings;
+}
+
 ApiResponse::create(201, 'route.created')
     ->withMessage("Route '$routePath' created successfully")
     ->withData($responseData)
@@ -332,23 +357,106 @@ function addRouteToStructure(array $segments, array $routes): array {
 /**
  * Resolve PHP file path for new route
  * Convention: ALL routes use folder structure - route/route.php
+ * Beta.8 A1 — ':slug' segments sanitised to '__slug' for filesystem.
  */
 function resolveNewRoutePhpPath(array $segments, array $routes, string $pagesDir): string {
-    $routePath = implode('/', $segments);
-    $routeName = end($segments);
-    
-    // All routes use folder structure: path/name/name.php
+    $fsSegments = array_map('paramRouteSegmentToFs', $segments);
+    $routePath  = implode('/', $fsSegments);
+    $routeName  = end($fsSegments);
     return $pagesDir . '/' . $routePath . '/' . $routeName . '.php';
 }
 
 /**
  * Resolve JSON file path for new route
  * Convention: ALL routes use folder structure - route/route.json
+ * Beta.8 A1 — ':slug' segments sanitised to '__slug' for filesystem.
  */
 function resolveNewRouteJsonPath(array $segments, string $jsonDir): string {
-    $routePath = implode('/', $segments);
-    $routeName = end($segments);
-    
-    // All routes use folder structure: path/name/name.json
+    $fsSegments = array_map('paramRouteSegmentToFs', $segments);
+    $routePath  = implode('/', $fsSegments);
+    $routeName  = end($fsSegments);
     return $jsonDir . '/' . $routePath . '/' . $routeName . '.json';
+}
+
+/**
+ * Detect conflicts when adding a param route at a level that already
+ * has siblings. Returns structured warnings[] (NOT blocking — the route
+ * still saves). Locked design 2026-06-04, BETA8_PARAMETERISED_ROUTES.md
+ * slice 4.
+ *
+ * Two warning shapes:
+ *  - 'route.warning.param_shadows_exact_siblings' — when adding a
+ *    ':name' segment at a depth that has existing literal siblings.
+ *    Specificity rule keeps the literals safe at runtime; warn so the
+ *    user confirms the catch-all is intended.
+ *  - 'route.warning.duplicate_param_at_depth' — when adding a ':name'
+ *    at a depth that already has a different ':other'. Declaration
+ *    order resolves at runtime, but ambiguous — warn.
+ *
+ * Each warning carries:
+ *   - type    : machine-readable i18n key
+ *   - message : EN literal fallback (client localises via type later)
+ *   - …       : structured data (siblings, existing, new, depth)
+ *
+ * @param array $segments  Segments of the route being added
+ * @param array $routes    Current routes structure
+ * @return array Array of warning objects
+ */
+function detectRouteConflicts(array $segments, array $routes): array {
+    $warnings = [];
+    $current  = $routes;
+    $depth    = 0;
+
+    foreach ($segments as $segment) {
+        $isParamSegment = strlen($segment) > 1 && $segment[0] === ':';
+
+        if ($isParamSegment) {
+            // Look at this level's siblings BEFORE descending — these
+            // are the routes that already exist at the same depth as
+            // the new ':name' segment.
+            $siblings = is_array($current) ? array_keys($current) : [];
+
+            // a) Exact literal siblings → 'param_shadows_exact_siblings'
+            $literalSiblings = array_values(array_filter(
+                $siblings,
+                fn(string $k): bool => strlen($k) === 0 || $k[0] !== ':'
+            ));
+            if (!empty($literalSiblings)) {
+                $siblingsList = implode(', ', array_map(fn($s) => '/' . $s, $literalSiblings));
+                $warnings[] = [
+                    'type'     => 'route.warning.param_shadows_exact_siblings',
+                    'depth'    => $depth,
+                    'paramName'=> substr($segment, 1),
+                    'siblings' => $literalSiblings,
+                    'message'  => "Param route '$segment' at depth $depth will catch URLs other than the existing exact siblings: $siblingsList. Specificity keeps those safe at runtime, but verify the catch-all is intended.",
+                ];
+            }
+
+            // b) Other ':name' siblings → 'duplicate_param_at_depth'
+            foreach ($siblings as $k) {
+                if (strlen($k) > 1 && $k[0] === ':' && $k !== $segment) {
+                    $warnings[] = [
+                        'type'     => 'route.warning.duplicate_param_at_depth',
+                        'depth'    => $depth,
+                        'existing' => $k,
+                        'new'      => $segment,
+                        'message'  => "Another param segment '$k' already exists at depth $depth. The new '$segment' is ambiguous — declaration order in routes.php decides which name captures (existing '$k' wins). Consider renaming or removing one.",
+                    ];
+                    break;  // one warning per duplicate is enough
+                }
+            }
+        }
+
+        // Descend if this segment exists (so deeper levels see the
+        // right siblings); otherwise stop the walk — there are no
+        // siblings to detect beyond this point for new branches.
+        if (is_array($current) && isset($current[$segment])) {
+            $current = $current[$segment];
+        } else {
+            break;
+        }
+        $depth++;
+    }
+
+    return $warnings;
 }

@@ -17,15 +17,15 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 // Define commands in global scope for access from __command_help()
 $GLOBALS['__help_commands'] = [
     'addRoute' => [
-        'description' => 'Creates a new route with PHP page template and empty JSON structure. Supports nested routes (e.g., "guides/getting-started").',
+        'description' => 'Creates a new route with PHP page template and empty JSON structure. Supports nested routes (e.g., "guides/getting-started") and parameterised routes (beta.8 A1) via ":name" segments (e.g., "products/:slug").',
         'method' => 'POST',
         'parameters' => [
             'route' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Route path (will be used in URL). Use slashes for nested routes. Can use "name" as alias for simple routes.',
-                'example' => 'about-us',
-                'validation' => 'Lowercase letters, numbers, and hyphens only. Max depth: 5 levels.',
+                'description' => 'Route path (will be used in URL). Use slashes for nested routes. Use ":name" segments for path parameters (e.g., "products/:slug" matches /products/red-vase). Can use "name" as alias for simple routes.',
+                'example' => 'products/:slug',
+                'validation' => 'Literal segments: lowercase letters, numbers, hyphens (no leading/trailing hyphens). Param segments: ":" followed by an identifier ([a-zA-Z_][a-zA-Z0-9_]*). Max depth: 5 levels.',
                 'alias' => 'name'
             ],
             'parent' => [
@@ -36,26 +36,27 @@ $GLOBALS['__help_commands'] = [
                 'validation' => 'Must be an existing route if provided'
             ]
         ],
-        'example_post' => 'POST /management/addRoute with body: {"route": "documentation/commands"} or {"route": "commands", "parent": "documentation"}',
+        'example_post' => 'POST /management/addRoute with body: {"route": "documentation/commands"} or {"route": "commands", "parent": "documentation"} or {"route": "products/:slug"}',
         'success_response' => [
             'status' => 201,
             'code' => 'route.created',
             'message' => 'Route successfully created and registered',
             'data' => [
-                'route' => 'about-us',
-                'php_file' => '/path/to/about-us.php',
-                'json_file' => '/path/to/about-us.json',
-                'routes_updated' => '/path/to/routes.php'
+                'route' => 'products/:slug',
+                'php_file' => '/templates/pages/products/__slug/__slug.php',
+                'json_file' => '/templates/model/json/pages/products/__slug/__slug.json',
+                'routes_updated' => '/path/to/routes.php',
+                'warnings' => '(optional) Array of structured conflict warnings (beta.8 A1) — see notes'
             ]
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing route parameter',
-            '400.route.invalid_name' => 'Invalid route name (only lowercase, numbers, hyphens)',
+            '400.route.invalid_segment' => 'Invalid segment. Literal: lowercase / numbers / hyphens. Param: ":name" with identifier.',
             '400.route.already_exists' => 'Route already exists',
             '500.server.file_write_failed' => 'Failed to create files',
             '500.server.directory_create_failed' => 'Failed to create directory'
         ],
-        'notes' => 'Creates PHP template with JSON renderer and empty JSON structure ([]). Use editStructure to populate content.'
+        'notes' => 'Creates PHP template + empty JSON structure. **Filesystem mapping**: ":slug" segments become "__slug" on disk (NTFS reserves ":") via routeHelpers.php. **Conflict warnings** (beta.8 A1, non-blocking): the response data.warnings[] array surfaces situations the user should confirm. Each warning carries a machine-readable `type` (i18n key) + EN `message` fallback + structured details. Two shapes today: `route.warning.param_shadows_exact_siblings` (param route alongside existing literals — runtime-safe via specificity but worth verifying intent) and `route.warning.duplicate_param_at_depth` (two ":name" siblings — declaration order resolves, but ambiguous).'
     ],
     
     'deleteRoute' => [

@@ -22,6 +22,9 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/String.php';
+// Beta.8 A1 — routeHelpers is already loaded by utilsManagement,
+// kept explicit here for clarity (paramRouteSegmentToFs use below).
+require_once SECURE_FOLDER_PATH . '/src/functions/routeHelpers.php';
 
 // ============================================================================
 // VALIDATION
@@ -64,9 +67,16 @@ if (strlen($routePath) < 1 || strlen($routePath) > 200) {
 $segments = array_filter(explode('/', $routePath), fn($s) => $s !== '');
 $segments = array_values($segments);
 
-// Validate segments
+// Validate segments. Accept both literal and `:name` param shapes
+// (beta.8 A1). The param regex here is slightly more permissive than
+// addRoute's strict lowercase: this lets deleteRoute clean up orphans
+// created via earlier too-loose validation (e.g., ':UPPER'). The real
+// existence check is routePathExists() below — segment validation just
+// guards against path-injection / weird characters.
 foreach ($segments as $segment) {
-    if (!preg_match('/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/', $segment)) {
+    $isLiteral = (bool) preg_match('/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/', $segment);
+    $isParam   = (bool) preg_match('/^:[a-zA-Z_][a-zA-Z0-9_]*$/', $segment);
+    if (!$isLiteral && !$isParam) {
         ApiResponse::create(400, 'route.invalid_segment')
             ->withMessage("Invalid segment '$segment'")
             ->send();
@@ -121,26 +131,31 @@ $filesToDelete = [];
 $dirsToDelete = [];
 
 foreach ($routesToDelete as $routeSegments) {
-    $path = implode('/', $routeSegments);
-    $name = end($routeSegments);
-    
+    // Beta.8 A1 — sanitise ':slug' → '__slug' for filesystem ops.
+    // routes.php key stays ':slug'; files on disk use '__slug'.
+    // Without this, file_exists() silently returns false for any
+    // param-route file and the cascade leaves ghost folders behind.
+    $fsSegments = array_map('paramRouteSegmentToFs', $routeSegments);
+    $path = implode('/', $fsSegments);
+    $name = end($fsSegments);
+
     // Determine file location (check both patterns)
     // Pattern 1: path/name.php (leaf)
     $leafPhp = $pagesDir . '/' . $path . '.php';
     // Pattern 2: path/name/name.php (branch)
     $branchPhp = $pagesDir . '/' . $path . '/' . $name . '.php';
-    
+
     if (file_exists($branchPhp)) {
         $filesToDelete[] = $branchPhp;
         $dirsToDelete[] = $pagesDir . '/' . $path;
     } elseif (file_exists($leafPhp)) {
         $filesToDelete[] = $leafPhp;
     }
-    
+
     // JSON files
     $leafJson = $jsonDir . '/' . $path . '.json';
     $branchJson = $jsonDir . '/' . $path . '/' . $name . '.json';
-    
+
     if (file_exists($branchJson)) {
         $filesToDelete[] = $branchJson;
         $dirsToDelete[] = $jsonDir . '/' . $path;

@@ -48,27 +48,52 @@ function varExportNested(array $array, int $indent = 0): string {
  * @return string The complete PHP page template content
  */
 function generate_page_template(string $route): string {
-    return <<<PHP
+    // Beta.8 A1 — emit a route-agnostic bootstrap. Pulling page +
+    // routeParams from TrimParameters at request time means the same
+    // template works for static AND param routes:
+    //   - static route 'home' → routePath() === 'home', routeParams() === []
+    //   - param  route 'test/:slug' → routePath() === 'test/:slug',
+    //                                routeParams() === ['slug' => 'red-vase']
+    // Behaviour for static routes is identical to the prior hardcoded
+    // form. Existing per-route .php files (generated before this
+    // change) keep their hardcoded shape — no migration needed.
+    //
+    // Page title key uses the route LITERAL ('page.titles.test/:slug')
+    // so authors can localise per-pattern. Falls back to a sensible
+    // default when no translation key is set.
+    return <<<'PHP'
 <?php
 
 require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';
-\$trimParameters = new TrimParameters();
+$trimParameters = new TrimParameters();
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
-\$translator = new Translator(\$trimParameters->lang());
-\$lang = \$trimParameters->lang();
+$translator = new Translator($trimParameters->lang());
+$lang = $trimParameters->lang();
 
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
-\$renderer = new JsonToHtmlRenderer(\$translator, ['lang' => \$lang, 'page' => '{$route}']);
+$renderer = new JsonToHtmlRenderer($translator, [
+    'lang'        => $lang,
+    'page'        => $trimParameters->routePath(),
+    'routeParams' => $trimParameters->routeParams(),
+]);
 
-\$content = \$renderer->renderPage('{$route}');
+$content = $renderer->renderPage($trimParameters->routePath());
 
 require_once SECURE_FOLDER_PATH . '/src/classes/PageManagement.php';
 
-// Get page title from translation
-\$pageTitle = \$translator->translate('page.titles.{$route}');
+// Page title — lookup uses the route PATTERN ('page.titles.test/:slug').
+// Translator returns the key itself when no translation is found; in
+// that case fall back to the route's leaf segment as a reasonable default.
+$titleKey = 'page.titles.' . $trimParameters->routePath();
+$pageTitle = $translator->translate($titleKey);
+if ($pageTitle === $titleKey || $pageTitle === '') {
+    $segments = $trimParameters->route();
+    $leaf = end($segments) ?: 'page';
+    $pageTitle = ucfirst(str_replace(['-', ':'], [' ', ''], $leaf));
+}
 
-\$page = new PageManagement(\$pageTitle, \$content, \$lang);
-\$page->render();
+$page = new PageManagement($pageTitle, $content, $lang);
+$page->render();
 
 PHP;
 }
