@@ -216,6 +216,12 @@ if (function_exists('opcache_invalidate')) {
     opcache_invalidate(ROUTES_PATH, true);
 }
 
+// Beta.8 A1 Build Slice 1 — regenerate the client-side routes schema
+// so qs.js (Slice 2) drops the deleted route immediately without a
+// full rebuild. Same pattern as addRoute above.
+$routesMetaPath = PUBLIC_CONTENT_PATH . '/scripts/qs-route-schema.js';
+writeRoutesMetaFile($newRoutes, $routesMetaPath);
+
 // ============================================================================
 // CLEAN UP ALIASES
 // ============================================================================

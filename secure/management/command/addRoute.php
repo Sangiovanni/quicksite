@@ -261,7 +261,14 @@ try {
     if (function_exists('opcache_invalidate')) {
         opcache_invalidate(ROUTES_PATH, true);
     }
-    
+
+    // Beta.8 A1 Build Slice 1 — regenerate the client-side routes
+    // schema so qs.js (Slice 2) sees the new route immediately
+    // without a full rebuild. Mirrors editApi's qs-api-config.js
+    // regen pattern. File is project-scoped public/scripts/qs-route-schema.js.
+    $routesMetaPath = PUBLIC_CONTENT_PATH . '/scripts/qs-route-schema.js';
+    writeRoutesMetaFile($newRoutes, $routesMetaPath);
+
 } catch (Exception $e) {
     // Cleanup on failure
     foreach (array_reverse($createdFiles) as $file) {

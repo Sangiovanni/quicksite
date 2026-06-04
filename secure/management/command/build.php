@@ -578,6 +578,18 @@ if (!$apiManager->writeCompiledJs($apiConfigPath)) {
         ->send();
 }
 
+// Step 4.6: Compile routes schema to JavaScript (beta.8 A1 Build Slice 1).
+// qs.js's client-side path matcher (Build Slice 2) consumes this on every
+// page load so deployed sites know which segments are :params. routeHelpers
+// is loaded via utilsManagement which build.php already depends on.
+$routesMetaPath = $scriptsDir . '/qs-route-schema.js';
+if (!writeRoutesMetaFile(ROUTES, $routesMetaPath)) {
+    release_build_lock();
+    ApiResponse::create(500, 'server.file_write_failed')
+        ->withMessage("Failed to write qs-route-schema.js")
+        ->send();
+}
+
 // Write qs-enums.js for the build. The runtime QS.enum() (and the
 // componentList render mode) reads from window.QS_ENUMS, populated by
 // this file. Built sites still need it — without it, any binding with

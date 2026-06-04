@@ -186,6 +186,30 @@ function __command_switchProject(array $params = [], array $urlParams = []): Api
         $result['enum_registry_warnings'] = $enumSync['warnings'];
     }
 
+    // Regenerate qs-route-schema.js with the new project's routes
+    // structure (beta.8 A1 Build Slice 1). Without this, qs.js's
+    // client-side path matcher would route URLs against the previous
+    // project's routes — same staleness class as qs-api-config.js
+    // and qs-enums.js. Loads the new project's routes.php directly
+    // (the ROUTES constant in scope here still points at the
+    // previous project's load).
+    require_once SECURE_FOLDER_PATH . '/src/functions/routeHelpers.php';
+    $projectRoutesFile = $projectPath . '/routes.php';
+    if (file_exists($projectRoutesFile)) {
+        $projectRoutes = require $projectRoutesFile;
+        if (is_array($projectRoutes)) {
+            $routesMetaPath = PUBLIC_CONTENT_PATH . '/scripts/qs-route-schema.js';
+            $result['routes_meta_regenerated'] = writeRoutesMetaFile($projectRoutes, $routesMetaPath);
+            $result['routes_meta_count']       = count($projectRoutes);
+        } else {
+            $result['routes_meta_regenerated'] = false;
+            $result['routes_meta_warning']     = 'routes.php returned a non-array';
+        }
+    } else {
+        $result['routes_meta_regenerated'] = false;
+        $result['routes_meta_warning']     = 'routes.php missing in project';
+    }
+
     return ApiResponse::create(200, 'operation.success')
         ->withMessage("Switched to project '$projectName'")
         ->withData($result);
