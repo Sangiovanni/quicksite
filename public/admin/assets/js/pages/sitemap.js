@@ -27,8 +27,6 @@
         return translations[key] || fallback || key;
     }
 
-    const esc = (s) => QuickSiteAdmin.escapeHtml(String(s));
-
     function getCoverageClass(percent) {
         if (percent >= 95) return 'sitemap__coverage--excellent';
         if (percent >= 80) return 'sitemap__coverage--good';
@@ -87,11 +85,156 @@
     }
 
     // ========================================================================
+    // DOM render helpers (createElement style — CLAUDE.md HTML-in-JS hygiene)
+    // ========================================================================
+    //
+    // The render functions below build DOM trees via createElement +
+    // textContent + setAttribute, returning Elements / DocumentFragments.
+    // Trusted SVG snippets from QuickSiteUtils are injected via
+    // wrapper.innerHTML and then unwrapped — the CLAUDE.md exemption
+    // covers small static icons. No user data flows through innerHTML.
+
+    /**
+     * Convert a trusted HTML string (typically a QuickSiteUtils icon helper
+     * return value) into a live Element. Pulls out the first child of a
+     * staging wrapper so the caller gets the element directly, not the
+     * wrapper. Returns null when the input is empty / unparseable.
+     */
+    function _htmlToEl(html) {
+        if (!html) return null;
+        const tmp = document.createElement('span');
+        tmp.innerHTML = html;
+        return tmp.firstElementChild;
+    }
+
+    /**
+     * Beta.8 A1 — Render the route path with param-segment styling +
+     * a trailing param-count badge.
+     *
+     * Splits the path on '/' and wraps any ':name' segment in a span
+     * with the --param accent class. Static (literal) segments stay as
+     * text nodes. If any param segments are present, appends a small
+     * "<N> param[s]" badge so the user can spot variable routes at a
+     * glance.
+     *
+     * Example output for '/products/:slug':
+     *   <span class="sitemap__route-path">
+     *     /products/<span class="sitemap__route-path-segment--param">:slug</span>
+     *     <span class="sitemap__route-badge--params">1 param</span>
+     *   </span>
+     *
+     * @param {string} pathString — e.g. '/products/:slug'
+     * @returns {HTMLElement}
+     */
+    function _renderRoutePath(pathString) {
+        const wrapper = document.createElement('span');
+        wrapper.className = 'sitemap__route-path';
+
+        const path = String(pathString || '');
+        const segments = path.split('/');
+        let paramCount = 0;
+
+        segments.forEach((seg, idx) => {
+            // Re-emit the leading slash between segments. segments[0] is
+            // empty when path starts with '/' — handled by skipping idx 0.
+            if (idx > 0) wrapper.appendChild(document.createTextNode('/'));
+            if (seg.startsWith(':')) {
+                paramCount++;
+                const paramSpan = document.createElement('span');
+                paramSpan.className = 'sitemap__route-path-segment--param';
+                paramSpan.textContent = seg;
+                wrapper.appendChild(paramSpan);
+            } else if (seg !== '') {
+                wrapper.appendChild(document.createTextNode(seg));
+            }
+        });
+
+        if (paramCount > 0) {
+            const badge = document.createElement('span');
+            badge.className = 'sitemap__route-badge--params';
+            const labelKey = paramCount === 1 ? 'paramSingular' : 'paramPlural';
+            const labelFallback = paramCount === 1 ? 'param' : 'params';
+            badge.textContent = paramCount + ' ' + t(labelKey, labelFallback);
+            wrapper.appendChild(badge);
+        }
+
+        return wrapper;
+    }
+
+    /**
+     * Render the per-route layout toggles (menu / footer visibility).
+     * Each is a button carrying data-action + data-route consumed by the
+     * delegated click listener in bindEvents.
+     */
+    function _renderLayoutToggles(routePath, layout) {
+        const wrap = document.createElement('span');
+        wrap.className = 'sitemap-layout-toggles';
+
+        const menuBtn = document.createElement('button');
+        menuBtn.type = 'button';
+        menuBtn.className = 'sitemap-layout-toggle' + (layout.menu ? ' sitemap-layout-toggle--on' : '');
+        menuBtn.setAttribute('data-action', 'toggle-menu');
+        menuBtn.setAttribute('data-route', routePath);
+        menuBtn.title = layout.menu ? t('menuOn', 'Menu: visible') : t('menuOff', 'Menu: hidden');
+        menuBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>';
+        wrap.appendChild(menuBtn);
+
+        const footerBtn = document.createElement('button');
+        footerBtn.type = 'button';
+        footerBtn.className = 'sitemap-layout-toggle' + (layout.footer ? ' sitemap-layout-toggle--on' : '');
+        footerBtn.setAttribute('data-action', 'toggle-footer');
+        footerBtn.setAttribute('data-route', routePath);
+        footerBtn.title = layout.footer ? t('footerOn', 'Footer: visible') : t('footerOff', 'Footer: hidden');
+        footerBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="15" x2="21" y2="15"/></svg>';
+        wrap.appendChild(footerBtn);
+
+        return wrap;
+    }
+
+    /**
+     * Render the row-hover action buttons (add-child + kebab context menu).
+     */
+    function _renderRouteActions(routePath, canAddChild, isHome, hasChildren, routeDepth) {
+        const wrap = document.createElement('span');
+        wrap.className = 'sitemap-actions';
+
+        if (canAddChild) {
+            const addBtn = document.createElement('button');
+            addBtn.type = 'button';
+            addBtn.className = 'sitemap-action sitemap-action--add';
+            addBtn.setAttribute('data-action', 'add-child');
+            addBtn.setAttribute('data-route', routePath);
+            addBtn.title = t('addChild');
+            addBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+            wrap.appendChild(addBtn);
+        }
+
+        const ctxBtn = document.createElement('button');
+        ctxBtn.type = 'button';
+        ctxBtn.className = 'sitemap-action sitemap-action--menu';
+        ctxBtn.setAttribute('data-action', 'context-menu');
+        ctxBtn.setAttribute('data-route', routePath);
+        ctxBtn.setAttribute('data-is-home', String(isHome));
+        ctxBtn.setAttribute('data-has-children', String(hasChildren));
+        ctxBtn.setAttribute('data-depth', String(routeDepth));
+        ctxBtn.title = 'Actions';
+        ctxBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>';
+        wrap.appendChild(ctxBtn);
+
+        return wrap;
+    }
+
+    // ========================================================================
     // Step 2: Render Route Tree (with action buttons for Steps 4-6)
     // ========================================================================
 
+    /**
+     * Render the route tree as a DocumentFragment. Recursive — child trees
+     * are produced by sub-calls and grafted into a wrapping container.
+     * Caller appends the returned fragment to its target element.
+     */
     function renderRouteTree(tree, depth = 0, parentPath = '') {
-        let html = '';
+        const fragment = document.createDocumentFragment();
         const entries = Object.entries(tree).filter(([key]) => key !== '_route');
         const layouts = sitemapData?.routeLayouts || {};
 
@@ -112,67 +255,69 @@
             const routeDepth = getRouteDepth(routePath);
             const canAddChild = routeDepth < 4 && !isHome; // max depth 5 = index 4
             const isExpanded = expandedNodes.has(routePath) || (expandedNodes.size === 0 && depth === 0);
-
-            // Layout toggles (menu/footer)
             const layout = layouts[routePath] || { menu: true, footer: true };
-            const layoutHtml = `<span class="sitemap-layout-toggles">
-                <button type="button" class="sitemap-layout-toggle${layout.menu ? ' sitemap-layout-toggle--on' : ''}" data-action="toggle-menu" data-route="${esc(routePath)}" title="${layout.menu ? t('menuOn', 'Menu: visible') : t('menuOff', 'Menu: hidden')}">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-                </button>
-                <button type="button" class="sitemap-layout-toggle${layout.footer ? ' sitemap-layout-toggle--on' : ''}" data-action="toggle-footer" data-route="${esc(routePath)}" title="${layout.footer ? t('footerOn', 'Footer: visible') : t('footerOff', 'Footer: hidden')}">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
-                </button>
-            </span>`;
-
-            // Action buttons
-            const addChildBtn = canAddChild
-                ? `<button type="button" class="sitemap-action sitemap-action--add" data-action="add-child" data-route="${esc(routePath)}" title="${t('addChild')}">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                   </button>`
-                : '';
-
-            const contextBtn = `<button type="button" class="sitemap-action sitemap-action--menu" data-action="context-menu" data-route="${esc(routePath)}" data-is-home="${isHome}" data-has-children="${hasChildren}" data-depth="${routeDepth}" title="Actions">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-            </button>`;
-
-            const actionsHtml = `<span class="sitemap-actions">${addChildBtn}${contextBtn}</span>`;
 
             if (hasChildren) {
-                html += `<div class="sitemap__tree-node${isExpanded ? ' sitemap__tree-node--open' : ''}" style="--depth: ${depth}" data-route-path="${esc(routePath)}">
-                    <div class="sitemap__tree-header">
-                        <button class="sitemap__tree-toggle" type="button" aria-label="Toggle">
-                            ${QuickSiteUtils.iconChevronRight(12)}
-                        </button>
-                        <span class="sitemap__route sitemap__route--parent">
-                            ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.folder, 14, 'sitemap__route-icon')}
-                            <span class="sitemap__route-name">${esc(name)}</span>
-                            <span class="sitemap__route-path">${esc(route.path)}</span>
-                        </span>
-                        ${layoutHtml}
-                        ${actionsHtml}
-                    </div>
-                    <div class="sitemap__tree-children">
-                        ${renderRouteTree(node, depth + 1, routePath)}
-                    </div>
-                </div>`;
-            } else {
-                const iconPath = isHome
-                    ? QuickSiteUtils.ICON_PATHS.home
-                    : QuickSiteUtils.ICON_PATHS.file;
+                const treeNode = document.createElement('div');
+                treeNode.className = 'sitemap__tree-node' + (isExpanded ? ' sitemap__tree-node--open' : '');
+                treeNode.style.setProperty('--depth', String(depth));
+                treeNode.setAttribute('data-route-path', routePath);
 
-                html += `<div class="sitemap__route sitemap__route--leaf" style="--depth: ${depth}" data-route-path="${esc(routePath)}">
-                    <svg class="sitemap__route-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                        ${iconPath}
-                    </svg>
-                    <span class="sitemap__route-name">${esc(name)}</span>
-                    <span class="sitemap__route-path">${esc(route.path)}</span>
-                    ${layoutHtml}
-                    ${actionsHtml}
-                </div>`;
+                const header = document.createElement('div');
+                header.className = 'sitemap__tree-header';
+
+                const toggleBtn = document.createElement('button');
+                toggleBtn.className = 'sitemap__tree-toggle';
+                toggleBtn.type = 'button';
+                toggleBtn.setAttribute('aria-label', 'Toggle');
+                toggleBtn.innerHTML = QuickSiteUtils.iconChevronRight(12);
+                header.appendChild(toggleBtn);
+
+                const routeSpan = document.createElement('span');
+                routeSpan.className = 'sitemap__route sitemap__route--parent';
+                const folderIcon = _htmlToEl(QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.folder, 14, 'sitemap__route-icon'));
+                if (folderIcon) routeSpan.appendChild(folderIcon);
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'sitemap__route-name';
+                nameSpan.textContent = name;
+                routeSpan.appendChild(nameSpan);
+                routeSpan.appendChild(_renderRoutePath(route.path));
+                header.appendChild(routeSpan);
+
+                header.appendChild(_renderLayoutToggles(routePath, layout));
+                header.appendChild(_renderRouteActions(routePath, canAddChild, isHome, hasChildren, routeDepth));
+                treeNode.appendChild(header);
+
+                const childrenWrap = document.createElement('div');
+                childrenWrap.className = 'sitemap__tree-children';
+                childrenWrap.appendChild(renderRouteTree(node, depth + 1, routePath));
+                treeNode.appendChild(childrenWrap);
+
+                fragment.appendChild(treeNode);
+            } else {
+                const leafNode = document.createElement('div');
+                leafNode.className = 'sitemap__route sitemap__route--leaf';
+                leafNode.style.setProperty('--depth', String(depth));
+                leafNode.setAttribute('data-route-path', routePath);
+
+                const iconPath = isHome ? QuickSiteUtils.ICON_PATHS.home : QuickSiteUtils.ICON_PATHS.file;
+                const leafIcon = _htmlToEl(QuickSiteUtils.svgIcon(iconPath, 14, 'sitemap__route-icon'));
+                if (leafIcon) leafNode.appendChild(leafIcon);
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'sitemap__route-name';
+                nameSpan.textContent = name;
+                leafNode.appendChild(nameSpan);
+
+                leafNode.appendChild(_renderRoutePath(route.path));
+                leafNode.appendChild(_renderLayoutToggles(routePath, layout));
+                leafNode.appendChild(_renderRouteActions(routePath, canAddChild, isHome, hasChildren, routeDepth));
+
+                fragment.appendChild(leafNode);
             }
         });
 
-        return html;
+        return fragment;
     }
 
     // ========================================================================
@@ -181,18 +326,32 @@
 
     function renderSummary(data, validationData) {
         const routes = data.routes || [];
-        const languages = data.languages || [];
         const dashSitemap = window.QUICKSITE_CONFIG?.translations?.dashboard?.sitemap || {};
 
-        const coverageBadges = renderCoverage(data, validationData);
+        const summary = document.createElement('div');
+        summary.className = 'sitemap__summary';
 
-        return `<div class="sitemap__summary">
-            <span class="sitemap__total">${data.totalUrls} ${dashSitemap.urls || 'URLs'}</span>
-            <span class="sitemap__divider">•</span>
-            <span>${routes.length} ${dashSitemap.routes || 'routes'}</span>
-            <span class="sitemap__divider">•</span>
-            ${coverageBadges}
-        </div>`;
+        const totalSpan = document.createElement('span');
+        totalSpan.className = 'sitemap__total';
+        totalSpan.textContent = data.totalUrls + ' ' + (dashSitemap.urls || 'URLs');
+        summary.appendChild(totalSpan);
+
+        const dividerA = document.createElement('span');
+        dividerA.className = 'sitemap__divider';
+        dividerA.textContent = '•';
+        summary.appendChild(dividerA);
+
+        const routesSpan = document.createElement('span');
+        routesSpan.textContent = routes.length + ' ' + (dashSitemap.routes || 'routes');
+        summary.appendChild(routesSpan);
+
+        const dividerB = document.createElement('span');
+        dividerB.className = 'sitemap__divider';
+        dividerB.textContent = '•';
+        summary.appendChild(dividerB);
+
+        summary.appendChild(renderCoverage(data, validationData));
+        return summary;
     }
 
     // ========================================================================
@@ -207,7 +366,10 @@
         const coverage = validationData || {};
 
         if (!multilingual || languages.length <= 1) {
-            return `<span class="badge badge--ghost">${languages[0]?.toUpperCase() || 'EN'}</span>`;
+            const ghost = document.createElement('span');
+            ghost.className = 'badge badge--ghost';
+            ghost.textContent = languages[0]?.toUpperCase() || 'EN';
+            return ghost;
         }
 
         const sorted = [...languages].sort((a, b) => {
@@ -216,119 +378,272 @@
             return a.localeCompare(b);
         });
 
-        let html = '<div style="display:flex; gap:var(--space-sm); flex-wrap:wrap; align-items:center;">';
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'display:flex; gap:var(--space-sm); flex-wrap:wrap; align-items:center;';
+
         sorted.forEach(lang => {
             const langName = languageNames[lang] || lang.toUpperCase();
             const isDefault = lang === defaultLang;
             const langCoverage = coverage[lang];
             const coveragePercent = langCoverage?.coverage_percent ?? null;
             const missingCount = langCoverage?.total_missing ?? 0;
-
             const coverageClass = coveragePercent !== null ? getCoverageClass(coveragePercent) : '';
             const tooltip = coveragePercent !== null
                 ? `${langName}: ${coveragePercent}% coverage` + (missingCount > 0 ? ` (${missingCount} missing keys)` : '')
                 : langName;
 
-            html += `<span class="sitemap-lang-badge ${coverageClass}" title="${esc(tooltip)}">
-                <span class="sitemap-lang-badge__flag">${getFlagEmoji(lang)}</span>
-                <span class="sitemap-lang-badge__code">${esc(lang.toUpperCase())}</span>
-                ${isDefault ? '<span class="sitemap-lang-badge__default">*</span>' : ''}
-                ${coveragePercent !== null ? `<span class="sitemap-lang-badge__pct">${coveragePercent}%</span>` : ''}
-            </span>`;
+            const badge = document.createElement('span');
+            badge.className = 'sitemap-lang-badge' + (coverageClass ? ' ' + coverageClass : '');
+            badge.title = tooltip;
+
+            const flag = document.createElement('span');
+            flag.className = 'sitemap-lang-badge__flag';
+            flag.textContent = getFlagEmoji(lang);
+            badge.appendChild(flag);
+
+            const code = document.createElement('span');
+            code.className = 'sitemap-lang-badge__code';
+            code.textContent = lang.toUpperCase();
+            badge.appendChild(code);
+
+            if (isDefault) {
+                const star = document.createElement('span');
+                star.className = 'sitemap-lang-badge__default';
+                star.textContent = '*';
+                badge.appendChild(star);
+            }
+
+            if (coveragePercent !== null) {
+                const pct = document.createElement('span');
+                pct.className = 'sitemap-lang-badge__pct';
+                pct.textContent = coveragePercent + '%';
+                badge.appendChild(pct);
+            }
+
+            wrap.appendChild(badge);
         });
-        html += '</div>';
-        return html;
+
+        return wrap;
     }
 
     // ========================================================================
     // Step 3: Reachability Graph
     // ========================================================================
 
-    function renderReachability(data) {
-        if (!data) return '<p style="color:var(--admin-text-muted);">Could not load reachability data.</p>';
+    /**
+     * Build the 3-column stats strip (total / reachable / orphans).
+     */
+    function _renderReachabilityStats(data) {
+        const { total_routes, reachable_count, orphan_count } = data;
+        const stats = document.createElement('div');
+        stats.style.cssText = 'display:flex; gap:var(--space-lg); flex-wrap:wrap; margin-bottom:var(--space-lg);';
 
-        const { total_routes, reachable_count, orphan_count, reachable, orphans, graph, global_links } = data;
+        function statBlock(value, label, color) {
+            const block = document.createElement('div');
+            block.style.textAlign = 'center';
+            const val = document.createElement('div');
+            val.style.cssText = 'font-size:var(--font-size-2xl); font-weight:var(--font-weight-bold);' + (color ? ' color:' + color + ';' : '');
+            val.textContent = String(value);
+            const lbl = document.createElement('div');
+            lbl.style.cssText = 'font-size:var(--font-size-sm); color:var(--admin-text-muted);';
+            lbl.textContent = label;
+            block.appendChild(val);
+            block.appendChild(lbl);
+            return block;
+        }
+
+        stats.appendChild(statBlock(total_routes, t('totalRoutes', 'Total Routes')));
+        stats.appendChild(statBlock(reachable_count, t('reachable', 'Reachable'), 'var(--admin-success)'));
+        stats.appendChild(statBlock(orphan_count, t('orphans', 'Orphans'),
+            orphan_count > 0 ? 'var(--admin-error)' : 'var(--admin-text-muted)'));
+        return stats;
+    }
+
+    /**
+     * Orphan-routes section. Returns null when there are no orphans so the
+     * caller can skip the divider visually.
+     */
+    function _renderReachabilityOrphans(orphans) {
+        if (!orphans || orphans.length === 0) return null;
+        const section = document.createElement('div');
+        section.style.marginBottom = 'var(--space-lg)';
+
+        const h3 = document.createElement('h3');
+        h3.style.cssText = 'margin-bottom:var(--space-sm); color:var(--admin-error);';
+        h3.textContent = t('unreachableRoutes', 'Unreachable Routes');
+        section.appendChild(h3);
+
+        const list = document.createElement('div');
+        list.style.cssText = 'display:flex; gap:var(--space-xs); flex-wrap:wrap;';
+        orphans.forEach(r => {
+            const badge = document.createElement('span');
+            badge.className = 'admin-badge admin-badge--error';
+            badge.textContent = '/' + r;
+            list.appendChild(badge);
+        });
+        section.appendChild(list);
+
+        const hint = document.createElement('p');
+        hint.style.cssText = 'font-size:var(--font-size-sm); color:var(--admin-text-muted); margin-top:var(--space-xs);';
+        hint.textContent = t('unreachableHint');
+        section.appendChild(hint);
+        return section;
+    }
+
+    /**
+     * Global menu / footer link rows.
+     */
+    function _renderReachabilityGlobalNav(globalLinks) {
+        const section = document.createElement('div');
+        section.style.marginBottom = 'var(--space-lg)';
+
+        const h3 = document.createElement('h3');
+        h3.style.marginBottom = 'var(--space-sm)';
+        h3.textContent = t('globalNav', 'Global Navigation Links');
+        section.appendChild(h3);
+
+        function navRow(label, links, isLast) {
+            const row = document.createElement('div');
+            if (!isLast) row.style.marginBottom = 'var(--space-xs)';
+            const strong = document.createElement('strong');
+            strong.textContent = label + ':';
+            row.appendChild(strong);
+            row.appendChild(document.createTextNode(' '));
+            if (links && links.length > 0) {
+                links.forEach((r, i) => {
+                    const badge = document.createElement('span');
+                    badge.className = 'admin-badge admin-badge--info';
+                    badge.textContent = '/' + r;
+                    row.appendChild(badge);
+                    if (i < links.length - 1) row.appendChild(document.createTextNode(' '));
+                });
+            } else {
+                const em = document.createElement('em');
+                em.textContent = t('none', 'none');
+                row.appendChild(em);
+            }
+            return row;
+        }
+
+        section.appendChild(navRow(t('menu', 'Menu'), globalLinks?.menu, false));
+        section.appendChild(navRow(t('footer', 'Footer'), globalLinks?.footer, true));
+        return section;
+    }
+
+    /**
+     * Link-graph table: each route → its outgoing internal links.
+     */
+    function _renderReachabilityLinkGraph(graph, orphans) {
+        const section = document.createElement('div');
+
+        const h3 = document.createElement('h3');
+        h3.style.marginBottom = 'var(--space-sm)';
+        h3.textContent = t('linkGraph', 'Link Graph');
+        section.appendChild(h3);
+
+        const desc = document.createElement('p');
+        desc.style.cssText = 'font-size:var(--font-size-sm); color:var(--admin-text-muted); margin-bottom:var(--space-sm);';
+        desc.textContent = t('linkGraphDesc');
+        section.appendChild(desc);
+
+        const table = document.createElement('table');
+        table.className = 'admin-table';
+        table.style.width = '100%';
+
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        const th1 = document.createElement('th');
+        th1.textContent = t('route', 'Route');
+        headerRow.appendChild(th1);
+        headerRow.appendChild(document.createElement('th'));
+        const th3 = document.createElement('th');
+        th3.textContent = t('linksTo', 'Links To');
+        headerRow.appendChild(th3);
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        const sortedRoutes = Object.keys(graph || {}).sort();
+        sortedRoutes.forEach(route => {
+            const targets = (graph[route] || []).sort();
+            const isOrphan = orphans && orphans.includes(route);
+            const row = document.createElement('tr');
+
+            const td1 = document.createElement('td');
+            const routeBadge = document.createElement('span');
+            routeBadge.className = 'admin-badge ' + (isOrphan ? 'admin-badge--error' : 'admin-badge--success');
+            routeBadge.textContent = '/' + route;
+            td1.appendChild(routeBadge);
+            row.appendChild(td1);
+
+            const td2 = document.createElement('td');
+            td2.style.fontSize = 'var(--font-size-sm)';
+            td2.textContent = '→';
+            row.appendChild(td2);
+
+            const td3 = document.createElement('td');
+            if (targets.length > 0) {
+                targets.forEach((target, idx) => {
+                    const cls = (orphans && orphans.includes(target)) ? 'admin-badge--error' : 'admin-badge--muted';
+                    const badge = document.createElement('span');
+                    badge.className = 'admin-badge admin-badge--small ' + cls;
+                    badge.textContent = '/' + target;
+                    td3.appendChild(badge);
+                    if (idx < targets.length - 1) td3.appendChild(document.createTextNode(' '));
+                });
+            } else {
+                const em = document.createElement('em');
+                em.style.color = 'var(--admin-text-muted)';
+                em.textContent = t('noLinks', 'no links');
+                td3.appendChild(em);
+            }
+            row.appendChild(td3);
+            tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        section.appendChild(table);
+        return section;
+    }
+
+    /**
+     * Top-level reachability render. Returns a DocumentFragment so the
+     * caller can swap it into the section via replaceChildren.
+     */
+    function renderReachability(data) {
+        if (!data) {
+            const p = document.createElement('p');
+            p.style.color = 'var(--admin-text-muted)';
+            p.textContent = 'Could not load reachability data.';
+            return p;
+        }
+
+        const fragment = document.createDocumentFragment();
+        const { orphan_count, orphans, graph, global_links } = data;
         const allGood = orphan_count === 0;
 
         // Status banner
-        const bannerClass = allGood ? 'admin-alert--success' : 'admin-alert--warning';
-        const bannerIcon = allGood
+        const banner = document.createElement('div');
+        banner.className = 'admin-alert ' + (allGood ? 'admin-alert--success' : 'admin-alert--warning');
+        banner.style.marginBottom = 'var(--space-lg)';
+        const bannerIconHtml = allGood
             ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
             : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+        const bannerIcon = _htmlToEl(bannerIconHtml);
+        if (bannerIcon) banner.appendChild(bannerIcon);
+        const bannerStrong = document.createElement('strong');
+        bannerStrong.textContent = allGood
+            ? t('allReachable')
+            : orphan_count + ' ' + t('orphansFound', 'orphan route(s) found').replace('{count}', orphan_count);
+        banner.appendChild(bannerStrong);
+        fragment.appendChild(banner);
 
-        // Stats
-        const statsHtml = `<div style="display:flex; gap:var(--space-lg); flex-wrap:wrap; margin-bottom:var(--space-lg);">
-            <div style="text-align:center;">
-                <div style="font-size:var(--font-size-2xl); font-weight:var(--font-weight-bold);">${total_routes}</div>
-                <div style="font-size:var(--font-size-sm); color:var(--admin-text-muted);">${t('totalRoutes', 'Total Routes')}</div>
-            </div>
-            <div style="text-align:center;">
-                <div style="font-size:var(--font-size-2xl); font-weight:var(--font-weight-bold); color:var(--admin-success);">${reachable_count}</div>
-                <div style="font-size:var(--font-size-sm); color:var(--admin-text-muted);">${t('reachable', 'Reachable')}</div>
-            </div>
-            <div style="text-align:center;">
-                <div style="font-size:var(--font-size-2xl); font-weight:var(--font-weight-bold); color:${orphan_count > 0 ? 'var(--admin-error)' : 'var(--admin-text-muted)'};">${orphan_count}</div>
-                <div style="font-size:var(--font-size-sm); color:var(--admin-text-muted);">${t('orphans', 'Orphans')}</div>
-            </div>
-        </div>`;
+        fragment.appendChild(_renderReachabilityStats(data));
+        const orphansEl = _renderReachabilityOrphans(orphans);
+        if (orphansEl) fragment.appendChild(orphansEl);
+        fragment.appendChild(_renderReachabilityGlobalNav(global_links));
+        fragment.appendChild(_renderReachabilityLinkGraph(graph, orphans));
 
-        // Orphans list
-        let orphansHtml = '';
-        if (orphans && orphans.length > 0) {
-            orphansHtml = `<div style="margin-bottom:var(--space-lg);">
-                <h3 style="margin-bottom:var(--space-sm); color:var(--admin-error);">${t('unreachableRoutes', 'Unreachable Routes')}</h3>
-                <div style="display:flex; gap:var(--space-xs); flex-wrap:wrap;">
-                    ${orphans.map(r => `<span class="admin-badge admin-badge--error">/${esc(r)}</span>`).join('')}
-                </div>
-                <p style="font-size:var(--font-size-sm); color:var(--admin-text-muted); margin-top:var(--space-xs);">${t('unreachableHint')}</p>
-            </div>`;
-        }
-
-        // Global nav
-        const menuBadges = (global_links?.menu || []).map(r => `<span class="admin-badge admin-badge--info">/${esc(r)}</span>`).join(' ');
-        const footerBadges = (global_links?.footer || []).map(r => `<span class="admin-badge admin-badge--info">/${esc(r)}</span>`).join(' ');
-        const globalHtml = `<div style="margin-bottom:var(--space-lg);">
-            <h3 style="margin-bottom:var(--space-sm);">${t('globalNav', 'Global Navigation Links')}</h3>
-            <div style="margin-bottom:var(--space-xs);"><strong>${t('menu', 'Menu')}:</strong> ${menuBadges || `<em>${t('none', 'none')}</em>`}</div>
-            <div><strong>${t('footer', 'Footer')}:</strong> ${footerBadges || `<em>${t('none', 'none')}</em>`}</div>
-        </div>`;
-
-        // Link graph table
-        let graphRows = '';
-        const sortedRoutes = Object.keys(graph || {}).sort();
-        for (const route of sortedRoutes) {
-            const targets = (graph[route] || []).sort();
-            const isOrphan = orphans && orphans.includes(route);
-            const routeBadgeClass = isOrphan ? 'admin-badge--error' : 'admin-badge--success';
-            const targetBadges = targets.map(t => {
-                const cls = (orphans && orphans.includes(t)) ? 'admin-badge--error' : 'admin-badge--muted';
-                return `<span class="admin-badge admin-badge--small ${cls}">/${esc(t)}</span>`;
-            }).join(' ');
-            graphRows += `<tr>
-                <td><span class="admin-badge ${routeBadgeClass}">/${esc(route)}</span></td>
-                <td style="font-size:var(--font-size-sm);">→</td>
-                <td>${targetBadges || `<em style="color:var(--admin-text-muted);">${t('noLinks', 'no links')}</em>`}</td>
-            </tr>`;
-        }
-        const graphHtml = `<div>
-            <h3 style="margin-bottom:var(--space-sm);">${t('linkGraph', 'Link Graph')}</h3>
-            <p style="font-size:var(--font-size-sm); color:var(--admin-text-muted); margin-bottom:var(--space-sm);">${t('linkGraphDesc')}</p>
-            <table class="admin-table" style="width:100%;">
-                <thead><tr><th>${t('route', 'Route')}</th><th></th><th>${t('linksTo', 'Links To')}</th></tr></thead>
-                <tbody>${graphRows}</tbody>
-            </table>
-        </div>`;
-
-        return `
-            <div class="admin-alert ${bannerClass}" style="margin-bottom:var(--space-lg);">
-                ${bannerIcon}
-                <strong>${allGood ? t('allReachable') : orphan_count + ' ' + t('orphansFound', 'orphan route(s) found').replace('{count}', orphan_count)}</strong>
-            </div>
-            ${statsHtml}
-            ${orphansHtml}
-            ${globalHtml}
-            ${graphHtml}
-        `;
+        return fragment;
     }
 
     // ========================================================================
@@ -342,33 +657,59 @@
         const isRoot = !parentRoute;
         const label = isRoot ? t('newRoute', 'New route') : `${t('newChildOf', 'New child of')} "${parentRoute}"`;
 
-        const formHtml = `<div class="sitemap-inline-form" id="sitemap-add-form">
-            <span class="sitemap-inline-form__label">${esc(label)}:</span>
-            <input type="text" class="admin-input admin-input--sm" id="sitemap-new-route-name"
-                   placeholder="${isRoot ? t('routeNameNested', 'route-name or parent/child') : t('routeName', 'route-name')}" pattern="[a-z0-9\\-/]+" autofocus />
-            <button type="button" class="admin-btn admin-btn--primary admin-btn--sm" id="sitemap-create-btn">${t('create', 'Create')}</button>
-            <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" id="sitemap-cancel-btn">${t('cancel', 'Cancel')}</button>
-            <span class="sitemap-inline-form__error" id="sitemap-add-error"></span>
-        </div>`;
+        const form = document.createElement('div');
+        form.className = 'sitemap-inline-form';
+        form.id = 'sitemap-add-form';
+
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'sitemap-inline-form__label';
+        labelSpan.textContent = label + ':';
+        form.appendChild(labelSpan);
+
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'admin-input admin-input--sm';
+        nameInput.id = 'sitemap-new-route-name';
+        nameInput.placeholder = isRoot
+            ? t('routeNameNested', 'route-name or parent/child')
+            : t('routeName', 'route-name');
+        nameInput.setAttribute('pattern', '[a-z0-9\\-/]+');
+        nameInput.autofocus = true;
+        form.appendChild(nameInput);
+
+        const createBtn = document.createElement('button');
+        createBtn.type = 'button';
+        createBtn.className = 'admin-btn admin-btn--primary admin-btn--sm';
+        createBtn.id = 'sitemap-create-btn';
+        createBtn.textContent = t('create', 'Create');
+        form.appendChild(createBtn);
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'admin-btn admin-btn--ghost admin-btn--sm';
+        cancelBtn.id = 'sitemap-cancel-btn';
+        cancelBtn.textContent = t('cancel', 'Cancel');
+        form.appendChild(cancelBtn);
+
+        const errorSpan = document.createElement('span');
+        errorSpan.className = 'sitemap-inline-form__error';
+        errorSpan.id = 'sitemap-add-error';
+        form.appendChild(errorSpan);
 
         if (isRoot) {
             // Insert at top of tree container
             const treeContainer = document.getElementById('sitemap-tree-container');
-            treeContainer.insertAdjacentHTML('afterbegin', formHtml);
+            treeContainer.prepend(form);
         } else {
             // Insert after the route's tree header or leaf element
             const routeEl = document.querySelector(`[data-route-path="${CSS.escape(parentRoute)}"]`);
             if (routeEl) {
                 const header = routeEl.querySelector('.sitemap__tree-header') || routeEl;
-                header.insertAdjacentHTML('afterend', formHtml);
+                header.after(form);
             }
         }
 
-        const nameInput = document.getElementById('sitemap-new-route-name');
-        const createBtn = document.getElementById('sitemap-create-btn');
-        const cancelBtn = document.getElementById('sitemap-cancel-btn');
-
-        nameInput?.focus();
+        nameInput.focus();
 
         // Beta.8 A1 — segment validation matches the server-side rules in
         // addRoute.php. Two valid shapes:
@@ -396,7 +737,10 @@
             }
 
             createBtn.disabled = true;
-            createBtn.innerHTML = `${QuickSiteUtils.htmlSpinner()} ${t('create')}`;
+            createBtn.textContent = '';
+            const spinnerEl = _htmlToEl(QuickSiteUtils.htmlSpinner());
+            if (spinnerEl) createBtn.appendChild(spinnerEl);
+            createBtn.appendChild(document.createTextNode(' ' + t('create')));
 
             try {
                 // Build full route path — addRoute handles cascade parent creation
@@ -461,6 +805,29 @@
     // Step 5: Context Menu
     // ========================================================================
 
+    /**
+     * Build one context-menu button. iconSvg is a trusted static SVG
+     * string (from QuickSiteUtils.* OR inline). data-ctx-action +
+     * data-route attrs feed the delegated click handler below.
+     */
+    function _ctxMenuItem({ action, route, iconSvg, label, danger, disabled, hasChildren }) {
+        const btn = document.createElement('button');
+        btn.className = 'sitemap-ctx__item'
+            + (danger ? ' sitemap-ctx__item--danger' : '')
+            + (disabled ? ' sitemap-ctx__item--disabled' : '');
+        if (action) btn.setAttribute('data-ctx-action', action);
+        if (route !== undefined) btn.setAttribute('data-route', route);
+        if (hasChildren !== undefined) btn.setAttribute('data-has-children', String(hasChildren));
+        if (disabled) btn.disabled = true;
+        const iconEl = _htmlToEl(iconSvg);
+        if (iconEl) btn.appendChild(iconEl);
+        btn.appendChild(document.createTextNode(' ' + label));
+        return btn;
+    }
+
+    // Trash icon used by both the delete + disabled-home items.
+    const _CTX_TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+
     function showContextMenu(button) {
         closeContextMenu();
 
@@ -470,47 +837,52 @@
         const depth = parseInt(button.dataset.depth || '0');
         const canAddChild = depth < 4 && !isHome;
 
-        let items = '';
-
-        if (canAddChild) {
-            items += `<button class="sitemap-ctx__item" data-ctx-action="add-child" data-route="${esc(route)}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                ${t('addChild', 'Add child')}
-            </button>`;
-        }
-
-        items += `<button class="sitemap-ctx__item" data-ctx-action="view-in-editor" data-route="${esc(route)}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-            ${t('viewInEditor', 'View in editor')}
-        </button>`;
-
-        items += `<button class="sitemap-ctx__item" data-ctx-action="open-page" data-route="${esc(route)}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            ${t('openPage', 'Open page')}
-        </button>`;
-
-        items += `<button class="sitemap-ctx__item" data-ctx-action="edit-title" data-route="${esc(route)}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-            ${t('editTitle', 'Edit title')}
-        </button>`;
-
-        if (!isHome) {
-            items += `<div class="sitemap-ctx__divider"></div>`;
-            items += `<button class="sitemap-ctx__item sitemap-ctx__item--danger" data-ctx-action="delete" data-route="${esc(route)}" data-has-children="${hasChildren}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                ${t('deleteRoute', 'Delete route')}
-            </button>`;
-        } else {
-            items += `<div class="sitemap-ctx__divider"></div>`;
-            items += `<button class="sitemap-ctx__item sitemap-ctx__item--disabled" disabled>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                ${t('cannotDeleteHome', 'Cannot delete home')}
-            </button>`;
-        }
-
         const menu = document.createElement('div');
         menu.className = 'sitemap-ctx';
-        menu.innerHTML = items;
+
+        if (canAddChild) {
+            menu.appendChild(_ctxMenuItem({
+                action: 'add-child', route,
+                label: t('addChild', 'Add child'),
+                iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+            }));
+        }
+
+        menu.appendChild(_ctxMenuItem({
+            action: 'view-in-editor', route,
+            label: t('viewInEditor', 'View in editor'),
+            iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
+        }));
+
+        menu.appendChild(_ctxMenuItem({
+            action: 'open-page', route,
+            label: t('openPage', 'Open page'),
+            iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>',
+        }));
+
+        menu.appendChild(_ctxMenuItem({
+            action: 'edit-title', route,
+            label: t('editTitle', 'Edit title'),
+            iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
+        }));
+
+        const divider = document.createElement('div');
+        divider.className = 'sitemap-ctx__divider';
+        menu.appendChild(divider);
+
+        if (!isHome) {
+            menu.appendChild(_ctxMenuItem({
+                action: 'delete', route, hasChildren,
+                label: t('deleteRoute', 'Delete route'),
+                danger: true, iconSvg: _CTX_TRASH_SVG,
+            }));
+        } else {
+            menu.appendChild(_ctxMenuItem({
+                disabled: true,
+                label: t('cannotDeleteHome', 'Cannot delete home'),
+                iconSvg: _CTX_TRASH_SVG,
+            }));
+        }
 
         // Position using fixed positioning relative to button
         const rect = button.getBoundingClientRect();
@@ -637,20 +1009,24 @@
         const routes = sd.routes || [];
 
         if (routes.length === 0) {
-            treeContainer.innerHTML = `<div class="admin-empty" style="padding:var(--space-lg);">
-                <p>${t('emptyHint')}</p>
-            </div>`;
+            const empty = document.createElement('div');
+            empty.className = 'admin-empty';
+            empty.style.padding = 'var(--space-lg)';
+            const p = document.createElement('p');
+            p.textContent = t('emptyHint');
+            empty.appendChild(p);
+            treeContainer.replaceChildren(empty);
         } else {
             const routeTree = buildRouteTree(routes);
-            treeContainer.innerHTML = renderSummary(sd, vd) +
-                '<div class="sitemap__routes sitemap__routes--flat sitemap__routes--tree">' +
-                renderRouteTree(routeTree) +
-                '</div>';
+            const routesWrap = document.createElement('div');
+            routesWrap.className = 'sitemap__routes sitemap__routes--flat sitemap__routes--tree';
+            routesWrap.appendChild(renderRouteTree(routeTree));
+            treeContainer.replaceChildren(renderSummary(sd, vd), routesWrap);
         }
 
         // Reachability
         const reachContainer = document.getElementById('sitemap-reachability-container');
-        reachContainer.innerHTML = renderReachability(rd);
+        reachContainer.replaceChildren(renderReachability(rd));
     }
 
     async function refreshAll() {
@@ -697,7 +1073,7 @@
                 if (reachResult.ok) {
                     reachabilityData = reachResult.data?.data || null;
                     const reachContainer = document.getElementById('sitemap-reachability-container');
-                    if (reachContainer) reachContainer.innerHTML = renderReachability(reachabilityData);
+                    if (reachContainer) reachContainer.replaceChildren(renderReachability(reachabilityData));
                 }
             } else {
                 // Revert
@@ -1091,23 +1467,48 @@
             const config = data.sitemapConfig || { excludedRoutes: [], customUrls: [] };
             const excludedSet = new Set(config.excludedRoutes || []);
 
-            // Render interactive URL list — one row per route with all its URLs
-            let html = '';
+            // Render interactive URL list — one row per route with all its URLs.
+            // Inline SVGs preserved here (not via QuickSiteUtils.iconCheck) because
+            // they carry specific classes (sitemap-url__check / __cross) for the
+            // CSS-driven toggle reveal AND the check uses stroke-width 2.5 for
+            // visual emphasis (the QuickSiteUtils helpers hardcode 2).
+            const urlsFragment = document.createDocumentFragment();
             const allRoutes = data.routes || [];
+            const checkSvgHtml = '<svg class="sitemap-url__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>';
+            const crossSvgHtml = '<svg class="sitemap-url__cross" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
             allRoutes.forEach(route => {
                 const isExcluded = excludedSet.has(route.name);
                 const urls = Object.values(route.urls || {});
                 const displayUrl = urls[0] || route.path;
-                const extraCount = urls.length > 1 ? ` <span class="sitemap-url__lang-count">×${urls.length} ${t('langs', 'langs')}</span>` : '';
-                html += `<div class="sitemap-url${isExcluded ? ' sitemap-url--excluded' : ''}" data-sitemap-route="${esc(route.name)}">
-                    <span class="sitemap-url__toggle" title="${t('toggleInclude', 'Toggle include/exclude')}">
-                        <svg class="sitemap-url__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>
-                        <svg class="sitemap-url__cross" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </span>
-                    <span class="sitemap-url__text">${esc(displayUrl)}${extraCount}</span>
-                </div>`;
+
+                const row = document.createElement('div');
+                row.className = 'sitemap-url' + (isExcluded ? ' sitemap-url--excluded' : '');
+                row.setAttribute('data-sitemap-route', route.name);
+
+                const toggle = document.createElement('span');
+                toggle.className = 'sitemap-url__toggle';
+                toggle.title = t('toggleInclude', 'Toggle include/exclude');
+                const checkEl = _htmlToEl(checkSvgHtml);
+                const crossEl = _htmlToEl(crossSvgHtml);
+                if (checkEl) toggle.appendChild(checkEl);
+                if (crossEl) toggle.appendChild(crossEl);
+                row.appendChild(toggle);
+
+                const text = document.createElement('span');
+                text.className = 'sitemap-url__text';
+                text.textContent = displayUrl;
+                if (urls.length > 1) {
+                    text.appendChild(document.createTextNode(' '));
+                    const langCount = document.createElement('span');
+                    langCount.className = 'sitemap-url__lang-count';
+                    langCount.textContent = '×' + urls.length + ' ' + t('langs', 'langs');
+                    text.appendChild(langCount);
+                }
+                row.appendChild(text);
+
+                urlsFragment.appendChild(row);
             });
-            urlList.innerHTML = html;
+            urlList.replaceChildren(urlsFragment);
 
             // Populate custom URLs textarea from config
             customUrlsArea.value = (config.customUrls || []).join('\n');
@@ -1180,7 +1581,10 @@
             renderAll(data);
         } catch (err) {
             const treeContainer = document.getElementById('sitemap-tree-container');
-            treeContainer.innerHTML = `<div class="admin-alert admin-alert--error">${esc(err.message)}</div>`;
+            const alert = document.createElement('div');
+            alert.className = 'admin-alert admin-alert--error';
+            alert.textContent = err.message;
+            treeContainer.replaceChildren(alert);
         }
     }
 

@@ -72,6 +72,8 @@
     --admin-sidebar-width: 280px;
     --admin-content-max-width: 1400px;
     --admin-mobile-toolbar-height: 100px;
+    --admin-primary: var(--admin-accent);
+    --admin-primary-bg: var(--admin-accent-muted);
 }
 code,
 .admin-header__logo:hover,
@@ -2411,6 +2413,30 @@ kbd {
     font-size: var(--font-size-sm);
     color: var(--admin-text-muted);
     text-align: right;
+}
+
+/* Beta.8 A1 — Param routes: accent the ':name' segment + count badge so
+   variable routes (e.g. /products/:slug) read distinctly from static ones.
+   Uses --admin-accent (the project's defined warm-copper accent token,
+   #c2703e) — NOT --admin-primary, which is referenced 100+ times across
+   this file but never defined, so all call sites silently fall back to
+   inherited color. See note in commit msg / PR for the broader cleanup. */
+.sitemap__route-path-segment--param {
+    color: var(--admin-accent);
+    font-weight: var(--font-weight-medium);
+}
+
+.sitemap__route-badge--params {
+    display: inline-block;
+    margin-left: var(--space-xs);
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+    font-size: 0.75em;
+    font-weight: var(--font-weight-medium);
+    background: var(--admin-accent-muted);
+    color: var(--admin-accent);
+    line-height: 1.4;
+    vertical-align: baseline;
 }
 
 .sitemap__route-external {

@@ -357,6 +357,8 @@
         "newChildOf": "New child of",
         "newRoute": "New route",
         "routeNameNested": "route-name or parent/child",
+        "paramSingular": "param",
+        "paramPlural": "params",
         "deleteRoute": "Delete route",
         "deleteConfirm": "Delete route /{route}?",
         "deleteConfirmChildren": "Route /{route} has {count} children. Delete all?",

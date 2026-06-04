@@ -371,6 +371,8 @@
         "newChildOf": "Nouvel enfant de",
         "newRoute": "Nouvelle route",
         "routeNameNested": "nom-route ou parent/enfant",
+        "paramSingular": "paramètre",
+        "paramPlural": "paramètres",
         "deleteRoute": "Supprimer la route",
         "deleteConfirm": "Supprimer la route /{route} ?",
         "deleteConfirmChildren": "La route /{route} a {count} enfants. Tout supprimer ?",
