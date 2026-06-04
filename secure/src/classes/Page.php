@@ -99,6 +99,15 @@ class Page {
         <?php require_once PROJECT_PATH . '/templates/footer.php'; ?>
     </footer>
     <?php endif; ?>
+    <?php
+    // Beta.8 A1 Build Slice 2 — emit routes schema BEFORE qs.js so the
+    // client-side path matcher (which runs synchronously in qs.js's
+    // IIFE) can read window.QS_ROUTES and populate QS.routeParams +
+    // QS.routePath. Mirrors PageManagement::render() ordering.
+    $routesMetaPath = PUBLIC_CONTENT_PATH . '/scripts/qs-route-schema.js';
+    if (file_exists($routesMetaPath)): ?>
+    <script src="/<?= PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '' ?>scripts/qs-route-schema.js"></script>
+    <?php endif; ?>
     <script src="/<?= PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '' ?>scripts/qs.js"></script>
     <?php
     // Inject theme toggle behaviour (mirrors PageManagement implementation)

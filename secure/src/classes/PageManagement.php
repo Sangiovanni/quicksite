@@ -137,6 +137,16 @@ class PageManagement {
             $body .= $renderer->renderFooter();
         }
 
+        // Beta.8 A1 Build Slice 2 — emit routes schema BEFORE qs.js so the
+        // client-side path matcher (which runs synchronously in qs.js's
+        // IIFE) can read window.QS_ROUTES and populate QS.routeParams +
+        // QS.routePath. Without this ordering, the matcher would see
+        // undefined and fall back to empty params.
+        $routesMetaPath = PUBLIC_CONTENT_PATH . '/scripts/qs-route-schema.js';
+        if (file_exists($routesMetaPath)) {
+            $body .= '<script src="' . BASE_URL . '/scripts/qs-route-schema.js"></script>';
+        }
+
         // Always include QuickSite core library for {{call:...}} interactions
         $body .= '<script src="' . BASE_URL . '/scripts/qs.js"></script>';
 

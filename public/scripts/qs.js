@@ -17,6 +17,107 @@
     // Create QS namespace
     const QS = {};
 
+    /**
+     * Client-side path matcher (beta.8 A1 Build Slice 2).
+     *
+     * Mirrors server-side TrimParameters::resolveRoute in pure JS.
+     * Walks window.QS_ROUTES (build-emitted by qs-route-schema.js,
+     * loaded BEFORE this file) and finds the best match for
+     * location.pathname.
+     *
+     * Specificity rule (locked 2026-06-04): more literal segments
+     * wins; declaration order in QS_ROUTES is the tie-breaker (first
+     * match at the highest score wins).
+     *
+     * Exposed:
+     *   QS.routeParams — captured URL path-params, e.g. {slug:'red-vase'}
+     *   QS.routePath   — the matched pattern, e.g. 'products/:slug'
+     *   QS.routeFound  — true when a route matched, false otherwise
+     *
+     * Multilingual: strips the first URL segment if it matches the
+     * page's <html lang> attribute. Other prefix handling (BASE_URL,
+     * PUBLIC_FOLDER_SPACE for sites in subpaths) is NOT yet handled —
+     * filed as a follow-up. For now sites in subpaths would see the
+     * subpath as the first segment.
+     */
+    QS.routeParams = {};
+    QS.routePath   = null;
+    QS.routeFound  = false;
+    (function matchRouteOnLoad() {
+        const schema = window.QS_ROUTES;
+        if (!Array.isArray(schema)) return;
+
+        // Normalise the URL path.
+        let path = (window.location && window.location.pathname) || '';
+
+        // Strip lang prefix if the first segment matches <html lang>.
+        const lang = (document.documentElement && document.documentElement.lang) || '';
+        if (lang) {
+            if (path === '/' + lang || path === '/' + lang + '/') {
+                path = '/';
+            } else if (path.indexOf('/' + lang + '/') === 0) {
+                path = path.substring(lang.length + 1);
+            }
+        }
+
+        // Trim leading / trailing slashes; drop empty segments
+        path = path.replace(/^\/+|\/+$/g, '');
+        if (!path) return; // root URL — no route to match
+
+        const urlSegments = path.split('/');
+
+        // Iterate routes, find the highest-specificity match.
+        // Specificity score = literal-segment count. Ties broken by
+        // declaration order: first-encountered match at the highest
+        // score wins (so we use strict-greater-than, not >=, when
+        // updating bestMatch).
+        let bestMatch = null;
+        let bestScore = -1;
+
+        for (let i = 0; i < schema.length; i++) {
+            const route = schema[i];
+            if (!route || typeof route.path !== 'string') continue;
+
+            const patternSegments = route.path.split('/');
+            if (patternSegments.length !== urlSegments.length) continue;
+
+            const params = {};
+            let literalScore = 0;
+            let matched = true;
+
+            for (let s = 0; s < patternSegments.length; s++) {
+                const pat = patternSegments[s];
+                const url = urlSegments[s];
+
+                if (pat.length > 1 && pat.charAt(0) === ':') {
+                    // Param segment — capture (urldecode to match
+                    // server-side TrimParameters behavior).
+                    try {
+                        params[pat.substring(1)] = decodeURIComponent(url);
+                    } catch (e) {
+                        params[pat.substring(1)] = url;
+                    }
+                } else if (pat === url) {
+                    literalScore++;
+                } else {
+                    matched = false;
+                    break;
+                }
+            }
+
+            if (matched && literalScore > bestScore) {
+                bestScore = literalScore;
+                bestMatch = { path: route.path, params: params };
+            }
+        }
+
+        if (bestMatch) {
+            QS.routePath   = bestMatch.path;
+            QS.routeParams = bestMatch.params;
+            QS.routeFound  = true;
+        }
+    })();
+
     // Inject default hidden class CSS if not already defined
     (function() {
         var id = 'qs-hidden-style';
