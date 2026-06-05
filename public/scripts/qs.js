@@ -1760,6 +1760,124 @@
     };
 
     /**
+     * Request a magic-link to be issued to an email address. The forward
+     * path of magic-link auth — pairs with QS.exchangeMagicLink (which
+     * runs on the landing page after the user clicks the email link).
+     *
+     * @param {string} endpointRef Registry ref of the issue-magic endpoint,
+     *                             e.g. '@auth-api/issue-magic'. Usually
+     *                             configured with auth.type='none' (this
+     *                             call runs BEFORE the user has a session).
+     * @param {string} email       Either a literal email address ('a@b.com')
+     *                             or a CSS selector ('#email-input',
+     *                             '.email-field') pointing to an <input>.
+     *                             The verb reads .value from the matched
+     *                             element. Mirrors the selector convention
+     *                             used by setState's value arg + QS.fetch's
+     *                             body= option.
+     * @param {string} [returnTo]  Optional URL to navigate to after the
+     *                             request succeeds — typically a "check
+     *                             your email" page.
+     *
+     * Returns a Promise resolving to the API response on success, or
+     * undefined on failure (console.warn surfaces the reason). The
+     * server-side endpoint MUST NOT reveal whether the email exists in
+     * its user store — the standard pattern is "always return 200 even
+     * when the email is unknown" to avoid an account-enumeration oracle.
+     * That's the AUTH API's responsibility; the verb just POSTs.
+     */
+    QS.requestMagicLink = function(endpointRef, email, returnTo) {
+        if (typeof endpointRef !== 'string' || endpointRef === '') {
+            console.warn('[QS] requestMagicLink: endpoint is required (e.g. @auth-api/issue-magic)');
+            return Promise.resolve();
+        }
+        if (typeof email !== 'string' || email === '') {
+            console.warn('[QS] requestMagicLink: email is required (literal address or #selector / .selector)');
+            return Promise.resolve();
+        }
+
+        // Resolve selector → input value, or use literal.
+        var emailValue = email;
+        if (email.charAt(0) === '#' || email.charAt(0) === '.') {
+            var el = document.querySelector(email);
+            if (!el) {
+                console.warn('[QS] requestMagicLink: selector not found:', email);
+                return Promise.resolve();
+            }
+            emailValue = (typeof el.value === 'string') ? el.value : (el.textContent || '');
+            if (!emailValue) {
+                console.warn('[QS] requestMagicLink: selector resolved to empty value:', email);
+                return Promise.resolve();
+            }
+        }
+
+        var resolved = resolveEndpoint(endpointRef.replace(/^@/, ''));
+        if (!resolved) {
+            console.warn('[QS] requestMagicLink: endpoint not found in registry:', endpointRef);
+            return Promise.resolve();
+        }
+
+        return fetch(resolved.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: emailValue })
+        })
+            .then(function(response) {
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                return response.json().catch(function() { return {}; });
+            })
+            .then(function(data) {
+                QS._lastFetchResult = data;
+                var target = (returnTo !== undefined && returnTo !== null && returnTo !== '') ? returnTo : null;
+                if (target) QS.redirect(target);
+                return data;
+            })
+            .catch(function(err) {
+                console.warn('[QS] requestMagicLink: request failed:', err);
+            });
+    };
+
+    /**
+     * Server-side logout — invalidates the session on the auth API. The
+     * Tier 1 logout pair (clearToken removes the client token; this verb
+     * tells the server to forget the session / revoke the refresh token).
+     * Both should chain together for a clean logout.
+     *
+     * Thin wrapper around QS.fetch so the registry's auth (bearer token,
+     * cookie credentials) is applied automatically — the server needs to
+     * identify which session is being invalidated. Configure the endpoint
+     * as POST in /admin/apis; auth inherits the API-level setting (usually
+     * bearer with auth.tokenSource pointing at the same key clearToken
+     * will remove afterwards).
+     *
+     * @param {string} endpointRef Registry ref like '@auth-api/logout'.
+     * @returns {Promise} QS.fetch's Promise (resolves on success or HTTP
+     *                    error). Failures are logged by QS.fetch's own
+     *                    error path — this verb intentionally doesn't
+     *                    surface them, because logout should "try" but
+     *                    always allow the chained clearToken + redirect
+     *                    to proceed (the user wants out either way).
+     */
+    QS.logoutServer = function(endpointRef) {
+        if (typeof endpointRef !== 'string' || endpointRef === '') {
+            console.warn('[QS] logoutServer: endpoint is required (e.g. @auth-api/logout)');
+            return Promise.resolve();
+        }
+        // Always resolve, even when QS.fetch rejects. The chained clearToken
+        // + redirect MUST run regardless of whether the server-side logout
+        // call succeeded — the user wants out either way, and a stuck
+        // session on the server is recoverable on next login while a stuck
+        // local token is not. Direct callers (devtools console) also
+        // benefit: no UnhandledPromiseRejection noise when the endpoint
+        // doesn't exist yet during initial wiring.
+        return QS.fetch(endpointRef).catch(function (err) {
+            console.warn('[QS] logoutServer: server logout failed (proceeding with local clearToken):', err);
+        });
+    };
+
+    /**
      * Custom error thrown by QS.validate to abort the action chain
      * (e.g. {{call:validate:event,#form}};{{call:fetch:...}} - the
      * fetch must NOT run if validation failed). Inline event handlers

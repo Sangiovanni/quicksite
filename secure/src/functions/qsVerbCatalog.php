@@ -262,9 +262,31 @@ function qsVerbCatalog(): array {
                 ['name' => 'paramName', 'type' => 'string', 'required' => true, 'description' => 'Name of the route :name segment that holds the code. For /auth/magic/:key this is "key". The verb reads QS.routeParams[<paramName>] (populated by qs.js\'s client-side path matcher — see ARCHITECTURE §5.3).'],
                 ['name' => 'returnTo', 'type' => 'string', 'required' => false, 'description' => 'Optional URL to navigate to after the exchange succeeds. Falls back to the ?return= query param. With neither, no auto-redirect — chain an explicit {{call:redirect:/path}} step instead. When provided AND saveToken calls are chained after this verb, the saveTokens still run before the browser processes the queued navigation (they\'re sync and execute in the same microtask).']
             ],
-            'description' => 'Exchange a single-use magic-link code for a real session token. POSTs {key: <captured code>} to the configured endpoint and stores the response in QS._lastFetchResult so chained saveToken calls pick up the returned token + refreshToken. The URL code is single-use and short-lived — never put the real session token in the URL directly (it leaks via email forwarding, browser history, corporate HTTPS proxy logs, and mail-client link prefetchers). Sits on a /auth/magic/:key (or similar) param route authored via /admin/sitemap. See BETA8_AUTH_TIER_3.md for the full actor diagram.',
+            'description' => 'Exchange a single-use magic-link code for a real session token. POSTs {key: <captured code>} to the configured endpoint and stores the response in QS._lastFetchResult so chained saveToken calls pick up the returned token + refreshToken. The URL code is single-use and short-lived — never put the real session token in the URL directly (it leaks via email forwarding, browser history, corporate HTTPS proxy logs, and mail-client link prefetchers). Sits on a /auth/magic/:key (or similar) param route authored via /admin/sitemap. Dispatches qs:auth:exchange-started before fetch + qs:auth:exchange-failed in catch so a magic-link-handler component can show "connecting" / "invalid link" UI via data-auth-show. See BETA8_AUTH_TIER_3.md for the full actor diagram.',
             'example' => '{{call:exchangeMagicLink:@auth-api/exchange-magic,key}};{{call:saveToken:localStorage,authToken,token}};{{call:saveToken:localStorage,refreshToken,refreshToken}};{{call:redirect:/dashboard}}',
             'events' => ['onload']
+        ],
+        [
+            'name' => 'requestMagicLink',
+            'signature' => 'QS.requestMagicLink(endpoint, email, returnTo?)',
+            'args' => [
+                ['name' => 'endpoint', 'type' => 'string', 'required' => true, 'description' => 'Auth API endpoint that issues a magic-link email, as @apiId/endpointId (e.g. @auth-api/issue-magic). Usually configured with auth.type=none — runs before the user has a session.'],
+                ['name' => 'email', 'type' => 'string', 'required' => true, 'description' => 'Either a literal email address ("user@example.com") or a CSS selector ("#email-input", ".email-field") pointing to an <input>. The verb reads .value from the matched element.'],
+                ['name' => 'returnTo', 'type' => 'string', 'required' => false, 'description' => 'Optional URL to navigate to after the request succeeds — typically a "check your email" confirmation page.']
+            ],
+            'description' => 'Forward path of magic-link auth — POSTs {email} to the issue-magic endpoint to trigger the auth API to email a single-use code to the user. Pairs with exchangeMagicLink (which runs on the landing page after the user clicks the email link). The server-side endpoint MUST NOT reveal whether the email exists in its user store; the standard pattern is "always return 200" to avoid an account-enumeration oracle — that\'s the auth API\'s responsibility, this verb just POSTs.',
+            'example' => '{{call:validate:event,#login-form}};{{call:requestMagicLink:@auth-api/issue-magic,#email-input,/check-email}}',
+            'events' => ['onsubmit', 'onclick']
+        ],
+        [
+            'name' => 'logoutServer',
+            'signature' => 'QS.logoutServer(endpoint)',
+            'args' => [
+                ['name' => 'endpoint', 'type' => 'string', 'required' => true, 'description' => 'Auth API endpoint that invalidates the server-side session, as @apiId/endpointId (e.g. @auth-api/logout). Usually a POST endpoint inheriting bearer auth — the server uses the request\'s token to identify which session to drop.']
+            ],
+            'description' => 'Server-side logout — tells the auth API to invalidate the session / revoke the refresh token. The Tier 1 logout pair: chain this BEFORE clearToken (so the request still has the token attached) then clearToken to drop the local copy. Thin wrapper around QS.fetch so the registry\'s bearer auth is applied. Logout failures are intentionally swallowed — the user wants out either way, so subsequent clearToken + redirect should always run.',
+            'example' => '{{call:logoutServer:@auth-api/logout}};{{call:clearToken:localStorage,authToken}};{{call:clearToken:localStorage,refreshToken}};{{call:redirect:/}}',
+            'events' => ['onclick']
         ],
         [
             'name' => 'setState',
