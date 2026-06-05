@@ -11,6 +11,19 @@ class TrimParametersManagement{
     $folder = PUBLIC_FOLDER_SPACE;
     $request_uri = removePrefix($request_uri, $folder ? trim($folder, '/') . '/' : '');
     $parts = explode('/', $request_uri);
+    // parse_url(PHP_URL_PATH) returns the path WITHOUT percent-decoding, so a
+    // segment like ':slug' that the client URL-encoded as '%3Aslug' arrives
+    // here still encoded. Decoding per-segment (NOT before explode — that would
+    // turn an encoded '/' into a separator) restores the original value so
+    // commands like getPageEvents / editPageEvent / setRouteLayout that look
+    // up a route by name find the matching entry under ROUTES. rawurldecode
+    // (not urldecode) because '+' is a literal '+' in URL paths — only the
+    // form-urlencoded body convention treats '+' as space.
+    // Surfaced by beta.8 A1 param routes ('test/:slug', '/auth/magic/:key'):
+    // before this defensive decode every route-by-URL-path command 404'd on
+    // any param route. (Note: $_GET is auto-decoded by PHP, so query-string
+    // params don't need this — only the path segments do.)
+    $parts = array_map('rawurldecode', $parts);
     //shift management folder
     array_shift($parts);
     if (count($parts) > 0 && $parts[0] !== '') {
