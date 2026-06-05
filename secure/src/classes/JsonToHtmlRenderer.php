@@ -767,7 +767,7 @@ class JsonToHtmlRenderer {
      * chain body, the body is wrapped in an async IIFE and each call gets
      * `await` so "fetch then hide" actually waits.
      */
-    private const CHAIN_AWAITABLE = ['fetch'];
+    private const CHAIN_AWAITABLE = ['fetch', 'exchangeMagicLink'];
 
     /**
      * Per-verb metadata: which keyword-arg names carry translation KEYS

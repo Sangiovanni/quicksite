@@ -1632,6 +1632,117 @@
         }));
     };
 
+    // =========================================================================
+    // MAGIC-LINK EXCHANGE  (beta.8 A3 — Tier 3 auth)
+    // =========================================================================
+    /**
+     * Exchange a single-use magic-link code for a real session token.
+     *
+     * Magic-link sign-in lands the user on a route like /auth/magic/:key.
+     * The URL value is a SINGLE-USE CODE (not the session token itself).
+     * This verb POSTs the captured code to the configured exchange
+     * endpoint, stores the response in QS._lastFetchResult so chained
+     * saveToken / saveToken calls pick up the returned token +
+     * refreshToken, then optionally redirects.
+     *
+     * Why a code, not the token directly: a token-in-URL leaks via email
+     * forwarding, browser history, corporate HTTPS proxies, and email-
+     * client link prefetchers. The code is single-use (server marks it
+     * USED on exchange) and short-lived. See BETA8_AUTH_TIER_3.md.
+     *
+     * @param {string} endpointRef Registry ref like '@auth-api/exchange-magic'.
+     *                             The endpoint should be configured with
+     *                             auth.type='none' — the exchange itself is
+     *                             the login. (Auth injection is not applied
+     *                             by this verb; for authed exchange endpoints
+     *                             use raw QS.fetch.)
+     * @param {string} paramName   Name of the route :name segment that holds
+     *                             the code (e.g. 'key' for /auth/magic/:key).
+     *                             The verb reads QS.routeParams[paramName].
+     * @param {string} [returnTo]  Optional URL to navigate to after the
+     *                             exchange succeeds. When OMITTED, falls
+     *                             back to the ?return= query param. With
+     *                             neither, no auto-redirect — chain an
+     *                             explicit {{call:redirect:/path}} step
+     *                             instead. WHEN PROVIDED, browser
+     *                             navigation is queued immediately after
+     *                             the fetch resolves; any chained
+     *                             synchronous saveToken calls still run
+     *                             before navigation actually happens
+     *                             (saveToken is sync, runs in the same
+     *                             microtask before the browser processes
+     *                             the queued navigation).
+     *
+     * Returns a Promise resolving to the API response on success, or
+     * undefined on failure (console.warn surfaces the reason). The verb
+     * is registered as CHAIN_AWAITABLE in JsonToHtmlRenderer.php so
+     * `{{call:exchangeMagicLink:…}};{{call:saveToken:…}}` chains await
+     * the exchange before saveToken reads QS._lastFetchResult.
+     *
+     * Typical chain:
+     *   {{call:exchangeMagicLink:@auth-api/exchange-magic,key}};
+     *   {{call:saveToken:localStorage,authToken,token}};
+     *   {{call:saveToken:localStorage,refreshToken,refreshToken}};
+     *   {{call:redirect:/dashboard}}
+     */
+    QS.exchangeMagicLink = function(endpointRef, paramName, returnTo) {
+        if (typeof endpointRef !== 'string' || endpointRef === '') {
+            console.warn('[QS] exchangeMagicLink: endpoint is required (e.g. @auth-api/exchange-magic)');
+            return Promise.resolve();
+        }
+        if (typeof paramName !== 'string' || paramName === '') {
+            console.warn('[QS] exchangeMagicLink: paramName is required (the route :name segment that holds the code)');
+            return Promise.resolve();
+        }
+
+        var code = QS.routeParams ? QS.routeParams[paramName] : undefined;
+        if (code === undefined || code === null || code === '') {
+            console.warn('[QS] exchangeMagicLink: route param "' + paramName + '" is empty — not on a /…/:' + paramName + ' page?');
+            return Promise.resolve();
+        }
+
+        var resolved = resolveEndpoint(endpointRef.replace(/^@/, ''));
+        if (!resolved) {
+            console.warn('[QS] exchangeMagicLink: endpoint not found in registry:', endpointRef);
+            return Promise.resolve();
+        }
+
+        // Exchange is always POST with a JSON body — the endpoint's
+        // configured method is intentionally ignored here. Browsers
+        // refuse to attach a body to GET, so honouring an accidentally-
+        // GET endpoint config would silently drop the {key} payload and
+        // the exchange would 405. Hardcoding POST surfaces a clear
+        // server-side method-not-allowed if the endpoint really is
+        // GET-only on the user's auth API (a real misconfig worth seeing).
+        return fetch(resolved.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: code })
+        })
+            .then(function(response) {
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                return response.json().catch(function() { return {}; });
+            })
+            .then(function(data) {
+                QS._lastFetchResult = data;
+                // Resolve returnTo: explicit arg → ?return= query → null.
+                var target = (returnTo !== undefined && returnTo !== null && returnTo !== '') ? returnTo : null;
+                if (!target) {
+                    var queryReturn = new URLSearchParams(location.search).get('return');
+                    if (queryReturn) target = queryReturn;
+                }
+                if (target) QS.redirect(target);
+                return data;
+            })
+            .catch(function(err) {
+                console.warn('[QS] exchangeMagicLink: exchange failed:', err);
+                // Leave QS._lastFetchResult untouched so chained saveToken
+                // doesn't pick up stale data from an earlier fetch.
+            });
+    };
+
     /**
      * Custom error thrown by QS.validate to abort the action chain
      * (e.g. {{call:validate:event,#form}};{{call:fetch:...}} - the

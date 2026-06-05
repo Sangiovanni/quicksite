@@ -231,45 +231,40 @@ class PageManagement {
                 if (!empty($currentPageEvents)) {
                     $eventScripts = [];
                     
+                    // Page events: each handler's array of {{call:...}} entries is
+                    // JOINED into ONE chain string then transformed ONCE so the
+                    // renderer's CHAIN_AWAITABLE detection sees the full chain. The
+                    // previous per-entry transform broke async chaining (each call
+                    // got its own isolated async IIFE; subsequent saveToken/redirect
+                    // entries ran synchronously before the awaited fetch resolved).
+                    // Surfaced by beta.8 A3 magic-link's exchangeMagicLink → saveToken
+                    // → redirect onload chain — the first real multi-step async page
+                    // event in the wild.
+
                     // onload → DOMContentLoaded
                     if (!empty($currentPageEvents['onload'])) {
-                        $onloadCalls = [];
-                        foreach ($currentPageEvents['onload'] as $callSyntax) {
-                            $transformed = $renderer->transformCallSyntaxPublic($callSyntax);
-                            if ($transformed && $transformed !== $callSyntax) {
-                                $onloadCalls[] = $transformed;
-                            }
-                        }
-                        if (!empty($onloadCalls)) {
-                            $eventScripts[] = 'document.addEventListener("DOMContentLoaded",function(){' . implode(';', $onloadCalls) . '});';
+                        $chainString = implode('', $currentPageEvents['onload']);
+                        $transformed = $renderer->transformCallSyntaxPublic($chainString);
+                        if ($transformed && $transformed !== $chainString) {
+                            $eventScripts[] = 'document.addEventListener("DOMContentLoaded",function(){' . $transformed . '});';
                         }
                     }
-                    
+
                     // onresize → window resize listener
                     if (!empty($currentPageEvents['onresize'])) {
-                        $resizeCalls = [];
-                        foreach ($currentPageEvents['onresize'] as $callSyntax) {
-                            $transformed = $renderer->transformCallSyntaxPublic($callSyntax);
-                            if ($transformed && $transformed !== $callSyntax) {
-                                $resizeCalls[] = $transformed;
-                            }
-                        }
-                        if (!empty($resizeCalls)) {
-                            $eventScripts[] = 'window.addEventListener("resize",function(){' . implode(';', $resizeCalls) . '});';
+                        $chainString = implode('', $currentPageEvents['onresize']);
+                        $transformed = $renderer->transformCallSyntaxPublic($chainString);
+                        if ($transformed && $transformed !== $chainString) {
+                            $eventScripts[] = 'window.addEventListener("resize",function(){' . $transformed . '});';
                         }
                     }
-                    
+
                     // onscroll → window scroll listener
                     if (!empty($currentPageEvents['onscroll'])) {
-                        $scrollCalls = [];
-                        foreach ($currentPageEvents['onscroll'] as $callSyntax) {
-                            $transformed = $renderer->transformCallSyntaxPublic($callSyntax);
-                            if ($transformed && $transformed !== $callSyntax) {
-                                $scrollCalls[] = $transformed;
-                            }
-                        }
-                        if (!empty($scrollCalls)) {
-                            $eventScripts[] = 'window.addEventListener("scroll",function(){' . implode(';', $scrollCalls) . '});';
+                        $chainString = implode('', $currentPageEvents['onscroll']);
+                        $transformed = $renderer->transformCallSyntaxPublic($chainString);
+                        if ($transformed && $transformed !== $chainString) {
+                            $eventScripts[] = 'window.addEventListener("scroll",function(){' . $transformed . '});';
                         }
                     }
                     
