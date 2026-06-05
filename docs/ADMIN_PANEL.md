@@ -4,7 +4,7 @@ _Last updated: 2026-06-03._
 
 > Canonical reference for the admin panel's JS architecture, boot flow, and module map. See [ARCHITECTURE.md](ARCHITECTURE.md) for the system-level overview, [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) for the workflow engine, and [COMMAND_API.md](COMMAND_API.md) for the API commands the panel calls.
 
-> _Maintainers note:_ re-check this doc when changing `public/admin/assets/js/core/storage-keys.js` (§6 storage keys), `secure/admin/templates/pages/preview/sidebar-tools.php` (§8.1 visual editor modes), or `secure/admin/templates/layout.php` (§2 boot order).
+> _Maintainers note:_ re-check this doc when changing `public/admin/assets/js/core/storage-keys.js` (§6 storage keys), `secure/admin/templates/pages/preview/sidebar-tools.php` (§8.1 visual editor modes), `secure/admin/templates/layout.php` (§2 boot order), `public/admin/assets/js/pages/sitemap.js` / `secure/management/command/addRoute.php` (§9.7 sitemap + param-route authoring), or the state-stores wizard's init source kinds in `public/admin/assets/js/pages/preview/preview-js-interactions.js` (§9.6).
 
 The admin panel is a server-rendered PHP shell plus a set of vanilla JS modules loaded per route. There is **no module bundler**. Load order is controlled by `secure/admin/templates/layout.php` and is the single most important contract in the front end — reorder a `<script>` tag and the panel breaks silently.
 
@@ -1106,15 +1106,19 @@ actions. Delete is read-modify-write — it re-saves the route's remaining store
   **default** for request/both, **from** + **append** for response/both. **`init`
   is the initial value** (leave it blank to use the default); the field *name* is
   the request parameter key, not `init`.
-- **`init` source kind** — a `<select>` (literal · URL query · localStorage ·
-  sessionStorage) paired with a key input whose placeholder swaps to match the
-  kind ("value" for literal, "URL param name" for query, "key name" for the
-  storage kinds). On save the wizard composes the canonical storage string
-  (`literal "Hello"` → `init: "Hello"`; `localStorage "authToken"` → `init:
-  "localStorage:authToken"`; etc.). On edit it parses the stored string back
-  into the pair, so existing `state-stores.json` files round-trip unchanged.
-  Replaces the older free-text input that required the user to know the
-  `query:` / `localStorage:` / `sessionStorage:` prefix syntax.
+- **`init` source kind** — a `<select>` (literal · URL query · URL path param ·
+  localStorage · sessionStorage) paired with a key input whose placeholder
+  swaps to match the kind ("value" for literal, "URL param name" for query,
+  "param name" for URL path param, "key name" for the storage kinds). On save
+  the wizard composes the canonical storage string (`literal "Hello"` →
+  `init: "Hello"`; `localStorage "authToken"` → `init: "localStorage:authToken"`;
+  `URL path param "slug"` → `init: "param:slug"`; etc.). On edit it parses the
+  stored string back into the pair, so existing `state-stores.json` files
+  round-trip unchanged. The **URL path param** kind reads from `QS.routeParams`
+  (populated by qs.js's client-side path matcher — see ARCHITECTURE §5.3),
+  closing the URL → live data loop: a field with `init: 'param:slug'` on a
+  `/products/:slug` page starts with the captured slug. Missing on a static
+  route → silent fallback to `default`, matching `query:` semantics.
 - **Auto-seed** — picking an endpoint that declares request/response schemas
   pre-fills the fields (request properties → `request`, response leaves →
   `response`, a name in both → `both`). It seeds only when no field has been entered
@@ -1236,6 +1240,77 @@ the exhausted flag and re-arms the trigger.
 
 Both patterns are demonstrated in the test pages `test/paged` (offset) and
 `test/state` (cursor) — see `BETA7_ORDER.md` for the full beta.7 context.
+
+### 9.7 Sitemap (/admin/sitemap)
+
+Visual route tree, reachability analyzer, layout toggles, and `sitemap.txt`
+generator — all backed by `getSiteMap` + `addRoute` / `deleteRoute` /
+`editRoute` + `setRouteLayout` + `analyzeReachability`. The runtime + matching
+algorithm live in [ARCHITECTURE §5.3](ARCHITECTURE.md); this section covers
+the editor UX.
+
+**Tree**. One row per route, hierarchical. Each row carries:
+
+- **Name** (left) — the leaf segment, monospaced.
+- **Path** (right) — the full path, muted by default. Param routes render
+  their `:name` segments in the project's accent color, with a small
+  `[N param(s)]` chip appended. Static routes show no chip.
+- **Layout toggles** — two icons that flip the route's visibility in the
+  global **menu** / **footer** (calls `setRouteLayout`). Optimistic UI;
+  the reachability section re-renders after each toggle since visibility
+  affects which routes count as reachable.
+- **Actions** (hover-revealed) — `+` to add a child, `⋯` to open the
+  context menu (Add child / View in editor / Open page / Edit title /
+  Delete route, with Delete greyed for the home route).
+
+The tree-toggle chevron expands / collapses parent nodes. Expanded state is
+remembered locally so re-renders (after add / delete / layout toggle) keep
+their shape.
+
+**Inline Add Route form**. The `+ Add root route` button (or the per-row
+add-child action) opens a one-line form right where it'll land in the tree.
+Each segment of the name is validated client-side against the same rules
+the server enforces in `addRoute.php`:
+
+- **Literal segment** — lowercase letters / digits / hyphens (no leading or
+  trailing hyphen).
+- **Param segment** — a `:` prefix followed by a lowercase identifier
+  (starts with a letter or underscore, then letters / digits / underscores).
+
+Separators are `/` for nested paths. An invalid segment surfaces inline
+("Invalid segment `:UPPER`…") without hitting the API.
+
+**Conflict warnings**. When the server accepts the route but flags it as
+ambiguous (param at a level with exact siblings, or two params at the same
+depth), the success toast is followed by one warning toast per entry in the
+response's `warnings` array. The matching rule still picks a winner at
+runtime (more literal segments wins; declaration order breaks ties — see
+ARCHITECTURE §5.3), so the toast is a "did you mean this?" surface rather
+than a block.
+
+**Edit title**. The context menu's `Edit title` opens a modal with one
+input per active language pre-filled from `page.titles.<route>` (via
+`getTranslation`). Save dispatches `setTranslationKeys` once per changed
+language and re-fetches on the next open.
+
+**Reachability**. Below the tree, the reachability section runs
+`analyzeReachability`: total / reachable / orphan counts, an orphans list
+with a hint, the global menu + footer links, and a per-route link graph
+table. The banner turns red when any orphan is detected.
+
+**Sitemap.txt generator**. At the bottom: a base-URL input + Preview
+button calls `getSiteMap` with the base, lists every route's URLs (with
+×N langs counts when multilingual), and lets the user toggle rows to
+exclude. A custom-URLs textarea takes one URL per line (for pages outside
+the route system). Save writes the file via `getSiteMap` + `save: true`.
+
+| Concern | Where |
+|---|---|
+| Tree + reachability + add form logic | `public/admin/assets/js/pages/sitemap.js` |
+| Page shell | `secure/admin/templates/pages/sitemap.php` + `sitemap-edit-title.php` partial |
+| Server commands | `addRoute`, `deleteRoute`, `editRoute`, `getSiteMap`, `setRouteLayout`, `analyzeReachability` |
+| Route schema | A project's `secure/management/routes.php` (writable via the commands; `varExportNested()` preserves nested string keys) |
+| Param syntax helpers | `secure/src/functions/routeHelpers.php` — single source for the `:name` ↔ `__name` filesystem sanitisation (NTFS reserves `:`) |
 
 ---
 

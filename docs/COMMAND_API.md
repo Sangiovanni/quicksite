@@ -4,7 +4,7 @@
 >
 > _Last updated: 2026-04-23._
 
-> _Maintainers note:_ re-check this doc when changing `secure/management/routes.php` (command count), `secure/src/classes/ApiResponse.php` (response shape), or `secure/src/classes/CommandRunner.php` (internal allowlist).
+> _Maintainers note:_ re-check this doc when changing `secure/management/routes.php` (command count), `secure/src/classes/ApiResponse.php` (response shape), `secure/src/classes/CommandRunner.php` (internal allowlist), or `secure/management/command/addRoute.php` / `deleteRoute.php` / `editRoute.php` (route body shape — param syntax + warnings array).
 
 ## Endpoint
 
@@ -104,12 +104,24 @@ Any HTTP client works. Examples:
 # List routes
 curl -H "Authorization: Bearer $TOKEN" http://local.quicksite/management/getRoutes
 
-# Add a route (POST + JSON body)
+# Add an exact route (POST + JSON body)
 curl -X POST \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"name":"about","title":"About"}' \
      http://local.quicksite/management/addRoute
+
+# Add a parameterised route — the ':slug' segment captures any URL value
+# at request time (one template serves many URLs). See ARCHITECTURE §5.3
+# for the matching algorithm + how params flow to PHP / qs.js.
+curl -X POST \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"products/:slug","title":"Product"}' \
+     http://local.quicksite/management/addRoute
+# Response data may carry a 'warnings' array when the new route shadows
+# exact siblings (curated landing + param catch-all is supported and not
+# blocked — the warning surfaces intent so the user can confirm).
 
 # Read the live spec for a command
 curl http://local.quicksite/management/help/addRoute

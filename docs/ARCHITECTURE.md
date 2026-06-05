@@ -4,7 +4,7 @@ _Last updated: 2026-04-23._
 
 > Canonical high-level overview of how QuickSite is structured and how a request flows through it. For the admin panel internals, see [ADMIN_PANEL.md](ADMIN_PANEL.md). For the workflow engine, see [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md). For the full command reference, see [COMMAND_API.md](COMMAND_API.md). For the on-disk layout, see [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
 
-> _Maintainers note:_ re-check this doc when changing `secure/management/routes.php` (§3 command count), `secure/management/config/roles.php` (§3 roles), `secure/src/classes/JsonToHtmlRenderer.php` (§2 node kinds, §7 tag blacklist), or `secure/src/functions/qsVerbCatalog.php` (§8 QS.* registry — single source of truth for verb metadata, consumed by `listJsFunctions`, `JsonToHtmlRenderer`, and `JsonToPhpCompiler`).
+> _Maintainers note:_ re-check this doc when changing `secure/management/routes.php` (§3 command count), `secure/management/config/roles.php` (§3 roles), `secure/src/classes/JsonToHtmlRenderer.php` (§2 node kinds, §7 tag blacklist), `secure/src/functions/qsVerbCatalog.php` (§8 QS.* registry — single source of truth for verb metadata, consumed by `listJsFunctions`, `JsonToHtmlRenderer`, and `JsonToPhpCompiler`), or `secure/src/classes/TrimParameters.php` / `secure/src/functions/routeHelpers.php` / a project's `secure/management/routes.php` schema (§5.3 routing — param syntax, matching algorithm, conflicts).
 
 QuickSite is a file-based, API-first website operations platform with a visual editor and workflow engine for deterministic and AI-assisted site changes. It is exportable and production-friendly, and while file-native by default, it is designed to integrate quickly with external client-side and server-side APIs when backend capabilities are needed.
 
@@ -255,7 +255,7 @@ init.php
   │
 index.php
   ├── checks aliases (data/aliases.json) → may redirect
-  ├── TrimParameters parses URL → (lang, route)
+  ├── TrimParameters parses URL → (lang, route, params)  ── see §5.3
   ├── validates route ∈ ROUTES (else 404)
   └── includes templates/pages/{route}/{leaf}.php
   │
@@ -286,6 +286,63 @@ addRoute.php
 ```
 
 The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 127 commands.
+
+### 5.3 Routing — exact and parameterised routes
+
+A route declared in a project's `secure/management/routes.php` is one of:
+
+- **Exact** — a literal path like `'about'` or `'blog/2026/announcement'`. Matches the URL bit-for-bit. The historical default; still the right choice for one-off pages.
+- **Parameterised** — a path with one or more `:name` segments, like `'products/:slug'` or `'users/:id/posts/:postId'`. One template serves many URLs; the captured values are exposed to PHP (`$slug`, `$id`) and to qs.js (`QS.routeParams.slug`). Introduced in beta.8.
+
+#### Param syntax
+
+`:name` follows the Express convention. The identifier rules match the addRoute validation:
+
+- starts with a lowercase letter or underscore
+- continues with lowercase letters, digits, or underscores
+- no hyphens, no uppercase, no special characters inside the identifier
+
+NTFS reserves `:` in filenames, so the on-disk page folder stores the segment as a doubled-underscore prefix (e.g. `pages/products/__slug/__slug.php`). The translation between the URL form (`:slug`) and the on-disk form (`__slug`) lives in `secure/src/functions/routeHelpers.php`. Always require that file from consumers — never inline the pattern.
+
+#### Matching algorithm
+
+`secure/src/classes/TrimParameters.php` walks `ROUTES` for each incoming request and picks the **most specific** match:
+
+1. Split the URL path into segments. Drop the language prefix if present.
+2. For each route in `ROUTES`, compare segments. A literal segment must equal the URL segment exactly; a `:name` segment captures whatever's there.
+3. **Score** each matching route by the count of literal (non-`:`) segments. The highest score wins.
+4. On a tie, the route declared first in `routes.php` wins.
+
+Worked example — three registered routes:
+
+| Route | Score | `/shop/sale/clearance` | `/shop/sale/red-vase` | `/shop/winter/jacket` |
+|---|---|---|---|---|
+| `shop/sale/clearance` | 3 | matches → wins | doesn't match | doesn't match |
+| `shop/sale/:item` | 2 | matches | matches → wins | doesn't match |
+| `shop/:cat/:item` | 1 | matches | matches | matches → wins |
+
+Captured values are URL-decoded before exposure, matching PHP's `$_GET` convention: `/products/red%20vase` exposes `slug = 'red vase'`.
+
+#### How captured params flow
+
+- **Server (PHP)** — `Page::render()` injects each captured value as a template variable named after the param. Inside a page's PHP template, `$slug`, `$id`, etc. sit alongside `$translator` and other request-scoped variables. Inside renderer-driven JSON pages, a `{{param:NAME}}` placeholder is substituted in both raw text and translated text by `JsonToHtmlRenderer::renderTextNode`. The literal `param:` prefix is required so it doesn't collide with component-variable patterns.
+- **Client (qs.js)** — The build emits `public/scripts/qs-route-schema.js` listing every route's pattern + param shape. qs.js's synchronous IIFE walks the schema against `location.pathname` on load and exposes three globals: `QS.routeParams` (a dict of captured values), `QS.routePath` (the matched pattern), `QS.routeFound` (a boolean). State stores can initialise a field from `init: 'param:slug'` — a fifth source kind alongside the existing `query:` / `localStorage:` / `sessionStorage:` / literal. The matcher is purely client-side; for a deeper URL → live data loop (server-rendered authed pages, SEO) the beta.8 server data resolver builds on the same schema.
+
+#### Conflict detection
+
+`addRoute` runs the same matcher against the existing route set when creating or editing a route. It **blocks** exact duplicates, and **warns** in two cases:
+
+- Param route added at a level that has exact siblings — e.g. registering `/products/:slug` when `/products/featured` already exists. The legitimate "curated landing + param catch-all" pattern every CMS supports. Runtime is safe via specificity scoring; the warn surfaces intent.
+- Two param routes at the same depth — e.g. `/products/:slug` and `/products/:id`. Ambiguous which name captures a given URL segment; declaration order decides at runtime.
+
+The response carries a `warnings` array of `{ type, message }` entries. The sitemap UI renders each warning as a toast after the success toast.
+
+#### Out of scope for 1.0
+
+- **Wildcards** (`:*`, `**`). A param captures one segment.
+- **Per-param type matching** beyond string. The schema's optional `type` field is reserved for a future `'integer'` form but unused at the matcher today.
+- **Param defaults**. A route with required params 404s when the URL is missing a segment. Users who want optional captures hand-author both shapes (`/products/:product` and `/products/:product/:variant`).
+- **Case-insensitive matching**. Paths are case-sensitive, matching Unix filesystem + HTTP convention.
 
 ---
 
