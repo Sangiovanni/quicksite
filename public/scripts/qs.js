@@ -1707,6 +1707,15 @@
             return Promise.resolve();
         }
 
+        // Beta.8 A3 — dispatch the 'started' lifecycle event before the
+        // fetch fires. Drives data-auth-show="connecting" visibility in
+        // the magic-link-handler component. Subsequent qs:auth:saved (from
+        // chained saveToken) or qs:auth:exchange-failed (from the catch
+        // below) flips the cursor away from 'connecting'.
+        document.dispatchEvent(new CustomEvent('qs:auth:exchange-started', {
+            detail: { endpoint: endpointRef, paramName: paramName, code: code }
+        }));
+
         // Exchange is always POST with a JSON body — the endpoint's
         // configured method is intentionally ignored here. Browsers
         // refuse to attach a body to GET, so honouring an accidentally-
@@ -1740,6 +1749,13 @@
                 console.warn('[QS] exchangeMagicLink: exchange failed:', err);
                 // Leave QS._lastFetchResult untouched so chained saveToken
                 // doesn't pick up stale data from an earlier fetch.
+                // Beta.8 A3 — dispatch the 'failed' lifecycle event so the
+                // magic-link-handler component's data-auth-show="failed"
+                // element becomes visible. Cleared on the next qs:auth:saved
+                // (retry succeeded) or qs:auth:cleared (logout).
+                document.dispatchEvent(new CustomEvent('qs:auth:exchange-failed', {
+                    detail: { endpoint: endpointRef, paramName: paramName, error: err }
+                }));
             });
     };
 
@@ -1914,9 +1930,29 @@
         return null;
     }
 
+    // Transient exchange-state cursor — set by qs:auth:exchange-started and
+    // qs:auth:exchange-failed (dispatched by QS.exchangeMagicLink in beta.8
+    // A3). Drives the 'connecting' / 'failed' modes of data-auth-show. Stays
+    // in-memory only — refresh resets to null so a fresh page always shows
+    // the appropriate state from the verb's lifecycle, not a stale phase.
+    //   null         → no exchange in flight; 'connecting' / 'failed'
+    //                  elements hidden; 'in' / 'out' fall through to the
+    //                  token-presence check.
+    //   'connecting' → between qs:auth:exchange-started and the next
+    //                  qs:auth:saved (success) or qs:auth:exchange-failed.
+    //   'failed'     → the verb's catch fired; stays until qs:auth:saved
+    //                  (retry succeeded) or qs:auth:cleared (logout).
+    var _exchangeState = null;
+
     /**
      * Apply declarative auth/storage-state bindings across the document:
-     *   data-auth-show="in" | "out"          → show by login state (auth sugar)
+     *   data-auth-show="in" | "out"          → show by token presence (Tier 1)
+     *   data-auth-show="connecting"          → show while a magic-link / OAuth
+     *                                          exchange is in flight (beta.8
+     *                                          A3 Tier 3)
+     *   data-auth-show="failed"              → show after the exchange's catch
+     *                                          fires; cleared on next success
+     *                                          or explicit clearToken
      *   data-storage-show="has:loc:key"      → show when a storage key is present
      *   data-storage-show="missing:loc:key"  → show when it is absent
      *   data-storage-value="loc:key"         → element text = the stored value
@@ -1924,13 +1960,24 @@
      * or any ancestor (set it once on a wrapper); the data-storage-* attrs
      * carry their source inline. Plain data-* namespace (NOT data-qs-*, which
      * the editor reserves and strips) so these stay user-authorable.
-     * Re-applies on load + qs:auth:saved / qs:auth:cleared. Exposed as
-     * QS.applyAuthState to re-scan after injecting DOM or a non-auth store.
+     * Re-applies on load + qs:auth:saved / qs:auth:cleared / qs:auth:exchange-*.
+     * Exposed as QS.applyAuthState to re-scan after injecting DOM or a
+     * non-auth store.
      */
     function applyAuthState() {
-        // Auth sugar: login-state show/hide (source from data-auth-source).
+        // Auth sugar: login-state + exchange-state show/hide. 'in' / 'out'
+        // need a data-auth-source (the token-presence check). 'connecting' /
+        // 'failed' don't — they read the in-memory _exchangeState cursor.
         document.querySelectorAll('[data-auth-show]').forEach(function (el) {
             const mode = el.getAttribute('data-auth-show');
+            if (mode === 'connecting') {
+                el.style.display = (_exchangeState === 'connecting') ? '' : 'none';
+                return;
+            }
+            if (mode === 'failed') {
+                el.style.display = (_exchangeState === 'failed') ? '' : 'none';
+                return;
+            }
             if (mode !== 'in' && mode !== 'out') return;
             const source = _resolveAuthSource(el);
             if (!source) {
@@ -1963,8 +2010,32 @@
     }
     QS.applyAuthState = applyAuthState;
 
-    document.addEventListener('qs:auth:saved', applyAuthState);
-    document.addEventListener('qs:auth:cleared', applyAuthState);
+    // qs:auth:saved → exchange (if any) succeeded OR a regular login completed;
+    // either way the 'connecting' / 'failed' states no longer apply. Clearing
+    // the cursor lets the welcome message ('in') show without the connecting
+    // spinner lingering.
+    document.addEventListener('qs:auth:saved', function () {
+        _exchangeState = null;
+        applyAuthState();
+    });
+    // qs:auth:cleared → explicit logout; reset any lingering exchange state
+    // so the user sees a clean logged-out UI on the next render.
+    document.addEventListener('qs:auth:cleared', function () {
+        _exchangeState = null;
+        applyAuthState();
+    });
+    // Beta.8 A3 — exchange lifecycle events dispatched by
+    // QS.exchangeMagicLink. The cursor drives 'connecting' / 'failed'
+    // visibility; the welcome path goes via qs:auth:saved (above) which
+    // also clears the cursor before applyAuthState runs.
+    document.addEventListener('qs:auth:exchange-started', function () {
+        _exchangeState = 'connecting';
+        applyAuthState();
+    });
+    document.addEventListener('qs:auth:exchange-failed', function () {
+        _exchangeState = 'failed';
+        applyAuthState();
+    });
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', applyAuthState);
     } else {
