@@ -4,7 +4,7 @@ _Last updated: 2026-04-23._
 
 > Canonical high-level overview of how QuickSite is structured and how a request flows through it. For the admin panel internals, see [ADMIN_PANEL.md](ADMIN_PANEL.md). For the workflow engine, see [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md). For the full command reference, see [COMMAND_API.md](COMMAND_API.md). For the on-disk layout, see [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
 
-> _Maintainers note:_ re-check this doc when changing `secure/management/routes.php` (§3 command count), `secure/management/config/roles.php` (§3 roles), `secure/src/classes/JsonToHtmlRenderer.php` (§2 node kinds, §7 tag blacklist), `secure/src/functions/qsVerbCatalog.php` (§8 QS.* registry — single source of truth for verb metadata, consumed by `listJsFunctions`, `JsonToHtmlRenderer`, and `JsonToPhpCompiler`), or `secure/src/classes/TrimParameters.php` / `secure/src/functions/routeHelpers.php` / a project's `secure/management/routes.php` schema (§5.3 routing — param syntax, matching algorithm, conflicts).
+> _Maintainers note:_ re-check this doc when changing `secure/management/routes.php` (§3 command count), `secure/management/config/roles.php` (§3 roles), `secure/src/classes/JsonToHtmlRenderer.php` (§2 node kinds, §7 tag blacklist, §8 `CHAIN_AWAITABLE`), `secure/src/functions/qsVerbCatalog.php` (§8 QS.* registry — single source of truth for verb metadata, consumed by `listJsFunctions`, `JsonToHtmlRenderer`, and `JsonToPhpCompiler`; verb count + groups in §8 grow when entries are added), `public/scripts/qs.js` (§8 verb implementations + auth-state UI primitives), or `secure/src/classes/TrimParameters.php` / `secure/src/functions/routeHelpers.php` / a project's `secure/management/routes.php` schema (§5.3 routing — param syntax, matching algorithm, conflicts).
 
 QuickSite is a file-based, API-first website operations platform with a visual editor and workflow engine for deterministic and AI-assisted site changes. It is exportable and production-friendly, and while file-native by default, it is designed to integrate quickly with external client-side and server-side APIs when backend capabilities are needed.
 
@@ -409,7 +409,7 @@ A single argument can contain literal commas by escaping them with `\,`. For exa
 
 **Reserved class names.** `qs.js` self-injects `<style id="qs-hidden-style">.hidden{display:none!important}</style>` into the document head at script-load time so projects without a `.hidden` rule still get a working hide. This makes `.hidden` a **reserved QuickSite class**: do not redefine it in your CSS — the `!important` will win regardless and the override won't apply. To get animated/custom hide behaviour, define your own class (e.g. `.fade-out`) and pass it as the `hideClass` arg to `QS.show`/`QS.hide`/`QS.toggleHide`/`QS.filter` instead.
 
-The core registry currently exposes 22 built-ins:
+The core registry currently exposes 25 built-ins:
 
 | Group | Functions |
 |---|---|
@@ -419,12 +419,12 @@ The core registry currently exposes 22 built-ins:
 | Navigation | `QS.redirect`, `QS.scrollTo` |
 | Data | `QS.filter`, `QS.fetch`, `QS.renderList` |
 | Feedback | `QS.toast` |
-| Auth / storage | `QS.saveToken`, `QS.clearToken`, `QS.refresh` |
+| Auth / storage | `QS.saveToken`, `QS.clearToken`, `QS.refresh`, `QS.exchangeMagicLink`, `QS.requestMagicLink`, `QS.logoutServer` |
 | State stores | `QS.setState`, `QS.fetchState`, `QS.onScrollFetchState` |
 
 Use the live `listJsFunctions` command for the authoritative list. The catalog itself is declared **once** in `secure/src/functions/qsVerbCatalog.php` (the single source of truth) and is read by three consumers: the `listJsFunctions` command (picker payload), `JsonToHtmlRenderer` (runtime `{{call:fn:...}}` allowlist), and `JsonToPhpCompiler` (build-time allowlist). Add a new QS.* verb by adding an entry to that catalog file — the picker, the renderer, and the compiler all pick it up automatically; an unknown verb wired anyway is dropped with a `console.warn('[QS] unknown verb …')` in the rendered page. (The renderer allowlist also accepts `applyAuthState` for hand-authored manual re-scans; it is intentionally not surfaced in the picker.)
 
-Beyond the `{{call:…}}` verbs, the auth-flows runtime adds **declarative bindings** read by `qs.js` on load + on `qs:auth:*` events — `data-auth-show` / `data-auth-source` (login-state show/hide) and the generic `data-storage-show` / `data-storage-value` (any storage key) — plus the `QS.isAuthed(source)` query. These are documented in `ADMIN_PANEL.md §9.5`.
+Beyond the `{{call:…}}` verbs, the auth-flows runtime adds **declarative bindings** read by `qs.js` on load + on `qs:auth:*` events — `data-auth-show` (with four modes: `in` / `out` for token presence, `connecting` / `failed` for the Tier 3 magic-link exchange lifecycle) / `data-auth-source` and the generic `data-storage-show` / `data-storage-value` (any storage key) — plus the `QS.isAuthed(source)` query. The Tier 3 magic-link verbs (`exchangeMagicLink`, `requestMagicLink`, `logoutServer`) dispatch `qs:auth:exchange-started` / `qs:auth:exchange-failed` to drive the connecting/failed modes. All documented in `ADMIN_PANEL.md §9.5`.
 
 `QS.filter` accepts a polymorphic `matchAttr` (3rd arg): omit it (or pass `textContent`) to match the element's text; pass a `data-*` name to match an attribute; pass a CSS selector starting with `.`, `#`, `>` or space to match the concatenated `textContent` of one or more **descendant** elements (e.g. `.cmd-name, .cmd-description` for "search across both"). The descendant-text and textContent modes also highlight matches in place via an XSS-safe DOM walk (skipped above a 500-node budget).
 
@@ -437,7 +437,7 @@ A project-scoped "custom JS function" feature existed in earlier betas (`addJsFu
 Calls in a handler attribute (`{{call:a}};{{call:b}};…`) are compiled by `JsonToHtmlRenderer::transformCallSyntax` with three rules:
 
 1. **Sync prelude** — verbs in `CHAIN_SYNC_PRELUDE` (`validate`) emit first as plain `QS.foo(...)` statements. They run inside the event tick and can still call `event.preventDefault()` or `throw` to abort the rest.
-2. **Async wrap** — if the remaining body contains at least one verb from `CHAIN_AWAITABLE` (`fetch`) AND there is more than one call, the body is wrapped in `(async()=>{await A;await B;…})().catch(e=>console.warn('[QS] chain aborted:',e))`. Every call gets `await`'d, so "fetch then hide" actually waits for the response.
+2. **Async wrap** — if the remaining body contains at least one verb from `CHAIN_AWAITABLE` (`fetch`, plus the Tier 3 magic-link verbs `exchangeMagicLink` / `requestMagicLink` / `logoutServer` added in beta.8) AND there is more than one call, the body is wrapped in `(async()=>{await A;await B;…})().catch(e=>console.warn('[QS] chain aborted:',e))`. Every call gets `await`'d, so "fetch then hide" — or "exchangeMagicLink then saveToken then redirect" — actually waits for the response.
 3. **Backward-compat** — a sole `{{call:fetch:...}}` (or a chain with no awaitable verb) stays as-is. Single-call handlers and pure-sync chains don't pay the microtask cost.
 
 Side channel: `QS.fetch` also dispatches `qs:fetch:loaded` / `qs:fetch:error` DOM events (with `detail.{ref, data}` or `detail.{ref, error}`) and caches the latest result per ref in `QS._fetchCache`. Use this when an action must react to a fetch fired from a different handler/page — see `QS.after(eventSuffix, handler)` and `QS.onceCached(eventSuffix, handler)` in `qs.js`. The chain rules above stay the default UX; events are the escape hatch.

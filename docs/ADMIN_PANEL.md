@@ -4,7 +4,7 @@ _Last updated: 2026-06-03._
 
 > Canonical reference for the admin panel's JS architecture, boot flow, and module map. See [ARCHITECTURE.md](ARCHITECTURE.md) for the system-level overview, [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) for the workflow engine, and [COMMAND_API.md](COMMAND_API.md) for the API commands the panel calls.
 
-> _Maintainers note:_ re-check this doc when changing `public/admin/assets/js/core/storage-keys.js` (§6 storage keys), `secure/admin/templates/pages/preview/sidebar-tools.php` (§8.1 visual editor modes), `secure/admin/templates/layout.php` (§2 boot order), `public/admin/assets/js/pages/sitemap.js` / `secure/management/command/addRoute.php` (§9.7 sitemap + param-route authoring), or the state-stores wizard's init source kinds in `public/admin/assets/js/pages/preview/preview-js-interactions.js` (§9.6).
+> _Maintainers note:_ re-check this doc when changing `public/admin/assets/js/core/storage-keys.js` (§6 storage keys), `secure/admin/templates/pages/preview/sidebar-tools.php` (§8.1 visual editor modes), `secure/admin/templates/layout.php` (§2 boot order), `public/admin/assets/js/pages/sitemap.js` / `secure/management/command/addRoute.php` (§9.7 sitemap + param-route authoring), the state-stores wizard's init source kinds in `public/admin/assets/js/pages/preview/preview-js-interactions.js` (§9.6), or the auth verbs in `public/scripts/qs.js` / `secure/src/functions/qsVerbCatalog.php` / `secure/src/classes/JsonToHtmlRenderer.php` `CHAIN_AWAITABLE` (§9.5 Tier 1+2+3 auth flows).
 
 The admin panel is a server-rendered PHP shell plus a set of vanilla JS modules loaded per route. There is **no module bundler**. Load order is controlled by `secure/admin/templates/layout.php` and is the single most important contract in the front end — reorder a `<script>` tag and the panel breaks silently.
 
@@ -918,12 +918,14 @@ Future verbs that introduce translatable kwargs (e.g. `confirm`,
 each call's args and translates the value whenever the key is in
 the list.
 
-### 9.5 Auth flows — Tier 1 (token persistence), cookie pattern, Tier 2 (refresh on 401)
+### 9.5 Auth flows — Tier 1 (token persistence), cookie pattern, Tier 2 (refresh on 401), Tier 3 (magic-link)
 
-Token-flow primitives across two shipped tiers (persistence + refresh)
-plus the cookie auth type. Tier 3 (reserved `/auth/*` routes for
-magic-link / OAuth) is still planned — see
-`NOTES/planning/BETA7_AUTH_FLOWS.md`.
+Token-flow primitives across three shipped tiers (persistence + refresh
++ magic-link) plus the cookie auth type. Tier 3 ships in beta.8 as
+**magic-link only**; OAuth follows in beta.9 (the design groundwork is
+preserved in `NOTES/planning/BETA8_AUTH_TIER_3.md`). The original
+"reserved /auth/* routes" plan was dropped in favour of user-owned
+routes guarded by `addRoute`'s conflict-detection rail (beta.8 A1).
 
 #### `QS.saveToken(storage, key, path)` / `QS.clearToken(storage, key)`
 
@@ -1068,6 +1070,7 @@ reserves for its own markers and strips from user params):
 | Attribute | Effect |
 |---|---|
 | `data-auth-show="in"` / `"out"` | show only when logged in / out. Token source from `data-auth-source` on the element or any ancestor (set once on a wrapper). |
+| `data-auth-show="connecting"` / `"failed"` | (Tier 3, beta.8) show during / after a magic-link exchange. Drives the "Signing you in…" + "invalid or expired link" messages in the `magic-link-handler` component. Driven by `qs:auth:exchange-started` / `qs:auth:exchange-failed` events from `QS.exchangeMagicLink`; cleared on `qs:auth:saved` (success path) or `qs:auth:cleared` (logout). |
 | `data-storage-show="has:localStorage:key"` / `"missing:localStorage:key"` | generic presence show/hide for any storage key |
 | `data-storage-value="localStorage:key"` | sets the element's text to the stored value |
 
@@ -1079,6 +1082,155 @@ hidden parent hides its children regardless of their own state.
 A scaffold workflow that emits this structure correctly, plus a generic
 `QS.store` verb (+ `qs:storage:changed` event) for non-auth writes, are
 filed in `BACKLOG.md` as the ergonomic follow-up.
+
+#### Tier 3 — Magic-link (beta.8)
+
+Magic-link sign-in: the user types their email, the auth API mails a
+single-use code, the user clicks the link, lands on `/auth/magic/<code>`,
+the page automatically exchanges the code for a real session token. No
+password.
+
+**Why a code, not the token directly.** Putting the actual session token
+in the URL leaks via email forwarding, browser history, corporate HTTPS
+proxy logs, and mail-client link prefetchers (many prefetch links for
+preview thumbnails, "consuming" the token before the user clicks). The
+URL value is a single-use code; the page exchanges it for the real token
+immediately on page load. See `NOTES/planning/BETA8_AUTH_TIER_3.md` for
+the full security analysis.
+
+**The flow** — three phases, four actors:
+
+```
+Phase 1 — User requests the link:
+  User           Browser            QuickSite site    Auth API
+   │ email          │                    │              │
+   ├───────────────>│ POST /issue-magic  │              │
+   │                │ {email}            │              │
+   │                ├───────────────────>│ (proxy)      │
+   │                │                    ├─────────────>│ generates "abc123",
+   │                │                    │              │ stores, emails user
+   │                │<───────────────────│ 200 OK       │
+   │ "Check your email"                  │              │
+
+Phase 2 — User clicks the email link (out of band):
+  User's inbox                                      User's browser
+   │ click magic-link URL                                  │
+   ├──────────────────────────────────────────────────────>│ navigates
+
+Phase 3 — Page loads, exchange runs:
+  Browser              QuickSite site         Auth API
+   │ GET /auth/magic/abc123 │                    │
+   ├───────────────────────>│ A1 matches /auth/magic/:key
+   │<───────────────────────│ renders page (with magic-link-handler component)
+   │ onload chain fires:    │                    │
+   │ POST /exchange-magic   │                    │
+   │ {key:"abc123"}         │                    │
+   ├──────────────────────────────────────────────>│ looks up code,
+   │                        │                    │ marks USED, issues tokens
+   │<──────────────────────────────────────────────│
+   │ saveToken token        │                    │
+   │ saveToken refreshToken │                    │
+   │ ✓ logged in            │                    │
+   │ (optional redirect)    │                    │
+```
+
+**The verb family** (qs.js — added beta.8 A3):
+
+| Verb | Purpose | Typical chain |
+|---|---|---|
+| `QS.exchangeMagicLink(endpoint, paramName, returnTo?)` | Landing-page exchange. Reads `QS.routeParams[paramName]` (populated by the beta.8 A1 path matcher — see [ARCHITECTURE §5.3](ARCHITECTURE.md)), POSTs `{key:<code>}`, stores response in `QS._lastFetchResult`. Dispatches `qs:auth:exchange-started` before fetch + `qs:auth:exchange-failed` in catch so the `magic-link-handler` component's `data-auth-show="connecting"` / `"failed"` UI morphs. | `exchangeMagicLink` → `saveToken` × 2 → `redirect` |
+| `QS.requestMagicLink(endpoint, email, returnTo?)` | Forward path. POSTs `{email}` to the issue endpoint. `email` accepts a literal address OR a `#selector` / `.selector` to read from an `<input>` (same convention as `setState`'s value arg). | `validate` → `requestMagicLink` → optional `redirect` to "check your email" page |
+| `QS.logoutServer(endpoint)` | Server-side logout — POST so the auth API can invalidate the session / revoke the refresh token. Thin wrapper over `QS.fetch` so registry bearer auth is applied. Errors are intentionally swallowed (the user wants out either way). | `logoutServer` BEFORE `clearToken` × 2 → `redirect` |
+
+All three are in `CHAIN_AWAITABLE`, so chains that include them are wrapped in `(async()=>{await ...})()` — subsequent saveToken / clearToken / redirect see resolved state.
+
+##### The `magic-link-handler` component
+
+QuickSite-provided 3-paragraph template. Copy into your project at
+`secure/projects/<your-project>/templates/model/json/components/magic-link-handler.json`:
+
+```json
+{
+    "tag": "div",
+    "params": {
+        "class": "magic-link-handler",
+        "data-auth-source": "localStorage:authToken"
+    },
+    "children": [
+        {"tag": "p", "params": {"data-auth-show": "connecting"}, "children": [{"textKey": "auth.connecting"}]},
+        {"tag": "p", "params": {"data-auth-show": "in"},         "children": [{"textKey": "auth.welcome"}]},
+        {"tag": "p", "params": {"data-auth-show": "failed"},     "children": [{"textKey": "auth.failed"}]}
+    ]
+}
+```
+
+Then add it to your `/auth/magic/:key` page via the visual editor (Add → Component → magic-link-handler).
+
+**Adjust `data-auth-source`** so the storage location matches the key your `saveToken` chain writes to. The canonical template uses `localStorage:authToken`; if your chain writes to `localStorage:token` instead, change the wrapper attribute accordingly.
+
+##### Translation strings
+
+Add the three keys to your project's `translate/<lang>.json` files:
+
+**EN** (`translate/en.json`):
+```json
+"auth": {
+    "connecting": "Signing you in…",
+    "welcome": "Welcome back!",
+    "failed": "This link is invalid or expired."
+}
+```
+
+**FR** (`translate/fr.json`):
+```json
+"auth": {
+    "connecting": "Connexion en cours…",
+    "welcome": "Bon retour !",
+    "failed": "Ce lien est invalide ou a expiré."
+}
+```
+
+Any additional languages your project ships need the same shape.
+
+##### What you need to wire up — checklist
+
+1. **Auth API endpoints** — your auth backend serves an `issue-magic` endpoint (POSTs `{email}`, mails the link, always returns 200), an `exchange-magic` endpoint (POSTs `{key}`, returns `{token, refreshToken}` on success or 401), and optionally a `logout` endpoint (POST with bearer, returns 200).
+2. **Register the endpoints in `/admin/apis`** — typically as `@auth-api/issue-magic`, `@auth-api/exchange-magic`, `@auth-api/logout`. Set `auth: 'none'` on the issue + exchange endpoints (no token to send pre-login). Set the API-level `tokenSource` to the same key your `saveToken` chain will write to.
+3. **Author the route** in `/admin/sitemap` — e.g. `/auth/magic/:key` (the `:key` is the path-param segment that captures the code).
+4. **Drop the component JSON** into your project's `components/` dir (canonical above), then add it to the route's page via the visual editor.
+5. **Add the onload page-event chain** — via the JS-mode page-events panel on that route. Example for the test project:
+   ```
+   {{call:exchangeMagicLink:@auth-api/exchange-magic,key}};
+   {{call:saveToken:localStorage,authToken,token}};
+   {{call:saveToken:localStorage,refreshToken,refreshToken}};
+   {{call:redirect:/dashboard}}
+   ```
+6. **Add the 3 translation keys** to every active language's `translate/<lang>.json`.
+7. **(Optional)** For the forward path, build a small email-entry form on a public page using `QS.requestMagicLink`:
+   ```html
+   <form>
+     <input id="email-input" type="email" required>
+     <button type="submit"
+             onclick="{{call:validate:event,event}};{{call:requestMagicLink:@auth-api/issue-magic,#email-input,/check-email}}">
+       Email me a sign-in link
+     </button>
+   </form>
+   ```
+
+##### Limitations / gotchas
+
+- **No built-in `/auth/*` reservation** — you author the routes yourself. The conflict-detection in `addRoute` (beta.8 A1) is the safety rail; conflicting param routes warn at create time.
+- **Auto-redirect interplay** — `exchangeMagicLink`'s `returnTo` arg queues navigation IMMEDIATELY on success. Chained `saveToken` calls still run before the browser processes the navigation (they're sync, in the same microtask), but chained verbs that are themselves async would race. Keep auth-side state changes in synchronous `saveToken` calls; don't chain another async verb between exchange and redirect.
+- **Email enumeration oracle** — your `requestMagicLink` server-side endpoint should ALWAYS return 200, even for unknown emails. Don't let attackers probe your user list. Auth-API responsibility, not the verb's.
+- **OAuth deferred to beta.9** — magic-link covers the common "passwordless email login" case. OAuth (Google / Meta / Amazon / etc.) ships in beta.9 with the same `data-auth-show="connecting"` / `"failed"` UI primitives, a parallel verb family, and per-provider preset configs.
+
+| Concern | Where |
+|---|---|
+| Runtime verbs | `public/scripts/qs.js` (search for `QS.exchangeMagicLink`, `QS.requestMagicLink`, `QS.logoutServer`) |
+| Catalog metadata | `secure/src/functions/qsVerbCatalog.php` (added beta.8 A3) |
+| Async-chain wrapping | `secure/src/classes/JsonToHtmlRenderer.php` `CHAIN_AWAITABLE` |
+| Lifecycle events | `qs:auth:exchange-started` / `qs:auth:exchange-failed` on `document`; cleared by `qs:auth:saved` / `qs:auth:cleared` |
+| Design groundwork | `NOTES/planning/BETA8_AUTH_TIER_3.md` |
 
 ---
 
