@@ -82,6 +82,12 @@ secure/management/config/target.php
 secure/management/config/auth.php
 secure/management/config/roles.php
 
+# Admin config - server-side secrets for data resolver (beta.8 A2).
+# Gitignored by design — anyone with filesystem access to secure/ can
+# read these. Ship secure/admin/config/api-secrets.php.example as the
+# template; deployments copy + rename to api-secrets.php and populate.
+secure/admin/config/api-secrets.php
+
 # Exports folder (temporary export ZIPs)
 secure/exports/
 
