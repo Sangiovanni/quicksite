@@ -200,6 +200,7 @@ class PageManagement {
         // qs-api-config (the store endpoints resolve against QS_API_ENDPOINTS)
         // and before the page-events script (so onload fetchState sees the
         // stores). Skipped in editor mode, like page events.
+        $currentStoresForHydration = [];
         if (!$editorMode) {
             $storesFile = PROJECT_PATH . '/data/state-stores.json';
             if (file_exists($storesFile)) {
@@ -208,6 +209,59 @@ class PageManagement {
                 $currentStores = is_array($storesAll) ? ($storesAll[$trimParameters->routePath()] ?? []) : [];
                 if (!empty($currentStores)) {
                     $body .= '<script>window.QS_STATE_STORES=' . json_encode($currentStores, JSON_UNESCAPED_SLASHES) . ';</script>';
+                    $currentStoresForHydration = $currentStores;
+                }
+            }
+        }
+
+        // Beta.8 A2 Slice 5 — hydration handoff.
+        //
+        // When the server-side resolver fetched the same endpoint a state
+        // store on this page is bound to, emit window.QS_RESOLVED carrying
+        // the resolved exposed values keyed by storeId.fieldName. qs.js's
+        // _initStores uses this to (a) seed each matching store's state
+        // with the server-resolved values, and (b) SKIP the initial
+        // fetchOnLoad — the data is already in the DOM (rendered via
+        // {{resolved:NAME}} substitution) AND now in the store's state,
+        // avoiding the duplicate client-side fetch on first paint.
+        // Subsequent fetchState() calls (Load More, search, paginate)
+        // work normally — only the initial load is skipped.
+        //
+        // Match algorithm: same endpoint ref + same field name. The
+        // author configures the resolver's `expose` keys to match the
+        // store's response/both field names; without that alignment,
+        // hydration is a no-op (store fetches on load like before).
+        //
+        // Skipped in editor mode (matches the state-store + page-events
+        // gates — editor previews are emulation-driven, not real
+        // resolver-fired).
+        if (!$editorMode && !empty($currentStoresForHydration)) {
+            require_once SECURE_FOLDER_PATH . '/src/functions/resolverHelpers.php';
+            $__hydrationRoutePath = $trimParameters->routePath();
+            $__hydrationResolver  = getResolverForRoute($__hydrationRoutePath);
+            $__hydrationResolved  = getResolvedVars();
+            if ($__hydrationResolver !== null
+                && !empty($__hydrationResolved)
+                && !empty($__hydrationResolver['endpoint'])) {
+                $__resolverEndpoint = $__hydrationResolver['endpoint'];
+                $__qsResolved = [];
+                foreach ($currentStoresForHydration as $__storeId => $__store) {
+                    if (!is_array($__store)) continue;
+                    if (($__store['endpoint'] ?? '') !== $__resolverEndpoint) continue;
+                    $__storeHydration = [];
+                    foreach (($__store['fields'] ?? []) as $__fieldName => $__fieldDef) {
+                        $__dir = $__fieldDef['dir'] ?? 'request';
+                        if ($__dir !== 'response' && $__dir !== 'both') continue;
+                        if (array_key_exists($__fieldName, $__hydrationResolved)) {
+                            $__storeHydration[$__fieldName] = $__hydrationResolved[$__fieldName];
+                        }
+                    }
+                    if (!empty($__storeHydration)) {
+                        $__qsResolved[$__storeId] = $__storeHydration;
+                    }
+                }
+                if (!empty($__qsResolved)) {
+                    $body .= '<script>window.QS_RESOLVED=' . json_encode($__qsResolved, JSON_UNESCAPED_SLASHES) . ';</script>';
                 }
             }
         }

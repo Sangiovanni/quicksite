@@ -2548,17 +2548,40 @@
 
     // Build live stores from the per-page definitions, seed initial values,
     // render scalars, and fire fetchOnLoad stores.
+    //
+    // Beta.8 A2 Slice 5 — hydration handoff. When the server-side resolver
+    // fired against the same endpoint a store is bound to, window.QS_RESOLVED
+    // arrives populated as { storeId: { fieldName: value, ... } }. Stores
+    // that have hydration data:
+    //   - seed state[fieldName] from the resolved values instead of the
+    //     default/init source (only for response/both fields — request-dir
+    //     fields still come from init: query/param/storage/literal),
+    //   - SKIP the initial fetchOnLoad fetch (the data is already on screen,
+    //     no point round-tripping for the same response on first paint),
+    //   - keep subsequent fetchState() calls working normally — Load More,
+    //     search, paginate all hit the upstream as before.
+    // Stores without hydration follow the unchanged client-only path.
     function _initStores() {
         var defs = window.QS_STATE_STORES || {};
+        var hydrationAll = window.QS_RESOLVED || {};
         for (var storeId in defs) {
             if (!Object.prototype.hasOwnProperty.call(defs, storeId)) continue;
             var def = defs[storeId];
             var fields = def.fields || {};
             var state = {};
+            var hydration = (hydrationAll && typeof hydrationAll === 'object' && hydrationAll[storeId])
+                ? hydrationAll[storeId]
+                : null;
             for (var name in fields) {
                 if (!Object.prototype.hasOwnProperty.call(fields, name)) continue;
                 var f = fields[name];
-                if (f.dir === 'response') {
+                if (hydration && Object.prototype.hasOwnProperty.call(hydration, name)) {
+                    // Server-resolved value wins for this field — the
+                    // server already extracted from response.<from> via the
+                    // resolver's expose mapping, so we use it directly
+                    // without consulting `default` or `init`.
+                    state[name] = hydration[name];
+                } else if (f.dir === 'response') {
                     state[name] = ('default' in f) ? f.default : (f.append ? [] : null);
                 } else {
                     state[name] = _resolveInit(f.init, f.default);
@@ -2566,7 +2589,10 @@
             }
             QS._stores[storeId] = { def: def, state: state, _inFlight: false, _exhausted: false };
             _renderStore(storeId);
-            if (def.fetchOnLoad) {
+            // Skip fetchOnLoad when hydration covered this store. Any
+            // subsequent QS.fetchState(storeId) (e.g. from a Load-More
+            // button or a search input handler) fires upstream normally.
+            if (def.fetchOnLoad && !hydration) {
                 QS.fetchState(storeId).catch(function () { /* QS.fetch already surfaced the error */ });
             }
         }
