@@ -41,7 +41,7 @@ return [
             'getAnimatedSelectors', 'listAliases', 'listBuilds', 'getBuild',
             'listRoles', 'getMyPermissions',
             // Content editing commands
-            'editStructure', 'addRoute', 'deleteRoute', 'setRouteLayout',
+            'editStructure', 'addRoute', 'deleteRoute', 'setRouteLayout', 'setRouteResolver',
             'setTranslationKeys', 'deleteTranslationKeys',
             'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations',
             'addLang', 'deleteLang', 'cleanOrphanTranslations', 'setDefaultLang', 'setMultilingual', 'checkStructureMulti',
@@ -70,7 +70,7 @@ return [
             'getAnimatedSelectors', 'listAliases', 'listBuilds', 'getBuild',
             'listRoles', 'getMyPermissions',
             // Content editing commands (same as editor)
-            'editStructure', 'addRoute', 'deleteRoute', 'setRouteLayout',
+            'editStructure', 'addRoute', 'deleteRoute', 'setRouteLayout', 'setRouteResolver',
             'setTranslationKeys', 'deleteTranslationKeys',
             'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations',
             'addLang', 'deleteLang', 'cleanOrphanTranslations', 'setDefaultLang', 'setMultilingual', 'checkStructureMulti',
@@ -104,7 +104,7 @@ return [
             'getAnimatedSelectors', 'listAliases', 'listBuilds', 'getBuild',
             'listRoles', 'getMyPermissions',
             // Content + style commands
-            'editStructure', 'addRoute', 'deleteRoute', 'setRouteLayout',
+            'editStructure', 'addRoute', 'deleteRoute', 'setRouteLayout', 'setRouteResolver',
             'setTranslationKeys', 'deleteTranslationKeys',
             'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations',
             'addLang', 'deleteLang', 'cleanOrphanTranslations', 'setDefaultLang', 'setMultilingual', 'checkStructureMulti',
@@ -142,7 +142,7 @@ return [
             'getAnimatedSelectors', 'listAliases', 'listBuilds', 'getBuild',
             'listRoles', 'getMyPermissions',
             // Content + style commands
-            'editStructure', 'addRoute', 'deleteRoute', 'setRouteLayout',
+            'editStructure', 'addRoute', 'deleteRoute', 'setRouteLayout', 'setRouteResolver',
             'setTranslationKeys', 'deleteTranslationKeys',
             'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations',
             'addLang', 'deleteLang', 'cleanOrphanTranslations', 'setDefaultLang', 'setMultilingual', 'checkStructureMulti',

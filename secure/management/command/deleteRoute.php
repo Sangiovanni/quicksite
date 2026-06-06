@@ -277,6 +277,23 @@ foreach ($routesToDelete as $routeSegments) {
 }
 
 // ============================================================================
+// CLEAN UP RESOLVERS (beta.8 A2)
+// ============================================================================
+// Drop the per-route resolver sidecar entry for every deleted route so the
+// resolver runtime doesn't fire against routes that no longer exist on
+// next page-load after a cascade-delete.
+
+require_once SECURE_FOLDER_PATH . '/src/functions/resolverHelpers.php';
+$deletedResolverRoutes = [];
+foreach ($routesToDelete as $routeSegments) {
+    $routeToRemove = implode('/', $routeSegments);
+    if (getResolverForRoute($routeToRemove) !== null) {
+        deleteResolverForRoute($routeToRemove);
+        $deletedResolverRoutes[] = $routeToRemove;
+    }
+}
+
+// ============================================================================
 // SUCCESS RESPONSE
 // ============================================================================
 
@@ -289,7 +306,8 @@ ApiResponse::create(200, 'route.deleted')
         'deleted_directories' => $deletedDirs,
         'failed_files' => $failedFiles,
         'aliases_removed' => $deletedAliases,
-        'page_events_cleaned' => $pageEventsCleanup['cleaned'] ?? []
+        'page_events_cleaned' => $pageEventsCleanup['cleaned'] ?? [],
+        'resolvers_cleaned' => $deletedResolverRoutes,
     ])
     ->send();
 
