@@ -106,6 +106,17 @@ class TrimParameters {
             $this->routeParams = $resolved['routeParams'] ?? [];
             $this->routeFound = $resolved['found'];
         }
+
+        // Beta.8 A2 — editor emulation override. When public/index.php
+        // detected _editor=1 + _emulate it stashed the desired routeParams
+        // in a global. Every TrimParameters instance picks them up here
+        // (per-route .php templates construct their own instances and
+        // would otherwise miss an override applied to a sibling instance).
+        // Production code path: global absent, no-op.
+        if (isset($GLOBALS['__qs_emulate_route_params'])
+            && is_array($GLOBALS['__qs_emulate_route_params'])) {
+            $this->routeParams = $GLOBALS['__qs_emulate_route_params'];
+        }
     }
     
     /**
@@ -237,7 +248,37 @@ class TrimParameters {
     public function routeParams(): array {
         return $this->routeParams;
     }
-    
+
+    /**
+     * Override the captured route params (beta.8 A2 Slice 3 — editor
+     * emulation). The visual editor previews a param route without
+     * knowing what concrete URL the visitor will hit, so it injects
+     * "preview values" via ?_emulate=... — public/index.php decodes
+     * that and calls this setter so downstream templates +
+     * {{param:NAME}} substitution see the emulated values.
+     *
+     * Production callers should NOT use this — it bypasses URL-based
+     * resolution. Editor-only, gated by ?_editor=1 in public/index.php.
+     */
+    public function setRouteParams(array $params): void {
+        $this->routeParams = $params;
+    }
+
+    /**
+     * Static accessor for the editor-emulation override stash. Templates
+     * construct their OWN fresh TrimParameters instance (the per-route
+     * .php files are independent of public/index.php's state), so just
+     * setting the override on index.php's instance doesn't propagate.
+     * The global stash lets the constructor pick up the override on every
+     * new instance.
+     *
+     * Set early in public/index.php (before any TrimParameters
+     * construction) when _editor=1 + _emulate are present.
+     */
+    public static function setEmulatedRouteParams(array $params): void {
+        $GLOBALS['__qs_emulate_route_params'] = $params;
+    }
+
     /**
      * Get current language
      * @return string|null

@@ -39,6 +39,15 @@
             </svg>
             <?= __admin('preview.emulationApply') ?? 'Apply Preview' ?>
         </button>
+        <!-- Beta.8 A2 Track 2e — live-data toggle. Visible only for page-edit
+             mode; component emulation has no resolver to go live against.
+             preview.js shows/hides per currentEditType. -->
+        <button type="button" class="admin-btn admin-btn--sm admin-btn--outline" id="emulation-live-btn" style="display: none;" data-active="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                <circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m10 0h6M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"/>
+            </svg>
+            <span data-emulation-live-label><?= __admin('preview.emulationUseLive') ?? 'Use Live Data' ?></span>
+        </button>
         <button type="button" class="admin-btn admin-btn--sm admin-btn--outline" id="emulation-reset-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
                 <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>

@@ -460,6 +460,68 @@ class JsonToHtmlRenderer {
         );
     }
 
+    /**
+     * Substitute `{{resolved:NAME}}` and `{{resolved:NAME.dot.path}}`
+     * placeholders with values from the server-side data resolver
+     * (beta.8 A2 Slice 3).
+     *
+     * Source resolution order:
+     *   1. $this->context['resolved'] when explicitly passed by the
+     *      page template.
+     *   2. Otherwise getResolvedVars() — populated by public/index.php
+     *      after firing DataResolver for the matched route. Legacy
+     *      templates (those that don't pass 'resolved') still benefit
+     *      via this fallback.
+     *
+     * - Fast path: returns unchanged when the text doesn't contain
+     *   '{{resolved:' OR when no resolved vars exist for this request.
+     * - Dot-path support: 'product.name' walks
+     *   $resolved['product']['name'].
+     * - Unknown names / out-of-range paths leave the literal placeholder
+     *   so the author can spot the typo (mirrors applyRouteParams).
+     * - Array / object values render as compact JSON; primitives cast
+     *   to string. Caller is responsible for htmlspecialchars after
+     *   substitution so the substituted value is properly escaped.
+     */
+    private function applyResolved(string $text): string {
+        if (strpos($text, '{{resolved:') === false) {
+            return $text;
+        }
+        $resolved = $this->context['resolved'] ?? null;
+        if ($resolved === null) {
+            // Fall back to the request-scoped global stash populated by
+            // public/index.php after DataResolver runs. require_once is
+            // idempotent — the helper file may already be loaded.
+            require_once __DIR__ . '/../functions/resolverHelpers.php';
+            $resolved = getResolvedVars();
+        }
+        if (empty($resolved) || !is_array($resolved)) {
+            return $text;
+        }
+        return preg_replace_callback(
+            '/\{\{resolved:([a-zA-Z_][a-zA-Z0-9_.]*)\}\}/',
+            function ($m) use ($resolved) {
+                $parts = explode('.', $m[1]);
+                $cursor = $resolved;
+                foreach ($parts as $part) {
+                    if (is_array($cursor) && array_key_exists($part, $cursor)) {
+                        $cursor = $cursor[$part];
+                    } else {
+                        return $m[0]; // unknown path — leave literal
+                    }
+                }
+                if (is_array($cursor) || is_object($cursor)) {
+                    return json_encode($cursor, JSON_UNESCAPED_SLASHES);
+                }
+                if (is_bool($cursor)) {
+                    return $cursor ? 'true' : 'false';
+                }
+                return (string) ($cursor ?? '');
+            },
+            $text
+        );
+    }
+
     private function renderTextNode(array $node): string {
         $textKey = $node['textKey'];
         
@@ -486,6 +548,11 @@ class JsonToHtmlRenderer {
             // Beta.8 A1 — substitute `{{param:NAME}}` placeholders from the
             // captured URL path-params (e.g., :slug from /products/:slug)
             // BEFORE htmlspecialchars so the substituted value gets escaped.
+            // Beta.8 A2 — also substitute `{{resolved:NAME[.dot.path]}}`
+            // from the server-side data resolver. resolved first so a
+            // routeParam value containing a literal {{resolved:...}} can't
+            // accidentally inject a real placeholder.
+            $rawText = $this->applyResolved($rawText);
             $rawText = $this->applyRouteParams($rawText);
             $escapedRaw = htmlspecialchars($rawText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
             if ($this->editorMode) {
@@ -517,7 +584,10 @@ class JsonToHtmlRenderer {
         // captured URL path-params AFTER translation lookup, BEFORE
         // htmlspecialchars. Translations can author the placeholder; e.g.
         // an EN string "Welcome, {{param:slug}}!" renders as the URL value.
-        $translatedRaw = $this->applyRouteParams($this->translator->translate($textKey));
+        // Beta.8 A2 — also substitute `{{resolved:NAME[.dot.path]}}` from
+        // the server-side data resolver, applied first (see applyResolved).
+        $translatedRaw = $this->applyResolved($this->translator->translate($textKey));
+        $translatedRaw = $this->applyRouteParams($translatedRaw);
         $translatedText = htmlspecialchars($translatedRaw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         
         // In editor mode, wrap in span with data-qs-textkey for inline editing

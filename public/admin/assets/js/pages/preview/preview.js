@@ -131,6 +131,8 @@
     const emulationPanelActions = document.getElementById('emulation-panel-actions');
     const emulationApplyBtn = document.getElementById('emulation-apply-btn');
     const emulationResetBtn = document.getElementById('emulation-reset-btn');
+    // Beta.8 A2 Track 2e — live-data toggle button (page emulation only).
+    const emulationLiveBtn  = document.getElementById('emulation-live-btn');
     const ctxNodeEmulation = document.getElementById('ctx-node-emulation');
     
     // Text mode contextual elements
@@ -2206,12 +2208,118 @@
                 url += getCurrentLang() + '/';
             }
             if (editName) {
-                url += editName;
+                // Beta.8 A2 — param routes (route names containing ':')
+                // need a concrete URL segment per param OR the public
+                // 404 fires before the resolver / template can run.
+                // Substitute each ':name' with the emulated value if
+                // saved (or a sensible fallback) so the iframe lands on
+                // a matchable URL. The emulation override in
+                // public/index.php then re-overrides routeParams() so
+                // templates see the EDITOR'S values regardless of what
+                // the URL segment happened to be.
+                let urlPath = editName;
+                if (urlPath.includes(':')) {
+                    const emulated = _getPageEmulationData(editName);
+                    const paramOverrides = emulated && emulated.routeParams || {};
+                    urlPath = urlPath.split('/').map(seg => {
+                        if (!seg.startsWith(':')) return seg;
+                        const name = seg.slice(1);
+                        const v = paramOverrides[name];
+                        return (v != null && v !== '') ? encodeURIComponent(v) : 'preview-' + name;
+                    }).join('/');
+                }
+                url += urlPath;
             }
             // Always add _editor=1 for editor mode
             url += (url.includes('?') ? '&' : '?') + '_editor=1';
+            // Beta.8 A2 — append page-emulation payload from localStorage
+            // when present. Encoded as base64(JSON({routeParams, resolved})).
+            // Server-side public/index.php decodes + overrides routeParams
+            // / resolved before the template renders.
+            //
+            // Track 2e — when the panel is in "Use Live Data" mode, add
+            // _live=1 so the real resolver fires server-side. In that
+            // case the _emulate payload carries only routeParams (the
+            // resolved overrides would defeat the purpose of going live).
+            const __pageEmulation = _getPageEmulationData(editName);
+            const __useLive = !!(__pageEmulation && __pageEmulation.useLive);
+            if (__useLive) {
+                url += '&_live=1';
+            }
+            if (__pageEmulation) {
+                const __payload = {};
+                if (Object.keys(__pageEmulation.routeParams || {}).length > 0) {
+                    __payload.routeParams = __pageEmulation.routeParams;
+                }
+                if (!__useLive && Object.keys(__pageEmulation.resolved || {}).length > 0) {
+                    __payload.resolved = __pageEmulation.resolved;
+                }
+                if (Object.keys(__payload).length > 0) {
+                    try {
+                        url += '&_emulate=' + encodeURIComponent(btoa(JSON.stringify(__payload)));
+                    } catch(e) { /* btoa fails on unicode — swallow; emulation simply absent */ }
+                }
+            }
         }
         return url;
+    }
+
+    /**
+     * Beta.8 A2 — read the editor's saved page-emulation values for a
+     * route. Storage key is namespaced (qs_emulate_page_*) so it can't
+     * collide with the component-emulation pattern (qs_emulate_*).
+     *
+     * Returns {routeParams: {...}, resolved: {...}} or null when nothing
+     * is saved / parse failed. Both sub-objects default to empty when
+     * absent so callers can read them safely.
+     */
+    function _getPageEmulationData(routePath) {
+        if (!routePath) return null;
+        const storageKey = 'qs_emulate_page_' + routePath;
+        try {
+            const raw = localStorage.getItem(storageKey);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed || typeof parsed !== 'object') return null;
+            return {
+                routeParams: (parsed.routeParams && typeof parsed.routeParams === 'object') ? parsed.routeParams : {},
+                resolved:    (parsed.resolved    && typeof parsed.resolved    === 'object') ? parsed.resolved    : {},
+                // Track 2e — live-data toggle. true → editor preview
+                // fires the real resolver instead of using the resolved
+                // overrides. Default false. Persists per page in
+                // localStorage alongside the rest of the emulation state.
+                useLive:     !!parsed.useLive,
+            };
+        } catch(e) {
+            return null;
+        }
+    }
+
+    /**
+     * Beta.8 A2 — derive the list of variables that the editor's
+     * emulation panel should offer fields for, given a route path:
+     *   - Route params: extract ':name' segments from the route pattern.
+     *   - Resolved vars: read the resolver's `expose` keys from
+     *     PreviewConfig.routeResolvers[routePath].expose.
+     *
+     * Returns {routeParams: ['slug', ...], resolved: ['product', ...]}.
+     * Either array may be empty (static route + no resolver = no fields,
+     * empty-state in the panel).
+     */
+    function _getPageEmulationVarNames(routePath) {
+        const out = { routeParams: [], resolved: [] };
+        if (!routePath) return out;
+        routePath.split('/').forEach(seg => {
+            if (seg.startsWith(':') && seg.length > 1) {
+                out.routeParams.push(seg.slice(1));
+            }
+        });
+        const resolvers = (PreviewConfig && PreviewConfig.routeResolvers) || {};
+        const cfg = resolvers[routePath];
+        if (cfg && cfg.expose && typeof cfg.expose === 'object') {
+            out.resolved = Object.keys(cfg.expose);
+        }
+        return out;
     }
     
     // ==================== Loading ====================
@@ -2236,8 +2344,17 @@
         showLoading();
         startLoadingTimeout();
         overlayInjected = false;
-        // For component preview, rebuild URL to include current emulation data
-        if (currentEditType === 'component') {
+        // Rebuild URL for component AND page previews so emulation
+        // changes (qs_emulate_* / qs_emulate_page_*) propagate. Pages
+        // previously used `iframe.src = iframe.src` which reused the OLD
+        // URL — the updated _emulate query was never picked up, so
+        // 'Apply Preview' on the page emulation panel silently did
+        // nothing without a hard refresh. Layouts keep the self-assign
+        // path since they don't emulate.
+        if (currentEditType === 'component'
+            || currentEditType === 'page'
+            || currentEditType === undefined
+            || currentEditType === null) {
             iframe.src = buildUrl(currentEditType, currentEditName);
         } else {
             iframe.src = iframe.src;
@@ -2349,9 +2466,20 @@
         if (ctxNodeEnums) {
             ctxNodeEnums.style.display = editType === 'component' ? '' : 'none';
         }
-        // Show/hide Emulation button (component-only)
+        // Show/hide Emulation button. Components: always shown.
+        // Pages: shown ONLY when the route has variables to emulate
+        // (':name' segments in the path OR a resolver in the sidecar).
+        // Static routes with no resolver get no button — there's nothing
+        // to emulate, so the button would just be noise.
         if (ctxNodeEmulation) {
-            ctxNodeEmulation.style.display = editType === 'component' ? '' : 'none';
+            let showBtn = false;
+            if (editType === 'component') {
+                showBtn = true;
+            } else if (editType === 'page' || editType === undefined || editType === null) {
+                const vars = _getPageEmulationVarNames(editName);
+                showBtn = vars.routeParams.length > 0 || vars.resolved.length > 0;
+            }
+            ctxNodeEmulation.style.display = showBtn ? '' : 'none';
         }
         // Hide Variables panel if open and switching away from component
         if (editType !== 'component' && variablesPanel && variablesPanel.style.display !== 'none') {
@@ -2361,8 +2489,10 @@
         if (editType !== 'component' && enumsPanel && enumsPanel.style.display !== 'none') {
             hideEnumsPanel();
         }
-        // Hide Emulation panel if open and switching away from component
-        if (editType !== 'component' && emulationPanel && emulationPanel.style.display !== 'none') {
+        // Hide Emulation panel if open and switching to layout (pages
+        // keep it open — the user can switch pages with their emulation
+        // panel still visible since each page has its own storage key).
+        if (editType === 'layout' && emulationPanel && emulationPanel.style.display !== 'none') {
             hideEmulationPanel();
         }
         
@@ -4782,6 +4912,14 @@
         }
         if (emulationResetBtn) {
             emulationResetBtn.addEventListener('click', resetEmulation);
+        }
+        // Beta.8 A2 Track 2e — live-data toggle. Clicking flips the
+        // useLive flag in localStorage and reloads the preview with
+        // _live=1 so the real resolver fires server-side instead of the
+        // emulated `resolved` overrides being used. Page-edit only —
+        // showEmulationPanel shows/hides the button per edit type.
+        if (emulationLiveBtn) {
+            emulationLiveBtn.addEventListener('click', toggleLiveData);
         }
         
         // Auto-generate ID from name
@@ -9841,8 +9979,14 @@
      * Show the Variable Emulation panel
      */
     async function showEmulationPanel() {
-        if (!emulationPanel || currentEditType !== 'component') return;
-        
+        // Component-edit path uses the structure-parsing flow below.
+        // Page-edit path (beta.8 A2) takes the dedicated page branch.
+        if (!emulationPanel) return;
+        if (currentEditType !== 'component' && currentEditType !== 'page'
+            && currentEditType !== undefined && currentEditType !== null) {
+            return;
+        }
+
         // Hide other panels
         const nodeActions = document.getElementById('ctx-node-actions');
         if (nodeActions) nodeActions.style.display = 'none';
@@ -9850,15 +9994,96 @@
         if (enumsPanel) enumsPanel.style.display = 'none';
         if (saveSnippetForm) saveSnippetForm.style.display = 'none';
         if (saveComponentForm) saveComponentForm.style.display = 'none';
-        
+
         emulationPanel.style.display = '';
-        
+
         // Show loading
         if (emulationPanelLoading) emulationPanelLoading.style.display = '';
         if (emulationPanelEmpty) emulationPanelEmpty.style.display = 'none';
         if (emulationPanelFields) emulationPanelFields.innerHTML = '';
         if (emulationPanelActions) emulationPanelActions.style.display = 'none';
-        
+
+        // ── Page emulation branch (beta.8 A2 Slice 3 Track 2c) ──
+        // Page emulation fields come from two sources: ':name' segments
+        // in the route pattern (route params) and the resolver's `expose`
+        // keys (resolved vars from PreviewConfig). No server fetch
+        // required — both are available client-side.
+        if (currentEditType === 'page' || currentEditType === undefined || currentEditType === null) {
+            try {
+                const vars = _getPageEmulationVarNames(currentEditName);
+                if (emulationPanelLoading) emulationPanelLoading.style.display = 'none';
+                if (vars.routeParams.length === 0 && vars.resolved.length === 0) {
+                    if (emulationPanelEmpty) {
+                        emulationPanelEmpty.querySelector('span').textContent =
+                            PreviewConfig.i18n?.noVariablesToEmulatePage
+                                || 'No route params or resolved variables on this page';
+                        emulationPanelEmpty.style.display = '';
+                    }
+                    return;
+                }
+                const saved = _getPageEmulationData(currentEditName) || { routeParams: {}, resolved: {}, useLive: false };
+                const hasAnySaved = Object.keys(saved.routeParams).length > 0
+                                 || Object.keys(saved.resolved).length > 0;
+                // Track 2d — fetch schema-driven defaults from
+                // PreviewConfig (computed server-side from each
+                // endpoint's responseSchema). Used to pre-fill resolved
+                // inputs on FIRST OPEN (no saved emulation yet). After
+                // the user has saved anything, their values win — we
+                // never overwrite a deliberate save with a default.
+                const resolverDefaults = (PreviewConfig.routeResolverDefaults || {})[currentEditName] || {};
+                if (emulationPanelFields) {
+                    vars.routeParams.forEach(name => {
+                        // Route params don't have schemas; default to
+                        // 'preview-{name}' so the URL has a matchable
+                        // segment without the author having to type.
+                        const fallback = hasAnySaved ? '' : ('preview-' + name);
+                        emulationPanelFields.appendChild(
+                            _createPageEmulationField('routeParams', name, saved.routeParams[name] || fallback)
+                        );
+                    });
+                    vars.resolved.forEach(name => {
+                        const schemaDefault = resolverDefaults[name];
+                        // Coerce non-string defaults (numbers, booleans)
+                        // to display strings for the text input. Arrays
+                        // / objects → leave the input blank (empty
+                        // collections aren't useful in a text field).
+                        let fallback = '';
+                        if (!hasAnySaved && schemaDefault !== undefined && schemaDefault !== null) {
+                            if (typeof schemaDefault === 'string'
+                                || typeof schemaDefault === 'number'
+                                || typeof schemaDefault === 'boolean') {
+                                fallback = String(schemaDefault);
+                            }
+                        }
+                        emulationPanelFields.appendChild(
+                            _createPageEmulationField('resolved', name, saved.resolved[name] || fallback)
+                        );
+                    });
+                }
+                // Track 2e — show the live-data toggle (page-only) and
+                // sync its visual state to the saved useLive flag. The
+                // button toggles class --active when live mode is on so
+                // the user sees the current state at a glance.
+                if (emulationLiveBtn) {
+                    emulationLiveBtn.style.display = '';
+                    _syncLiveBtnState(saved.useLive, vars.resolved.length === 0);
+                }
+                if (emulationPanelActions) emulationPanelActions.style.display = '';
+            } catch (error) {
+                console.error('[Preview] Page emulation panel error:', error);
+                if (emulationPanelLoading) emulationPanelLoading.style.display = 'none';
+                if (emulationPanelFields) {
+                    emulationPanelFields.innerHTML = '<div style="color:var(--admin-danger);font-size:var(--font-size-sm);padding:var(--space-sm);">'
+                        + (PreviewConfig.i18n?.error || 'Error') + ': ' + error.message + '</div>';
+                }
+            }
+            return;
+        }
+
+        // Hide live button on the component branch (no resolver concept).
+        if (emulationLiveBtn) emulationLiveBtn.style.display = 'none';
+
+        // ── Component branch (existing flow) ──
         try {
             const structInfo = parseStruct(selectedStruct || ('component-' + currentEditName));
             if (!structInfo) throw new Error('Invalid struct');
@@ -10016,16 +10241,106 @@
         row.appendChild(resetBtn);
         return row;
     }
-    
+
     /**
-     * Apply emulation: store values in localStorage and reload preview
+     * Beta.8 A2 — Create a single emulation field for page-edit mode.
+     * Mirrors createEmulationField's structural output (same CSS classes
+     * for the row + label + input + reset button) so the panel chrome is
+     * indistinguishable from the component case, but carries a small
+     * data-section marker so applyEmulation can rebuild the nested
+     * {routeParams: {...}, resolved: {...}} shape on save.
+     *
+     * @param {'routeParams' | 'resolved'} section
+     * @param {string} varName
+     * @param {string} savedValue
+     */
+    function _createPageEmulationField(section, varName, savedValue) {
+        const row = document.createElement('div');
+        row.className = 'preview-emulation-field';
+        row.dataset.varName = varName;
+        row.dataset.pageSection = section;
+
+        const label = document.createElement('label');
+        label.className = 'preview-emulation-field__label';
+        label.textContent = varName;
+        // Small badge indicating which kind of variable this is. Reuses
+        // the existing badge styling from the enum case.
+        const badge = document.createElement('span');
+        badge.className = 'preview-emulation-field__badge';
+        badge.textContent = section === 'routeParams' ? 'param' : 'resolved';
+        label.appendChild(badge);
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'admin-input admin-input--sm preview-emulation-field__input';
+        input.value = (typeof savedValue === 'string') ? savedValue : (savedValue == null ? '' : String(savedValue));
+        input.placeholder = section === 'routeParams'
+            ? '{{param:' + varName + '}}'
+            : '{{resolved:' + varName + '}}';
+
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.className = 'preview-emulation-field__reset';
+        resetBtn.title = PreviewConfig.i18n?.emulationResetField || 'Reset';
+        resetBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>';
+        resetBtn.addEventListener('click', () => { input.value = ''; });
+
+        row.appendChild(label);
+        row.appendChild(input);
+        row.appendChild(resetBtn);
+        return row;
+    }
+
+    /**
+     * Apply emulation: store values in localStorage and reload preview.
+     * Branches by edit type — pages use a nested {routeParams, resolved}
+     * shape under qs_emulate_page_*, components use the existing flat
+     * shape under qs_emulate_*.
      */
     function applyEmulation() {
         if (!emulationPanelFields) return;
-        
+
+        // Page-edit branch (beta.8 A2). Detect by either the explicit
+        // edit type OR the data-page-section marker on the first field.
+        const isPageEmulation = (currentEditType === 'page'
+            || currentEditType === undefined
+            || currentEditType === null);
+        if (isPageEmulation) {
+            const data = { routeParams: {}, resolved: {} };
+            let hasValues = false;
+            emulationPanelFields.querySelectorAll('.preview-emulation-field').forEach(row => {
+                const section = row.dataset.pageSection;
+                const varName = row.dataset.varName;
+                const input = row.querySelector('.preview-emulation-field__input');
+                const value = input?.value?.trim();
+                if (!section || !varName || !value) return;
+                data[section][varName] = value;
+                hasValues = true;
+            });
+            // Track 2e — preserve the live-data flag if it was set. We
+            // don't toggle it here; Apply just persists the current
+            // emulation values + whatever live-mode state is already
+            // active. The user clicks "Use Live Data" to change the
+            // mode separately.
+            const previousSaved = _getPageEmulationData(currentEditName);
+            if (previousSaved && previousSaved.useLive) {
+                data.useLive = true;
+            }
+            const storageKey = 'qs_emulate_page_' + currentEditName;
+            if (hasValues || data.useLive) {
+                localStorage.setItem(storageKey, JSON.stringify(data));
+            } else {
+                localStorage.removeItem(storageKey);
+            }
+            reloadPreview();
+            showToast(PreviewConfig.i18n?.emulationApplied || 'Emulation applied', 'success');
+            return;
+        }
+
+        // Component-edit branch (existing flow).
         const data = {};
         let hasValues = false;
-        
+
         emulationPanelFields.querySelectorAll('.preview-emulation-field').forEach(row => {
             const varName = row.dataset.varName;
             const input = row.querySelector('.preview-emulation-field__input');
@@ -10035,26 +10350,33 @@
                 hasValues = true;
             }
         });
-        
+
         const storageKey = 'qs_emulate_' + currentEditName;
-        
+
         if (hasValues) {
             localStorage.setItem(storageKey, JSON.stringify(data));
         } else {
             localStorage.removeItem(storageKey);
         }
-        
+
         reloadPreview();
         showToast(PreviewConfig.i18n?.emulationApplied || 'Emulation applied', 'success');
     }
-    
+
     /**
-     * Reset emulation: clear localStorage and reload preview
+     * Reset emulation: clear localStorage and reload preview. Branches
+     * on edit type so the right storage key is cleared (mirrors
+     * applyEmulation).
      */
     function resetEmulation() {
-        const storageKey = 'qs_emulate_' + currentEditName;
+        const isPageEmulation = (currentEditType === 'page'
+            || currentEditType === undefined
+            || currentEditType === null);
+        const storageKey = isPageEmulation
+            ? 'qs_emulate_page_' + currentEditName
+            : 'qs_emulate_' + currentEditName;
         localStorage.removeItem(storageKey);
-        
+
         // Reset all fields
         if (emulationPanelFields) {
             emulationPanelFields.querySelectorAll('.preview-emulation-field__input').forEach(input => {
@@ -10065,11 +10387,90 @@
                 }
             });
         }
-        
+
+        // Track 2e — Reset also clears the live-data flag. The full
+        // "everything wiped" semantics matches the button label "Reset All".
+        if (emulationLiveBtn) {
+            _syncLiveBtnState(false, false);
+        }
+
         reloadPreview();
         showToast(PreviewConfig.i18n?.emulationReset || 'Emulation reset', 'success');
     }
-    
+
+    /**
+     * Beta.8 A2 Track 2e — toggle live-data mode for the current page.
+     * Persists the flag in localStorage alongside the emulation values
+     * and rebuilds the preview URL. When live mode is ON the iframe URL
+     * gains _live=1; public/index.php sees that and fires the REAL
+     * resolver (instead of skipping it). The emulated routeParams are
+     * still applied so the URL has matchable segments AND so the live
+     * resolver receives the author's chosen "preview slug".
+     *
+     * The resolved-section inputs stay editable when live mode is on
+     * (they're just ignored at render time) — that way the author can
+     * switch back to fully-emulated mode and keep their work.
+     */
+    function toggleLiveData() {
+        if (currentEditType !== 'page'
+            && currentEditType !== undefined
+            && currentEditType !== null) {
+            return;
+        }
+        const current = _getPageEmulationData(currentEditName) || { routeParams: {}, resolved: {}, useLive: false };
+        const next = !current.useLive;
+
+        // Build the persisted payload from the current panel state +
+        // the new useLive value. We re-read the panel inputs so live
+        // mode flips don't lose in-flight unsaved edits to routeParams.
+        const data = { routeParams: {}, resolved: {}, useLive: next };
+        if (emulationPanelFields) {
+            emulationPanelFields.querySelectorAll('.preview-emulation-field').forEach(row => {
+                const section = row.dataset.pageSection;
+                const varName = row.dataset.varName;
+                const input = row.querySelector('.preview-emulation-field__input');
+                const value = input?.value?.trim();
+                if (!section || !varName || !value) return;
+                data[section][varName] = value;
+            });
+        }
+        const storageKey = 'qs_emulate_page_' + currentEditName;
+        const hasValues = Object.keys(data.routeParams).length > 0
+                       || Object.keys(data.resolved).length > 0;
+        if (hasValues || data.useLive) {
+            localStorage.setItem(storageKey, JSON.stringify(data));
+        } else {
+            localStorage.removeItem(storageKey);
+        }
+        _syncLiveBtnState(next, false);
+        reloadPreview();
+        showToast(next
+            ? (PreviewConfig.i18n?.emulationLiveOn || 'Live data ON — real resolver firing')
+            : (PreviewConfig.i18n?.emulationLiveOff || 'Live data OFF — using emulated values'),
+            'success');
+    }
+
+    /**
+     * Beta.8 A2 Track 2e — sync the live-data button's visual state to
+     * the persisted useLive flag. Adds the --active class when ON so
+     * the user sees the current mode at a glance + flips the label.
+     * Optional disabled flag for the empty-resolved case (no resolved
+     * vars on this page — live mode is meaningless).
+     */
+    function _syncLiveBtnState(useLive, noResolvedVars) {
+        if (!emulationLiveBtn) return;
+        emulationLiveBtn.dataset.active = useLive ? 'true' : 'false';
+        emulationLiveBtn.classList.toggle('admin-btn--primary', useLive);
+        emulationLiveBtn.classList.toggle('admin-btn--outline', !useLive);
+        emulationLiveBtn.disabled = !!noResolvedVars;
+        const label = emulationLiveBtn.querySelector('[data-emulation-live-label]');
+        if (label) {
+            label.textContent = useLive
+                ? (PreviewConfig.i18n?.emulationUsingLive || 'Using Live (click for emulated)')
+                : (PreviewConfig.i18n?.emulationUseLive || 'Use Live Data');
+        }
+    }
+
     /**
      * Detect if an enum variable is used in a class param and create CSS stubs
      * for all map values that don't already have a CSS rule.

@@ -215,4 +215,207 @@ if (!file_exists($templateFile)) {
     exit;
 }
 
+// ============================================================================
+// SERVER-SIDE DATA RESOLVER (beta.8 A2)
+// ============================================================================
+// Lifecycle position (locked Q4 in BETA8_DATA_RESOLVER.md): AFTER the
+// route/auth gate, BEFORE the page template runs. Templates pick up the
+// exposed vars via JsonToHtmlRenderer's {{resolved:NAME}} substitution
+// or by calling getResolvedVars() directly in PHP scope.
+//
+// Only routes with a sidecar config in data/route-resolvers.json fire the
+// resolver — overhead is one file read + one missing-key check for routes
+// without a resolver. The sidecar is loaded lazily inside
+// getResolverForRoute so static routes pay no cost on the hot path
+// beyond the helper require.
+require_once SECURE_FOLDER_PATH . '/src/functions/resolverHelpers.php';
+$__resolverConfig = getResolverForRoute($routePath);
+
+// ----------------------------------------------------------------------------
+// Editor preview emulation (beta.8 A2 Track 2a)
+// ----------------------------------------------------------------------------
+// The visual editor previews param routes + resolver-bound pages WITHOUT
+// firing the real resolver — production data is request-specific and
+// the editor needs deterministic, scenario-controllable rendering. The
+// editor builds the iframe URL with ?_editor=1&_emulate=<base64-json>;
+// the JSON payload carries {routeParams: {...}, resolved: {...}} overrides.
+//
+// When editor mode is detected:
+//   - routeParams from the emulation override what TrimParameters captured
+//     (so `:slug` shows the author's "preview slug" everywhere — in
+//     {{param:slug}}, in templates that read $trimParameters->routeParams(),
+//     in state-store init sources of kind 'param:').
+//   - resolved vars from the emulation feed getResolvedVars() so
+//     {{resolved:NAME}} substitution renders the author's mock data.
+//   - The REAL resolver is skipped entirely. Side effects (upstream API
+//     calls, server-side cache writes, rate-limit consumption) belong
+//     to production requests, not editor previews.
+//
+// Emulation values default to empty when ?_emulate is absent — the page
+// renders with literal {{param:NAME}} / {{resolved:NAME}} placeholders
+// visible, which the editor's inputs panel (Track 2c) lets the author
+// fill in.
+$__editorMode = isset($_GET['_editor']) && $_GET['_editor'] === '1';
+// Beta.8 A2 Track 2e — live-data toggle. When the editor's emulation
+// panel switches to "Use Live Data", the iframe URL adds _live=1. In that
+// mode the REAL resolver fires (instead of being skipped), but the
+// emulated routeParams still override the URL-captured ones — so the
+// resolver receives the author's chosen "preview slug" while exercising
+// the production fetch path. Useful for validating the page against
+// real API responses without leaving the editor.
+$__editorLiveMode = $__editorMode && isset($_GET['_live']) && $_GET['_live'] === '1';
+$__emulateRouteParams = null;
+$__emulateResolved    = null;
+if ($__editorMode && !empty($_GET['_emulate'])) {
+    $__emulateDecoded = base64_decode($_GET['_emulate'], true);
+    if ($__emulateDecoded !== false) {
+        $__emulateParsed = json_decode($__emulateDecoded, true);
+        if (is_array($__emulateParsed)) {
+            if (isset($__emulateParsed['routeParams']) && is_array($__emulateParsed['routeParams'])) {
+                // Coerce to string values only (matches the real
+                // routeParams() return shape from TrimParameters).
+                $__emulateRouteParams = [];
+                foreach ($__emulateParsed['routeParams'] as $k => $v) {
+                    if (is_string($k) && $k !== '' && (is_string($v) || is_numeric($v))) {
+                        $__emulateRouteParams[$k] = (string) $v;
+                    }
+                }
+            }
+            if (isset($__emulateParsed['resolved']) && is_array($__emulateParsed['resolved'])) {
+                // Resolved supports nested values (objects / arrays) so the
+                // dot-path substitution {{resolved:product.name}} works.
+                $__emulateResolved = $__emulateParsed['resolved'];
+            }
+        }
+    }
+}
+if ($__editorMode && $__emulateRouteParams !== null) {
+    // Set the global so per-route .php templates that construct a fresh
+    // TrimParameters pick up the override too.
+    TrimParameters::setEmulatedRouteParams($__emulateRouteParams);
+    // Also apply to index.php's already-constructed instance so the
+    // route-not-found / template-file-resolution above this point sees
+    // the emulated values (404 fallback behaviour stays consistent).
+    $trimParameters->setRouteParams($__emulateRouteParams);
+}
+if ($__editorMode && !$__editorLiveMode && $__emulateResolved !== null) {
+    // Skip applying resolved emulation in live mode — the real resolver
+    // will populate getResolvedVars() with production data instead.
+    setResolvedVars($__emulateResolved);
+}
+
+// In editor mode the production resolver is skipped UNLESS the editor
+// explicitly requested live data (_live=1). Track 2e.
+if ($__editorMode && !$__editorLiveMode) {
+    $__resolverConfig = null;
+}
+
+if ($__resolverConfig !== null) {
+    require_once SECURE_FOLDER_PATH . '/src/classes/DataResolver.php';
+    $__resolver = new DataResolver();
+    $__resolverContext = [
+        'routeParams' => $trimParameters->routeParams(),
+        'query'       => $_GET,
+        // Server-side session (token, userId, etc.) is wired by Tier 3
+        // server-session integration — empty for now. Bearer-authed
+        // server fetches without a session token will 401 upstream;
+        // public resolvers (auth=none) work today.
+        'session'     => [],
+        'cookieHeader'=> $_SERVER['HTTP_COOKIE'] ?? null,
+    ];
+    $__resolverResult = $__resolver->resolve($__resolverConfig, $__resolverContext);
+    if ($__resolverResult['ok']) {
+        setResolvedVars($__resolverResult['exposed']);
+    } else {
+        // Status-aware failure routing (Track 1, after Test B feedback).
+        //
+        //   Upstream 4xx (item not found / unauthorized / forbidden):
+        //     "the requested resource doesn't exist for this URL" — render
+        //     the project's 404.php template at HTTP 404. Matches the
+        //     /products/red-vase pattern in every CMS — a missing slug is
+        //     a not-found, not a server crash.
+        //
+        //   Upstream 5xx OR transport failure (status=0 from curl error):
+        //     "upstream broke" — render the project's 500.php template at
+        //     HTTP 500. The server proxied the user's request and the API
+        //     it depends on is down or returned a 5xx. Falls back to
+        //     plain text when the project has no 500.php.
+        //
+        //   Local config bug (endpoint missing from registry, apiKey not
+        //   configured, callableFrom=client, etc.): the resolver itself is
+        //   misconfigured. status=0 + a known config-error text in 'error'.
+        //   Render the ugly inline 500 so devs see the misconfig loudly
+        //   instead of a styled 404 page that hides the bug.
+        //
+        //   onMiss: 'render-empty' (Slice 6 — not yet implemented) will
+        //   take precedence over all three when configured on the route.
+        $__status = (int) ($__resolverResult['status'] ?? 0);
+        $__errMsg = $__resolverResult['error'] ?? 'unknown resolver error';
+
+        // Detect local config bugs (status=0 + config-style error text).
+        // We *don't* want to swallow these into a 404/500 template — they
+        // need to surface as a clear dev signal.
+        $__isConfigBug = ($__status === 0) && (
+            stripos($__errMsg, 'not found in registry') !== false ||
+            stripos($__errMsg, 'API not found') !== false ||
+            stripos($__errMsg, 'callableFrom') !== false ||
+            stripos($__errMsg, 'apiKey not configured') !== false ||
+            stripos($__errMsg, 'missing endpoint') !== false ||
+            stripos($__errMsg, 'missing required field') !== false
+        );
+
+        if ($__isConfigBug) {
+            http_response_code(500);
+            echo "<h1>500 — Data resolver misconfigured</h1>\n";
+            echo '<p>Route: <code>' . htmlspecialchars($routePath) . "</code></p>\n";
+            echo '<p>Error: ' . htmlspecialchars($__errMsg) . "</p>\n";
+            echo "<p><small>This is a config bug — the resolver references something that doesn't exist or is invalid. Fix the resolver config (or the API registry) and reload.</small></p>\n";
+            exit;
+        }
+
+        if ($__status >= 400 && $__status < 500) {
+            // Upstream "not found / unauthorized / forbidden" → render the
+            // project's 404 template. Stash the resolver status so the
+            // template (or future logging) can branch on it if needed.
+            $GLOBALS['__qs_resolver_failure'] = [
+                'route'  => $routePath,
+                'status' => $__status,
+                'error'  => $__errMsg,
+            ];
+            http_response_code(404);
+            $__notFoundFile = PROJECT_PATH . '/templates/pages/404/404.php';
+            if (!file_exists($__notFoundFile)) {
+                $__notFoundFile = PROJECT_PATH . '/templates/pages/404.php';
+            }
+            if (file_exists($__notFoundFile)) {
+                require_once $__notFoundFile;
+            } else {
+                echo "<h1>404 — Not Found</h1>\n";
+                echo "<p>The requested content was not found.</p>\n";
+            }
+            exit;
+        }
+
+        // Anything else (status >= 500 or status === 0 with non-config
+        // error) → upstream / transport failure → 500 template.
+        $GLOBALS['__qs_resolver_failure'] = [
+            'route'  => $routePath,
+            'status' => $__status,
+            'error'  => $__errMsg,
+        ];
+        http_response_code(500);
+        $__serverErrFile = PROJECT_PATH . '/templates/pages/500/500.php';
+        if (!file_exists($__serverErrFile)) {
+            $__serverErrFile = PROJECT_PATH . '/templates/pages/500.php';
+        }
+        if (file_exists($__serverErrFile)) {
+            require_once $__serverErrFile;
+        } else {
+            echo "<h1>500 — Server Error</h1>\n";
+            echo "<p>Something went wrong while fetching data for this page. Please try again later.</p>\n";
+        }
+        exit;
+    }
+}
+
 require_once $templateFile;

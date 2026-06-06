@@ -2,9 +2,32 @@
 /**
  * Preview Page Configuration
  * Generates the PreviewConfig JavaScript object for preview.js
- * 
+ *
  * This file is included by preview.php to separate config from template
  */
+
+// Beta.8 A2 — route resolvers sidecar exposed to PreviewConfig so the
+// editor knows which routes have a resolver (and what variables they
+// expose) when building the emulation panel. Small payload — only
+// routes WITH a resolver are present.
+require_once SECURE_FOLDER_PATH . '/src/functions/resolverHelpers.php';
+$__previewRouteResolvers = loadResolversSidecar();
+
+// Beta.8 A2 Track 2d — per-route schema-driven default values for the
+// emulation panel. For each resolver-bound route, walk the endpoint's
+// responseSchema (if defined in /admin/apis) and generate sample values
+// per `expose` mapping. The editor uses these to pre-fill the panel
+// when no per-page emulation has been saved yet — author sees realistic
+// placeholders without typing. Empty defaults when the endpoint has no
+// responseSchema (panel falls back to empty inputs).
+$__previewResolverDefaults = [];
+if (!empty($__previewRouteResolvers)) {
+    require_once SECURE_FOLDER_PATH . '/src/classes/ApiEndpointManager.php';
+    $__previewApiManager = new ApiEndpointManager();
+    foreach ($__previewRouteResolvers as $__routePath => $__resolverCfg) {
+        $__previewResolverDefaults[$__routePath] = getResolverDefaultsForRoute($__resolverCfg, $__previewApiManager);
+    }
+}
 ?>
 <!-- Preview Configuration (needed before preview.js) -->
 <script>
@@ -13,6 +36,18 @@ window.PreviewConfig = {
     baseUrl: <?= json_encode(rtrim(BASE_URL, '/')) ?>,
     adminUrl: <?= json_encode($router->url('')) ?>,
     managementUrl: <?= json_encode(rtrim(BASE_URL, '/') . '/management/') ?>,
+
+    // Beta.8 A2 — per-route resolver sidecar (only routes with a resolver).
+    // Used by the editor's emulation panel to know which variables exist
+    // per page (resolver.expose keys → editable inputs).
+    routeResolvers: <?= json_encode($__previewRouteResolvers ?: new stdClass()) ?>,
+
+    // Beta.8 A2 Track 2d — schema-driven sample defaults for resolver
+    // variables. Used by the emulation panel to pre-fill first-time
+    // inputs with realistic placeholders derived from the endpoint's
+    // responseSchema. Empty per-route map when the endpoint has no
+    // schema declared in /admin/apis.
+    routeResolverDefaults: <?= json_encode($__previewResolverDefaults ?: new stdClass()) ?>,
     projectStyleUrl: <?= json_encode(rtrim(BASE_URL, '/') . '/style/style.css') ?>,
     authToken: <?= json_encode($router->getToken()) ?>,
     structureUrl: <?= json_encode($router->url('structure')) ?>,
