@@ -120,6 +120,17 @@ function qsDataAttributeCatalog(): array {
             'since' => 'v1.0.0-beta.7'
         ],
         [
+            'name' => 'data-state-show-empty',
+            'description' => 'Inverse of data-state-show — visible when the referenced state-store field is FALSY (null / "" / 0 / false / empty array). Pair with data-state-show on the same field to render a "no data" fallback alongside the happy path. Also drives the resolver onMiss:render-empty fallback: when a route opts into render-empty and the resolver fails, the template renders with empty resolved vars and these elements become visible.',
+            'category' => 'state',
+            'valueShape' => 'store-field-ref',
+            'valuePlaceholder' => 'storeId.fieldName',
+            'tagsAllowed' => ['*'],
+            'docAnchor' => 'ADMIN_PANEL.md#96-state-stores',
+            'examplePayload' => '<div data-state-show-empty="product.name">Sorry, we couldn\'t find that product.</div>',
+            'since' => 'v1.0.0-beta.8'
+        ],
+        [
             'name' => 'data-state-pagenav',
             'description' => 'Runtime-rendered numbered-page navigator bound to a state store. Reads totalPages to size itself; writes page on click then re-fetches. Smart-ellipsis windowing. Emitted by the paged-navigator complex element, also hand-authorable.',
             'category' => 'state',

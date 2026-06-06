@@ -504,11 +504,19 @@ class JsonToHtmlRenderer {
                 $parts = explode('.', $m[1]);
                 $cursor = $resolved;
                 foreach ($parts as $part) {
-                    if (is_array($cursor) && array_key_exists($part, $cursor)) {
-                        $cursor = $cursor[$part];
-                    } else {
-                        return $m[0]; // unknown path — leave literal
+                    // Beta.8 A2 Slice 6 — once we walk into a null
+                    // ancestor, deeper segments have no meaning. Render
+                    // the placeholder as empty (consistent with how a
+                    // direct {{resolved:nullKey}} renders) rather than
+                    // leaving it literal. Matters for onMiss:render-empty
+                    // mode where the top-level expose keys are set to null
+                    // and deeper paths like {{resolved:product.name}}
+                    // would otherwise show as raw '{{...}}' text.
+                    if ($cursor === null) return '';
+                    if (!is_array($cursor) || !array_key_exists($part, $cursor)) {
+                        return $m[0]; // unknown / wrong-type — leave literal (typo detection)
                     }
+                    $cursor = $cursor[$part];
                 }
                 if (is_array($cursor) || is_object($cursor)) {
                     return json_encode($cursor, JSON_UNESCAPED_SLASHES);

@@ -218,6 +218,27 @@ if (!file_exists($templateFile)) {
 // ============================================================================
 // SERVER-SIDE DATA RESOLVER (beta.8 A2)
 // ============================================================================
+
+/**
+ * Detect whether a resolver failure is a LOCAL config bug (endpoint
+ * missing from registry, callableFrom=client, apiKey not configured,
+ * etc.) — those go to the inline 500 surface so devs see them loudly,
+ * even when the route opted into onMiss: 'render-empty' for upstream
+ * failures. Status === 0 + an error string we know we emit from
+ * serverFetch / DataResolver = config bug.
+ */
+function _qsIsResolverConfigBug(string $errMsg, int $status): bool {
+    if ($status !== 0) return false;
+    return (
+        stripos($errMsg, 'not found in registry') !== false ||
+        stripos($errMsg, 'API not found')         !== false ||
+        stripos($errMsg, 'callableFrom')          !== false ||
+        stripos($errMsg, 'apiKey not configured') !== false ||
+        stripos($errMsg, 'missing endpoint')      !== false ||
+        stripos($errMsg, 'missing required field')!== false
+    );
+}
+
 // Lifecycle position (locked Q4 in BETA8_DATA_RESOLVER.md): AFTER the
 // route/auth gate, BEFORE the page template runs. Templates pick up the
 // exposed vars via JsonToHtmlRenderer's {{resolved:NAME}} substitution
@@ -326,6 +347,29 @@ if ($__resolverConfig !== null) {
     $__resolverResult = $__resolver->resolve($__resolverConfig, $__resolverContext);
     if ($__resolverResult['ok']) {
         setResolvedVars($__resolverResult['exposed']);
+    } else if (($__resolverConfig['onMiss'] ?? null) === 'render-empty'
+               && !_qsIsResolverConfigBug($__resolverResult['error'] ?? '', (int)($__resolverResult['status'] ?? 0))) {
+        // Beta.8 A2 Slice 6 — onMiss: 'render-empty' opt-in.
+        //
+        // The route declared a fallback render path: instead of 404'ing
+        // or 500'ing on resolver failure, render the template with each
+        // expose key set to null. The {{resolved:NAME}} substitution
+        // renders null values as empty strings (NOT as literal
+        // placeholders — the key exists in the dict, just with a null
+        // value), so the page content carries no stale "{{...}}" text.
+        // The template's data-state-show-empty bindings (when paired
+        // with a state store on the same endpoint) drive the "no data
+        // found" UI.
+        //
+        // Config bugs still go to the inline 500 surface below — a
+        // misconfigured resolver shouldn't silently render a styled
+        // not-found template. That's a dev signal worth seeing.
+        $__nullExposed = [];
+        foreach (($__resolverConfig['expose'] ?? []) as $__varName => $__path) {
+            $__nullExposed[$__varName] = null;
+        }
+        setResolvedVars($__nullExposed);
+        // Fall through to template render — no exit.
     } else {
         // Status-aware failure routing (Track 1, after Test B feedback).
         //
@@ -351,18 +395,7 @@ if ($__resolverConfig !== null) {
         //   take precedence over all three when configured on the route.
         $__status = (int) ($__resolverResult['status'] ?? 0);
         $__errMsg = $__resolverResult['error'] ?? 'unknown resolver error';
-
-        // Detect local config bugs (status=0 + config-style error text).
-        // We *don't* want to swallow these into a 404/500 template — they
-        // need to surface as a clear dev signal.
-        $__isConfigBug = ($__status === 0) && (
-            stripos($__errMsg, 'not found in registry') !== false ||
-            stripos($__errMsg, 'API not found') !== false ||
-            stripos($__errMsg, 'callableFrom') !== false ||
-            stripos($__errMsg, 'apiKey not configured') !== false ||
-            stripos($__errMsg, 'missing endpoint') !== false ||
-            stripos($__errMsg, 'missing required field') !== false
-        );
+        $__isConfigBug = _qsIsResolverConfigBug($__errMsg, $__status);
 
         if ($__isConfigBug) {
             http_response_code(500);

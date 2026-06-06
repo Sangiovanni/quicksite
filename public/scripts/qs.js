@@ -2254,6 +2254,26 @@
             el.hidden = !truthy;
         });
 
+        // Beta.8 A2 Slice 6 — inverse of data-state-show: visible when
+        // the referenced state field is FALSY (null / undefined / '' / 0 /
+        // false / empty array). Used by routes with the resolver's
+        // `onMiss: 'render-empty'` config so the template can carry a
+        // 'No data found' fallback alongside its happy-path content:
+        //   <div data-state-show="product.name"> <!-- happy path --> </div>
+        //   <div data-state-show-empty="product.name">Sorry, not found.</div>
+        // Also generally useful for client-side stores anytime an "empty
+        // state" UI needs to differ from a "loaded state" UI without
+        // hand-written JS.
+        document.querySelectorAll('[data-state-show-empty]').forEach(function (el) {
+            var ref = el.getAttribute('data-state-show-empty') || '';
+            var dot = ref.indexOf('.');
+            if (dot === -1 || ref.slice(0, dot) !== storeId) return;
+            var v = store.state[ref.slice(dot + 1)];
+            var truthy = !(v === null || v === undefined || v === '' || v === 0 || v === false
+                || (Array.isArray(v) && v.length === 0));
+            el.hidden = truthy;
+        });
+
         // Paged-navigator binding: [data-state-pagenav="storeId"] is a
         // <nav> whose numbered buttons are rendered (and re-rendered)
         // every time the bound store updates. Reads the configured
