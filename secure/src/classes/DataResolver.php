@@ -113,8 +113,15 @@ class DataResolver {
             }
         }
 
-        // 2. Call serverFetch with the resolved inputs.
-        $result = serverFetch($endpointRef, $resolvedInputs, $context);
+        // 2. Call serverFetch with the resolved inputs. Beta.8 A2 Slice 4
+        //    — forward the resolver's cacheTTL (if any) via the fetch
+        //    context so serverFetch can cache before / after curl.
+        //    Default 0 = no caching (per-request fetch every time).
+        $fetchContext = $context;
+        if (isset($config['cacheTTL']) && is_int($config['cacheTTL']) && $config['cacheTTL'] > 0) {
+            $fetchContext['cacheTTL'] = $config['cacheTTL'];
+        }
+        $result = serverFetch($endpointRef, $resolvedInputs, $fetchContext);
         if (!$result['ok']) {
             return [
                 'ok' => false,

@@ -133,7 +133,7 @@ function getCommandCategories(): array {
         'build_deployment' => [
             'label' => 'Build & Deploy',
             'icon' => 'package',
-            'commands' => ['build', 'listBuilds', 'getBuild', 'deleteBuild', 'cleanBuilds', 'deployBuild', 'downloadBuild']
+            'commands' => ['build', 'listBuilds', 'getBuild', 'deleteBuild', 'cleanBuilds', 'cleanResolverCache', 'deployBuild', 'downloadBuild']
         ],
         'project_management' => [
             'label' => 'Project Management',

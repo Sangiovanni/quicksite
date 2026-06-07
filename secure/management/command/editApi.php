@@ -113,6 +113,21 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
     // bad binding doesn't block the save.
     $enumSync = EnumSyncHelper::sync();
 
+    // Beta.8 A2 Slice 4 — auto-clear the resolver response cache for
+    // this API (locked Q1 of BETA8_DATA_RESOLVER.md). Any cached
+    // response was issued against the previous endpoint config; the
+    // config just changed, so honour-the-edit means dropping stale
+    // entries. Common case: author tweaked the endpoint URL or response
+    // shape and wonders why the page still shows old data — this clears
+    // that confusion at the source.
+    //
+    // Best-effort: a filesystem failure (full disk, permission denied)
+    // gets logged but doesn't 500 the edit. The next edit / housekeeping
+    // sweep will retry, and stale entries naturally expire at their TTL
+    // anyway.
+    require_once SECURE_FOLDER_PATH . '/src/functions/resolverCache.php';
+    $resolverCacheCleared = clearResolverCacheForApi($apiId);
+
     // Cascade cleanup when an endpoint was deleted
     $cascadeCleanup = null;
     if (isset($updates['deleteEndpoint'])) {
@@ -154,6 +169,7 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
             'count' => $enumSync['count'] ?? 0,
             'warnings' => $enumSync['warnings'] ?? [],
         ],
+        'resolverCacheCleared' => $resolverCacheCleared,
     ];
     if ($cascadeCleanup) {
         $responseData['cascadeCleanup'] = $cascadeCleanup;

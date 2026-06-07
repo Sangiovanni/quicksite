@@ -88,6 +88,12 @@ secure/management/config/roles.php
 # template; deployments copy + rename to api-secrets.php and populate.
 secure/admin/config/api-secrets.php
 
+# Resolver response cache (beta.8 A2 Slice 4). File-based TTL cache for
+# the server-side data resolver. Per-deployment runtime state — never
+# committed. cleanResolverCache command handles housekeeping; editApi
+# auto-clears on endpoint config change.
+secure/cache/resolver/
+
 # Exports folder (temporary export ZIPs)
 secure/exports/
 

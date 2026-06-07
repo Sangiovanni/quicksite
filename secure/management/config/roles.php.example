@@ -115,7 +115,7 @@ return [
             'setKeyframes', 'deleteKeyframes',
             'editFavicon', 'editTitle',
             // Build & deploy commands
-            'build', 'deleteBuild', 'cleanBuilds', 'deployBuild', 'downloadBuild',
+            'build', 'deleteBuild', 'cleanBuilds', 'cleanResolverCache', 'deployBuild', 'downloadBuild',
             'listAiProviders', 'detectProvider', 'testAiKey', 'callAi',
             'moveNode', 'deleteNode', 'duplicateNode', 'addNode', 'editNode',
             'addComponentToNode', 'editComponentToNode', 'renameComponent', 'duplicateComponent',
@@ -153,7 +153,7 @@ return [
             'setKeyframes', 'deleteKeyframes',
             'editFavicon', 'editTitle',
             // Build & deploy commands
-            'build', 'deleteBuild', 'cleanBuilds', 'deployBuild', 'downloadBuild',
+            'build', 'deleteBuild', 'cleanBuilds', 'cleanResolverCache', 'deployBuild', 'downloadBuild',
             // Admin-specific commands
             'listProjects', 'getActiveProject', 'switchProject', 'createProject', 'deleteProject',
             'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup',

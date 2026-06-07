@@ -345,6 +345,18 @@ if ($__resolverConfig !== null) {
         'cookieHeader'=> $_SERVER['HTTP_COOKIE'] ?? null,
     ];
     $__resolverResult = $__resolver->resolve($__resolverConfig, $__resolverContext);
+
+    // Beta.8 A2 Slice 4 — emit cache observability header. serverFetch
+    // sets $GLOBALS['__qs_resolver_cache_status'] to 'hit' / 'miss' /
+    // 'skip' (no TTL configured) / 'disabled' (auth type forbids cache).
+    // DevTools Network tab → response headers shows this on the
+    // document request so users can watch cache behaviour without
+    // tailing PHP logs. headers_sent() guards against late emission
+    // when the template already started outputting.
+    if (!headers_sent() && isset($GLOBALS['__qs_resolver_cache_status'])) {
+        header('X-QS-Resolver-Cache: ' . $GLOBALS['__qs_resolver_cache_status']);
+    }
+
     if ($__resolverResult['ok']) {
         setResolvedVars($__resolverResult['exposed']);
     } else if (($__resolverConfig['onMiss'] ?? null) === 'render-empty'

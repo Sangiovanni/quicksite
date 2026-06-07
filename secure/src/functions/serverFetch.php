@@ -269,6 +269,30 @@ function serverFetch(string $endpointRef, array $inputs = [], array $context = [
     // The right place for a per-call observe(start, endpoint, callableFrom)
     // before curl_exec + observe(end, status, durationMs, cacheHit) after.
 
+    // Beta.8 A2 Slice 4 — cache read attempt.
+    // Eligibility: cacheTTL>0 + auth type doesn't carry per-user identity.
+    // The auth-cacheable rule (LOCKED): only `none` and `apiKey` —
+    // `bearer`/`cookie`/`basic` would cross-leak user data across sessions.
+    // Observability cursor: $GLOBALS['__qs_resolver_cache_status'] gets set
+    // to one of 'hit' / 'miss' / 'skip' / 'disabled' so public/index.php
+    // can emit the X-QS-Resolver-Cache header for DevTools visibility.
+    require_once __DIR__ . '/resolverCache.php';
+    $cacheTTL = (int) ($context['cacheTTL'] ?? 0);
+    $cacheable = false;
+    if ($cacheTTL <= 0) {
+        $GLOBALS['__qs_resolver_cache_status'] = 'skip';
+    } elseif (!isResolverAuthCacheable($authType)) {
+        $GLOBALS['__qs_resolver_cache_status'] = 'disabled';
+    } else {
+        $cacheable = true;
+        $cached = readResolverCache('@' . $endpointRef, $inputs);
+        if ($cached !== null) {
+            $GLOBALS['__qs_resolver_cache_status'] = 'hit';
+            return $cached;
+        }
+        $GLOBALS['__qs_resolver_cache_status'] = 'miss';
+    }
+
     // Fire curl.
     $ch = curl_init();
     curl_setopt_array($ch, [
@@ -307,9 +331,20 @@ function serverFetch(string $endpointRef, array $inputs = [], array $context = [
         ? $decoded
         : $responseBody;
 
-    return [
+    $result = [
         'ok' => $httpCode >= 200 && $httpCode < 300,
         'status' => $httpCode,
         'data' => $data,
     ];
+
+    // Beta.8 A2 Slice 4 — cache write on success.
+    // Only successful (2xx) responses get cached. 4xx / 5xx / transport
+    // failures aren't cached because re-trying soon is the right behaviour
+    // for a missing item, rate limit, or transient upstream blip. Failure
+    // would just persist a 'not found' for the whole TTL — bad UX.
+    if ($cacheable && $result['ok']) {
+        writeResolverCache('@' . $endpointRef, $inputs, $result, $cacheTTL);
+    }
+
+    return $result;
 }
