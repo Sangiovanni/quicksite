@@ -656,8 +656,17 @@
                 document.getElementById('endpoint-description').value = endpoint.description || '';
                 // beta.8 Track A4 — explicit callableFrom value, or empty for auto-derive
                 document.getElementById('endpoint-callable-from').value = endpoint.callableFrom || '';
-                // No auth property = public (none), like OpenAPI security: []
-                document.getElementById('endpoint-auth').value = endpoint.auth || 'none';
+                // Beta.8 A2 Slice 4 follow-up: an absent auth field is
+                // semantically "inherit from API" (that's how serverFetch
+                // + the existing manager normalizer interpret it). Pre-
+                // this-fix the picker loaded missing auth as 'none' which
+                // was misleading — author saw 'none' but the endpoint
+                // actually inherited the parent API's auth at runtime.
+                // Default to 'inherit' now; author can explicitly switch
+                // to 'none' for endpoints that should be truly public,
+                // and the save path persists 'none' literally instead of
+                // collapsing it to an absent field.
+                document.getElementById('endpoint-auth').value = endpoint.auth || 'inherit';
                 document.getElementById('endpoint-request-schema').value =
                     endpoint.requestSchema ? JSON.stringify(endpoint.requestSchema, null, 2) : '';
                 document.getElementById('endpoint-response-schema').value =
@@ -828,8 +837,16 @@
             name: name,
             path: path,
             description: description,
-            // '' = public/none (backend drops the key); 'inherit'/'required' kept.
-            auth: (auth && auth !== 'none') ? auth : '',
+            // Beta.8 A2 Slice 4 follow-up: send the explicit picker value,
+            // including 'none'. Previously 'none' was collapsed to '' which
+            // the backend's normalizer strips entirely, making "explicit
+            // public" indistinguishable from "auth field absent" (which
+            // serverFetch interprets as "inherit from API"). Persisting
+            // 'none' literally lets downstream consumers — including the
+            // resolver's cache-eligibility check — see the author's intent.
+            // Other inherited string values stay literal; an empty
+            // picker value (no selection) still strips the field.
+            auth: auth || '',
             parameters: parameters,
             requestSchema: requestSchema || '',
             responseSchema: responseSchema || '',
