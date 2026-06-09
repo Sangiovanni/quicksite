@@ -217,4 +217,169 @@ class DataResolver {
         }
         return $cursor;
     }
+
+    /**
+     * Beta.8 A2 Slice 7.5.C — resolve an array of resolver configs
+     * concurrently via serverFetchMulti. Replaces the per-resolver
+     * loop the single-config caller would otherwise need to roll, and
+     * preserves per-resolver `onMiss` semantics.
+     *
+     * Single-resolver routes pass a 1-element array — execution path
+     * is identical to resolve() but with multi-handle plumbing. The
+     * latency cost of curl_multi_init for a single fetch is negligible
+     * (<1ms); the consistency win of one code path is worth it.
+     *
+     * Return shape:
+     *   [
+     *       'ok'              => bool,    // false ONLY if any resolver failed
+     *                                     // AND wasn't covered by onMiss
+     *       'exposed'         => array,   // FLAT namespace — merged
+     *                                     // across all resolvers (collisions
+     *                                     // are rejected at save time per
+     *                                     // BETA8_MULTI_RESOLVER.md, so this
+     *                                     // merge is collision-free at
+     *                                     // runtime).
+     *       'exposedByIndex'  => array,   // [resolverIdx => [varName => value]]
+     *                                     // — for the namespaced address
+     *                                     // ($r0, $r1, ...) fallback the
+     *                                     // template can use to disambiguate
+     *                                     // if author skipped flat exposure.
+     *       'firstError'      => array|null, // when ok=false, the FIRST
+     *                                     // resolver failure that wasn't
+     *                                     // covered by onMiss. Caller (index.php)
+     *                                     // uses this to drive the 404/500 path.
+     *                                     // {error, status, resolverIndex}
+     *   ]
+     *
+     * Failure semantics (locked in BETA8_MULTI_RESOLVER.md #5):
+     *   - Per-resolver onMiss applies independently to its exposed vars.
+     *   - Any resolver failure WITHOUT onMiss='render-empty' short-circuits
+     *     the whole page (ok=false; caller emits 404/500 with firstError).
+     *   - onMiss='render-empty' on a failed resolver: its exposed vars
+     *     become null; the page renders.
+     *
+     * @param array $configs Array of resolver config blocks (from
+     *                       getResolversForRoute, normalised — always array).
+     * @param array $context Request-time context (same shape as resolve()).
+     * @return array         See "Return shape" above.
+     */
+    public function resolveMany(array $configs, array $context = []): array {
+        if (empty($configs)) {
+            return [
+                'ok'             => true,
+                'exposed'        => [],
+                'exposedByIndex' => [],
+                'firstError'     => null,
+            ];
+        }
+
+        // Build serverFetchMulti specs per resolver. Specs index in the
+        // SAME ORDER as $configs so we can map results back. Malformed
+        // configs (missing endpoint — should be caught by the validator
+        // at save time; defensive here) get a synthetic error result
+        // and their slot stays null in the specs array.
+        $specs = [];
+        $synthErrors = [];   // idx => synthetic error result
+        foreach ($configs as $idx => $config) {
+            if (!is_array($config) || empty($config['endpoint'])) {
+                $synthErrors[$idx] = [
+                    'ok'     => false,
+                    'status' => 0,
+                    'data'   => null,
+                    'error'  => 'Resolver config missing required field: endpoint',
+                ];
+                continue;
+            }
+
+            // Resolve each input's source spec. null values are dropped so
+            // they don't override the upstream's defaults.
+            $resolvedInputs = [];
+            foreach (($config['inputs'] ?? []) as $inputName => $sourceSpec) {
+                $value = $this->resolveSource((string) $sourceSpec, $context);
+                if ($value !== null) {
+                    $resolvedInputs[$inputName] = $value;
+                }
+            }
+
+            // Per-resolver context overrides (only cacheTTL today).
+            $perResolverContext = [];
+            if (isset($config['cacheTTL']) && is_int($config['cacheTTL']) && $config['cacheTTL'] > 0) {
+                $perResolverContext['cacheTTL'] = $config['cacheTTL'];
+            }
+
+            $specs[$idx] = [
+                'endpointRef' => (string) $config['endpoint'],
+                'inputs'      => $resolvedInputs,
+                'context'     => $perResolverContext,
+            ];
+        }
+
+        // Run multi-fetch on the valid specs. We index by config slot,
+        // serverFetchMulti returns a dense array — re-map by collecting
+        // its results into a sparse one keyed by the original index.
+        $validIndices = array_keys($specs);
+        $multiResults = !empty($validIndices)
+            ? serverFetchMulti(array_values($specs), $context)
+            : [];
+
+        $fetchByIdx = [];
+        foreach ($validIndices as $j => $origIdx) {
+            $fetchByIdx[$origIdx] = $multiResults[$j];
+        }
+        foreach ($synthErrors as $origIdx => $err) {
+            $fetchByIdx[$origIdx] = $err;
+        }
+
+        // Build the flat + indexed exposed namespaces, plus track first
+        // unrecovered failure for the caller's error path.
+        $exposed        = [];
+        $exposedByIndex = [];
+        $allHandled     = true;
+        $firstError     = null;
+
+        foreach ($configs as $idx => $config) {
+            $fetchResult     = $fetchByIdx[$idx];
+            $resolverExposed = [];
+
+            if (!empty($fetchResult['ok'])) {
+                foreach (($config['expose'] ?? []) as $varName => $responsePath) {
+                    $resolverExposed[(string) $varName] = $this->readDotPath(
+                        $fetchResult['data'],
+                        (string) $responsePath
+                    );
+                }
+            } else {
+                $onMiss = $config['onMiss'] ?? null;
+                if ($onMiss === 'render-empty') {
+                    // Render-empty — expose null vars; page still renders.
+                    foreach (($config['expose'] ?? []) as $varName => $_path) {
+                        $resolverExposed[(string) $varName] = null;
+                    }
+                } else {
+                    // Unrecovered failure — record + flag for caller.
+                    if ($firstError === null) {
+                        $firstError = [
+                            'error'         => $fetchResult['error'] ?? 'fetch failed',
+                            'status'        => $fetchResult['status'] ?? 0,
+                            'resolverIndex' => $idx,
+                        ];
+                    }
+                    $allHandled = false;
+                }
+            }
+
+            // Merge into flat namespace (collision-free by save-time validation).
+            foreach ($resolverExposed as $k => $v) {
+                $exposed[$k] = $v;
+            }
+            $exposedByIndex[$idx] = $resolverExposed;
+        }
+
+        return [
+            'ok'             => $allHandled,
+            'exposed'        => $exposed,
+            'exposedByIndex' => $exposedByIndex,
+            'firstError'     => $firstError,
+        ];
+    }
 }

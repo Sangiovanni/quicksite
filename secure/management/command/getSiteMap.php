@@ -176,6 +176,16 @@ function __command_getSiteMap(array $params = [], array $urlParams = []): ApiRes
     }
     $sitemapData['routeLayouts'] = $routeLayouts;
 
+    // Beta.8 A2 Slice 7 — per-route resolver configs (sparse map: only
+    // routes that have a sidecar entry are present). Powers two things in
+    // the sitemap UI:
+    //   1. The 'resolver' badge in _renderRoutePath (presence check).
+    //   2. The Configure-resolver modal — opens pre-populated from the
+    //      current config without a second round-trip on first edit.
+    // Empty array when no resolvers are configured (most projects).
+    require_once SECURE_FOLDER_PATH . '/src/functions/resolverHelpers.php';
+    $sitemapData['routeResolvers'] = loadResolversSidecar();
+
     // Load sitemap config (exclusions + custom URLs)
     $sitemapConfig = loadSitemapConfig();
     $sitemapData['sitemapConfig'] = $sitemapConfig;

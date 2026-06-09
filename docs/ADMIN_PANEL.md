@@ -1,10 +1,10 @@
 # QuickSite Admin Panel
 
-_Last updated: 2026-06-03._
+_Last updated: 2026-06-09._
 
 > Canonical reference for the admin panel's JS architecture, boot flow, and module map. See [ARCHITECTURE.md](ARCHITECTURE.md) for the system-level overview, [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) for the workflow engine, and [COMMAND_API.md](COMMAND_API.md) for the API commands the panel calls.
 
-> _Maintainers note:_ re-check this doc when changing `public/admin/assets/js/core/storage-keys.js` (§6 storage keys), `secure/admin/templates/pages/preview/sidebar-tools.php` (§8.1 visual editor modes), `secure/admin/templates/layout.php` (§2 boot order), `public/admin/assets/js/pages/sitemap.js` / `secure/management/command/addRoute.php` (§9.7 sitemap + param-route authoring), the state-stores wizard's init source kinds in `public/admin/assets/js/pages/preview/preview-js-interactions.js` (§9.6), or the auth verbs in `public/scripts/qs.js` / `secure/src/functions/qsVerbCatalog.php` / `secure/src/classes/JsonToHtmlRenderer.php` `CHAIN_AWAITABLE` (§9.5 Tier 1+2+3 auth flows).
+> _Maintainers note:_ re-check this doc when changing `public/admin/assets/js/core/storage-keys.js` (§6 storage keys), `secure/admin/templates/pages/preview/sidebar-tools.php` (§8.1 visual editor modes), `secure/admin/templates/layout.php` (§2 boot order), `public/admin/assets/js/pages/sitemap.js` / `secure/management/command/addRoute.php` (§9.8 sitemap + param-route authoring), the state-stores wizard's init source kinds in `public/admin/assets/js/pages/preview/preview-js-interactions.js` (§9.6), `secure/src/classes/DataResolver.php` / `secure/src/functions/serverFetch.php` / `secure/src/functions/resolverHelpers.php` / `secure/admin/templates/pages/sitemap-resolver*.php` (§9.7 server-side data resolvers), or the auth verbs in `public/scripts/qs.js` / `secure/src/functions/qsVerbCatalog.php` / `secure/src/classes/JsonToHtmlRenderer.php` `CHAIN_AWAITABLE` (§9.5 Tier 1+2+3 auth flows).
 
 The admin panel is a server-rendered PHP shell plus a set of vanilla JS modules loaded per route. There is **no module bundler**. Load order is controlled by `secure/admin/templates/layout.php` and is the single most important contract in the front end — reorder a `<script>` tag and the panel breaks silently.
 
@@ -1393,7 +1393,316 @@ the exhausted flag and re-arms the trigger.
 Both patterns are demonstrated in the test pages `test/paged` (offset) and
 `test/state` (cursor) — see `BETA7_ORDER.md` for the full beta.7 context.
 
-### 9.7 Sitemap (/admin/sitemap)
+### 9.7 Server-side data resolvers
+
+A **resolver** is a per-route declaration that fires a server-side fetch
+**before** the page renders, and exposes the response as template
+variables. The initial HTML carries the API content already populated —
+search engines and AI crawlers see real text on the first byte, not an
+empty shell waiting for JS. State stores (§9.6) still handle the
+*client-side, post-load* path (search, paginate, refresh); the resolver
+is the *server-side, first-paint* path. Same JSON-style declaration,
+two executors.
+
+A route may have **one** resolver (the common case) or **multiple**
+resolvers firing in parallel (for pages that need data from several
+endpoints — comparison pages, multi-source mashups, content + metadata
+splits). Multi-resolver storage + execution + UI shipped in beta.8
+Slice 7.5.
+
+| Concern | Where |
+|---|---|
+| Storage (per project, keyed by route) | `secure/projects/<project>/data/route-resolvers.json` |
+| Server-side execution | `secure/src/classes/DataResolver.php` → `resolveMany()` |
+| Server-side fetch (single + parallel) | `secure/src/functions/serverFetch.php` → `serverFetch()` / `serverFetchMulti()` |
+| Storage + validation helpers | `secure/src/functions/resolverHelpers.php` |
+| Cache layer | `secure/src/functions/resolverCache.php` + `cleanResolverCache` command |
+| Read / write commands | `setRouteResolver` (set / clear / patch / append / remove single slot) |
+| Page emit — flat namespace | `secure/src/classes/Page.php` (templates read via `{{resolved:NAME}}` substitution) |
+| Page emit — `r0`/`r1` namespaced | Same, plus `secure/src/classes/PageManagement.php` for the JS-side mirror |
+| Hydration handoff to client | `secure/src/classes/PageManagement.php` → `window.QS_RESOLVED` + `window.QS_RESOLVED_BY_INDEX` |
+| Admin UI — list view + per-config modal | `/admin/sitemap` → context menu ⋯ → "Configure resolver" — partials `sitemap-resolver-list.php` + `sitemap-resolver.php`; logic in `public/admin/assets/js/pages/sitemap.js` |
+
+#### Sidecar shape
+
+`route-resolvers.json` is a route-keyed object. Each value is either a
+**single config** (object) or an **array of configs**:
+
+```json
+{
+    "products/:slug": {
+        "endpoint": "@products-api/get-product",
+        "inputs":   { "id": "param:slug" },
+        "expose":   { "product": "data.product" },
+        "cacheTTL": 300
+    },
+    "compare/:a/vs/:b": [
+        {
+            "endpoint": "@products-api/get-product",
+            "inputs":   { "id": "param:a" },
+            "expose":   { "productA": "data.product" },
+            "cacheTTL": 300
+        },
+        {
+            "endpoint": "@products-api/get-product",
+            "inputs":   { "id": "param:b" },
+            "expose":   { "productB": "data.product" },
+            "cacheTTL": 300
+        }
+    ]
+}
+```
+
+Backward compatibility: single-resolver routes written before
+beta.8 Slice 7.5 stay scalar; the runtime accepts both shapes via
+`getResolversForRoute()`, which always returns a normalised array.
+Write path picks the shape per length — scalar when one config, array
+when two or more.
+
+#### Config field reference
+
+| Field | Required | Type | Notes |
+|---|---|---|---|
+| `endpoint` | yes | string | `@apiId/endpointId` reference (matches the API registry from §9.1). Must be `callableFrom: server` or `both` — `client`-only endpoints are rejected at save time + at runtime. |
+| `inputs` | no | `{name: spec}` | Map of endpoint parameter name → source spec (see below). Omit when the endpoint takes no inputs. |
+| `expose` | no | `{varName: dotPath}` | Map of template variable name → response dot-path. Omit when the resolver's only purpose is a side-effect (rare). |
+| `cacheTTL` | no | integer (seconds) | 0 or omitted = no cache. Positive = cache window. **Cache is force-disabled by the server for `bearer` / `cookie` / `basic` auth regardless of TTL** — see auth-cacheable rule below. |
+| `onMiss` | no | string | `render-empty` to fall back to null-valued exposes on failure (page still renders). Omitted = fail-loud (page short-circuits to 404 / 500). Future values reserved. |
+
+#### Inputs — source specs
+
+The same prefix convention as state-store `init` (§9.6) — one
+authoring vocabulary, two consumers:
+
+```
+"id"     => "param:slug"       // URL path param (TrimParameters routeParams)
+"lang"   => "query:locale"     // URL query string
+"userId" => "session:userId"   // server-side session (depends on Tier 3 wiring)
+"tag"    => "featured"         // bare literal (no recognised prefix)
+```
+
+Missing sources resolve to `null` and get dropped from the request
+entirely (the upstream's default applies), instead of being sent as an
+empty placeholder. Path placeholders that don't resolve are left as
+the literal `:name` in the URL so the upstream 404 surfaces the
+misconfig visibly.
+
+#### Expose — response dot-paths
+
+Each entry maps a template variable name to a dot-path through the
+response JSON. `data.product.name` walks `$response['data']['product']
+['name']`. An **empty string path** is shorthand for "expose the whole
+response":
+
+```json
+"expose": {
+    "product":   "data.product",
+    "fullPayload": ""
+}
+```
+
+Templates substitute via `{{resolved:NAME}}` for flat names and
+`{{resolved:NAME.path.through.value}}` for further dot-path traversal
+into the exposed shape. PHP code can also read the values directly
+through `getResolvedVars()` from `secure/src/functions/resolverHelpers.php`.
+
+When the **endpoint declares a `responseSchema`**, the expose editor's
+dot-path field is a `<select>` of the enumerated paths (with an orphan
+warning option if the saved path isn't in the schema). When the
+endpoint has no schema, the field is a plain `<input>` with a
+free-text fallback and a warning hint suggesting the author add a
+schema in `/admin/apis` for autocomplete-driven authoring.
+
+#### Cache — TTL + auth gating
+
+The cache is keyed by `sha256(endpoint + canonicalised inputs)` — it
+is **route-agnostic**. Two routes hitting the same endpoint + inputs
+share the cached response. A route's `resolver` declaration is a
+*trigger* (fires the resolver when this route is requested), not a
+*cache scope*.
+
+The **auth-cacheable rule** (locked in `BETA8_DATA_RESOLVER.md`
+Slice 4):
+
+| Auth type | Cacheable? | Reason |
+|---|---|---|
+| `none` | yes | No per-user identity in the request — shared response is safe. |
+| `apiKey` | yes | Server-side shared secret, identical for every caller. |
+| `bearer` | **no** | Per-user token. Sharing the cache would leak one user's data to others. Server forces no-cache regardless of TTL. |
+| `cookie` | **no** | Same: per-user session. |
+| `basic` | **no** | Same: per-user credentials. |
+
+The Configure-resolver modal surfaces this rule live: a **green
+"cacheable"** badge next to the TTL field when the endpoint's effective
+auth is `none` / `apiKey`, a **warning "disabled for &lt;auth-type&gt;"** badge
+otherwise. When disabled, the TTL input is also greyed out — the typed
+value would be silently ignored by the server, so the form makes the
+constraint visible.
+
+Cache writes happen only on **2xx** responses. 4xx / 5xx / transport
+failures aren't cached, so a transient blip doesn't lock in a "not
+found" for the full TTL window. The `cleanResolverCache` command
+clears entries (by endpoint id, API id, expired-only, or all) — useful
+for development and for the auto-clear hook `editApi` runs when an
+endpoint config changes.
+
+**Cache observability** — every document response carries an
+`X-QS-Resolver-Cache` header with one of `hit` / `miss` / `skip` /
+`disabled` per resolver, comma-separated for multi-resolver routes
+(`hit,miss,disabled`). DevTools Network tab shows the resolver's
+cache state without needing to tail logs.
+
+#### `onMiss` — failure-mode fallback
+
+Per-resolver, locked values:
+
+| Value | Behaviour |
+|---|---|
+| (absent, "fail-loud") | A failure short-circuits the page — see failure-mode table. |
+| `render-empty` | Failure exposes the resolver's expose keys as **null**; page renders with null vars; template uses `data-state-show-empty` (§10) for graceful "no data" UI. |
+
+Future values (e.g. `redirect:<url>`) are reserved.
+
+#### Multi-resolver — parallel execution + namespaced access
+
+When a route has more than one resolver, `DataResolver::resolveMany()`
+fires them all concurrently via `curl_multi_*` — total latency =
+max(individuals), not sum. Each resolver gets its **own** cache lookup
+(two resolvers within a route hitting the same endpoint + inputs
+share the cache entry — same key-derivation rule applies).
+
+**Exposed vars merge into the flat namespace** (`{{resolved:NAME}}`).
+That merge is **collision-free**: `setRouteResolver` rejects at save
+time any save where two resolvers expose the same key name to the
+flat namespace.
+
+```json
+// REJECTED with reason: collision
+[
+    { "endpoint": "@books-api/get-book",    "expose": { "title": "data.title" } },
+    { "endpoint": "@books-api/get-chapter", "expose": { "title": "data.title" } }
+]
+```
+
+Authors disambiguate by **renaming** (`{ "bookTitle": "data.title" }`
+on one, `{ "chapterTitle": "data.title" }` on the other) OR by using
+the **namespaced-by-index** form, which is always available regardless
+of flat collisions:
+
+| Layer | Flat access | Namespaced access |
+|---|---|---|
+| PHP — template substitution | `{{resolved:bookTitle}}` | `{{resolved:r0.title}}` |
+| PHP — array | `$vars['bookTitle']` | `$vars['r0']['title']` |
+| JS — `window.QS_RESOLVED` | (store-keyed, not flat) | — |
+| JS — `window.QS_RESOLVED_BY_INDEX` | — | `.r0.title` |
+
+`r0` / `r1` / ... follow the resolver's position in the array. The
+namespaced form is also emitted for single-resolver routes (`r0` with
+the same data the template sees as flat), so authors who switch a
+route between single and multi don't have to rewrite anything.
+
+**Reorder is cache-safe.** The cache key is endpoint + inputs, not
+position. Drag-handle reorder in the list view changes the `r0` / `r1`
+addressing (and the render-time execution order) but never invalidates
+cache entries.
+
+#### Hydration handoff — `window.QS_RESOLVED` + `window.QS_RESOLVED_BY_INDEX`
+
+Two globals get embedded in the rendered page when applicable:
+
+```html
+<script>
+window.QS_RESOLVED = {
+    "authProbe": { "sessionToken": "tok_...", "userEmail": "..." }
+};
+window.QS_RESOLVED_BY_INDEX = {
+    "r0": { "sessionToken": "tok_...", "userEmail": "...", "wholeResponse": {…} },
+    "r1": { "items": [...], "total": 97, "hasMore": true }
+};
+</script>
+```
+
+- `QS_RESOLVED` is **store-keyed** for state-store skip-fetch
+  hydration. When a state store (§9.6) on the route is bound to an
+  endpoint that *any* resolver on the route also called, the store's
+  matching `response` / `both` fields seed from the resolver's
+  exposed values. `qs.js`'s `_initStores` reads this AND skips the
+  initial `fetchOnLoad`; the data is already in the DOM, no
+  duplicate round-trip. Subsequent `fetchState` calls (search,
+  paginate, refresh) work normally.
+- `QS_RESOLVED_BY_INDEX` is **resolver-index-keyed**, mirroring the
+  PHP-side `$r0` / `$r1` namespace for client-side code that wants
+  explicit per-resolver addressing.
+
+Editor mode skips both — emulation drives the preview's resolved
+values, not the production resolver.
+
+#### Failure modes — what makes the page 200 / 404 / 500
+
+`onMiss` operates per-resolver. With multi-resolver routes, **the
+strictest unrecovered failure wins**: any single resolver that fails
+without `render-empty` short-circuits the whole page.
+
+| Single-resolver outcome | Multi-resolver outcome | Page result |
+|---|---|---|
+| Resolver succeeds | All resolvers succeed | **200** — template renders with vars populated |
+| Resolver fails + `onMiss: render-empty` + upstream 4xx/5xx | At least one resolver fails this way; all other failures are also `render-empty` | **200** — template renders with null vars for the failed resolver(s); template's `data-state-show-empty` (§10) drives the "no data" UI |
+| Resolver fails + no `onMiss` + upstream **4xx** | Any resolver fails this way | **404** — render the project's `templates/pages/404.php` (the slug doesn't exist; matches the `/products/red-vase` not-found pattern) |
+| Resolver fails + no `onMiss` + upstream **5xx or curl error** | Any resolver fails this way | **500** — render the project's `templates/pages/500.php` (the upstream is down; the page can't render meaningfully) |
+| Resolver fails + **config bug** (endpoint missing from registry, `apiKey` not set, `callableFrom: client` server-side call, etc.) | Any resolver fails this way | **500** — currently a verbose inline page surfacing the misconfig (route, error message, fix hint). Loud dev signal; **filed for dev-vs-prod presentation polish** before tag — see backlog. |
+
+`$GLOBALS['__qs_resolver_failure']` is populated for `404` / `500`
+template branches with `{ route, status, error }` so the template can
+log or surface the cause. The multi-resolver case carries the
+**first unrecovered failure's** details (`resolverIndex` included) —
+the short-circuit policy means subsequent failures aren't reached.
+
+#### Editor emulation panel
+
+`?_editor=1` activates emulation: the production resolver is **not
+fired**, and routeParams + resolved vars come from a base64-encoded
+`_emulate` JSON payload in the URL. The visual editor's emulation
+panel (extended from the param-route emulation) provides:
+
+- **Inputs panel** — every route `:name` segment + every resolver
+  expose key, editable as text inputs. Schema-driven defaults
+  (Track 2d) pre-fill the expose inputs from the endpoint's
+  `responseSchema` when one is declared.
+- **Live-data toggle** (`?_live=1`) — runs the REAL resolver instead
+  of the emulation. Useful for validating the page against real API
+  responses while still using the editor's emulated routeParams.
+
+#### Admin authoring — list view + per-config modal
+
+Sitemap → context menu ⋯ → "Configure resolver" opens the **list
+view** modal (`sitemap-resolver-list.php`). Single-resolver routes
+show with one entry; multi-resolver routes show all entries; routes
+without a resolver show an empty state with "+ Add resolver".
+
+| Action | Effect |
+|---|---|
+| Per-row Edit | Opens the per-config modal (`sitemap-resolver.php`) scoped to that index. Save patches that slot via `setRouteResolver { route, resolver, index: N }`. Cancel / X / backdrop return to the list view. |
+| Per-row × Remove | Confirms (with stronger wording on last-resolver removal), POSTs `setRouteResolver { route, index: N }` (no `resolver` body = remove-at-index). |
+| Drag handle ⋮⋮ | Drag-and-drop reorder. Applies immediately via `setRouteResolver { route, resolver: [reorderedArray] }` — no separate "Save order" button. |
+| + Add resolver | Opens the per-config modal in append mode (`editIndex = current length`). Save inserts at end. |
+
+The per-config modal's sections (endpoint picker, inputs editor,
+expose editor, cacheTTL, onMiss) all carry live UX scaffolds —
+endpoint picker filters out `client`-only endpoints + surfaces
+orphans; inputs name picker uses the endpoint's declared `parameters`
+when present (free-text fallback otherwise); expose path picker uses
+the `responseSchema` when present (free-text fallback otherwise);
+cacheTTL input disables when auth isn't cacheable. Save validation
+runs both client-side (per-row + cross-row collision) and server-side
+(per-config + cross-resolver collision detection in `validateResolverConfigs`).
+
+The sitemap badge on resolver-bound routes shows `resolver` (single)
+or `resolver × N` (multi). Tooltip lists each endpoint comma-
+separated.
+
+---
+
+### 9.8 Sitemap (/admin/sitemap)
 
 Visual route tree, reachability analyzer, layout toggles, and `sitemap.txt`
 generator — all backed by `getSiteMap` + `addRoute` / `deleteRoute` /

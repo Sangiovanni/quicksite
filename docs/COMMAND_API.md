@@ -2,9 +2,9 @@
 
 > Reference for the Management API — the single HTTP surface every QuickSite client (admin panel, CLI, external apps) talks to.
 >
-> _Last updated: 2026-04-23._
+> _Last updated: 2026-06-09._
 
-> _Maintainers note:_ re-check this doc when changing `secure/management/routes.php` (command count), `secure/src/classes/ApiResponse.php` (response shape), `secure/src/classes/CommandRunner.php` (internal allowlist), or `secure/management/command/addRoute.php` / `deleteRoute.php` / `editRoute.php` (route body shape — param syntax + warnings array).
+> _Maintainers note:_ re-check this doc when changing `secure/management/routes.php` (command count), `secure/src/classes/ApiResponse.php` (response shape), `secure/src/classes/CommandRunner.php` (internal allowlist), `secure/management/command/setRouteResolver.php` (resolver body shapes — scalar / array / index / collision errors), `secure/management/command/cleanResolverCache.php` (cache invalidation surface), or `secure/management/command/addRoute.php` / `deleteRoute.php` / `editRoute.php` (route body shape — param syntax + warnings array).
 
 ## Endpoint
 
@@ -24,7 +24,7 @@ The API documents itself. Once installed:
 GET /management/help
 ```
 
-returns full documentation for **all 127 commands** — parameters, examples, validation rules, and error codes. For a specific command:
+returns full documentation for **all 129 commands** — parameters, examples, validation rules, and error codes. For a specific command:
 
 ```
 GET /management/help/addRoute
@@ -67,7 +67,7 @@ There is **no separate error envelope**. A failed call uses the same four fields
 
 ## Command catalogue
 
-The 127 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
+The 129 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
 
 > **AI is browser-direct (BYOK).** As of v1.0.0-beta.6 there is no `callAi` / `testAiKey` / `detectProvider` / `listAiProviders` server command — the admin panel calls AI providers directly from the browser using credentials stored in `aiConnectionsV3` (localStorage). The Management API only handles workflow specs and command execution.
 
@@ -93,6 +93,7 @@ The 127 commands group into the categories below. Use `GET /management/help` for
 | **Page events** | Page-level lifecycle hooks (`onload`, `onresize`, `onscroll`). Add / edit / delete page-event interactions per route (`addPageEvent`, `editPageEvent`, `deletePageEvent`, `getPageEvents`). |
 | **API endpoints** | Manage external API integrations callable from page interactions. |
 | **State stores** | Per-page named client state bound to one API endpoint — fields with direction (request/response/both), init source, and response path. Gives interactions memory (pagination, search, filters, infinite scroll). Read/write via `getStateStores` / `setStateStores`. |
+| **Server-side data resolvers** | Per-route declaration that fires a server-side fetch BEFORE template render and exposes the response as template variables — SEO/AEO/first-paint payoff (initial HTML carries API content). Single resolver per route OR an array of resolvers firing in parallel (`curl_multi_*`) for multi-endpoint pages. Same JSON-style declaration as state stores (one shape, two executors). Read via `getSiteMap` (per-route subset under `routeResolvers`); write via `setRouteResolver` (the idempotent six-shape command — set / clear / patch / append / remove single slot). File-based cache with TTL + auth-cacheable gating; manual invalidation via `cleanResolverCache`. See [ADMIN_PANEL.md §9.7](ADMIN_PANEL.md). |
 | **System updates** | Pull updates, run migrations, inspect engine version. |
 | **Workflow tooling** | `listWorkflowBlocks` enumerates the reusable prompt blocks in `secure/admin/workflows/{blocks,pins,warnings,examples}/` for the editor's multi-select dropdowns; `lintWorkflows` reports paragraphs that occur in 3+ workflow templates as candidates for extraction. Both are admin-tier (will move to superadmin once that role lands — beta.7 sub-task). |
 
@@ -125,12 +126,52 @@ curl -X POST \
 
 # Read the live spec for a command
 curl http://local.quicksite/management/help/addRoute
+
+# Attach a server-side data resolver to a route (single — scalar shape).
+# Body shape: {route, resolver}. The resolver fires once per request,
+# server-side, before the page template renders.
+curl -X POST \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "route": "products/:slug",
+       "resolver": {
+         "endpoint": "@products-api/get-product",
+         "inputs":   { "id": "param:slug" },
+         "expose":   { "product": "data.product" },
+         "cacheTTL": 300
+       }
+     }' \
+     http://local.quicksite/management/setRouteResolver
+
+# Same command, multi-resolver shape (array). Resolvers fire concurrently
+# via curl_multi_*. Save is REJECTED with reason 'collision' if any two
+# resolvers expose the same flat-namespace key — disambiguate by renaming
+# OR by using the namespaced address ($r0.title / $r1.title in templates,
+# window.QS_RESOLVED_BY_INDEX.r0.title / .r1.title in JS).
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+     -d '{
+       "route": "compare/:a/vs/:b",
+       "resolver": [
+         {"endpoint":"@products-api/get-product","inputs":{"id":"param:a"},"expose":{"productA":"data.product"}},
+         {"endpoint":"@products-api/get-product","inputs":{"id":"param:b"},"expose":{"productB":"data.product"}}
+       ]
+     }' \
+     http://local.quicksite/management/setRouteResolver
+
+# Patch one resolver slot in a multi-resolver route (the `index` param
+# targets a specific slot). Same command supports append (index === length),
+# remove (no `resolver` body + `index`), and clear-all (no `resolver` + no
+# `index`) — see help/setRouteResolver for the full body-shape matrix.
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+     -d '{"route":"compare/:a/vs/:b","resolver":{"endpoint":"@products-api/get-product","inputs":{"id":"param:a"},"expose":{"productA":"data.product"}},"index":0}' \
+     http://local.quicksite/management/setRouteResolver
 ```
 
 ## Internals
 
 - Command handlers live in `secure/management/command/<command>.php`, one file per command.
-- The whitelist of valid commands is `secure/management/routes.php` (127 entries — this file is the single source of truth for which commands exist).
+- The whitelist of valid commands is `secure/management/routes.php` (129 entries — this file is the single source of truth for which commands exist).
 - Shared helpers live in `secure/src/functions/utilsManagement.php` (e.g., `varExportNested()`, `SPECIAL_PAGES`, role helpers).
 - Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `secure/src/classes/CommandRunner.php`. CommandRunner currently carries a **hardcoded read-only allowlist** of ~50 `get*` / `list*` commands it will execute internally; this is a tech-debt shortcut and should eventually be replaced by reusing the role/permission helpers in `secure/src/functions/AuthManagement.php` so there is one source of truth for "what is safe to call internally".
 - Workflow execution adds its own role check via `WorkflowManager::setTokenInfo()` so steps respect the calling token's permissions.

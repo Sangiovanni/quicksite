@@ -69,7 +69,14 @@ function __command_listApiEndpoints(array $params = [], array $urlParams = []): 
                 'requestSchema' => $endpoint['requestSchema'] ?? null,
                 'responseSchema' => $endpoint['responseSchema'] ?? null,
                 'responseBindings' => $endpoint['responseBindings'] ?? [],
-                'hasResponseBindings' => !empty($endpoint['responseBindings'])
+                'hasResponseBindings' => !empty($endpoint['responseBindings']),
+                // Beta.8 A2 Slice 7 — surface the effective callableFrom
+                // (raw OR auto-derived from auth type per Track A4) so
+                // admin pickers like the resolver modal can filter out
+                // endpoints they can't call. Computing the effective
+                // value here means callers don't need to replicate the
+                // auth-type → callableFrom auto-derive logic.
+                'callableFrom' => ApiEndpointManager::effectiveCallableFrom($api, $endpoint),
             ];
             $totalEndpoints++;
             if (isset($endpointsByMethod[$method])) {

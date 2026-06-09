@@ -2439,6 +2439,23 @@ kbd {
     vertical-align: baseline;
 }
 
+/* Beta.8 A2 Slice 7 — server-side data resolver presence indicator.
+   Uses the --admin-info palette to distinguish from the --params badge
+   (accent palette): a route can have BOTH and the two need to be
+   visually parseable at a glance. */
+.sitemap__route-badge--resolver {
+    display: inline-block;
+    margin-left: var(--space-xs);
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+    font-size: 0.75em;
+    font-weight: var(--font-weight-medium);
+    background: var(--admin-info-bg);
+    color: var(--admin-info);
+    line-height: 1.4;
+    vertical-align: baseline;
+}
+
 .sitemap__route-external {
     color: var(--admin-text-muted);
     opacity: 0;
@@ -16273,6 +16290,373 @@ body[data-page="preview"] .global-miniplayer {
 .sitemap-edit-title-row--missing .sitemap-edit-title-row__lang::after {
     content: ' ●';
     color: var(--admin-warning, #b3691e);
+}
+
+/* Beta.8 A2 Slice 7 — Configure-resolver modal.
+   Geometry mirrors .sitemap-edit-title-modal__* (same modal shell), with
+   a wider max-width (the form has more sections than the edit-title's
+   single column of per-language inputs). Kept as a parallel class set
+   instead of consolidating to a shared .sitemap-modal__* base: that's a
+   beta.9+ refactor once a third modal makes the work worth it. */
+.sitemap-resolver-modal {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 10000;
+    display: flex; align-items: center; justify-content: center;
+}
+.sitemap-resolver-modal__backdrop {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: #00000080;
+    backdrop-filter: blur(2px);
+}
+.sitemap-resolver-modal__content {
+    position: relative;
+    z-index: 1;
+    background: var(--admin-bg-secondary, #1f1f1f);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    width: 90%; max-width: 720px; max-height: 90vh;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+}
+.sitemap-resolver-modal__header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--admin-border);
+}
+.sitemap-resolver-modal__header h3 {
+    margin: 0; font-size: 1.1rem; font-weight: 600;
+    color: var(--admin-text);
+}
+.sitemap-resolver-modal__close {
+    background: transparent; border: none;
+    padding: var(--space-xs); cursor: pointer;
+    color: var(--admin-text-muted);
+    border-radius: var(--radius-sm);
+}
+.sitemap-resolver-modal__close svg { width: 18px; height: 18px; }
+.sitemap-resolver-modal__body {
+    padding: var(--space-md) var(--space-lg);
+    overflow-y: auto;
+    flex: 1;
+}
+.sitemap-resolver-modal__footer {
+    display: flex; justify-content: flex-end; gap: var(--space-sm);
+    padding: var(--space-md) var(--space-lg);
+    border-top: 1px solid var(--admin-border);
+}
+
+/* Form sections inside the resolver modal. Each section (endpoint
+   picker, inputs editor, expose editor, cache, onMiss) sits in its own
+   block with a label + control(s) + optional hint paragraph. */
+.sitemap-resolver-section {
+    margin-bottom: var(--space-md);
+}
+.sitemap-resolver-section:empty {
+    /* Steps 3-5 placeholder sections — empty until populated. */
+    margin: 0;
+}
+.sitemap-resolver-label {
+    display: block;
+    font-weight: 600;
+    color: var(--admin-text);
+    margin-bottom: var(--space-xs);
+    font-size: 0.9rem;
+}
+.sitemap-resolver-label__required {
+    color: var(--admin-warning, #b3691e);
+    margin-left: 2px;
+}
+.sitemap-resolver-hint {
+    margin: var(--space-xs) 0 0;
+    font-size: 0.8rem;
+    color: var(--admin-text-muted);
+    line-height: 1.4;
+}
+
+/* Warning variant — shown for situations like "endpoint has no
+   response schema" / "endpoint has no declared parameters" where the
+   author should be steered toward fixing the upstream config but
+   isn't blocked from using free-text fallback. */
+.sitemap-resolver-hint--warning {
+    color: var(--admin-warning, #b3691e);
+}
+
+/* Beta.8 A2 Slice 7 Step 3 — inputs editor rows.
+   Layout: name = kind value × (in one flex line). The shared
+   .sitemap-resolver-rows wrap is reused by the expose editor (Step 4)
+   and any future row-style sub-editor. Row classes stay separate so
+   inputs + expose can diverge if their fields end up needing different
+   geometry (so far they don't, but the option's there). */
+.sitemap-resolver-rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin: var(--space-sm) 0 0;
+}
+.sitemap-resolver-input-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+/* Beta.8 A2 Slice 7 Step 4 follow-up — name field swapped to a
+   cell-wrapper pattern so the inner element can flip between <select>
+   (endpoint declares params) and <input> (no declared params), same
+   as the value cell and the expose path cell. */
+.sitemap-resolver-input-row__name-cell { flex: 1 1 25%; min-width: 0; }
+.sitemap-resolver-input-row__name-cell > * { width: 100%; }
+.sitemap-resolver-input-row__sep {
+    flex: 0 0 auto;
+    color: var(--admin-text-muted);
+    font-weight: 600;
+    padding: 0 2px;
+}
+.sitemap-resolver-input-row__kind { flex: 0 0 110px; }
+.sitemap-resolver-input-row__value { flex: 1 1 40%; min-width: 0; }
+.sitemap-resolver-input-row__value > * { width: 100%; }
+.sitemap-resolver-input-row__remove {
+    flex: 0 0 auto;
+    padding: 4px 8px;
+    line-height: 1;
+}
+
+/* Validation error highlight — applied to incomplete rows (totally
+   empty, empty name, OR empty value — all three block save). Both the
+   name field AND the value field get the red treatment so the user can
+   see which side is at fault by reading the inline status message
+   ("name is required" / "value is required"). Cleared live as the
+   user types into the offending field (see _collectResolverInputs
+   docblock + the renderValue / nameInput input listeners).
+   The __name-cell wrapper (Step 4 follow-up) means name targeting now
+   uses the inner element via `> *`, same as the value cell pattern. */
+.sitemap-resolver-input-row--error .sitemap-resolver-input-row__name-cell > *,
+.sitemap-resolver-input-row--error .sitemap-resolver-input-row__value > * {
+    border-color: var(--admin-danger, #b3261e);
+    background: rgba(179, 38, 30, 0.06);
+}
+
+/* Beta.8 A2 Slice 7 Step 4 — expose editor rows.
+   Layout: varName ← dotPath × (in one flex line). The varName field
+   gets less width than inputs' name field because dot-paths are
+   typically longer (data.product.images.0.url etc.). */
+.sitemap-resolver-expose-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+.sitemap-resolver-expose-row__name { flex: 1 1 30%; min-width: 0; }
+.sitemap-resolver-expose-row__sep {
+    flex: 0 0 auto;
+    color: var(--admin-text-muted);
+    font-weight: 600;
+    padding: 0 2px;
+}
+.sitemap-resolver-expose-row__path { flex: 1 1 50%; min-width: 0; }
+.sitemap-resolver-expose-row__remove {
+    flex: 0 0 auto;
+    padding: 4px 8px;
+    line-height: 1;
+}
+
+/* Same --error treatment as inputs rows — see comment above for
+   why both fields turn red. For expose, the empty-path case is
+   legitimate (whole-response semantics) so a row with name AND
+   empty path is NOT in error. */
+.sitemap-resolver-expose-row--error .sitemap-resolver-expose-row__name,
+.sitemap-resolver-expose-row--error .sitemap-resolver-expose-row__path {
+    border-color: var(--admin-danger, #b3261e);
+    background: rgba(179, 38, 30, 0.06);
+}
+
+/* Beta.8 A2 Slice 7 Step 5 — cacheTTL section.
+   Layout: [number] seconds [auth-cacheable badge]. The badge is
+   read-only and surfaces the server-side rule (caching is force-
+   disabled for bearer/cookie/basic auth) so the author isn't
+   surprised by silently-not-cached responses. */
+.sitemap-resolver-cache-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-top: var(--space-xs);
+}
+.sitemap-resolver-cache-input { flex: 0 0 120px; }
+.sitemap-resolver-cache-unit {
+    color: var(--admin-text-muted);
+    font-size: 0.85rem;
+}
+.sitemap-resolver-cache-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-medium);
+    line-height: 1.4;
+}
+.sitemap-resolver-cache-badge--ok {
+    background: var(--admin-success-bg);
+    color: var(--admin-success);
+}
+.sitemap-resolver-cache-badge--blocked {
+    background: var(--admin-warning-bg);
+    color: var(--admin-warning);
+}
+
+/* Beta.8 A2 Slice 7 Step 5 — onMiss section. Single full-width
+   select; future onMiss values reserved per the design doc but only
+   render-empty + default are surfaced today. */
+.sitemap-resolver-onmiss-select {
+    width: 100%;
+    margin-top: var(--space-xs);
+}
+
+/* Beta.8 A2 Slice 7.5.D — Resolver list-view modal.
+   Same shell pattern as the per-config and edit-title modals; the
+   list rows + drag-and-drop are the new bits. */
+.sitemap-resolver-list-modal {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 10000;
+    display: flex; align-items: center; justify-content: center;
+}
+.sitemap-resolver-list-modal__backdrop {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: #00000080;
+    backdrop-filter: blur(2px);
+}
+.sitemap-resolver-list-modal__content {
+    position: relative;
+    z-index: 1;
+    background: var(--admin-bg-secondary, #1f1f1f);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    width: 90%; max-width: 720px; max-height: 90vh;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+}
+.sitemap-resolver-list-modal__header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--admin-border);
+}
+.sitemap-resolver-list-modal__header h3 {
+    margin: 0; font-size: 1.1rem; font-weight: 600;
+    color: var(--admin-text);
+    display: flex; align-items: center; gap: var(--space-xs);
+    flex-wrap: wrap;
+}
+.sitemap-resolver-list__count {
+    color: var(--admin-text-muted);
+    font-size: 0.85rem;
+    font-weight: var(--font-weight-medium);
+}
+.sitemap-resolver-list-modal__close {
+    background: transparent; border: none;
+    padding: var(--space-xs); cursor: pointer;
+    color: var(--admin-text-muted);
+    border-radius: var(--radius-sm);
+}
+.sitemap-resolver-list-modal__close svg { width: 18px; height: 18px; }
+.sitemap-resolver-list-modal__body {
+    padding: var(--space-md) var(--space-lg);
+    overflow-y: auto;
+    flex: 1;
+}
+.sitemap-resolver-list-modal__footer {
+    display: flex; justify-content: flex-end; gap: var(--space-sm);
+    padding: var(--space-md) var(--space-lg);
+    border-top: 1px solid var(--admin-border);
+}
+
+.sitemap-resolver-list-rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin: var(--space-sm) 0;
+}
+
+/* One row per resolver. Drag handle + index label + endpoint reference
+   + Edit + × Remove. Drag-targeting visuals (--drag-target / --dragging)
+   give the author live feedback during reorder. */
+.sitemap-resolver-list-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    cursor: grab;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.sitemap-resolver-list-row:hover {
+    border-color: var(--admin-accent, #7a9eb8);
+}
+.sitemap-resolver-list-row--dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+}
+.sitemap-resolver-list-row--drag-target {
+    border-color: var(--admin-accent, #7a9eb8);
+    background: rgba(122, 158, 184, 0.08);
+}
+
+.sitemap-resolver-list-row__handle {
+    flex: 0 0 auto;
+    color: var(--admin-text-muted);
+    cursor: grab;
+    user-select: none;
+    font-weight: var(--font-weight-bold);
+    padding: 0 4px;
+}
+.sitemap-resolver-list-row__index {
+    flex: 0 0 auto;
+    color: var(--admin-info, #7a9eb8);
+    font-family: monospace;
+    font-size: 0.85rem;
+    font-weight: var(--font-weight-medium);
+    padding: 2px 8px;
+    background: var(--admin-info-bg);
+    border-radius: var(--radius-full);
+}
+.sitemap-resolver-list-row__endpoint {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: var(--admin-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.sitemap-resolver-list-row__edit { flex: 0 0 auto; }
+.sitemap-resolver-list-row__remove {
+    flex: 0 0 auto;
+    padding: 4px 8px;
+    line-height: 1;
+}
+
+.sitemap-resolver-list__empty {
+    margin: var(--space-md) 0;
+    padding: var(--space-md);
+    color: var(--admin-text-muted);
+    font-style: italic;
+    text-align: center;
+    background: var(--admin-bg);
+    border: 1px dashed var(--admin-border);
+    border-radius: var(--radius-md);
+}
+
+.sitemap-resolver-list__add {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-top: var(--space-sm);
+}
+
+/* Add-input / add-row button (shared with Step 4 expose). */
+.sitemap-resolver-add {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-top: var(--space-xs);
 }
 
 /* Paged-navigator complex element (BETA7 #11, beta.7 close).

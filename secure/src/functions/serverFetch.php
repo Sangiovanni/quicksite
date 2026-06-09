@@ -84,7 +84,30 @@
 
 require_once __DIR__ . '/../classes/ApiEndpointManager.php';
 
-function serverFetch(string $endpointRef, array $inputs = [], array $context = []): array {
+/**
+ * Internal — build a curl handle + bookkeeping for serverFetch /
+ * serverFetchMulti. Holds all the deterministic work (registry
+ * lookup, callableFrom gate, URL/body/headers construction, auth
+ * resolution, cache eligibility + read) so the caller does ONLY the
+ * actual transport (curl_exec single vs curl_multi_exec parallel).
+ *
+ * Return shape:
+ *   ['state' => 'error',    'result' => <serverFetch envelope, ok:false>]
+ *   ['state' => 'hit',      'result' => <cached envelope, ok:true>,
+ *                            'cacheStatus' => 'hit']
+ *   ['state' => 'prepared', 'handle' => <curl handle>,
+ *                            'endpointRef' => '<apiId/endpointId without leading @>',
+ *                            'inputs' => <canonicalised inputs for cache key>,
+ *                            'cacheable' => <bool>,
+ *                            'cacheTTL' => <int>,
+ *                            'cacheStatus' => 'miss'|'skip'|'disabled']
+ *
+ * Beta.8 A2 Slice 7.5.C — extracted from serverFetch's single-curl
+ * implementation so serverFetchMulti can prepare N requests, hit the
+ * cache for the ones with usable entries, and only fire curl_multi_*
+ * for genuine misses.
+ */
+function _serverFetchPrepare(string $endpointRef, array $inputs, array $context): array {
     // Strip leading '@' if present (registry-mode convention from QS.fetch).
     $endpointRef = ltrim($endpointRef, '@');
 
@@ -99,12 +122,12 @@ function serverFetch(string $endpointRef, array $inputs = [], array $context = [
     $manager = new ApiEndpointManager();
     $endpoint = $manager->getEndpoint($endpointId, $apiId);
     if ($endpoint === null) {
-        return [
+        return ['state' => 'error', 'result' => [
             'ok' => false,
             'status' => 0,
             'data' => null,
             'error' => "Endpoint not found in registry: @{$endpointRef}",
-        ];
+        ]];
     }
 
     // callableFrom enforcement. Need the merged API config for
@@ -112,21 +135,21 @@ function serverFetch(string $endpointRef, array $inputs = [], array $context = [
     // the full $api array, so re-fetch via getApi.
     $api = $manager->getApi($endpoint['apiId']);
     if ($api === null) {
-        return [
+        return ['state' => 'error', 'result' => [
             'ok' => false,
             'status' => 0,
             'data' => null,
             'error' => "API not found for resolved endpoint: {$endpoint['apiId']}",
-        ];
+        ]];
     }
     $callableFrom = ApiEndpointManager::effectiveCallableFrom($api, $endpoint);
     if ($callableFrom === 'client') {
-        return [
+        return ['state' => 'error', 'result' => [
             'ok' => false,
             'status' => 0,
             'data' => null,
             'error' => "Endpoint @{$endpointRef} is marked callableFrom='client' and cannot be invoked server-side. Either change its callableFrom to 'server' / 'both' in /admin/apis, or call it from the browser via QS.fetch.",
-        ];
+        ]];
     }
 
     // Identify which inputs map to path :placeholders so they don't
@@ -212,12 +235,12 @@ function serverFetch(string $endpointRef, array $inputs = [], array $context = [
         }
         $apiIdForSecret = $endpoint['apiId'];
         if (!isset($apiSecrets[$apiIdForSecret]) || $apiSecrets[$apiIdForSecret] === '') {
-            return [
+            return ['state' => 'error', 'result' => [
                 'ok' => false,
                 'status' => 0,
                 'data' => null,
                 'error' => "apiKey not configured for API '{$apiIdForSecret}' in secure/admin/config/api-secrets.php (see .example template).",
-            ];
+            ]];
         }
         $keyValue = $apiSecrets[$apiIdForSecret];
         $tokenSource = $auth['tokenSource'] ?? 'header:X-API-Key';
@@ -269,82 +292,237 @@ function serverFetch(string $endpointRef, array $inputs = [], array $context = [
     // The right place for a per-call observe(start, endpoint, callableFrom)
     // before curl_exec + observe(end, status, durationMs, cacheHit) after.
 
-    // Beta.8 A2 Slice 4 — cache read attempt.
+    // Beta.8 A2 Slice 4 — cache read attempt (cacheStatus reporting
+    // moved up to the caller in Slice 7.5.C so multi-resolver callers
+    // get a per-resolver status array instead of a single $GLOBALS
+    // value clobbered by whichever call ran last).
+    //
     // Eligibility: cacheTTL>0 + auth type doesn't carry per-user identity.
     // The auth-cacheable rule (LOCKED): only `none` and `apiKey` —
     // `bearer`/`cookie`/`basic` would cross-leak user data across sessions.
-    // Observability cursor: $GLOBALS['__qs_resolver_cache_status'] gets set
-    // to one of 'hit' / 'miss' / 'skip' / 'disabled' so public/index.php
-    // can emit the X-QS-Resolver-Cache header for DevTools visibility.
     require_once __DIR__ . '/resolverCache.php';
     $cacheTTL = (int) ($context['cacheTTL'] ?? 0);
     $cacheable = false;
+    $cacheStatus = 'skip';
     if ($cacheTTL <= 0) {
-        $GLOBALS['__qs_resolver_cache_status'] = 'skip';
+        $cacheStatus = 'skip';
     } elseif (!isResolverAuthCacheable($authType)) {
-        $GLOBALS['__qs_resolver_cache_status'] = 'disabled';
+        $cacheStatus = 'disabled';
     } else {
         $cacheable = true;
         $cached = readResolverCache('@' . $endpointRef, $inputs);
         if ($cached !== null) {
-            $GLOBALS['__qs_resolver_cache_status'] = 'hit';
-            return $cached;
+            return [
+                'state'       => 'hit',
+                'result'      => $cached,
+                'cacheStatus' => 'hit',
+            ];
         }
-        $GLOBALS['__qs_resolver_cache_status'] = 'miss';
+        $cacheStatus = 'miss';
     }
 
-    // Fire curl.
+    // Prepare the curl handle. CURLOPT_RETURNTRANSFER is on so we can
+    // recover the body via curl_multi_getcontent (curl_multi path) or
+    // the return of curl_exec (single path).
     $ch = curl_init();
     curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
+        CURLOPT_URL            => $url,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_TIMEOUT => 10,
+        CURLOPT_TIMEOUT        => 10,
         CURLOPT_CONNECTTIMEOUT => 5,
-        CURLOPT_CUSTOMREQUEST => $method,
-        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_CUSTOMREQUEST  => $method,
+        CURLOPT_HTTPHEADER     => $headers,
     ]);
     if ($body !== null) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
     }
+
+    return [
+        'state'       => 'prepared',
+        'handle'      => $ch,
+        'endpointRef' => $endpointRef,   // stripped of leading '@'
+        'inputs'      => $inputs,        // for cache key on write
+        'cacheable'   => $cacheable,
+        'cacheTTL'    => $cacheTTL,
+        'cacheStatus' => $cacheStatus,
+    ];
+}
+
+/**
+ * Decode a response body. Shared post-curl logic used by both single
+ * (serverFetch) and multi (serverFetchMulti) paths.
+ */
+function _serverFetchParseResponse(string $responseBody, int $httpCode): array {
+    // JSON when it parses; raw string otherwise (the resolver's expose
+    // mapping reads dot-paths into the decoded value, so non-JSON
+    // responses simply yield null exposes — the template's `onMiss`
+    // fallback handles it).
+    $decoded = json_decode($responseBody, true);
+    $data = ($decoded !== null || json_last_error() === JSON_ERROR_NONE)
+        ? $decoded
+        : $responseBody;
+    return [
+        'ok'     => $httpCode >= 200 && $httpCode < 300,
+        'status' => $httpCode,
+        'data'   => $data,
+    ];
+}
+
+/**
+ * Single-endpoint synchronous fetch. Thin wrapper around the prepare /
+ * curl_exec / parse trio; preserves the pre-7.5.C contract for callers
+ * (signature unchanged, `$GLOBALS['__qs_resolver_cache_status']` still
+ * set for back-compat with public/index.php's single-resolver path).
+ */
+function serverFetch(string $endpointRef, array $inputs = [], array $context = []): array {
+    $prep = _serverFetchPrepare($endpointRef, $inputs, $context);
+
+    if ($prep['state'] === 'error') {
+        // Skip/disabled wasn't set; surface a neutral status for the header.
+        $GLOBALS['__qs_resolver_cache_status'] = 'skip';
+        return $prep['result'];
+    }
+    if ($prep['state'] === 'hit') {
+        $GLOBALS['__qs_resolver_cache_status'] = 'hit';
+        return $prep['result'];
+    }
+
+    // state === 'prepared'
+    $GLOBALS['__qs_resolver_cache_status'] = $prep['cacheStatus'];
+    $ch = $prep['handle'];
 
     $responseBody = curl_exec($ch);
     if ($responseBody === false) {
         $curlError = curl_error($ch);
         curl_close($ch);
         return [
-            'ok' => false,
+            'ok'     => false,
             'status' => 0,
-            'data' => null,
-            'error' => "curl failed for @{$endpointRef}: {$curlError}",
+            'data'   => null,
+            'error'  => "curl failed for @{$prep['endpointRef']}: {$curlError}",
         ];
     }
     $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    // Decode response body. JSON when it parses; raw string otherwise
-    // (the resolver's expose mapping reads dot-paths into the decoded
-    // value, so non-JSON responses simply yield null exposes — the
-    // template's `onMiss` fallback handles it).
-    $decoded = json_decode($responseBody, true);
-    $data = ($decoded !== null || json_last_error() === JSON_ERROR_NONE)
-        ? $decoded
-        : $responseBody;
+    $result = _serverFetchParseResponse($responseBody, $httpCode);
 
-    $result = [
-        'ok' => $httpCode >= 200 && $httpCode < 300,
-        'status' => $httpCode,
-        'data' => $data,
-    ];
-
-    // Beta.8 A2 Slice 4 — cache write on success.
-    // Only successful (2xx) responses get cached. 4xx / 5xx / transport
-    // failures aren't cached because re-trying soon is the right behaviour
-    // for a missing item, rate limit, or transient upstream blip. Failure
-    // would just persist a 'not found' for the whole TTL — bad UX.
-    if ($cacheable && $result['ok']) {
-        writeResolverCache('@' . $endpointRef, $inputs, $result, $cacheTTL);
+    // Cache write on success only — failures aren't cached so re-trying
+    // soon is the right behaviour (Slice 4 reasoning, unchanged).
+    if ($prep['cacheable'] && $result['ok']) {
+        writeResolverCache('@' . $prep['endpointRef'], $prep['inputs'], $result, $prep['cacheTTL']);
     }
 
     return $result;
+}
+
+/**
+ * Parallel multi-endpoint fetch (beta.8 A2 Slice 7.5.C).
+ *
+ * Accepts an array of fetch specs and fires them concurrently via
+ * curl_multi_*. Each spec gets its OWN preparation pass (cache lookup,
+ * URL/header build, auth resolution); cache hits short-circuit without
+ * touching curl_multi. Only the genuine cache-miss specs are added to
+ * the multi-handle.
+ *
+ * Returns results in the SAME order as the input specs (a results array
+ * indexed 0..N-1). Each result has the serverFetch envelope shape.
+ *
+ * Per-resolver cache statuses are collected into
+ * $GLOBALS['__qs_resolver_cache_statuses'] (array, in spec order). The
+ * caller (public/index.php) emits the X-QS-Resolver-Cache header as a
+ * comma-separated list of these per-call statuses.
+ *
+ * @param array $specs Array of `['endpointRef' => ..., 'inputs' => [...],
+ *                      'context' => [...]]`. The per-spec `context` is
+ *                      merged on top of the outer `$context` so callers
+ *                      can per-spec-override cacheTTL etc.
+ * @param array $context Default execution context applied to every spec
+ *                       (session, cookieHeader, apiSecrets test-injection).
+ * @return array Indexed array of result envelopes (same order as $specs).
+ */
+function serverFetchMulti(array $specs, array $context = []): array {
+    $n = count($specs);
+    $results  = array_fill(0, $n, null);
+    $statuses = array_fill(0, $n, 'skip');
+    $prepared = [];   // idx => prep array (for the genuine misses)
+
+    // Preparation phase — registry lookup + auth + cache check per spec.
+    foreach ($specs as $idx => $spec) {
+        $endpointRef    = (string) ($spec['endpointRef'] ?? '');
+        $specInputs     = $spec['inputs'] ?? [];
+        $mergedContext  = array_merge($context, $spec['context'] ?? []);
+
+        $prep = _serverFetchPrepare($endpointRef, $specInputs, $mergedContext);
+
+        if ($prep['state'] === 'error') {
+            $results[$idx]  = $prep['result'];
+            $statuses[$idx] = 'skip';   // no cache interaction happened
+            continue;
+        }
+        if ($prep['state'] === 'hit') {
+            $results[$idx]  = $prep['result'];
+            $statuses[$idx] = 'hit';
+            continue;
+        }
+        // prepared — needs curl
+        $statuses[$idx]  = $prep['cacheStatus'];
+        $prepared[$idx]  = $prep;
+    }
+
+    // Multi-curl phase — fire all the prepared handles in parallel.
+    if (!empty($prepared)) {
+        $multi = curl_multi_init();
+        foreach ($prepared as $idx => $prep) {
+            curl_multi_add_handle($multi, $prep['handle']);
+        }
+
+        $stillRunning = null;
+        do {
+            $multiStatus = curl_multi_exec($multi, $stillRunning);
+            if ($stillRunning > 0) {
+                // Block until at least one handle has activity — keeps
+                // CPU off the busy-loop while the network does its work.
+                curl_multi_select($multi, 1.0);
+            }
+        } while ($stillRunning > 0 && $multiStatus === CURLM_OK);
+
+        // Collection phase — read each response body + parse + cache write.
+        foreach ($prepared as $idx => $prep) {
+            $ch           = $prep['handle'];
+            $responseBody = curl_multi_getcontent($ch);
+            $httpCode     = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErrno    = curl_errno($ch);
+            $curlError    = $curlErrno !== 0 ? curl_error($ch) : '';
+
+            curl_multi_remove_handle($multi, $ch);
+            curl_close($ch);
+
+            if ($curlErrno !== 0 || $responseBody === false || $responseBody === null) {
+                $results[$idx] = [
+                    'ok'     => false,
+                    'status' => 0,
+                    'data'   => null,
+                    'error'  => "curl failed for @{$prep['endpointRef']}: {$curlError}",
+                ];
+                continue;
+            }
+
+            $result = _serverFetchParseResponse((string) $responseBody, $httpCode);
+            if ($prep['cacheable'] && $result['ok']) {
+                writeResolverCache('@' . $prep['endpointRef'], $prep['inputs'], $result, $prep['cacheTTL']);
+            }
+            $results[$idx] = $result;
+        }
+
+        curl_multi_close($multi);
+    }
+
+    // Per-resolver cache status array for observability. public/index.php
+    // emits this as a comma-separated X-QS-Resolver-Cache header so
+    // DevTools shows "hit,miss,disabled" for a 3-resolver route.
+    $GLOBALS['__qs_resolver_cache_statuses'] = $statuses;
+
+    return $results;
 }

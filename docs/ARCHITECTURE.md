@@ -1,10 +1,10 @@
 # QuickSite Architecture
 
-_Last updated: 2026-04-23._
+_Last updated: 2026-06-09._
 
 > Canonical high-level overview of how QuickSite is structured and how a request flows through it. For the admin panel internals, see [ADMIN_PANEL.md](ADMIN_PANEL.md). For the workflow engine, see [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md). For the full command reference, see [COMMAND_API.md](COMMAND_API.md). For the on-disk layout, see [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
 
-> _Maintainers note:_ re-check this doc when changing `secure/management/routes.php` (§3 command count), `secure/management/config/roles.php` (§3 roles), `secure/src/classes/JsonToHtmlRenderer.php` (§2 node kinds, §7 tag blacklist, §8 `CHAIN_AWAITABLE`), `secure/src/functions/qsVerbCatalog.php` (§8 QS.* registry — single source of truth for verb metadata, consumed by `listJsFunctions`, `JsonToHtmlRenderer`, and `JsonToPhpCompiler`; verb count + groups in §8 grow when entries are added), `public/scripts/qs.js` (§8 verb implementations + auth-state UI primitives), or `secure/src/classes/TrimParameters.php` / `secure/src/functions/routeHelpers.php` / a project's `secure/management/routes.php` schema (§5.3 routing — param syntax, matching algorithm, conflicts).
+> _Maintainers note:_ re-check this doc when changing `secure/management/routes.php` (§3 command count), `secure/management/config/roles.php` (§3 roles), `secure/src/classes/JsonToHtmlRenderer.php` (§2 node kinds, §7 tag blacklist, §8 `CHAIN_AWAITABLE`), `secure/src/functions/qsVerbCatalog.php` (§8 QS.* registry — single source of truth for verb metadata, consumed by `listJsFunctions`, `JsonToHtmlRenderer`, and `JsonToPhpCompiler`; verb count + groups in §8 grow when entries are added), `public/scripts/qs.js` (§8 verb implementations + auth-state UI primitives), `secure/src/classes/DataResolver.php` / `secure/src/functions/serverFetch.php` / `secure/src/functions/resolverHelpers.php` (§8.4 server-side data resolvers — sidecar shape, parallel execution, namespaced addressing, hydration handoff), or `secure/src/classes/TrimParameters.php` / `secure/src/functions/routeHelpers.php` / a project's `secure/management/routes.php` schema (§5.3 routing — param syntax, matching algorithm, conflicts).
 
 QuickSite is a file-based, API-first website operations platform with a visual editor and workflow engine for deterministic and AI-assisted site changes. It is exportable and production-friendly, and while file-native by default, it is designed to integrate quickly with external client-side and server-side APIs when backend capabilities are needed.
 
@@ -661,6 +661,56 @@ DOM bindings (store → DOM, re-applied on init / `setState` / `fetchState`):
 so the endpoint's own `responseBindings` are skipped on store fetches — otherwise an
 append would flicker (bindings replace, then the store appends). Drive a store's
 list via `data-state-list`, not via that endpoint's `responseBindings`.
+
+### 8.4 Server-side data resolvers
+
+Beta.8's server-rendering layer. Where state stores (§8.3) give interactions memory
+on the **client** post-load, a **resolver** declares "before this page renders,
+fetch from API X and expose its response as template variables." The initial HTML
+goes out with API data already baked in — SEO + AEO + first-paint win that state
+stores alone couldn't deliver (crawlers see empty content until JS runs; AI
+crawlers are even more conservative about running JS).
+
+| Concern | Where |
+|---|---|
+| Storage (per project) | `secure/projects/<project>/data/route-resolvers.json` |
+| Server-side execution | `secure/src/classes/DataResolver.php` → `resolveMany()` (handles single- and multi-resolver routes uniformly) |
+| Server-side fetch | `secure/src/functions/serverFetch.php` → `serverFetch()` (single) / `serverFetchMulti()` (parallel via `curl_multi_*`) |
+| Storage + validation helpers | `secure/src/functions/resolverHelpers.php` |
+| File-based cache + observability | `secure/src/functions/resolverCache.php` + `X-QS-Resolver-Cache` header |
+| Commands | `setRouteResolver` (set / clear / patch / append / remove), `cleanResolverCache` |
+| Lifecycle position | `public/index.php` — AFTER auth gate (yes/no), BEFORE template render (`DataResolver::resolveMany()` fires once per request) |
+| Hydration handoff | `secure/src/classes/PageManagement.php` → `window.QS_RESOLVED` (store-keyed for state-store skip-fetch) + `window.QS_RESOLVED_BY_INDEX` (resolver-index-keyed mirror of PHP `$r0` / `$r1`) |
+| Admin UI | `/admin/sitemap` context menu — list view + per-config modal — see [ADMIN_PANEL.md §9.7](ADMIN_PANEL.md). |
+
+Sidecar shape supports both **scalar** (single config object) and **array** (list
+of configs, multi-resolver). The on-disk shape is the only thing that differs — both
+flow through the same `getResolversForRoute()` accessor which returns a normalised
+array. Single resolvers stay scalar on disk for backward compat with sidecars
+written before beta.8 Slice 7.5.
+
+Multi-resolver semantics (locked in `NOTES/planning/BETA8_MULTI_RESOLVER.md`):
+- **Parallel execution** via `curl_multi_*`. Total latency = max(individuals).
+- **Cache key is endpoint + canonical inputs**, route-agnostic. Two routes — or two
+  resolvers on one route — that hit the same endpoint with the same inputs share
+  the cached entry.
+- **Exposed vars merge into a flat namespace** (`{{resolved:NAME}}`). Collisions
+  across resolvers are **rejected at save time** by
+  `resolverHelpers.php::validateResolverConfigs`. Authors disambiguate by renaming
+  OR by using the **namespaced address** (`{{resolved:r0.NAME}}` / `$r0['NAME']`
+  in templates; `window.QS_RESOLVED_BY_INDEX.r0.NAME` in JS) — always available
+  regardless of flat-namespace state.
+- **Per-resolver `onMiss`** applies independently. `render-empty` on a failed
+  resolver exposes its vars as null and the page continues rendering. Any
+  failure WITHOUT `onMiss='render-empty'` short-circuits the whole page (404 or
+  500 driven by the **first** unrecovered failure).
+
+The headline architectural payoff: state-store JSON and resolver JSON are
+**runtime-agnostic** — one shape, two executors. The same declaration that drives
+a client-side store can drive a server-side resolver with minor extensions (the
+`param:` source kind and the optional `cacheTTL` / `onMiss` keys). Future
+unification (state-store → resolver promotion in the admin UI) is filed as
+beta.9+ polish.
 
 ---
 

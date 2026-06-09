@@ -71,33 +71,153 @@ function saveResolversSidecar(array $resolvers): bool {
             return false;
         }
     }
-    $json = json_encode($resolvers, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    // PHP can't distinguish empty-list `[]` from empty-object `{}` at
+    // the encoding layer (json_encode of either emits `[]`). The
+    // sidecar is semantically a route-keyed object — write `{}` when
+    // empty so the on-disk file looks right to humans reading it.
+    // (JSON_FORCE_OBJECT is NOT a fix — it'd also clobber the inner
+    // array-shape resolver lists, turning [config0, config1] into
+    // {"0": config0, "1": config1}.)
+    if (empty($resolvers)) {
+        $json = "{}\n";
+    } else {
+        $json = json_encode($resolvers, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    }
     return file_put_contents($path, $json, LOCK_EX) !== false;
 }
 
-function getResolverForRoute(string $routePath): ?array {
-    $all = loadResolversSidecar();
-    return $all[$routePath] ?? null;
+/**
+ * Beta.8 A2 Slice 7.5 — sidecar storage now supports BOTH shapes per
+ * route (backward-compat with single-resolver entries):
+ *
+ *   - SCALAR (associative array, has 'endpoint' key directly):
+ *       {"products/:slug": {"endpoint": "...", "inputs": {...}, ...}}
+ *     Single-resolver route. Written when a route has exactly ONE
+ *     resolver. Backward-compat — existing sidecars from Slices 1-7
+ *     keep their on-disk shape.
+ *
+ *   - ARRAY (sequential numeric-indexed array of associative configs):
+ *       {"book/:id": [{"endpoint": "...", ...}, {"endpoint": "...", ...}]}
+ *     Multi-resolver route. Written when a route has >1 resolver.
+ *     Fires in parallel via curl_multi_*; exposed vars go into a flat
+ *     namespace AND namespaced-by-index ($r0, $r1, ...) — collision
+ *     in the flat namespace is rejected at save time per
+ *     BETA8_MULTI_RESOLVER.md locked decisions.
+ *
+ * Detection: a SCALAR entry has 'endpoint' as a top-level key (the
+ * required resolver field). An ARRAY entry is a sequential 0-indexed
+ * array of objects. `_normalizeResolverEntry` consolidates both into
+ * an internal array-of-configs representation that downstream code
+ * (DataResolver, validators) works on uniformly.
+ */
+
+/**
+ * True when $arr is a sequential 0-indexed list (PHP 8.1's
+ * array_is_list polyfill — runtime is 8.0.30).
+ */
+function _isResolverArrayShape(array $arr): bool {
+    if (empty($arr)) return false;
+    return array_keys($arr) === range(0, count($arr) - 1);
 }
 
 /**
- * Idempotent set/clear. Passing $config = null removes the entry.
+ * Normalise a sidecar entry (either scalar or array shape) to the
+ * internal array-of-configs representation. Empty array for malformed
+ * input; downstream code treats empty as "no resolver."
  */
-function setResolverForRoute(string $routePath, ?array $config): bool {
+function _normalizeResolverEntry($entry): array {
+    if (!is_array($entry) || empty($entry)) return [];
+    if (_isResolverArrayShape($entry)) {
+        // Array shape — filter out any non-array (malformed) entries
+        // so downstream code can iterate safely.
+        return array_values(array_filter($entry, 'is_array'));
+    }
+    // Scalar (single config) — wrap into a 1-element array.
+    return [$entry];
+}
+
+/**
+ * Get all resolvers for a route as an array. Empty array when none.
+ *
+ * This is the canonical accessor for downstream code (DataResolver,
+ * renderer, hydration handoff) — both single- and multi-resolver
+ * routes look identical from the caller's perspective. Slice 7.5
+ * onward; existing callers from Slices 1-7 still use
+ * getResolverForRoute (backward-compat wrapper below).
+ */
+function getResolversForRoute(string $routePath): array {
     $all = loadResolversSidecar();
-    if ($config === null) {
+    return _normalizeResolverEntry($all[$routePath] ?? null);
+}
+
+/**
+ * Set or clear ALL resolvers for a route. Pass $configs = null OR
+ * empty array to clear. Otherwise pass an array of resolver configs:
+ *
+ *   - 1 element → written as SCALAR shape on disk (backward-compat
+ *     readers from Slices 1-7 keep working)
+ *   - 2+ elements → written as ARRAY shape on disk
+ *
+ * Idempotent: clearing a route that has no resolver is a no-op
+ * success. Caller must run validateResolverConfigs first — this
+ * function does not re-validate, it just writes.
+ */
+function setResolversForRoute(string $routePath, ?array $configs): bool {
+    $all = loadResolversSidecar();
+    if ($configs === null || empty($configs)) {
         if (!array_key_exists($routePath, $all)) {
             return true; // already absent — nothing to do
         }
         unset($all[$routePath]);
     } else {
-        $all[$routePath] = $config;
+        // Storage shape locked in BETA8_MULTI_RESOLVER.md decision #1:
+        //   scalar when single resolver (back-compat with Slices 1-7)
+        //   array  when multiple resolvers
+        $list = array_values($configs);
+        $all[$routePath] = count($list) === 1 ? $list[0] : $list;
     }
     return saveResolversSidecar($all);
 }
 
+/**
+ * Backward-compat single-resolver accessor — returns the FIRST
+ * resolver of the route (or null when none). Used by existing
+ * callsites in public/index.php, PageManagement.php, deleteRoute.php
+ * until they migrate to getResolversForRoute (incremental in
+ * subsequent Slice 7.5 sub-slices).
+ *
+ * Multi-resolver routes silently return only the first entry through
+ * this function — that's the price of keeping the existing contract.
+ * Callers that need ALL resolvers MUST switch to getResolversForRoute.
+ *
+ * @deprecated since Slice 7.5 — prefer getResolversForRoute. Kept for
+ *             backward compatibility with pre-7.5 callers; removed in
+ *             a future cleanup once all callsites migrate.
+ */
+function getResolverForRoute(string $routePath): ?array {
+    $configs = getResolversForRoute($routePath);
+    return empty($configs) ? null : $configs[0];
+}
+
+/**
+ * Backward-compat single-resolver setter — REPLACES the entire entry
+ * with the single config (or clears with null). Multi-resolver entries
+ * are clobbered to a single resolver if called.
+ *
+ * @deprecated since Slice 7.5 — prefer setResolversForRoute. Kept for
+ *             backward compatibility (setRouteResolver command uses it
+ *             until the command grows the multi-resolver `index` param
+ *             in Slice 7.5.B).
+ */
+function setResolverForRoute(string $routePath, ?array $config): bool {
+    if ($config === null) {
+        return setResolversForRoute($routePath, null);
+    }
+    return setResolversForRoute($routePath, [$config]);
+}
+
 function deleteResolverForRoute(string $routePath): bool {
-    return setResolverForRoute($routePath, null);
+    return setResolversForRoute($routePath, null);
 }
 
 /**
@@ -321,12 +441,58 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
                     ];
                     continue;
                 }
+                // Beta.8 A2 Slice 7 — character validation. Input names
+                // map to endpoint param keys (URL/query/body); hyphens
+                // ARE allowed (kebab-case APIs like `api-key`,
+                // `content-type` are common). Special chars (quotes,
+                // spaces, dots, etc.) break URL encoding semantics or
+                // create JSON-escape oddness — block them.
+                if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_\-]*$/', $name)) {
+                    $errors[] = [
+                        'field'  => 'resolver.inputs',
+                        'reason' => 'invalid_name_chars',
+                        'value'  => $name,
+                        'hint'   => 'Input names must start with a letter or underscore and use only letters, digits, underscores, or hyphens.',
+                    ];
+                    continue;
+                }
                 if (!is_string($sourceSpec)) {
                     $errors[] = [
                         'field'    => "resolver.inputs.{$name}",
                         'reason'   => 'invalid_type',
                         'expected' => 'string',
                         'hint'     => "Use a source spec like 'param:slug' / 'query:lang' / 'session:userId', or a bare literal.",
+                    ];
+                    continue;
+                }
+                // Beta.8 A2 Slice 7 server backstop — empty + malformed
+                // source specs. The admin UI blocks these at form-fill
+                // time, but direct POST callers (curl, scripts) need
+                // the same protection so a malformed config can't slip
+                // into the sidecar.
+                //
+                // Source-spec semantics (inputs ONLY — expose's empty
+                // dot-path means "whole response" and is legitimate):
+                //   - empty                : meaningless ('' as a literal
+                //     value is ~never intentional; "default to empty"
+                //     is better expressed as not declaring the input)
+                //   - 'param:' / 'query:' /
+                //     'session:' (no payload): missing the value after
+                //     the colon — author started typing then stopped
+                if ($sourceSpec === '') {
+                    $errors[] = [
+                        'field'  => "resolver.inputs.{$name}",
+                        'reason' => 'empty_value',
+                        'hint'   => 'Source spec cannot be empty. Use param:<segment>, query:<key>, session:<field>, or a literal value.',
+                    ];
+                    continue;
+                }
+                if (preg_match('/^(param|query|session):$/', $sourceSpec)) {
+                    $errors[] = [
+                        'field'  => "resolver.inputs.{$name}",
+                        'reason' => 'malformed_spec',
+                        'value'  => $sourceSpec,
+                        'hint'   => "Source spec '{$sourceSpec}' is missing the value after the colon. Use e.g. 'param:slug' / 'query:lang' / 'session:userId'.",
                     ];
                 }
             }
@@ -348,6 +514,22 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
                         'field'  => 'resolver.expose',
                         'reason' => 'invalid_key',
                         'hint'   => 'Template variable names must be non-empty strings.',
+                    ];
+                    continue;
+                }
+                // Beta.8 A2 Slice 7 — character validation. Expose names
+                // become $<name> PHP template variables — anything that
+                // isn't a valid PHP identifier silently breaks the
+                // template at render time. STRICT rule: letters, digits,
+                // underscores only, must start with letter or underscore.
+                // Hyphens are NOT allowed here (would break PHP var
+                // syntax) even though they're allowed in input names.
+                if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $name)) {
+                    $errors[] = [
+                        'field'  => 'resolver.expose',
+                        'reason' => 'invalid_name_chars',
+                        'value'  => $name,
+                        'hint'   => 'Template variable names must start with a letter or underscore and use only letters, digits, and underscores (becomes a $variable in the template — must be a valid PHP identifier).',
                     ];
                     continue;
                 }
@@ -374,7 +556,14 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
         }
     }
 
-    // onMiss — optional string (Slice 6 enumerates valid values; just validate shape for now).
+    // onMiss — optional enum. Beta.8 A2 Slice 7 Step 5 tightens to a
+    // strict allowed list so typos like 'render-empy' are caught at
+    // save time instead of silently falling through to default at
+    // request time. Future onMiss values (e.g. 'redirect:<url>') are
+    // reserved per BETA8_DATA_RESOLVER.md — when added, extend
+    // ALLOWED_ONMISS here AND the dropdown in sitemap.js's
+    // _renderResolverOnMissSection.
+    $ALLOWED_ONMISS = ['render-empty'];
     if (array_key_exists('onMiss', $config)) {
         if (!is_string($config['onMiss']) || $config['onMiss'] === '') {
             $errors[] = [
@@ -382,6 +571,101 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
                 'reason'   => 'invalid_type',
                 'expected' => "string (e.g. 'render-empty')",
             ];
+        } elseif (!in_array($config['onMiss'], $ALLOWED_ONMISS, true)) {
+            $errors[] = [
+                'field'    => 'resolver.onMiss',
+                'reason'   => 'invalid_value',
+                'value'    => $config['onMiss'],
+                'expected' => 'one of: ' . implode(', ', $ALLOWED_ONMISS),
+                'hint'     => "Currently only 'render-empty' is supported. Future values (e.g. 'redirect:<url>') reserved per the design doc.",
+            ];
+        }
+    }
+
+    return $errors;
+}
+
+/**
+ * Beta.8 A2 Slice 7.5 — multi-resolver validator. Walks an array of
+ * resolver configs, runs validateResolverConfig on each (collecting
+ * per-config errors with the array index baked into the field path),
+ * then runs the collision check: expose key names must be unique
+ * across all resolvers in the array (locked decision in
+ * BETA8_MULTI_RESOLVER.md — flat-namespace collisions are rejected at
+ * save time, authors disambiguate by renaming OR by using the
+ * always-available $r0/$r1 namespaced form in the template).
+ *
+ * Single-resolver routes use the same function with a 1-element array
+ * — the collision check is a no-op on length 1.
+ *
+ * @param array $configs Array of resolver config blocks.
+ * @param ApiEndpointManager|null $apiManager Optional injection point.
+ * @return array<array> Error entries — same shape as validateResolverConfig
+ *                       returns (field/reason/hint/value), plus a
+ *                       `resolverIndex` field on per-config errors so the
+ *                       caller can highlight the right entry in the UI.
+ */
+function validateResolverConfigs(array $configs, ?ApiEndpointManager $apiManager = null): array {
+    $errors = [];
+    if (empty($configs)) return $errors;
+
+    // Phase 1 — per-config validation. Each config gets the full
+    // validateResolverConfig pass; errors get re-pathed with the
+    // array index so the caller can map them back to a specific
+    // resolver slot in the form.
+    foreach ($configs as $idx => $config) {
+        if (!is_array($config)) {
+            $errors[] = [
+                'field'         => "resolver[{$idx}]",
+                'reason'        => 'invalid_type',
+                'expected'      => 'object',
+                'resolverIndex' => $idx,
+            ];
+            continue;
+        }
+        $perConfigErrors = validateResolverConfig($config, $apiManager);
+        foreach ($perConfigErrors as $err) {
+            if (isset($err['field']) && is_string($err['field'])) {
+                // Rewrite 'resolver.x.y' → 'resolver[N].x.y' so the
+                // index is explicit in error reporting.
+                if (strpos($err['field'], 'resolver.') === 0) {
+                    $err['field'] = 'resolver[' . $idx . '].' . substr($err['field'], 9);
+                } elseif ($err['field'] === 'resolver') {
+                    $err['field'] = 'resolver[' . $idx . ']';
+                }
+            }
+            $err['resolverIndex'] = $idx;
+            $errors[] = $err;
+        }
+    }
+
+    // Phase 2 — flat-namespace collision detection. Locked decision
+    // (BETA8_MULTI_RESOLVER.md #4): when two resolvers in the same
+    // route expose a key with the same name, the save is REJECTED.
+    // Authors disambiguate by renaming, OR by accessing the colliding
+    // values through the always-available namespaced form
+    // ($r0.title / $r1.title) and removing the offending flat
+    // expose from one resolver.
+    $exposeKeyToResolverIndex = [];
+    foreach ($configs as $idx => $config) {
+        if (!is_array($config)) continue;
+        $expose = $config['expose'] ?? [];
+        if (!is_array($expose)) continue;
+        foreach ($expose as $name => $path) {
+            if (!is_string($name) || $name === '') continue;
+            if (isset($exposeKeyToResolverIndex[$name])) {
+                $otherIdx = $exposeKeyToResolverIndex[$name];
+                $errors[] = [
+                    'field'         => "resolver[{$idx}].expose.{$name}",
+                    'reason'        => 'collision',
+                    'value'         => $name,
+                    'collidesWith'  => "resolver[{$otherIdx}].expose.{$name}",
+                    'resolverIndex' => $idx,
+                    'hint'          => "Two resolvers expose '{$name}' to the flat template namespace. Rename one (e.g. {$name}Alt), OR use the namespaced form in your template (\$r{$idx}['{$name}'] / \$r{$otherIdx}['{$name}']) and remove the colliding flat exposure from one resolver.",
+                ];
+            } else {
+                $exposeKeyToResolverIndex[$name] = $idx;
+            }
         }
     }
 

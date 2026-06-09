@@ -235,19 +235,56 @@ class PageManagement {
         // Skipped in editor mode (matches the state-store + page-events
         // gates — editor previews are emulation-driven, not real
         // resolver-fired).
-        if (!$editorMode && !empty($currentStoresForHydration)) {
+        // Beta.8 A2 Slice 7.5.E — resolver-side handoff to the client.
+        // Two related globals, both gated by editor mode (emulation
+        // previews are deterministic, not resolver-fired):
+        //
+        //   window.QS_RESOLVED            (existing — Slice 5)
+        //     Store-keyed map for state-store skip-fetch hydration.
+        //     `{storeId: {fieldName: value}}`. Only emitted when a
+        //     state store on the route matches a resolver endpoint.
+        //
+        //   window.QS_RESOLVED_BY_INDEX   (new — Slice 7.5.E)
+        //     Resolver-index-keyed map mirroring the PHP-side
+        //     `$r0` / `$r1` / ... namespace. `{r0: {varName: value},
+        //     r1: {...}, ...}`. Emitted whenever the route has
+        //     resolvers, regardless of state stores. Lets client-side
+        //     code access the same per-resolver shape templates use.
+        //
+        // Shared resolver lookup so both blocks see the same data
+        // without duplicating the work.
+        if (!$editorMode) {
             require_once SECURE_FOLDER_PATH . '/src/functions/resolverHelpers.php';
             $__hydrationRoutePath = $trimParameters->routePath();
-            $__hydrationResolver  = getResolverForRoute($__hydrationRoutePath);
+            $__hydrationResolvers = getResolversForRoute($__hydrationRoutePath);
             $__hydrationResolved  = getResolvedVars();
-            if ($__hydrationResolver !== null
-                && !empty($__hydrationResolved)
-                && !empty($__hydrationResolver['endpoint'])) {
-                $__resolverEndpoint = $__hydrationResolver['endpoint'];
+        }
+
+        if (!$editorMode && !empty($currentStoresForHydration)) {
+            // Beta.8 A2 Slice 7.5.C — array-aware lookup. For multi-
+            // resolver routes, each state store matches the FIRST
+            // resolver whose endpoint matches the store's endpoint.
+            // Store fields hydrate from the flat exposed namespace
+            // (collision-free per save-time validation), so the
+            // matching reduces to "is this store's endpoint covered
+            // by any resolver on this route?".
+            if (!empty($__hydrationResolvers) && !empty($__hydrationResolved)) {
+                // Collect every endpoint covered by any resolver on this
+                // route. Store-store hydration then checks against this set.
+                $__resolverEndpoints = [];
+                foreach ($__hydrationResolvers as $__resCfg) {
+                    if (is_array($__resCfg) && !empty($__resCfg['endpoint'])) {
+                        $__resolverEndpoints[] = (string) $__resCfg['endpoint'];
+                    }
+                }
+                $__resolverEndpoints = array_unique($__resolverEndpoints);
+
                 $__qsResolved = [];
                 foreach ($currentStoresForHydration as $__storeId => $__store) {
                     if (!is_array($__store)) continue;
-                    if (($__store['endpoint'] ?? '') !== $__resolverEndpoint) continue;
+                    $__storeEndpoint = (string) ($__store['endpoint'] ?? '');
+                    if ($__storeEndpoint === '') continue;
+                    if (!in_array($__storeEndpoint, $__resolverEndpoints, true)) continue;
                     $__storeHydration = [];
                     foreach (($__store['fields'] ?? []) as $__fieldName => $__fieldDef) {
                         $__dir = $__fieldDef['dir'] ?? 'request';
@@ -263,6 +300,37 @@ class PageManagement {
                 if (!empty($__qsResolved)) {
                     $body .= '<script>window.QS_RESOLVED=' . json_encode($__qsResolved, JSON_UNESCAPED_SLASHES) . ';</script>';
                 }
+            }
+        }
+
+        // Beta.8 A2 Slice 7.5.E — resolver-index-keyed snapshot for
+        // client-side code that wants to access values by their
+        // namespaced resolver address ($r0 / $r1 / ... on the PHP
+        // side; window.QS_RESOLVED_BY_INDEX.r0 / .r1 / ... on the JS
+        // side). Symmetric with the template-side namespace populated
+        // in public/index.php (Slice 7.5.C).
+        //
+        // Emitted whenever the route has resolvers AND any resolved
+        // vars exist — independent of state stores. Single-resolver
+        // routes still get an r0 entry (a 1-element array of
+        // namespaced exposes is the same data the template sees as
+        // $r0). Editor mode skipped (matches the QS_RESOLVED guard
+        // above — emulation populates getResolvedVars() directly,
+        // not via resolveMany, so the r0/r1 keys aren't present).
+        if (!$editorMode && !empty($__hydrationResolvers) && !empty($__hydrationResolved)) {
+            $__resolvedByIndex = [];
+            foreach ($__hydrationResolved as $__key => $__val) {
+                // Match `r<digits>` keys only — keeps flat-exposed names
+                // out of the namespaced bucket even when an author
+                // happens to expose `r1` as a flat variable (rare; the
+                // collision check would normally catch that, but be
+                // defensive).
+                if (is_string($__key) && preg_match('/^r\d+$/', $__key) && is_array($__val)) {
+                    $__resolvedByIndex[$__key] = $__val;
+                }
+            }
+            if (!empty($__resolvedByIndex)) {
+                $body .= '<script>window.QS_RESOLVED_BY_INDEX=' . json_encode($__resolvedByIndex, JSON_UNESCAPED_SLASHES) . ';</script>';
             }
         }
 

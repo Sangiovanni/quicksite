@@ -250,7 +250,11 @@ function _qsIsResolverConfigBug(string $errMsg, int $status): bool {
 // getResolverForRoute so static routes pay no cost on the hot path
 // beyond the helper require.
 require_once SECURE_FOLDER_PATH . '/src/functions/resolverHelpers.php';
-$__resolverConfig = getResolverForRoute($routePath);
+// Beta.8 A2 Slice 7.5.A — array-aware accessor. Routes with no
+// resolver return []; single-resolver routes return a 1-element
+// array; multi-resolver routes return N elements. DataResolver's
+// resolveMany handles all three cases identically via serverFetchMulti.
+$__resolverConfigs = getResolversForRoute($routePath);
 
 // ----------------------------------------------------------------------------
 // Editor preview emulation (beta.8 A2 Track 2a)
@@ -328,10 +332,10 @@ if ($__editorMode && !$__editorLiveMode && $__emulateResolved !== null) {
 // In editor mode the production resolver is skipped UNLESS the editor
 // explicitly requested live data (_live=1). Track 2e.
 if ($__editorMode && !$__editorLiveMode) {
-    $__resolverConfig = null;
+    $__resolverConfigs = [];
 }
 
-if ($__resolverConfig !== null) {
+if (!empty($__resolverConfigs)) {
     require_once SECURE_FOLDER_PATH . '/src/classes/DataResolver.php';
     $__resolver = new DataResolver();
     $__resolverContext = [
@@ -344,44 +348,37 @@ if ($__resolverConfig !== null) {
         'session'     => [],
         'cookieHeader'=> $_SERVER['HTTP_COOKIE'] ?? null,
     ];
-    $__resolverResult = $__resolver->resolve($__resolverConfig, $__resolverContext);
+    // Beta.8 A2 Slice 7.5.C — resolveMany handles single- AND multi-
+    // resolver routes uniformly via serverFetchMulti. Failure semantics
+    // (per-resolver onMiss, page-level short-circuit on unrecovered
+    // failure) baked into its return: ok=false ONLY when a resolver
+    // failed AND onMiss didn't catch it; firstError carries the
+    // resolverIndex for the 404/500 path.
+    $__resolverResult = $__resolver->resolveMany($__resolverConfigs, $__resolverContext);
 
-    // Beta.8 A2 Slice 4 — emit cache observability header. serverFetch
-    // sets $GLOBALS['__qs_resolver_cache_status'] to 'hit' / 'miss' /
-    // 'skip' (no TTL configured) / 'disabled' (auth type forbids cache).
-    // DevTools Network tab → response headers shows this on the
-    // document request so users can watch cache behaviour without
-    // tailing PHP logs. headers_sent() guards against late emission
-    // when the template already started outputting.
-    if (!headers_sent() && isset($GLOBALS['__qs_resolver_cache_status'])) {
-        header('X-QS-Resolver-Cache: ' . $GLOBALS['__qs_resolver_cache_status']);
+    // Beta.8 A2 Slice 4 + 7.5.C — emit cache observability header.
+    // serverFetchMulti sets $GLOBALS['__qs_resolver_cache_statuses']
+    // (array, in resolver order) so multi-resolver routes show
+    // "hit,miss,disabled" instead of clobbering each other's status.
+    // headers_sent() guards against late emission when the template
+    // already started outputting.
+    if (!headers_sent() && isset($GLOBALS['__qs_resolver_cache_statuses'])) {
+        $__cacheStatusesHeader = implode(',', $GLOBALS['__qs_resolver_cache_statuses']);
+        header('X-QS-Resolver-Cache: ' . $__cacheStatusesHeader);
     }
 
     if ($__resolverResult['ok']) {
-        setResolvedVars($__resolverResult['exposed']);
-    } else if (($__resolverConfig['onMiss'] ?? null) === 'render-empty'
-               && !_qsIsResolverConfigBug($__resolverResult['error'] ?? '', (int)($__resolverResult['status'] ?? 0))) {
-        // Beta.8 A2 Slice 6 — onMiss: 'render-empty' opt-in.
-        //
-        // The route declared a fallback render path: instead of 404'ing
-        // or 500'ing on resolver failure, render the template with each
-        // expose key set to null. The {{resolved:NAME}} substitution
-        // renders null values as empty strings (NOT as literal
-        // placeholders — the key exists in the dict, just with a null
-        // value), so the page content carries no stale "{{...}}" text.
-        // The template's data-state-show-empty bindings (when paired
-        // with a state store on the same endpoint) drive the "no data
-        // found" UI.
-        //
-        // Config bugs still go to the inline 500 surface below — a
-        // misconfigured resolver shouldn't silently render a styled
-        // not-found template. That's a dev signal worth seeing.
-        $__nullExposed = [];
-        foreach (($__resolverConfig['expose'] ?? []) as $__varName => $__path) {
-            $__nullExposed[$__varName] = null;
+        // Beta.8 A2 Slice 7.5.C — flat namespace + namespaced-by-index.
+        // The flat namespace is collision-free (validated at save time).
+        // The namespaced form gives templates {{resolved:r0.title}} as
+        // a stable alternative when authors want to keep expose names
+        // overlapping across resolvers (intentional shadowing is then
+        // explicit in the template).
+        $__resolvedNamespace = $__resolverResult['exposed'];
+        foreach ($__resolverResult['exposedByIndex'] as $__idx => $__vars) {
+            $__resolvedNamespace['r' . $__idx] = $__vars;
         }
-        setResolvedVars($__nullExposed);
-        // Fall through to template render — no exit.
+        setResolvedVars($__resolvedNamespace);
     } else {
         // Status-aware failure routing (Track 1, after Test B feedback).
         //
@@ -403,10 +400,15 @@ if ($__resolverConfig !== null) {
         //   Render the ugly inline 500 so devs see the misconfig loudly
         //   instead of a styled 404 page that hides the bug.
         //
-        //   onMiss: 'render-empty' (Slice 6 — not yet implemented) will
-        //   take precedence over all three when configured on the route.
-        $__status = (int) ($__resolverResult['status'] ?? 0);
-        $__errMsg = $__resolverResult['error'] ?? 'unknown resolver error';
+        // Beta.8 A2 Slice 7.5.C — failure details now come from
+        // resolveMany's firstError (the FIRST unrecovered resolver
+        // failure across the array). Per-resolver onMiss='render-empty'
+        // is handled inside resolveMany — those failures don't reach
+        // here, the page renders with null vars for that resolver's
+        // expose keys instead.
+        $__firstError = $__resolverResult['firstError'] ?? null;
+        $__status = (int) ($__firstError['status'] ?? 0);
+        $__errMsg = $__firstError['error'] ?? 'unknown resolver error';
         $__isConfigBug = _qsIsResolverConfigBug($__errMsg, $__status);
 
         if ($__isConfigBug) {
