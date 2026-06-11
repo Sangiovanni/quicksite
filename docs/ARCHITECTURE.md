@@ -712,6 +712,30 @@ a client-side store can drive a server-side resolver with minor extensions (the
 unification (state-store → resolver promotion in the admin UI) is filed as
 beta.9+ polish.
 
+**Auth gate vs auth data** — two distinct concepts that share a token/cookie
+but operate at different lifecycle positions:
+
+- The **auth gate** (yes/no decision: is this user allowed to access this
+  route?) is framework-hardwired middleware running EARLIEST in the request
+  lifecycle — before any resolver. Produces the session context (`$_SESSION` /
+  cookie data) that downstream resolvers can read from via the `session:`
+  source kind.
+- The **auth data fetch** (who is this user? populate `$user` for the
+  template) is just a regular resolver with `inputs: ['userId' => 'session:userId']`,
+  sitting in the standard resolver lifecycle position (AFTER auth gate,
+  BEFORE template render). It consumes the gate's session context to
+  fetch user info from the user-api.
+
+They share the token; they don't share the model. Treating both as
+user-configurable resolvers would have overloaded the resolver concept with
+framework-special behaviour at the earliest position. Treating them as one
+mechanism (e.g. auth-gate-as-resolver) would have coupled the gate's
+framework position to user-configurable lifecycle. Keeping them distinct
+preserves a clean separation: the framework enforces access; the user
+configures data. Locked rationale in
+[DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) under "Auth-gate vs auth-data —
+distinct concepts".
+
 ---
 
 ## 9. Style management
