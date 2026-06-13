@@ -1,6 +1,6 @@
 # QuickSite — Locked Design Decisions
 
-_Last updated: 2026-06-09._
+_Last updated: 2026-06-11._
 
 > Canonical log of design decisions that have been **locked** during the
 > project's evolution. Each entry captures the *why* — what was chosen,
@@ -894,3 +894,191 @@ authoring UX).
 (entries flagged `internal: true`),
 `secure/management/command/listDataBindings.php` (default-filter
 behaviour).
+
+---
+
+## Release shape (beta.9)
+
+### Beta.9 concern ordering — OAuth first, translation manager last (locked 2026-06-11)
+
+**Decision**: Beta.9 ships its four concerns in the order OAuth →
+picker overhaul → stylesheet editor → translation manager, after a
+small foundation sweep clears backlog items that every concern
+benefits from.
+
+**Reasoning**: Beta.8 closed with magic-link auth, server-side fetch,
+and the secrets-file pattern all fresh — OAuth rides that momentum
+and ships the headline user-value feature first. The translation
+manager is the smallest concern and its only prep (extracting a
+shared translation helper) happens in the foundation sweep, making it
+the natural release-closing win. Accepted cost: OAuth's picker-facing
+verbs ship with plain-text arguments and get a small retrofit pass
+when the picker overhaul's endpoint-aware input type lands.
+
+**Alternatives considered**: Picker overhaul first (avoids the OAuth
+verb retrofit, but delays the headline feature and cools the warm
+beta.8 auth context). Translation manager as an early warm-up
+(visible editor value sooner, but pushes OAuth out by roughly two
+weeks).
+
+**Source**: Beta.9 kickoff design round (2026-06-11). Behaviour lands
+across the beta.9 release; see the release notes at tag time.
+
+### Stylesheet editor — full scope committed, no fallback gate (locked 2026-06-11)
+
+**Decision**: The in-editor stylesheet editor ships at full scope —
+structured rules view plus editable raw view with two-way live sync
+and live iframe preview. No fallback shape is pre-committed; the CSS
+parser round-trip test still runs at concern start, but as a
+diagnostic that scopes parser hardening, not as a gate deciding what
+ships.
+
+**Reasoning**: Full scope was already the confirmed direction
+(2026-05-30); committing outright avoids designing and maintaining
+two shapes, and converts parser risk from scope risk into schedule
+risk — acceptable because both in-tree parsers already exist
+(`secure/src/classes/CssParser.php` server-side,
+`public/admin/assets/js/lib/css-refiner/css-parser.js` client-side)
+and the early diagnostic reveals what needs hardening while there is
+still room to fix it.
+
+**Alternatives considered**: Spike-gated fallback (the drafted plan —
+pre-commit to a lighter two-view shape without live sync, upgrade to
+full scope on spike pass; rejected at kickoff: the lighter shape is
+meaningfully less polished, and a pre-agreed gate invites shipping
+it).
+
+**Source**: `secure/src/classes/CssParser.php`,
+`public/admin/assets/js/lib/css-refiner/css-parser.js` (the two
+parsers the diagnostic exercises). Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) stylesheet-editor section at ship
+time.
+
+### CSS Refiner stays separate from the stylesheet editor (locked 2026-06-11)
+
+**Decision**: The CSS Refiner on the optimize page remains a separate
+batch-cleanup tool (analyzers + diff + apply); the new stylesheet
+editor is the authoring surface. The two cross-link rather than
+merge. Parser reuse happens at the library layer: the Refiner's
+client-side CSS parser is the candidate for the editor's live
+raw-to-structured sync.
+
+**Reasoning**: The two surfaces serve different intents — "find and
+apply suggested cleanups in batch" versus "author styles in context."
+Folding the Refiner's UI into the editor would grow the release's
+riskiest concern; sunsetting it would delete working value (seven
+analyzers and a diff view) for a tidier nav entry. Sharing the parser
+library captures the real synergy without merging surfaces.
+
+**Alternatives considered**: Fold into the editor (one CSS surface
+for users; rejected — scope growth on the riskiest concern). Sunset
+the Refiner (rejected — batch auto-refine and the diff view have no
+replacement in the editor's scope). Defer the decision to concern
+start (rejected — nothing material was going to change the
+trade-off).
+
+**Source**: `secure/admin/templates/pages/optimize.php` (Refiner
+host), `public/admin/assets/js/lib/css-refiner/` (shared-candidate
+parser + analyzers). Behaviour: [ADMIN_PANEL.md](ADMIN_PANEL.md).
+
+### Project-to-workflow exporter ships in beta.9 (locked 2026-06-11)
+
+**Decision**: The "save the current project state as a replayable
+workflow" tool ships in beta.9 as a self-contained bonus slice
+alongside the polish work, rather than waiting for v1.0 preparation.
+
+**Reasoning**: The tool reverse-reads project state through the
+command surface, so it needed that surface to stop moving — beta.8
+stabilised it, and beta.9's concerns (editor tooling + OAuth) don't
+reshape project-state commands. The groundwork is already resolved
+(bulk read-then-emit step generation, the two-mode asset approach, a
+dedicated admin page), making it a bounded slice that unlocks
+template sharing ahead of v1.0 and gets real usage feedback earlier.
+
+**Alternatives considered**: v1.0 prep (rejected — no dependency
+forces the wait; the feature synergises with the v1.0 template story
+whether it ships now or later).
+
+**Source**: Lands as an admin tool emitting workflow JSON under
+`secure/admin/workflows/custom/`; implementation shape settles at its
+design round. Behaviour: [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) at
+ship time.
+
+---
+
+## OAuth (beta.9)
+
+### OAuth client secrets — dedicated oauth-secrets.php (locked 2026-06-11)
+
+**Decision**: OAuth provider credentials (client id + client secret
+per provider) live in a dedicated
+`secure/admin/config/oauth-secrets.php` (with a committed `.example`
+twin), separate from beta.8's `api-secrets.php`.
+
+**Reasoning**: Identity-provider credentials have a different
+lifecycle from general API secrets — they are issued and rotated in
+each provider's console, they gate user identity rather than data
+access, and their blast radius on leak is account impersonation. A
+dedicated file keeps the OAuth setup story self-contained (one file
+to create, one example to copy) at the cost of a second secrets file
+to gitignore, load, and document.
+
+**Alternatives considered**: Reuse `api-secrets.php` (the groundwork
+recommendation — one home for all server-side secrets; rejected at
+kickoff in favour of the cleaner provider-credential boundary).
+
+**Source**: `secure/admin/config/oauth-secrets.php(.example)` (lands
+with the OAuth concern), consumed by the server-side OAuth handler.
+Behaviour: [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
+
+### OAuth state parameter — server-generated 16-byte hex, single-use (locked 2026-06-11)
+
+**Decision**: The OAuth `state` parameter is generated server-side as
+16 random bytes hex-encoded (32 characters), stored server-side at
+flow start, expires quickly, and is single-use: the callback handler
+compares the returned value against the stored one and rejects
+mismatches and replays.
+
+**Reasoning**: This is the standard CSRF guard for the
+authorization-code flow — the server proves the callback belongs to a
+flow it started. A CSPRNG value with server-side comparison is the
+boring, audit-friendly choice; no signing scheme to design or get
+wrong.
+
+**Alternatives considered**: Signed stateless state (encode and sign
+the payload instead of storing it — rejected: adds a homegrown crypto
+surface to a dependency-free codebase for a storage saving that does
+not matter at this scale). Client-generated state (rejected — defeats
+the purpose; the server must be the issuer).
+
+**Source**: Server-side OAuth handler (lands with the OAuth concern
+as `secure/src/classes/OAuthHandler.php`). Behaviour:
+[ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
+
+### OAuth userinfo caching — user-configurable TTL (locked 2026-06-11)
+
+**Decision**: The userinfo fetch in the OAuth flow is cacheable with
+a TTL the site owner configures, following the resolver cache
+precedent from beta.8 (a per-config `cacheTTL` in seconds, file-based
+cache, zero or absent meaning no cache). No hardcoded cache duration.
+
+**Reasoning**: Cache duration is a per-site, per-provider judgment —
+rate limits, profile-freshness needs, and provider terms differ — so
+the owner sets it rather than the platform guessing. The resolver
+cache already taught users this exact knob (TTL field + clean-cache
+command), so reusing the shape costs nothing to learn. Where the TTL
+is configured (provider preset vs API auth config), its default
+value, and the per-provider terms check before shipping defaults are
+settled in the OAuth concern's design round.
+
+**Alternatives considered**: Hardcoded 15-minute TTL (the groundwork
+lean — rejected: exactly the kind of value the project's
+"configurable vs convention" principle says the user should own). No
+caching at all (rejected — the configurable knob subsumes it; owners
+who want no cache leave the TTL unset).
+
+**Source**: Server-side OAuth handler + cache helper (lands with the
+OAuth concern). Resolver precedent:
+`secure/src/functions/serverFetch.php` (cache eligibility),
+`secure/src/functions/resolverHelpers.php` (`cacheTTL` validation).
+Behaviour: [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
