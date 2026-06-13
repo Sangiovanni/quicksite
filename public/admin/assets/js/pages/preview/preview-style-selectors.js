@@ -14,6 +14,12 @@
     // ==================== Module State ====================
     
     let selectorsLoaded = false;
+    // Set by the qs:editor:structure-changed listener (bottom of file).
+    // Producers: preview.js broadcastStructureChanged() after each
+    // addNode / editNode / deleteNode / duplicateNode / addComponentToNode
+    // / addComplexElement / insertSnippet success. Cleared the next time
+    // getCategorizedSelectors runs after re-scanning the iframe DOM.
+    let selectorsStale = false;
     let allSelectors = [];
     let categorizedSelectors = {
         tags: [],
@@ -249,6 +255,14 @@
             return;
         }
         if (!iframeDoc) return;
+
+        // Strip previously-merged DOM-only entries (hasRules: false) so
+        // ids/classes/tags removed from the iframe disappear from the
+        // cache too. CSS-backed entries (hasRules: true) survive — those
+        // are owned by loadSelectorsData (CSS fetch), not this scan.
+        categorizedSelectors.tags = categorizedSelectors.tags.filter(function(t) { return t.hasRules; });
+        categorizedSelectors.classes = categorizedSelectors.classes.filter(function(c) { return c.hasRules; });
+        categorizedSelectors.ids = categorizedSelectors.ids.filter(function(i) { return i.hasRules; });
 
         // Collect existing CSS selector names for fast lookup
         const existingTags = new Set(categorizedSelectors.tags.map(t => t.selector.toLowerCase()));
@@ -1123,7 +1137,18 @@
         
         // Get data for external use
         getAllSelectors: function() { return allSelectors; },
-        getCategorizedSelectors: function() { return categorizedSelectors; },
+        getCategorizedSelectors: function() {
+            // Lazy refresh: a structure mutation fired since last call,
+            // so re-scan the iframe DOM before handing the cache back.
+            // mergeWithDomSelectors only ADDS new ids/classes/tags it
+            // finds — removals aren't tracked (acceptable for the
+            // picker; a full re-fetch happens on style mode reload).
+            if (selectorsStale && selectorsLoaded) {
+                mergeWithDomSelectors();
+                selectorsStale = false;
+            }
+            return categorizedSelectors;
+        },
         getSelectedSelector: function() { return currentSelectedSelector; },
         getSelectedCount: function() { return editingSelectorCount; },
         
@@ -1141,6 +1166,15 @@
         onOpenTransitionEditor: function(callback) { onOpenTransitionEditor = callback; },
         onCopyStyleFrom: function(callback) { onCopyStyleFrom = callback; }
     };
+
+    // Mark cache stale on every structure mutation so the next
+    // getCategorizedSelectors call re-scans the iframe DOM. Fired
+    // by preview.js broadcastStructureChanged() after each successful
+    // addNode / editNode / deleteNode / duplicateNode /
+    // addComponentToNode / addComplexElement / insertSnippet.
+    window.addEventListener('qs:editor:structure-changed', function() {
+        selectorsStale = true;
+    });
 
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {

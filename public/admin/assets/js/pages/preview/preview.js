@@ -185,6 +185,8 @@
     const globalInfoNodeTag = document.getElementById('info-node-tag');
     const globalInfoNodeClasses = document.getElementById('info-node-classes');
     const globalInfoNodeChildren = document.getElementById('info-node-children');
+    const globalInfoNodeParams = document.getElementById('info-node-params');
+    const globalInfoNodeParamsRow = document.getElementById('info-node-params-row');
     const globalInfoNodeTextKeyRow = document.getElementById('info-node-textkey-row');
     const globalInfoNodeTextKey = document.getElementById('info-node-textkey');
     const globalInfoNodeComponentRow = document.getElementById('info-node-component-row');
@@ -3120,17 +3122,47 @@
     function updateGlobalElementInfo(data) {
         if (!globalElementInfo) return;
         
-        // Update summary
+        // Update summary. The `kind` field disambiguates text-only wrappers
+        // (the renderer wraps text in <span data-qs-textonly>) from real
+        // elements — used to read as just "span" and led to misdiagnosis.
         if (globalElementInfoSummary) {
             const nodeDisplay = data.isComponent ? data.componentNode : (data.node === '' ? '(root)' : data.node || '-');
-            globalElementInfoSummary.textContent = `${data.tag || '-'}${data.classes ? '.' + data.classes.split(' ')[0] : ''} [${nodeDisplay}]`;
+            let summary;
+            if (data.kind === 'text') {
+                const preview = (data.textContent || '').replace(/\s+/g, ' ').substring(0, 30);
+                summary = `[text "${preview}"] [${nodeDisplay}]`;
+            } else if (data.kind === 'component') {
+                summary = `[component ${data.component || data.tag || '?'}] [${nodeDisplay}]`;
+            } else {
+                summary = `${data.tag || '-'}${data.classes ? '.' + data.classes.split(' ')[0] : ''} [${nodeDisplay}]`;
+            }
+            globalElementInfoSummary.textContent = summary;
         }
-        
+
         // Update details
         if (globalInfoNodeId) globalInfoNodeId.textContent = data.isComponent ? data.componentNode : (data.node === '' ? '(root)' : data.node || '-');
         if (globalInfoNodeTag) globalInfoNodeTag.textContent = data.tag || '-';
         if (globalInfoNodeClasses) globalInfoNodeClasses.textContent = data.classes || '-';
         if (globalInfoNodeChildren) globalInfoNodeChildren.textContent = data.childCount !== undefined ? data.childCount : '-';
+
+        // Params row: stacked key="value" lines, hidden when no user-authored
+        // attrs survive the editor-chrome filter (data-qs-*, contenteditable).
+        if (globalInfoNodeParamsRow && globalInfoNodeParams) {
+            const entries = data.params ? Object.entries(data.params) : [];
+            if (entries.length === 0) {
+                globalInfoNodeParamsRow.style.display = 'none';
+                globalInfoNodeParams.textContent = '';
+            } else {
+                globalInfoNodeParams.textContent = '';
+                entries.forEach(function (pair) {
+                    const line = document.createElement('div');
+                    line.className = 'preview-element-info__param-line';
+                    line.textContent = pair[0] + '="' + pair[1] + '"';
+                    globalInfoNodeParams.appendChild(line);
+                });
+                globalInfoNodeParamsRow.style.display = '';
+            }
+        }
         
         // Component row
         if (data.isComponent && data.component) {
@@ -3163,10 +3195,12 @@
         if (globalInfoNodeTag) globalInfoNodeTag.textContent = '-';
         if (globalInfoNodeClasses) globalInfoNodeClasses.textContent = '-';
         if (globalInfoNodeChildren) globalInfoNodeChildren.textContent = '-';
-        
+        if (globalInfoNodeParams) globalInfoNodeParams.textContent = '';
+
         // Hide optional rows
         if (globalInfoNodeComponentRow) globalInfoNodeComponentRow.style.display = 'none';
         if (globalInfoNodeTextKeyRow) globalInfoNodeTextKeyRow.style.display = 'none';
+        if (globalInfoNodeParamsRow) globalInfoNodeParamsRow.style.display = 'none';
     }
     
     /**
@@ -4537,7 +4571,18 @@
         if (ctxTextDefault) ctxTextDefault.style.display = '';
         if (ctxTextInfo) ctxTextInfo.style.display = 'none';
     }
-    
+
+    /**
+     * Fire after every successful structure mutation. The selector
+     * cache in preview-style-selectors.js listens and marks itself
+     * stale so the next picker open re-scans the iframe DOM for
+     * newly-added ids and classes (lazy — avoids re-fetching on
+     * every rapid mutation).
+     */
+    function broadcastStructureChanged() {
+        window.dispatchEvent(new CustomEvent('qs:editor:structure-changed'));
+    }
+
     async function deleteTextOnlyNode() {
         if (!textOnlySelection) return;
         
@@ -4573,11 +4618,12 @@
             }
             
             showToast(PreviewConfig.i18n.textNodeDeleted || 'Text node deleted', 'success');
-            
+
             // Live DOM update — remove the node from iframe
             sendToIframe('removeNode', { struct, nodeId: node });
-            
+
             resetTextModeInfo();
+            broadcastStructureChanged();
         } catch (error) {
             console.error('[Preview] Text delete error:', error);
             showToast(PreviewConfig.i18n.error + ': ' + error.message, 'error');
@@ -4678,13 +4724,14 @@
             
             showToast(PreviewConfig.i18n.nodeDeleted, 'success');
             console.log('[Preview] Node deleted successfully');
-            
+
             // Live DOM update - remove node and reindex siblings
             sendToIframe('removeNode', {
                 struct: structToDelete,
                 nodeId: nodeToDelete
             });
-            
+            broadcastStructureChanged();
+
         } catch (error) {
             console.error('[Preview] Delete error:', error);
             showToast(PreviewConfig.i18n.error + ': ' + error.message, 'error');
@@ -4755,7 +4802,8 @@
                 // Root duplication or no rendered HTML - full reload needed
                 reloadPreview();
             }
-            
+            broadcastStructureChanged();
+
         } catch (error) {
             console.error('[Preview] Duplicate error:', error);
             showToast((PreviewConfig.i18n?.error || 'Error') + ': ' + error.message, 'error');
@@ -5244,6 +5292,13 @@
         else if (addClassInput) addClassInput.value = '';
         if (addCustomParamsList) addCustomParamsList.innerHTML = '';
 
+        // Tear down any prior Complex wizard mount. #add-complex-body is a
+        // SIBLING of #add-complex-field in contextual-add.php — hiding only
+        // the field below leaves the body's rendered wizard visible inside
+        // the form, masking the class chip + custom rows.
+        renderComplexWizardBody(null);
+        if (addComplexKindSelect) addComplexKindSelect.value = '';
+
         // Explicit edit-mode visibility — DON'T call
         // updateSidebarAddNodeTypeUI(); it would un-hide things we want
         // hidden (it's wired for Add Element's tab-driven UX).
@@ -5502,6 +5557,7 @@
         } else {
             if (typeof reloadPreview === 'function') reloadPreview();
         }
+        broadcastStructureChanged();
     }
 
     // Update add form tabs UI
@@ -7449,6 +7505,7 @@
         });
         
         return {
+            addClass,
             reset() {
                 selectedClasses = [];
                 syncHiddenInput();
@@ -7649,6 +7706,7 @@
         hideSidebarAddForm();
         // Refresh the iframe so the new subtree appears.
         if (typeof reloadPreview === 'function') reloadPreview();
+        broadcastStructureChanged();
     }
     
     // Add tag node
@@ -7736,6 +7794,7 @@
                 console.log('[Preview] No HTML returned, reloading preview. Data:', data);
                 reloadPreview();
             }
+            broadcastStructureChanged();
         } else {
             throw new Error(response.data?.message || 'Failed to add element');
         }
@@ -7810,6 +7869,7 @@
             } else {
                 reloadPreview();
             }
+            broadcastStructureChanged();
         } else {
             throw new Error(response.data?.message || 'Failed to add text');
         }
@@ -7890,6 +7950,7 @@
                 console.log('[Preview] No component HTML returned, reloading preview. Data:', data);
                 reloadPreview();
             }
+            broadcastStructureChanged();
         } else {
             throw new Error(response.data?.message || 'Failed to add component');
         }
@@ -7967,6 +8028,7 @@
                 console.log('[Preview] No snippet HTML returned, reloading preview. Data:', data);
                 reloadPreview();
             }
+            broadcastStructureChanged();
         } else {
             throw new Error(response.data?.message || 'Failed to insert snippet');
         }

@@ -50,7 +50,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Show element(s) by removing the hidden class',
             'example' => '{{call:show:#modal}}',
-            'events' => ['onclick', 'onchange']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onchange']
         ],
         [
             'name' => 'hide',
@@ -61,7 +61,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Hide element(s) by adding the hidden class',
             'example' => '{{call:hide:#modal}}',
-            'events' => ['onclick', 'onchange']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onchange']
         ],
         [
             'name' => 'toggle',
@@ -72,7 +72,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Toggle a CSS class on element(s)',
             'example' => '{{call:toggle:#menu,open}}',
-            'events' => ['onclick']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup']
         ],
         [
             'name' => 'toggleHide',
@@ -83,7 +83,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Toggle element(s) visibility - if hidden, show it; if visible, hide it',
             'example' => '{{call:toggleHide:#dropdown}}',
-            'events' => ['onclick']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup']
         ],
         [
             'name' => 'addClass',
@@ -94,7 +94,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Add a CSS class to element(s)',
             'example' => '{{call:addClass:#card,highlight}}',
-            'events' => ['onclick', 'onmouseenter']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onmouseenter']
         ],
         [
             'name' => 'removeClass',
@@ -105,7 +105,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Remove a CSS class from element(s)',
             'example' => '{{call:removeClass:#card,highlight}}',
-            'events' => ['onclick', 'onmouseleave']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onmouseleave']
         ],
         [
             'name' => 'setValue',
@@ -116,7 +116,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Set the value of element(s). Handles inputs, textareas, selects, checkboxes, and radios.',
             'example' => '{{call:setValue:#output,Hello World}}',
-            'events' => ['onclick', 'onchange']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onchange']
         ],
         [
             'name' => 'redirect',
@@ -126,7 +126,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Navigate to a URL',
             'example' => '{{call:redirect:/thank-you}}',
-            'events' => ['onclick']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup']
         ],
         [
             'name' => 'filter',
@@ -140,7 +140,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Filter elements based on input value. Use on input fields.',
             'example' => '{{call:filter:event,.card,data-title}}',
-            'events' => ['oninput', 'onkeyup']
+            'events' => ['oninput', 'onchange', 'onkeydown', 'onkeyup']
         ],
         [
             'name' => 'scrollTo',
@@ -151,7 +151,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Smoothly scroll to an element',
             'example' => '{{call:scrollTo:#contact}}',
-            'events' => ['onclick']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup']
         ],
         [
             'name' => 'focus',
@@ -161,7 +161,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Focus an element',
             'example' => '{{call:focus:#searchInput}}',
-            'events' => ['onclick', 'onload']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onload']
         ],
         [
             'name' => 'blur',
@@ -171,7 +171,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Remove focus from an element',
             'example' => '{{call:blur:#searchInput}}',
-            'events' => ['onclick']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup']
         ],
         [
             'name' => 'renderList',
@@ -183,7 +183,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Render an array of data into a container using data-bind templates. Container\'s first child is cloned for each item. Use data-bind="fieldName" and data-bind-attr="attrName" on child elements.',
             'example' => '{{call:renderList:.files-list,files,No files found}}',
-            'events' => ['onclick', 'onload']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onload', 'onsubmit']
         ],
         [
             'name' => 'toast',
@@ -195,7 +195,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Show a toast notification message',
             'example' => '{{call:toast:Hello world!,success}}',
-            'events' => ['onclick', 'onload', 'onsubmit']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onchange', 'onload', 'onsubmit']
         ],
         [
             'name' => 'fetch',
@@ -208,7 +208,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Make an API call. Direct URL mode: pass METHOD, URL, then options. Registry mode: pass @apiId/endpointId. Use body=#form-id to submit every named input inside the selected form/container as a JSON body — the canonical way to wire a form-submit chain after QS.validate.',
             'example' => '{{call:fetch:POST,/api/contact,body=#contact-form}}',
-            'events' => ['onsubmit', 'onclick', 'onload']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onsubmit', 'onload']
         ],
         [
             'name' => 'validate',
@@ -231,7 +231,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Read a value from the last fetch response (QS._lastFetchResult) and stash it in localStorage / sessionStorage. Typical use: chain after a login fetch to persist the returned token so subsequent calls pick it up via the endpoint\'s auth.tokenSource. Fires `qs:auth:saved` on document with detail.{storage, key, tokenKey, value}.',
             'example' => '{{call:fetch:@auth-api/login,body=#login-form}};{{call:saveToken:localStorage,authToken,token}}',
-            'events' => ['onsubmit', 'onclick']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onsubmit', 'onload']
         ],
         [
             'name' => 'clearToken',
@@ -242,7 +242,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Remove a stored token (logout). Fires `qs:auth:cleared` on document with detail.{storage, key, tokenKey} so login-state badges can re-render.',
             'example' => '{{call:clearToken:localStorage,authToken}};{{call:redirect:/}}',
-            'events' => ['onclick']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup']
         ],
         [
             'name' => 'refresh',
@@ -252,7 +252,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Manually run the Tier 2 token refresh for an API (same flow as the automatic refresh-on-401). Reads the refresh token from the API\'s refreshTokenSource, POSTs to its refreshEndpoint, and stores the new access token. A raw fetch to the refresh endpoint will NOT work — only this verb can inject the stored refresh token. Fires `qs:auth:saved` on success. Use for a "Refresh session" button.',
             'example' => '{{call:refresh:@auth-api}}',
-            'events' => ['onclick']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onload']
         ],
         [
             'name' => 'exchangeMagicLink',
@@ -276,7 +276,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Forward path of magic-link auth — POSTs {email} to the issue-magic endpoint to trigger the auth API to email a single-use code to the user. Pairs with exchangeMagicLink (which runs on the landing page after the user clicks the email link). The server-side endpoint MUST NOT reveal whether the email exists in its user store; the standard pattern is "always return 200" to avoid an account-enumeration oracle — that\'s the auth API\'s responsibility, this verb just POSTs.',
             'example' => '{{call:validate:event,#login-form}};{{call:requestMagicLink:@auth-api/issue-magic,#email-input,/check-email}}',
-            'events' => ['onsubmit', 'onclick']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onsubmit']
         ],
         [
             'name' => 'logoutServer',
@@ -286,7 +286,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Server-side logout — tells the auth API to invalidate the session / revoke the refresh token. The Tier 1 logout pair: chain this BEFORE clearToken (so the request still has the token attached) then clearToken to drop the local copy. Thin wrapper around QS.fetch so the registry\'s bearer auth is applied. Logout failures are intentionally swallowed — the user wants out either way, so subsequent clearToken + redirect should always run.',
             'example' => '{{call:logoutServer:@auth-api/logout}};{{call:clearToken:localStorage,authToken}};{{call:clearToken:localStorage,refreshToken}};{{call:redirect:/}}',
-            'events' => ['onclick']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup']
         ],
         [
             'name' => 'setState',
@@ -298,7 +298,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Set a state store field — to a literal value, or to the live value of a #/. selector (e.g. a search box). Pair with fetchState to send it to the bound endpoint.',
             'example' => '{{call:setState:results,q,#searchBox}}',
-            'events' => ['onclick', 'oninput', 'onchange', 'onkeyup']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'oninput', 'onchange']
         ],
         [
             'name' => 'fetchState',
@@ -308,7 +308,7 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Run the store\'s bound endpoint with its current field values, apply the response back into the store, and re-render its bound DOM (data-state-value / data-state-list). Use after setState, or for one-shot loads. For infinite-scroll triggers, prefer onScrollFetchState — it adds debounce + in-flight + exhausted guards (raw onscroll → fetchState thrashes the API).',
             'example' => '{{call:fetchState:commandsList}}',
-            'events' => ['onclick', 'onload', 'onsubmit', 'oninput']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'oninput', 'onchange', 'onsubmit', 'onload']
         ],
         [
             'name' => 'onScrollFetchState',

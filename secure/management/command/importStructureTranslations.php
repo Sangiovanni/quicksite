@@ -30,6 +30,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 
 /**
  * Walk a JSON structure tree and find the first node matching a kind
@@ -109,54 +110,9 @@ function _measureTableDimensions(array $tableNode): ?array {
     ];
 }
 
-/**
- * Convert a flat `{dot.path: value}` map into the nested structure the
- * translation files use. Replicates setTranslationKeys.php's
- * convertDotNotationToNested — extracted here so we don't pull in
- * setTranslationKeys.php (whose logic runs at top-level on include).
- * BACKLOG: factor both into `src/functions/translationHelpers.php`.
- */
-function _flatToNested(array $flat): array {
-    $nested = [];
-    foreach ($flat as $dotKey => $value) {
-        if (strpos($dotKey, '.') === false) {
-            $nested[$dotKey] = $value;
-            continue;
-        }
-        $parts = explode('.', $dotKey);
-        $cursor = &$nested;
-        $lastIdx = count($parts) - 1;
-        foreach ($parts as $i => $part) {
-            if ($i === $lastIdx) {
-                $cursor[$part] = $value;
-            } else {
-                if (!isset($cursor[$part]) || !is_array($cursor[$part])) {
-                    $cursor[$part] = [];
-                }
-                $cursor = &$cursor[$part];
-            }
-        }
-        unset($cursor);
-    }
-    return $nested;
-}
-
-/**
- * Deep-merge $new INTO $existing (mutating semantics, returns the
- * merged tree). Same shape as setTranslationKeys.php's mergeTranslations:
- * when both sides have the same key and both values are arrays, recurse;
- * otherwise $new's value wins.
- */
-function _deepMergeTranslations(array $existing, array $new): array {
-    foreach ($new as $k => $v) {
-        if (is_array($v) && isset($existing[$k]) && is_array($existing[$k])) {
-            $existing[$k] = _deepMergeTranslations($existing[$k], $v);
-        } else {
-            $existing[$k] = $v;
-        }
-    }
-    return $existing;
-}
+// Translation flat-to-nested + deep-merge plumbing is shared via
+// src/functions/translationHelpers.php (C9). Use
+// convertDotNotationToNested + mergeTranslations directly below.
 
 /**
  * @param array $params Body: route, kind, structureId, language, header[], rows[][]
@@ -333,7 +289,7 @@ function __command_importStructureTranslations(array $params = [], array $urlPar
     }
 
     // ---- write to the language file --------------------------------------
-    $newNested = _flatToNested($flat);
+    $newNested = convertDotNotationToNested($flat);
 
     $translationsFile = PROJECT_PATH . '/translate/' . $language . '.json';
     $existingTranslations = [];
@@ -347,7 +303,7 @@ function __command_importStructureTranslations(array $params = [], array $urlPar
         }
     }
 
-    $merged = _deepMergeTranslations($existingTranslations, $newNested);
+    $merged = mergeTranslations($existingTranslations, $newNested);
 
     $output = json_encode($merged, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if ($output === false) {

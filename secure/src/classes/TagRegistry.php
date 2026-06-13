@@ -4,7 +4,7 @@
  * TagRegistry — Single source of truth for ALL HTML tag classification.
  * 
  * Used by: addNode, editNode, editStructure, JsonToHtmlRenderer,
- *          _tag-selector.php, add-node.php modal.
+ *          _tag-selector.php.
  * 
  * NEVER define tag lists anywhere else. Always reference this class.
  */

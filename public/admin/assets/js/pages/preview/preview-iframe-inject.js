@@ -1073,7 +1073,38 @@
         
         // Check for children with data-qs-node
         const hasChildren = el.querySelector('[data-qs-node]') !== null;
-        
+
+        // Node kind: text-only wrappers carry data-qs-textonly; components
+        // carry data-qs-component; everything else is a regular element.
+        // Used by the info bar so the user can tell a text node apart from
+        // its visual <span> wrapper (which used to read as "span").
+        let kind;
+        if (el.hasAttribute('data-qs-textonly')) {
+            kind = 'text';
+        } else if (component) {
+            kind = 'component';
+        } else {
+            kind = 'element';
+        }
+
+        // User-authored attributes. Skip editor chrome (data-qs-*,
+        // contenteditable) and clean editor classes off the class attr
+        // the same way the `classes` field above does.
+        const params = {};
+        const editorClassRe = /qs-(hover|selected|draggable|dragging|drag-over|text-editable|text-editing)/g;
+        for (let i = 0; i < el.attributes.length; i++) {
+            const attr = el.attributes[i];
+            const name = attr.name;
+            if (name.indexOf('data-qs-') === 0) continue;
+            if (name === 'contenteditable') continue;
+            let value = attr.value;
+            if (name === 'class') {
+                value = value.replace(editorClassRe, '').replace(/\s+/g, ' ').trim();
+                if (value === '') continue;
+            }
+            params[name] = value;
+        }
+
         return {
             // Editor info
             struct: struct,
@@ -1081,6 +1112,7 @@
             component: component,
             componentNode: componentNode,
             isComponent: !!component,
+            kind: kind,
             // DOM info
             tag: el.tagName.toLowerCase(),
             id: id,
@@ -1088,6 +1120,7 @@
             childCount: el.children.length,
             textContent: textContent,
             textKeys: textKeys,
+            params: params,
             // Navigation info
             hasParent: hasParent,
             hasPrevSibling: hasPrevSibling,

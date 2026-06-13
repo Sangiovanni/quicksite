@@ -185,6 +185,20 @@ if (!isset($params['structure']) && $action !== 'delete') {
 $type = $params['type'];
 $structure = $params['structure'] ?? null;
 
+// Defense against malformed callers that send `structure: null` or a
+// scalar — json_encode(null) writes the literal string "null" to disk
+// (silent component/page corruption that only surfaces when the
+// renderer tries to load it). The 'delete' action legitimately runs
+// without a structure; everyone else must send an object or array.
+if ($action !== 'delete' && !is_array($structure)) {
+    ApiResponse::create(400, 'validation.invalid_type')
+        ->withMessage('The structure parameter must be an object or array of objects.')
+        ->withErrors([
+            ['field' => 'structure', 'reason' => 'invalid_type', 'expected' => 'object or array']
+        ])
+        ->send();
+}
+
 // SECURITY: walk the incoming structure recursively for reserved-namespace
 // storage keys in data-storage-* / data-auth-source values (slice 5b —
 // admin-token theft prevention). Each command that writes structure params

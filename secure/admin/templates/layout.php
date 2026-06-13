@@ -103,8 +103,11 @@ $langNames = [
         
         <?php
             // Determine which nav group should be highlighted
-            $buildPages = ['workflows', 'command', 'preview'];
-            $settingsPages = ['settings', 'apis', 'ai-settings', 'ai-connections', 'embed-security'];
+            // API Endpoints moved Settings → Build (N1): it's an authoring
+            // surface used constantly during build (fetch picker, interactions,
+            // component-list bindings), not a config setting.
+            $buildPages = ['workflows', 'command', 'preview', 'apis'];
+            $settingsPages = ['settings', 'ai-settings', 'ai-connections', 'embed-security'];
             $isBuildActive = in_array($currentPage, $buildPages);
             $isSettingsActive = in_array($currentPage, $settingsPages);
             $isAssetsActive = ($currentPage === 'assets');
@@ -151,7 +154,7 @@ $langNames = [
                         </svg>
                         <span><?= __admin('nav.workflows') ?></span>
                     </a>
-                    <a href="<?= $router->url('command') ?>" 
+                    <a href="<?= $router->url('command') ?>"
                        class="admin-nav__link<?= $currentPage === 'command' ? ' admin-nav__link--active' : '' ?>">
                         <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="16 18 22 12 16 6"/>
@@ -159,9 +162,18 @@ $langNames = [
                         </svg>
                         <span><?= __admin('nav.commands') ?></span>
                     </a>
+                    <a href="<?= $router->url('apis') ?>"
+                       class="admin-nav__link<?= $currentPage === 'apis' ? ' admin-nav__link--active' : '' ?>"
+                       data-requires-command="listApiEndpoints">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                            <polyline points="22 6 12 13 2 6"/>
+                        </svg>
+                        <span><?= __admin('nav.apiEndpoints') ?></span>
+                    </a>
                 </div>
             </div>
-            
+
             <!-- Assets - Top-level tab -->
             <a href="<?= $router->url('assets') ?>" 
                class="admin-nav__link<?= $isAssetsActive ? ' admin-nav__link--active' : '' ?>"
@@ -213,16 +225,7 @@ $langNames = [
                         </svg>
                         <span><?= __admin('nav.projectSettings') ?></span>
                     </a>
-                    <a href="<?= $router->url('apis') ?>" 
-                       class="admin-nav__link<?= $currentPage === 'apis' ? ' admin-nav__link--active' : '' ?>"
-                       data-requires-command="listApiEndpoints">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                            <polyline points="22 6 12 13 2 6"/>
-                        </svg>
-                        <span><?= __admin('nav.apiEndpoints') ?></span>
-                    </a>
-                    <a href="<?= $router->url('ai-connections') ?>" 
+                    <a href="<?= $router->url('ai-connections') ?>"
                        class="admin-nav__link<?= ($currentPage === 'ai-connections' || $currentPage === 'ai-settings') ? ' admin-nav__link--active' : '' ?>">
                         <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>

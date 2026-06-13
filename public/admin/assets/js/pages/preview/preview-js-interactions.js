@@ -42,6 +42,7 @@
     let jsFormFunctionSection = null;
     let jsFormApiSection = null;
     let jsFormFunction = null;
+    let jsFormFunctionShowAll = null;
     let jsFormFunctionDetails = null;
     let jsFormApi = null;
     let jsFormEndpoint = null;
@@ -93,6 +94,7 @@
     let peFormFunctionSection = null;
     let peFormApiSection = null;
     let peFormFunction = null;
+    let peFormFunctionShowAll = null;
     let peFormApi = null;
     let peFormEndpoint = null;
     let peFormParams = null;
@@ -160,6 +162,7 @@
         jsFormFunctionSection = document.getElementById('js-form-function-section');
         jsFormApiSection = document.getElementById('js-form-api-section');
         jsFormFunction = document.getElementById('js-form-function');
+        jsFormFunctionShowAll = document.getElementById('js-form-function-show-all');
         jsFormFunctionDetails = document.getElementById('js-form-function-details');
         jsFormApi = document.getElementById('js-form-api');
         jsFormEndpoint = document.getElementById('js-form-endpoint');
@@ -202,6 +205,7 @@
         peFormFunctionSection = document.getElementById('js-page-event-function-section');
         peFormApiSection = document.getElementById('js-page-event-api-section');
         peFormFunction = document.getElementById('js-page-event-function');
+        peFormFunctionShowAll = document.getElementById('js-page-event-function-show-all');
         peFormApi = document.getElementById('js-page-event-api');
         peFormEndpoint = document.getElementById('js-page-event-endpoint');
         peFormParams = document.getElementById('js-page-event-params');
@@ -326,9 +330,16 @@
             jsFormFunction.addEventListener('change', handleFunctionChange);
         }
         
-        // Event dropdown change
+        // Event dropdown change — also re-filters the function dropdown
+        // (V12: each verb's qsVerbCatalog `events` field is the gate).
         if (jsFormEvent) {
-            jsFormEvent.addEventListener('change', updatePreview);
+            jsFormEvent.addEventListener('change', function() {
+                populateFunctionDropdown();
+                updatePreview();
+            });
+        }
+        if (jsFormFunctionShowAll) {
+            jsFormFunctionShowAll.addEventListener('change', populateFunctionDropdown);
         }
         
         // Save button
@@ -384,9 +395,17 @@
             });
         }
         
-        // Page event event change
+        // Page event event change — also re-filters the function dropdown.
         if (peFormEvent) {
-            peFormEvent.addEventListener('change', updatePageEventPreview);
+            peFormEvent.addEventListener('change', function() {
+                _populateFnSelect(peFormFunction, peFormEvent.value);
+                updatePageEventPreview();
+            });
+        }
+        if (peFormFunctionShowAll) {
+            peFormFunctionShowAll.addEventListener('change', function() {
+                _populateFnSelect(peFormFunction, peFormEvent ? peFormEvent.value : '');
+            });
         }
         
         // Response binding add buttons
@@ -2055,15 +2074,48 @@
     }
     
     /**
-     * Populate function dropdown (grouped by type)
+     * Hide verbs that aren't meant for the chosen event. Each verb in
+     * qsVerbCatalog declares `events: ['onclick', ...]`; without this
+     * filter the picker shipped `onScrollFetchState` for `onclick` — a
+     * setup verb hooked to the wrong event was the beta.7 silent break.
+     * Show-all overrides for the rare cases where the catalog hasn't
+     * been updated to declare a verb for an unusual event.
+     */
+    function _filterFunctionsByEvent(fns, eventName, showAll) {
+        if (showAll || !eventName) return fns;
+        return fns.filter(function(fn) {
+            return fn && Array.isArray(fn.events) && fn.events.indexOf(eventName) !== -1;
+        });
+    }
+
+    /**
+     * Populate function dropdown (grouped by type, filtered by event)
      */
     function populateFunctionDropdown() {
         if (!jsFormFunction) return;
-        
-        jsFormFunction.innerHTML = `<option value="">${PreviewConfig.i18n?.selectFunction || 'Select function...'}</option>`;
-        
+
+        var eventName = jsFormEvent ? jsFormEvent.value : '';
+        var showAll = jsFormFunctionShowAll && jsFormFunctionShowAll.checked;
+        var fnsToShow = _filterFunctionsByEvent(availableFunctions, eventName, showAll);
+
+        // Placeholder text becomes the hint when the filter would strand
+        // the user (real event picked but no verb in the catalog declares
+        // it). They get a clear next move without losing the Show-all
+        // override sitting right below the dropdown.
+        var placeholderText;
+        if (fnsToShow.length === 0 && eventName && !showAll) {
+            placeholderText = '— No function presets for "' + eventName + '" — flip "Show all" or use API Call —';
+        } else {
+            placeholderText = PreviewConfig.i18n?.selectFunction || '-- Select function --';
+        }
+        jsFormFunction.innerHTML = '';
+        var placeholderOpt = document.createElement('option');
+        placeholderOpt.value = '';
+        placeholderOpt.textContent = placeholderText;
+        jsFormFunction.appendChild(placeholderOpt);
+
         const grouped = {};
-        availableFunctions.forEach(fn => {
+        fnsToShow.forEach(fn => {
             const type = fn.type || 'other';
             if (!grouped[type]) grouped[type] = [];
             grouped[type].push(fn);
@@ -2246,9 +2298,18 @@
             typingInput.autocomplete = 'off';
             typingInput.placeholder = PreviewConfig.i18n?.matchTargetHint || 'textContent, .child-class, or data-attr';
         } else if (inputType === 'selector') {
-            input.placeholder = PreviewConfig.i18n?.selectorOrThis || 'Selector or "this"';
+            // Selector vs class hint (V12 sibling fix): the two look alike
+            // in a chain (`QS.hide('.foo', 'foo')`) but the picker treats
+            // them differently — selectors keep their `.`/`#`/`[` prefix
+            // (handed to querySelector); class names lose it (handed to
+            // classList.add). Make the distinction visible up front.
+            input.placeholder = PreviewConfig.i18n?.selectorOrThis || 'CSS selector (.class, #id, [data-x]) — or "this"';
+            input.title = PreviewConfig.i18n?.selectorHint
+                || 'Keep the CSS prefix — e.g. .my-class, #header, [data-foo]. Use "this" to target the element firing the event.';
         } else if (inputType === 'class') {
-            input.placeholder = PreviewConfig.i18n?.searchClass || 'Search class...';
+            input.placeholder = PreviewConfig.i18n?.searchClass || 'class name only (no leading .)';
+            input.title = PreviewConfig.i18n?.classHint
+                || 'Bare class name without the dot — e.g. hidden, active. Passed to classList.add().';
         }
 
         // Initial value
@@ -3099,7 +3160,7 @@
         editingPageEvent = { event: eventName, index: index, interaction: entry };
 
         // Populate dropdowns (same as handlePageEventAdd does for new entries).
-        _populateFnSelect(peFormFunction);
+        _populateFnSelect(peFormFunction, eventName);
         _populateApiSelects(peFormApi, peFormEndpoint);
 
         // Show form, hide add button.
@@ -3201,16 +3262,17 @@
         if (availableFunctions.length === 0) await fetchJsFunctions();
         if (availableApiEndpoints.length === 0) await fetchApiEndpoints();
 
-        // Populate function dropdown
-        _populateFnSelect(peFormFunction);
+        // Reset form fields BEFORE populating the function dropdown so
+        // _populateFnSelect filters against the right default event.
+        if (peFormEvent) peFormEvent.value = 'onload';
+
+        // Populate function dropdown (filtered by the default event)
+        _populateFnSelect(peFormFunction, 'onload');
         _populateApiSelects(peFormApi, peFormEndpoint);
 
         // Show form, hide add button
         if (peForm) peForm.style.display = '';
         if (peAddBtn?.parentElement) peAddBtn.parentElement.style.display = 'none';
-
-        // Reset form fields
-        if (peFormEvent) peFormEvent.value = 'onload';
         if (peFormActionType) peFormActionType.value = 'function';
         if (peFormFunctionSection) peFormFunctionSection.style.display = '';
         if (peFormApiSection) peFormApiSection.classList.remove('visible');
@@ -5533,15 +5595,32 @@
     }
 
     /**
-     * Helper: Populate a <select> with available functions (grouped by type)
+     * Helper: Populate a <select> with available functions (grouped by
+     * type, filtered by the event being wired). eventName comes from
+     * the caller — peFormEvent for page events. Show-all overrides;
+     * an empty filter result swaps the placeholder for an actionable
+     * hint so the author knows what to do next.
      */
-    function _populateFnSelect(selectEl) {
+    function _populateFnSelect(selectEl, eventName) {
         if (!selectEl) return;
-        selectEl.innerHTML = '<option value="">' +
-            (PreviewConfig.i18n?.selectFunction || 'Select function...') + '</option>';
-        
+        var ev = eventName || '';
+        var showAll = peFormFunctionShowAll && peFormFunctionShowAll.checked;
+        var fnsToShow = _filterFunctionsByEvent(availableFunctions, ev, showAll);
+
+        var placeholderText;
+        if (fnsToShow.length === 0 && ev && !showAll) {
+            placeholderText = '— No function presets for "' + ev + '" — flip "Show all" or use API Call —';
+        } else {
+            placeholderText = PreviewConfig.i18n?.selectFunction || '-- Select function --';
+        }
+        selectEl.innerHTML = '';
+        var placeholderOpt = document.createElement('option');
+        placeholderOpt.value = '';
+        placeholderOpt.textContent = placeholderText;
+        selectEl.appendChild(placeholderOpt);
+
         var grouped = {};
-        availableFunctions.forEach(function(fn) {
+        fnsToShow.forEach(function(fn) {
             var type = fn.type || 'other';
             if (!grouped[type]) grouped[type] = [];
             grouped[type].push(fn);

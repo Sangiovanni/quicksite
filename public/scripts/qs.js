@@ -133,11 +133,17 @@
     const DEFAULT_HIDDEN_CLASS = 'hidden';
 
     /**
-     * Get all elements matching selector
-     * @param {string} selector - CSS selector
-     * @returns {NodeList}
+     * Resolve `selector` to a list of elements. Accepts a CSS string, a
+     * single Element (inline `onclick="QS.hide(this)"`), an Array, or a
+     * NodeList — so picker-saved selectors and inline-event `this` share
+     * one entry point.
+     * @param {string|Element|NodeList|Element[]} selector
+     * @returns {NodeList|Element[]}
      */
     function getElements(selector) {
+        if (selector instanceof Element) return [selector];
+        if (selector instanceof NodeList) return selector;
+        if (Array.isArray(selector)) return selector;
         try {
             return document.querySelectorAll(selector);
         } catch (e) {
@@ -147,8 +153,23 @@
     }
 
     /**
+     * Single-element variant of getElements.
+     * @param {string|Element} target
+     * @returns {Element|null}
+     */
+    function getElement(target) {
+        if (target instanceof Element) return target;
+        try {
+            return document.querySelector(target);
+        } catch (e) {
+            console.warn('[QS] Invalid selector:', target);
+            return null;
+        }
+    }
+
+    /**
      * Show element(s) - removes hidden class
-     * @param {string} target - CSS selector
+     * @param {string|Element} target - CSS selector, or an Element (e.g. inline `this`)
      * @param {string} [hideClass] - Class to remove (default: 'hidden')
      */
     QS.show = function(target, hideClass) {
@@ -159,7 +180,7 @@
 
     /**
      * Hide element(s) - adds hidden class
-     * @param {string} target - CSS selector
+     * @param {string|Element} target - CSS selector, or an Element (e.g. inline `this`)
      * @param {string} [hideClass] - Class to add (default: 'hidden')
      */
     QS.hide = function(target, hideClass) {
@@ -170,7 +191,7 @@
 
     /**
      * Toggle element(s) visibility (show/hide flip-switch)
-     * @param {string} target - CSS selector
+     * @param {string|Element} target - CSS selector, or an Element (e.g. inline `this`)
      * @param {string} [hideClass] - Class to toggle (default: 'hidden')
      */
     QS.toggleHide = function(target, hideClass) {
@@ -444,12 +465,12 @@
 
     /**
      * Scroll smoothly to an element
-     * @param {string} target - CSS selector
+     * @param {string|Element} target - CSS selector, or an Element (e.g. inline `this`)
      * @param {string} [behavior] - 'smooth' (default) or 'instant'
      */
     QS.scrollTo = function(target, behavior) {
         behavior = behavior || 'smooth';
-        const element = document.querySelector(target);
+        const element = getElement(target);
         if (element) {
             element.scrollIntoView({ behavior: behavior, block: 'start' });
         }
@@ -457,10 +478,10 @@
 
     /**
      * Focus an element
-     * @param {string} target - CSS selector
+     * @param {string|Element} target - CSS selector, or an Element (e.g. inline `this`)
      */
     QS.focus = function(target) {
-        const element = document.querySelector(target);
+        const element = getElement(target);
         if (element && element.focus) {
             element.focus();
         }
@@ -468,10 +489,10 @@
 
     /**
      * Blur (unfocus) an element
-     * @param {string} target - CSS selector
+     * @param {string|Element} target - CSS selector, or an Element (e.g. inline `this`)
      */
     QS.blur = function(target) {
-        const element = document.querySelector(target);
+        const element = getElement(target);
         if (element && element.blur) {
             element.blur();
         }

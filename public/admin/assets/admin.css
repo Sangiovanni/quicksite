@@ -7092,12 +7092,13 @@ kbd {
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .preview-element-info {
+    position: relative; /* anchor for the bottom-up details dropdown */
     display: flex;
     flex-direction: column;
     background: var(--admin-surface);
     border-top: 1px solid var(--admin-border);
     flex-shrink: 0;
-    min-height: 55px; /* Ensure always visible */
+    min-height: 45px; /* Ensure always visible */
 }
 
 .preview-element-info__toggle {
@@ -7132,14 +7133,24 @@ kbd {
 }
 
 .preview-element-info__details {
+    /* Opens UP from the toggle bar like a bottom-anchored dropdown.
+       Absolute positioning keeps expansion from pushing layout or being
+       clipped by ancestors; max-height + overflow-y handle tall content. */
     display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
     padding: var(--space-sm) var(--space-md);
-    padding-top: 0;
-    min-height: 150px;
+    max-height: 60vh;
+    overflow-y: auto;
     gap: var(--space-xs);
     flex-direction: column;
     background: var(--admin-bg-secondary);
     border-top: 1px solid var(--admin-border);
+    border-bottom: 1px solid var(--admin-border);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.12);
+    z-index: 10;
 }
 
 .preview-element-info__row {

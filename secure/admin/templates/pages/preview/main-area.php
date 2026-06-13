@@ -196,7 +196,7 @@
     <div class="preview-element-info" id="preview-element-info">
         <button type="button" class="preview-element-info__toggle" id="preview-element-info-toggle" title="<?= __admin('preview.toggleDetails') ?? 'Toggle details' ?>">
             <svg class="preview-element-info__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6 9 12 15 18 9"/>
+                <polyline points="6 15 12 9 18 15"/>
             </svg>
             <span class="preview-element-info__summary" id="preview-element-info-summary">-</span>
         </button>
@@ -216,6 +216,10 @@
             <div class="preview-element-info__row">
                 <span class="preview-element-info__label"><?= __admin('preview.nodeChildren') ?>:</span>
                 <span class="preview-element-info__value" id="info-node-children">-</span>
+            </div>
+            <div class="preview-element-info__row preview-element-info__row--params" id="info-node-params-row" style="display: none;">
+                <span class="preview-element-info__label"><?= __admin('preview.nodeParams') ?? 'Params' ?>:</span>
+                <span class="preview-element-info__value preview-element-info__value--params" id="info-node-params"></span>
             </div>
             <div class="preview-element-info__row" id="info-node-textkey-row" style="display: none;">
                 <span class="preview-element-info__label"><?= __admin('preview.textKey') ?? 'Text Key' ?>:</span>

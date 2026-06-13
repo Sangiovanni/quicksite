@@ -53,6 +53,14 @@
                             <option value=""><?= __admin('preview.selectFunction') ?? '-- Select function --' ?></option>
                         </select>
                     </div>
+                    <!-- Show-all toggle for the page-event picker. Same role as
+                         the element-level one above — bypass the event filter. -->
+                    <div class="preview-contextual-js-form-row preview-contextual-js-form-row--inline">
+                        <label class="preview-contextual-js-form-toggle">
+                            <input type="checkbox" id="js-page-event-function-show-all">
+                            <span><?= __admin('preview.showAllFunctions') ?? 'Show all functions' ?></span>
+                        </label>
+                    </div>
                 </div>
                 <!-- API section (hidden by default) -->
                 <div id="js-page-event-api-section" class="preview-contextual-js-form-api-section">
@@ -276,6 +284,15 @@
                     <select class="preview-contextual-js-form-select" id="js-form-function">
                         <option value=""><?= __admin('preview.selectFunction') ?? '-- Select function --' ?></option>
                     </select>
+                </div>
+                <!-- Show-all toggle: by default the function list is filtered to verbs
+                     that declare the chosen event in their qsVerbCatalog `events` field.
+                     Authors hitting an unusual case toggle this to see every verb. -->
+                <div class="preview-contextual-js-form-row preview-contextual-js-form-row--inline">
+                    <label class="preview-contextual-js-form-toggle">
+                        <input type="checkbox" id="js-form-function-show-all">
+                        <span><?= __admin('preview.showAllFunctions') ?? 'Show all functions' ?></span>
+                    </label>
                 </div>
                 <!-- Function details panel: full description + example.
                      Populated on function-select change. Hidden when no selection. -->

@@ -529,6 +529,37 @@
         }
     }
 
+    /**
+     * Validate that a parsed schema has the JSON-Schema shape downstream
+     * features expect: an object with a top-level `type`, and `properties`
+     * when type is "object". Catches the most common authoring mistake —
+     * pasting the whole `{"responseSchema": {...}}` envelope instead of
+     * the inner schema. Returns null when OK, or a user-facing error.
+     */
+    function _validateSchemaShape(schema, label) {
+        if (schema === null || typeof schema !== 'object' || Array.isArray(schema)) {
+            return label + ' must be a JSON object — e.g. { "type": "object", "properties": {...} }.';
+        }
+        // Double-wrap detection: the user pasted the outer container.
+        if (!schema.type && (schema.responseSchema || schema.requestSchema)) {
+            const wrapKey = schema.responseSchema ? 'responseSchema' : 'requestSchema';
+            return label + ' looks double-wrapped — paste only the inner schema (the value of "' + wrapKey + '"), not the whole envelope.';
+        }
+        if (!schema.type) {
+            return label + ' must have a top-level "type" field (e.g. "object", "array", "string").';
+        }
+        const typeIsValid = typeof schema.type === 'string' || Array.isArray(schema.type);
+        if (!typeIsValid) {
+            return label + '\'s "type" must be a string or array of strings.';
+        }
+        const isObjectType = schema.type === 'object'
+            || (Array.isArray(schema.type) && schema.type.indexOf('object') !== -1);
+        if (isObjectType && (!schema.properties || typeof schema.properties !== 'object' || Array.isArray(schema.properties))) {
+            return label + ' is type "object" but missing a "properties" object. Add "properties": {} even if empty.';
+        }
+        return null;
+    }
+
     async function handleApiSubmit(e) {
         e.preventDefault();
         
@@ -808,15 +839,29 @@
         
         try {
             const reqSchemaText = document.getElementById('endpoint-request-schema').value.trim();
-            if (reqSchemaText) requestSchema = JSON.parse(reqSchemaText);
+            if (reqSchemaText) {
+                requestSchema = JSON.parse(reqSchemaText);
+                const shapeErr = _validateSchemaShape(requestSchema, 'Request schema');
+                if (shapeErr) {
+                    showToast(shapeErr, 'error');
+                    return;
+                }
+            }
         } catch (err) {
             showToast('Invalid request schema JSON', 'error');
             return;
         }
-        
+
         try {
             const resSchemaText = document.getElementById('endpoint-response-schema').value.trim();
-            if (resSchemaText) responseSchema = JSON.parse(resSchemaText);
+            if (resSchemaText) {
+                responseSchema = JSON.parse(resSchemaText);
+                const shapeErr = _validateSchemaShape(responseSchema, 'Response schema');
+                if (shapeErr) {
+                    showToast(shapeErr, 'error');
+                    return;
+                }
+            }
         } catch (err) {
             showToast('Invalid response schema JSON', 'error');
             return;

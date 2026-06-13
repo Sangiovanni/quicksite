@@ -330,10 +330,9 @@
     // row + set the key; the user can edit / re-pick manually.
 
     function addCompanionRow(companionName) {
-        // Find the "+ Add another param" button. Sidebar add-element
-        // form is the only active surface today (modal/add-node.php is
-        // dead code per the slice-6 audit), so this getElementById is
-        // unambiguous.
+        // Find the "+ Add another param" button. The sidebar add-element
+        // form is the only surface that hosts this button, so the lookup
+        // is unambiguous.
         var addBtn = document.getElementById('add-another-param');
         if (!addBtn) {
             console.warn('[data-attr-picker] add-another-param button not found; cannot add companion row');
