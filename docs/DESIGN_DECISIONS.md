@@ -1082,3 +1082,259 @@ OAuth concern). Resolver precedent:
 `secure/src/functions/serverFetch.php` (cache eligibility),
 `secure/src/functions/resolverHelpers.php` (`cacheTTL` validation).
 Behaviour: [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
+
+### OAuth token custody — server-held + session cookie (BFF pattern) (locked 2026-06-14)
+
+**Decision**: OAuth provider tokens (`access_token`, `refresh_token`)
+are held server-side after the code exchange. The browser receives a
+first-party `HttpOnly; Secure; SameSite=Lax` session cookie that maps
+to a server-side session record; provider tokens never reach
+JavaScript. This is the BFF (Backend-For-Frontend) pattern. Single
+mode — no per-provider toggle to hand tokens to the browser.
+
+**Reasoning**: The beta.10 security threat model (locked 2026-06-12 —
+compromised admin / multi-author / SaaS preview-sharing) treats
+stored XSS as the primary risk; defaulting OAuth to localStorage
+tokens would directly create the credential-harvest surface beta.10
+is meant to prevent. The IETF "OAuth 2.0 for Browser-Based Apps" BCP
+draft explicitly recommends BFF and treats browser-held tokens as a
+security anti-pattern. Every major OAuth provider (Google, Meta,
+Amazon, GitHub, Apple) explicitly documents "confidential client +
+server-side flow" as the canonical "Web server applications" pattern;
+Apple Sign In additionally REQUIRES server-side ID-token verification.
+The "login via your own API" pattern (Tier 1/2/3 magic-link)
+continues to use the token-to-browser flow it was designed for —
+that's the existing user-choice surface and stays available.
+
+**Alternatives considered**: Token-to-browser for OAuth (Tier 1/2/3
+`saveToken` pattern applied to provider tokens) — rejected: directly
+contradicts the beta.10 threat model; XSS exfil of provider creds is
+exactly the failure mode beta.10 prevents. Per-provider configurable
+(cookie OR browser) — rejected: ~30-40% scope increase across the
+OAuthHandler / preset / oauth-button slices, two code paths to
+maintain forever, hands authors a security-implications choice they
+often lack context to make well, creates install-to-install
+inconsistency. Override path stays open: a per-provider
+`tokenDelivery: 'cookie' | 'browser'` flag could be added later if a
+real cross-origin-browser-API-call use case surfaces.
+
+**Source**: Server-side OAuth handler (lands with the OAuth concern
+as `secure/src/classes/OAuthHandler.php`). Session storage mechanism
+settled at Q4 of the OAuth design round. CSRF mitigation via
+`SameSite=Lax` cookie attr + server-issued state parameter (locked
+2026-06-11). Behaviour: [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at
+ship time.
+
+### OAuth callback hook — resolver kind `oauth-callback` (locked 2026-06-14)
+
+**Decision**: User-authored callback routes (e.g. `/auth/oauth/:provider/callback`)
+hand control to `OAuthHandler` via a route-resolver of kind `oauth-callback`,
+attached through `setRouteResolver`. The resolver runs server-side before
+render, performs state validation + code exchange + userinfo fetch + session
+creation, and short-circuits with a redirect response. This introduces a new
+resolver archetype — "resolvers with side effects" — alongside the beta.8
+data resolvers.
+
+**Reasoning**: Reuses the resolver-attachment UX authors already learned in
+beta.8 testing (configure via the sitemap resolver list view). Keeps the
+callback URL flexible — authors pick their own path shape
+(`/auth/oauth/:provider/callback`, `/signin/google`, whatever) without a
+path-convention dependency. Symmetric with the start-URL resolver kind, so the
+OAuth-button wizard creates both routes together with the same authoring
+pattern.
+
+**Alternatives considered**: Route marker — new `oauthCallback: true` field
+on the route record (rejected: schema growth for a one-off, doesn't extend
+to similar flows). Path convention — any route matching the OAuth callback
+pattern auto-invokes the handler (rejected: magic; breaks if author wants
+a different URL shape; violates the "users own all routes" beta.8 lock).
+
+**Source**: `secure/src/classes/OAuthHandler.php` (handler),
+`secure/src/classes/DataResolver.php` (resolver-kind registration),
+`secure/management/command/setRouteResolver.php` (authoring command).
+Behaviour: [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
+
+### OAuth start URL — user-authored route + resolver kind `oauth-start` (locked 2026-06-14)
+
+**Decision**: The OAuth flow's start URL is a user-authored route (e.g.
+`/auth/oauth/:provider/start`) with a resolver of kind `oauth-start`
+attached. The resolver generates the state token server-side, stores it,
+builds the provider's authorize URL with all required parameters
+(`client_id`, `redirect_uri`, `scope`, `state`, `code_challenge`), and
+short-circuits with a 302 to the provider. The `oauth-button` Complex
+Element wizard auto-creates BOTH start and callback routes when the author
+picks a provider, so the 2-route ergonomics stay hidden behind a single
+"Add Google Sign-In" action.
+
+**Reasoning**: Symmetric with the callback resolver (same authoring
+pattern, same archetype). Respects "users own all routes" (beta.8 lock).
+The state must be server-issued (kickoff lock on state generation), which
+rules out pure client-side URL building from the button. Server-resolver
+hands control cleanly: one HTTP per click → state issued → 302 to provider.
+
+**Alternatives considered**: Built-in start endpoint
+(`/qs/oauth/:provider/start` hardcoded in core, not user-authored —
+rejected: breaks "users own all routes" for a flow that doesn't need that
+exception). Client-side URL build with a small state-fetch endpoint —
+rejected: 2 round-trips per click for no win.
+
+**Source**: `secure/src/classes/OAuthHandler.php`,
+`secure/src/classes/complexElements/OAuthButton.php` (wizard that creates
+both routes). Behaviour: [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
+
+### OAuth state + session storage — PHP sessions behind a thin abstraction (locked 2026-06-14)
+
+**Decision**: OAuth state (pre-auth, ~10-min single-use) and post-auth
+session (cookie-id → user + provider-tokens mapping) both live in PHP
+sessions, accessed through a thin storage interface (`storeState` /
+`getState` / `storeSession` / `getSession`, ~30 LOC). `session_start()`
+is lazy — called only inside `OAuthHandler`, so non-auth page renders pay
+no cost. Session cookie attributes: `HttpOnly; Secure; SameSite=Lax`.
+
+**Reasoning**: PHP sessions are designed exactly for this — built-in,
+OS-managed storage with restricted permissions, session-cookie shape
+configurable via `session_set_cookie_params()`. Storing provider tokens
+in project-local files has a real security wrinkle (project folder often
+in git, world-readable in dev, copied by backups), which the OS-managed
+`session.save_path` avoids. The thin abstraction layer keeps swap-to-file-
+storage a one-file change later if multi-language support or
+project-local-with-encryption becomes important.
+
+**Alternatives considered**: File transient in project folder — custom
+JSON store with TTL + cleanup management (rejected: project-local storage
+of provider tokens is a security risk per the beta.10 threat model; also
+reinvents `session_handler_interface` for no win). File transient with
+per-project encryption-at-rest — rejected for the initial slice: addresses
+the security risk but adds ~100 LOC of encryption-helper code + key-
+management surface, for marginal gain over PHP sessions today (offered as
+future migration path if project-local becomes important).
+
+**Source**: `secure/src/classes/OAuthHandler.php` (consumes the
+abstraction), `secure/src/functions/oauthStateStore.php` (the abstraction,
+PHP-session-backed implementation). Behaviour: [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
+
+### OAuth PKCE — always-on for all clients (locked 2026-06-14)
+
+**Decision**: Every OAuth flow includes PKCE (Proof Key for Code Exchange,
+RFC 7636) regardless of client type. `OAuthHandler` generates a fresh
+`code_verifier` per flow, computes
+`code_challenge = base64url(SHA256(verifier))`, sends the challenge with
+the authorize request, and sends the verifier with the token exchange.
+
+**Reasoning**: PKCE was designed for public clients (SPAs/mobile) but
+adds belt-and-braces protection for confidential clients (web app with
+`client_secret`) too. If the OAuth `code` somehow leaks (reverse-proxy
+logs, server access logs, accidental paste), an attacker still needs
+BOTH the leaked code AND the `code_verifier` to redeem it. Negligible
+cost — ~64 bytes of state alongside the existing OAuth state. Google
+explicitly recommends PKCE for confidential clients. No major provider
+rejects PKCE on confidential clients, so no compatibility risk.
+
+**Alternatives considered**: Per-provider toggle (preset declares
+`requirePkce: bool`) — rejected: YAGNI; no major provider rejects PKCE
+on confidential clients. Off for confidential clients (rely on
+`client_secret` alone) — rejected: strictly weaker, no upside.
+
+**Source**: `secure/src/classes/OAuthHandler.php`. Behaviour:
+[ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
+
+### OAuth provider presets — JSON, single file (locked 2026-06-14)
+
+**Decision**: Provider presets live in
+`secure/admin/config/oauth-presets.json` as one JSON document with all
+providers (Google, Meta, Amazon, GitHub initially). Each preset declares
+`authorize_url`, `token_url`, `userinfo_url`, default scope, and the
+JSON path to `sub` / `email` in the userinfo response. Authors extend by
+adding entries to the file (Apple, GitLab, Slack, etc.) without needing
+PHP knowledge.
+
+**Reasoning**: Aligns with the "Data shape — JSON for the author's
+website data, with carve-out for user-extensible admin config" principle
+(locked 2026-06-14 — separate entry below). Authors who add a provider
+preset don't need PHP knowledge. Single file matches the existing
+config-file convention (now JSON-shaped instead of PHP-array) and keeps
+the 4-provider initial catalog readable. Per-provider files are a
+possible refactor later if a community-presets feature ships and per-file
+diffs become important.
+
+**Alternatives considered**: PHP array file (`oauth-presets.php`) —
+rejected: contradicts the data-shape principle; presets are
+user-extensible admin config, and PHP-array forces PHP knowledge for
+extension. Per-provider files
+(`secure/admin/config/oauth-providers/<name>.json`) — rejected for the
+initial slice: better for community-presets distribution but premature
+now; mechanical refactor if it ever matters.
+
+**Source**: `secure/admin/config/oauth-presets.json` (the file),
+`secure/src/classes/OAuthHandler.php` (consumer). Behaviour:
+[ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
+
+### OAuth userinfo cacheTTL — API auth config, default 0, skip TOS check at 0 (locked 2026-06-14)
+
+**Decision**: The userinfo-fetch `cacheTTL` knob lives on the per-endpoint
+API auth config (where beta.8's resolver `cacheTTL` already lives), not
+on the provider preset. Ships with default `0` (no cache) — the standard
+OAuth login flow does a single userinfo fetch per login, so caching is
+moot for that path. Per-provider TOS check is deferred until a future
+shipped default exceeds 0.
+
+**Reasoning**: API auth config placement matches the beta.8 resolver
+`cacheTTL` precedent (per-config, not per-provider) — authors find the
+knob in the same place. Default 0 keeps the correctness story simple:
+single fetch per login is well within every major provider's normal
+usage, no TOS check needed. Authors who add re-fetch-userinfo flows
+(e.g., a `/profile` endpoint that resyncs from Google on each request)
+can crank the TTL to 300s+ at their discretion + responsibility; at that
+point a TOS check on their target provider becomes the author's call.
+
+**Alternatives considered**: Provider preset (per-provider default) —
+rejected: doesn't match the resolver `cacheTTL` location authors already
+know. Both (preset default + API override) — rejected: complexity for
+marginal win. Default of 300s or 900s — rejected: the login flow doesn't
+repeat-fetch, so a non-zero default would mostly be unused noise; defer
+until a real repeat-fetch pattern emerges.
+
+**Source**: `secure/src/classes/OAuthHandler.php` (reads the TTL from
+the consumed API auth config), `secure/src/functions/serverFetch.php`
+(cacheable rule already in place from beta.8). Behaviour:
+[ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
+
+---
+
+## Project conventions (beta.9)
+
+### Data shape — JSON for the author's website data, PHP for engine plumbing (locked 2026-06-14)
+
+**Decision**: Per-project data — anything under `secure/projects/<p>/`
+that describes the AUTHOR'S WEBSITE — defaults to JSON. QuickSite engine
+and admin panel itself stay PHP (QuickSite is and will remain a PHP app).
+The line: if the data describes the author's website, it's JSON; if it's
+QuickSite plumbing (engine, admin, framework config), it's PHP. Carve-out:
+admin config that users routinely EXTEND (OAuth provider presets, future
+plugin registries, etc.) defaults to JSON too — so extension doesn't
+require PHP knowledge.
+
+**Reasoning**: The website QuickSite BUILDS could conceivably target a
+different runtime later (or be exported, mirrored, imported
+independently); JSON for project data keeps that option open. Most
+per-project data already follows this pattern (translations, state
+stores, route resolvers, API endpoints). Notable migration candidate:
+`secure/projects/<p>/management/routes.php` — currently PHP-array,
+should be JSON; deferred to a future slice (chip filed; natural slot is
+beta.11 when the build pipeline touches it). The carve-out for
+user-extensible admin config means OAuth presets land as JSON without
+contradicting the engine-stays-PHP rule.
+
+**Alternatives considered**: All-PHP — rejected: locks every project to
+a PHP runtime, defeats portability and clean export/import scenarios.
+All-JSON (including engine/admin) — rejected: loses PHP expressivity
+for code-adjacent config (constants, env-var interpolation in
+`api-secrets.php`, helper functions inline). Per-file judgement without
+a documented principle — rejected: leads to drift; new code lands in
+inconsistent shapes.
+
+**Source**: New per-project data lands as JSON by default; existing
+PHP-array per-project data files (notably
+`secure/projects/<p>/management/routes.php`) flagged as migration
+candidates. Workflow rule mirrored in `CLAUDE.md` (Architecture
+Principles section). Behaviour: applies forward to every new data file.
