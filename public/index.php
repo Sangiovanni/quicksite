@@ -336,6 +336,57 @@ if ($__editorMode && !$__editorLiveMode) {
 }
 
 if (!empty($__resolverConfigs)) {
+    // ── beta.9 A1 Slice 2b — side-effect resolver short-circuit ──
+    // OAuth resolver kinds (oauth-start, oauth-callback) replace the
+    // data-fetch + render pipeline with a 302 + optional session-cookie
+    // response. validateResolverConfigs enforces all-same-kind per route,
+    // so the first config's kind is authoritative for the whole array.
+    $__firstKind = $__resolverConfigs[0]['kind'] ?? 'data';
+    if ($__firstKind === 'oauth-start' || $__firstKind === 'oauth-callback') {
+        require_once SECURE_FOLDER_PATH . '/src/classes/OAuthHandler.php';
+        require_once SECURE_FOLDER_PATH . '/src/functions/oauthStateStore.php';
+
+        $__oauthCfg = $__resolverConfigs[0];
+        $__provider = $__oauthCfg['provider'] ?? '';
+        // A {:routeParam} placeholder in the provider field lets one
+        // resolver entry on /auth/oauth/:provider/callback serve every
+        // provider. Resolve against the URL's captured params.
+        if (preg_match('/^\{:(\w+)\}$/', $__provider, $__pm)) {
+            $__provider = $trimParameters->routeParams()[$__pm[1]] ?? '';
+        }
+
+        try {
+            $__oauthHandler = new OAuthHandler($__provider);
+        } catch (RuntimeException $__oauthErr) {
+            // Surface OAuth misconfig loudly — missing presets file,
+            // unknown provider id, missing secrets entry. Mirrors the
+            // existing data-resolver config-bug treatment.
+            http_response_code(500);
+            echo "<h1>500 — OAuth misconfigured</h1>\n";
+            echo '<p>Route: <code>' . htmlspecialchars($routePath) . "</code></p>\n";
+            echo '<p>Provider: <code>' . htmlspecialchars((string) $__provider) . "</code></p>\n";
+            echo '<p>Error: ' . htmlspecialchars($__oauthErr->getMessage()) . "</p>\n";
+            echo "<p><small>Fix the OAuth config (oauth-presets.json / oauth-secrets.php) and reload.</small></p>\n";
+            exit;
+        }
+
+        $__oauthResult = ($__firstKind === 'oauth-start')
+            ? $__oauthHandler->handleStart($_GET['return'] ?? null)
+            : $__oauthHandler->handleCallback($_GET);
+
+        // Apply optional session cookie + 302 redirect. Return shape
+        // locked in OAuthHandler's docblock: ['redirect' => $url,
+        // 'cookie' => null | ['name'=>..., 'value'=>..., 'options'=>[...]]].
+        if (!empty($__oauthResult['cookie'])) {
+            $__c = $__oauthResult['cookie'];
+            setcookie($__c['name'], $__c['value'], $__c['options'] ?? []);
+        }
+        $__redirect = $__oauthResult['redirect'] ?? '/';
+        header('Location: ' . $__redirect, true, 302);
+        exit;
+    }
+
+    // ── existing data-resolver path (kind=data, the only beta.8 path) ──
     require_once SECURE_FOLDER_PATH . '/src/classes/DataResolver.php';
     $__resolver = new DataResolver();
     $__resolverContext = [

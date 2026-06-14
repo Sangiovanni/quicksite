@@ -380,8 +380,88 @@ function _sampleValueFromSchemaNode($schema, string $varName) {
  * shape mistakes loudly at write time so the resolver itself can keep
  * its runtime path tight.
  */
+/**
+ * Allowed resolver kinds. Beta.8 shipped only data-fetch resolvers (kind
+ * was implicit); beta.9 A1 Slice 2b introduces side-effect kinds
+ * (oauth-start, oauth-callback) that short-circuit the render with a
+ * redirect + optional session cookie. Future side-effect kinds (e.g.
+ * 'redirect', 'oauth-logout') extend this list + the dispatcher in
+ * public/index.php.
+ */
+const RESOLVER_ALLOWED_KINDS = ['data', 'oauth-start', 'oauth-callback'];
+
 function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager = null): array {
     $errors = [];
+
+    // Kind dispatch (beta.9 A1 Slice 2b). Default 'data' preserves
+    // backward-compat with beta.8 configs (no kind field = data resolver).
+    $kind = $config['kind'] ?? 'data';
+    if (!is_string($kind) || $kind === '') {
+        return [[
+            'field'    => 'resolver.kind',
+            'reason'   => 'invalid_type',
+            'expected' => 'string',
+        ]];
+    }
+    if (!in_array($kind, RESOLVER_ALLOWED_KINDS, true)) {
+        return [[
+            'field'    => 'resolver.kind',
+            'reason'   => 'invalid_value',
+            'value'    => $kind,
+            'expected' => 'one of: ' . implode(', ', RESOLVER_ALLOWED_KINDS),
+        ]];
+    }
+
+    // OAuth kinds use a completely different schema (provider, no
+    // endpoint/inputs/expose/cacheTTL/onMiss). Validate + early-return.
+    if ($kind === 'oauth-start' || $kind === 'oauth-callback') {
+        // provider — required, string, either a known preset id or a
+        // {:routeParam} placeholder so one resolver entry on
+        // /auth/oauth/:provider/callback can serve every provider.
+        if (!isset($config['provider']) || !is_string($config['provider']) || $config['provider'] === '') {
+            $errors[] = [
+                'field'  => 'resolver.provider',
+                'reason' => 'required',
+                'hint'   => 'OAuth resolver kinds require a provider id matching a key in oauth-presets.json (e.g. "google", "github"), or a {:routeParam} placeholder.',
+            ];
+        } else {
+            $provider = $config['provider'];
+            $isPlaceholder = (bool) preg_match('/^\{:\w+\}$/', $provider);
+            if (!$isPlaceholder) {
+                // Literal provider — must exist in oauth-presets.json.
+                $presetsPath = SECURE_FOLDER_PATH . '/admin/config/oauth-presets.json';
+                if (file_exists($presetsPath)) {
+                    $presets = json_decode(@file_get_contents($presetsPath) ?: '{}', true);
+                    if (is_array($presets) && !isset($presets[$provider])) {
+                        $errors[] = [
+                            'field'  => 'resolver.provider',
+                            'reason' => 'unknown_provider',
+                            'value'  => $provider,
+                            'hint'   => 'Provider id must match a key in secure/admin/config/oauth-presets.json. Add the preset there (URL/scope/userinfo paths) or use a {:routeParam} placeholder to read from the URL.',
+                        ];
+                    }
+                }
+            }
+        }
+
+        // Reject fields that belong to the data-resolver schema — author
+        // likely mixed shapes by mistake; explicit error beats silent
+        // ignore so they fix the config rather than expect both to work.
+        foreach (['endpoint', 'inputs', 'expose', 'cacheTTL', 'onMiss'] as $dataField) {
+            if (isset($config[$dataField])) {
+                $errors[] = [
+                    'field'  => 'resolver.' . $dataField,
+                    'reason' => 'inapplicable_for_kind',
+                    'kind'   => $kind,
+                    'hint'   => 'Field "' . $dataField . '" applies only to data resolvers (kind=data). OAuth kinds use only "kind" + "provider".',
+                ];
+            }
+        }
+
+        return $errors;
+    }
+
+    // ── kind == 'data' → existing data-resolver validation below ──
     $apiManager = $apiManager ?? new ApiEndpointManager();
 
     // endpoint — required, string, must exist in registry, server-callable.
@@ -639,32 +719,57 @@ function validateResolverConfigs(array $configs, ?ApiEndpointManager $apiManager
         }
     }
 
-    // Phase 2 — flat-namespace collision detection. Locked decision
-    // (BETA8_MULTI_RESOLVER.md #4): when two resolvers in the same
-    // route expose a key with the same name, the save is REJECTED.
-    // Authors disambiguate by renaming, OR by accessing the colliding
-    // values through the always-available namespaced form
-    // ($r0.title / $r1.title) and removing the offending flat
-    // expose from one resolver.
-    $exposeKeyToResolverIndex = [];
-    foreach ($configs as $idx => $config) {
-        if (!is_array($config)) continue;
-        $expose = $config['expose'] ?? [];
-        if (!is_array($expose)) continue;
-        foreach ($expose as $name => $path) {
-            if (!is_string($name) || $name === '') continue;
-            if (isset($exposeKeyToResolverIndex[$name])) {
-                $otherIdx = $exposeKeyToResolverIndex[$name];
-                $errors[] = [
-                    'field'         => "resolver[{$idx}].expose.{$name}",
-                    'reason'        => 'collision',
-                    'value'         => $name,
-                    'collidesWith'  => "resolver[{$otherIdx}].expose.{$name}",
-                    'resolverIndex' => $idx,
-                    'hint'          => "Two resolvers expose '{$name}' to the flat template namespace. Rename one (e.g. {$name}Alt), OR use the namespaced form in your template (\$r{$idx}['{$name}'] / \$r{$otherIdx}['{$name}']) and remove the colliding flat exposure from one resolver.",
-                ];
-            } else {
-                $exposeKeyToResolverIndex[$name] = $idx;
+    // Phase 2 — all-same-kind check (beta.9 A1 Slice 2b). Mixing data +
+    // side-effect resolvers on one route is incoherent: side-effect kinds
+    // (oauth-start, oauth-callback) short-circuit the render with a 302;
+    // data resolvers expect the render to proceed with their exposed
+    // vars. Reject mixed routes — author splits into separate routes.
+    $kinds = [];
+    foreach ($configs as $config) {
+        if (is_array($config)) {
+            $kinds[] = $config['kind'] ?? 'data';
+        }
+    }
+    $uniqueKinds = array_values(array_unique($kinds));
+    if (count($uniqueKinds) > 1) {
+        $errors[] = [
+            'field'  => 'resolver',
+            'reason' => 'mixed_kinds',
+            'kinds'  => $uniqueKinds,
+            'hint'   => 'A single route cannot mix resolver kinds — side-effect kinds (oauth-start, oauth-callback) short-circuit the render, data resolvers feed it. Split into separate routes (one route per kind).',
+        ];
+    }
+
+    // Phase 3 — flat-namespace collision detection (data resolvers only).
+    // Locked decision (BETA8_MULTI_RESOLVER.md #4): when two data
+    // resolvers in the same route expose a key with the same name, the
+    // save is REJECTED. Authors disambiguate by renaming, OR by accessing
+    // the colliding values through the always-available namespaced form
+    // ($r0.title / $r1.title) and removing the offending flat expose
+    // from one resolver. Skip for non-data kinds — OAuth resolvers have
+    // no expose field.
+    $isAllData = (count($uniqueKinds) === 1 && $uniqueKinds[0] === 'data');
+    if ($isAllData) {
+        $exposeKeyToResolverIndex = [];
+        foreach ($configs as $idx => $config) {
+            if (!is_array($config)) continue;
+            $expose = $config['expose'] ?? [];
+            if (!is_array($expose)) continue;
+            foreach ($expose as $name => $path) {
+                if (!is_string($name) || $name === '') continue;
+                if (isset($exposeKeyToResolverIndex[$name])) {
+                    $otherIdx = $exposeKeyToResolverIndex[$name];
+                    $errors[] = [
+                        'field'         => "resolver[{$idx}].expose.{$name}",
+                        'reason'        => 'collision',
+                        'value'         => $name,
+                        'collidesWith'  => "resolver[{$otherIdx}].expose.{$name}",
+                        'resolverIndex' => $idx,
+                        'hint'          => "Two resolvers expose '{$name}' to the flat template namespace. Rename one (e.g. {$name}Alt), OR use the namespaced form in your template (\$r{$idx}['{$name}'] / \$r{$otherIdx}['{$name}']) and remove the colliding flat exposure from one resolver.",
+                    ];
+                } else {
+                    $exposeKeyToResolverIndex[$name] = $idx;
+                }
             }
         }
     }
