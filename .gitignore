@@ -90,6 +90,14 @@ secure/management/config/roles.php
 secure/admin/config/api-secrets.php
 secure/admin/config/oauth-secrets.php
 
+# Per-project OAuth credentials (beta.9 A1 Slice 2.5 — primary lookup
+# before falling back to the admin-level file above). The
+# secure/projects/* tree is already gitignored EXCEPT the quicksite
+# starter template; this re-ignores the secrets file inside the template
+# explicitly so a copy-and-rename setup in the template can't accidentally
+# leak credentials at commit time.
+secure/projects/quicksite/data/oauth-secrets.json
+
 # Resolver response cache (beta.8 A2 Slice 4). File-based TTL cache for
 # the server-side data resolver. Per-deployment runtime state — never
 # committed. cleanResolverCache command handles housekeeping; editApi

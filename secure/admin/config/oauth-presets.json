@@ -1,6 +1,7 @@
 {
     "_schema": {
         "_comment": "Reference schema for adding new providers. Not consumed by the OAuthHandler (the leading underscore is the ignore marker).",
+        "_lookup_order": "Slice 2.5 (locked 2026-06-15): per-project secure/projects/<active>/data/oauth-presets.json wins over this admin catalogue at PROVIDER level (full-entry replace, not field-level merge). Most projects use admin's catalogue as-is; per-project file only when a project needs custom providers, modified scope, or different extra_authorize_params.",
         "authorize_url": "<provider authorize endpoint>",
         "token_url": "<provider token endpoint>",
         "userinfo_url": "<provider userinfo endpoint>",

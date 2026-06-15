@@ -383,7 +383,7 @@ if (!empty($__resolverConfigs)) {
 
         $__oauthResult = ($__firstKind === 'oauth-start')
             ? $__oauthHandler->handleStart($__oauthCfg, $_GET['return'] ?? null)
-            : $__oauthHandler->handleCallback($_GET);
+            : $__oauthHandler->handleCallback($__oauthCfg, $_GET);
 
         // Apply optional session cookie + 302 redirect. Return shape
         // locked in OAuthHandler's docblock: ['redirect' => $url,

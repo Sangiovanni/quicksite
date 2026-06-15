@@ -1349,6 +1349,192 @@ implementation), `secure/src/functions/routeHelpers.php`
 (`substituteRouteParams()` helper), `public/index.php` (dispatcher
 wiring). Behaviour: [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
 
+### OAuth handleCallback shape — Basic client auth + dedicated cURL helper + sessionId cookie + 14d TTL + ?oauth_error redirects (locked 2026-06-15)
+
+**Decision**: `OAuthHandler::handleCallback(array $config, array $query)`
+implements the post-redirect half of the OAuth flow with five concrete
+shape choices made together:
+
+1. **Token-endpoint client auth**: `client_secret_basic` —
+   `Authorization: Basic base64(client_id:client_secret)` header, body
+   carries only the OAuth params (`grant_type`, `code`, `redirect_uri`,
+   `code_verifier`). Not `client_secret_post`.
+2. **HTTP client**: a small dedicated cURL wrapper (private static
+   `httpRequest` on `OAuthHandler`, ~30 LOC) for the two back-channel
+   calls (token exchange + userinfo). NOT a reuse of beta.8's
+   `serverFetch.php`.
+3. **Post-auth session cookie**: a separate `qs_oauth_user` cookie
+   holding an opaque 32-byte sessionId (64 hex chars), HttpOnly +
+   Secure + SameSite=Lax + 14-day Max-Age. Server-side mapping in
+   `$_SESSION['oauth_session'][$sessionId]` via the scaffolded
+   `storeOAuthSession`. NOT a single-cookie design that reuses
+   `qs_oauth_session` (the PHP session cookie).
+4. **Session TTL + redirect**: 14-day default session TTL (hardcoded
+   `OAuthHandler::SESSION_TTL_SECONDS = 14 * 86400`; per-API-auth-
+   config knob deferred). On success, redirect to the sanitised
+   `returnTo` recovered from the state record, or `/` if absent.
+5. **Provider-error / failure redirect shape**: on `error` in the
+   callback query (user denied consent, etc.) OR on recoverable
+   internal failure (token exchange 4xx/5xx, userinfo failure,
+   missing required `sub`), redirect to `returnTo` (or `/`) with
+   `?oauth_error=<code>` appended. Author owns the UX layer (their
+   landing page reads the query param).
+
+**Reasoning**:
+
+1. **Basic auth** is RFC 6749 §2.3.1's preferred scheme ("the
+   authorization server MUST support" Basic; `_post` is allowed but
+   downgrade-only). All four shipped providers (Google, Meta, Amazon,
+   GitHub) plus the test.oauth fixture accept Basic. Cleaner
+   separation: credentials in header, request data in body.
+2. **Dedicated cURL wrapper** wins on focus: OAuth's two back-channel
+   calls have very specific shapes (form-urlencoded body for token,
+   Bearer for userinfo, no follow-redirect, modest timeouts). Threading
+   those through `serverFetch.php`'s config-driven auth flow (designed
+   for api-secrets-driven REST consumption) would require adapter
+   shims for marginal de-duplication benefit. ~30 LOC of dedicated
+   helper is clearer.
+3. **Separate sessionId cookie** preserves "swap to file-based
+   session storage" as a one-file change later (the PHP session
+   cookie would go away, sessionId cookie stays the durable auth).
+   Matches the scaffolding shape — `storeOAuthSession($sessionId, …)`
+   was already shaped for an externally-supplied id, indicating the
+   2a-author had the same model in mind.
+4. **14-day TTL** matches the test.oauth fixture's
+   `OAUTH_REFRESH_TOKEN_TTL` and is a common SaaS-app default
+   (Auth0 / Clerk / Supabase defaults sit in the 7-30 day range).
+   `returnTo` reuse: the start handler already sanitised + stored
+   the value, callback just consumes the safe version.
+5. **`?oauth_error=` query** lets the author decide UX without
+   coupling the handler to a specific landing page. Symmetric with
+   how successful OAuth on most apps drops users back to the
+   destination they were trying to reach.
+
+**Alternatives considered**:
+
+1. **`client_secret_post`** (secret in body alongside other params) —
+   accepted by all providers; spec-permissible but downgrade. Rejected
+   for the cleaner separation of Basic.
+2. **Reuse `serverFetch.php`** for the back-channel calls — its auth
+   handling is config-driven (api-secrets.php sources `apiKey` etc.);
+   OAuth's per-flow client_secret + Basic header is a foreign shape.
+   Adapting serverFetch costs more than the focused helper.
+   **Inline curl_*() in handleCallback without a helper** — works but
+   smears the same setup logic across two call sites.
+3. **Single PHP-session cookie** (reuse `qs_oauth_session`, no
+   separate sessionId) — simpler today, but couples the session
+   surface to PHP's session subsystem; the planned migration to
+   file-based storage (per locked Q4 "swap-to-file becomes a
+   one-file change") becomes a two-surface change (must reinvent
+   the session-cookie story).
+4. **Session lifetime = `access_token` lifetime** (1 hour typical) —
+   forces re-login every hour; unusable for the common "open the
+   site, come back tomorrow" UX. Refresh tokens are the bridge,
+   so session TTL ≥ refresh window makes more sense.
+   **Session lifetime = `refresh_token` lifetime** — varies wildly
+   by provider (GitHub: no expiry; Google: 6 months; Meta: 60
+   days). 14d is the simplest fixed choice that works for all four.
+5. **Redirect to `/` with no info** — silent UX failure mode.
+   **Throw a 500 page** — server-side error display for a user-
+   initiated denial isn't a server error. **Render an error page
+   directly in the resolver** — couples the handler to a specific
+   UX surface.
+
+**Source**: `secure/src/classes/OAuthHandler.php` (`handleCallback`
+implementation + `exchangeCodeForTokens` / `fetchUserInfo` private
+methods + `httpRequest` / `dotPath` / `buildErrorRedirect` helpers),
+`secure/src/functions/oauthStateStore.php` (post-auth session storage
+already scaffolded — consumer landed here). Behaviour:
+[ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time. PII surface
+tracked in `NOTES/planning/DATA_FLOWS_INVENTORY.md` (running log).
+
+### OAuth presets + secrets — per-project override over admin fallback (locked 2026-06-15)
+
+**Decision**: OAuth presets and OAuth secrets each have a two-tier
+lookup: **per-project file first, admin file as fallback**. The two
+files at each tier:
+
+- Presets: `secure/projects/<active>/data/oauth-presets.json` (project,
+  JSON) → `secure/admin/config/oauth-presets.json` (admin catalogue,
+  JSON).
+- Secrets: `secure/projects/<active>/data/oauth-secrets.json` (project,
+  JSON) → `secure/admin/config/oauth-secrets.php` (admin fallback, PHP).
+
+Override is at **provider level** (full-entry replace, NOT field-level
+merge). If a project file declares `google`, it owns google entirely
+for that project; admin's google is ignored. Authors who want to tweak
+one field copy the whole admin entry into their project file and edit
+it.
+
+Save-time validation accepts the UNION (provider exists in EITHER
+file); runtime lookup resolves per-project-first.
+
+**Reasoning**: Provider facts (URLs, scope defaults, userinfo dot-
+paths) and credentials (client_id, client_secret) have different
+sharing patterns. Provider facts are usually identical across every
+project on an install — Google's authorize URL doesn't change per
+project. Credentials are usually different — each project registers
+its own OAuth app with each provider for security, analytics, and
+blast-radius reasons. Two-tier with override accommodates both:
+
+- Solo authors / dev installs: admin catalogue + admin secrets work
+  out of the box.
+- Multi-project installs: each project drops its own
+  `data/oauth-secrets.json` with its own `client_id`/`client_secret`
+  per provider. Admin catalogue still supplies the provider facts.
+- Custom providers (corporate SSO, niche OAuth servers): per-project
+  `oauth-presets.json` adds new keys without touching the engine
+  catalogue.
+
+Full-entry replace beats field-level merge because override resolution
+is local + predictable: one file to read to know what a project sees.
+Field-level merge means "what scope does google actually use here?"
+requires reading two files + applying merge rules in your head. The
+copy-and-edit overhead for the rare partial-override case (~5 lines of
+JSON) is much less surprise-prone than silent magic.
+
+Per-project files are JSON (both presets and secrets) — matches the
+locked "data shape" principle (per-project data is JSON; lets authors
+edit without PHP knowledge). Admin secrets keep their PHP shape because
+they're admin config consumed only by the engine, and PHP allows env-
+var interpolation patterns that real deployments use.
+
+**Alternatives considered**:
+
+- **Single-tier per-project only** — clean isolation, but forces
+  duplication when every project on an install uses the same Google
+  app (common for solo authors). Rejected as too rigid for the common
+  case.
+- **Single-tier admin only** (current pre-Slice-2.5 state) —
+  simplest, but breaks the moment a multi-project install hits
+  different OAuth apps per project. Rejected as the flag that
+  triggered this slice.
+- **Field-level deep merge** instead of provider-level replace — more
+  ergonomic for "tweak one field" but the cognitive cost of "what is
+  the effective config?" becomes a recurring foot-gun, especially
+  when fields like `scope` are space-separated strings that don't
+  merge cleanly (concat? union? replace?). Rejected for explicitness.
+- **Move all OAuth config to per-project, no admin tier** — same
+  rejection as single-tier per-project only.
+- **Add an explicit "exclude admin provider X for this project"
+  mechanism** — over-engineering for an edge case (block admin's
+  google while not providing project's own). Authors who need this
+  can override with an unused-but-present entry. Defer until a real
+  use case surfaces.
+
+**Source**: `secure/src/classes/OAuthHandler.php` (`loadPreset` +
+`loadSecret` + `projectConfigPath` / `readJsonFile` /
+`normaliseSecretEntry` helpers), `secure/src/functions/resolverHelpers.php`
+(oauth-kind validator now reads union of both files),
+`secure/admin/config/oauth-presets.json` (admin catalogue +
+`_lookup_order` field on the `_schema` reference entry documenting
+the pattern), `secure/admin/config/oauth-secrets.php.example`
+(docblock LOOKUP ORDER section documenting the pattern + per-project
+JSON shape), `.gitignore`
+(`secure/projects/quicksite/data/oauth-secrets.json` explicit ignore
+inside the un-ignored quicksite starter template). Behaviour:
+[ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
+
 ---
 
 ## Project conventions (beta.9)

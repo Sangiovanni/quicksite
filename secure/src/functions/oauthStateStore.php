@@ -57,7 +57,7 @@ function _oauthEnsureSession(): void {
         'lifetime' => 0,       // session cookie (cleared on browser close;
                                 // server-side TTL is independent and longer)
         'path'     => '/',
-        'secure'   => true,
+        'secure'   => _oauthIsHttps(),
         'httponly' => true,
         'samesite' => 'Lax',
     ]);
@@ -69,6 +69,31 @@ function _oauthEnsureSession(): void {
     if (!isset($_SESSION['oauth_session']) || !is_array($_SESSION['oauth_session'])) {
         $_SESSION['oauth_session'] = [];
     }
+}
+
+/**
+ * Detect whether the current request arrived over HTTPS. Honours the
+ * common `X-Forwarded-Proto` reverse-proxy header alongside the direct
+ * `$_SERVER['HTTPS']` + port 443 signals.
+ *
+ * Used to gate the `Secure` cookie attribute — browsers SILENTLY DROP
+ * cookies marked `Secure` when the connection is plain HTTP, which
+ * breaks the OAuth session round-trip in dev (state stored at /start
+ * vanishes because the cookie was never accepted). Auto-detect keeps
+ * dev (`http://local.quicksite`) working without sacrificing the
+ * `Secure` attribute in production.
+ */
+function _oauthIsHttps(): bool {
+    if (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') {
+        return true;
+    }
+    if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') {
+        return true;
+    }
+    if (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443) {
+        return true;
+    }
+    return false;
 }
 
 /**

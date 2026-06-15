@@ -428,18 +428,45 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
             $provider = $config['provider'];
             $isPlaceholder = (bool) preg_match('/^\{:\w+\}$/', $provider);
             if (!$isPlaceholder) {
-                // Literal provider — must exist in oauth-presets.json.
-                $presetsPath = SECURE_FOLDER_PATH . '/admin/config/oauth-presets.json';
-                if (file_exists($presetsPath)) {
-                    $presets = json_decode(@file_get_contents($presetsPath) ?: '{}', true);
-                    if (is_array($presets) && !isset($presets[$provider])) {
-                        $errors[] = [
-                            'field'  => 'resolver.provider',
-                            'reason' => 'unknown_provider',
-                            'value'  => $provider,
-                            'hint'   => 'Provider id must match a key in secure/admin/config/oauth-presets.json. Add the preset there (URL/scope/userinfo paths) or use a {:routeParam} placeholder to read from the URL.',
-                        ];
+                // Literal provider — must exist either in the per-project
+                // oauth-presets.json OR the admin catalogue. Slice 2.5
+                // (2026-06-15): per-project overrides take precedence at
+                // runtime, but for save-time validation we accept the
+                // union (the resolver only needs the provider id to be
+                // resolvable somewhere; OAuthHandler picks which file).
+                $known = [];
+                if (defined('PROJECT_PATH')) {
+                    $projectPath = PROJECT_PATH . '/data/oauth-presets.json';
+                    if (file_exists($projectPath)) {
+                        $projectPresets = json_decode(@file_get_contents($projectPath) ?: '{}', true);
+                        if (is_array($projectPresets)) {
+                            foreach (array_keys($projectPresets) as $k) {
+                                // Skip _schema / _comment doc entries
+                                if (is_string($k) && $k !== '' && $k[0] !== '_') {
+                                    $known[$k] = true;
+                                }
+                            }
+                        }
                     }
+                }
+                $adminPath = SECURE_FOLDER_PATH . '/admin/config/oauth-presets.json';
+                if (file_exists($adminPath)) {
+                    $admin = json_decode(@file_get_contents($adminPath) ?: '{}', true);
+                    if (is_array($admin)) {
+                        foreach (array_keys($admin) as $k) {
+                            if (is_string($k) && $k !== '' && $k[0] !== '_') {
+                                $known[$k] = true;
+                            }
+                        }
+                    }
+                }
+                if (!empty($known) && !isset($known[$provider])) {
+                    $errors[] = [
+                        'field'  => 'resolver.provider',
+                        'reason' => 'unknown_provider',
+                        'value'  => $provider,
+                        'hint'   => 'Provider id must match a key in oauth-presets.json — either per-project at secure/projects/<active>/data/oauth-presets.json or the engine catalogue at secure/admin/config/oauth-presets.json. Add the preset there (URL/scope/userinfo paths) or use a {:routeParam} placeholder to read from the URL.',
+                    ];
                 }
             }
         }
