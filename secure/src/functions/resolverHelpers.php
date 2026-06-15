@@ -444,6 +444,30 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
             }
         }
 
+        // callback_url — optional, string. Applies ONLY to oauth-start
+        // (it sets the redirect_uri sent to the provider). The
+        // oauth-callback route IS the callback URL, so the field is
+        // inapplicable on that kind. {:routeParam} placeholders are
+        // allowed and resolved by the dispatcher before handleStart()
+        // is invoked. Omitted ⇒ handler defaults to
+        // /auth/oauth/<provider>/callback.
+        if (array_key_exists('callback_url', $config)) {
+            if ($kind === 'oauth-callback') {
+                $errors[] = [
+                    'field'  => 'resolver.callback_url',
+                    'reason' => 'inapplicable_for_kind',
+                    'kind'   => $kind,
+                    'hint'   => 'callback_url applies only to oauth-start (it sets the redirect_uri sent to the provider). The oauth-callback route IS the callback URL.',
+                ];
+            } elseif (!is_string($config['callback_url']) || $config['callback_url'] === '') {
+                $errors[] = [
+                    'field'  => 'resolver.callback_url',
+                    'reason' => 'invalid_type',
+                    'hint'   => 'callback_url must be a non-empty string (e.g., "/auth/oauth/{:provider}/callback" or "/auth/google/callback"). Omit to use the default /auth/oauth/<provider>/callback.',
+                ];
+            }
+        }
+
         // Reject fields that belong to the data-resolver schema — author
         // likely mixed shapes by mistake; explicit error beats silent
         // ignore so they fix the config rather than expect both to work.
@@ -453,7 +477,7 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
                     'field'  => 'resolver.' . $dataField,
                     'reason' => 'inapplicable_for_kind',
                     'kind'   => $kind,
-                    'hint'   => 'Field "' . $dataField . '" applies only to data resolvers (kind=data). OAuth kinds use only "kind" + "provider".',
+                    'hint'   => 'Field "' . $dataField . '" applies only to data resolvers (kind=data). OAuth kinds use "kind" + "provider" (+ optional "callback_url" for oauth-start).',
                 ];
             }
         }

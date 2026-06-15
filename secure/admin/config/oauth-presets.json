@@ -61,5 +61,17 @@
         "userinfo_name_path": "name",
         "extra_authorize_params": {},
         "refresh_token_supported": false
+    },
+
+    "test-oauth": {
+        "_comment": "Local development fixture — quick-api-oauth (http://test.oauth) acts as the auth server, quick-api-route (http://test.api) as the resource server. Confidential client (test-client / test-secret) — exercises confidential + PKCE which matches the real-provider shape. Not for production use.",
+        "authorize_url": "http://test.oauth/authorize.php",
+        "token_url": "http://test.oauth/token.php",
+        "userinfo_url": "http://test.oauth/userinfo.php",
+        "scope": "profile",
+        "userinfo_sub_path": "sub",
+        "userinfo_email_path": "email",
+        "extra_authorize_params": {},
+        "refresh_token_supported": true
     }
 }

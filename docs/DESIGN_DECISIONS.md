@@ -1299,6 +1299,56 @@ the consumed API auth config), `secure/src/functions/serverFetch.php`
 (cacheable rule already in place from beta.8). Behaviour:
 [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
 
+### OAuth handleStart shape — config-array signature, dispatcher-side placeholder substitution, auto-absolute redirect_uri (locked 2026-06-14)
+
+**Decision**: `OAuthHandler::handleStart()` takes the full resolver
+config array plus an optional `returnTo` (signature:
+`handleStart(array $config, ?string $returnTo)`). `{:routeParam}`
+placeholders in config string fields (`provider`, `callback_url`, and
+any future fields) are substituted by the dispatcher in
+`public/index.php` BEFORE the handler is invoked, using a small shared
+helper `substituteRouteParams(string $str, array $routeParams): string`
+promoted from the inline regex into
+`secure/src/functions/routeHelpers.php`. The handler resolves the OAuth
+`redirect_uri` from `$config['callback_url']` (already substituted)
+with a default of `/auth/oauth/<provider>/callback`; if the resolved
+path is relative, the handler makes it absolute against
+`$_SERVER['HTTPS']` + `$_SERVER['HTTP_HOST']`.
+
+**Reasoning**: Config-array signature keeps the handler API stable as
+the remaining OAuth slices add more knobs (session TTL, success
+redirect, scope override, etc.) without churning the callers. Dispatcher
+substitution is forced anyway by the eager `loadPreset()` in the
+constructor (which needs a resolved provider id), so promoting the
+existing inline regex into a tiny shared helper lets future side-effect
+resolver kinds (e.g., `oauth-logout`) reuse the same substitution
+without copy-pasting the regex. Auto-absolute from `$_SERVER` is the
+standard tutorial path — the registered `redirect_uris` at the provider
+IS the security boundary, so a spoofed `HTTP_HOST` simply gets the
+redirect rejected by the provider; reverse-proxy gotchas (host/scheme
+stripping) get a docs note when ADMIN_PANEL §9.5 ships.
+
+**Alternatives considered**: Explicit-params signature
+(`handleStart(?string $callbackUrl, ?string $returnTo)`) — rejected:
+forces a signature change for every new config field across the
+remaining OAuth slices. Options-bag signature
+(`handleStart(array $options)`) — rejected: overkill; loses
+type-checking on the common case. Handler-side placeholder substitution
+(`OAuthHandler` takes `$routeParams` in constructor) — rejected: leaks
+routing into the auth class, and substitution must already happen
+pre-construct for `provider`, so the dispatcher is the natural home.
+Author-written absolute `redirect_uri` (full
+`http://local.quicksite/...` URL in the config) — rejected: terrible UX
+across dev/staging/prod environments. Project-level `site_url` config
+field as the absolute-URL source — deferred: useful escape hatch for
+reverse-proxy / multi-env cases, can land as a follow-up if real demand
+surfaces.
+
+**Source**: `secure/src/classes/OAuthHandler.php` (`handleStart()`
+implementation), `secure/src/functions/routeHelpers.php`
+(`substituteRouteParams()` helper), `public/index.php` (dispatcher
+wiring). Behaviour: [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
+
 ---
 
 ## Project conventions (beta.9)

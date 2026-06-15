@@ -202,3 +202,37 @@ if (!function_exists('fsRoutePathToParam')) {
         return preg_replace('#(^|/)__([a-zA-Z][a-zA-Z0-9_]*)#', '$1:$2', $fsRoutePath);
     }
 }
+
+if (!function_exists('substituteRouteParams')) {
+    /**
+     * Substitute every `{:name}` placeholder in `$str` with the matching
+     * value from `$routeParams`. Missing params resolve to '' (matches
+     * the prior inline behaviour in the OAuth dispatcher).
+     *
+     * Used by side-effect resolver kinds (oauth-start, oauth-callback,
+     * future oauth-logout, …) to resolve `{:routeParam}` references in
+     * resolver config fields (provider, callback_url, …) against the
+     * URL's captured params before the handler is invoked.
+     *
+     * Examples (routeParams = ['provider' => 'google']):
+     *   '{:provider}'                         → 'google'
+     *   '/auth/oauth/{:provider}/callback'    → '/auth/oauth/google/callback'
+     *   'no-placeholders-here'                → 'no-placeholders-here'
+     *   '{:missing}'                          → ''
+     *
+     * Locked design 2026-06-14, DESIGN_DECISIONS.md "OAuth handleStart shape".
+     *
+     * @param string                $str
+     * @param array<string, string> $routeParams
+     * @return string
+     */
+    function substituteRouteParams(string $str, array $routeParams): string {
+        return preg_replace_callback(
+            '/\{:(\w+)\}/',
+            function ($m) use ($routeParams) {
+                return isset($routeParams[$m[1]]) ? (string) $routeParams[$m[1]] : '';
+            },
+            $str
+        );
+    }
+}

@@ -347,13 +347,24 @@ if (!empty($__resolverConfigs)) {
         require_once SECURE_FOLDER_PATH . '/src/functions/oauthStateStore.php';
 
         $__oauthCfg = $__resolverConfigs[0];
-        $__provider = $__oauthCfg['provider'] ?? '';
-        // A {:routeParam} placeholder in the provider field lets one
-        // resolver entry on /auth/oauth/:provider/callback serve every
-        // provider. Resolve against the URL's captured params.
-        if (preg_match('/^\{:(\w+)\}$/', $__provider, $__pm)) {
-            $__provider = $trimParameters->routeParams()[$__pm[1]] ?? '';
+        $__routeParams = $trimParameters->routeParams();
+        // Substitute {:routeParam} placeholders in every config string
+        // field BEFORE the handler runs — handler operates on already-
+        // resolved values. Covers `provider` (one resolver entry on
+        // /auth/oauth/:provider/callback can serve every provider) AND
+        // `callback_url` (lets the start-flow target match the user's
+        // route shape, e.g. /auth/oauth/{:provider}/callback). See
+        // DESIGN_DECISIONS.md "OAuth handleStart shape" for why
+        // substitution lives in the dispatcher, not the handler.
+        foreach (['provider', 'callback_url'] as $__phField) {
+            if (isset($__oauthCfg[$__phField]) && is_string($__oauthCfg[$__phField])) {
+                $__oauthCfg[$__phField] = substituteRouteParams(
+                    $__oauthCfg[$__phField],
+                    $__routeParams
+                );
+            }
         }
+        $__provider = $__oauthCfg['provider'] ?? '';
 
         try {
             $__oauthHandler = new OAuthHandler($__provider);
@@ -371,7 +382,7 @@ if (!empty($__resolverConfigs)) {
         }
 
         $__oauthResult = ($__firstKind === 'oauth-start')
-            ? $__oauthHandler->handleStart($_GET['return'] ?? null)
+            ? $__oauthHandler->handleStart($__oauthCfg, $_GET['return'] ?? null)
             : $__oauthHandler->handleCallback($_GET);
 
         // Apply optional session cookie + 302 redirect. Return shape

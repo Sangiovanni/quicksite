@@ -82,11 +82,13 @@ secure/management/config/target.php
 secure/management/config/auth.php
 secure/management/config/roles.php
 
-# Admin config - server-side secrets for data resolver (beta.8 A2).
+# Admin config - server-side secrets for data resolver (beta.8 A2) +
+# OAuth provider credentials (beta.9 A1).
 # Gitignored by design — anyone with filesystem access to secure/ can
-# read these. Ship secure/admin/config/api-secrets.php.example as the
-# template; deployments copy + rename to api-secrets.php and populate.
+# read these. Ship the .example sibling as the template; deployments
+# copy + rename to the live filename and populate.
 secure/admin/config/api-secrets.php
+secure/admin/config/oauth-secrets.php
 
 # Resolver response cache (beta.8 A2 Slice 4). File-based TTL cache for
 # the server-side data resolver. Per-deployment runtime state — never

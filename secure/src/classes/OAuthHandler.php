@@ -52,15 +52,14 @@
  *   ]
  *
  *
- * Out of scope for this slice (2a — scaffolding):
+ * Slice status:
  *
- *   - Resolver-kind registration in DataResolver / resolverHelpers (Slice 2b)
- *   - Actual start-flow logic (Slice 2c)
- *   - Actual callback-flow logic (Slice 2d)
- *   - Logout + session-helpers (Slice 2e)
+ *   - Resolver-kind registration in resolverHelpers (Slice 2b — DONE)
+ *   - Start-flow logic (Slice 2c — DONE)
+ *   - Callback-flow logic (Slice 2d — pending)
+ *   - Logout + session-helpers (Slice 2e — pending)
  *
- * The methods below throw with a "not implemented" message until the
- * corresponding flow slice lands.
+ * `handleCallback` throws with a "not implemented" message until 2d lands.
  */
 
 class OAuthHandler
@@ -93,14 +92,77 @@ class OAuthHandler
      * Start the OAuth flow. Resolver calls this; we return the redirect
      * spec for the resolver to apply.
      *
-     * Slice 2c will implement: generate state + PKCE, store via
-     * oauthStateStore, build authorize URL with `client_id`,
-     * `redirect_uri`, `scope`, `state`, `code_challenge`,
-     * `code_challenge_method=S256`, + any preset `extra_authorize_params`.
+     * Flow:
+     *   1. Generate `state` (16 random bytes hex-encoded; 32 chars).
+     *   2. Generate PKCE `code_verifier` (32 random bytes base64url-encoded;
+     *      ~43 chars — RFC 7636 minimum, 256 bits of entropy) +
+     *      `code_challenge = base64url(SHA256(verifier))`.
+     *   3. Resolve `redirect_uri` from `$config['callback_url']` (already
+     *      substituted of `{:routeParam}` placeholders by the dispatcher);
+     *      default to `/auth/oauth/<provider>/callback`. If relative,
+     *      make absolute against the current scheme + host.
+     *   4. Store `state` → {verifier, provider, returnTo, redirect_uri}
+     *      via `storeOAuthState()` with ~10-min TTL, single-use.
+     *   5. Build the provider's authorize URL with `client_id`,
+     *      `redirect_uri`, `response_type=code`, `scope`, `state`,
+     *      `code_challenge`, `code_challenge_method=S256`, + any preset
+     *      `extra_authorize_params`.
+     *   6. Return `['redirect' => $authorizeUrl, 'cookie' => null]`.
+     *      (PHP's `session_start()` inside `storeOAuthState()` already
+     *      sets the `qs_oauth_session` cookie that holds the state record,
+     *      so the dispatcher doesn't need to set anything extra.)
+     *
+     * @param array<string, mixed> $config The resolver config (provider,
+     *                                     callback_url, …); placeholder
+     *                                     substitution already done by the
+     *                                     dispatcher.
+     * @param string|null          $returnTo Optional post-login redirect
+     *                                       target. Only same-site paths
+     *                                       starting with '/' (and not '//')
+     *                                       are honoured; everything else
+     *                                       is dropped to prevent open-
+     *                                       redirect abuse.
+     * @return array{redirect: string, cookie: null}
      */
-    public function handleStart(?string $returnTo = null): array
+    public function handleStart(array $config, ?string $returnTo = null): array
     {
-        throw new RuntimeException('OAuthHandler::handleStart not yet implemented (Slice 2c)');
+        $state = bin2hex(random_bytes(16));
+        $codeVerifier = self::base64url(random_bytes(32));
+        $codeChallenge = self::base64url(hash('sha256', $codeVerifier, true));
+
+        $callbackUrl = isset($config['callback_url']) && is_string($config['callback_url']) && $config['callback_url'] !== ''
+            ? $config['callback_url']
+            : '/auth/oauth/' . $this->providerId . '/callback';
+        $redirectUri = self::makeAbsoluteUrl($callbackUrl);
+
+        $safeReturnTo = self::sanitiseReturnTo($returnTo);
+
+        storeOAuthState($state, [
+            'verifier'     => $codeVerifier,
+            'provider'     => $this->providerId,
+            'returnTo'     => $safeReturnTo,
+            'redirect_uri' => $redirectUri,
+        ], 600);
+
+        $params = [
+            'response_type'         => 'code',
+            'client_id'             => $this->secret['client_id'],
+            'redirect_uri'          => $redirectUri,
+            'scope'                 => (string) ($this->preset['scope'] ?? ''),
+            'state'                 => $state,
+            'code_challenge'        => $codeChallenge,
+            'code_challenge_method' => 'S256',
+        ];
+        $extra = $this->preset['extra_authorize_params'] ?? [];
+        if (is_array($extra)) {
+            foreach ($extra as $k => $v) {
+                $params[(string) $k] = (string) $v;
+            }
+        }
+
+        $authorizeUrl = $this->preset['authorize_url'] . '?' . http_build_query($params);
+
+        return ['redirect' => $authorizeUrl, 'cookie' => null];
     }
 
     /**
@@ -195,5 +257,61 @@ class OAuthHandler
                 ? (string) $all[$providerId]['client_secret']
                 : null,
         ];
+    }
+
+    // ====================================================================
+    // Helpers — URL + encoding + sanitisation utilities used by both
+    // start (2c) and (forthcoming) callback (2d) flows.
+    // ====================================================================
+
+    /**
+     * Base64URL encoding per RFC 4648 §5 (URL-and-filename-safe alphabet,
+     * no padding). Used for the PKCE `code_verifier`/`code_challenge` and
+     * by RFC 7636 §4 explicitly: standard base64 with `+`→`-`, `/`→`_`,
+     * and trailing `=` removed.
+     */
+    private static function base64url(string $raw): string
+    {
+        return rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+    }
+
+    /**
+     * Promote a relative URL to absolute against the current request's
+     * scheme + host. Pass-through when already absolute (starts with
+     * `http://` or `https://`). Honours `X-Forwarded-Proto` for the common
+     * reverse-proxy case (project-level base-url config is a deferred
+     * escape hatch — see DESIGN_DECISIONS.md "OAuth handleStart shape").
+     */
+    private static function makeAbsoluteUrl(string $url): string
+    {
+        if (preg_match('#^https?://#i', $url)) {
+            return $url;
+        }
+        $isHttps = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+            || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+            || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
+        $scheme = $isHttps ? 'https' : 'http';
+        $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
+        if ($url === '' || $url[0] !== '/') {
+            $url = '/' . $url;
+        }
+        return $scheme . '://' . $host . $url;
+    }
+
+    /**
+     * Open-redirect guard for the `returnTo` value. Only same-site paths
+     * starting with `/` (and NOT `//`, which would be a protocol-relative
+     * URL pointing off-site) are honoured; everything else is dropped to
+     * null so the callback handler falls back to the safe default.
+     */
+    private static function sanitiseReturnTo(?string $returnTo): ?string
+    {
+        if ($returnTo === null || $returnTo === '') {
+            return null;
+        }
+        if ($returnTo[0] !== '/' || (isset($returnTo[1]) && $returnTo[1] === '/')) {
+            return null;
+        }
+        return $returnTo;
     }
 }
