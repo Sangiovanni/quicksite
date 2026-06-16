@@ -81,6 +81,76 @@
         return g;
     }
 
+    // Tiny helpers for the cookie-note body — multiple paragraphs with
+    // inline <code> / <a> fragments. Keeping them as named _render*
+    // helpers per the CLAUDE.md HTML-in-JS hygiene rule (createElement +
+    // textContent over innerHTML strings).
+    function _renderCode(text) {
+        const c = document.createElement('code');
+        c.textContent = text;
+        return c;
+    }
+    function _renderAnchor(href, text) {
+        const a = document.createElement('a');
+        a.href = href;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = text;
+        return a;
+    }
+    function _renderParagraph(parts, marginBottom) {
+        const p = document.createElement('p');
+        p.style.margin = '0 0 ' + (marginBottom || '0') + ' 0';
+        parts.forEach(function (part) {
+            if (typeof part === 'string') {
+                p.appendChild(document.createTextNode(part));
+            } else {
+                p.appendChild(part);
+            }
+        });
+        return p;
+    }
+    function _renderCookieNoteBody() {
+        const body = document.createElement('div');
+        body.style.marginTop = '8px';
+        body.style.fontSize = '12px';
+        body.style.lineHeight = '1.5';
+        body.style.color = 'var(--admin-text-muted, #555)';
+
+        body.appendChild(_renderParagraph([
+            'In the standard flow (user clicks this button on your site, ',
+            'gets redirected to the provider, comes back to ',
+            _renderCode('/auth/oauth/<provider>/callback'),
+            ') the OAuth cookies are FIRST-PARTY and work everywhere.',
+        ], '6px'));
+
+        body.appendChild(_renderParagraph([
+            'If you EMBED this site in an ',
+            _renderCode('<iframe>'),
+            ' on a different origin (e.g. a partner portal) then Safari ',
+            'Intelligent Tracking Prevention and Firefox Enhanced Tracking ',
+            'Protection may treat the OAuth cookies as third-party and ',
+            'BLOCK them — the user appears to log in but the callback ',
+            'drops their session.',
+        ], '6px'));
+
+        body.appendChild(_renderParagraph([
+            'Workarounds when embedding: open the sign-in flow in a new ',
+            'tab/popup (',
+            _renderCode('target="_blank"'),
+            ') so the cookies are set in a first-party context, or use ',
+            _renderAnchor(
+                'https://developer.mozilla.org/docs/Web/API/Storage_Access_API',
+                'the Storage Access API'
+            ),
+            ' to request cookie access. Full guidance lives in ',
+            _renderCode('ADMIN_PANEL.md §9.5'),
+            ' under the OAuth tier.',
+        ]));
+
+        return body;
+    }
+
     function renderWizard(container) {
         const wrap = document.createElement('div');
         wrap.className = 'qs-complex-wizard qs-complex-wizard--oauth-button';
@@ -159,6 +229,35 @@
             + 'to the homepage.'
         ));
         wrap.appendChild(returnGroup);
+
+        // ---- third-party cookie note (Slice 6) ------------------------
+        // BFF cookies are first-party in the standard OAuth flow (page →
+        // provider → callback all hit the QuickSite-built site directly,
+        // so the cookies set on the QuickSite origin are first-party from
+        // the browser's perspective). The edge case where this breaks:
+        // when the site is EMBEDDED in a cross-origin iframe (think
+        // "your QuickSite site embedded on a partner's portal"). Safari
+        // ITP / Firefox ETP treat cookies set from inside such iframes
+        // as third-party and may block them — the OAuth flow then loses
+        // its session between /start and /callback. Surfaced as a
+        // collapsed details block so authors who don't care don't see
+        // noise, but authors who do embed get the heads-up.
+        const cookieNote = document.createElement('details');
+        cookieNote.className = 'qs-oauth-button-cookie-note';
+        cookieNote.style.marginTop = '12px';
+        cookieNote.style.padding = '8px 10px';
+        cookieNote.style.border = '1px solid var(--admin-border-subtle, #ddd)';
+        cookieNote.style.borderRadius = '4px';
+        cookieNote.style.background = 'var(--admin-bg-subtle, #f9f9f9)';
+        const cookieSummary = document.createElement('summary');
+        cookieSummary.style.cursor = 'pointer';
+        cookieSummary.style.fontWeight = '600';
+        cookieSummary.style.fontSize = '13px';
+        cookieSummary.textContent = 'Third-party cookies note — relevant if you embed this site in iframes';
+        cookieNote.appendChild(cookieSummary);
+        const cookieBody = _renderCookieNoteBody();
+        cookieNote.appendChild(cookieBody);
+        wrap.appendChild(cookieNote);
 
         container.appendChild(wrap);
 

@@ -24,7 +24,7 @@ The API documents itself. Once installed:
 GET /management/help
 ```
 
-returns full documentation for **all 129 commands** — parameters, examples, validation rules, and error codes. For a specific command:
+returns full documentation for **all 130 commands** — parameters, examples, validation rules, and error codes. For a specific command:
 
 ```
 GET /management/help/addRoute
@@ -67,7 +67,7 @@ There is **no separate error envelope**. A failed call uses the same four fields
 
 ## Command catalogue
 
-The 129 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
+The 130 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
 
 > **AI is browser-direct (BYOK).** As of v1.0.0-beta.6 there is no `callAi` / `testAiKey` / `detectProvider` / `listAiProviders` server command — the admin panel calls AI providers directly from the browser using credentials stored in `aiConnectionsV3` (localStorage). The Management API only handles workflow specs and command execution.
 
@@ -92,6 +92,7 @@ The 129 commands group into the categories below. Use `GET /management/help` for
 | **Interactions** | Bind triggers (click, hover, scroll…) to actions on a node. |
 | **Page events** | Page-level lifecycle hooks (`onload`, `onresize`, `onscroll`). Add / edit / delete page-event interactions per route (`addPageEvent`, `editPageEvent`, `deletePageEvent`, `getPageEvents`). |
 | **API endpoints** | Manage external API integrations callable from page interactions. |
+| **Authentication** | `listOAuthProviders` returns the union of admin + per-project OAuth presets (from `oauth-presets.json`) with a per-provider `setup` summary describing whether the `/auth/oauth/<provider>/start` + `/callback` routes already exist. Drives the `oauth-button` Complex Element wizard. The OAuth flow itself runs through route-resolvers (`oauth-start` / `oauth-callback` / `oauth-logout` kinds) attached via `setRouteResolver` — not standalone commands. See [ADMIN_PANEL.md §9.5 "Tier 4 — OAuth"](ADMIN_PANEL.md). |
 | **State stores** | Per-page named client state bound to one API endpoint — fields with direction (request/response/both), init source, and response path. Gives interactions memory (pagination, search, filters, infinite scroll). Read/write via `getStateStores` / `setStateStores`. |
 | **Server-side data resolvers** | Per-route declaration that fires a server-side fetch BEFORE template render and exposes the response as template variables — SEO/AEO/first-paint payoff (initial HTML carries API content). Single resolver per route OR an array of resolvers firing in parallel (`curl_multi_*`) for multi-endpoint pages. Same JSON-style declaration as state stores (one shape, two executors). Read via `getSiteMap` (per-route subset under `routeResolvers`); write via `setRouteResolver` (the idempotent six-shape command — set / clear / patch / append / remove single slot). File-based cache with TTL + auth-cacheable gating; manual invalidation via `cleanResolverCache`. See [ADMIN_PANEL.md §9.7](ADMIN_PANEL.md). |
 | **System updates** | Pull updates, run migrations, inspect engine version. |

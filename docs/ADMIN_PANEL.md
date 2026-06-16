@@ -1232,6 +1232,153 @@ Any additional languages your project ships need the same shape.
 | Lifecycle events | `qs:auth:exchange-started` / `qs:auth:exchange-failed` on `document`; cleared by `qs:auth:saved` / `qs:auth:cleared` |
 | Design groundwork | `NOTES/planning/BETA8_AUTH_TIER_3.md` |
 
+#### Tier 4 — OAuth (beta.9)
+
+OAuth 2.0 Authorization Code + PKCE flow with provider-side identity
+(Google / Meta / Amazon / GitHub presets shipped; authors add others).
+Server-side token custody — provider tokens never reach the browser.
+
+**When to use OAuth vs Tier 3 magic-link**:
+
+- **OAuth** when you want "Sign in with Google / GitHub / Meta / Amazon"
+  branded buttons backed by the provider's identity. Lets users sign in
+  with accounts they already have. Server-side session, ~14-day default.
+- **Magic-link (Tier 3)** when you own the identity store (your own
+  user database, your own email sender). Browser-side token, you
+  control everything end-to-end.
+
+The two coexist — same site can offer both.
+
+**Token custody — BFF (Backend-For-Frontend)**: the OAuth flow's
+provider tokens (`access_token`, `refresh_token`) are kept server-side
+after the code exchange. The browser receives a first-party
+`HttpOnly; Secure; SameSite=Lax` session cookie (`qs_oauth_user`)
+mapping to a server-side session record. Provider tokens never reach
+JavaScript — closes the XSS exfil surface that
+browser-localStorage-stored OAuth tokens create. Locked design (see
+DESIGN_DECISIONS.md "OAuth token custody"); the IETF "OAuth 2.0 for
+Browser-Based Apps" BCP and every major provider recommend this
+pattern for confidential web-server clients.
+
+**Setting up a provider — 3 steps**:
+
+1. **Preset** — engine catalogue at `secure/admin/config/oauth-presets.json`
+   ships Google / Meta / Amazon / GitHub + a test-oauth fixture. To
+   add a custom provider, append an entry there (see `_schema` for
+   the field list). Per-project overrides land at
+   `secure/projects/<active>/data/oauth-presets.json` — same shape,
+   wins over admin per-provider (full-entry replace, not field
+   merge). Useful when one project wants extra scopes or a custom
+   provider not in the engine catalogue.
+2. **Credentials** — copy `secure/admin/config/oauth-secrets.php.example`
+   to `oauth-secrets.php` (gitignored), fill in
+   `client_id` + `client_secret` for each provider you use. Most
+   projects use per-project credentials instead — drop a
+   `secure/projects/<active>/data/oauth-secrets.json` with the same
+   shape. Per-project wins over admin. Real-world: each project
+   registers its own OAuth app with each provider (different
+   `client_id` per project, blast-radius isolation).
+3. **Button + routes** — open the visual editor on a page, click
+   "Add Element" → **Sign in with OAuth**, pick a provider in the
+   wizard. The wizard creates the start + callback routes
+   (`/auth/oauth/<provider>/start` + `/callback`), attaches the
+   `oauth-start` + `oauth-callback` resolvers, and emits the button
+   in one pass. Re-running the wizard for the same provider on
+   another page reuses the existing routes (with an explicit
+   warning) and just adds the button.
+
+**The flow** (no author interaction past step 3):
+
+1. User clicks the button → 302 to
+   `http://your-site/auth/oauth/<provider>/start`
+2. `OAuthHandler::handleStart` generates state + PKCE verifier,
+   stores them server-side, redirects to the provider's authorize URL
+3. User logs in at the provider, approves the scope grant
+4. Provider redirects to
+   `http://your-site/auth/oauth/<provider>/callback?code=…&state=…`
+5. `OAuthHandler::handleCallback` validates state, POSTs the code to
+   the provider's token endpoint (client_secret_basic auth +
+   code_verifier), fetches userinfo with the access_token, generates
+   a session id, stores `{provider, sub, email, name, tokens}`
+   server-side, returns a 302 to the homepage (or to the
+   `?return=/path` query param if provided) + sets the
+   `qs_oauth_user` cookie
+
+Authors customise the post-login landing by setting the wizard's
+"Redirect after login" field — appends `?return=/path` to the button's
+href. Server-side sanitisation rejects off-site URLs (open-redirect
+guard).
+
+**Template helpers** (always available — loaded by init.php):
+
+| Helper | Returns |
+|---|---|
+| `isOAuthLoggedIn(): bool` | true if the current request has a valid OAuth session |
+| `getOAuthUser(): ?array` | `{provider, sub, email, name}` or null. **Identity-only** — access_token / refresh_token / scope are NEVER exposed to templates (BFF custody). |
+
+Anonymous visitors (no `qs_oauth_user` cookie) trigger neither
+session creation nor lookup cost — both helpers early-return.
+
+```php
+<?php if (isOAuthLoggedIn()): ?>
+    <p>Welcome, <?= htmlspecialchars(getOAuthUser()['email']) ?></p>
+<?php else: ?>
+    <p>Please <a href="/auth/oauth/google/start">sign in</a></p>
+<?php endif; ?>
+```
+
+**Logout**: drop an `oauth-logout` resolver onto any route (e.g.
+`/auth/oauth/logout`, `/sign-out`). The dispatcher reads the
+`qs_oauth_user` cookie → finds the session → POSTs the access_token
+to the provider's `revoke_url` (when the preset declares one — Google,
+Amazon, the test-oauth fixture all do; GitHub + Meta use non-RFC-7009
+revoke flows so local-only logout there) → clears the server session
+→ expires the cookie → redirects to `?return=/path` or `/`. Idempotent
+(no-session → just expire the cookie, no errors). Provider field on
+`oauth-logout` is optional — declared value acts as a sanity check
+against the cookie's session.
+
+**Failure-mode UX**: callback redirects to `returnTo` (or `/`) with
+`?oauth_error=<code>` appended on:
+`invalid_state` / `missing_code` / `token_exchange_failed` /
+`userinfo_failed` / `userinfo_missing_sub`, plus the provider's own
+`error` query param when the user denied consent (`access_denied`,
+etc.). The author owns the UX layer on the landing page — read the
+`oauth_error` query param and surface a sensible message.
+
+**Third-party cookies** (Safari ITP / Firefox ETP): the cookies set
+in the standard flow are FIRST-PARTY (user navigates directly to your
+site for start + callback). The edge case where this breaks: your
+site is EMBEDDED in a cross-origin iframe on another domain (partner
+portal, embedded preview, etc.). Browsers may treat the cookies as
+third-party and block them — user appears to log in but the callback
+drops their session. Workarounds when embedding:
+
+- Open the sign-in flow in a new tab / popup
+  (`target="_blank"` on the button) so cookies are set first-party
+- Use the [Storage Access API](https://developer.mozilla.org/docs/Web/API/Storage_Access_API)
+  to request cookie access from the embedding context
+
+The oauth-button wizard surfaces a collapsed "Third-party cookies
+note" with this guidance so authors who embed don't get caught off-
+guard.
+
+**Touchpoints**:
+
+| Aspect | File |
+|---|---|
+| Server-side handler | `secure/src/classes/OAuthHandler.php` |
+| State + session storage | `secure/src/functions/oauthStateStore.php` (PHP-session-backed; swappable abstraction) |
+| Resolver kind registration + validation | `secure/src/functions/resolverHelpers.php` (`oauth-start` / `oauth-callback` / `oauth-logout` in `RESOLVER_ALLOWED_KINDS`) |
+| Dispatcher | `public/index.php` OAuth branch (substitutes `{:routeParam}` placeholders, dispatches to handleStart / handleCallback / handleLogout) |
+| Provider presets | `secure/admin/config/oauth-presets.json` (admin catalogue) + per-project `data/oauth-presets.json` (override) |
+| Provider credentials | `secure/admin/config/oauth-secrets.php` (admin fallback) + per-project `data/oauth-secrets.json` (primary) |
+| Provider listing | `secure/management/command/listOAuthProviders.php` (union of admin + per-project, with per-provider setup status) |
+| Visual element | `secure/src/classes/complexElements/OAuthButton.php` (builder) + `public/admin/.../contextual-complex/complex-oauth-button.js` (wizard) |
+| Template helpers | `secure/src/functions/oauthStateStore.php` (`isOAuthLoggedIn`, `getOAuthUser`) — loaded globally by `public/init.php` |
+| Locked decisions | `docs/DESIGN_DECISIONS.md` "OAuth (beta.9)" section (10+ entries — token custody, state generation, PKCE always-on, presets-as-JSON, per-project overrides, handleStart shape, handleCallback shape, logout shape, oauth-button shape) |
+| PII surface log | `NOTES/planning/DATA_FLOWS_INVENTORY.md` (running log of OAuth-stored fields) |
+
 ---
 
 ### 9.6 State stores

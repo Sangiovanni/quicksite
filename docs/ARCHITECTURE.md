@@ -169,7 +169,7 @@ ApiResponse::create(201, 'route.created')
     ->send();
 ```
 
-The full list of 127 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
+The full list of 130 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
 
 ### Response shape
 
@@ -735,6 +735,23 @@ preserves a clean separation: the framework enforces access; the user
 configures data. Locked rationale in
 [DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) under "Auth-gate vs auth-data —
 distinct concepts".
+
+**Side-effect resolver kinds (beta.9 OAuth)** — `oauth-start`,
+`oauth-callback`, `oauth-logout` extend the resolver pattern with a
+new archetype: resolvers that **short-circuit the render** with a 302
+redirect + optional session cookie instead of feeding template vars.
+The dispatcher routes side-effect kinds to `OAuthHandler` BEFORE the
+data-fetch path; `validateResolverConfigs` rejects mixing side-effect
+and data resolvers on the same route ("incoherent" — one short-
+circuits while the other expects render to proceed). Storage shape is
+identical to data resolvers (per-route sidecar entry; scalar or array
+for single / multi). `RESOLVER_ALLOWED_KINDS` in
+`secure/src/functions/resolverHelpers.php` lists all four. The
+detailed flow + per-kind config schema lives in
+[ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) under "Tier 4 — OAuth (beta.9)";
+the rationale (kind dispatch, callback hook = resolver kind, BFF
+token custody) lives in
+[DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) "OAuth (beta.9)" section.
 
 ---
 
