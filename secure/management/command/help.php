@@ -4421,6 +4421,39 @@ $GLOBALS['__help_commands'] = [
         ],
         'notes' => 'APIs and endpoints are defined per-project in data/api-endpoints.json. Use {{call:fetch:@apiId/endpointId,...}} in interactions to call these endpoints.'
     ],
+    'listOAuthProviders' => [
+        'description' => 'Lists available OAuth provider presets (the union of admin catalogue + per-project overrides) along with whether the per-provider routes are already set up. Drives the oauth-button wizard\'s provider picker.',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/listOAuthProviders',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => '2 OAuth providers listed',
+            'data' => [
+                'providers' => [
+                    [
+                        'id' => 'google',
+                        'name' => 'Google',
+                        'source' => 'admin',
+                        'scope' => 'openid email profile',
+                        'refresh_token_supported' => true,
+                        'has_revoke_url' => true,
+                        'setup' => [
+                            'start_route_exists' => false,
+                            'callback_route_exists' => false,
+                            'fully_set_up' => false,
+                            'start_route_path' => 'auth/oauth/google/start',
+                            'callback_route_path' => 'auth/oauth/google/callback'
+                        ]
+                    ]
+                ],
+                'count' => 1
+            ]
+        ],
+        'error_responses' => [],
+        'notes' => 'Sources: "admin" (engine catalogue at secure/admin/config/oauth-presets.json), "project" (project-only at secure/projects/<active>/data/oauth-presets.json), "project-override" (project overrides an admin entry). Per the Slice 2.5 lookup order locked 2026-06-15, project entries replace admin entries at PROVIDER level (full-entry replace, not field-level merge).'
+    ],
     
     'getApiEndpoint' => [
         'description' => 'Gets a single endpoint by ID, including the parent API\'s auth configuration.',

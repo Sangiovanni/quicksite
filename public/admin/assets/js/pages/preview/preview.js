@@ -7675,6 +7675,20 @@
             if (err) { showToast(err, 'error'); return; }
         }
 
+        // Optional pre-submit hook (beta.9 A1 Slice 4): lets a wizard
+        // perform multi-step setup (route + resolver creation, etc.)
+        // BEFORE the final addComplexElement call. Used by oauth-button
+        // to call addRoute x2 + setRouteResolver x2 before the button
+        // is spliced in. Wizards that don't need it omit the hook.
+        if (typeof addComplexController.preSubmit === 'function') {
+            try {
+                await addComplexController.preSubmit();
+            } catch (e) {
+                showToast(e && e.message ? e.message : 'Setup failed', 'error');
+                return;
+            }
+        }
+
         const config = (typeof addComplexController.getConfig === 'function')
             ? addComplexController.getConfig() : {};
 

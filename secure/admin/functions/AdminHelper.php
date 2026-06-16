@@ -170,6 +170,11 @@ function getCommandCategories(): array {
             'icon' => 'globe',
             'commands' => ['listApiEndpoints', 'getApiEndpoint', 'addApi', 'editApi', 'deleteApi', 'testApiEndpoint']
         ],
+        'authentication' => [
+            'label' => 'Authentication',
+            'icon' => 'shield',
+            'commands' => ['listOAuthProviders']
+        ],
         'snippet_management' => [
             'label' => 'Snippets',
             'icon' => 'puzzle',

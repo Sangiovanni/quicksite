@@ -1647,6 +1647,136 @@ constructing handler; falls back to local-only logout if preset is
 gone). Behaviour: [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
 PII surface tracked in `NOTES/planning/DATA_FLOWS_INVENTORY.md`.
 
+### OAuth-button Complex Element — sign-in only + listOAuthProviders + per-provider literal routes + branded a-link + skip-with-warn + standard insertion (locked 2026-06-15)
+
+**Decision**: The `oauth-button` Complex Element + its
+contextual-complex wizard make per-provider OAuth setup a single
+drag-and-fill action. Six concrete shape choices made together:
+
+1. **Scope of wizard automation**: **sign-in flow only**. The wizard
+   creates the start + callback routes (`/auth/oauth/<provider>/start`
+   and `/auth/oauth/<provider>/callback`), attaches the two resolvers
+   (`oauth-start`, `oauth-callback`), and emits the visual button.
+   Logout is NOT part of the wizard — author drags a separate
+   `oauth-logout-button` Complex Element when ready (own micro-slice
+   later), or just manually links to a `/logout` route they author
+   themselves.
+2. **Provider picker source**: **new `listOAuthProviders` command**
+   returning the union of admin + per-project `oauth-presets.json`
+   (filtering `_schema` / `_comment` ignore-markers). Mirrors
+   `listApiEndpoints` which `FormScaffold` already uses. Future-
+   proofs: adding a provider entry to the JSON automatically surfaces
+   in the wizard.
+3. **Route shape created**: **per-provider literal routes**
+   (`/auth/oauth/google/start`, `/auth/oauth/github/start`, …) — not
+   shared `:provider` param routes. Per-provider literal routes
+   preserve the Slice 2.5 per-project preset override capability
+   locally (each route's resolver can carry per-provider config) and
+   render with the provider name visible in the sitemap.
+4. **Button HTML shape**: **branded `<a>` link** —
+   `<a class="qs-oauth-button qs-oauth-button--<provider>"
+   href="/auth/oauth/<provider>/start"><textKey>Sign in with <X></textKey></a>`
+   (with an optional `<span class="qs-oauth-button__icon"
+   aria-hidden="true">` for CSS-driven branding). Real anchor, full-
+   page navigation — matches the locked redirect-not-popup flow from
+   Slice 2c/2d. Provider-specific CSS class lets designers theme per-
+   provider without re-emitting structure. No default CSS shipped
+   today; authors style via the existing style.css. CSS polish is a
+   later concern (post-2026-06-15).
+5. **Idempotency when provider routes already exist**: **skip-if-
+   exists, with explicit UX warning**. Wizard attempts each addRoute /
+   setRouteResolver; existing routes return `route.already_exists`
+   which the wizard treats as success and continues to button
+   emission. UX shows "Routes for `<provider>` already exist — this
+   wizard run will reuse them and add a button on this page" so the
+   author isn't surprised when a second Google sign-in button on a
+   different page silently shares the setup of the first.
+6. **Insertion mechanism**: **standard `addComplexElement` command**
+   with `kind: 'oauth-button'` + `targetNodeId` + `position`. The
+   wizard's final step calls addComplexElement just like every other
+   Complex Element wizard. After the splice, the button subtree is
+   indistinguishable from a hand-built one — same JSON shape, same
+   renderer, editable with the regular visual-editor tools.
+
+**Reasoning**:
+
+1. **Sign-in only** keeps the first complex-multi-step wizard tight.
+   Logout is one more route + resolver pair + visual element — easier
+   to add as a sibling micro-slice once we see how sign-in lands.
+   Avoids scope creep on the headline feature.
+2. **listOAuthProviders command** mirrors a pattern that already
+   works (`listApiEndpoints` for FormScaffold). Authors who add a
+   custom provider preset see it surface in the picker without code
+   changes. Cost: ~50 LOC PHP + 4 registration entries (per CLAUDE.md
+   command checklist).
+3. **Per-provider literal routes** make the sitemap human-readable
+   (`/auth/oauth/google/start` reads better than
+   `/auth/oauth/:provider/start` for a sitemap viewer). Locks in
+   that each provider's setup is locally tracked — important for the
+   per-project override pattern locked in Slice 2.5.
+4. **Branded `<a>` link** matches the redirect-not-popup OAuth UX
+   locked in earlier slices. CSS-driven branding is cheaper to ship
+   AND easier to customise per-project than emitting per-provider
+   SVGs or `<img>` references inline. Translatable label via textKey
+   keeps multi-language sites first-class.
+5. **Skip-with-warn** matches the "idempotent setup" instinct.
+   Failing on conflict forces author to delete first ("worse UX —
+   they want to add another button, not redo setup"); always
+   overwriting destroys prior customisation; skipping silently is the
+   one that surprises authors when their second button shares the
+   first's setup. Warn + skip is the only option that respects what
+   the author probably meant.
+6. **Standard addComplexElement insertion** keeps the wizard a thin
+   orchestration layer on top of established commands (`addRoute`,
+   `setRouteResolver`, `addComplexElement`). Visual editor's
+   "Add Element" UI surfaces oauth-button in the catalogue like every
+   other Complex Element.
+
+**Alternatives considered**:
+
+1. **Sign-in + sign-out kit** — wizard handles both flows. Rejected
+   for first-version scope; logout pattern slots in later as
+   `oauth-logout-button` Complex Element. **Just the button (no
+   route automation)** — rejected because it doesn't solve the
+   "discoverability problem" the wizard is meant for; the author
+   would still hand-craft routes + resolvers.
+2. **Hardcode the 4 shipped providers in JS** — fastest to ship but
+   breaks the moment someone adds a custom provider (which is the
+   point of Slice 2.5's override pattern). Rejected. **Wizard reads
+   JSON files directly** — JS can't read admin PHP-side files
+   without an endpoint anyway; admin endpoint properly auth-gates.
+   Rejected.
+3. **Shared param routes** (`:provider`) — fewer routes overall, but
+   ALL providers share one resolver config, defeating the per-
+   project per-provider override capability that motivated Slice
+   2.5. Rejected. **Author picks per-call** — extra friction on
+   every wizard run for an architectural decision authors shouldn't
+   re-make. Rejected.
+4. **`<button>` with onclick JS** — needs JS-enabled clients,
+   slower first paint, mismatches the redirect-not-popup decision.
+   Rejected. **Provider-canonical pixel-perfect buttons** (Google's
+   SDK button, etc.) — each provider has brand-guide specs; honouring
+   all four = lots of per-provider conditional HTML+CSS. Defer to a
+   polish pass; ship a "good enough" branded button now.
+5. **Fail-if-exists** — bad UX for "add another button on this page"
+   (the common case). Rejected. **Always overwrite** — destroys
+   author customisation. Rejected.
+6. **Dedicated insertion command** — doesn't match the established
+   Complex Element pattern. Rejected.
+
+**Source**: `secure/management/command/listOAuthProviders.php` (new
+command — union of admin + per-project presets),
+`secure/src/classes/complexElements/OAuthButton.php` (PHP builder —
+pure, kind = `'oauth-button'`),
+`public/admin/assets/js/pages/preview/contextual-complex/complex-oauth-button.js`
+(JS wizard — picker + form + orchestration of addRoute×2 +
+setRouteResolver×2 + addComplexElement),
+`secure/management/routes.php` (command registration),
+`secure/management/config/roles.php` + `.example` (command permission),
+`secure/management/command/help.php` (command docs),
+`secure/admin/functions/AdminHelper.php` `getCommandCategories()` (UI
+list). Behaviour: [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
+
 ---
 
 ## Project conventions (beta.9)
