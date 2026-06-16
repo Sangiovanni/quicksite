@@ -10,13 +10,15 @@
         "userinfo_email_path": "<dot-path into the userinfo JSON for the user's email>",
         "userinfo_name_path": "<dot-path into the userinfo JSON for the user's display name; optional>",
         "extra_authorize_params": "<object of additional query params to append to the authorize URL; provider-specific (e.g. Google's access_type=offline)>",
-        "refresh_token_supported": "<true if the provider issues refresh tokens with the standard flow; false for providers like GitHub OAuth Apps that don't expire tokens by default>"
+        "refresh_token_supported": "<true if the provider issues refresh tokens with the standard flow; false for providers like GitHub OAuth Apps that don't expire tokens by default>",
+        "revoke_url": "<OPTIONAL provider token-revocation endpoint per RFC 7009. When present, oauth-logout POSTs the access_token here with client_secret_basic auth. Omit for providers that don't implement RFC 7009 (e.g., GitHub uses a non-standard URL pattern; Meta uses a Graph API DELETE call) — logout falls back to local-only session clear in that case. Slice 2e (locked 2026-06-15)."
     },
 
     "google": {
         "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
         "token_url": "https://oauth2.googleapis.com/token",
         "userinfo_url": "https://www.googleapis.com/oauth2/v2/userinfo",
+        "revoke_url": "https://oauth2.googleapis.com/revoke",
         "scope": "openid email profile",
         "userinfo_sub_path": "id",
         "userinfo_email_path": "email",
@@ -44,6 +46,7 @@
         "authorize_url": "https://www.amazon.com/ap/oa",
         "token_url": "https://api.amazon.com/auth/o2/token",
         "userinfo_url": "https://api.amazon.com/user/profile",
+        "revoke_url": "https://api.amazon.com/auth/o2/revoke",
         "scope": "profile",
         "userinfo_sub_path": "user_id",
         "userinfo_email_path": "email",
@@ -69,6 +72,7 @@
         "authorize_url": "http://test.oauth/authorize.php",
         "token_url": "http://test.oauth/token.php",
         "userinfo_url": "http://test.oauth/userinfo.php",
+        "revoke_url": "http://test.oauth/revoke.php",
         "scope": "profile",
         "userinfo_sub_path": "sub",
         "userinfo_email_path": "email",

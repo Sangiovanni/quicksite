@@ -297,6 +297,18 @@ if (!defined('BASE_URL')) {
 }
 
 // ============================================================================
+// GLOBAL TEMPLATE HELPERS
+// ============================================================================
+// Function-definition-only files that templates may call without an
+// explicit require. The file uses function_exists guards so dispatch-
+// path code can also require_once it without double-declare; loading
+// here just makes the helpers reachable from any page template.
+//
+// Beta.9 A1 Slice 2e: isOAuthLoggedIn() / getOAuthUser() — templates
+// use these for "Sign in" vs "Welcome, <name>" conditional renders.
+require_once SECURE_FOLDER_PATH . '/src/functions/oauthStateStore.php';
+
+// ============================================================================
 // SECURITY HEADERS - Applied to all PHP-served responses
 // ============================================================================
 header('X-Content-Type-Options: nosniff');

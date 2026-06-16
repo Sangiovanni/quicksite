@@ -167,6 +167,61 @@ function clearOAuthSession(string $sessionId): void {
 }
 
 /**
+ * Template/PHP-side helper: does this request belong to a logged-in
+ * OAuth user? Reads $_COOKIE['qs_oauth_user'] (the opaque sessionId set
+ * by handleCallback), looks up the matching server-side record via
+ * getOAuthSession, returns true when a non-expired record exists.
+ *
+ * Cheap to call repeatedly within a request — only loads the PHP
+ * session once (lazy _oauthEnsureSession). Returns false on missing
+ * cookie, missing record, or expired record.
+ *
+ * Slice 2e (locked 2026-06-15).
+ */
+function isOAuthLoggedIn(): bool {
+    $sessionId = isset($_COOKIE['qs_oauth_user']) ? (string) $_COOKIE['qs_oauth_user'] : '';
+    if ($sessionId === '') {
+        return false;
+    }
+    return getOAuthSession($sessionId) !== null;
+}
+
+/**
+ * Template/PHP-side helper: return the logged-in user's identity
+ * fields, or null if no active OAuth session.
+ *
+ * **Identity-only exposure** — locked design 2026-06-15. The returned
+ * array contains ONLY the fields a template legitimately needs to
+ * render personalisation (`provider`, `sub`, `email`, `name`). The
+ * access_token, refresh_token, token_expires_at, and scope are STRIPPED
+ * before return: provider tokens stay in BFF custody (server-side
+ * session record only), never reach the template layer. Templates that
+ * need to act on the user's behalf (call a provider API, etc.) request
+ * the action via a server-side endpoint that uses the token directly —
+ * the token never has to leave the server.
+ *
+ * Slice 2e (locked 2026-06-15).
+ *
+ * @return array{provider:string,sub:string,email:?string,name:?string}|null
+ */
+function getOAuthUser(): ?array {
+    $sessionId = isset($_COOKIE['qs_oauth_user']) ? (string) $_COOKIE['qs_oauth_user'] : '';
+    if ($sessionId === '') {
+        return null;
+    }
+    $record = getOAuthSession($sessionId);
+    if ($record === null) {
+        return null;
+    }
+    return [
+        'provider' => isset($record['provider']) ? (string) $record['provider'] : '',
+        'sub'      => isset($record['sub'])      ? (string) $record['sub']      : '',
+        'email'    => isset($record['email'])    ? (string) $record['email']    : null,
+        'name'     => isset($record['name'])     ? (string) $record['name']     : null,
+    ];
+}
+
+/**
  * Prune any expired entries from both buckets. Best-effort housekeeping;
  * called opportunistically by storeOAuthState to keep the session record
  * from growing unbounded across long-running browser sessions.

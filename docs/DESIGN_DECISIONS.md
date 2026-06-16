@@ -1535,6 +1535,118 @@ JSON shape), `.gitignore`
 inside the un-ignored quicksite starter template). Behaviour:
 [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
 
+### OAuth logout shape — oauth-logout kind + optional-provider sanity check + always-revoke-if-preset-declares + identity-only helpers (locked 2026-06-15)
+
+**Decision**: Logout is implemented as a third resolver kind
+`oauth-logout` (symmetric with `oauth-start` / `oauth-callback`) with
+four concrete shape choices made together:
+
+1. **Trigger**: `oauth-logout` resolver kind. Author writes a route
+   anywhere (e.g., `/auth/oauth/logout` or `/sign-out`), attaches
+   `{kind: "oauth-logout"}`, hitting the URL invokes
+   `OAuthHandler::handleLogout()`. No fixed engine endpoint (would
+   break the "users own all routes" lock that drove the start +
+   callback designs).
+2. **Provider field on the resolver**: **optional**. When omitted
+   (common case), the dispatcher auto-detects the provider from the
+   `qs_oauth_user` cookie → session record. When present, used as a
+   sanity check — mismatch is `error_log()`-warned but logout proceeds
+   with the session's actual provider (cookie is the truth). One
+   logout route works for sites with multi-provider login.
+3. **Provider-side token revoke**: when the preset declares
+   `revoke_url`, logout POSTs the access token to that endpoint with
+   `client_secret_basic` auth (RFC 7009). Always-on; no per-resolver
+   opt-out. Revoke failure is logged but doesn't block local logout
+   (the user's intent of "log me out HERE" succeeds regardless).
+   Initial preset `revoke_url` additions: Google
+   (`oauth2.googleapis.com/revoke`), Amazon
+   (`api.amazon.com/auth/o2/revoke`), test-oauth fixture
+   (`test.oauth/revoke.php`). Skipped: Meta (uses non-RFC-7009 Graph
+   API DELETE), GitHub (uses non-standard URL pattern
+   `applications/{client_id}/token`) — local-only logout for those,
+   tokens expire naturally.
+4. **Template helpers**: `isOAuthLoggedIn(): bool` +
+   `getOAuthUser(): ?array` in `oauthStateStore.php`.
+   `getOAuthUser` returns **identity-only** fields (`provider`, `sub`,
+   `email`, `name`); access_token / refresh_token / token_expires_at /
+   scope are stripped before return. Templates that need to act on
+   the user's behalf request the action via a server-side endpoint
+   that uses the token directly — the token never leaves the server.
+
+**Reasoning**:
+
+1. **Resolver-kind trigger** is symmetric with start/callback; reuses
+   the resolver-attachment UX authors already learned for the rest of
+   the OAuth flow; respects the "users own all routes" lock that
+   ruled out built-in endpoints during the callback design.
+2. **Optional provider with sanity check** lets one logout route serve
+   every provider on the site without forcing per-provider duplication.
+   Sites with a single provider can still declare it for clarity in
+   the admin sitemap UI; the sanity check warns on copy-paste mistakes
+   (declared "google" but cookie says "meta") without breaking the
+   logout — the user shouldn't be punished for a config error they
+   didn't make.
+3. **Always-revoke-if-preset-declares** is the security-conscious
+   default: provider-side tokens that survive a "logout" past their
+   natural expiry are a real concern in shared-device / abandoned-
+   session scenarios. Making revoke opt-in (per-resolver field) would
+   hand authors a security choice they often lack context to make
+   well; making it always-on with preset-declared URLs lets the
+   PRESET (provider-fact-level) carry the policy. Failure-doesn't-
+   block-local-logout matters because the user-facing intent is "log
+   me out from this site" — provider-side cleanup is a hygiene step,
+   not a correctness requirement.
+4. **Identity-only helper exposure** matches the BFF token-custody
+   decision (locked 2026-06-14). Templates need to render
+   personalisation ("Welcome, Sara"); they DON'T need raw tokens.
+   Exposing tokens to templates would re-create the XSS exfil surface
+   BFF was chosen to prevent. The scope field is technically
+   identity-adjacent (which permissions did the user grant?), but
+   that's deferred to a separate scope-aware-rendering concern
+   landing closer to Slice 4 — chip filed (task_5b20a582).
+
+**Alternatives considered**:
+
+1. **Fixed engine endpoint** (`/qs/oauth/logout` hardcoded in core,
+   not user-authored) — rejected: breaks "users own all routes" for
+   no win.
+2. **Required provider field** (symmetric with start/callback for
+   consistency) — rejected: forces per-provider logout duplication on
+   sites with multi-provider login, with no benefit (the cookie
+   already knows the provider). **Provider absent + no sanity check**
+   (auto-detect only, no field even when supplied) — rejected: loses
+   the documentation value of an explicit declaration in the sitemap
+   UI for single-provider sites.
+3. **Opt-in revoke** (per-resolver `revoke: true/false` field) —
+   rejected: security choice authors often lack context for, lets
+   "I just won't bother with revoke today" become the default. **Never
+   revoke** (local-only logout, always) — rejected: leaves provider-
+   side token alive until natural expiry, real concern in shared-
+   device scenarios. **Block-on-revoke-failure** (5xx on revoke
+   failure) — rejected: prioritises hygiene over the user's intent
+   ("log me out HERE"), which always succeeds locally.
+4. **Expose full session record** (including tokens) to templates —
+   directly contradicts BFF token custody (locked 2026-06-14); the
+   threat model says templates ARE the XSS surface, exposing tokens
+   there is the exfil vector. **Expose scope alongside identity** —
+   deferred to a separate slice/chip with concrete UX consumers, per
+   "no helpers nobody calls" rule.
+
+**Source**: `secure/src/classes/OAuthHandler.php` (`handleLogout` +
+`revokeAtProvider` private method),
+`secure/src/functions/oauthStateStore.php` (`isOAuthLoggedIn` +
+`getOAuthUser` module-scoped helpers, identity-only return),
+`secure/src/functions/resolverHelpers.php` (`oauth-logout` added to
+`RESOLVER_ALLOWED_KINDS`; provider becomes optional on that kind;
+data-resolver-field rejection hint updated),
+`secure/admin/config/oauth-presets.json` (`revoke_url` field added to
+google + amazon + test-oauth; `_schema._revoke_url` documents the
+field as OPTIONAL + RFC 7009 standard), `public/index.php` (dispatcher
+branches on logout to derive provider from session before
+constructing handler; falls back to local-only logout if preset is
+gone). Behaviour: [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
+PII surface tracked in `NOTES/planning/DATA_FLOWS_INVENTORY.md`.
+
 ---
 
 ## Project conventions (beta.9)

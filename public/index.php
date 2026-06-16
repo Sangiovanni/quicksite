@@ -336,13 +336,14 @@ if ($__editorMode && !$__editorLiveMode) {
 }
 
 if (!empty($__resolverConfigs)) {
-    // ── beta.9 A1 Slice 2b — side-effect resolver short-circuit ──
-    // OAuth resolver kinds (oauth-start, oauth-callback) replace the
-    // data-fetch + render pipeline with a 302 + optional session-cookie
-    // response. validateResolverConfigs enforces all-same-kind per route,
-    // so the first config's kind is authoritative for the whole array.
+    // ── beta.9 A1 Slice 2b/2c/2d/2e — side-effect resolver short-circuit ──
+    // OAuth resolver kinds (oauth-start, oauth-callback, oauth-logout)
+    // replace the data-fetch + render pipeline with a 302 + optional
+    // session-cookie response. validateResolverConfigs enforces all-
+    // same-kind per route, so the first config's kind is authoritative
+    // for the whole array.
     $__firstKind = $__resolverConfigs[0]['kind'] ?? 'data';
-    if ($__firstKind === 'oauth-start' || $__firstKind === 'oauth-callback') {
+    if ($__firstKind === 'oauth-start' || $__firstKind === 'oauth-callback' || $__firstKind === 'oauth-logout') {
         require_once SECURE_FOLDER_PATH . '/src/classes/OAuthHandler.php';
         require_once SECURE_FOLDER_PATH . '/src/functions/oauthStateStore.php';
 
@@ -364,7 +365,34 @@ if (!empty($__resolverConfigs)) {
                 );
             }
         }
-        $__provider = $__oauthCfg['provider'] ?? '';
+
+        // Slice 2e: oauth-logout takes a different path to derive the
+        // provider id. start/callback get the provider from the config
+        // (URL-driven); logout auto-detects from the active session,
+        // because the user might have logged in via Meta and now hit a
+        // generic /logout route — the cookie is the truth.
+        $__logoutSessionId = '';
+        if ($__firstKind === 'oauth-logout') {
+            $__logoutSessionId = isset($_COOKIE['qs_oauth_user']) ? (string) $_COOKIE['qs_oauth_user'] : '';
+            $__logoutSession = $__logoutSessionId !== '' ? getOAuthSession($__logoutSessionId) : null;
+            if ($__logoutSession === null) {
+                // No active session — logout is idempotent. Expire the
+                // cookie defensively (in case it lingers with a stale
+                // sessionId no longer in the store) and redirect.
+                setcookie('qs_oauth_user', '', [
+                    'expires'  => time() - 3600,
+                    'path'     => '/',
+                    'secure'   => _oauthIsHttps(),
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ]);
+                header('Location: ' . ($_GET['return'] ?? '/'), true, 302);
+                exit;
+            }
+            $__provider = (string) ($__logoutSession['provider'] ?? '');
+        } else {
+            $__provider = $__oauthCfg['provider'] ?? '';
+        }
 
         try {
             $__oauthHandler = new OAuthHandler($__provider);
@@ -372,6 +400,29 @@ if (!empty($__resolverConfigs)) {
             // Surface OAuth misconfig loudly — missing presets file,
             // unknown provider id, missing secrets entry. Mirrors the
             // existing data-resolver config-bug treatment.
+            //
+            // Exception for logout: if the handler can't be built (e.g.,
+            // preset was removed after the user logged in), fall back to
+            // local-only logout — the user's intent of "log me out" must
+            // succeed even when the provider catalogue changed under
+            // them. The provider-side token will expire naturally.
+            if ($__firstKind === 'oauth-logout') {
+                error_log(
+                    "OAuth logout: handler construction failed (provider='{$__provider}'): "
+                    . $__oauthErr->getMessage()
+                    . '. Falling back to local-only logout.'
+                );
+                clearOAuthSession($__logoutSessionId);
+                setcookie('qs_oauth_user', '', [
+                    'expires'  => time() - 3600,
+                    'path'     => '/',
+                    'secure'   => _oauthIsHttps(),
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ]);
+                header('Location: ' . ($_GET['return'] ?? '/'), true, 302);
+                exit;
+            }
             http_response_code(500);
             echo "<h1>500 — OAuth misconfigured</h1>\n";
             echo '<p>Route: <code>' . htmlspecialchars($routePath) . "</code></p>\n";
@@ -381,9 +432,16 @@ if (!empty($__resolverConfigs)) {
             exit;
         }
 
-        $__oauthResult = ($__firstKind === 'oauth-start')
-            ? $__oauthHandler->handleStart($__oauthCfg, $_GET['return'] ?? null)
-            : $__oauthHandler->handleCallback($__oauthCfg, $_GET);
+        switch ($__firstKind) {
+            case 'oauth-start':
+                $__oauthResult = $__oauthHandler->handleStart($__oauthCfg, $_GET['return'] ?? null);
+                break;
+            case 'oauth-callback':
+                $__oauthResult = $__oauthHandler->handleCallback($__oauthCfg, $_GET);
+                break;
+            default: // 'oauth-logout'
+                $__oauthResult = $__oauthHandler->handleLogout($__oauthCfg, $__logoutSessionId, $_GET['return'] ?? null);
+        }
 
         // Apply optional session cookie + 302 redirect. Return shape
         // locked in OAuthHandler's docblock: ['redirect' => $url,

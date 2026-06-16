@@ -384,11 +384,11 @@ function _sampleValueFromSchemaNode($schema, string $varName) {
  * Allowed resolver kinds. Beta.8 shipped only data-fetch resolvers (kind
  * was implicit); beta.9 A1 Slice 2b introduces side-effect kinds
  * (oauth-start, oauth-callback) that short-circuit the render with a
- * redirect + optional session cookie. Future side-effect kinds (e.g.
- * 'redirect', 'oauth-logout') extend this list + the dispatcher in
- * public/index.php.
+ * redirect + optional session cookie. Slice 2e adds oauth-logout. Future
+ * side-effect kinds (e.g. 'redirect') extend this list + the dispatcher
+ * in public/index.php.
  */
-const RESOLVER_ALLOWED_KINDS = ['data', 'oauth-start', 'oauth-callback'];
+const RESOLVER_ALLOWED_KINDS = ['data', 'oauth-start', 'oauth-callback', 'oauth-logout'];
 
 function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager = null): array {
     $errors = [];
@@ -414,17 +414,23 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
 
     // OAuth kinds use a completely different schema (provider, no
     // endpoint/inputs/expose/cacheTTL/onMiss). Validate + early-return.
-    if ($kind === 'oauth-start' || $kind === 'oauth-callback') {
-        // provider — required, string, either a known preset id or a
-        // {:routeParam} placeholder so one resolver entry on
-        // /auth/oauth/:provider/callback can serve every provider.
-        if (!isset($config['provider']) || !is_string($config['provider']) || $config['provider'] === '') {
+    if ($kind === 'oauth-start' || $kind === 'oauth-callback' || $kind === 'oauth-logout') {
+        // provider — REQUIRED on oauth-start / oauth-callback (must be a
+        // preset id or a {:routeParam} placeholder so one resolver on
+        // /auth/oauth/:provider/callback covers every provider).
+        // OPTIONAL on oauth-logout (handler auto-detects from the cookie's
+        // session record; when present, the value acts as a sanity check —
+        // mismatch is logged but doesn't block the logout).
+        $providerRequired = ($kind !== 'oauth-logout');
+        $providerMissing = !isset($config['provider']) || !is_string($config['provider']) || $config['provider'] === '';
+
+        if ($providerRequired && $providerMissing) {
             $errors[] = [
                 'field'  => 'resolver.provider',
                 'reason' => 'required',
-                'hint'   => 'OAuth resolver kinds require a provider id matching a key in oauth-presets.json (e.g. "google", "github"), or a {:routeParam} placeholder.',
+                'hint'   => 'oauth-start and oauth-callback require a provider id matching a key in oauth-presets.json (e.g. "google", "github"), or a {:routeParam} placeholder. oauth-logout reads the provider from the active session and the field is optional there.',
             ];
-        } else {
+        } elseif (!$providerMissing) {
             $provider = $config['provider'];
             $isPlaceholder = (bool) preg_match('/^\{:\w+\}$/', $provider);
             if (!$isPlaceholder) {
@@ -473,18 +479,18 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
 
         // callback_url — optional, string. Applies ONLY to oauth-start
         // (it sets the redirect_uri sent to the provider). The
-        // oauth-callback route IS the callback URL, so the field is
-        // inapplicable on that kind. {:routeParam} placeholders are
-        // allowed and resolved by the dispatcher before handleStart()
-        // is invoked. Omitted ⇒ handler defaults to
-        // /auth/oauth/<provider>/callback.
+        // oauth-callback route IS the callback URL; oauth-logout doesn't
+        // need one (uses its own returnTo concept). {:routeParam}
+        // placeholders are allowed and resolved by the dispatcher before
+        // handleStart() is invoked. Omitted on oauth-start ⇒ handler
+        // defaults to /auth/oauth/<provider>/callback.
         if (array_key_exists('callback_url', $config)) {
-            if ($kind === 'oauth-callback') {
+            if ($kind !== 'oauth-start') {
                 $errors[] = [
                     'field'  => 'resolver.callback_url',
                     'reason' => 'inapplicable_for_kind',
                     'kind'   => $kind,
-                    'hint'   => 'callback_url applies only to oauth-start (it sets the redirect_uri sent to the provider). The oauth-callback route IS the callback URL.',
+                    'hint'   => 'callback_url applies only to oauth-start (it sets the redirect_uri sent to the provider). oauth-callback IS the callback URL; oauth-logout uses returnTo instead.',
                 ];
             } elseif (!is_string($config['callback_url']) || $config['callback_url'] === '') {
                 $errors[] = [
@@ -504,7 +510,7 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
                     'field'  => 'resolver.' . $dataField,
                     'reason' => 'inapplicable_for_kind',
                     'kind'   => $kind,
-                    'hint'   => 'Field "' . $dataField . '" applies only to data resolvers (kind=data). OAuth kinds use "kind" + "provider" (+ optional "callback_url" for oauth-start).',
+                    'hint'   => 'Field "' . $dataField . '" applies only to data resolvers (kind=data). OAuth kinds: oauth-start uses "kind" + "provider" + optional "callback_url"; oauth-callback uses "kind" + "provider"; oauth-logout uses "kind" + optional "provider" (sanity check; auto-detected from session if omitted).',
                 ];
             }
         }
@@ -772,8 +778,8 @@ function validateResolverConfigs(array $configs, ?ApiEndpointManager $apiManager
 
     // Phase 2 — all-same-kind check (beta.9 A1 Slice 2b). Mixing data +
     // side-effect resolvers on one route is incoherent: side-effect kinds
-    // (oauth-start, oauth-callback) short-circuit the render with a 302;
-    // data resolvers expect the render to proceed with their exposed
+    // (oauth-start, oauth-callback, oauth-logout) short-circuit the render
+    // with a 302; data resolvers expect the render to proceed with their exposed
     // vars. Reject mixed routes — author splits into separate routes.
     $kinds = [];
     foreach ($configs as $config) {
@@ -787,7 +793,7 @@ function validateResolverConfigs(array $configs, ?ApiEndpointManager $apiManager
             'field'  => 'resolver',
             'reason' => 'mixed_kinds',
             'kinds'  => $uniqueKinds,
-            'hint'   => 'A single route cannot mix resolver kinds — side-effect kinds (oauth-start, oauth-callback) short-circuit the render, data resolvers feed it. Split into separate routes (one route per kind).',
+            'hint'   => 'A single route cannot mix resolver kinds — side-effect kinds (oauth-start, oauth-callback, oauth-logout) short-circuit the render, data resolvers feed it. Split into separate routes (one route per kind).',
         ];
     }
 

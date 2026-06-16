@@ -57,7 +57,7 @@
  *   - Resolver-kind registration in resolverHelpers (Slice 2b — DONE)
  *   - Start-flow logic (Slice 2c — DONE)
  *   - Callback-flow logic (Slice 2d — DONE)
- *   - Logout + session-helpers (Slice 2e — pending)
+ *   - Logout + session-helpers (Slice 2e — DONE)
  */
 
 class OAuthHandler
@@ -299,6 +299,122 @@ class OAuthHandler
                 ],
             ],
         ];
+    }
+
+    /**
+     * Log the user out: optionally revoke the access token at the
+     * provider (if the preset declares `revoke_url`), clear the server-
+     * side session record, return a redirect + cookie-expiration spec.
+     *
+     * Dispatcher contract:
+     *   - Resolves the session BEFORE constructing OAuthHandler (so the
+     *     handler is built with the session's provider, not the URL).
+     *   - Calls handleLogout with the resolved sessionId + the resolver
+     *     config (used for the optional sanity check on `provider`) +
+     *     `?return` query param.
+     *   - When there's no session at all (cookie missing / expired), the
+     *     dispatcher short-circuits before reaching this method — see
+     *     public/index.php oauth-logout branch.
+     *
+     * Provider-side revoke per RFC 7009: POST `token=<access_token>` to
+     * the preset's `revoke_url` with client_secret_basic auth. Failure
+     * is logged but doesn't block local logout — the user's intent of
+     * "log me out HERE" succeeds regardless. Providers without an
+     * RFC 7009-compatible revoke endpoint (GitHub, Meta) simply omit
+     * `revoke_url` in their preset and we skip the call.
+     *
+     * Cookie expiration uses `expires` in the past (rather than
+     * Max-Age=0) for broadest browser compatibility — same attrs as
+     * the original set call (HttpOnly + Secure-when-HTTPS + SameSite=Lax)
+     * so the browser recognises it as the same cookie to overwrite.
+     *
+     * @param array<string, mixed> $config       Resolver config (used to
+     *                                           sanity-check provider field
+     *                                           when present).
+     * @param string               $sessionId    Value of the qs_oauth_user
+     *                                           cookie (the dispatcher
+     *                                           confirmed it points at a
+     *                                           live session before calling).
+     * @param string|null          $returnTo     Optional post-logout
+     *                                           redirect (same sanitisation
+     *                                           as handleStart's returnTo).
+     * @return array{redirect: string, cookie: array{name:string,value:string,options:array}}
+     */
+    public function handleLogout(array $config, string $sessionId, ?string $returnTo = null): array
+    {
+        $record = getOAuthSession($sessionId);
+
+        if ($record !== null && isset($config['provider']) && is_string($config['provider']) && $config['provider'] !== '') {
+            $declaredProvider = (string) $config['provider'];
+            $actualProvider   = isset($record['provider']) ? (string) $record['provider'] : '';
+            if ($declaredProvider !== $actualProvider) {
+                error_log(
+                    "OAuth logout sanity-check mismatch: resolver declared "
+                    . "provider='{$declaredProvider}' but active session is "
+                    . "for '{$actualProvider}'. Proceeding with logout for "
+                    . "'{$actualProvider}' (cookie is the truth)."
+                );
+            }
+        }
+
+        if ($record !== null
+            && isset($this->preset['revoke_url']) && is_string($this->preset['revoke_url']) && $this->preset['revoke_url'] !== ''
+            && isset($record['access_token']) && is_string($record['access_token']) && $record['access_token'] !== ''
+        ) {
+            $this->revokeAtProvider((string) $this->preset['revoke_url'], (string) $record['access_token']);
+        }
+
+        clearOAuthSession($sessionId);
+
+        $safeReturnTo = self::sanitiseReturnTo($returnTo) ?? '/';
+
+        return [
+            'redirect' => $safeReturnTo,
+            'cookie'   => [
+                'name'    => 'qs_oauth_user',
+                'value'   => '',
+                'options' => [
+                    'expires'  => time() - 3600,
+                    'path'     => '/',
+                    'secure'   => _oauthIsHttps(),
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * POST the access token to the provider's RFC 7009 revoke endpoint
+     * with client_secret_basic auth. Failure is logged + swallowed —
+     * provider-side revoke is best-effort; local logout always succeeds.
+     */
+    private function revokeAtProvider(string $revokeUrl, string $accessToken): void
+    {
+        $body  = http_build_query([
+            'token'           => $accessToken,
+            'token_type_hint' => 'access_token',
+        ]);
+        $basic = base64_encode($this->secret['client_id'] . ':' . ($this->secret['client_secret'] ?? ''));
+
+        $result = self::httpRequest(
+            'POST',
+            $revokeUrl,
+            $body,
+            [
+                'Authorization: Basic ' . $basic,
+                'Content-Type: application/x-www-form-urlencoded',
+                'Accept: application/json',
+            ]
+        );
+        if ($result === null || $result['status'] < 200 || $result['status'] >= 300) {
+            error_log(
+                "OAuth revoke at provider '{$this->providerId}' failed "
+                . '(status=' . ($result['status'] ?? 'transport_error') . '). '
+                . 'Local logout proceeded; provider-side token may remain '
+                . 'valid until natural expiry.'
+            );
+        }
     }
 
     /**
