@@ -1,0 +1,157 @@
+/*
+ * QSSearchableSelect — combobox that wraps a native <select>.
+ * Used by the JS-function picker (beta.9 A2 Slice 2) and any future
+ * surface that wants the search-inline-in-dropdown pattern (A2 Slice 5
+ * route picker, etc.).
+ *
+ * Theme: --admin-* variables (admin is dark-themed).
+ */
+
+.qs-searchable-select {
+    display: block;
+    width: 100%;
+}
+
+.qs-searchable-select__trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 32px;
+    padding: 6px 10px;
+    background: var(--admin-bg);
+    color: var(--admin-text);
+    border: 1px solid var(--admin-border);
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.12s ease;
+}
+.qs-searchable-select__trigger:hover {
+    border-color: var(--admin-border-focus);
+}
+.qs-searchable-select__trigger:focus {
+    outline: none;
+    border-color: var(--admin-accent);
+    box-shadow: 0 0 0 2px var(--admin-accent-muted);
+}
+.qs-searchable-select__trigger--open {
+    border-color: var(--admin-accent);
+}
+
+.qs-searchable-select__text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--admin-text);
+}
+.qs-searchable-select__text--placeholder {
+    color: var(--admin-text-muted);
+}
+
+.qs-searchable-select__chevron {
+    flex-shrink: 0;
+    margin-left: 8px;
+    color: var(--admin-text-muted);
+    transition: transform 0.12s ease;
+}
+.qs-searchable-select__trigger--open .qs-searchable-select__chevron {
+    transform: rotate(180deg);
+}
+
+/* Dropdown (position: fixed, mounted on document.body to escape overflow) */
+.qs-searchable-select__dropdown {
+    background: var(--admin-bg-secondary);
+    border: 1px solid var(--admin-border);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    max-height: 360px;
+    display: flex;
+    flex-direction: column;
+    z-index: 10000;
+    overflow: hidden;
+}
+
+.qs-searchable-select__search {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--admin-bg);
+    color: var(--admin-text);
+    border: 0;
+    border-bottom: 1px solid var(--admin-border);
+    font-size: 13px;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+.qs-searchable-select__search:focus {
+    outline: none;
+    background: var(--admin-bg);
+}
+.qs-searchable-select__search::placeholder {
+    color: var(--admin-text-muted);
+}
+
+.qs-searchable-select__list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0;
+}
+
+.qs-searchable-select__group {
+    padding: 4px 0;
+}
+
+.qs-searchable-select__group-label {
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--admin-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.qs-searchable-select__item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    padding: 6px 12px;
+    background: transparent;
+    color: var(--admin-text);
+    border: 0;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+}
+.qs-searchable-select__item:hover,
+.qs-searchable-select__item--focused {
+    background: var(--admin-surface);
+}
+
+.qs-searchable-select__item-label {
+    color: var(--admin-text);
+    font-weight: 500;
+}
+
+.qs-searchable-select__item-desc {
+    color: var(--admin-text-muted);
+    font-size: 12px;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.qs-searchable-select__empty {
+    padding: 12px;
+    text-align: center;
+    color: var(--admin-text-muted);
+    font-size: 13px;
+    font-style: italic;
+}

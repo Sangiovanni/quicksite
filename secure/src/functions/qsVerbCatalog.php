@@ -37,12 +37,28 @@ if (!defined('SECURE_FOLDER_PATH')) {
  *   'store'      = state-store name picker
  *   (default)    = plain text input
  *
+ * category hints (consumed by the admin picker — beta.9 A2 Slice 1,
+ * locked 2026-06-17):
+ *   'dom-toggle'  = show/hide/class manipulation
+ *   'form'        = form-targeted (validate, future submit helpers)
+ *   'fetch'       = network calls
+ *   'auth'        = saveToken/clearToken/refresh/magic-link/logout
+ *   'nav'         = redirect, scroll-to, future history helpers
+ *   'focus'       = focus/blur
+ *   'state-store' = state-store interactions (setState/fetchState/onScroll)
+ *   'display'     = rendering / notification helpers (toast/renderList/filter)
+ *   'general'     = INTENTIONAL placement for truly cross-cutting verbs
+ *                   (visually distinct from "Uncategorized")
+ *   (missing)     = falls into "Uncategorized" — defensive fallback, flags
+ *                   to the picker user that the verb forgot to declare
+ *
  * @return array<int, array<string, mixed>>
  */
 function qsVerbCatalog(): array {
     return [
         [
             'name' => 'show',
+            'category' => 'dom-toggle',
             'signature' => 'QS.show(target, hideClass?)',
             'args' => [
                 ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s) to show', 'inputType' => 'selector'],
@@ -54,6 +70,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'hide',
+            'category' => 'dom-toggle',
             'signature' => 'QS.hide(target, hideClass?)',
             'args' => [
                 ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s) to hide', 'inputType' => 'selector'],
@@ -65,6 +82,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'toggle',
+            'category' => 'dom-toggle',
             'signature' => 'QS.toggle(target, className)',
             'args' => [
                 ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s)', 'inputType' => 'selector'],
@@ -76,6 +94,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'toggleHide',
+            'category' => 'dom-toggle',
             'signature' => 'QS.toggleHide(target, hideClass?)',
             'args' => [
                 ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s) to toggle visibility', 'inputType' => 'selector'],
@@ -87,6 +106,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'addClass',
+            'category' => 'dom-toggle',
             'signature' => 'QS.addClass(target, className)',
             'args' => [
                 ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s)', 'inputType' => 'selector'],
@@ -98,6 +118,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'removeClass',
+            'category' => 'dom-toggle',
             'signature' => 'QS.removeClass(target, className)',
             'args' => [
                 ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s)', 'inputType' => 'selector'],
@@ -109,6 +130,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'setValue',
+            'category' => 'dom-toggle',
             'signature' => 'QS.setValue(target, value)',
             'args' => [
                 ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element(s)', 'inputType' => 'selector'],
@@ -120,6 +142,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'redirect',
+            'category' => 'nav',
             'signature' => 'QS.redirect(url)',
             'args' => [
                 ['name' => 'url', 'type' => 'string', 'required' => true, 'description' => 'URL to navigate to']
@@ -130,6 +153,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'filter',
+            'category' => 'display',
             'signature' => 'QS.filter(event, itemsSelector, matchAttr?, hideClass?, emptyParent?)',
             'args' => [
                 ['name' => 'event', 'type' => 'Event', 'required' => true, 'default' => 'event', 'description' => 'Pass "event" keyword to get input value, or a CSS selector to read from a different input', 'inputType' => 'eventArg'],
@@ -144,6 +168,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'scrollTo',
+            'category' => 'nav',
             'signature' => 'QS.scrollTo(target, behavior?)',
             'args' => [
                 ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element to scroll to', 'inputType' => 'selector'],
@@ -155,6 +180,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'focus',
+            'category' => 'focus',
             'signature' => 'QS.focus(target)',
             'args' => [
                 ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element to focus', 'inputType' => 'selector']
@@ -165,6 +191,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'blur',
+            'category' => 'focus',
             'signature' => 'QS.blur(target)',
             'args' => [
                 ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element to blur', 'inputType' => 'selector']
@@ -175,6 +202,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'renderList',
+            'category' => 'display',
             'signature' => 'QS.renderList(containerSelector, dataField, emptyText?)',
             'args' => [
                 ['name' => 'containerSelector', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for the container element', 'inputType' => 'selector'],
@@ -187,6 +215,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'toast',
+            'category' => 'general',
             'signature' => 'QS.toast(message, type?, duration?)',
             'args' => [
                 ['name' => 'message', 'type' => 'string', 'required' => true, 'description' => 'Message to display'],
@@ -199,6 +228,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'fetch',
+            'category' => 'fetch',
             'signature' => 'QS.fetch(target, ...options)',
             'args' => [
                 ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'HTTP method (GET/POST/PUT/PATCH/DELETE) for direct URL mode, or @apiId/endpointId for registry mode'],
@@ -212,6 +242,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'validate',
+            'category' => 'form',
             'signature' => 'QS.validate(event, formSelector)',
             'args' => [
                 ['name' => 'event', 'type' => 'event', 'required' => true, 'description' => 'The event object — pass the literal keyword `event` (the renderer forwards it). Used to call preventDefault() on failure.'],
@@ -223,6 +254,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'saveToken',
+            'category' => 'auth',
             'signature' => 'QS.saveToken(storage, key, path)',
             'args' => [
                 ['name' => 'storage', 'type' => 'string', 'required' => true, 'description' => 'Where to store the token: localStorage (persists across browser restarts) or sessionStorage (clears on tab close).', 'inputType' => 'enum', 'options' => ['localStorage', 'sessionStorage']],
@@ -235,6 +267,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'clearToken',
+            'category' => 'auth',
             'signature' => 'QS.clearToken(storage, key)',
             'args' => [
                 ['name' => 'storage', 'type' => 'string', 'required' => true, 'description' => 'Storage to clear from: localStorage or sessionStorage.', 'inputType' => 'enum', 'options' => ['localStorage', 'sessionStorage']],
@@ -246,6 +279,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'refresh',
+            'category' => 'auth',
             'signature' => 'QS.refresh(apiRef)',
             'args' => [
                 ['name' => 'apiRef', 'type' => 'string', 'required' => true, 'description' => 'API to refresh as @apiId (must have a Refresh config in /admin/apis). It reads that API\'s stored refresh token, requests a new access token, stores it back, and rotates the refresh token if configured.']
@@ -256,6 +290,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'exchangeMagicLink',
+            'category' => 'auth',
             'signature' => 'QS.exchangeMagicLink(endpoint, paramName, returnTo?)',
             'args' => [
                 ['name' => 'endpoint', 'type' => 'string', 'required' => true, 'description' => 'Auth API endpoint that trades the URL code for a session token, as @apiId/endpointId (e.g. @auth-api/exchange-magic). Typically configured with auth.type=none — the exchange itself IS the login.'],
@@ -268,6 +303,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'requestMagicLink',
+            'category' => 'auth',
             'signature' => 'QS.requestMagicLink(endpoint, email, returnTo?)',
             'args' => [
                 ['name' => 'endpoint', 'type' => 'string', 'required' => true, 'description' => 'Auth API endpoint that issues a magic-link email, as @apiId/endpointId (e.g. @auth-api/issue-magic). Usually configured with auth.type=none — runs before the user has a session.'],
@@ -280,6 +316,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'logoutServer',
+            'category' => 'auth',
             'signature' => 'QS.logoutServer(endpoint)',
             'args' => [
                 ['name' => 'endpoint', 'type' => 'string', 'required' => true, 'description' => 'Auth API endpoint that invalidates the server-side session, as @apiId/endpointId (e.g. @auth-api/logout). Usually a POST endpoint inheriting bearer auth — the server uses the request\'s token to identify which session to drop.']
@@ -290,6 +327,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'setState',
+            'category' => 'state-store',
             'signature' => 'QS.setState(storeId, field, value)',
             'args' => [
                 ['name' => 'storeId', 'type' => 'string', 'required' => true, 'description' => 'State store to update (defined in the State stores panel)', 'inputType' => 'store'],
@@ -302,6 +340,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'fetchState',
+            'category' => 'state-store',
             'signature' => 'QS.fetchState(storeId)',
             'args' => [
                 ['name' => 'storeId', 'type' => 'string', 'required' => true, 'description' => 'State store to fetch (defined in the State stores panel)', 'inputType' => 'store']
@@ -312,6 +351,7 @@ function qsVerbCatalog(): array {
         ],
         [
             'name' => 'onScrollFetchState',
+            'category' => 'state-store',
             'signature' => 'QS.onScrollFetchState(storeId, triggerPx?, debounceMs?)',
             'args' => [
                 ['name' => 'storeId', 'type' => 'string', 'required' => true, 'description' => 'State store to refresh on scroll-near-bottom (defined in the State stores panel)', 'inputType' => 'store'],

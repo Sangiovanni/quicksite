@@ -1896,6 +1896,249 @@ existing OAuth row in `NOTES/planning/DATA_FLOWS_INVENTORY.md`
 
 ---
 
+## Picker overhaul (beta.9)
+
+### Picker categorisation — optional field + General + Uncategorized buckets (locked 2026-06-17)
+
+**Decision**: The admin's verb / function picker (used in element
+interactions, page events, action chains, complex element wizards)
+now groups its `<option>`s by a `category` field declared on each
+entry in `secure/src/functions/qsVerbCatalog.php`. The field is
+**OPTIONAL** with a deliberate two-bucket fallback:
+
+- `category: '<known-slug>'` — placed in the matching named group
+  (e.g., `dom-toggle` → "DOM toggles"). Known slugs: `dom-toggle`,
+  `form`, `fetch`, `auth`, `nav`, `state-store`, `focus`, `display`.
+- `category: 'general'` — INTENTIONAL placement for cross-cutting
+  utilities (like `toast`) that don't fit a specialised concern but
+  the author deliberately chose to land in a general bucket. Visible
+  as a "General" group.
+- *No `category` field* — DEFENSIVE fallback into an "Uncategorized"
+  group, RENDERED LAST so admins notice that the verb forgot to
+  declare a category. Distinct from "General" — uncategorized signals
+  oversight; general signals intent.
+
+The picker renders groups in a locked order (most-authored first:
+`dom-toggle, form, fetch, auth, nav, state-store, focus, display,
+general, uncategorized`), with any unknown-but-declared categories
+slotted alphabetically between `display` and `uncategorized`.
+
+This replaces the previous vestigial `core` / `custom` / `other`
+optgroup split — the `core` label dated to early beta.7 when the
+plan was to support author-registered `custom` functions alongside;
+that plan was explicitly dropped during beta.7, leaving `core` as
+the lone bucket with zero discriminatory value across 25 (and
+growing) verbs.
+
+**Reasoning**:
+
+- **Optional, not required** — making `category` required would
+  force a "touch every entry" migration plus block any future verb
+  addition pending a category decision. Optional + visible
+  "Uncategorized" bucket is the same forcing function (admin sees
+  the gap) without the friction.
+- **Two buckets** — collapsing "intentional cross-cutting" and
+  "forgot to declare" into one "Misc" group conflates two different
+  signals. Authors can't tell whether they're looking at deliberate
+  placement or a TODO. Splitting `general` (intent) from
+  `uncategorized` (oversight) costs nothing visually and recovers
+  the signal.
+- **Locked render order** — alphabetical would scatter the
+  most-authored groups (`dom-toggle`, `form`, `fetch`) below less-
+  common ones (`auth`, `display`). Most-authored-first is the
+  ergonomic default for repeated authoring. Author can build muscle
+  memory for the top of the list.
+
+**Alternatives considered**:
+
+- **Required `category` field** — cleanest catalog contract, but
+  forces a touch-everything migration AND blocks every future verb
+  addition pending a category decision. Rejected for friction.
+- **Hand-curated lookup in JS** (`CATEGORY_BY_VERB` map outside the
+  catalog) — adds a second source of truth that has to stay in
+  sync with the catalog every time a verb gets added or renamed.
+  Rejected; the catalog IS the source of truth for everything else
+  verb-related.
+- **Single "Misc" fallback** — simpler, but loses the intent-vs-
+  oversight signal. Rejected for the diagnostic value of separating
+  the two.
+- **Alphabetical group order** — neutral but doesn't optimise for
+  the common case (DOM toggles are the most-authored verbs by far).
+  Rejected.
+
+**Source**: `secure/src/functions/qsVerbCatalog.php` (each entry's
+optional `category` field + documented vocabulary in the file's
+opening docblock),
+`public/admin/assets/js/pages/preview/preview-js-interactions.js`
+(two picker spots: `populateFunctionDropdown` for element
+interactions + `_populateFnSelect` for page events; both use the
+same `KNOWN_CATEGORY_ORDER` + `CATEGORY_LABELS` constants — kept
+in sync manually for Slice 1; extraction to a shared helper deferred
+to Slice 2 if duplication grows).
+`secure/management/command/listJsFunctions.php` still decorates
+each entry with `type: 'core'` (back-compat for any external consumer
+of the API; the picker just doesn't use the field anymore).
+Behaviour: [ADMIN_PANEL.md §9.x](ADMIN_PANEL.md) at ship time of
+the full picker overhaul (Slice 7).
+
+### Picker search-as-you-type — input above select + name+description match (superseded 2026-06-17)
+
+> **Superseded** by "Picker search-as-you-type — combobox wrapper
+> with inline search (locked 2026-06-17, supersedes earlier same-day
+> input-above-select entry)" below. Kept verbatim for the historical
+> record. The "input above the select" shape shipped briefly then was
+> reverted within the same session after user feedback that it didn't
+> match the established `QSPropertySelector` / tag-picker UX pattern
+> already present in the codebase.
+
+**Decision**: An `<input type="search">` is injected above each
+function dropdown the first time the picker renders. Typing into it
+filters the dropdown's verbs in real-time, matching against the
+verb's **name** (primary) AND **description** (secondary) via
+case-insensitive substring. A verb matches if EITHER field contains
+the query. Groups with zero matches are hidden; empty query restores
+the full list. The native `<select>`'s built-in keyboard navigation
+handles arrow-key movement through the visible filtered options for
+free — no custom combobox needed.
+
+The input persists across re-populates triggered by event-dropdown
+changes (the search is the user's intent; the event filter is the
+context — orthogonal). Re-population is the implementation: on every
+search-input event, the populate routine re-runs and rebuilds the
+dropdown's content excluding non-matching verbs (instead of trying
+to hide individual `<option>` elements via CSS, which behaves
+inconsistently across browsers for keyboard-nav purposes).
+
+**Reasoning**:
+
+- **Both name + description search** — limiting to name only would
+  miss the discovery use case ("I want to fetch something" finds
+  verbs whose description mentions fetching even when the name
+  doesn't). Name + description with EITHER-match is the lowest-cost
+  way to capture both.
+- **Filter-rebuild over option-hiding** — `option { display: none }`
+  hides the visual element but native `<select>` keyboard nav may
+  still cycle through hidden options (Chrome ≠ Firefox ≠ Safari).
+  Rebuilding the dropdown's content guarantees that arrow keys
+  traverse only matches.
+- **Input persists across event changes** — clearing it on every
+  event change would force the user to re-type after every event
+  switch. The search is a separate axis of filtering.
+- **No custom combobox** — a fully custom searchable-select would
+  add accessibility surface (focus traps, ARIA roles, escape
+  handling, click-outside-to-close) for marginal benefit over the
+  native select + sibling search input. Defer if a real UX gap
+  surfaces.
+
+**Alternatives considered**:
+
+- **Custom combobox** (input + popover + filtered list) — full
+  control, more polish potential, but doubles the implementation
+  cost + reinvents accessibility. Rejected for first-pass scope.
+- **Option-hiding via CSS** — simpler code but cross-browser nav
+  inconsistency. Rejected.
+- **Search input INSIDE the optgroup as the first option** — clever
+  but breaks the native select's option-as-value contract. Rejected.
+- **Name-only match** — simpler but misses the discovery use case.
+  Rejected; description-match is cheap.
+- **In-group ranking by match source** (name-matches first within
+  each group) — defensible, but adds reorder churn for marginal
+  benefit; the category grouping already does the heavy lifting
+  for scannability. Deferred — surface a chip if it matters.
+
+**Source**:
+`public/admin/assets/js/pages/preview/preview-js-interactions.js`
+(`_ensureFnSearchInput`, `_getFnSearchValue`, `_filterFnsBySearch`
+helpers near `_filterFunctionsByEvent`; both `populateFunctionDropdown`
+and `_populateFnSelect` call the helpers). Empty-result placeholder
+text adapts to the cause (search miss vs event-filter miss).
+Behaviour: [ADMIN_PANEL.md §9.x](ADMIN_PANEL.md) at ship time of
+the full picker overhaul (Slice 7).
+
+### Picker search-as-you-type — combobox wrapper with inline search (locked 2026-06-17, supersedes earlier same-day input-above-select entry)
+
+**Decision**: The verb picker swaps its native `<select>` for a
+custom combobox UI rendered by the new reusable
+**`QSSearchableSelect`** class
+(`public/admin/assets/js/core/searchable-select.js`). The native
+`<select>` stays in the DOM (visually hidden via `display: none`) as
+the data store — all existing code that reads `.value`, listens to
+`change` events, or inspects `<option>.dataset` keeps working
+unchanged. The wrapper:
+
+- Renders a trigger button showing the current value + chevron
+- On open, mounts a dropdown (position: fixed, escapes overflow) with:
+  - **Inline search input** at the top (auto-focused)
+  - **Grouped item list** below, reading `<optgroup>` labels + filtered
+    `<option>` items from the native select
+- Search filters case-insensitively against `<option>` value + textContent
+  + `data-description`; empty groups hidden; empty query shows all
+- Keyboard nav: ArrowUp/Down move focus, Enter selects, Escape closes
+- On select: sets `nativeSelect.value` + dispatches `change` so external
+  listeners fire as if the user had used the native select directly
+- Exposes `refresh()` so external code that rebuilds the select's
+  options can sync the wrapper's display
+
+Wired in `preview-js-interactions.js` to wrap **both** picker spots
+(`jsFormFunction` for element interactions; `peFormFunction` for page
+events) at init time, with `refresh()` called after every populate.
+
+**Reasoning**:
+
+- **Matches the established codebase pattern**: `QSPropertySelector`
+  (CSS property picker) and the visual editor's tag picker both use
+  trigger + dropdown + inline search. Two different patterns in the
+  same admin UI was the wrong call. Consistency wins.
+- **Wrap rather than replace**: keeping the native `<select>` as the
+  data store means ~20 existing references (`.value`, `change`
+  listeners, `selectedOption.dataset.args`/`description`/`example`
+  readers) keep working unchanged. The pivot becomes a pure UI
+  change — zero risk to the existing form-submit + value-handling
+  flow.
+- **Reusable component, not one-off**: the planning doc already
+  hinted at extracting `SearchableSelect` for future surfaces. A2
+  Slice 5's `route` inputType picker uses this same component;
+  potential future surfaces (any admin select that benefits from
+  search) get it for free.
+
+**Alternatives considered**:
+
+- **"Input above select" approach** (the earlier same-day entry,
+  marked superseded above) — shipped briefly, then reverted after
+  user feedback. The input-above shape doesn't match the trigger +
+  dropdown shape that the rest of the admin uses for searchable
+  selects. Inconsistency was the deal-breaker.
+- **Reuse `QSPropertySelector` directly** — its `_renderList` is
+  hardcoded to `CSS_PROPERTY_CATEGORIES` + property-specific item
+  shape (type label, exclude-properties, custom-property fallback).
+  Generalising it OR carrying CSS-specific code into the verb picker
+  were both worse than a fresh sibling class. Rejected.
+- **Match the tag-picker pattern** (PHP-template-driven, JS handler
+  reads element IDs) — tight coupling to template markup, not
+  extractable. The user referenced the tag picker as their UX
+  *reference*, not its implementation pattern. Rejected for the
+  reusability concern.
+- **Replace the native `<select>` entirely** — would require
+  refactoring 20+ existing references to read from a wrapper-only
+  API. Big-blast-radius change for no UX benefit beyond what the
+  wrap-and-hide approach already provides. Rejected.
+
+**Source**:
+`public/admin/assets/js/core/searchable-select.js` (new — the
+`QSSearchableSelect` class, ~340 LOC, load-guarded so double-include
+is a no-op),
+`public/admin/assets/css/searchable-select.css` (new — admin-themed
+combobox styles using `--admin-*` variables),
+`secure/admin/templates/layout.php` (loads the JS + CSS),
+`public/admin/assets/js/pages/preview/preview-js-interactions.js`
+(`jsFnPicker` + `peFnPicker` module-scope wrappers; instantiated at
+init alongside the native select references; `refresh()` called at
+the tail of `populateFunctionDropdown` and `_populateFnSelect`).
+Behaviour: [ADMIN_PANEL.md §9.x](ADMIN_PANEL.md) at ship time of
+the full picker overhaul (Slice 7).
+
+---
+
 ## Project conventions (beta.9)
 
 ### Data shape — JSON for the author's website data, PHP for engine plumbing (locked 2026-06-14)

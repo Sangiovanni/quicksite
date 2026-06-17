@@ -44,6 +44,13 @@
     let jsFormFunction = null;
     let jsFormFunctionShowAll = null;
     let jsFormFunctionDetails = null;
+    // Beta.9 A2 Slice 2 — searchable combobox wrappers around the two
+    // native function <select>s. The native selects stay in the DOM
+    // (hidden) as data stores; the wrappers render the trigger button +
+    // dropdown with inline search. Refresh() called after every
+    // populate so the dropdown stays in sync with rebuilt options.
+    let jsFnPicker = null; // wraps jsFormFunction
+    let peFnPicker = null; // wraps peFormFunction
     let jsFormApi = null;
     let jsFormEndpoint = null;
     let jsFormApiBody = null;
@@ -164,6 +171,20 @@
         jsFormFunction = document.getElementById('js-form-function');
         jsFormFunctionShowAll = document.getElementById('js-form-function-show-all');
         jsFormFunctionDetails = document.getElementById('js-form-function-details');
+
+        // Slice 2: wrap the function select with the searchable combobox.
+        // Idempotent — load-guard on the class itself prevents double-wrap.
+        if (jsFormFunction && window.QSSearchableSelect && !jsFnPicker) {
+            try {
+                jsFnPicker = new window.QSSearchableSelect(jsFormFunction, {
+                    placeholder: (PreviewConfig && PreviewConfig.i18n && PreviewConfig.i18n.selectFunction) || '-- Select function --',
+                    searchPlaceholder: 'Search functions… (matches name + description)',
+                    emptyText: 'No functions match',
+                });
+            } catch (e) {
+                console.warn('[PreviewJsInteractions] Failed to mount QSSearchableSelect on jsFormFunction:', e);
+            }
+        }
         jsFormApi = document.getElementById('js-form-api');
         jsFormEndpoint = document.getElementById('js-form-endpoint');
         jsFormApiBody = document.getElementById('js-form-api-body');
@@ -206,6 +227,20 @@
         peFormApiSection = document.getElementById('js-page-event-api-section');
         peFormFunction = document.getElementById('js-page-event-function');
         peFormFunctionShowAll = document.getElementById('js-page-event-function-show-all');
+
+        // Slice 2: wrap the page-event function select with the
+        // searchable combobox (same pattern as jsFnPicker).
+        if (peFormFunction && window.QSSearchableSelect && !peFnPicker) {
+            try {
+                peFnPicker = new window.QSSearchableSelect(peFormFunction, {
+                    placeholder: (PreviewConfig && PreviewConfig.i18n && PreviewConfig.i18n.selectFunction) || '-- Select function --',
+                    searchPlaceholder: 'Search functions… (matches name + description)',
+                    emptyText: 'No functions match',
+                });
+            } catch (e) {
+                console.warn('[PreviewJsInteractions] Failed to mount QSSearchableSelect on peFormFunction:', e);
+            }
+        }
         peFormApi = document.getElementById('js-page-event-api');
         peFormEndpoint = document.getElementById('js-page-event-endpoint');
         peFormParams = document.getElementById('js-page-event-params');
@@ -2114,40 +2149,65 @@
         placeholderOpt.textContent = placeholderText;
         jsFormFunction.appendChild(placeholderOpt);
 
+        // Beta.9 A2 Slice 1: group by verb category (replaces the old
+        // type=core/custom/other split — `core` was vestigial after the
+        // custom-functions plan was dropped; see DESIGN_DECISIONS.md
+        // "Picker categorisation"). category is OPTIONAL on catalog
+        // entries: missing → "Uncategorized" (defensive bucket — visually
+        // flags forgotten declarations); 'general' is the intentional
+        // cross-cutting bucket (e.g. toast).
         const grouped = {};
         fnsToShow.forEach(fn => {
-            const type = fn.type || 'other';
-            if (!grouped[type]) grouped[type] = [];
-            grouped[type].push(fn);
+            const cat = fn.category || 'uncategorized';
+            if (!grouped[cat]) grouped[cat] = [];
+            grouped[cat].push(fn);
         });
-        
-        const typeOrder = ['core', 'custom', 'other'];
-        const typeLabels = {
-            'core': PreviewConfig.i18n?.functionGroupCore || 'Core Functions',
-            'custom': PreviewConfig.i18n?.functionGroupCustom || 'Custom Functions',
-            'other': PreviewConfig.i18n?.functionGroupOther || 'Other'
+
+        const KNOWN_CATEGORY_ORDER = [
+            'dom-toggle', 'form', 'fetch', 'auth', 'nav',
+            'state-store', 'focus', 'display', 'general'
+        ];
+        const CATEGORY_LABELS = {
+            'dom-toggle':  'DOM toggles',
+            'form':        'Forms',
+            'fetch':       'Fetch / network',
+            'auth':        'Auth',
+            'nav':         'Navigation',
+            'state-store': 'State stores',
+            'focus':       'DOM focus',
+            'display':     'Rendering / display',
+            'general':     'General',
+            'uncategorized': 'Uncategorized'
         };
-        
-        typeOrder.forEach(type => {
-            if (!grouped[type] || grouped[type].length === 0) return;
-            
+        // Render known categories first in the locked order, then any
+        // unknown declared categories alphabetically, then the
+        // uncategorized bucket LAST so authors notice missing declarations.
+        const renderOrder = KNOWN_CATEGORY_ORDER.slice();
+        Object.keys(grouped)
+            .filter(c => c !== 'uncategorized' && KNOWN_CATEGORY_ORDER.indexOf(c) === -1)
+            .sort()
+            .forEach(c => renderOrder.push(c));
+        if (grouped.uncategorized) renderOrder.push('uncategorized');
+
+        renderOrder.forEach(cat => {
+            if (!grouped[cat] || grouped[cat].length === 0) return;
             const optgroup = document.createElement('optgroup');
-            optgroup.label = typeLabels[type] || type;
-            
-            grouped[type].forEach(fn => {
+            optgroup.label = CATEGORY_LABELS[cat] || cat;
+            grouped[cat].forEach(fn => {
                 const option = document.createElement('option');
                 option.value = fn.name;
-                // Show only the function name (beta.6: full description lives
-                // in the Details panel below the <select>, no truncation needed).
                 option.textContent = fn.name;
                 option.dataset.args = JSON.stringify(fn.args || []);
                 option.dataset.description = fn.description || '';
                 option.dataset.example = fn.example || '';
                 optgroup.appendChild(option);
             });
-            
             jsFormFunction.appendChild(optgroup);
         });
+
+        // Slice 2 combobox: sync the wrapper now that the native select
+        // has been rebuilt. No-op if the wrapper isn't mounted yet.
+        if (jsFnPicker) jsFnPicker.refresh();
     }
     
     /**
@@ -5619,28 +5679,48 @@
         placeholderOpt.textContent = placeholderText;
         selectEl.appendChild(placeholderOpt);
 
+        // Beta.9 A2 Slice 1: category-based grouping (mirrors the same
+        // change in populateFunctionDropdown — kept in sync). category is
+        // OPTIONAL; missing falls into "Uncategorized" (defensive
+        // bucket); 'general' is the intentional cross-cutting bucket.
+        // See DESIGN_DECISIONS.md "Picker categorisation".
         var grouped = {};
         fnsToShow.forEach(function(fn) {
-            var type = fn.type || 'other';
-            if (!grouped[type]) grouped[type] = [];
-            grouped[type].push(fn);
+            var cat = fn.category || 'uncategorized';
+            if (!grouped[cat]) grouped[cat] = [];
+            grouped[cat].push(fn);
         });
-        
-        var labels = {
-            core: PreviewConfig.i18n?.functionGroupCore || 'Core Functions',
-            custom: PreviewConfig.i18n?.functionGroupCustom || 'Custom Functions',
-            other: PreviewConfig.i18n?.functionGroupOther || 'Other'
+
+        var KNOWN_CATEGORY_ORDER = [
+            'dom-toggle', 'form', 'fetch', 'auth', 'nav',
+            'state-store', 'focus', 'display', 'general'
+        ];
+        var CATEGORY_LABELS = {
+            'dom-toggle':  'DOM toggles',
+            'form':        'Forms',
+            'fetch':       'Fetch / network',
+            'auth':        'Auth',
+            'nav':         'Navigation',
+            'state-store': 'State stores',
+            'focus':       'DOM focus',
+            'display':     'Rendering / display',
+            'general':     'General',
+            'uncategorized': 'Uncategorized'
         };
-        
-        ['core', 'custom', 'other'].forEach(function(type) {
-            if (!grouped[type] || grouped[type].length === 0) return;
+        var renderOrder = KNOWN_CATEGORY_ORDER.slice();
+        Object.keys(grouped)
+            .filter(function(c) { return c !== 'uncategorized' && KNOWN_CATEGORY_ORDER.indexOf(c) === -1; })
+            .sort()
+            .forEach(function(c) { renderOrder.push(c); });
+        if (grouped.uncategorized) renderOrder.push('uncategorized');
+
+        renderOrder.forEach(function(cat) {
+            if (!grouped[cat] || grouped[cat].length === 0) return;
             var optgroup = document.createElement('optgroup');
-            optgroup.label = labels[type] || type;
-            grouped[type].forEach(function(fn) {
+            optgroup.label = CATEGORY_LABELS[cat] || cat;
+            grouped[cat].forEach(function(fn) {
                 var option = document.createElement('option');
                 option.value = fn.name;
-                // Show only the function name (beta.6: Details panel carries
-                // the full description / example).
                 option.textContent = fn.name;
                 option.dataset.args = JSON.stringify(fn.args || []);
                 option.dataset.description = fn.description || '';
@@ -5649,8 +5729,13 @@
             });
             selectEl.appendChild(optgroup);
         });
+
+        // Slice 2 combobox: sync whichever picker wraps this selectEl.
+        // Today only peFnPicker wraps a select handled by this routine;
+        // future callers can register more pickers via the same shape.
+        if (peFnPicker && selectEl === peFormFunction) peFnPicker.refresh();
     }
-    
+
     /**
      * Helper: Populate API and endpoint <select> elements
      */

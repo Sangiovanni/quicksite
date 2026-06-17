@@ -83,8 +83,11 @@ $langNames = [
     <link rel="stylesheet" href="<?= $versionedAsset('/admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/tag-examples.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/oauth-admin.css') ?>">
+    <link rel="stylesheet" href="<?= $versionedAsset('/css/searchable-select.css') ?>">
     <!-- Storage key registry — must load before any page script that references QuickSiteStorageKeys -->
     <script src="<?= $versionedAsset('/js/core/storage-keys.js') ?>"></script>
+    <!-- Reusable searchable combobox (beta.9 A2 Slice 2). Wraps a native <select> — page scripts construct QSSearchableSelect after locating their select element. -->
+    <script src="<?= $versionedAsset('/js/core/searchable-select.js') ?>"></script>
 </head>
 <body class="admin-body<?= $isLoginPage ? ' admin-body--login' : '' ?>" data-page="<?= adminEscape($currentPage) ?>">
     
