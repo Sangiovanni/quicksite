@@ -24,6 +24,7 @@ class AdminRouter {
         'embed-security', // Embed Security (iframe sandbox)
         'preview',     // Visual Editor (route kept as 'preview' for URL compatibility)
         'apis',        // External API Registry
+        'oauth-providers', // OAuth Provider catalogue + per-project overrides (beta.9 A1 Slice 8)
         'assets',      // Asset Management page
         'sitemap',     // Visual Sitemap & Route Management
         'optimize',    // Optimization Tools
@@ -187,6 +188,7 @@ class AdminRouter {
         // browser-stored data. Any authenticated admin can view it.
         // (Old 'ai-settings' route 301-redirects to it in dispatch().)
         'apis'           => ['listApiEndpoints'],
+        'oauth-providers'=> ['listOAuthProviders'],
         'embed-security' => ['getIframeSandbox'],
         // 'workflows' is no longer gated by callAi: AI calls now happen in
         // the browser via QSAiCall (no PHP proxy). Any admin user can open

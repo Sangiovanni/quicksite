@@ -167,7 +167,7 @@ return [
             'listInteractions', 'addInteraction', 'editInteraction', 'deleteInteraction',
             'getPageEvents', 'addPageEvent', 'editPageEvent', 'deletePageEvent',
             'importStructureTranslations',
-            'listApiEndpoints', 'listOAuthProviders', 'getApiEndpoint', 'addApi', 'editApi', 'deleteApi', 'testApiEndpoint',
+            'listApiEndpoints', 'listOAuthProviders', 'addOAuthProvider', 'editOAuthProvider', 'deleteOAuthProvider', 'getApiEndpoint', 'addApi', 'editApi', 'deleteApi', 'testApiEndpoint',
             'listSnippets', 'getSnippet', 'createSnippet', 'deleteSnippet', 'duplicateSnippet', 'insertSnippet',
             'checkForUpdates', 'applyUpdate',
         ],

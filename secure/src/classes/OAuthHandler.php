@@ -664,10 +664,22 @@ class OAuthHandler
     }
 
     /**
-     * Open-redirect guard for the `returnTo` value. Only same-site paths
-     * starting with `/` (and NOT `//`, which would be a protocol-relative
-     * URL pointing off-site) are honoured; everything else is dropped to
-     * null so the callback handler falls back to the safe default.
+     * Open-redirect guard for the `returnTo` value. Three layers of
+     * defense:
+     *
+     *   1. Must start with '/' (rejects full URLs like
+     *      http://evil.com/foo)
+     *   2. Must NOT start with '//' (rejects protocol-relative URLs
+     *      like //evil.com/foo)
+     *   3. Must match a registered route in ROUTES (rejects typo'd
+     *      and made-up paths; eliminates the "what if a phishing
+     *      route gets injected somehow" surface — locked 2026-06-15
+     *      following Slice 8 verification feedback)
+     *
+     * Anything that fails returns null so the callback handler falls
+     * back to '/' (homepage — always valid). Query string + fragment
+     * on `$returnTo` survive the check (stripped before matching,
+     * re-appended on return).
      */
     private static function sanitiseReturnTo(?string $returnTo): ?string
     {
@@ -677,7 +689,68 @@ class OAuthHandler
         if ($returnTo[0] !== '/' || (isset($returnTo[1]) && $returnTo[1] === '/')) {
             return null;
         }
+
+        // Split off query + fragment for the route-existence check.
+        $pathOnly = $returnTo;
+        $cutAt = false;
+        $qpos = strpos($returnTo, '?');
+        $fpos = strpos($returnTo, '#');
+        if ($qpos !== false && ($fpos === false || $qpos < $fpos)) $cutAt = $qpos;
+        elseif ($fpos !== false) $cutAt = $fpos;
+        if ($cutAt !== false) {
+            $pathOnly = substr($returnTo, 0, $cutAt);
+        }
+
+        // '/' is always valid (homepage).
+        if ($pathOnly === '/') {
+            return $returnTo;
+        }
+        if (!defined('ROUTES') || !is_array(ROUTES)) {
+            return null;
+        }
+        $segments = array_values(array_filter(
+            explode('/', trim($pathOnly, '/')),
+            function ($s) { return $s !== ''; }
+        ));
+        if (empty($segments)) {
+            return $returnTo;
+        }
+        if (!self::routeMatches($segments, ROUTES)) {
+            return null;
+        }
         return $returnTo;
+    }
+
+    /**
+     * Walk `$segments` against the routes tree. Literal children take
+     * precedence over `:name` param children (matches the production
+     * routing specificity rule in TrimParameters::resolveRoute).
+     * Returns true only when ALL segments resolve (no partial matches).
+     */
+    private static function routeMatches(array $segments, array $routes): bool
+    {
+        $current = $routes;
+        foreach ($segments as $segment) {
+            if (is_array($current) && isset($current[$segment])) {
+                $current = $current[$segment];
+                continue;
+            }
+            if (!is_array($current)) {
+                return false;
+            }
+            $paramKey = null;
+            foreach (array_keys($current) as $key) {
+                if (is_string($key) && strlen($key) > 1 && $key[0] === ':') {
+                    $paramKey = $key;
+                    break;
+                }
+            }
+            if ($paramKey === null) {
+                return false;
+            }
+            $current = $current[$paramKey];
+        }
+        return true;
     }
 
     /**

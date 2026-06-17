@@ -965,14 +965,14 @@
     function getSelectableTarget(el, mouseX, mouseY) {
         if (!el || el === document.body || el === document.documentElement) return null;
         if (ignoreTags.includes(el.tagName)) return null;
-        
+
         // Check if element has editor attributes
         if (!el.hasAttribute('data-qs-struct')) {
             // No editor attributes, find closest parent with them
             el = el.closest('[data-qs-struct]');
             if (!el) return null;
         }
-        
+
         // If mouse coords provided, check if an embed child is under the cursor
         if (mouseX !== undefined && mouseY !== undefined) {
             var embedHit = findEmbedAtPoint(el, mouseX, mouseY);
@@ -980,7 +980,24 @@
                 el = embedHit;
             }
         }
-        
+
+        // Text-only nodes (<span data-qs-textkey data-qs-textonly>) are
+        // selection-by-arrow-key only. A direct click on text content
+        // would otherwise land on the text wrapper, but most edit
+        // operations (styles, params, classes, delete) want the parent
+        // tag (heading, paragraph, link, etc.). Walk one step up to the
+        // nearest real tag node. Text MODE bypasses getSelectableTarget
+        // entirely (its handler targets [data-qs-textkey] directly), so
+        // this change doesn't affect text editing. JS mode previously
+        // duplicated this walk inline; that copy is now redundant.
+        // Beta.9 A1 Slice 8 verification feedback (2026-06-17).
+        if (el.hasAttribute('data-qs-textonly')) {
+            const realTag = el.parentElement
+                ? el.parentElement.closest('[data-qs-node]:not([data-qs-textonly])')
+                : null;
+            if (realTag) el = realTag;
+        }
+
         // If inside a component, bubble up to component root
         if (el.hasAttribute('data-qs-in-component') && !el.hasAttribute('data-qs-component')) {
             const componentRoot = el.closest('[data-qs-component]');
@@ -988,7 +1005,7 @@
                 return componentRoot;
             }
         }
-        
+
         return el;
     }
     
@@ -2272,14 +2289,30 @@
         if (isEditorMode() && navTarget(e.target)) {
             e.preventDefault();
             e.stopPropagation();
-            // In TEXT mode, don't stop immediate propagation — the
-            // second click listener below dispatches startTextEdit on
-            // [data-qs-textkey] spans, and we want that to fire for
-            // text nodes nested inside <a> / <button type="submit">
-            // (otherwise anchor text is unreachable in Text mode while
-            // button text in non-form contexts works — confusing
-            // asymmetry the user hit during beta.7 #11 testing).
-            if (currentMode !== 'text') {
+            // stopImmediatePropagation would also kill the downstream
+            // capture-phase listeners on `document` — including the
+            // mode-specific select/style/js/add handlers below. Only
+            // call it in modes where there is NO downstream handler
+            // that needs the click (drag, preview), so anchors / form
+            // submits stay selectable in all authoring modes.
+            //
+            // History: text mode got the exception during beta.7 #11
+            // (anchor text was unreachable in Text mode); beta.9 A1
+            // Slice 8 verification surfaced the same shape for select
+            // mode (oauth-button <a> couldn't be selected because the
+            // nav guard ate the click before the select handler ran).
+            // The fix generalises: don't stop immediate propagation in
+            // any mode whose downstream click listener lives in this
+            // file. preventDefault + stopPropagation are enough to
+            // block both browser navigation and site-attached element
+            // handlers (those fire on target phase, which stopPropagation
+            // in the capture phase prevents the event from reaching).
+            var allowDownstream = (
+                currentMode === 'select' || currentMode === 'style' ||
+                currentMode === 'js'     || currentMode === 'add'   ||
+                currentMode === 'text'
+            );
+            if (!allowDownstream) {
                 e.stopImmediatePropagation();
             }
         }
@@ -2393,19 +2426,10 @@
         if (currentMode === 'js') {
             e.stopImmediatePropagation();
 
+            // text-only walk-up moved into getSelectableTarget itself
+            // (Slice 8 verification fix) — same logic now benefits
+            // select / style / drag / add modes uniformly.
             let target = getSelectableTarget(e.target, e.clientX, e.clientY);
-            // Interactions can never live on a text-only node (textKey).
-            // The renderer wraps text in a <span data-qs-textkey data-qs-textonly>
-            // which carries its own data-qs-node, so a naive "closest [data-qs-node]"
-            // walk lands on the span instead of the parent tag. Walk one step up
-            // to the nearest real tag node so the JS panel always targets an
-            // element that actually accepts params.
-            if (target && target.hasAttribute('data-qs-textonly')) {
-                const realTag = target.parentElement
-                    ? target.parentElement.closest('[data-qs-node]:not([data-qs-textonly])')
-                    : null;
-                if (realTag) target = realTag;
-            }
             if (target) {
                 // Remove previous selection
                 document.querySelectorAll('.qs-js-selected').forEach(el => {

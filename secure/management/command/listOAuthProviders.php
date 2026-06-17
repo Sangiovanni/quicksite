@@ -44,6 +44,87 @@ function __listOAuthProviders_readPresets(string $path): array {
 }
 
 /**
+ * Load the union of secrets known to the project — per-project JSON
+ * first, admin PHP fallback. Returns map of providerId => true when
+ * client_id is present. Used only to compute credentials_status; the
+ * actual secret values are NEVER returned by listOAuthProviders.
+ */
+function __listOAuthProviders_credentialSet(): array {
+    $set = [];
+    $adminPath = SECURE_FOLDER_PATH . '/admin/config/oauth-secrets.php';
+    if (file_exists($adminPath)) {
+        $admin = require $adminPath;
+        if (is_array($admin)) {
+            foreach ($admin as $id => $entry) {
+                if (is_string($id) && is_array($entry) && isset($entry['client_id']) && $entry['client_id'] !== '') {
+                    $set[$id] = true;
+                }
+            }
+        }
+    }
+    if (defined('PROJECT_PATH')) {
+        $projectPath = PROJECT_PATH . '/data/oauth-secrets.json';
+        if (file_exists($projectPath)) {
+            $raw = @file_get_contents($projectPath);
+            $project = $raw !== false ? json_decode($raw, true) : null;
+            if (is_array($project)) {
+                foreach ($project as $id => $entry) {
+                    if (is_string($id) && is_array($entry) && isset($entry['client_id']) && $entry['client_id'] !== '') {
+                        $set[$id] = true;
+                    }
+                }
+            }
+        }
+    }
+    return $set;
+}
+
+/**
+ * Count how many route-resolvers explicitly reference a provider id
+ * (literal `provider: "<id>"` field on oauth-start / oauth-callback /
+ * oauth-logout kinds). Param-placeholder references like
+ * `provider: "{:provider}"` are NOT counted — they're ambiguous and
+ * the in-use guard at delete time runs a fuller scan anyway.
+ *
+ * Cheap: one file read + a shallow walk over the resolvers sidecar.
+ */
+function __listOAuthProviders_resolverCounts(): array {
+    $counts = [];
+    if (!defined('PROJECT_PATH')) {
+        return $counts;
+    }
+    $sidecar = PROJECT_PATH . '/data/route-resolvers.json';
+    if (!file_exists($sidecar)) {
+        return $counts;
+    }
+    $raw = @file_get_contents($sidecar);
+    $all = $raw !== false ? json_decode($raw, true) : null;
+    if (!is_array($all)) {
+        return $counts;
+    }
+    foreach ($all as $entry) {
+        // Storage shape: single resolver = scalar, multi = array
+        $configs = (isset($entry['kind']) && is_string($entry['kind'])) ? [$entry] : $entry;
+        if (!is_array($configs)) {
+            continue;
+        }
+        foreach ($configs as $config) {
+            if (!is_array($config)) continue;
+            $kind = $config['kind'] ?? null;
+            if ($kind !== 'oauth-start' && $kind !== 'oauth-callback' && $kind !== 'oauth-logout') {
+                continue;
+            }
+            $provider = $config['provider'] ?? null;
+            if (!is_string($provider) || $provider === '' || preg_match('/^\{:\w+\}$/', $provider)) {
+                continue;
+            }
+            $counts[$provider] = ($counts[$provider] ?? 0) + 1;
+        }
+    }
+    return $counts;
+}
+
+/**
  * Check whether ROUTES has a literal segment chain set. Used to detect
  * existing /auth/oauth/<provider>/start + /callback for the setup
  * summary.
@@ -86,20 +167,26 @@ function __command_listOAuthProviders(array $params = [], array $urlParams = [])
         $sources[$key] = isset($sources[$key]) ? 'project-override' : 'project';
     }
 
-    $routes = defined('ROUTES') ? ROUTES : [];
+    $routes        = defined('ROUTES') ? ROUTES : [];
+    $credentialSet = __listOAuthProviders_credentialSet();
+    $resolverCounts = __listOAuthProviders_resolverCounts();
 
     $providers = [];
     foreach ($merged as $id => $preset) {
         $startExists    = __listOAuthProviders_routeExists($routes, ['auth', 'oauth', $id, 'start']);
         $callbackExists = __listOAuthProviders_routeExists($routes, ['auth', 'oauth', $id, 'callback']);
+        $preset_obj     = is_array($preset) ? $preset : [];
 
         $providers[] = [
             'id'                      => $id,
             'name'                    => ucfirst(str_replace('-', ' ', $id)),
             'source'                  => $sources[$id],
-            'scope'                   => isset($preset['scope']) ? (string) $preset['scope'] : '',
-            'refresh_token_supported' => (bool) ($preset['refresh_token_supported'] ?? false),
-            'has_revoke_url'          => isset($preset['revoke_url']) && is_string($preset['revoke_url']) && $preset['revoke_url'] !== '',
+            'preset'                  => $preset_obj,
+            'scope'                   => isset($preset_obj['scope']) ? (string) $preset_obj['scope'] : '',
+            'refresh_token_supported' => (bool) ($preset_obj['refresh_token_supported'] ?? false),
+            'has_revoke_url'          => isset($preset_obj['revoke_url']) && is_string($preset_obj['revoke_url']) && $preset_obj['revoke_url'] !== '',
+            'credentials_status'      => isset($credentialSet[$id]) ? 'set' : 'missing',
+            'resolver_count'          => $resolverCounts[$id] ?? 0,
             'setup' => [
                 'start_route_exists'    => $startExists,
                 'callback_route_exists' => $callbackExists,

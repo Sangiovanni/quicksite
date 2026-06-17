@@ -4452,7 +4452,72 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [],
-        'notes' => 'Sources: "admin" (engine catalogue at secure/admin/config/oauth-presets.json), "project" (project-only at secure/projects/<active>/data/oauth-presets.json), "project-override" (project overrides an admin entry). Per the Slice 2.5 lookup order locked 2026-06-15, project entries replace admin entries at PROVIDER level (full-entry replace, not field-level merge).'
+        'notes' => 'Sources: "admin" (engine catalogue at secure/admin/config/oauth-presets.json), "project" (project-only at secure/projects/<active>/data/oauth-presets.json), "project-override" (project overrides an admin entry). Per the Slice 2.5 lookup order locked 2026-06-15, project entries replace admin entries at PROVIDER level (full-entry replace, not field-level merge). Each provider entry includes preset, credentials_status (set/missing), resolver_count (route-resolvers explicitly referencing this provider id), and setup (per-provider route existence).'
+    ],
+    'addOAuthProvider' => [
+        'description' => 'Add a new OAuth provider preset and (optionally) its credentials at admin or per-project scope. Writes to oauth-presets.json + oauth-secrets.{php,json}. Drives the /admin/oauth-providers page\'s Add modal.',
+        'method' => 'POST',
+        'parameters' => [
+            'scope' => ['required' => true, 'type' => 'string', 'enum' => ['admin', 'project'], 'description' => 'Where to write the preset.'],
+            'id' => ['required' => true, 'type' => 'string', 'description' => 'Lowercase provider id (slug). /^[a-z][a-z0-9-]*$/.', 'example' => 'mycorp-sso'],
+            'preset' => ['required' => true, 'type' => 'object', 'description' => 'Full preset shape: authorize_url, token_url, userinfo_url, revoke_url (optional), scope, userinfo_sub_path, userinfo_email_path, userinfo_name_path (optional), extra_authorize_params (optional), refresh_token_supported.'],
+            'credentials' => ['required' => false, 'type' => 'object', 'description' => 'Optional {client_id, client_secret}. client_secret optional for public clients (PKCE-only).']
+        ],
+        'example_post' => 'POST /management/addOAuthProvider with {"scope":"project","id":"mycorp-sso","preset":{...},"credentials":{"client_id":"abc","client_secret":"xyz"}}',
+        'success_response' => [
+            'status' => 201,
+            'code' => 'oauth.provider.created',
+            'data' => ['id' => 'mycorp-sso', 'scope' => 'project', 'credentials_status' => 'set']
+        ],
+        'error_responses' => [
+            '400.validation.failed' => 'Invalid body — see errors[] for per-field details',
+            '409.oauth.provider.duplicate' => 'An entry with this id already exists at the target scope; use editOAuthProvider'
+        ],
+        'notes' => 'Admin-tier only — handles client_secret. Cross-scope duplicates (e.g., same id in both admin and project) are allowed and are the per-project override pattern locked in Slice 2.5.'
+    ],
+    'editOAuthProvider' => [
+        'description' => 'Update an existing OAuth provider preset and (optionally) credentials. Supports rename (newId) and cross-scope move (newScope). Replace-all semantic on the preset object — read the current entry first if you want field-level updates.',
+        'method' => 'POST',
+        'parameters' => [
+            'scope' => ['required' => true, 'type' => 'string', 'enum' => ['admin', 'project']],
+            'id' => ['required' => true, 'type' => 'string'],
+            'preset' => ['required' => true, 'type' => 'object', 'description' => 'Full preset shape (replaces existing)'],
+            'credentials' => ['required' => false, 'type' => 'object', 'description' => 'When omitted, existing secret is left untouched. When client_secret is empty, only client_id is updated; the existing secret is preserved.'],
+            'newId' => ['required' => false, 'type' => 'string', 'description' => 'New provider id (rename). Must not collide at target scope.'],
+            'newScope' => ['required' => false, 'type' => 'string', 'enum' => ['admin', 'project'], 'description' => 'Move between scopes; copy-then-delete.']
+        ],
+        'example_post' => 'POST /management/editOAuthProvider with {"scope":"admin","id":"google","preset":{...},"newScope":"project"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'oauth.provider.updated',
+            'data' => ['id' => 'google', 'scope' => 'project', 'old_id' => null, 'old_scope' => 'admin']
+        ],
+        'error_responses' => [
+            '400.validation.failed' => 'Invalid body',
+            '404.oauth.provider.not_found' => 'Source entry not found at declared scope',
+            '409.oauth.provider.duplicate' => 'newId / newScope target already has an entry'
+        ],
+        'notes' => 'Admin-tier only. Cross-scope move is copy-then-delete; on partial failure the entry exists in BOTH scopes (recoverable via deleteOAuthProvider).'
+    ],
+    'deleteOAuthProvider' => [
+        'description' => 'Remove an OAuth provider preset and credentials at the given scope. STRICT in-use block: refuses with 409 when route-resolvers or page-structure oauth-button elements still reference this provider. The response carries a usage summary so the UI can guide the author to remove consumers first.',
+        'method' => 'POST',
+        'parameters' => [
+            'scope' => ['required' => true, 'type' => 'string', 'enum' => ['admin', 'project']],
+            'id' => ['required' => true, 'type' => 'string']
+        ],
+        'example_post' => 'POST /management/deleteOAuthProvider with {"scope":"project","id":"mycorp-sso"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'oauth.provider.deleted',
+            'data' => ['id' => 'mycorp-sso', 'scope' => 'project', 'was_override' => false, 'admin_entry_remains' => false]
+        ],
+        'error_responses' => [
+            '400.validation.failed' => 'Invalid body',
+            '404.oauth.provider.not_found' => 'No entry at the declared scope',
+            '409.oauth.provider.in_use' => 'Provider is referenced by route-resolvers or oauth-button elements; data.usage carries the per-site list'
+        ],
+        'notes' => 'Removing a PROJECT-scope OVERRIDE (when an admin entry with the same id exists) skips the in-use check — the admin entry survives, so consumers still resolve. data.was_override = true in that case.'
     ],
     
     'getApiEndpoint' => [

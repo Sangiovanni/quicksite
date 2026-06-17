@@ -1,0 +1,366 @@
+/*
+ * OAuth admin surfaces (beta.9 A1 Slice 4 + 6 + 8).
+ *
+ * Two consumers:
+ *   - The oauth-button Complex Element wizard (cookie note panel,
+ *     provider picker status panel — runs inside the visual editor)
+ *   - The /admin/oauth-providers page (cards, modal form, in-use
+ *     error panel)
+ *
+ * All colors use the --admin-* CSS variables defined in admin.css so
+ * the surfaces theme correctly (admin is dark-themed; light-themed
+ * fallbacks land invisible).
+ */
+
+
+/* ====================================================================
+ * oauth-button wizard — status panel + cookie note
+ * ==================================================================== */
+
+.qs-oauth-status-panel {
+    padding: 8px;
+    border-radius: 4px;
+    background: var(--admin-bg-secondary);
+    color: var(--admin-text);
+    line-height: 1.6;
+    font-size: 13px;
+}
+.qs-oauth-status-panel__row { color: var(--admin-text-muted); }
+.qs-oauth-status-panel__row--done { color: var(--admin-success); }
+.qs-oauth-status-panel__summary { margin-top: 6px; font-weight: 500; color: var(--admin-text); }
+.qs-oauth-status-panel__summary--warn { color: var(--admin-warning); }
+.qs-oauth-status-panel__reminder {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--admin-text-muted);
+}
+
+.qs-oauth-cookie-note {
+    margin-top: 12px;
+    padding: 8px 10px;
+    border: 0.5px solid var(--admin-border);
+    border-radius: 4px;
+    background: var(--admin-bg-secondary);
+    color: var(--admin-text);
+}
+.qs-oauth-cookie-note__summary {
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--admin-text);
+    /* Override the default <summary> marker color so it's visible in dark mode. */
+    list-style-position: inside;
+}
+.qs-oauth-cookie-note__body {
+    margin-top: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--admin-text-muted);
+}
+.qs-oauth-cookie-note__body p { margin: 0 0 6px 0; }
+.qs-oauth-cookie-note__body p:last-child { margin-bottom: 0; }
+.qs-oauth-cookie-note__body code {
+    background: var(--admin-bg-tertiary);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--admin-text);
+}
+.qs-oauth-cookie-note__body a {
+    color: var(--admin-accent);
+}
+.qs-oauth-cookie-note__body a:hover {
+    color: var(--admin-accent-hover);
+}
+
+
+/* ====================================================================
+ * /admin/oauth-providers — list + cards + filters
+ * ==================================================================== */
+
+.oauth-providers-header__icon {
+    width: 32px;
+    height: 32px;
+    margin-right: 8px;
+}
+
+.oauth-providers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.oauth-providers-list__loading {
+    padding: 24px;
+    color: var(--admin-text-muted);
+    text-align: center;
+}
+.oauth-providers-list__empty {
+    padding: 24px;
+    color: var(--admin-text-muted);
+    text-align: center;
+}
+
+.oauth-provider-card {
+    background: var(--admin-card-bg);
+    border: 0.5px solid var(--admin-border);
+    border-radius: 8px;
+    padding: 14px 16px;
+}
+.oauth-provider-card__row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+.oauth-provider-card__main { min-width: 0; flex: 1; }
+.oauth-provider-card__pills {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.oauth-provider-card__id {
+    font-weight: 500;
+    font-size: 15px;
+    color: var(--admin-text);
+}
+.oauth-provider-card__summary {
+    font-size: 12px;
+    color: var(--admin-text-muted);
+    margin-top: 6px;
+    font-family: var(--font-mono, monospace);
+}
+.oauth-provider-card__actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.oauth-provider-card__action {
+    padding: 4px 10px;
+    font-size: 12px;
+}
+.oauth-provider-card__action--disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+
+/* Pills — source + status indicators */
+
+.oauth-pill {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--admin-bg-tertiary);
+    color: var(--admin-text-muted);
+}
+.oauth-pill--admin    { background: var(--admin-bg-tertiary); color: var(--admin-text-muted); }
+.oauth-pill--project,
+.oauth-pill--override { background: var(--admin-info-bg); color: var(--admin-info); }
+.oauth-pill--success  { background: var(--admin-success-bg); color: var(--admin-success); }
+.oauth-pill--warning  { background: var(--admin-warning-bg); color: var(--admin-warning); }
+.oauth-pill--danger   { background: var(--admin-error-bg); color: var(--admin-error); }
+.oauth-pill--neutral  { background: var(--admin-bg-tertiary); color: var(--admin-text-muted); }
+
+
+/* Filter bar */
+
+.oauth-filter-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.oauth-filter-bar__btn {
+    padding: 4px 12px;
+    font-size: 13px;
+}
+.oauth-filter-bar__btn--active {
+    background: var(--admin-surface);
+    border-color: transparent;
+}
+
+
+/* ====================================================================
+ * Modal — add / edit / override / delete
+ * ==================================================================== */
+
+.oauth-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    z-index: 1000;
+    padding: 40px 16px;
+    overflow-y: auto;
+}
+.oauth-modal-dialog {
+    background: var(--admin-bg-secondary);
+    color: var(--admin-text);
+    border-radius: 8px;
+    border: 0.5px solid var(--admin-border);
+    padding: 20px 24px;
+    width: 100%;
+    max-width: 640px;
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
+}
+.oauth-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+.oauth-modal-header__title {
+    margin: 0;
+    font-size: 18px;
+    color: var(--admin-text);
+}
+.oauth-modal-header__close {
+    padding: 4px 8px;
+}
+
+
+/* Form: scope toggle radio cards */
+
+.oauth-scope-toggle {
+    display: flex;
+    gap: 12px;
+}
+.oauth-scope-toggle__option {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    padding: 10px;
+    border: 0.5px solid var(--admin-border);
+    border-radius: 8px;
+    cursor: pointer;
+    background: var(--admin-bg);
+}
+.oauth-scope-toggle__option--checked {
+    border-color: var(--admin-accent);
+    background: var(--admin-accent-muted);
+}
+.oauth-scope-toggle__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.oauth-scope-toggle__label {
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--admin-text);
+}
+.oauth-scope-toggle__hint {
+    margin: 0;
+    font-size: 12px;
+    color: var(--admin-text-muted);
+}
+
+
+/* Credentials sub-section */
+
+.oauth-credentials {
+    margin-top: 12px;
+    padding: 12px 14px;
+    background: var(--admin-bg-tertiary);
+    border-radius: 8px;
+}
+.oauth-credentials__title {
+    margin: 0 0 8px;
+    font-size: 14px;
+    color: var(--admin-text);
+}
+.oauth-credentials__secret-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.oauth-credentials__reveal-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+.oauth-credentials__revealed-value {
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    color: var(--admin-text-muted);
+}
+
+
+/* Extra-params editor */
+
+.oauth-extra-params {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.oauth-extra-params__rows {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.oauth-extra-params__row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+.oauth-extra-params__add {
+    padding: 4px 10px;
+    font-size: 12px;
+    align-self: flex-start;
+}
+
+
+/* Modal actions row */
+
+.oauth-modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+.oauth-modal-actions__error {
+    color: var(--admin-error);
+    font-size: 13px;
+    margin-right: auto;
+    align-self: center;
+}
+.oauth-modal-actions__btn--danger {
+    background: var(--admin-error);
+    color: #fff;
+    border-color: transparent;
+}
+
+
+/* In-use error panel (delete blocked) */
+
+.oauth-in-use-panel {
+    padding: 12px 14px;
+    background: var(--admin-error-bg);
+    border: 0.5px solid var(--admin-error);
+    border-radius: 8px;
+    color: var(--admin-error);
+}
+.oauth-in-use-panel__msg {
+    margin: 0 0 8px;
+    font-weight: 500;
+}
+.oauth-in-use-panel__group-title {
+    font-size: 13px;
+    font-weight: 500;
+    margin-top: 4px;
+}
+.oauth-in-use-panel__list {
+    margin: 4px 0;
+    padding-left: 20px;
+    font-size: 12px;
+}
+.oauth-in-use-panel__hint {
+    margin: 8px 0 0;
+    font-size: 12px;
+}

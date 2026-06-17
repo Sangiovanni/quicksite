@@ -173,7 +173,7 @@ function getCommandCategories(): array {
         'authentication' => [
             'label' => 'Authentication',
             'icon' => 'shield',
-            'commands' => ['listOAuthProviders']
+            'commands' => ['listOAuthProviders', 'addOAuthProvider', 'editOAuthProvider', 'deleteOAuthProvider']
         ],
         'snippet_management' => [
             'label' => 'Snippets',

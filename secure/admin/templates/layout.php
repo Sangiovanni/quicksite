@@ -82,6 +82,7 @@ $langNames = [
     <!-- Admin-specific styles -->
     <link rel="stylesheet" href="<?= $versionedAsset('/admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/tag-examples.css') ?>">
+    <link rel="stylesheet" href="<?= $versionedAsset('/css/oauth-admin.css') ?>">
     <!-- Storage key registry — must load before any page script that references QuickSiteStorageKeys -->
     <script src="<?= $versionedAsset('/js/core/storage-keys.js') ?>"></script>
 </head>
@@ -185,7 +186,7 @@ $langNames = [
             </a>
             
             <!-- Sitemap - Top-level tab -->
-            <a href="<?= $router->url('sitemap') ?>" 
+            <a href="<?= $router->url('sitemap') ?>"
                class="admin-nav__link<?= $currentPage === 'sitemap' ? ' admin-nav__link--active' : '' ?>"
                data-requires-command="getSiteMap">
                 <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -193,7 +194,18 @@ $langNames = [
                 </svg>
                 <span><?= __admin('nav.sitemap') ?></span>
             </a>
-            
+
+            <!-- Authentication - Top-level tab (beta.9 A1 Slice 8) -->
+            <!-- Future home for magic-link config, role management, etc.; today links straight to the OAuth providers page since it's the only auth surface so far. -->
+            <a href="<?= $router->url('oauth-providers') ?>"
+               class="admin-nav__link<?= $currentPage === 'oauth-providers' ? ' admin-nav__link--active' : '' ?>"
+               data-requires-command="listOAuthProviders">
+                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span>Authentication</span>
+            </a>
+
             <!-- Optimize - Top-level tab -->
             <a href="<?= $router->url('optimize') ?>" 
                class="admin-nav__link<?= $currentPage === 'optimize' ? ' admin-nav__link--active' : '' ?>"

@@ -1777,6 +1777,123 @@ setRouteResolver×2 + addComplexElement),
 `secure/admin/functions/AdminHelper.php` `getCommandCategories()` (UI
 list). Behaviour: [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
 
+### OAuth providers admin page — top-level Authentication nav + full CRUD + strict in-use delete block + first-chars credential reveal + pre-filled override-in-project (locked 2026-06-15)
+
+**Decision**: `/admin/oauth-providers` ships as a top-level admin
+page (sibling of /admin/apis / /admin/sitemap / /admin/styles) under
+a new **Authentication** nav section. Full CRUD over OAuth provider
+presets + credentials at both admin and per-project scope. Five
+concrete shape choices made together:
+
+1. **Nav placement**: new top-level "Authentication" section
+   (matches the AdminHelper.php `getCommandCategories()`
+   "authentication" category added in Slice 4). Future home for
+   future auth UIs (magic-link config, role management, OAuth
+   session inspection). NOT folded under Settings or under
+   /admin/apis.
+2. **Delete-when-in-use**: **strict block** with explicit usage list
+   surfaced in the UI ("3 buttons / 2 routes use this provider —
+   remove them before deleting"). Backend returns HTTP 409 with the
+   per-site list. NOT a soft warn-and-allow that would silently
+   break the consuming buttons / routes.
+3. **Credentials masking**: default `••••••••` placeholder; explicit
+   `[Show first chars]` click reveals the first 4-6 characters of the
+   stored `client_secret` (e.g., `GOCSPX-Ab12···`). NOT full reveal
+   (leak risk on screenshots/videos), NOT write-only (authors need a
+   "is this the right credential?" sanity check; provider prefixes
+   like Google's `GOCSPX-` and GitHub's `gho_` are the most useful
+   disambiguator).
+4. **Override-in-project flow**: clicking "Override in project" on
+   an admin-scope row opens the edit modal pre-filled with the
+   admin entry's values + scope-toggle set to "project". Author
+   tweaks the fields they want different + saves; the project
+   override is written; admin entry untouched. Same shape as edit;
+   one fewer click than "duplicate then edit".
+5. **Slice scope**: **full CRUD + override management** — add /
+   edit / delete provider, set / update credentials, override
+   admin entries per-project, remove override (fall back to admin
+   entry). NOT a read-only viewer; NOT a partial slice that defers
+   delete or override to a follow-up. The right vertical to ship
+   end-to-end.
+
+**Reasoning**:
+
+1. **Top-level Authentication nav** matches the AdminHelper category
+   already in place. Authentication is its own concern — folding it
+   under Settings buries it; folding under API Registry conflates
+   "what APIs do I call" with "how do my users sign in". The
+   Authentication section will grow naturally (magic-link config,
+   role management UI, future session inspection); top-level
+   placement future-proofs that without nav churn.
+2. **Strict delete block** matches the data integrity instinct that
+   drove the resolver "all-same-kind" rejection (Slice 2b) and the
+   /admin/apis "deleteApi" in-use check. Authors who DO want to
+   remove a heavily-used provider can do so in two steps (remove the
+   consumers, then delete) — explicit beats silent breakage. The
+   server-side guard reads the per-provider usage count already
+   surfaced in `listOAuthProviders`'s `setup` summary (extended in
+   this slice to also count oauth-button references across pages).
+3. **First-chars reveal** is the middle ground between "completely
+   write-only" (annoying — authors can't sanity-check) and "full
+   reveal on click" (screenshot/video leak risk). Reveals ~24 bits
+   of entropy on a typical 32-char base62 secret; remaining ~166
+   bits is still cryptographically strong. Provider prefixes like
+   `GOCSPX-` / `gho_` / `amzn1.*` give authors a real
+   disambiguation signal. UI default is masked; reveal is explicit
+   click; nothing happens automatically.
+4. **Pre-filled override modal** is just edit-with-different-scope.
+   No new UI primitive. The "duplicate then edit" alternative is
+   two-step UX for the same result.
+5. **Full CRUD scope** because half-shipping (e.g. read + add but no
+   edit/delete) ships an admin page that immediately surfaces "wait,
+   how do I update X?" friction. The vertical is tight; finishing
+   it costs ~2 days vs leaving a UX gap that authors will hit on
+   day one.
+
+**Alternatives considered**:
+
+1. **Subpage under Settings** — buries the surface, harder to find,
+   doesn't scale to future auth UIs. **Subpage under /admin/apis** —
+   conflates outbound API calls with inbound user authentication;
+   different mental model. Rejected.
+2. **Allow delete with auto-cleanup** (cascade-remove consuming
+   buttons / routes) — surprising behaviour for the author who just
+   wanted to remove the provider; silently breaks consumers without
+   their consent. **Allow delete with soft warn** — authors who skim
+   the warning destroy their setup; explicit block forces eyes-on.
+   Rejected.
+3. **Write-only credentials** (strictest — once saved, never
+   shown; only replace) — defensible for the highest-security
+   environments but creates a "is this the right secret?" friction
+   loop that authors solve by overwriting anyway (net negative on
+   security). **Full reveal on click** — leaks the entire credential
+   to anything that sees the screen; not worth it for a sanity-check
+   feature. **Last-chars reveal** (GitHub/AWS pattern) — same
+   entropy math as first-chars; first-chars wins because provider
+   prefixes carry more signal than suffixes. Rejected.
+4. **Two-step override** (duplicate → then edit) — extra click for
+   no benefit. **Inline override** (toggle a per-field "override
+   this field" checkbox on the admin entry's edit modal) — would
+   re-introduce field-level merge complexity that Slice 2.5
+   explicitly rejected ("override is at PROVIDER level, full-entry
+   replace"). Rejected.
+5. **Read + add only** (defer edit/delete) — leaves the surface
+   half-done and immediately reveals the gap to first-day users.
+   Rejected.
+
+**Source**: `secure/management/command/addOAuthProvider.php`,
+`secure/management/command/editOAuthProvider.php`,
+`secure/management/command/deleteOAuthProvider.php` (new — full
+CRUD), enhanced `listOAuthProviders.php` (adds `credentials_status`
++ `usage_count` per provider), `secure/admin/templates/pages/oauth-providers.php`
+(new admin page template), `public/admin/assets/js/pages/oauth-providers.js`
+(new — list + form modal + CRUD orchestration), nav entry added to
+the admin sidebar / index. Behaviour:
+[ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) extended with an "Admin page
+walkthrough" subsection at ship time. PII surface unchanged from
+existing OAuth row in `NOTES/planning/DATA_FLOWS_INVENTORY.md`
+(this slice is admin UX over the same data).
+
 ---
 
 ## Project conventions (beta.9)

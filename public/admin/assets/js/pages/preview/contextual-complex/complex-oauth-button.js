@@ -25,6 +25,8 @@
 
     let _providersCache = null;
     let _providersPromise = null;
+    let _routesCache = null;
+    let _routesPromise = null;
 
     function loadProvidersOnce() {
         if (_providersCache !== null) return Promise.resolve(_providersCache);
@@ -54,6 +56,58 @@
     // cached setup status goes stale).
     function invalidateProvidersCache() {
         _providersCache = null;
+        _routesCache = null;
+    }
+
+    /**
+     * Load the project's literal routes for the "Redirect after login"
+     * picker. Skips :param routes since the wizard can't predict what
+     * value to substitute; authors who need a param-route landing
+     * configure it via the element's params editor after insertion.
+     * 'home' is normalised to '/' (matches the public-site root).
+     *
+     * Server-side OAuthHandler::sanitiseReturnTo enforces the same
+     * "must be a registered route" rule — this client-side picker is
+     * UX, not security.
+     */
+    function loadRoutesOnce() {
+        if (_routesCache !== null) return Promise.resolve(_routesCache);
+        if (_routesPromise) return _routesPromise;
+        const adminApi = window.QuickSiteAdmin;
+        if (!adminApi || typeof adminApi.apiRequest !== 'function') {
+            _routesCache = ['/'];
+            return Promise.resolve(_routesCache);
+        }
+        _routesPromise = (async function () {
+            try {
+                const r = await adminApi.apiRequest('getRoutes', 'GET');
+                const payload = (r && r.data && (r.data.data || r.data)) || {};
+                _routesCache = _flattenLiteralRoutes(payload.routes || {});
+            } catch (err) {
+                console.warn('[OAuthButton] failed to load routes:', err);
+                _routesCache = ['/'];
+            } finally {
+                _routesPromise = null;
+            }
+            return _routesCache;
+        })();
+        return _routesPromise;
+    }
+
+    function _flattenLiteralRoutes(routes, prefix) {
+        const out = [];
+        if (!routes || typeof routes !== 'object') return out;
+        prefix = prefix || '';
+        Object.keys(routes).forEach(function (key) {
+            if (key.charAt(0) === ':') return;
+            const path = (key === 'home' && prefix === '') ? '/' : (prefix + '/' + key);
+            out.push(path);
+            const child = routes[key];
+            if (child && typeof child === 'object' && !Array.isArray(child)) {
+                _flattenLiteralRoutes(child, prefix + '/' + key).forEach(function (p) { out.push(p); });
+            }
+        });
+        return out;
     }
 
     function _renderLabel(text, required) {
@@ -98,9 +152,8 @@
         a.textContent = text;
         return a;
     }
-    function _renderParagraph(parts, marginBottom) {
+    function _renderParagraph(parts) {
         const p = document.createElement('p');
-        p.style.margin = '0 0 ' + (marginBottom || '0') + ' 0';
         parts.forEach(function (part) {
             if (typeof part === 'string') {
                 p.appendChild(document.createTextNode(part));
@@ -112,17 +165,14 @@
     }
     function _renderCookieNoteBody() {
         const body = document.createElement('div');
-        body.style.marginTop = '8px';
-        body.style.fontSize = '12px';
-        body.style.lineHeight = '1.5';
-        body.style.color = 'var(--admin-text-muted, #555)';
+        body.className = 'qs-oauth-cookie-note__body';
 
         body.appendChild(_renderParagraph([
             'In the standard flow (user clicks this button on your site, ',
             'gets redirected to the provider, comes back to ',
             _renderCode('/auth/oauth/<provider>/callback'),
             ') the OAuth cookies are FIRST-PARTY and work everywhere.',
-        ], '6px'));
+        ]));
 
         body.appendChild(_renderParagraph([
             'If you EMBED this site in an ',
@@ -132,7 +182,7 @@
             'Protection may treat the OAuth cookies as third-party and ',
             'BLOCK them — the user appears to log in but the callback ',
             'drops their session.',
-        ], '6px'));
+        ]));
 
         body.appendChild(_renderParagraph([
             'Workarounds when embedding: open the sign-in flow in a new ',
@@ -177,11 +227,7 @@
         const statusGroup = _renderGroup();
         statusGroup.appendChild(_renderLabel('Setup status'));
         const statusPanel = document.createElement('div');
-        statusPanel.className = 'qs-oauth-button-status admin-hint';
-        statusPanel.style.padding = '8px';
-        statusPanel.style.borderRadius = '4px';
-        statusPanel.style.background = 'var(--admin-bg-subtle, #f4f4f4)';
-        statusPanel.style.lineHeight = '1.6';
+        statusPanel.className = 'qs-oauth-status-panel';
         statusPanel.textContent = 'Pick a provider to see what the wizard will create.';
         statusGroup.appendChild(statusPanel);
         wrap.appendChild(statusGroup);
@@ -216,19 +262,38 @@
         // ---- optional "redirect after login" --------------------------
         const returnGroup = _renderGroup();
         returnGroup.appendChild(_renderLabel('Redirect after login (optional)'));
-        const returnInput = document.createElement('input');
-        returnInput.type = 'text';
-        returnInput.className = 'admin-input';
-        returnInput.placeholder = 'e.g. /dashboard';
-        returnInput.autocomplete = 'off';
-        returnGroup.appendChild(returnInput);
+        const returnSelect = document.createElement('select');
+        returnSelect.className = 'admin-input';
+        const homeOpt = document.createElement('option');
+        homeOpt.value = '';
+        homeOpt.textContent = '(homepage — / by default)';
+        returnSelect.appendChild(homeOpt);
+        returnSelect.disabled = true;
+        const loadingOpt = document.createElement('option');
+        loadingOpt.value = '';
+        loadingOpt.textContent = 'Loading routes…';
+        returnSelect.appendChild(loadingOpt);
+        returnGroup.appendChild(returnSelect);
         returnGroup.appendChild(_renderHint(
-            'Path on this site users land on after a successful sign-in. '
-            + 'Must start with "/" (server rejects off-site URLs to '
-            + 'prevent open-redirect abuse). Leave empty to send users '
-            + 'to the homepage.'
+            'Path on this site users land on after sign-in. Restricted to '
+            + 'existing routes (server rejects unknown / off-site paths to '
+            + 'prevent open-redirect abuse). To land on a :param route, '
+            + 'leave this empty and set ?return=/path/manually via the '
+            + 'element params editor after insertion.'
         ));
         wrap.appendChild(returnGroup);
+
+        loadRoutesOnce().then(function (routes) {
+            // Remove the loading placeholder; keep the "(homepage)" option
+            while (returnSelect.options.length > 1) returnSelect.remove(1);
+            routes.forEach(function (r) {
+                const opt = document.createElement('option');
+                opt.value = r;
+                opt.textContent = r;
+                returnSelect.appendChild(opt);
+            });
+            returnSelect.disabled = false;
+        });
 
         // ---- third-party cookie note (Slice 6) ------------------------
         // BFF cookies are first-party in the standard OAuth flow (page →
@@ -243,20 +308,12 @@
         // collapsed details block so authors who don't care don't see
         // noise, but authors who do embed get the heads-up.
         const cookieNote = document.createElement('details');
-        cookieNote.className = 'qs-oauth-button-cookie-note';
-        cookieNote.style.marginTop = '12px';
-        cookieNote.style.padding = '8px 10px';
-        cookieNote.style.border = '1px solid var(--admin-border-subtle, #ddd)';
-        cookieNote.style.borderRadius = '4px';
-        cookieNote.style.background = 'var(--admin-bg-subtle, #f9f9f9)';
+        cookieNote.className = 'qs-oauth-cookie-note';
         const cookieSummary = document.createElement('summary');
-        cookieSummary.style.cursor = 'pointer';
-        cookieSummary.style.fontWeight = '600';
-        cookieSummary.style.fontSize = '13px';
+        cookieSummary.className = 'qs-oauth-cookie-note__summary';
         cookieSummary.textContent = 'Third-party cookies note — relevant if you embed this site in iframes';
         cookieNote.appendChild(cookieSummary);
-        const cookieBody = _renderCookieNoteBody();
-        cookieNote.appendChild(cookieBody);
+        cookieNote.appendChild(_renderCookieNoteBody());
         wrap.appendChild(cookieNote);
 
         container.appendChild(wrap);
@@ -332,8 +389,8 @@
 
             function row(text, isDone) {
                 const r = document.createElement('div');
+                r.className = 'qs-oauth-status-panel__row' + (isDone ? ' qs-oauth-status-panel__row--done' : '');
                 r.textContent = (isDone ? '✓ ' : '○ ') + text;
-                r.style.color = isDone ? 'var(--admin-success, #1a7f37)' : 'var(--admin-text-muted, #555)';
                 return r;
             }
             lines.appendChild(row('Start route ' + setup.start_route_path, setup.start_route_exists));
@@ -341,24 +398,17 @@
             statusPanel.appendChild(lines);
 
             const summary = document.createElement('div');
-            summary.style.marginTop = '6px';
-            summary.style.fontWeight = '600';
-            if (setup.fully_set_up) {
-                summary.textContent = 'Routes already exist — wizard will reuse them and add a button on this page.';
-                summary.style.color = 'var(--admin-warning, #b58100)';
-            } else {
-                summary.textContent = 'Wizard will create the missing route(s) + attach oauth-start / oauth-callback resolvers, then insert the button.';
-                summary.style.color = 'var(--admin-text, #222)';
-            }
+            summary.className = 'qs-oauth-status-panel__summary' + (setup.fully_set_up ? ' qs-oauth-status-panel__summary--warn' : '');
+            summary.textContent = setup.fully_set_up
+                ? 'Routes already exist — wizard will reuse them and add a button on this page.'
+                : 'Wizard will create the missing route(s) + attach oauth-start / oauth-callback resolvers, then insert the button.';
             statusPanel.appendChild(summary);
 
             const reminder = document.createElement('div');
-            reminder.style.marginTop = '6px';
-            reminder.style.fontSize = '12px';
+            reminder.className = 'qs-oauth-status-panel__reminder';
             reminder.textContent = 'Remember: fill in client_id + client_secret for "'
                 + provider.id + '" in secure/admin/config/oauth-secrets.php '
                 + 'OR secure/projects/<active>/data/oauth-secrets.json before clicking the button.';
-            reminder.style.color = 'var(--admin-text-muted, #555)';
             statusPanel.appendChild(reminder);
         }
 
@@ -384,7 +434,7 @@
             };
             const icon = iconInput.value.trim();
             if (icon !== '') cfg.iconClass = icon;
-            const ret = returnInput.value.trim();
+            const ret = returnSelect.value.trim();
             if (ret !== '') cfg.returnTo = ret;
             return cfg;
         }
