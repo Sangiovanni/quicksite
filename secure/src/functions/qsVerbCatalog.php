@@ -282,7 +282,7 @@ function qsVerbCatalog(): array {
             'category' => 'auth',
             'signature' => 'QS.refresh(apiRef)',
             'args' => [
-                ['name' => 'apiRef', 'type' => 'string', 'required' => true, 'description' => 'API to refresh as @apiId (must have a Refresh config in /admin/apis). It reads that API\'s stored refresh token, requests a new access token, stores it back, and rotates the refresh token if configured.']
+                ['name' => 'apiRef', 'type' => 'string', 'required' => true, 'description' => 'API to refresh as @apiId (must have a Refresh config in /admin/apis). It reads that API\'s stored refresh token, requests a new access token, stores it back, and rotates the refresh token if configured.', 'inputType' => 'api']
             ],
             'description' => 'Manually run the Tier 2 token refresh for an API (same flow as the automatic refresh-on-401). Reads the refresh token from the API\'s refreshTokenSource, POSTs to its refreshEndpoint, and stores the new access token. A raw fetch to the refresh endpoint will NOT work — only this verb can inject the stored refresh token. Fires `qs:auth:saved` on success. Use for a "Refresh session" button.',
             'example' => '{{call:refresh:@auth-api}}',
@@ -293,7 +293,7 @@ function qsVerbCatalog(): array {
             'category' => 'auth',
             'signature' => 'QS.exchangeMagicLink(endpoint, paramName, returnTo?)',
             'args' => [
-                ['name' => 'endpoint', 'type' => 'string', 'required' => true, 'description' => 'Auth API endpoint that trades the URL code for a session token, as @apiId/endpointId (e.g. @auth-api/exchange-magic). Typically configured with auth.type=none — the exchange itself IS the login.'],
+                ['name' => 'endpoint', 'type' => 'string', 'required' => true, 'description' => 'Auth API endpoint that trades the URL code for a session token, as @apiId/endpointId (e.g. @auth-api/exchange-magic). Typically configured with auth.type=none — the exchange itself IS the login.', 'inputType' => 'apiEndpoint'],
                 ['name' => 'paramName', 'type' => 'string', 'required' => true, 'description' => 'Name of the route :name segment that holds the code. For /auth/magic/:key this is "key". The verb reads QS.routeParams[<paramName>] (populated by qs.js\'s client-side path matcher — see ARCHITECTURE §5.3).'],
                 ['name' => 'returnTo', 'type' => 'string', 'required' => false, 'description' => 'Optional URL to navigate to after the exchange succeeds. Falls back to the ?return= query param. With neither, no auto-redirect — chain an explicit {{call:redirect:/path}} step instead. When provided AND saveToken calls are chained after this verb, the saveTokens still run before the browser processes the queued navigation (they\'re sync and execute in the same microtask).']
             ],
@@ -306,7 +306,7 @@ function qsVerbCatalog(): array {
             'category' => 'auth',
             'signature' => 'QS.requestMagicLink(endpoint, email, returnTo?)',
             'args' => [
-                ['name' => 'endpoint', 'type' => 'string', 'required' => true, 'description' => 'Auth API endpoint that issues a magic-link email, as @apiId/endpointId (e.g. @auth-api/issue-magic). Usually configured with auth.type=none — runs before the user has a session.'],
+                ['name' => 'endpoint', 'type' => 'string', 'required' => true, 'description' => 'Auth API endpoint that issues a magic-link email, as @apiId/endpointId (e.g. @auth-api/issue-magic). Usually configured with auth.type=none — runs before the user has a session.', 'inputType' => 'apiEndpoint'],
                 ['name' => 'email', 'type' => 'string', 'required' => true, 'description' => 'Either a literal email address ("user@example.com") or a CSS selector ("#email-input", ".email-field") pointing to an <input>. The verb reads .value from the matched element.'],
                 ['name' => 'returnTo', 'type' => 'string', 'required' => false, 'description' => 'Optional URL to navigate to after the request succeeds — typically a "check your email" confirmation page.']
             ],
@@ -319,7 +319,7 @@ function qsVerbCatalog(): array {
             'category' => 'auth',
             'signature' => 'QS.logoutServer(endpoint)',
             'args' => [
-                ['name' => 'endpoint', 'type' => 'string', 'required' => true, 'description' => 'Auth API endpoint that invalidates the server-side session, as @apiId/endpointId (e.g. @auth-api/logout). Usually a POST endpoint inheriting bearer auth — the server uses the request\'s token to identify which session to drop.']
+                ['name' => 'endpoint', 'type' => 'string', 'required' => true, 'description' => 'Auth API endpoint that invalidates the server-side session, as @apiId/endpointId (e.g. @auth-api/logout). Usually a POST endpoint inheriting bearer auth — the server uses the request\'s token to identify which session to drop.', 'inputType' => 'apiEndpoint']
             ],
             'description' => 'Server-side logout — tells the auth API to invalidate the session / revoke the refresh token. The Tier 1 logout pair: chain this BEFORE clearToken (so the request still has the token attached) then clearToken to drop the local copy. Thin wrapper around QS.fetch so the registry\'s bearer auth is applied. Logout failures are intentionally swallowed — the user wants out either way, so subsequent clearToken + redirect should always run.',
             'example' => '{{call:logoutServer:@auth-api/logout}};{{call:clearToken:localStorage,authToken}};{{call:clearToken:localStorage,refreshToken}};{{call:redirect:/}}',

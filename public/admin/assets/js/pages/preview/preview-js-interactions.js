@@ -822,6 +822,17 @@
         }
         populateFunctionDropdown();
 
+        // Slice 4: ensure the API endpoint catalogue is loaded BEFORE we
+        // dispatch the function-change event below — the apiEndpoint/api
+        // inputType pickers (refresh, exchangeMagicLink, requestMagicLink,
+        // logoutServer) render their options synchronously from
+        // availableApiEndpoints during _createArgRow. Mirrors what the
+        // page-event edit flow already does (line 3218) and the API-mode
+        // branch below (line 865).
+        if (availableApiEndpoints.length === 0) {
+            await fetchApiEndpoints();
+        }
+
         // Pre-fill event dropdown
         if (jsFormEvent) jsFormEvent.value = interaction.event;
 
@@ -964,7 +975,11 @@
                             }
                         }
                         input.value = params[i];
-                        input.dispatchEvent(new Event('input'));
+                        // <select> listeners (including QSSearchableSelect's
+                        // trigger-label sync) bind to 'change', not 'input';
+                        // the browser only fires 'change' on programmatic
+                        // value-set if we dispatch it ourselves. Slice 4.
+                        input.dispatchEvent(new Event(input.tagName === 'SELECT' ? 'change' : 'input'));
                     }
                 });
                 // Close any picker dropdowns that the synthetic input events opened
@@ -1770,6 +1785,15 @@
         if (inputType === 'store') {
             // State-store arg: a dropdown of the current page's stores.
             row.appendChild(_renderStoreArgSelect(arg, paramIndex, updateFn));
+        } else if (inputType === 'apiEndpoint' || inputType === 'api') {
+            // Slice 4: registry-backed picker for auth verbs.
+            // apiEndpoint = @api/ep cascade (exchangeMagicLink, requestMagicLink,
+            // logoutServer); api = @api alone (refresh.apiRef).
+            var apiSel = inputType === 'apiEndpoint'
+                ? _renderApiEndpointArgSelect(arg, paramIndex, updateFn)
+                : _renderApiArgSelect(arg, paramIndex, updateFn);
+            row.appendChild(apiSel);
+            _mountApiPickerWrap(apiSel, inputType);
         } else if (usePicker && (inputType === 'selector' || inputType === 'class' || inputType === 'matchTarget')) {
             var picker = createSearchablePicker(inputType, arg, paramIndex);
             row.appendChild(picker);
@@ -1824,6 +1848,124 @@
         }
         sel.addEventListener('change', updateFn);
         return sel;
+    }
+
+    /**
+     * Beta.9 A2 Slice 4: populate the apiEndpoint-inputType <select> with
+     * one option per registered endpoint. Option value is the @api/ep ref
+     * that gets persisted; textContent stays compact so the trigger label
+     * (set from textContent by QSSearchableSelect) fits the form column.
+     * The METHOD + path + endpoint description go into data-description
+     * — the wrapper shows it as a secondary line in the dropdown AND
+     * folds it into search matching (see searchable-select.js _matches).
+     */
+    function _populateApiEndpointOptions(sel) {
+        sel.textContent = '';
+        var placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = PreviewConfig.i18n?.selectApiEndpoint || '— Select an API endpoint —';
+        sel.appendChild(placeholder);
+        availableApiEndpoints.forEach(function(ep) {
+            var opt = document.createElement('option');
+            opt.value = '@' + ep.api + '/' + ep.endpoint;
+            opt.textContent = '@' + ep.api + '/' + ep.endpoint;
+            var subtitle = (ep.method || 'POST').toUpperCase() + ' ' + (ep.path || '');
+            if (ep.description) subtitle += ' — ' + ep.description;
+            opt.dataset.description = subtitle;
+            sel.appendChild(opt);
+        });
+    }
+
+    function _renderApiEndpointArgSelect(arg, paramIndex, updateFn) {
+        var sel = document.createElement('select');
+        sel.className = 'preview-contextual-js-form-input';
+        sel.dataset.paramIndex = paramIndex;
+        sel.dataset.paramName = arg.name || '';
+        sel.dataset.inputType = 'apiEndpoint';
+        sel.addEventListener('change', updateFn);
+        _populateApiEndpointOptions(sel);
+        return sel;
+    }
+
+    /**
+     * Slice 4: populate the api-inputType <select> with one option per
+     * UNIQUE API (deduplicated from availableApiEndpoints). Only refresh
+     * uses this today — apiRef takes @apiId alone, no endpoint segment.
+     * The endpoint count + sample names land in data-description so
+     * search across "auth-api" hits APIs that have a /login endpoint too.
+     */
+    function _populateApiOptions(sel) {
+        sel.textContent = '';
+        var placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = PreviewConfig.i18n?.selectApi || '— Select an API —';
+        sel.appendChild(placeholder);
+        var seen = {};
+        availableApiEndpoints.forEach(function(ep) {
+            if (seen[ep.api]) return;
+            seen[ep.api] = true;
+            var endpointsForApi = availableApiEndpoints.filter(function(e) { return e.api === ep.api; });
+            var sampleNames = endpointsForApi.slice(0, 3).map(function(e) { return e.endpoint; }).join(', ');
+            var subtitle = endpointsForApi.length + ' endpoint' + (endpointsForApi.length === 1 ? '' : 's');
+            if (sampleNames) subtitle += ' — ' + sampleNames + (endpointsForApi.length > 3 ? ', …' : '');
+            var opt = document.createElement('option');
+            opt.value = '@' + ep.api;
+            opt.textContent = '@' + ep.api;
+            opt.dataset.description = subtitle;
+            sel.appendChild(opt);
+        });
+    }
+
+    function _renderApiArgSelect(arg, paramIndex, updateFn) {
+        var sel = document.createElement('select');
+        sel.className = 'preview-contextual-js-form-input';
+        sel.dataset.paramIndex = paramIndex;
+        sel.dataset.paramName = arg.name || '';
+        sel.dataset.inputType = 'api';
+        sel.addEventListener('change', updateFn);
+        _populateApiOptions(sel);
+        return sel;
+    }
+
+    /**
+     * Slice 4: wrap an apiEndpoint/api <select> with QSSearchableSelect.
+     * Called from _createArgRow AFTER the select is in the DOM (the
+     * wrapper's constructor inserts its trigger via parentNode.insertBefore
+     * — needs the select mounted first).
+     *
+     * Defensive lazy-load: the JS-form and page-event flows already
+     * pre-fetch availableApiEndpoints before opening the form, but if a
+     * future call site renders an arg row cold, this kicks the fetch and
+     * repopulates + refreshes the picker once the data lands.
+     */
+    function _mountApiPickerWrap(sel, inputType) {
+        if (!window.QSSearchableSelect) return null;
+        var labels = inputType === 'apiEndpoint'
+            ? {
+                placeholder: PreviewConfig.i18n?.selectApiEndpoint || 'Select an API endpoint…',
+                searchPlaceholder: 'Search endpoints… (matches name, path, description)',
+                emptyText: 'No endpoints match',
+            }
+            : {
+                placeholder: PreviewConfig.i18n?.selectApi || 'Select an API…',
+                searchPlaceholder: 'Search APIs…',
+                emptyText: 'No APIs match',
+            };
+        var picker;
+        try {
+            picker = new window.QSSearchableSelect(sel, labels);
+        } catch (e) {
+            console.warn('[PreviewJsInteractions] QSSearchableSelect mount failed for inputType=' + inputType + ':', e);
+            return null;
+        }
+        if (availableApiEndpoints.length === 0) {
+            fetchApiEndpoints().then(function() {
+                if (inputType === 'apiEndpoint') _populateApiEndpointOptions(sel);
+                else _populateApiOptions(sel);
+                picker.refresh();
+            });
+        }
+        return picker;
     }
 
     /**
@@ -3303,7 +3445,10 @@
                         }
                     }
                     input.value = savedParams[idx];
-                    input.dispatchEvent(new Event('input'));
+                    // <select> listeners (incl. QSSearchableSelect trigger
+                    // label) bind to 'change'; dispatch it explicitly so
+                    // pre-fill updates the wrapped trigger label. Slice 4.
+                    input.dispatchEvent(new Event(input.tagName === 'SELECT' ? 'change' : 'input'));
                 });
                 updatePageEventPreview();
             }, 100);

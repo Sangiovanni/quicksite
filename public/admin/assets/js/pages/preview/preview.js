@@ -21,6 +21,25 @@
     const previewResizeHandle = document.getElementById('preview-resize-handle');
     const loading = document.getElementById('preview-loading');
     const targetSelect = document.getElementById('preview-target');  // Unified page/component dropdown
+
+    // Beta.9 A2 Slice 4 follow-up: wrap the edit-target select with the
+    // searchable combobox so authors can filter by typing instead of
+    // scrolling the layout/pages/components optgroups. Idempotent —
+    // QSSearchableSelect has its own double-wrap guard on the native
+    // select's dataset.qsSearchableWrapped marker.
+    let targetPicker = null;
+    if (targetSelect && window.QSSearchableSelect) {
+        try {
+            targetPicker = new window.QSSearchableSelect(targetSelect, {
+                placeholder: '— Select page or component —',
+                searchPlaceholder: 'Search pages, components, layout…',
+                emptyText: 'No matches',
+            });
+        } catch (e) {
+            console.warn('[Preview] Failed to mount QSSearchableSelect on preview-target:', e);
+        }
+    }
+
     const langSelect = document.getElementById('preview-lang');
     const reloadBtn = document.getElementById('preview-reload');
     const deviceBtns = document.querySelectorAll('.preview-device-btn');

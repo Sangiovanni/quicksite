@@ -2137,6 +2137,236 @@ the tail of `populateFunctionDropdown` and `_populateFnSelect`).
 Behaviour: [ADMIN_PANEL.md §9.x](ADMIN_PANEL.md) at ship time of
 the full picker overhaul (Slice 7).
 
+### Picker search persistence — per-picker localStorage key, restored on open (superseded 2026-06-17, reverted)
+
+> **Superseded** by "Picker search persistence — NOT shipped; combobox
+> resets on every open" below. The persistence shipped briefly within
+> this same session then was reverted after user testing surfaced the
+> UX problems (ghost-filter confusion on reopen + cross-reload, no
+> common pattern in similar tools, hypothetical Q2 "yes" did not
+> survive contact with the actual experience). Preserved verbatim for
+> the historical record per the append-only discipline.
+
+**Decision**: `QSSearchableSelect` accepts an optional `persistKey`
+option. When set, the search input's current value is written to
+`localStorage[persistKey]` on every keystroke, and read back into the
+input the next time the dropdown opens. Empty values REMOVE the key
+(deliberate clear leaves no stale entry). Storage errors (private-
+mode browsers, quota exceeded, disabled storage) are silently
+swallowed — persistence is best-effort, never blocks the picker.
+
+Keys live in the central `QuickSiteStorageKeys` registry
+(`public/admin/assets/js/core/storage-keys.js`). Slice 3 adds two
+keys, one per existing picker:
+
+- `pickerSearchJsFn` → `quicksite_picker_search_js_fn` (element
+  interactions form)
+- `pickerSearchPeFn` → `quicksite_picker_search_pe_fn` (page events
+  form)
+
+Independent keys so the two pickers track their searches separately
+(authoring a page event for `onload` rarely shares context with
+authoring an element click handler).
+
+**Reasoning**:
+
+- **Optional, not on-by-default** — `QSSearchableSelect` is a generic
+  component. Most callers (future surfaces like the route picker)
+  may not want persistence. Opt-in via `persistKey` keeps the
+  default zero-cost.
+- **Per-picker keys** — collapsing the two pickers into one shared
+  key would mean a search query typed for an element interaction
+  pre-applies to the next page event opened, which is a context
+  mismatch the authoring flow doesn't benefit from.
+- **localStorage over sessionStorage** — the typical authoring
+  pattern is "I was filtering by `magic` yesterday, open the picker
+  today, still on `magic`." sessionStorage would lose that on tab
+  close.
+- **Per-keystroke write, not debounced** — localStorage writes for
+  short strings are cheap (sub-millisecond). Debouncing adds
+  complexity to recover negligible perf.
+
+**Alternatives considered**:
+
+- **Persist also the "last selected verb"** — already the form's
+  job (when editing an existing interaction, the value is loaded
+  from saved structure). The picker doesn't need to remember
+  selections — only the *filter state* that's NOT part of saved
+  structure.
+- **Persist whether dropdown was open at last unmount** — minor UX
+  win, but auto-opening on page load is usually surprising. Rejected.
+- **Persist focused-item index** — fragile across catalog changes
+  (verb removed → stale index). Skip.
+- **Shared key across all picker types** — see "Per-picker keys"
+  reasoning above.
+
+**Source**:
+`public/admin/assets/js/core/storage-keys.js` (two new keys),
+`public/admin/assets/js/core/searchable-select.js` (`persistKey`
+option + `_readPersistedQuery` / `_writePersistedQuery` private
+helpers; restore in `open()`, write in the search input's
+`input` event),
+`public/admin/assets/js/pages/preview/preview-js-interactions.js`
+(both `jsFnPicker` + `peFnPicker` instantiations pass their
+respective `QuickSiteStorageKeys` value as `persistKey`).
+Behaviour: [ADMIN_PANEL.md §6](ADMIN_PANEL.md) storage key registry
+(two new entries) + [ADMIN_PANEL.md §9.x](ADMIN_PANEL.md) picker
+section at full-overhaul ship time.
+
+### Picker search persistence — NOT shipped; combobox resets on every open (locked 2026-06-17, supersedes earlier same-day persist-via-localStorage entry)
+
+**Decision**: The verb picker (and the reusable
+`QSSearchableSelect` component in general) does **NOT** persist the
+search query. Each open starts with a clean empty search input + full
+filtered-by-event list. Closing the dropdown discards the query;
+reopening starts fresh.
+
+The earlier same-day Slice 3 entry that shipped per-picker
+`localStorage`-backed persistence was reverted after user verification
+testing — the UX in practice contradicted the hypothetical answer
+given at kickoff.
+
+**Reasoning** (why persistence was wrong here):
+
+- **No common pattern matches it** — Google search, GitHub command
+  palette, Spotlight, VS Code Quick Open, browser address-bar autocomplete:
+  none persist a prior query. The user's mental model is "fresh
+  invocation = fresh input."
+- **Stale filter is worse than no filter** — a filter the user set
+  hours or days ago restores invisibly on next open. They see fewer
+  options than expected, may not notice the search box still holds
+  text, end up thinking the picker is broken.
+- **Authoring sessions don't repeat the same filter** — once an
+  author selects a verb for one interaction, the next interaction
+  is rarely on the SAME concept (different element, different
+  event, different concern). The "I'm wiring up all auth verbs
+  today" use case assumed at kickoff turns out to be uncommon.
+- **Page-reload restore was especially confusing** — opening a
+  fresh editor session and finding the picker pre-filtered with
+  yesterday's query reads as a bug, not a feature.
+
+**Alternatives considered** (and now also rejected):
+
+- **`localStorage` persistence across reloads** (the entry above —
+  the original Slice 3 shipment). Reverted same day.
+- **`sessionStorage`-only** (per-tab session) — milder version, but
+  same problem: close+reopen the picker still shows stale filter.
+- **Persist for current open dropdown only** — equivalent to "no
+  persistence" since the dropdown stays open during a single
+  filter-and-select flow anyway. Adds an option for no benefit.
+- **Persist + show a visible "stale filter" badge** — over-engineered
+  recovery for a feature that shouldn't exist.
+
+**Source**: `public/admin/assets/js/core/searchable-select.js` (the
+`persistKey` option + `_readPersistedQuery` + `_writePersistedQuery`
+helpers all removed; no localStorage interaction remains).
+`public/admin/assets/js/core/storage-keys.js` (the two `pickerSearch*`
+entries removed). `public/admin/assets/js/pages/preview/preview-js-interactions.js`
+(`persistKey` option dropped from both picker instantiations).
+`docs/ADMIN_PANEL.md` §6 (the two new rows removed). Behaviour
+documented at the picker section in [ADMIN_PANEL.md §9.x](ADMIN_PANEL.md)
+at full-overhaul ship time.
+
+### Picker inputType `apiEndpoint` — single combined combobox (locked 2026-06-17)
+
+**Decision**: The catalog gains two new inputType values for registry-
+backed args:
+
+- `inputType: 'apiEndpoint'` — for verb args that take an `@apiId/endpointId`
+  ref. Renders ONE `QSSearchableSelect` whose options are the FLAT
+  cross-product of every registered API × every endpoint, each with
+  value `@api/ep` and a secondary line carrying `METHOD path — description`.
+  Used by `exchangeMagicLink.endpoint`, `requestMagicLink.endpoint`,
+  `logoutServer.endpoint`.
+- `inputType: 'api'` — for verb args that take an `@apiId` alone (no
+  endpoint segment). Renders ONE `QSSearchableSelect` with a deduplicated
+  list of registered APIs, secondary line carrying endpoint count +
+  sample names. Used by `refresh.apiRef` — the lone catalog arg that
+  takes just an API.
+
+Both pickers reuse the existing `availableApiEndpoints` global (already
+populated by the fetch-mode wizard + page-event wizard via the
+`/management/listApiEndpoints` round-trip). Search matches against
+value + textContent + data-description per the wrapper's standard rules,
+so typing "logout" returns logout endpoints across every API, "auth"
+returns every endpoint under `@auth-api`.
+
+**Reasoning**:
+
+- **One combined picker, not two cascading selects** — the existing
+  fetch-mode and page-event wizards use a two-`<select>` cascade
+  (`jsFormApi` → `jsFormEndpoint`). For a single-arg auth verb like
+  `logoutServer.endpoint`, that's two widgets of chrome for one stored
+  string. The combined approach also lets the search box span every
+  endpoint at once — "logout" surfaces hits across APIs the author
+  might not even remember declaring, which matches the A2 trajectory
+  of "search > navigate".
+- **Why a separate `api` inputType instead of overloading `apiEndpoint`** —
+  `refresh.apiRef` is the ONLY catalog arg today that takes `@api` alone.
+  Mirroring the existing `store` precedent (one inputType per registry
+  shape) keeps the catalog readable: a reader sees `'api'` and knows
+  the stored value is `@apiId`; `'apiEndpoint'` and they know it's
+  `@apiId/endpointId`. Overloading one type with an `optionalEndpoint`
+  flag would force every downstream picker site to reason about the
+  flag instead of two distinct types.
+- **`fetch.target` deliberately left untouched** — the fetch wizard
+  already has a dedicated `registry vs direct URL` radio + per-mode
+  fields (method dropdown, body row visibility, path params, auth hint).
+  The catalog-driven picker has never been responsible for `fetch.target`
+  and converting that wizard is a separate slice, not a freebie. The
+  existing two-`<select>` cascade stays for now.
+- **Pre-fetch `availableApiEndpoints` eagerly on Add + Edit** — the
+  pickers populate options synchronously in `_createArgRow`. The Add
+  flow already pre-fetched (line 1012); Edit's function-mode branch
+  didn't until this slice (the API-mode branch did at line 865). One
+  unconditional `await fetchApiEndpoints()` before the function-mode
+  block matches the page-event edit flow's existing pattern (line 3218)
+  and keeps the pickers working from the very first arg-row render.
+- **`<select>` `change` dispatch on pre-fill** — the edit pre-fill
+  loop at setTimeout(100) dispatched `'input'` for every form input,
+  but `<select>` (and any future widget wrapping a select) listens for
+  `'change'`, not `'input'`. The fix dispatches `'change'` for SELECT
+  elements specifically so `QSSearchableSelect`'s trigger-label sync
+  fires during edit pre-fill.
+
+**Alternatives considered**:
+
+- **Two cascading `QSSearchableSelects`** (API picker → endpoint picker,
+  matching the existing fetch wizard pattern) — pro: same mental model
+  as the fetch wizard, pro: API gating prevents wrong-API picks, con:
+  two widgets per arg, con: long flat list is fine in practice (auth
+  APIs are small). Rejected for combined picker's simpler chrome.
+- **Overload `apiEndpoint` with `optionalEndpoint: true` for refresh** —
+  saves one inputType slot, costs a flag every downstream picker site
+  has to branch on. Rejected for the `store`-precedent symmetry of one
+  type per registry shape.
+- **Leave `refresh.apiRef` as plain string** — defers the
+  inconsistency but the user typing `@auth-api` manually is exactly
+  the typo-class A2 is supposed to kill. Rejected as half-measure.
+- **Two-line option label** (value + rich description as separate text
+  nodes in the option's textContent) — the `QSSearchableSelect`'s
+  trigger label is set from option.textContent, so a rich label would
+  show "@auth-api/logout — POST /auth/logout — Server-side logout…"
+  in the trigger after selection. That's too long for the form column.
+  Rejected; the secondary line lives in `data-description` (dropdown
+  only, also searchable) instead.
+
+**Source**: `secure/src/functions/qsVerbCatalog.php` (4 catalog args
+gained `'inputType' => 'apiEndpoint' | 'api'`).
+`public/admin/assets/js/pages/preview/preview-js-interactions.js`
+(`_renderApiEndpointArgSelect` + `_populateApiEndpointOptions` +
+`_renderApiArgSelect` + `_populateApiOptions` + `_mountApiPickerWrap`
+helpers; dispatch added to `_createArgRow` after the `store` branch;
+`await fetchApiEndpoints()` added to `editInteraction` before the
+mode-detection block; `'change'` dispatched for `<select>` elements
+in both edit pre-fill loops — `editInteraction` setTimeout + the
+`editPageEventEntry` function-mode setTimeout). The `refresh.apiRef`
+arg is the only `'api'` user today; `apiEndpoint` covers the three
+auth verbs. `fetch.target` deliberately stays string-typed (handled
+by the existing dedicated fetch wizard, not the catalog-driven picker).
+Behaviour documented in [ADMIN_PANEL.md §9.x](ADMIN_PANEL.md) at
+full-overhaul ship time (Slice 7).
+
 ---
 
 ## Project conventions (beta.9)
