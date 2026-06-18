@@ -65,7 +65,24 @@ function __command_addPageEvent(array $params = [], array $urlParams = []): ApiR
     if (!is_array($functionParams)) {
         $functionParams = [$functionParams];
     }
-    
+
+    // ==========================================================================
+    // PER-VERB ARG VALIDATION (Slice 5 follow-up)
+    // ==========================================================================
+    // Defense-in-depth — symmetric with addInteraction. See
+    // interactionHelpers.php validateInteractionArgs() for rationale.
+    // pageName enables inputType=routeParam validation.
+    $argErrors = validateInteractionArgs($function, $functionParams, $pageName);
+    if (!empty($argErrors)) {
+        $reason = $argErrors[0]['reason'] ?? '';
+        $unknownVerb = $reason === 'unknown_verb';
+        return ApiResponse::create($unknownVerb ? 422 : 400, $unknownVerb ? 'validation.unknown_verb' : 'validation.required')
+            ->withMessage($unknownVerb
+                ? "Unknown verb: {$function}"
+                : 'One or more parameters failed validation.')
+            ->withErrors($argErrors);
+    }
+
     // Generate call syntax
     $callSyntax = generateCallSyntax($function, $functionParams);
     

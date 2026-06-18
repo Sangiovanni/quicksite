@@ -223,6 +223,147 @@ if (!function_exists('generateCallSyntax')) {
 }
 
 /**
+ * Beta.9 A2 Slice 5 follow-up — extract the :param names declared on a
+ * page slug. The in-memory + over-the-wire slug carries the literal
+ * `:name` form straight from routes.php (e.g. "auth/magic/:key" →
+ * ["key"], "user/:id/posts/:postid" → ["id", "postid"]). The NTFS-safe
+ * `:` ↔ `__` sanitisation only kicks in when building file-system paths;
+ * defensive: tolerate the sanitised `__name` form too in case any future
+ * surface sends it.
+ *
+ * Used by validateInteractionArgs() when an arg declares
+ * `inputType: 'routeParam'` (today: exchangeMagicLink.paramName) — the
+ * verb reads QS.routeParams[name] at runtime, so name MUST be one of
+ * the route's :params.
+ */
+if (!function_exists('routeParamsForPageSlug')) {
+    function routeParamsForPageSlug(string $slug): array {
+        $params = [];
+        $seen   = [];
+        foreach (explode('/', $slug) as $seg) {
+            $name = null;
+            if ($seg !== '' && $seg[0] === ':' && strlen($seg) > 1) {
+                $name = substr($seg, 1);
+            } elseif (strpos($seg, '__') === 0 && strlen($seg) > 2) {
+                $name = substr($seg, 2);
+            }
+            if ($name !== null && !isset($seen[$name])) {
+                $seen[$name] = true;
+                $params[] = $name;
+            }
+        }
+        return $params;
+    }
+}
+
+/**
+ * Beta.9 A2 Slice 5 follow-up — validate that a verb's required positional
+ * args are present (non-empty) in the supplied params array AND that
+ * inputType-specific values match their contract.
+ *
+ * Without the required-arg check, a client serializer that compacts empties
+ * (which preview-js-interactions.js did before this slice) could land
+ * later args in the slots of earlier ones — e.g. exchangeMagicLink with
+ * only returnTo filled would persist as
+ *   {{call:exchangeMagicLink:/dashboard}}
+ * with "/dashboard" mis-bound to the `endpoint` arg (position 0).
+ *
+ * Without the routeParam value check, a paramName that doesn't exist in
+ * the current page's route (typo or stale config) would pass save and
+ * fail silently at runtime (QS.routeParams[badName] = undefined).
+ *
+ * Defense-in-depth: the client-side validator should catch this first
+ * and surface field-level errors, but this server check guards against
+ * direct API callers, batch imports, and future client regressions.
+ *
+ * @param string      $verb     The verb name (e.g. "redirect", "setState").
+ * @param array       $params   Positional values as collected from the form.
+ *                              Empty/missing slots count as "not provided".
+ * @param string|null $pageName Optional page slug for inputType-aware checks
+ *                              (today: 'routeParam'). When null, those
+ *                              context-dependent checks are skipped — the
+ *                              basic required-arg check still runs.
+ *
+ * @return array  Empty array on success.
+ *                On failure: list of [
+ *                    'field'   => arg name,
+ *                    'index'   => positional index (0-based),
+ *                    'reason'  => 'missing' | 'unknown_verb' | 'invalid_route_param',
+ *                    'hint'    => human-readable hint,
+ *                ].
+ *                When the verb itself is unknown (not in the catalog),
+ *                returns a single entry with field='function',
+ *                reason='unknown_verb' so the caller can return 422
+ *                without consulting the verb's argspec.
+ */
+if (!function_exists('validateInteractionArgs')) {
+    function validateInteractionArgs(string $verb, array $params, ?string $pageName = null): array {
+        require_once SECURE_FOLDER_PATH . '/src/functions/qsVerbCatalog.php';
+
+        $catalog = qsVerbCatalog();
+        $entry = null;
+        foreach ($catalog as $e) {
+            if (isset($e['name']) && $e['name'] === $verb) {
+                $entry = $e;
+                break;
+            }
+        }
+
+        if ($entry === null) {
+            return [[
+                'field'  => 'function',
+                'index'  => -1,
+                'reason' => 'unknown_verb',
+                'hint'   => "Verb '{$verb}' is not in the QS verb catalog.",
+            ]];
+        }
+
+        $argSpec = $entry['args'] ?? [];
+        $errors  = [];
+
+        foreach ($argSpec as $i => $arg) {
+            $required  = isset($arg['required']) ? (bool) $arg['required'] : true;
+            $inputType = $arg['inputType'] ?? '';
+            $value     = $params[$i] ?? '';
+
+            // Required-emptiness check — runs first; if empty + required,
+            // skip the context check (the missing-error already covers it).
+            if ($required && ($value === '' || $value === null)) {
+                $errors[] = [
+                    'field'  => $arg['name'] ?? ('arg' . $i),
+                    'index'  => $i,
+                    'reason' => 'missing',
+                    'hint'   => 'Required parameter "' . ($arg['name'] ?? ('arg' . $i)) . '" is empty.',
+                ];
+                continue;
+            }
+
+            // Empty optional values are valid; no further checks needed.
+            if ($value === '' || $value === null) {
+                continue;
+            }
+
+            // Context-dependent checks (only run with pageName available).
+            if ($inputType === 'routeParam' && $pageName !== null) {
+                $valid = routeParamsForPageSlug($pageName);
+                if (!in_array($value, $valid, true)) {
+                    $errors[] = [
+                        'field'  => $arg['name'] ?? ('arg' . $i),
+                        'index'  => $i,
+                        'reason' => 'invalid_route_param',
+                        'hint'   => empty($valid)
+                            ? "Current page '{$pageName}' has no :params; this verb requires a route with a :param segment."
+                            : "Value '{$value}' is not a :param in the current page's route. Available: " . implode(', ', $valid) . '.',
+                    ];
+                }
+            }
+        }
+
+        return $errors;
+    }
+}
+
+/**
  * Find a node by its semantic nodeId (like "0.1.2") in a structure
  * Returns array with 'node' and 'path' keys, or null if not found
  */

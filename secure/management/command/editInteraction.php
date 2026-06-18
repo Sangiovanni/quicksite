@@ -96,13 +96,15 @@ function __command_editInteraction(array $params = [], array $urlParams = []): A
     if (!is_array($functionParams)) {
         $functionParams = [$functionParams];
     }
-    
+
     // ==========================================================================
     // DETERMINE PAGE/COMPONENT NAME
     // ==========================================================================
-    
+    // Done BEFORE arg validation so the validator can be passed pageName
+    // for inputType-aware checks (today: routeParam).
+
     $pageName = null;
-    
+
     if ($structType === 'page' || $structType === 'component') {
         // pageName is required for page/component types
         if (!isset($params['pageName']) || $params['pageName'] === '') {
@@ -110,9 +112,9 @@ function __command_editInteraction(array $params = [], array $urlParams = []): A
                 ->withMessage("Missing required parameter: pageName (required for structType='{$structType}')")
                 ->withErrors([['field' => 'pageName', 'reason' => 'required for page/component types']]);
         }
-        
+
         $pageName = $params['pageName'];
-        
+
         if ($structType === 'page') {
             $specialPages = ['404', '500', '403', '401'];
             if (!routeExists($pageName, ROUTES) && !in_array($pageName, $specialPages, true)) {
@@ -120,6 +122,23 @@ function __command_editInteraction(array $params = [], array $urlParams = []): A
                     ->withMessage("Page '{$pageName}' does not exist");
             }
         }
+    }
+
+    // ==========================================================================
+    // PER-VERB ARG VALIDATION (Slice 5 follow-up)
+    // ==========================================================================
+    // Defense-in-depth — symmetric with addInteraction. See
+    // interactionHelpers.php validateInteractionArgs() for rationale.
+    // pageName enables inputType=routeParam validation.
+    $argErrors = validateInteractionArgs($function, $functionParams, $pageName);
+    if (!empty($argErrors)) {
+        $reason = $argErrors[0]['reason'] ?? '';
+        $unknownVerb = $reason === 'unknown_verb';
+        return ApiResponse::create($unknownVerb ? 422 : 400, $unknownVerb ? 'validation.unknown_verb' : 'validation.required')
+            ->withMessage($unknownVerb
+                ? "Unknown verb: {$function}"
+                : 'One or more parameters failed validation.')
+            ->withErrors($argErrors);
     }
     
     // ==========================================================================

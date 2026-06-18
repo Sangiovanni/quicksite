@@ -11320,6 +11320,77 @@ code.preview-node-panel__value {
     box-shadow: 0 0 0 2px #f59e0b33;
 }
 
+/* Beta.9 A2 Slice 5 — route inputType hybrid picker.
+   Wrapper holds two interchangeable widgets: a QSSearchableSelect
+   (picker mode) and a text input + back button (custom-URL mode).
+   At any moment ONE of {qs-searchable-select container, custom input}
+   is visible; the back button shows only in custom mode. The native
+   <select> stays display:none under QSSearchableSelect's control. */
+.qs-route-picker {
+    display: flex;
+    gap: var(--space-xs, 6px);
+    align-items: center;
+    width: 100%;
+}
+.qs-searchable-select{
+    min-width: 200px;
+}
+.qs-route-picker > .qs-searchable-select {
+    flex: 1;
+    min-width: 0;
+}
+.qs-route-picker__custom-input {
+    flex: 1;
+    min-width: 0;
+}
+.qs-route-picker__back {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    background: var(--admin-bg);
+    color: var(--admin-text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    line-height: 1;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.qs-route-picker__back:hover {
+    border-color: #f59e0b;
+    background: var(--admin-bg-hover, var(--admin-bg));
+}
+.qs-route-picker__back:focus {
+    outline: none;
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 2px #f59e0b33;
+}
+
+/* Beta.9 A2 Slice 5 follow-up — required-arg validation feedback.
+   Painted by _applyArgErrors when save is blocked. Class lifts as
+   soon as the user starts editing the offending field (one-shot
+   listener attached by _applyArgErrors). The :has() selector tints
+   the QSSearchableSelect trigger red too when the hidden native
+   select inside a wrapper is in error state. */
+.preview-contextual-js-form-input--error,
+.qs-route-picker:has(> .preview-contextual-js-form-input--error) > .qs-searchable-select .qs-searchable-select__trigger {
+    border-color: #ef4444 !important;
+    background-color: rgba(239, 68, 68, 0.06);
+}
+.preview-contextual-js-form-row--error label {
+    color: #ef4444;
+}
+.preview-contextual-js-form-error {
+    color: #ef4444;
+    font-size: 0.7rem;
+    margin-top: 4px;
+    line-height: 1.3;
+}
+
 .preview-contextual-js-form-select optgroup {
     font-weight: bold;
     color: var(--admin-text-secondary);

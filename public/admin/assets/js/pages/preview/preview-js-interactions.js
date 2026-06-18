@@ -15,6 +15,9 @@
     let currentJsContext = null;
     let availableFunctions = [];
     let availableApiEndpoints = [];
+    // Slice 5: project routes (loaded via getRoutes; stored WITHOUT
+    // leading "/"). Used by the route inputType picker.
+    let availableRoutes = [];
     let currentAvailableEvents = [];
     // Bucketed events from listInteractions (beta.6+):
     //   { common: [...], lessCommon: [...], advanced: [...] }
@@ -827,10 +830,17 @@
         // inputType pickers (refresh, exchangeMagicLink, requestMagicLink,
         // logoutServer) render their options synchronously from
         // availableApiEndpoints during _createArgRow. Mirrors what the
-        // page-event edit flow already does (line 3218) and the API-mode
-        // branch below (line 865).
+        // page-event edit flow already does and the API-mode branch below.
         if (availableApiEndpoints.length === 0) {
             await fetchApiEndpoints();
+        }
+
+        // Slice 5: same eagerness for project routes — the route picker
+        // (redirect, exchangeMagicLink.returnTo, requestMagicLink.returnTo)
+        // populates options synchronously from availableRoutes during
+        // _createArgRow.
+        if (availableRoutes.length === 0) {
+            await fetchRoutes();
         }
 
         // Pre-fill event dropdown
@@ -961,6 +971,17 @@
                 const params = interaction.params || [];
                 paramInputs.forEach((input, i) => {
                     if (params[i] !== undefined) {
+                        // Slice 5: route picker — delegate to setValue so
+                        // an external URL auto-swaps the row to custom mode
+                        // (and an unknown internal route gets the legacy
+                        // option injection inside the picker).
+                        if (input.tagName === 'SELECT' && input.dataset.inputType === 'route') {
+                            const rp = input.parentElement && input.parentElement._qsRoutePicker;
+                            if (rp) {
+                                rp.setValue(params[i]);
+                                return;
+                            }
+                        }
                         // For <select> form inputs (e.g. eventArg picker), if the
                         // saved value isn't in the options list, inject it as a
                         // "(legacy)" option so the user can still see/edit it.
@@ -1026,6 +1047,14 @@
         // responseSchema / responseBindings) surface immediately.
         await fetchApiEndpoints();
         populateApiDropdown();
+
+        // Slice 5: routes are rarely edited mid-session so a cache check
+        // suffices (vs. apiEndpoints' always-refetch). Lazy enough that
+        // first-open after a route add via /admin/sitemap may show stale
+        // options until the editor reloads — acceptable trade.
+        if (availableRoutes.length === 0) {
+            await fetchRoutes();
+        }
 
         // Reset form
         if (jsFormEvent) jsFormEvent.value = '';
@@ -1794,6 +1823,19 @@
                 : _renderApiArgSelect(arg, paramIndex, updateFn);
             row.appendChild(apiSel);
             _mountApiPickerWrap(apiSel, inputType);
+        } else if (inputType === 'route') {
+            // Slice 5: route picker. Strict QSSearchableSelect by default;
+            // when arg.allowExternal is true (redirect.url), a 'Custom URL…'
+            // sentinel swaps the row to a free-text input + back button.
+            var routeWrap = _renderRouteArgRow(arg, paramIndex, updateFn);
+            row.appendChild(routeWrap);
+            routeWrap._qsRoutePicker.mount();
+        } else if (inputType === 'routeParam') {
+            // Slice 5 follow-up: :param picker for verbs that read QS.routeParams.
+            // Options come from currentPageName's __X-sanitised segments.
+            var rpSel = _renderRouteParamArgSelect(arg, paramIndex, updateFn);
+            row.appendChild(rpSel);
+            _mountRouteParamPickerWrap(rpSel);
         } else if (usePicker && (inputType === 'selector' || inputType === 'class' || inputType === 'matchTarget')) {
             var picker = createSearchablePicker(inputType, arg, paramIndex);
             row.appendChild(picker);
@@ -1966,6 +2008,301 @@
             });
         }
         return picker;
+    }
+
+    /**
+     * Slice 5: detect whether a saved value is "not a registered route" —
+     * either a true external URL (http/https/protocol-relative/mailto/etc.)
+     * or something that doesn't start with '/'. Used by the route picker's
+     * setValue to decide whether to swap to custom-URL mode on edit pre-fill.
+     */
+    function _isExternalUrl(v) {
+        if (!v || typeof v !== 'string') return false;
+        if (v === '/') return false;          // home shortcut, always internal
+        if (v.charAt(0) !== '/') return true; // doesn't start with / → not a route
+        if (v.charAt(1) === '/') return true; // starts with // → protocol-relative
+        return false;
+    }
+
+    /**
+     * Slice 5: populate the route-inputType <select>. Layout:
+     *   - placeholder ('— Select a route —')
+     *   - '__custom__' sentinel (only when allowExternal)
+     *   - '/' home shortcut
+     *   - one option per registered project route (prepended with /)
+     * Each option's value is the canonical path that gets persisted.
+     */
+    function _populateRouteOptions(sel, allowExternal) {
+        sel.textContent = '';
+        var placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = PreviewConfig.i18n?.selectRoute || '— Select a route —';
+        sel.appendChild(placeholder);
+
+        if (allowExternal) {
+            // Escape-hatch sentinel — visible at the top of the dropdown so
+            // the option to type a free URL is discoverable. The change
+            // handler in _renderRouteArgRow swaps the row to custom mode
+            // when this gets picked.
+            var custom = document.createElement('option');
+            custom.value = '__custom__';
+            custom.textContent = PreviewConfig.i18n?.routeCustomUrl || 'Custom URL…';
+            custom.dataset.description = 'Type any URL (external or internal)';
+            sel.appendChild(custom);
+        }
+
+        // Conventional shortcut — many sites redirect to "/" after auth.
+        var home = document.createElement('option');
+        home.value = '/';
+        home.textContent = '/';
+        home.dataset.description = 'Project home';
+        sel.appendChild(home);
+
+        availableRoutes.forEach(function(r) {
+            var path = '/' + r.replace(/^\//, '');
+            var opt = document.createElement('option');
+            opt.value = path;
+            opt.textContent = path;
+            sel.appendChild(opt);
+        });
+    }
+
+    /**
+     * Slice 5: build a route-picker row — a hybrid combobox that's a
+     * strict QSSearchableSelect by default, with an opt-in "Custom URL…"
+     * sentinel (when arg.allowExternal === true) that swaps the row to a
+     * free-text input + back-to-picker button.
+     *
+     * Returned element is the WRAPPER; the param-collector reads either
+     * the <select> OR the text <input> depending on which currently
+     * carries the .preview-contextual-js-form-input class (swap helpers
+     * move it). The wrapper exposes ._qsRoutePicker = { sel, input,
+     * backBtn, picker, swapToCustom, swapToPicker, setValue, mount }
+     * so the edit pre-fill loop can drive mode + value externally.
+     *
+     * The picker (QSSearchableSelect) is instantiated lazily via mount()
+     * — must be called AFTER the wrapper is in the DOM because the
+     * wrapper class's constructor inserts its trigger via
+     * nativeSelect.parentNode.insertBefore.
+     */
+    function _renderRouteArgRow(arg, paramIndex, updateFn) {
+        var allowExternal = !!arg.allowExternal;
+
+        var wrap = document.createElement('div');
+        wrap.className = 'qs-route-picker';
+        wrap.dataset.routePicker = '1';
+        wrap.dataset.allowExternal = allowExternal ? '1' : '0';
+        wrap.dataset.routePickerMode = 'picker';
+
+        var sel = document.createElement('select');
+        sel.className = 'preview-contextual-js-form-input qs-route-picker__select';
+        sel.dataset.paramIndex = paramIndex;
+        sel.dataset.paramName = arg.name || '';
+        sel.dataset.inputType = 'route';
+
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'qs-route-picker__custom-input';
+        input.dataset.paramIndex = paramIndex;
+        input.dataset.paramName = arg.name || '';
+        input.placeholder = 'https://example.com or /custom-path';
+        input.style.display = 'none';
+
+        var backBtn = document.createElement('button');
+        backBtn.type = 'button';
+        backBtn.className = 'qs-route-picker__back';
+        backBtn.title = 'Back to route picker';
+        backBtn.textContent = '←';
+        backBtn.style.display = 'none';
+
+        _populateRouteOptions(sel, allowExternal);
+
+        var picker = null;
+
+        function swapToCustom() {
+            if (picker && picker.containerEl) picker.containerEl.style.display = 'none';
+            sel.classList.remove('preview-contextual-js-form-input');
+            input.classList.add('preview-contextual-js-form-input');
+            input.style.display = '';
+            backBtn.style.display = '';
+            wrap.dataset.routePickerMode = 'custom';
+            input.focus();
+            updateFn();
+        }
+
+        function swapToPicker() {
+            if (picker && picker.containerEl) picker.containerEl.style.display = '';
+            input.classList.remove('preview-contextual-js-form-input');
+            sel.classList.add('preview-contextual-js-form-input');
+            input.style.display = 'none';
+            input.value = '';
+            backBtn.style.display = 'none';
+            wrap.dataset.routePickerMode = 'picker';
+            sel.value = '';
+            sel.dispatchEvent(new Event('change'));
+        }
+
+        function setValue(v) {
+            if (allowExternal && _isExternalUrl(v)) {
+                swapToCustom();
+                input.value = v;
+                // input listener fires updateFn on user typing — manually
+                // dispatch one here to keep preview + param state in sync.
+                input.dispatchEvent(new Event('input'));
+                return;
+            }
+            // Internal-but-unknown routes are surfaced with the existing
+            // (legacy) suffix pattern — matches the apiEndpoint behaviour.
+            var has = Array.from(sel.options).some(function(o) { return o.value === v; });
+            if (!has && v !== '' && v !== '__custom__') {
+                var opt = document.createElement('option');
+                opt.value = v;
+                opt.textContent = v + ' (legacy)';
+                sel.appendChild(opt);
+            }
+            sel.value = v;
+            sel.dispatchEvent(new Event('change'));
+        }
+
+        sel.addEventListener('change', function() {
+            if (sel.value === '__custom__') {
+                swapToCustom();
+            } else {
+                updateFn();
+            }
+        });
+        input.addEventListener('input', updateFn);
+        backBtn.addEventListener('click', swapToPicker);
+
+        wrap.appendChild(sel);
+        wrap.appendChild(input);
+        if (allowExternal) wrap.appendChild(backBtn);
+
+        wrap._qsRoutePicker = {
+            sel: sel,
+            input: input,
+            backBtn: backBtn,
+            allowExternal: allowExternal,
+            swapToCustom: swapToCustom,
+            swapToPicker: swapToPicker,
+            setValue: setValue,
+            mount: function() {
+                picker = _mountRoutePickerWrap(sel, allowExternal);
+                wrap._qsRoutePicker.picker = picker;
+            }
+        };
+
+        return wrap;
+    }
+
+    function _mountRoutePickerWrap(sel, allowExternal) {
+        if (!window.QSSearchableSelect) return null;
+        var picker;
+        try {
+            picker = new window.QSSearchableSelect(sel, {
+                placeholder: PreviewConfig.i18n?.selectRoute || 'Select a route…',
+                searchPlaceholder: allowExternal ? 'Search routes… (or pick Custom URL)' : 'Search routes…',
+                emptyText: 'No routes match',
+            });
+        } catch (e) {
+            console.warn('[PreviewJsInteractions] QSSearchableSelect mount failed for inputType=route:', e);
+            return null;
+        }
+        if (availableRoutes.length === 0) {
+            fetchRoutes().then(function() {
+                _populateRouteOptions(sel, allowExternal);
+                picker.refresh();
+            });
+        }
+        return picker;
+    }
+
+    /**
+     * Slice 5 follow-up — routeParam inputType.
+     *
+     * Reads the current page's route from currentPageName (a slash-separated
+     * slug like "auth/magic/:key") and extracts every ":name" segment as a
+     * route :param. The in-memory slug carries the literal ":name" form
+     * straight from routes.php → flattenRoutes → toolbar option value.
+     * The NTFS-safe `:` ↔ `__` sanitisation only kicks in when building
+     * file-system paths (templates/model/json/pages/auth/magic/__key/__key.json);
+     * over-the-wire and in-app, the slug stays ":name". Defensive: tolerate
+     * both forms in case a future surface sends the sanitised version.
+     *
+     * Used by exchangeMagicLink.paramName — the verb reads QS.routeParams[name]
+     * at runtime, so name MUST be a :param declared on the page's route.
+     * The picker locks that contract: only declared :params are pickable.
+     *
+     * Edge case — page has no :params (e.g. /dashboard): the picker shows
+     * "No :params on this route — add one at /admin/sitemap first" and
+     * disables the select. The required-arg validator then blocks save.
+     */
+    function _routeParamsForCurrentPage() {
+        if (!currentPageName || typeof currentPageName !== 'string') return [];
+        var params = [];
+        var seen = {};
+        currentPageName.split('/').forEach(function(seg) {
+            var name = null;
+            if (seg.charAt(0) === ':' && seg.length > 1) {
+                name = seg.substring(1);
+            } else if (seg.indexOf('__') === 0 && seg.length > 2) {
+                name = seg.substring(2);
+            }
+            if (name && !seen[name]) {
+                seen[name] = true;
+                params.push(name);
+            }
+        });
+        return params;
+    }
+
+    function _populateRouteParamOptions(sel) {
+        sel.textContent = '';
+        var params = _routeParamsForCurrentPage();
+        var placeholder = document.createElement('option');
+        placeholder.value = '';
+        if (params.length === 0) {
+            placeholder.textContent = PreviewConfig.i18n?.noRouteParams
+                || '— No :params on this route — add one at /admin/sitemap —';
+            sel.appendChild(placeholder);
+            sel.disabled = true;
+            return;
+        }
+        placeholder.textContent = PreviewConfig.i18n?.selectRouteParam || '— Select a :param —';
+        sel.appendChild(placeholder);
+        sel.disabled = false;
+        params.forEach(function(p) {
+            var opt = document.createElement('option');
+            opt.value = p;
+            opt.textContent = p;
+            opt.dataset.description = 'Captured from :' + p + ' in the route URL';
+            sel.appendChild(opt);
+        });
+    }
+
+    function _renderRouteParamArgSelect(arg, paramIndex, updateFn) {
+        var sel = document.createElement('select');
+        sel.className = 'preview-contextual-js-form-input';
+        sel.dataset.paramIndex = paramIndex;
+        sel.dataset.paramName = arg.name || '';
+        sel.dataset.inputType = 'routeParam';
+        sel.addEventListener('change', updateFn);
+        _populateRouteParamOptions(sel);
+        return sel;
+    }
+
+    function _mountRouteParamPickerWrap(sel) {
+        if (!window.QSSearchableSelect) return null;
+        try {
+            return new window.QSSearchableSelect(sel, {
+                placeholder: PreviewConfig.i18n?.selectRouteParam || 'Select a :param',
+                searchPlaceholder: 'Search :params…',
+                emptyText: 'No :params on this route',
+            });
+        } catch (e) {
+            console.warn('[PreviewJsInteractions] QSSearchableSelect mount failed for inputType=routeParam:', e);
+            return null;
+        }
     }
 
     /**
@@ -2146,10 +2483,41 @@
             }
             
             console.log('[PreviewJsInteractions] API endpoints loaded:', availableApiEndpoints.length);
-            
+
         } catch (error) {
             console.error('[PreviewJsInteractions] Failed to load API endpoints:', error);
             availableApiEndpoints = [];
+        }
+    }
+
+    /**
+     * Slice 5: fetch project routes for the `route` inputType picker.
+     * getRoutes returns flat_routes as dot/slash paths WITHOUT leading
+     * "/" (e.g. ["test/complex-element", "documentation/commands"]).
+     * We cache them as-stored — the picker prepends "/" at render time
+     * for the canonical href form. Matches route-input.js's behaviour.
+     */
+    async function fetchRoutes() {
+        try {
+            const response = await fetch('/management/getRoutes', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${PreviewConfig.authToken}`
+                }
+            });
+            if (!response.ok) {
+                throw new Error('Failed to fetch routes');
+            }
+            const result = await response.json();
+            // ApiResponse envelope wraps payload in `.data.data`; defensive
+            // unwrap in case the envelope shape changes.
+            const payload = (result && result.data && (result.data.data || result.data)) || {};
+            const flat = Array.isArray(payload.flat_routes) ? payload.flat_routes : [];
+            availableRoutes = flat.filter(function(r) { return typeof r === 'string' && r !== ''; });
+            console.log('[PreviewJsInteractions] Routes loaded:', availableRoutes.length);
+        } catch (error) {
+            console.error('[PreviewJsInteractions] Failed to load routes:', error);
+            availableRoutes = [];
         }
     }
 
@@ -2989,12 +3357,103 @@
                 preview += ':' + params.join(',');
             }
             preview += '}}';
-            
+
             if (jsPreviewCode) jsPreviewCode.textContent = preview;
             if (jsFormSave) jsFormSave.disabled = !eventName || !fnName;
         }
     }
-    
+
+    /**
+     * Slice 5 follow-up — required-arg validation + positional serializer.
+     *
+     * Before this slice, handleSave / handlePageEventSave collected params
+     * via `if (input.value.trim()) params.push(...)` which compacts empty
+     * slots. For a verb like exchangeMagicLink(endpoint, paramName, returnTo?)
+     * where only returnTo got filled, this produced
+     *   {{call:exchangeMagicLink:/dashboard}}
+     * with "/dashboard" mis-bound to the `endpoint` arg.
+     *
+     * The fix is two-part: (1) validate that every `required: true` arg
+     * has a non-empty value at its positional index; (2) replace the
+     * compact-empty serializer with a positional collector that drops
+     * only TRAILING empties (so the {{call}} stays compact for skipped
+     * trailing optional args, while middle gaps — only legal if optional —
+     * are preserved as empty positional slots that parseCallSyntax handles
+     * via empty entries in its split array).
+     *
+     * Server-side mirrors this check (interactionHelpers.php
+     * validateInteractionArgs) as a defense-in-depth net for direct API
+     * callers and batch imports.
+     */
+    function _validateRequiredArgs(fnName, paramInputs) {
+        const verb = availableFunctions.find(f => f.name === fnName);
+        // Unknown verb — the server will return 422; client just collects
+        // values and lets the round-trip surface the issue.
+        if (!verb || !Array.isArray(verb.args)) return { ok: true, errors: [] };
+        const inputs = Array.from(paramInputs);
+        const errors = [];
+        verb.args.forEach((arg, i) => {
+            // Default is required=true (matches the catalog convention that
+            // omitted 'required' means required).
+            const required = arg.required !== false;
+            if (!required) return;
+            const el = inputs[i] || null;
+            const value = el ? (el.value || '').trim() : '';
+            if (value === '') {
+                errors.push({
+                    argName: arg.name || ('arg' + i),
+                    paramIndex: i,
+                    inputEl: el,
+                });
+            }
+        });
+        return { ok: errors.length === 0, errors: errors };
+    }
+
+    function _collectPositionalParams(paramInputs) {
+        const values = Array.from(paramInputs).map(input => (input.value || '').trim());
+        while (values.length > 0 && values[values.length - 1] === '') {
+            values.pop();
+        }
+        return values;
+    }
+
+    function _applyArgErrors(errors, paramsContainer) {
+        _clearArgErrors(paramsContainer);
+        errors.forEach(err => {
+            if (!err.inputEl) return;
+            err.inputEl.classList.add('preview-contextual-js-form-input--error');
+            const row = err.inputEl.closest('.preview-contextual-js-form-row');
+            if (!row) return;
+            const msg = document.createElement('div');
+            msg.className = 'preview-contextual-js-form-error';
+            msg.dataset.errFor = err.argName;
+            msg.textContent = '⚠ ' + err.argName + ' is required';
+            row.appendChild(msg);
+            row.classList.add('preview-contextual-js-form-row--error');
+            // One-shot live-clear when the user starts editing the field.
+            const clearOne = () => {
+                err.inputEl.classList.remove('preview-contextual-js-form-input--error');
+                row.classList.remove('preview-contextual-js-form-row--error');
+                const m = row.querySelector('.preview-contextual-js-form-error[data-err-for="' + err.argName + '"]');
+                if (m) m.remove();
+            };
+            err.inputEl.addEventListener('input', clearOne, { once: true });
+            err.inputEl.addEventListener('change', clearOne, { once: true });
+        });
+    }
+
+    function _clearArgErrors(paramsContainer) {
+        if (!paramsContainer) return;
+        paramsContainer.querySelectorAll('.preview-contextual-js-form-input--error').forEach(el => {
+            el.classList.remove('preview-contextual-js-form-input--error');
+        });
+        paramsContainer.querySelectorAll('.preview-contextual-js-form-error').forEach(el => el.remove());
+        paramsContainer.querySelectorAll('.preview-contextual-js-form-row--error').forEach(el => {
+            el.classList.remove('preview-contextual-js-form-row--error');
+        });
+    }
+
     /**
      * Handle save button click
      */
@@ -3067,21 +3526,31 @@
             }
         } else {
             fnName = jsFormFunction?.value || '';
-            
+
             if (!eventName || !fnName || !currentJsContext) {
                 if (showToastFn) {
                     showToastFn(PreviewConfig.i18n?.selectEventAndFunction || 'Please select event and function', 'error');
                 }
                 return;
             }
-            
+
+            // Slice 5 follow-up: per-verb required-arg validation BEFORE
+            // collecting positional params. Renders inline error chips on
+            // offending fields + toasts a summary. See the helper docstring
+            // above for the bug this fixes (compacted-empty serializer
+            // mis-binding positional args).
             const paramInputs = jsFormParams?.querySelectorAll('.preview-contextual-js-form-input') || [];
-            params = [];
-            paramInputs.forEach(input => {
-                if (input.value.trim()) {
-                    params.push(input.value.trim());
+            const validation = _validateRequiredArgs(fnName, paramInputs);
+            if (!validation.ok) {
+                _applyArgErrors(validation.errors, jsFormParams);
+                if (showToastFn) {
+                    const names = validation.errors.map(e => e.argName).join(', ');
+                    showToastFn('Missing required parameter' + (validation.errors.length > 1 ? 's' : '') + ': ' + names, 'error');
                 }
-            });
+                return;
+            }
+            _clearArgErrors(jsFormParams);
+            params = _collectPositionalParams(paramInputs);
         }
         
         if (!currentJsContext) {
@@ -3358,6 +3827,7 @@
         // Ensure dropdown data is loaded before we try to pre-select values.
         if (availableFunctions.length === 0) await fetchJsFunctions();
         if (availableApiEndpoints.length === 0) await fetchApiEndpoints();
+        if (availableRoutes.length === 0) await fetchRoutes();
 
         editingPageEvent = { event: eventName, index: index, interaction: entry };
 
@@ -3430,6 +3900,15 @@
                 var savedParams = entry.params || [];
                 paramInputs.forEach(function (input, idx) {
                     if (savedParams[idx] === undefined) return;
+                    // Slice 5: route picker — delegate to setValue (same
+                    // logic as editInteraction).
+                    if (input.tagName === 'SELECT' && input.dataset.inputType === 'route') {
+                        var rp = input.parentElement && input.parentElement._qsRoutePicker;
+                        if (rp) {
+                            rp.setValue(savedParams[idx]);
+                            return;
+                        }
+                    }
                     // For <select> inputs whose options were built from a
                     // catalogue (e.g. 'store' inputType): if the saved
                     // value isn't an option, inject a (legacy) row so the
@@ -3466,6 +3945,7 @@
         // Ensure functions/APIs are loaded
         if (availableFunctions.length === 0) await fetchJsFunctions();
         if (availableApiEndpoints.length === 0) await fetchApiEndpoints();
+        if (availableRoutes.length === 0) await fetchRoutes();
 
         // Reset form fields BEFORE populating the function dropdown so
         // _populateFnSelect filters against the right default event.
@@ -3664,11 +4144,19 @@
                 if (showToastFn) showToastFn('Select a function', 'error');
                 return;
             }
-            var paramInputs = peFormParams?.querySelectorAll('.preview-contextual-js-form-input') || [];
-            params = [];
-            paramInputs.forEach(function(input) {
-                if (input.value.trim()) params.push(input.value.trim());
-            });
+            // Slice 5 follow-up: same required-arg validation as handleSave.
+            var peParamInputs = peFormParams?.querySelectorAll('.preview-contextual-js-form-input') || [];
+            var peValidation = _validateRequiredArgs(fnName, peParamInputs);
+            if (!peValidation.ok) {
+                _applyArgErrors(peValidation.errors, peFormParams);
+                if (showToastFn) {
+                    var peNames = peValidation.errors.map(function(e) { return e.argName; }).join(', ');
+                    showToastFn('Missing required parameter' + (peValidation.errors.length > 1 ? 's' : '') + ': ' + peNames, 'error');
+                }
+                return;
+            }
+            _clearArgErrors(peFormParams);
+            params = _collectPositionalParams(peParamInputs);
         }
         
         var isEdit = !!editingPageEvent;

@@ -2367,6 +2367,339 @@ by the existing dedicated fetch wizard, not the catalog-driven picker).
 Behaviour documented in [ADMIN_PANEL.md §9.x](ADMIN_PANEL.md) at
 full-overhaul ship time (Slice 7).
 
+### Picker inputType `route` — strict picker + per-arg allowExternal hatch (locked 2026-06-17)
+
+**Decision**: A new catalog inputType `route` and a per-arg flag
+`allowExternal: bool` lock the previously-loose "URL field" args into
+a search-driven picker:
+
+- `inputType: 'route'` — renders a `QSSearchableSelect` whose options
+  are the project's registered routes (loaded from the existing
+  `getRoutes` command's `flat_routes`, prepended with `/`) plus a `/`
+  home shortcut. Used by 3 catalog args today: `redirect.url`,
+  `exchangeMagicLink.returnTo`, `requestMagicLink.returnTo`.
+- `allowExternal: true` on an arg — adds a `Custom URL…` sentinel
+  option to the top of the dropdown. Picking it SWAPS the row from
+  the QSSearchableSelect to a free-text `<input type="text">` plus a
+  small "←" button that returns to picker mode. The native `<select>`
+  and the text input share the same `dataset.paramIndex`; the
+  param-collector reads whichever currently carries
+  `.preview-contextual-js-form-input` (the swap helpers move the
+  class). Default is `false` — strict picker, no free-text escape.
+- `allowExternal: false` (the default) — no sentinel, no escape.
+  Authors can only pick registered routes. Mirrors the server-side
+  `OAuthHandler::sanitiseReturnTo` strictness for post-auth returns.
+
+Per-arg defaults:
+- `redirect.url`             → `allowExternal: true` — historic
+  behaviour accepts any URL incl. external; locking would break
+  existing sites doing `{{call:redirect:https://...}}`.
+- `exchangeMagicLink.returnTo` → `allowExternal: false` — matches the
+  OAuth pattern (open-redirect class is real).
+- `requestMagicLink.returnTo` → `allowExternal: false` — typically a
+  "check your email" internal page.
+
+Edit pre-fill auto-swaps to custom mode when the saved value is
+external (regex: doesn't start with single `/`). Internal-but-
+unknown values fall through to the existing "(legacy)" option
+injection in the picker — same pattern as Slice 4.
+
+**Reasoning**:
+
+- **Hybrid combobox over two cascading patterns** — there are two
+  existing route surfaces in the admin: the QSSearchableSelect
+  ergonomic (Slice 2+4 thesis) and the `<datalist>` from
+  `route-input.js` (used by 3 complex-element wizards). Picking
+  ONE pattern for the catalog-driven picker (the combobox + sentinel
+  hybrid) keeps the verb authoring story coherent — every catalog
+  arg with `inputType: 'route'` reads the same way regardless of
+  the `allowExternal` flag. The datalist UX stays at the complex
+  wizards for now (datalist works, no user complaints) — UX-
+  consistency migration deferred to a chip if it becomes load-
+  bearing.
+- **Per-arg flag, not per-inputType split** — the alternative was
+  two inputTypes (`'route'` strict, `'routeOrUrl'` allowExternal).
+  But the picker UX is materially the SAME in both cases: same
+  options list, same search behaviour, only the sentinel differs.
+  One inputType + a one-line flag on the arg keeps the catalog
+  vocabulary tight and the picker dispatch a single branch.
+- **`/` home shortcut hard-coded** — every project has `/` as a
+  meaningful route (home), but it may not appear in `flat_routes`
+  if the project's nested routes structure doesn't include it as
+  a leaf. Mirrors `route-input.js`'s line 56 (`home.value = '/'`).
+- **`Custom URL…` sentinel at top, not bottom** — the escape hatch
+  has to be discoverable. Bottom-of-list hides behind every route;
+  top-of-list reads as "the first thing you'd do if you wanted to
+  type a URL". The QSSearchableSelect search box still finds it
+  if the user types "custom".
+- **Back-button clears the typed URL on swap-to-picker** — explicit
+  "start over" semantic. Preserving the URL across mode swaps
+  would leak state (the input would hold a value the form doesn't
+  read), and accidental clicks are recoverable (the user retypes).
+  Predictable beats "smart" here.
+- **Auto-swap to custom mode on external-URL pre-fill** — without
+  it, editing a `redirect.url` that's `https://external.com` would
+  surface the value as a "(legacy)" picker option. Custom mode is
+  the semantically correct view for an external URL — pre-fill
+  detects this with a stripped-down regex (anything not starting
+  with single `/`) and swaps.
+
+**Alternatives considered**:
+
+- **`<datalist>` for all route args** — what the complex-element
+  wizards already use. Simpler, less code. Rejected because the
+  catalog-driven picker should match the A2 trajectory (search-
+  first prominent dropdown). Datalist's filter-on-typing is
+  inconsistent across browsers and gives no visual signal that
+  the field IS a picker.
+- **Two inputTypes (`'route'` vs `'routeOrUrl'`)** — rejected (see
+  above). The shared picker chrome doesn't justify the catalog
+  vocabulary cost.
+- **Custom mode as a separate row beneath the picker (vertical
+  stack)** — keeps both controls visible at once. Rejected: the
+  param has ONE value; showing two slots invites confusion about
+  which is authoritative. Mode-swap forces a single source of
+  truth at any moment.
+- **Preserve URL across mode swaps** — would feel smart but leaks
+  state. Rejected.
+- **Migrate complex-element wizards (breadcrumb, nav-menu,
+  oauth-button) to QSSearchableSelect in this slice** — deferred.
+  Datalist works; if UX-consistency complaints accumulate, chip
+  the migration.
+
+**Source**: `secure/src/functions/qsVerbCatalog.php` (3 args gained
+`'inputType' => 'route'`; `redirect.url` also gained `'allowExternal'
+=> true`). `public/admin/assets/js/pages/preview/preview-js-interactions.js`
+(`availableRoutes` cache; `fetchRoutes` helper; `_isExternalUrl`,
+`_populateRouteOptions`, `_renderRouteArgRow`, `_mountRoutePickerWrap`
+helpers; dispatch wired into `_createArgRow` after the `apiEndpoint`/
+`api` branch; pre-fetch added to all 4 form-entry flows: `handleAddClick`,
+`editInteraction`, `handlePageEventAdd`, `editPageEventEntry`; both
+edit pre-fill loops delegate to `_qsRoutePicker.setValue` for the
+route inputType). `public/admin/assets/admin.css` (`.qs-route-picker`
++ `.qs-route-picker__back` styles — flex row layout + admin-themed
+icon button). The existing `<datalist>` in `route-input.js` stays as-
+is for the complex-element wizards. Behaviour documented in
+[ADMIN_PANEL.md §9.x](ADMIN_PANEL.md) at full-overhaul ship time
+(Slice 7).
+
+### Required-arg validation — two-layer check + positional serializer (locked 2026-06-17)
+
+**Decision**: Interaction save now validates that every `required: true`
+arg in the verb's catalog entry has a non-empty value at its positional
+index. The check fires at TWO layers:
+
+- **Client (UX layer)** — `_validateRequiredArgs` in
+  `preview-js-interactions.js` consults `availableFunctions` (the same
+  catalog the picker uses) before building the POST payload. On
+  failure, `_applyArgErrors` paints a red border on each offending
+  input + an inline "⚠ <argName> is required" message under the row
+  + lifts the marks on next edit (one-shot `input`/`change` listener).
+  A summary toast names the missing arg(s).
+- **Server (data-integrity layer)** — `validateInteractionArgs` in
+  `interactionHelpers.php` reads `qsVerbCatalog()` and walks the same
+  argspec. Returns `400` with field-level `withErrors([{field, index,
+  reason, hint}, ...])` when any required arg is empty, `422` when
+  the verb itself is unknown to the catalog. Wired into the four
+  save commands: `addInteraction`, `editInteraction`, `addPageEvent`,
+  `editPageEvent` — symmetric placement, right after the envelope
+  validation (`structType`, `nodeId`, `event`, `function`).
+
+Same slice ALSO fixes the positional serializer. The pre-Slice-5
+collector at `preview-js-interactions.js:3354-3358` was:
+
+```js
+paramInputs.forEach(input => {
+    if (input.value.trim()) params.push(input.value.trim());
+});
+```
+
+The `if`-filter dropped empty positional slots, compacting the array.
+For `exchangeMagicLink(endpoint, paramName, returnTo?)` with only
+`returnTo='/dashboard'` filled, `['', '', '/dashboard']` collapsed to
+`['/dashboard']` — which positionally bound `/dashboard` to the
+`endpoint` arg, producing the bogus `{{call:exchangeMagicLink:/dashboard}}`.
+The fix is `_collectPositionalParams`: collect all values, strip
+ONLY trailing empties (so trailing optional skips stay compact in
+the {{call}} output), preserve middle gaps as empty positional slots.
+Validation upstream guarantees no required position is empty by the
+time the serializer runs.
+
+**Reasoning**:
+
+- **Two layers, not one** — client-only validation catches the typo
+  class at form-submit time with the best UX (per-field inline
+  errors), but it does nothing for direct API callers, scripted batch
+  imports, or future client regressions. Server-only validation
+  catches everything but produces a generic toast 200ms after the
+  click with no per-field highlight — worse UX for the same outcome.
+  Both is the right answer: 95% of the work is the client-side UX;
+  the server check is a 30-line symmetric net. Server is the SOURCE
+  OF TRUTH for "what's a required arg" (it reads the catalog
+  directly); client is the fast-feedback layer.
+- **Positional preservation, not compaction** — the alternative
+  ("auto-fill empty required slots with placeholders") would hide
+  bugs at runtime instead of blocking them at save. Compaction
+  silently mis-binds args. Positional preservation + validation +
+  strip-trailing-only is the only design that doesn't lie about
+  what the user wrote.
+- **Validation BEFORE payload build (client)** — alternatives include
+  validating on server response + retry. Server-side echo-back is
+  300-500ms slower than instant client validation, and the user
+  has to wait for the round-trip to learn what's missing. Client
+  validation is the same code path the picker UX already builds
+  against.
+- **One-shot live-clear of error marks** — alternatives are "stay red
+  forever until next save", "live-clear on every keystroke (live
+  re-validate)". Permanent-until-save is jarring (user fixes the
+  field, error stays). Live re-validate is over-engineering for a
+  surface that's saved once at click time. One-shot clear (first
+  edit dismisses the mark; if the user re-empties, the next save
+  re-paints) is the right middle ground.
+- **Server returns 400 for missing, 422 for unknown verb** — 422
+  ("Unprocessable Entity") matches the semantic of "the verb you
+  named doesn't exist". 400 is for "you sent the right shape but
+  the values are missing." Splitting the codes lets a hypothetical
+  future caller distinguish "fix your field" from "fix your verb
+  name".
+
+**Alternatives considered**:
+
+- **Server-only validation** — simpler, but worse UX (see above).
+  Rejected.
+- **Client-only validation** — rejected. The whole point of the
+  server is to be the source of truth; data integrity can't depend
+  on a client doing its job.
+- **Add validation as a wrapping middleware before all four
+  commands** — would centralize the call, but `addInteraction` /
+  `editInteraction` / etc. each have different argspecs already
+  (envelope-level), so the validation would still be per-command.
+  Rejected for marginal benefit.
+- **Block save on form-input change (live)** — would prevent the
+  user from ever reaching a state where required args are empty.
+  Rejected: blocks normal authoring rhythm (the user may want to
+  fill `endpoint` last after picking the rest). Validation at save
+  time is the right gate.
+- **Keep the compacting serializer** — rejected. The bug is the
+  serializer, not the validation. Even with perfect validation, an
+  un-fixed serializer would still produce subtly wrong output if a
+  future verb has optional middle args (which the validator
+  legitimately wouldn't catch).
+
+**Source**: `secure/src/functions/interactionHelpers.php`
+(`validateInteractionArgs` helper — loads `qsVerbCatalog()`, walks
+the argspec, returns `[]` on ok or list of `{field, index, reason,
+hint}` on failure). `secure/management/command/addInteraction.php`,
+`editInteraction.php`, `addPageEvent.php`, `editPageEvent.php` (each
+calls the validator after envelope validation, returns 400 or 422
+with `withErrors([])`).
+`public/admin/assets/js/pages/preview/preview-js-interactions.js`
+(`_validateRequiredArgs`, `_collectPositionalParams`, `_applyArgErrors`,
+`_clearArgErrors` helpers; `handleSave` + `handlePageEventSave` call
+the validator before payload build and render inline error chips on
+failure; the compacting `if (input.value.trim())` filter replaced by
+`_collectPositionalParams`).
+`public/admin/assets/admin.css` (`.preview-contextual-js-form-input--error`
++ `.preview-contextual-js-form-error` + `.preview-contextual-js-form-row--error`
+styles — red border via `:has()` for QSSearchableSelect triggers).
+
+### Picker inputType `routeParam` — :params from the current page's route (locked 2026-06-17)
+
+**Decision**: A new catalog inputType `routeParam` replaces free-text
+for verb args that name a `:param` in the current page's route URL.
+Today's lone user: `exchangeMagicLink.paramName` — the verb reads
+`QS.routeParams[paramName]` at runtime, so `paramName` MUST be a
+`:name` segment declared on the page's route (`/auth/magic/:key` →
+`paramName = "key"`). There is no other source for `routeParams`,
+so free input adds nothing but typo risk.
+
+The picker reads `currentPageName` (already available — set by
+`preview.js`'s `setCurrentPage`) and extracts every `:X` segment.
+`currentPageName` carries the literal route slug straight from
+`routes.php → flattenRoutes → toolbar option value` — for the test
+project's magic-link page it's `auth/magic/:key`. The NTFS-safe
+`:` ↔ `__` sanitisation only kicks in when building file-system paths
+(`templates/model/json/pages/auth/magic/__key/__key.json`); over the
+wire and in memory the slug stays `:name`. The extractor tolerates
+both forms defensively (`:X` primary, `__X` fallback) in case any
+future surface sends the sanitised version. No server roundtrip
+needed; the slug carries the route shape losslessly.
+
+Edge case: page has no `:params` (e.g. `/dashboard` slug `dashboard`):
+the picker shows `— No :params on this route — add one at /admin/sitemap —`
+and disables the select. The required-arg validator then blocks save
+with a clear error.
+
+Server validation is symmetric. `validateInteractionArgs` gained an
+optional `$pageName` parameter; when supplied and an arg declares
+`inputType: 'routeParam'`, the validator runs `routeParamsForPageSlug($pageName)`
+(same `__X → X` extraction) and rejects values not in that list with
+`reason: 'invalid_route_param'`. All four save commands now pass
+`$pageName` — for add/editInteraction the validation call moved BELOW
+the existing pageName-extraction block; for add/editPageEvent the
+pageName was already in scope.
+
+**Reasoning**:
+
+- **Picker over free text** — `paramName` has exactly one legitimate
+  source (`QS.routeParams`), which is exactly the route's `:name`
+  segments. Any other value is either a typo or means the user
+  misunderstood the verb. Closing that door is the whole point.
+- **Slug carries the route shape** — once we realised the
+  filesystem sanitisation (`:` → `__`) is reversible by a single
+  segment scan, the entire feature collapsed to ~30 lines per side.
+  No new endpoint, no new cache, no new dependency on the routes
+  data structure.
+- **Validation moved AFTER pageName extraction in add/editInteraction**
+  — the alternative was a two-pass approach (basic check before
+  pageName, routeParam check after). Reordering keeps the validator
+  call single + lets all errors (missing arg, missing pageName,
+  invalid routeParam) report from the same code path. The minor
+  cost: a user with a typo'd verb name now sees the "page doesn't
+  exist" error first if both apply. Acceptable trade — typoed verbs
+  shouldn't happen from the admin form (the picker offers a fixed
+  list).
+- **Single-user inputType is fine** — mirrors the precedent set by
+  `inputType: 'api'` in Slice 4 (only `refresh.apiRef`). One type
+  per registry/source shape stays clearer than overloading a
+  generic 'enum' with a `source: 'routeParam'` flag.
+
+**Alternatives considered**:
+
+- **Free text + server-only validation** — relies on user trial-
+  and-error. Rejected; the typo class is exactly what A2 is
+  supposed to kill.
+- **Fetch :params from a new server endpoint** — would work if the
+  slug didn't already carry the shape. Rejected for needless I/O.
+- **Generic `inputType: 'fromPageContext'` with a `source` field** —
+  would generalise across hypothetical future "data from the page's
+  route" args. Rejected for premature abstraction; today's single
+  user gets a clearer single-purpose type.
+- **Walk the project's ROUTES array on the server** instead of the
+  slug scan — would catch the rare case where the slug doesn't
+  perfectly mirror the route shape. Rejected; current QuickSite
+  convention IS that they mirror exactly, and divergence would
+  break other things first.
+
+**Source**: `secure/src/functions/qsVerbCatalog.php` (`exchangeMagicLink.paramName`
+gained `inputType: 'routeParam'` and a plain-English description front-loaded
+with the concrete `/auth/magic/:key → "key"` example — the old description was
+jargon-heavy with "QS.routeParams" and "ARCHITECTURE §5.3" mentions first;
+those stay at the end for power-users).
+`public/admin/assets/js/pages/preview/preview-js-interactions.js`
+(`_routeParamsForCurrentPage`, `_populateRouteParamOptions`,
+`_renderRouteParamArgSelect`, `_mountRouteParamPickerWrap` helpers;
+dispatch wired into `_createArgRow` after the `route` branch).
+`secure/src/functions/interactionHelpers.php` (`routeParamsForPageSlug`
+helper; `validateInteractionArgs` gained optional `$pageName` parameter
++ `invalid_route_param` error reason).
+`secure/management/command/addInteraction.php`, `editInteraction.php`
+(arg-validation block moved AFTER pageName-extraction block so the
+validator gets `$pageName`).
+`secure/management/command/addPageEvent.php`, `editPageEvent.php`
+(validator call updated to pass already-extracted `$pageName`).
+No CSS changes — reuses QSSearchableSelect styling.
+
 ---
 
 ## Project conventions (beta.9)
