@@ -870,6 +870,62 @@ class JsonToHtmlRenderer {
         'fetch' => ['toastSuccessKey', 'toastErrorKey'],
     ];
 
+    /**
+     * Beta.9 A2 Slice 6 — POSITIONAL translation-key resolution.
+     *
+     * Per-verb cache of positional-arg indices that carry a translation
+     * key (inputType: 'translationKey' in qsVerbCatalog). Built lazily on
+     * first lookup per verb so the catalog walk is O(N) once per render
+     * cycle instead of per-{{call}}.
+     *
+     * Today's user: toast.message (message arg at index 0). Future verbs
+     * gain compile-time translation automatically by declaring the
+     * inputType in the catalog — no renderer change required.
+     */
+    private static array $translatablePositionalCache = [];
+
+    /**
+     * Look up which positional args of a verb carry translation keys.
+     * Empty array = no translatable positional args (most verbs).
+     */
+    private static function getTranslatablePositionalIndices(string $fn): array {
+        if (isset(self::$translatablePositionalCache[$fn])) {
+            return self::$translatablePositionalCache[$fn];
+        }
+        $indices = [];
+        foreach (qsVerbCatalog() as $entry) {
+            if (($entry['name'] ?? '') !== $fn) continue;
+            foreach (($entry['args'] ?? []) as $i => $arg) {
+                if (($arg['inputType'] ?? '') === 'translationKey') {
+                    $indices[] = $i;
+                }
+            }
+            break;
+        }
+        return self::$translatablePositionalCache[$fn] = $indices;
+    }
+
+    /**
+     * Try to resolve a value as a translation key; fall back to the
+     * original value if it's not a known key. This makes the verb's
+     * `allowFreeText` mode work without renderer-side flagging — a Custom
+     * Text value like "Hello world!" returns itself; a key like
+     * "home.welcome" returns its translation.
+     *
+     * Translator::translate returns "{translation missing: <key>}" on
+     * miss; that marker is the trigger to fall back. False positives are
+     * possible if the user types raw text that ACCIDENTALLY matches a
+     * declared key — accepted: the picker is the primary path, and the
+     * collision is a feature (user wanted the key, just typed it raw).
+     */
+    private static function resolveTranslationKeyOrFallback(string $value): string {
+        $translated = Translator::translate($value);
+        if (strpos($translated, '{translation missing:') === 0) {
+            return $value;
+        }
+        return $translated;
+    }
+
     private function transformCallSyntax(string $value): string {
         // Capture every {{call:...}} in order; non-call text is dropped (the
         // validator below already rejects it, this just makes the boundary
@@ -965,6 +1021,17 @@ class JsonToHtmlRenderer {
                 }
                 return $key . '=' . Translator::translate($val);
             }, $args);
+        }
+
+        // Beta.9 A2 Slice 6 — POSITIONAL translation-key resolution.
+        // Catalog-driven (inputType: 'translationKey' on the arg). Skip
+        // kwarg-shape values that landed in positional slots (defensive).
+        // Empty values stay empty — no point translating a non-value.
+        $translatablePositions = self::getTranslatablePositionalIndices($fn);
+        foreach ($translatablePositions as $idx) {
+            if (!isset($args[$idx]) || $args[$idx] === '') continue;
+            if (strpos($args[$idx], '=') !== false) continue;
+            $args[$idx] = self::resolveTranslationKeyOrFallback($args[$idx]);
         }
 
         $quoted = array_map(function ($arg) use ($jsKeywords) {

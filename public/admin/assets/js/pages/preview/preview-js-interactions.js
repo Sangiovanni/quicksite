@@ -181,8 +181,8 @@
             try {
                 jsFnPicker = new window.QSSearchableSelect(jsFormFunction, {
                     placeholder: (PreviewConfig && PreviewConfig.i18n && PreviewConfig.i18n.selectFunction) || '-- Select function --',
-                    searchPlaceholder: 'Search functions… (matches name + description)',
-                    emptyText: 'No functions match',
+                    searchPlaceholder: PreviewConfig.i18n?.searchFunctions || 'Search functions… (matches name + description)',
+                    emptyText: PreviewConfig.i18n?.noFunctionsMatch || 'No functions match',
                 });
             } catch (e) {
                 console.warn('[PreviewJsInteractions] Failed to mount QSSearchableSelect on jsFormFunction:', e);
@@ -237,8 +237,8 @@
             try {
                 peFnPicker = new window.QSSearchableSelect(peFormFunction, {
                     placeholder: (PreviewConfig && PreviewConfig.i18n && PreviewConfig.i18n.selectFunction) || '-- Select function --',
-                    searchPlaceholder: 'Search functions… (matches name + description)',
-                    emptyText: 'No functions match',
+                    searchPlaceholder: PreviewConfig.i18n?.searchFunctions || 'Search functions… (matches name + description)',
+                    emptyText: PreviewConfig.i18n?.noFunctionsMatch || 'No functions match',
                 });
             } catch (e) {
                 console.warn('[PreviewJsInteractions] Failed to mount QSSearchableSelect on peFormFunction:', e);
@@ -329,6 +329,12 @@
         // Body input change
         if (jsFormApiBody) {
             jsFormApiBody.addEventListener('input', updatePreview);
+            // Slice 6 item 6 — selector autocomplete on the body source
+            // input. Suggests `#id` and `.class` selectors from the page's
+            // form-like elements so the author doesn't have to remember
+            // exact ids. Re-populated each time the user opens the fetch
+            // form (selectors may have changed since last open).
+            _attachSelectorDatalist(jsFormApiBody, 'qs-body-source-suggestions');
         }
 
         // API mode radio (registry vs direct URL)
@@ -979,6 +985,18 @@
                             const rp = input.parentElement && input.parentElement._qsRoutePicker;
                             if (rp) {
                                 rp.setValue(params[i]);
+                                return;
+                            }
+                        }
+                        // Slice 6: translationKey picker — hidden input is
+                        // the form-input target; the wrapper carries the
+                        // _qsTranslationKeyPicker handle. Delegate so an
+                        // unknown / free-text saved value auto-swaps to
+                        // custom mode when allowFreeText is on.
+                        if (input.type === 'hidden' && input.dataset.inputType === 'translationKey') {
+                            const tkp = input.parentElement && input.parentElement._qsTranslationKeyPicker;
+                            if (tkp) {
+                                tkp.setValue(params[i]);
                                 return;
                             }
                         }
@@ -1836,6 +1854,19 @@
             var rpSel = _renderRouteParamArgSelect(arg, paramIndex, updateFn);
             row.appendChild(rpSel);
             _mountRouteParamPickerWrap(rpSel);
+        } else if (inputType === 'enum') {
+            // Slice 6 — fixed-option select. Catalog declares 'options: [...]';
+            // saveToken.storage / clearToken.storage carried this metadata
+            // pre-Slice-6 but no JS handler existed (rendered as plain text).
+            // scrollTo.behavior + toast.type added in Slice 6.
+            row.appendChild(_renderEnumArgSelect(arg, paramIndex, updateFn));
+        } else if (inputType === 'translationKey') {
+            // Slice 6 — translation-key picker. Reuses QSComplexWizard.createTextKeyPicker.
+            // When arg.allowFreeText is true (toast.message), a 'Custom text…'
+            // sentinel swaps the row to a free-text input + back button.
+            var tkWrap = _renderTranslationKeyArgRow(arg, paramIndex, updateFn);
+            row.appendChild(tkWrap);
+            tkWrap._qsTranslationKeyPicker.mount();
         } else if (usePicker && (inputType === 'selector' || inputType === 'class' || inputType === 'matchTarget')) {
             var picker = createSearchablePicker(inputType, arg, paramIndex);
             row.appendChild(picker);
@@ -1985,13 +2016,13 @@
         var labels = inputType === 'apiEndpoint'
             ? {
                 placeholder: PreviewConfig.i18n?.selectApiEndpoint || 'Select an API endpoint…',
-                searchPlaceholder: 'Search endpoints… (matches name, path, description)',
-                emptyText: 'No endpoints match',
+                searchPlaceholder: PreviewConfig.i18n?.searchEndpoints || 'Search endpoints… (matches name, path, description)',
+                emptyText: PreviewConfig.i18n?.noEndpointsMatch || 'No endpoints match',
             }
             : {
                 placeholder: PreviewConfig.i18n?.selectApi || 'Select an API…',
-                searchPlaceholder: 'Search APIs…',
-                emptyText: 'No APIs match',
+                searchPlaceholder: PreviewConfig.i18n?.searchApis || 'Search APIs…',
+                emptyText: PreviewConfig.i18n?.noApisMatch || 'No APIs match',
             };
         var picker;
         try {
@@ -2047,7 +2078,7 @@
             var custom = document.createElement('option');
             custom.value = '__custom__';
             custom.textContent = PreviewConfig.i18n?.routeCustomUrl || 'Custom URL…';
-            custom.dataset.description = 'Type any URL (external or internal)';
+            custom.dataset.description = PreviewConfig.i18n?.routeCustomUrlHint || 'Type any URL (external or internal)';
             sel.appendChild(custom);
         }
 
@@ -2111,7 +2142,7 @@
         var backBtn = document.createElement('button');
         backBtn.type = 'button';
         backBtn.className = 'qs-route-picker__back';
-        backBtn.title = 'Back to route picker';
+        backBtn.title = PreviewConfig.i18n?.backToRoutePicker || 'Back to route picker';
         backBtn.textContent = '←';
         backBtn.style.display = 'none';
 
@@ -2201,8 +2232,10 @@
         try {
             picker = new window.QSSearchableSelect(sel, {
                 placeholder: PreviewConfig.i18n?.selectRoute || 'Select a route…',
-                searchPlaceholder: allowExternal ? 'Search routes… (or pick Custom URL)' : 'Search routes…',
-                emptyText: 'No routes match',
+                searchPlaceholder: allowExternal
+                    ? (PreviewConfig.i18n?.searchRoutesOrCustom || 'Search routes… (or pick Custom URL)')
+                    : (PreviewConfig.i18n?.searchRoutes || 'Search routes…'),
+                emptyText: PreviewConfig.i18n?.noRoutesMatch || 'No routes match',
             });
         } catch (e) {
             console.warn('[PreviewJsInteractions] QSSearchableSelect mount failed for inputType=route:', e);
@@ -2275,7 +2308,7 @@
             var opt = document.createElement('option');
             opt.value = p;
             opt.textContent = p;
-            opt.dataset.description = 'Captured from :' + p + ' in the route URL';
+            opt.dataset.description = (PreviewConfig.i18n?.routeParamCapturedFrom || 'Captured from :{name} in the route URL').replace('{name}', p);
             sel.appendChild(opt);
         });
     }
@@ -2296,13 +2329,257 @@
         try {
             return new window.QSSearchableSelect(sel, {
                 placeholder: PreviewConfig.i18n?.selectRouteParam || 'Select a :param',
-                searchPlaceholder: 'Search :params…',
-                emptyText: 'No :params on this route',
+                searchPlaceholder: PreviewConfig.i18n?.searchRouteParams || 'Search :params…',
+                emptyText: PreviewConfig.i18n?.noRouteParamsMatch || 'No :params on this route',
             });
         } catch (e) {
             console.warn('[PreviewJsInteractions] QSSearchableSelect mount failed for inputType=routeParam:', e);
             return null;
         }
+    }
+
+    /**
+     * Slice 6 — render an enum-typed arg as a native <select> populated from
+     * arg.options. Default to arg.default if present, else the placeholder.
+     * No QSSearchableSelect wrap — enums are small fixed lists where search
+     * adds nothing (3-4 items). Mirrors the 'store' picker shape.
+     *
+     * Today's users: scrollTo.behavior (smooth/instant/auto),
+     * toast.type (info/success/error/warning), saveToken.storage +
+     * clearToken.storage (localStorage/sessionStorage — these carried the
+     * 'enum' inputType metadata pre-Slice-6 but no JS handler existed;
+     * Slice 6 is the first time their pickers actually render as a select).
+     */
+    function _renderEnumArgSelect(arg, paramIndex, updateFn) {
+        var sel = document.createElement('select');
+        sel.className = 'preview-contextual-js-form-input';
+        sel.dataset.paramIndex = paramIndex;
+        sel.dataset.paramName = arg.name || '';
+        sel.dataset.inputType = 'enum';
+
+        var options = Array.isArray(arg.options) ? arg.options : [];
+
+        // Placeholder only when the arg is required AND no default. Optional
+        // args with a default get the default pre-selected (no placeholder).
+        if (arg.required !== false && (arg.default === undefined || arg.default === null || arg.default === '')) {
+            var placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = PreviewConfig.i18n?.selectEnumValue
+                || ('— Select ' + (arg.name || 'value') + ' —');
+            sel.appendChild(placeholder);
+        }
+
+        options.forEach(function(value) {
+            var opt = document.createElement('option');
+            opt.value = value;
+            opt.textContent = value;
+            sel.appendChild(opt);
+        });
+
+        if (arg.default !== undefined && arg.default !== null && arg.default !== '') {
+            sel.value = arg.default;
+        }
+
+        sel.addEventListener('change', updateFn);
+        return sel;
+    }
+
+    /**
+     * Slice 6 — translation-key picker for verb args that name a key in
+     * the project's translation file. Today's lone user: toast.message
+     * (with allowFreeText: true for back-compat with raw-string toasts).
+     *
+     * The hybrid shape mirrors the route picker (Slice 5):
+     * - Default mode shows QSComplexWizard.createTextKeyPicker (the same
+     *   primitive the complex-wizard variables panel uses), which
+     *   includes the "Create new key" inline form for adding missing
+     *   keys without leaving the verb form.
+     * - When allowFreeText is true, a "Custom text…" sentinel button
+     *   swaps the row to a plain <input> + back button. Pre-fill auto-
+     *   swaps to custom mode when the saved value isn't a known key
+     *   (heuristic: doesn't match dotted-identifier pattern OR contains
+     *   whitespace).
+     *
+     * Storage: stored value is the raw string the user picked OR typed.
+     * The runtime renderer treats anything not matching the translation
+     * key list as a literal — same convention as toast verbs today.
+     */
+    function _renderTranslationKeyArgRow(arg, paramIndex, updateFn) {
+        var allowFreeText = !!arg.allowFreeText;
+
+        var wrap = document.createElement('div');
+        wrap.className = 'qs-translation-key-picker';
+        wrap.dataset.tkPicker = '1';
+        wrap.dataset.allowFreeText = allowFreeText ? '1' : '0';
+        wrap.dataset.tkPickerMode = 'picker';
+
+        // Hidden form-input carries the value for the param collector.
+        // The visible UI (createTextKeyPicker mount OR custom text input)
+        // writes through to this hidden element on every change.
+        var hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.className = 'preview-contextual-js-form-input';
+        hidden.dataset.paramIndex = paramIndex;
+        hidden.dataset.paramName = arg.name || '';
+        hidden.dataset.inputType = 'translationKey';
+
+        // Mount target for createTextKeyPicker.
+        var pickerHost = document.createElement('div');
+        pickerHost.className = 'qs-translation-key-picker__host';
+
+        // Sentinel button — "Custom text…". Renders only when allowFreeText.
+        var sentinelBtn = document.createElement('button');
+        sentinelBtn.type = 'button';
+        sentinelBtn.className = 'qs-translation-key-picker__sentinel';
+        sentinelBtn.textContent = PreviewConfig.i18n?.customTextSentinel || 'Custom text…';
+        sentinelBtn.title = PreviewConfig.i18n?.customTextHint
+            || 'Use a raw string instead of a translation key (one-off / debug)';
+
+        // Custom mode: free-text input + back button.
+        var customInput = document.createElement('input');
+        customInput.type = 'text';
+        customInput.className = 'qs-translation-key-picker__custom-input';
+        customInput.placeholder = PreviewConfig.i18n?.customTextPlaceholder
+            || 'Any text (not translation-aware)';
+        customInput.style.display = 'none';
+
+        var backBtn = document.createElement('button');
+        backBtn.type = 'button';
+        backBtn.className = 'qs-translation-key-picker__back';
+        backBtn.title = PreviewConfig.i18n?.backToKeyPicker || 'Back to translation key picker';
+        backBtn.textContent = '←';
+        backBtn.style.display = 'none';
+
+        var tkPicker = null;
+
+        function swapToCustom() {
+            pickerHost.style.display = 'none';
+            sentinelBtn.style.display = 'none';
+            customInput.style.display = '';
+            backBtn.style.display = '';
+            wrap.dataset.tkPickerMode = 'custom';
+            customInput.focus();
+            updateFn();
+        }
+
+        function swapToPicker() {
+            pickerHost.style.display = '';
+            sentinelBtn.style.display = allowFreeText ? '' : 'none';
+            customInput.style.display = 'none';
+            customInput.value = '';
+            hidden.value = '';
+            backBtn.style.display = 'none';
+            wrap.dataset.tkPickerMode = 'picker';
+            if (tkPicker) tkPicker.setValue('');
+            updateFn();
+        }
+
+        // External-driven value setter (used by edit pre-fill).
+        // Heuristic for "looks like a key": only dots, ascii alphanumerics,
+        // underscores, dashes. Anything with a space or non-key char gets
+        // routed to custom mode (when allowed).
+        function _looksLikeKey(v) {
+            return typeof v === 'string' && v !== '' && /^[A-Za-z0-9_.-]+$/.test(v);
+        }
+        function setValue(v) {
+            if (allowFreeText && v !== '' && !_looksLikeKey(v)) {
+                swapToCustom();
+                customInput.value = v;
+                hidden.value = v;
+                return;
+            }
+            // Picker mode — if tkPicker is mounted, drive it; otherwise stash.
+            hidden.value = v || '';
+            if (tkPicker) tkPicker.setValue(v || '');
+        }
+
+        sentinelBtn.addEventListener('click', swapToCustom);
+        backBtn.addEventListener('click', swapToPicker);
+        customInput.addEventListener('input', function() {
+            hidden.value = customInput.value;
+            updateFn();
+        });
+
+        wrap.appendChild(hidden);
+        wrap.appendChild(pickerHost);
+        if (allowFreeText) wrap.appendChild(sentinelBtn);
+        wrap.appendChild(customInput);
+        if (allowFreeText) wrap.appendChild(backBtn);
+
+        wrap._qsTranslationKeyPicker = {
+            hidden: hidden,
+            customInput: customInput,
+            sentinelBtn: sentinelBtn,
+            backBtn: backBtn,
+            allowFreeText: allowFreeText,
+            swapToCustom: swapToCustom,
+            swapToPicker: swapToPicker,
+            setValue: setValue,
+            mount: function() {
+                if (!window.QSComplexWizard || typeof window.QSComplexWizard.createTextKeyPicker !== 'function') {
+                    console.warn('[PreviewJsInteractions] QSComplexWizard.createTextKeyPicker unavailable for inputType=translationKey');
+                    return;
+                }
+                tkPicker = window.QSComplexWizard.createTextKeyPicker({
+                    container: pickerHost,
+                    value: '',
+                    placeholder: PreviewConfig.i18n?.searchTranslationKey || 'Search translation keys…',
+                    onChange: function(key) {
+                        hidden.value = key || '';
+                        updateFn();
+                    }
+                });
+                wrap._qsTranslationKeyPicker.picker = tkPicker;
+            }
+        };
+
+        return wrap;
+    }
+
+    /**
+     * Slice 6 item 6 — attach a <datalist> of page selectors to an
+     * existing <input>, idempotently. Caller passes the input element and
+     * the desired datalist id. We replace the datalist's options on every
+     * mount + on every input focus, so newly-authored form ids surface
+     * without an admin reload.
+     *
+     * Used for the fetch body source input (#form-id autocomplete). Could
+     * be lifted into a shared helper if other inputs want the same
+     * behavior — for now it's narrow.
+     */
+    function _attachSelectorDatalist(input, datalistId) {
+        if (!input || !datalistId) return;
+        var existing = document.getElementById(datalistId);
+        if (existing) existing.remove();
+        var datalist = document.createElement('datalist');
+        datalist.id = datalistId;
+        input.setAttribute('list', datalistId);
+        input.parentElement && input.parentElement.appendChild(datalist);
+
+        function repopulate() {
+            datalist.textContent = '';
+            var seen = {};
+            var add = function(value) {
+                if (!value || seen[value]) return;
+                seen[value] = true;
+                var opt = document.createElement('option');
+                opt.value = value;
+                datalist.appendChild(opt);
+            };
+            var cats = getCategorizedSelectorsFn ? getCategorizedSelectorsFn() : { ids: [], classes: [], tags: [] };
+            (cats.ids || []).forEach(function(s) {
+                add(stripPseudoFromSelector(s.selector || s));
+            });
+            (cats.classes || []).forEach(function(s) {
+                add(stripPseudoFromSelector(s.selector || s));
+            });
+            // Conventional placeholder seed — every project has at least
+            // one #form-shaped target eventually; surface as a hint.
+            add('#form');
+        }
+
+        repopulate();
+        input.addEventListener('focus', repopulate);
     }
 
     /**
@@ -3428,7 +3705,7 @@
             const msg = document.createElement('div');
             msg.className = 'preview-contextual-js-form-error';
             msg.dataset.errFor = err.argName;
-            msg.textContent = '⚠ ' + err.argName + ' is required';
+            msg.textContent = (PreviewConfig.i18n?.argRequiredLabel || '⚠ {name} is required').replace('{name}', err.argName);
             row.appendChild(msg);
             row.classList.add('preview-contextual-js-form-row--error');
             // One-shot live-clear when the user starts editing the field.
@@ -3545,7 +3822,10 @@
                 _applyArgErrors(validation.errors, jsFormParams);
                 if (showToastFn) {
                     const names = validation.errors.map(e => e.argName).join(', ');
-                    showToastFn('Missing required parameter' + (validation.errors.length > 1 ? 's' : '') + ': ' + names, 'error');
+                    const msgTpl = validation.errors.length > 1
+                        ? (PreviewConfig.i18n?.missingRequiredParams || 'Missing required parameters: {names}')
+                        : (PreviewConfig.i18n?.missingRequiredParam || 'Missing required parameter: {name}');
+                    showToastFn(msgTpl.replace('{names}', names).replace('{name}', names), 'error');
                 }
                 return;
             }
@@ -3909,6 +4189,14 @@
                             return;
                         }
                     }
+                    // Slice 6: translationKey picker — same delegation.
+                    if (input.type === 'hidden' && input.dataset.inputType === 'translationKey') {
+                        var tkp = input.parentElement && input.parentElement._qsTranslationKeyPicker;
+                        if (tkp) {
+                            tkp.setValue(savedParams[idx]);
+                            return;
+                        }
+                    }
                     // For <select> inputs whose options were built from a
                     // catalogue (e.g. 'store' inputType): if the saved
                     // value isn't an option, inject a (legacy) row so the
@@ -4151,7 +4439,10 @@
                 _applyArgErrors(peValidation.errors, peFormParams);
                 if (showToastFn) {
                     var peNames = peValidation.errors.map(function(e) { return e.argName; }).join(', ');
-                    showToastFn('Missing required parameter' + (peValidation.errors.length > 1 ? 's' : '') + ': ' + peNames, 'error');
+                    var peMsgTpl = peValidation.errors.length > 1
+                        ? (PreviewConfig.i18n?.missingRequiredParams || 'Missing required parameters: {names}')
+                        : (PreviewConfig.i18n?.missingRequiredParam || 'Missing required parameter: {name}');
+                    showToastFn(peMsgTpl.replace('{names}', peNames).replace('{name}', peNames), 'error');
                 }
                 return;
             }
@@ -5584,36 +5875,44 @@
         root.appendChild(fallbackRow);
 
         // ── Wire up textKey pickers (shared primitive from contextual-complex) ──
+        // Slice 6 item 7 — V5 default keys. Pre-fill the three slots with
+        // `qs.count.zero` / `qs.count.one` / `qs.count.many` when no
+        // existing binding provides them. The author can override per
+        // binding (the picker's "Create new key" inline form lets them
+        // type a field-specific key like `home.commandsZero`); these
+        // shared defaults work for the common case where the count copy
+        // is generic ("0 items / 1 item / N items").
         var pickerFactory = window.QSComplexWizard && window.QSComplexWizard.createTextKeyPicker;
         var pickers = { zero: null, one: null, many: null };
         if (typeof pickerFactory === 'function') {
             pickers.zero = pickerFactory({
                 container:   zeroSlot.mount,
                 placeholder: 'e.g. home.commandsZero',
-                value:       (existing && existing.zeroKey) || '',
+                value:       (existing && existing.zeroKey) || 'qs.count.zero',
             });
             pickers.one = pickerFactory({
                 container:   oneSlot.mount,
                 placeholder: 'e.g. home.commandsOne',
-                value:       (existing && existing.oneKey) || '',
+                value:       (existing && existing.oneKey) || 'qs.count.one',
             });
             pickers.many = pickerFactory({
                 container:   manySlot.mount,
                 placeholder: 'e.g. home.commandsMany',
-                value:       (existing && existing.manyKey) || '',
+                value:       (existing && existing.manyKey) || 'qs.count.many',
             });
         } else {
             // Fallback: plain text inputs if the picker primitive isn't
             // loaded. Saves typing the key by hand instead of breaking.
-            [['zero', zeroSlot, 'home.commandsZero'],
-             ['one',  oneSlot,  'home.commandsOne'],
-             ['many', manySlot, 'home.commandsMany']].forEach(function(triple) {
+            [['zero', zeroSlot, 'home.commandsZero', 'qs.count.zero'],
+             ['one',  oneSlot,  'home.commandsOne',  'qs.count.one'],
+             ['many', manySlot, 'home.commandsMany', 'qs.count.many']].forEach(function(triple) {
                 var key = triple[0];
                 var slot = triple[1];
                 var input = document.createElement('input');
                 input.type = 'text';
                 input.placeholder = 'e.g. ' + triple[2];
-                input.value = (existing && existing[key + 'Key']) || '';
+                // Slice 6 item 7 — V5 default keys, fallback parity with the picker path.
+                input.value = (existing && existing[key + 'Key']) || triple[3];
                 slot.mount.appendChild(input);
                 pickers[key] = {
                     getValue: function() { return input.value; },

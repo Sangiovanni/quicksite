@@ -172,7 +172,7 @@ function qsVerbCatalog(): array {
             'signature' => 'QS.scrollTo(target, behavior?)',
             'args' => [
                 ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'CSS selector for element to scroll to', 'inputType' => 'selector'],
-                ['name' => 'behavior', 'type' => 'string', 'required' => false, 'default' => 'smooth', 'description' => '"smooth" or "instant"']
+                ['name' => 'behavior', 'type' => 'string', 'required' => false, 'default' => 'smooth', 'description' => 'Scroll animation: smooth (animated), instant (jump), auto (let browser decide based on prefers-reduced-motion).', 'inputType' => 'enum', 'options' => ['smooth', 'instant', 'auto']]
             ],
             'description' => 'Smoothly scroll to an element',
             'example' => '{{call:scrollTo:#contact}}',
@@ -218,9 +218,9 @@ function qsVerbCatalog(): array {
             'category' => 'general',
             'signature' => 'QS.toast(message, type?, duration?)',
             'args' => [
-                ['name' => 'message', 'type' => 'string', 'required' => true, 'description' => 'Message to display'],
-                ['name' => 'type', 'type' => 'string', 'required' => false, 'default' => 'info', 'description' => 'success, error, warning, or info'],
-                ['name' => 'duration', 'type' => 'number', 'required' => false, 'default' => '4000', 'description' => 'Duration in milliseconds']
+                ['name' => 'message', 'type' => 'string', 'required' => true, 'description' => 'Text shown in the toast. For multilingual sites pick a translation key (the picker shows the project\'s keys) — raw English text bakes the language into the page. The "Custom text" sentinel lets you type a raw string for one-off / debug toasts.', 'inputType' => 'translationKey', 'allowFreeText' => true],
+                ['name' => 'type', 'type' => 'string', 'required' => false, 'default' => 'info', 'description' => 'Visual style: success (green), error (red), warning (yellow), info (neutral).', 'inputType' => 'enum', 'options' => ['info', 'success', 'error', 'warning']],
+                ['name' => 'duration', 'type' => 'number', 'required' => false, 'default' => '4000', 'description' => 'Auto-dismiss delay in milliseconds.']
             ],
             'description' => 'Show a toast notification message',
             'example' => '{{call:toast:Hello world!,success}}',

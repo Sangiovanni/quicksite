@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../functions/qsVerbCatalog.php';
+require_once __DIR__ . '/Translator.php';
 
 /**
  * JsonToPhpCompiler
@@ -579,16 +580,49 @@ class JsonToPhpCompiler {
      * @param string $value The attribute value containing {{call:...}} placeholders
      * @return string Transformed JavaScript code
      */
+    /**
+     * Beta.9 A2 Slice 6 — POSITIONAL translation-key resolution cache
+     * (mirrors JsonToHtmlRenderer::$translatablePositionalCache; the two
+     * compile paths read the same qsVerbCatalog so kept in sync via
+     * catalog metadata, not via a shared base class).
+     */
+    private static array $translatablePositionalCache = [];
+
+    private static function getTranslatablePositionalIndices(string $fn): array {
+        if (isset(self::$translatablePositionalCache[$fn])) {
+            return self::$translatablePositionalCache[$fn];
+        }
+        $indices = [];
+        foreach (qsVerbCatalog() as $entry) {
+            if (($entry['name'] ?? '') !== $fn) continue;
+            foreach (($entry['args'] ?? []) as $i => $arg) {
+                if (($arg['inputType'] ?? '') === 'translationKey') {
+                    $indices[] = $i;
+                }
+            }
+            break;
+        }
+        return self::$translatablePositionalCache[$fn] = $indices;
+    }
+
+    private static function resolveTranslationKeyOrFallback(string $value): string {
+        $translated = Translator::translate($value);
+        if (strpos($translated, '{translation missing:') === 0) {
+            return $value;
+        }
+        return $translated;
+    }
+
     private function transformCallSyntax(string $value): string {
         return preg_replace_callback(
             '/\{\{call:([a-zA-Z][a-zA-Z0-9]*)(:[^}]*)?\}\}/',
             function ($matches) {
                 $functionName = $matches[1];
                 $argsString = isset($matches[2]) ? substr($matches[2], 1) : '';
-                
+
                 // Get allowed function names dynamically (core + custom)
                 $allowedFunctions = $this->getAllowedJsFunctions();
-                
+
                 if (!in_array($functionName, $allowedFunctions, true)) {
                     // Loud failure: emit a console.warn into the compiled
                     // output instead of swallowing the call as a comment.
@@ -598,15 +632,25 @@ class JsonToPhpCompiler {
                     error_log("Unknown QS function at compile: {$functionName}");
                     return "console.warn('[QS] unknown verb {{call:{$functionName}:...}} dropped at compile — verb missing from secure/src/functions/qsVerbCatalog.php')";
                 }
-                
+
                 if (empty($argsString)) {
                     return "QS.{$functionName}()";
                 }
-                
+
                 // Special keywords that should not be quoted (JS variables)
                 $jsKeywords = ['event', 'this'];
-                
+
                 $args = array_map('trim', explode(',', $argsString));
+
+                // Beta.9 A2 Slice 6 — POSITIONAL translation-key resolution
+                // (catalog-driven; same logic as JsonToHtmlRenderer).
+                $translatablePositions = self::getTranslatablePositionalIndices($functionName);
+                foreach ($translatablePositions as $idx) {
+                    if (!isset($args[$idx]) || $args[$idx] === '') continue;
+                    if (strpos($args[$idx], '=') !== false) continue;
+                    $args[$idx] = self::resolveTranslationKeyOrFallback($args[$idx]);
+                }
+
                 $quotedArgs = array_map(function($arg) use ($jsKeywords) {
                     if (in_array($arg, $jsKeywords, true)) {
                         return $arg;
@@ -614,7 +658,7 @@ class JsonToPhpCompiler {
                     $escaped = str_replace("'", "\\'", $arg);
                     return "'{$escaped}'";
                 }, $args);
-                
+
                 return "QS.{$functionName}(" . implode(', ', $quotedArgs) . ")";
             },
             $value

@@ -2700,6 +2700,142 @@ validator gets `$pageName`).
 (validator call updated to pass already-extracted `$pageName`).
 No CSS changes — reuses QSSearchableSelect styling.
 
+### Picker Slice 6 — enum handler + translationKey + compile-time resolution + two reverts (locked 2026-06-19)
+
+**Decision**: Slice 6 ships four locked additions and two principled reverts.
+
+**Additions:**
+
+1. **`inputType: 'enum'` handler in the picker JS.** The catalog had
+   `enum` metadata pre-Slice-6 (on `saveToken.storage` / `clearToken.storage`),
+   but no JS handler honoured it — those fields rendered as plain text
+   throughout beta.7-8. Slice 6's `_renderEnumArgSelect` is the first
+   handler. `scrollTo.behavior` and `toast.type` ride on it. Native
+   `<select>` (no QSSearchableSelect wrap) because fixed lists of 3-4
+   options gain nothing from search.
+
+2. **`inputType: 'translationKey'` + `allowFreeText` flag** on
+   `toast.message`. Reuses the existing `QSComplexWizard.createTextKeyPicker`
+   primitive. The `Custom text…` sentinel mirrors Slice 5's route picker
+   `allowExternal` pattern — same hybrid combobox shape (picker by
+   default; sentinel swaps row to text input + back button).
+
+3. **Compile-time translation-key resolution** (THE critical piece).
+   `JsonToHtmlRenderer::buildQsCallJs` + `JsonToPhpCompiler::transformCallSyntax`
+   now read `qsVerbCatalog()` at compile time, collect positional arg
+   indices flagged `inputType: 'translationKey'` (cached per verb), and
+   for each such arg in a `{{call:...}}` chain run
+   `Translator::translate(value)`. If the result is the missing marker
+   (`{translation missing: X}`), the value passes through unchanged —
+   that's Custom Text mode's natural fallback path. Multi-language
+   works without further code: source JSON keeps the key, per-request
+   render substitutes the per-language string. Future verbs gain
+   compile-time translation by declaring the inputType in the catalog,
+   no renderer code changes.
+
+4. **V5 default keys for count-sentence picker.** Pre-fills the
+   zero/one/many textKey slots with `qs.count.zero` / `qs.count.one`
+   / `qs.count.many` when no existing binding overrides them. Authors
+   replace per-binding via the picker's "Create new key" form.
+
+**Reverts (same Slice 6 commit, post-verification):**
+
+5. **V13 atomic-child demotion** — REVERTED. The original BACKLOG entry
+   argued `<td>` outside `<tr>` is bad UX. Verification flipped that:
+   no security reason; skilled authors prefer access; the existing
+   Suggested optgroup already surfaces context-aware children when a
+   relevant parent is selected. The default-category filter was UX
+   paranoia, not protection.
+
+6. **`storageKey` autocomplete** (saveToken.key / clearToken.key) —
+   REVERTED. The attempt at live-localStorage + APIs'-`auth.tokenSource`
+   autocomplete was noisy at runtime AND papered over the wrong
+   problem. The right design is a project-level **storage registry**
+   (declared model of every storage location with scope / purpose /
+   retention / consentRequired) which also solves GDPR cookie consent.
+   Filed as `NOTES/planning/BETA9_STORAGE_REGISTRY.md`; lands post-
+   Slice-7 of A2 (either as Track A5 of beta.9 or its own beta.10
+   candidate depending on remaining budget).
+
+**Reasoning**:
+
+- **Catalog-driven over hand-curated tables** — for the translationKey
+  resolution, the alternative was extending the existing
+  `TRANSLATABLE_KEYWORD_ARGS` const in JsonToHtmlRenderer with
+  positional indices. Rejected: that table grows linearly with each
+  new translatable verb arg. Catalog-driven means the renderer code
+  stays constant; new args declare themselves.
+- **`allowFreeText` mirrors `allowExternal`** — Slice 5 established
+  the hybrid-picker pattern (strict default + opt-in escape hatch via
+  a sentinel button). Slice 6's `allowFreeText` for translationKey
+  reuses the same shape, same mental model. Both flags live on the
+  catalog arg, both render the same swap UX.
+- **Translation missing-marker as the fallback trigger** — `Translator::translate`
+  returns `"{translation missing: <key>}"` on miss (not the input
+  string). Detecting that prefix and falling back to the input value
+  gives Custom Text mode a natural pass-through with zero extra
+  catalog plumbing.
+- **Mirroring the resolution in both renderer + compiler** — the
+  runtime renderer is the primary surface; the compiler (build path)
+  is symmetric for projects that pre-render. The two divergent
+  implementations are a pre-existing concern (renderer has kwarg
+  translation, compiler doesn't); the new positional translation is
+  added to BOTH to keep the new feature consistent across paths.
+- **V13 revert was driven by author feedback** — the design was
+  defensible in isolation but the user's reaction ("I might be
+  paranoid when I agree to this") was the right reading. Reverting
+  during verification is cheaper than carrying the divergent UX
+  through to deprecation later.
+- **storageKey revert + registry pivot** — the BACKLOG entry framed
+  the problem as "picker UX". Verification revealed it as "missing
+  declared model". The picker was a treatment for the symptom; the
+  registry is the cure. Pivoting before commit avoids shipping a
+  primitive that gets replaced in 2-3 betas.
+
+**Alternatives considered:**
+
+- **Translate at SAVE time** (compile the {{call}} with the resolved
+  string baked into the JSON). Rejected explicitly — defeats
+  multilingual sites (one JSON × N languages can't bake N versions
+  of the string).
+- **Pass a `{{tr:key}}` marker syntax** that the renderer detects
+  inline. Rejected for verbosity — the catalog metadata IS the marker
+  semantically; the user shouldn't have to type a marker around every
+  translation key.
+- **Ship V13 as a `Show all`-toggle** (keep demotion default-on, add
+  a power-user escape). Rejected — adds chrome for a feature the user
+  no longer wants. Revert is cleaner.
+- **Ship storageKey now, replace later with registry**. Rejected for
+  admin-debt; primitives that are scheduled for replacement in the
+  next slice cycle shouldn't ship.
+
+**Source**: `secure/src/functions/qsVerbCatalog.php` (scrollTo.behavior
++ toast.type enum metadata; toast.message → translationKey + allowFreeText).
+`public/admin/assets/js/pages/preview/preview-js-interactions.js`
+(`_renderEnumArgSelect`, `_renderTranslationKeyArgRow` + swap helpers,
+`_qsTranslationKeyPicker` external API; dispatch in `_createArgRow`;
+edit pre-fill delegates to `_qsTranslationKeyPicker.setValue`;
+count-sentence default values; selector datalist on jsFormApiBody;
+i18n catchup — 13 hardcoded strings wrapped with `PreviewConfig.i18n?.X`
+fallbacks).
+`secure/src/classes/JsonToHtmlRenderer.php` (`getTranslatablePositionalIndices`
+cache + `resolveTranslationKeyOrFallback` helper; positional resolution
+added to `buildQsCallJs` after the existing kwarg-translation pass).
+`secure/src/classes/JsonToPhpCompiler.php` (parallel positional
+resolution; `require_once Translator.php` added; the kwarg-translation
+gap stays as a pre-existing concern, separate from this slice).
+`secure/admin/translations/en.json` + `fr.json` (31 keys added across
+both — search/empty texts for function/api/route pickers, route
+custom-URL sentinel, route-param hints, validation messages, custom
+text sentinel for translationKey).
+`public/admin/assets/admin.css` (`.qs-translation-key-picker` hybrid
+layout mirroring `.qs-route-picker`).
+`secure/admin/templates/pages/preview/_tag-selector.php` (V13 atomic-
+child filter REVERTED; original behaviour restored).
+`NOTES/planning/BETA9_STORAGE_REGISTRY.md` (new planning doc — design
+for the storage registry that replaces the reverted storageKey
+autocomplete; post-Slice-7 timing).
+
 ---
 
 ## Project conventions (beta.9)

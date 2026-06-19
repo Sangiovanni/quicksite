@@ -11370,6 +11370,74 @@ code.preview-node-panel__value {
     box-shadow: 0 0 0 2px #f59e0b33;
 }
 
+/* Beta.9 A2 Slice 6 — translationKey hybrid picker.
+   Same shape as the route picker: a column-stacked picker host on top,
+   sentinel button below, with custom-mode (text input + back) hidden
+   until activated. Wider than the route picker because the inline
+   "Create new key" form from createTextKeyPicker needs vertical room. */
+.qs-translation-key-picker {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs, 6px);
+    width: 100%;
+}
+.qs-translation-key-picker__host {
+    width: 100%;
+}
+.qs-translation-key-picker__sentinel {
+    align-self: flex-start;
+    background: transparent;
+    border: 1px dashed var(--admin-border);
+    border-radius: var(--radius-sm);
+    color: var(--admin-text-muted);
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+.qs-translation-key-picker__sentinel:hover {
+    border-color: #f59e0b;
+    color: var(--admin-text);
+}
+.qs-translation-key-picker[data-tk-picker-mode="custom"] {
+    flex-direction: row;
+    align-items: center;
+}
+.qs-translation-key-picker[data-tk-picker-mode="custom"] .qs-translation-key-picker__host,
+.qs-translation-key-picker[data-tk-picker-mode="custom"] .qs-translation-key-picker__sentinel {
+    display: none;
+}
+.qs-translation-key-picker__custom-input {
+    flex: 1;
+    min-width: 0;
+}
+.qs-translation-key-picker__back {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    background: var(--admin-bg);
+    color: var(--admin-text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    line-height: 1;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.qs-translation-key-picker__back:hover {
+    border-color: #f59e0b;
+    background: var(--admin-bg-hover, var(--admin-bg));
+}
+.qs-translation-key-picker__back:focus {
+    outline: none;
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 2px #f59e0b33;
+}
+
 /* Beta.9 A2 Slice 5 follow-up — required-arg validation feedback.
    Painted by _applyArgErrors when save is blocked. Class lifts as
    soon as the user starts editing the offending field (one-shot
