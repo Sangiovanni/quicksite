@@ -913,10 +913,16 @@ private const TRANSLATABLE_KEYWORD_ARGS = [
 ];
 ```
 
-Future verbs that introduce translatable kwargs (e.g. `confirm`,
+Future verbs that introduce translatable **kwargs** (e.g. `confirm`,
 `prompt`) add one line. `JsonToHtmlRenderer::buildQsCallJs` walks
 each call's args and translates the value whenever the key is in
 the list.
+
+Parallel path for translatable **positional** args (beta.9 A2 Slice 6,
+catalog-driven): args declaring `inputType: 'translationKey'` in
+`qsVerbCatalog.php` are resolved automatically at render time —
+no per-verb code change required. See §9.9.7 + ARCHITECTURE §8.0.2
+for the resolution mechanics.
 
 ### 9.5 Auth flows — Tier 1 (token persistence), cookie pattern, Tier 2 (refresh on 401), Tier 3 (magic-link)
 
@@ -1919,6 +1925,256 @@ the route system). Save writes the file via `getSiteMap` + `save: true`.
 | Server commands | `addRoute`, `deleteRoute`, `editRoute`, `getSiteMap`, `setRouteLayout`, `analyzeReachability` |
 | Route schema | A project's `secure/management/routes.php` (writable via the commands; `varExportNested()` preserves nested string keys) |
 | Param syntax helpers | `secure/src/functions/routeHelpers.php` — single source for the `:name` ↔ `__name` filesystem sanitisation (NTFS reserves `:`) |
+
+### 9.9 Verb picker (interactions, page events, complex wizards)
+
+The structured authoring UI for every `{{call:verb:args}}` interaction in
+the admin. Lives in `preview-js-interactions.js`. Shipped in five iterative
+slices during beta.9 (track A2 of `NOTES/beta/1.0.0-beta.9_NOTES.txt`);
+this section documents the SURFACE — the catalog metadata + the picker UI
+contract — without re-explaining each slice's history (see
+`docs/DESIGN_DECISIONS.md` "Picker overhaul (beta.9)" for the design
+rationale + alternatives weighed).
+
+**Where the picker appears**
+
+- **Interactions panel** (element-level) — Add Interaction form, both the
+  verb dropdown and per-arg inputs.
+- **Page events panel** (page-level) — same shape, parallel form
+  (`peForm*` references in the JS).
+- **Complex element wizards** — wizards that author chained verbs
+  internally (e.g. magic-link landing page presets) reuse the same
+  `_createArgRow` helper.
+
+#### 9.9.1 Verb categorisation
+
+Each entry in `secure/src/functions/qsVerbCatalog.php` declares an
+optional `category` field. The picker groups verbs by category in a
+locked render order (most-authored first):
+
+| Category | Display label | Verbs (today's catalog) |
+|---|---|---|
+| `dom-toggle` | DOM toggles | show, hide, toggle, toggleHide, addClass, removeClass, setValue |
+| `form` | Forms | validate |
+| `fetch` | Fetch / network | fetch |
+| `auth` | Auth | saveToken, clearToken, refresh, exchangeMagicLink, requestMagicLink, logoutServer |
+| `nav` | Navigation | redirect, scrollTo |
+| `state-store` | State stores | setState, fetchState, onScrollFetchState |
+| `focus` | DOM focus | focus, blur |
+| `display` | Rendering / display | filter, renderList |
+| `general` | General | toast (intentionally cross-cutting) |
+| *(missing)* | Uncategorized | *defensive bucket — verb forgot to declare* |
+
+The `general` bucket is INTENTIONAL placement for cross-cutting
+utilities. The `uncategorized` bucket is a DEFENSIVE fallback, rendered
+LAST so authors notice that the verb forgot to declare a category.
+
+#### 9.9.2 Search-as-you-type (QSSearchableSelect)
+
+Every dropdown in the picker (verb selection, apiEndpoint, route,
+routeParam, translationKey) is wrapped with `QSSearchableSelect` — a
+reusable combobox primitive at
+`public/admin/assets/js/core/searchable-select.js`. Behaviours:
+
+- Wraps a native `<select>` (kept in DOM as data store, visually hidden).
+  All existing code that reads `.value`, listens to `change`, or
+  inspects `<option>` data-attributes keeps working.
+- Trigger button shows the current value + chevron; clicking opens a
+  dropdown with a search input at the top.
+- **Search matches**: case-insensitive substring against option
+  `value`, `textContent`, AND `data-description` (either field counts).
+  Empty query shows everything.
+- Optgroups become labeled categories; empty groups hidden when
+  filtering; empty result shows `No matches for "<query>"`.
+- Keyboard nav: ArrowUp/Down move focus, Enter selects, Escape closes
+  + returns focus to trigger.
+- Dropdown uses `position: fixed` to escape `overflow:hidden` parents.
+  Width matches trigger exactly. Flips upward when trigger is low on
+  the viewport. Re-anchors after every filter so a 1-item visible list
+  hugs the trigger.
+
+`min-width: 200px` applied globally so short labels don't collapse the
+trigger (post-Slice-4 polish).
+
+#### 9.9.3 Event filtering
+
+Each verb in `qsVerbCatalog.php` declares an `events: [...]` array of
+DOM events it's meant for (`onclick`, `onsubmit`, `onload`, …). The
+picker filters the verb dropdown by the currently-edited event:
+
+- `onScrollFetchState` declares `events: ['onload']` → only appears when
+  authoring `onload`.
+- `exchangeMagicLink` declares `events: ['onload']` → page-event only.
+- `redirect` declares `events: ['onclick', 'ondblclick', 'oncontextmenu',
+  'onkeydown', 'onkeyup']` → element-interaction events.
+
+A **Show all** checkbox above the verb picker overrides the filter for
+the unusual cases (e.g. authoring a custom event chain). The filter
+runs in `_filterFunctionsByEvent` (preview-js-interactions.js:~2629).
+
+#### 9.9.4 inputType taxonomy — canonical reference
+
+Each verb's arg can declare an `inputType` hint in
+`secure/src/functions/qsVerbCatalog.php`. The catalog metadata IS the
+dispatch table — `_createArgRow` in the picker JS reads
+`arg.inputType` and routes to the matching handler.
+
+This table is the canonical inputType reference; the consumer columns
+(picker UI + metadata fields + example) are everything an author or
+maintainer needs to know about a given inputType. The server-side
+validator (`interactionHelpers.php::validateInteractionArgs`) honours
+these hints too — today checks required-arg presence and the
+`routeParam` constraint that values must match the page's `:name`
+segments.
+
+| inputType | Picker UI | Metadata fields | Used by (today's verbs) |
+|---|---|---|---|
+| *(default)* | Plain `<input type="text">` | — | Any arg without an inputType hint |
+| `selector` | Searchable autocomplete from page's `#id` / `.class` / tag tokens | — | show.target, hide.target, focus.target, scrollTo.target, … |
+| `class` | Searchable autocomplete from page's classes (no leading `.`) | — | show.hideClass, addClass.className, … |
+| `eventArg` | Auto-injected hidden input (the `event` keyword arg) | — | validate.event |
+| `matchTarget` | GitHub-style tokenfield — selectors OR attribute names | — | filter.matchAttr |
+| `enum` | Native `<select>` from arg `options` | `options: [string,…]` (required), `default` (optional) | scrollTo.behavior, toast.type, saveToken.storage, clearToken.storage |
+| `store` | Native `<select>` of current page's state-store IDs | — | setState.storeId, fetchState.storeId, onScrollFetchState.storeId |
+| `api` | QSSearchableSelect of `@apiId` (no endpoint segment) | — | refresh.apiRef |
+| `apiEndpoint` | QSSearchableSelect of `@apiId/endpointId` | — | exchangeMagicLink.endpoint, requestMagicLink.endpoint, logoutServer.endpoint |
+| `route` | QSSearchableSelect of project routes; with `allowExternal: true`, a `Custom URL…` sentinel swaps the row to free-text input | `allowExternal: bool` (default `false`) | redirect.url *(allowExternal)*, exchangeMagicLink.returnTo, requestMagicLink.returnTo |
+| `routeParam` | QSSearchableSelect of `:name` segments extracted from the current page's route slug | — | exchangeMagicLink.paramName |
+| `translationKey` | `QSComplexWizard.createTextKeyPicker` (searchable tree + inline "Create new key" form); with `allowFreeText: true`, a `Custom text…` sentinel swaps the row to free-text input. Catalog-flagged positional args also get **compile-time resolution** at render (§9.9.7) | `allowFreeText: bool` (default `false`) | toast.message *(allowFreeText)* |
+| `storageKey` | *(planned)* — picker reads from a per-project storage registry (`localStorage` / `sessionStorage` / `cookie` declarations with scope / purpose / retention / consentRequired). See `NOTES/planning/BETA9_STORAGE_REGISTRY.md` | *(to be defined)* | saveToken.key, clearToken.key *(post-registry)* |
+
+#### 9.9.5 Hybrid-picker pattern (`allowExternal` / `allowFreeText`)
+
+Two inputType handlers carry a per-arg flag that opts in to a "Custom
+…" sentinel — a button at the top of the dropdown that swaps the row
+from picker mode to a free-text input + a `←` back button.
+
+- `route` + `allowExternal: true` (today: `redirect.url`) — picker shows
+  registered routes; the `Custom URL…` sentinel lets the author type
+  any URL (external, anchor, scheme-prefixed). Picker mode is the
+  default; back button returns to it.
+- `translationKey` + `allowFreeText: true` (today: `toast.message`) —
+  picker shows the project's translation keys; the `Custom text…`
+  sentinel lets the author type a raw string for one-off / debug
+  toasts. Back button returns to the picker.
+
+The hybrid resolves the typo-vs-flexibility tension: typing the URL
+or raw string is one click away, but the picker is the primary path.
+
+Edit pre-fill auto-swaps to custom mode based on a heuristic:
+- `allowExternal`: value doesn't start with single `/` → custom mode.
+- `allowFreeText`: value doesn't match dotted-identifier pattern OR
+  contains whitespace → custom mode.
+
+The auto-swap means re-editing an interaction with a saved
+`redirect.url = "https://other.com"` correctly shows the URL in custom
+mode + pre-filled (vs. dumping it as a "(legacy)" picker option).
+
+#### 9.9.6 Required-arg validation
+
+Save is blocked when any `required: true` catalog arg has an empty
+value at its positional index. Two-layer check:
+
+**Client side** — `_validateRequiredArgs` reads `availableFunctions`
+(the same catalog the picker uses) before building the POST payload.
+On failure:
+- Red border on each offending input
+  (`.preview-contextual-js-form-input--error`).
+- Inline chip below each offending row
+  (`⚠ <argName> is required`).
+- Summary toast: `Missing required parameter(s): <names>`.
+- Form stays open; save did not fire.
+
+Marks lift on first edit of the offending field (one-shot `input` /
+`change` listener attached when the marks are painted).
+
+**Server side** — `validateInteractionArgs` in
+`secure/src/functions/interactionHelpers.php` reads `qsVerbCatalog()`
+and walks the same argspec. Wired into `addInteraction`,
+`editInteraction`, `addPageEvent`, `editPageEvent`. Returns `400` with
+field-level `withErrors([{field, index, reason, hint}, ...])` when a
+required arg is empty, `422` when the verb itself is unknown to the
+catalog. Defense in depth for direct API callers, batch imports, and
+future client regressions.
+
+#### 9.9.7 Compile-time translation (catalog-driven)
+
+When a verb arg declares `inputType: 'translationKey'`, the saved
+value is stored as a translation key (e.g.
+`{{call:toast:hello.world,info,4000}}`). At render time,
+`JsonToHtmlRenderer::buildQsCallJs` reads the catalog, sees that the
+`message` arg of `toast` carries the translationKey hint, and
+substitutes the per-language string before the chain is compiled into
+the JS attribute:
+
+```
+en.json:  hello.world = "Hello world"
+fr.json:  hello.world = "Bonjour le monde"
+```
+
+Rendered output (English request):
+```html
+<button onclick="QS.toast('Hello world', 'info', '4000')">…</button>
+```
+
+Rendered output (French request):
+```html
+<button onclick="QS.toast('Bonjour le monde', 'info', '4000')">…</button>
+```
+
+The source JSON is identical for both languages — multilingual works
+natively. Custom Text mode (when `allowFreeText: true`) passes
+through unchanged: a raw string like `"Hello world!"` triggers
+`Translator::translate`'s missing-marker, which the resolver falls
+back from to the raw value.
+
+Mirrored in `JsonToPhpCompiler::transformCallSyntax` for the build
+path. Future verbs gain compile-time translation by declaring the
+inputType in the catalog — zero renderer code changes.
+
+#### 9.9.8 Files
+
+| Concern | Where |
+|---|---|
+| Catalog (single source of truth) | `secure/src/functions/qsVerbCatalog.php` |
+| Picker JS (verb + arg rendering, validation, save) | `public/admin/assets/js/pages/preview/preview-js-interactions.js` |
+| Combobox primitive | `public/admin/assets/js/core/searchable-select.js` |
+| TranslationKey picker primitive | `public/admin/assets/js/pages/preview/contextual-complex/text-key-picker.js` |
+| Route datalist primitive (complex wizards) | `public/admin/assets/js/pages/preview/contextual-complex/route-input.js` |
+| CSS (picker + hybrid layouts + validation styles) | `public/admin/assets/admin.css` (search for `.qs-searchable-select`, `.qs-route-picker`, `.qs-translation-key-picker`, `.preview-contextual-js-form-input--error`) |
+| Server validator | `secure/src/functions/interactionHelpers.php` (`validateInteractionArgs`, `routeParamsForPageSlug`) |
+| Save commands wired | `secure/management/command/addInteraction.php`, `editInteraction.php`, `addPageEvent.php`, `editPageEvent.php` |
+| Compile-time translation | `secure/src/classes/JsonToHtmlRenderer.php` (`getTranslatablePositionalIndices`, `resolveTranslationKeyOrFallback`) + `JsonToPhpCompiler.php` |
+| Inputs catalogue | [COMMAND_API.md "Catalog inputType reference"](COMMAND_API.md) |
+
+#### 9.9.9 Authoring a new inputType
+
+Adding a new inputType is a four-touchpoint change:
+
+1. **Catalog** — declare it on the relevant arg in
+   `secure/src/functions/qsVerbCatalog.php` (`'inputType' => 'newType'`
+   + any metadata fields like `options`, `allowExternal`,
+   `allowFreeText`).
+2. **Picker JS** — add a branch in `_createArgRow`
+   (preview-js-interactions.js) that calls a `_renderNewTypeArgRow()`
+   helper. Helpers return the visible row element; the param
+   collector reads from a `.preview-contextual-js-form-input`-classed
+   descendant.
+3. **Server validator** *(if inputType-specific constraints apply)* —
+   extend `validateInteractionArgs` in
+   `secure/src/functions/interactionHelpers.php` with a new `reason`
+   (e.g. `invalid_<type>`) and the constraint check.
+4. **Docs** — update the table in §9.9.4 above (this is the canonical
+   reference; no parallel table exists in COMMAND_API.md). Append a
+   `DESIGN_DECISIONS.md` entry under "Picker overhaul (beta.9)"
+   capturing why this new type instead of overloading an existing
+   one.
+
+The minimum-viable new inputType is text-only — no metadata fields,
+no validation; just a rendered picker. Examples of "small" inputTypes
+shipped in beta.9: `enum`, `api`, `routeParam`. The larger ones
+(`route`, `translationKey`) added per-arg flags + compile-time
+behavior.
 
 ---
 

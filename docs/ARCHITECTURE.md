@@ -444,6 +444,22 @@ Side channel: `QS.fetch` also dispatches `qs:fetch:loaded` / `qs:fetch:error` DO
 
 `event.preventDefault()` caveat: after the chain enters its async IIFE, calling preventDefault is a no-op (the default action has already fired). `validate` is in the sync prelude precisely for this reason. Any future verb that needs preventDefault must be added to `CHAIN_SYNC_PRELUDE`.
 
+#### 8.0.2 Compile-time translation resolution
+
+The renderer resolves translation keys at compile time so the rendered HTML carries the per-language **string**, never the key — `qs.js` at runtime has no access to translation files.
+
+Two parallel resolution paths in `JsonToHtmlRenderer::buildQsCallJs`:
+
+1. **Keyword-arg path** (the original) — a `TRANSLATABLE_KEYWORD_ARGS` const lists per-verb kwarg names. The first consumer was `fetch`'s `toastSuccessKey` / `toastErrorKey`. Pattern: `{{call:fetch:@api/ep,toastSuccessKey=form.contact.success}}` → resolved kwarg value substituted in the rendered call.
+
+2. **Positional-arg path** (added beta.9 A2 Slice 6, catalog-driven) — reads `qsVerbCatalog()` and collects positional indices flagged `inputType: 'translationKey'` per verb (cached per verb on first lookup). For each such arg in the chain, `Translator::translate(value)` is called; if the result is the missing marker (`{translation missing: <key>}`), the value passes through unchanged (the `allowFreeText` fallback path for raw Custom Text inputs).
+
+Today's positional users: `toast.message` (with `allowFreeText: true`). Future verbs declaring `inputType: 'translationKey'` on a positional arg are picked up automatically — no renderer code change required.
+
+Mirrored in `JsonToPhpCompiler::transformCallSyntax` for the build path. Multi-language sites work natively: source JSON is identical across languages; each per-request render produces a per-language compiled chain.
+
+See [ADMIN_PANEL.md §9.9](ADMIN_PANEL.md) for the authoring UX (translationKey picker + Custom Text sentinel in §9.9.7) and the full inputType taxonomy (§9.9.4).
+
 ### 8.1 External API registry (`QS.fetch`)
 
 `QS.fetch('@<apiId>/<endpointId>', 'name=value', …)` resolves the

@@ -24,7 +24,7 @@ The API documents itself. Once installed:
 GET /management/help
 ```
 
-returns full documentation for **all 130 commands** — parameters, examples, validation rules, and error codes. For a specific command:
+returns full documentation for **all 133 commands** — parameters, examples, validation rules, and error codes. For a specific command:
 
 ```
 GET /management/help/addRoute
@@ -67,36 +67,42 @@ There is **no separate error envelope**. A failed call uses the same four fields
 
 ## Command catalogue
 
-The 130 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
+The 133 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
 
 > **AI is browser-direct (BYOK).** As of v1.0.0-beta.6 there is no `callAi` / `testAiKey` / `detectProvider` / `listAiProviders` server command — the admin panel calls AI providers directly from the browser using credentials stored in `aiConnectionsV3` (localStorage). The Management API only handles workflow specs and command execution.
 
-| Category | What it covers |
+Each row enumerates the commands in that category — comma-separated, alphabetical within the category — followed by what the category covers. Categories are derived from `secure/management/routes.php`; if a command isn't here, it isn't routed.
+
+| Category | Commands & detail |
 |---|---|
-| **Pages** | Create / read / update / delete page JSON structures, page metadata, titles, favicons. |
-| **Structure** | Edit nodes inside a page tree (`getStructure`, `editStructure`, `addNode`, `removeNode`, `moveNode`, etc.). |
-| **Translations** | Add / edit / delete translation keys per language; sidecar files per page. |
-| **Languages** | Add / remove site languages, set default and admin locales. |
-| **Assets** | Upload / list / delete files in `public/assets/{images,font,audio,videos}/`, with metadata (alt text, dimensions). |
-| **Styles** | Edit `style.css` blocks, scoped selectors, theme variables. |
-| **CSS variables** | Manage CSS custom-property registries used by the visual editor's color picker and refiner. |
-| **Animations** | Define and apply named animation presets to nodes. |
-| **Builds** | Compile a project to a static `public/build/<name>/` deliverable; list / delete builds. |
-| **Projects** | Create / list / switch / delete projects under `secure/projects/`. |
-| **Backups** | Snapshot a project (configurable scope), list snapshots, restore. |
-| **Export / Import** | Pack a project as a ZIP for portability; import a ZIP back. |
-| **Tokens** | Generate / revoke / list bearer tokens, assign roles. |
-| **Roles** | Define / edit / delete roles and their command permissions. |
-| **Snippets** | Manage reusable component snippets (nav, cards, forms…) shared across pages. |
-| **JS functions** | Register named JS functions invoked by Interactions v2 (`{{call:fn:args}}`). |
-| **Interactions** | Bind triggers (click, hover, scroll…) to actions on a node. |
-| **Page events** | Page-level lifecycle hooks (`onload`, `onresize`, `onscroll`). Add / edit / delete page-event interactions per route (`addPageEvent`, `editPageEvent`, `deletePageEvent`, `getPageEvents`). |
-| **API endpoints** | Manage external API integrations callable from page interactions. |
-| **Authentication** | `listOAuthProviders` returns the union of admin + per-project OAuth presets (from `oauth-presets.json`) with a per-provider `setup` summary describing whether the `/auth/oauth/<provider>/start` + `/callback` routes already exist. Drives the `oauth-button` Complex Element wizard. The OAuth flow itself runs through route-resolvers (`oauth-start` / `oauth-callback` / `oauth-logout` kinds) attached via `setRouteResolver` — not standalone commands. See [ADMIN_PANEL.md §9.5 "Tier 4 — OAuth"](ADMIN_PANEL.md). |
-| **State stores** | Per-page named client state bound to one API endpoint — fields with direction (request/response/both), init source, and response path. Gives interactions memory (pagination, search, filters, infinite scroll). Read/write via `getStateStores` / `setStateStores`. |
-| **Server-side data resolvers** | Per-route declaration that fires a server-side fetch BEFORE template render and exposes the response as template variables — SEO/AEO/first-paint payoff (initial HTML carries API content). Single resolver per route OR an array of resolvers firing in parallel (`curl_multi_*`) for multi-endpoint pages. Same JSON-style declaration as state stores (one shape, two executors). Read via `getSiteMap` (per-route subset under `routeResolvers`); write via `setRouteResolver` (the idempotent six-shape command — set / clear / patch / append / remove single slot). File-based cache with TTL + auth-cacheable gating; manual invalidation via `cleanResolverCache`. See [ADMIN_PANEL.md §9.7](ADMIN_PANEL.md). |
-| **System updates** | Pull updates, run migrations, inspect engine version. |
-| **Workflow tooling** | `listWorkflowBlocks` enumerates the reusable prompt blocks in `secure/admin/workflows/{blocks,pins,warnings,examples}/` for the editor's multi-select dropdowns; `lintWorkflows` reports paragraphs that occur in 3+ workflow templates as candidates for extraction. Both are admin-tier (will move to superadmin once that role lands — beta.7 sub-task). |
+| **Meta** | `help` — single self-documenting endpoint; the only command callable without a bearer token. |
+| **Pages** | `listPages`, `createAlias`, `deleteAlias`, `listAliases`, `editFavicon`, `editTitle` — page metadata, title, favicon, alias routes. |
+| **Routes & sitemap** | `addRoute`, `deleteRoute`, `getRoutes`, `getSiteMap`, `setRouteLayout`, `analyzeReachability` — URL routing tree CRUD, sitemap export, dead-route audit. `setRouteResolver` is under "Server-side data resolvers" below since the route layer just hosts the resolver config. |
+| **Structure** | `getStructure`, `editStructure`, `addNode`, `addComplexElement`, `addComponentToNode`, `editComponentToNode`, `editNode`, `moveNode`, `deleteNode`, `duplicateNode` — edit nodes inside a page tree. |
+| **Components** | `listComponents`, `getComponent`, `findComponentUsages`, `renameComponent`, `duplicateComponent` — reusable component definitions (NOT the in-tree snippet shortcuts below). |
+| **Translations** | `getTranslation`, `getTranslations`, `getTranslationKeys`, `setTranslationKeys`, `deleteTranslationKeys`, `cleanOrphanTranslations`, `validateTranslations`, `getUnusedTranslationKeys`, `analyzeTranslations`, `importStructureTranslations` — translation keys per language; audits + structure-aware bulk operations. |
+| **Languages** | `getLangList`, `getLanguageList`, `addLang`, `deleteLang`, `setDefaultLang`, `setMultilingual`, `checkStructureMulti` — site language config (add/remove, default, multilingual gate). |
+| **Assets** | `uploadAsset`, `listAssets`, `editAsset`, `deleteAsset` — upload, list, delete files in `public/assets/{images,font,audio,videos}/`, with metadata (alt text, dimensions). |
+| **Styles** | `getStyles`, `editStyles`, `listStyleRules`, `getStyleRule`, `setStyleRule`, `deleteStyleRule` — `style.css` blocks + scoped CSS rule management. |
+| **CSS variables** | `getRootVariables`, `setRootVariables`, `setThemeMode` — CSS custom-property registries used by the color picker and theme switcher. |
+| **Animations** | `listKeyframes`, `getKeyframes`, `setKeyframes`, `deleteKeyframes`, `getAnimatedSelectors` — named keyframes + per-element animation bindings. |
+| **Builds** | `build`, `listBuilds`, `getBuild`, `deleteBuild`, `cleanBuilds`, `deployBuild`, `downloadBuild` — compile a project to a static `public/build/<name>/` deliverable; list / deploy / clean. |
+| **Projects** | `listProjects`, `getActiveProject`, `switchProject`, `createProject`, `cloneProject`, `deleteProject` — per-project CRUD + active-project switching under `secure/projects/`. |
+| **Backups** | `backupProject`, `listBackups`, `restoreBackup`, `deleteBackup` — snapshot / restore (configurable scope). |
+| **Export / Import** | `exportProject`, `importProject`, `downloadExport`, `clearExports` — pack a project as ZIP for portability; import a ZIP back. |
+| **Tokens** | `generateToken`, `listTokens`, `revokeToken` — bearer token CRUD, with role assignment. |
+| **Roles** | `listRoles`, `getMyPermissions`, `createRole`, `editRole`, `deleteRole` — role + per-command permission management. |
+| **Snippets** | `listSnippets`, `getSnippet`, `createSnippet`, `deleteSnippet`, `duplicateSnippet`, `insertSnippet`, `injectSnippetCss` — reusable in-tree snippets (nav, cards, forms…); insert / inject into a page's structure. |
+| **JS functions & data bindings** | `listJsFunctions`, `listDataBindings` — catalog read endpoints. `listJsFunctions` returns the QS.* verb catalog (consumed by the admin picker; see [ADMIN_PANEL.md §9.9](ADMIN_PANEL.md)). `listDataBindings` returns the `data-qs-*` attribute catalog. |
+| **Interactions** | `listInteractions`, `addInteraction`, `editInteraction`, `deleteInteraction` — bind triggers (click, hover, scroll…) to verb chains on a node. |
+| **Page events** | `getPageEvents`, `addPageEvent`, `editPageEvent`, `deletePageEvent` — page-level lifecycle hooks (`onload`, `onresize`, `onscroll`) per route. |
+| **API endpoints** | `listApiEndpoints`, `getApiEndpoint`, `addApi`, `editApi`, `deleteApi`, `testApiEndpoint` — manage external API integrations callable from page interactions; live test endpoint with replay capture. |
+| **Authentication** | `listOAuthProviders`, `addOAuthProvider`, `editOAuthProvider`, `deleteOAuthProvider` — OAuth provider preset CRUD. `listOAuthProviders` returns the union of admin + per-project presets (from `oauth-presets.json`) with a per-provider `setup` summary describing whether the `/auth/oauth/<provider>/start` + `/callback` routes already exist. Drives the `oauth-button` Complex Element wizard. The OAuth flow itself runs through route-resolvers (`oauth-start` / `oauth-callback` / `oauth-logout` kinds) attached via `setRouteResolver` — not standalone commands. See [ADMIN_PANEL.md §9.5 "Tier 4 — OAuth"](ADMIN_PANEL.md). |
+| **State stores** | `getStateStores`, `setStateStores` — per-page named client state bound to one API endpoint; fields with direction (request/response/both), init source, and response path. Gives interactions memory (pagination, search, filters, infinite scroll). |
+| **Server-side data resolvers** | `setRouteResolver`, `cleanResolverCache` — per-route declaration that fires a server-side fetch BEFORE template render and exposes the response as template variables (SEO/AEO/first-paint payoff). `setRouteResolver` is idempotent six-shape (set / clear / patch / append / remove single slot). File-based cache with TTL + auth-cacheable gating; manual invalidation via `cleanResolverCache`. Read via `getSiteMap` (per-route subset under `routeResolvers`). See [ADMIN_PANEL.md §9.7](ADMIN_PANEL.md). |
+| **System updates** | `checkForUpdates`, `applyUpdate` — pull engine updates, run migrations, inspect engine version. |
+| **System** | `getCommandHistory`, `clearCommandHistory`, `getSizeInfo`, `getIframeSandbox`, `setIframeSandbox`, `removeIframeSandbox` — engine-level state (audit log of executed commands, project size info, iframe sandbox config for the visual editor). |
+| **Workflow tooling** | `listWorkflowBlocks`, `lintWorkflows` — enumerate reusable prompt blocks in `secure/admin/workflows/{blocks,pins,warnings,examples}/` for the editor's multi-select dropdowns; report paragraphs that occur in 3+ workflow templates as candidates for extraction. Both are admin-tier (will move to superadmin once that role lands — beta.7 sub-task). |
 
 ## Calling the API
 
