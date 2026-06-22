@@ -1602,8 +1602,8 @@ four concrete shape choices made together:
    Exposing tokens to templates would re-create the XSS exfil surface
    BFF was chosen to prevent. The scope field is technically
    identity-adjacent (which permissions did the user grant?), but
-   that's deferred to a separate scope-aware-rendering concern
-   landing closer to Slice 4 — chip filed (task_5b20a582).
+   that's deferred to a separate scope-aware-rendering concern —
+   chip filed (task_5b20a582).
 
 **Alternatives considered**:
 
@@ -2876,13 +2876,13 @@ PHP-array per-project data files (notably
 candidates. Workflow rule mirrored in `CLAUDE.md` (Architecture
 Principles section). Behaviour: applies forward to every new data file.
 
-## A4 Translation Manager (beta.9)
+## Translation Manager (beta.9)
 
 ### Inline editor shape — row expansion, not modal (locked 2026-06-21)
 
 **Decision**: Click Edit/Set value on a row → an editor panel expands
 directly BELOW that row (textarea + Save/Cancel/inline error). Same
-mechanism reused by the Delete confirm panel (Q4 lock below). Only one
+mechanism reused by the Delete confirm panel (see below). Only one
 row can be expanded at a time; toggling Edit on the open row closes it.
 Per-row Delete and Edit can swap modes on the same key without closing.
 
@@ -2902,7 +2902,7 @@ specific row. **Side panel** (slides in from the right) — rejected,
 takes too much horizontal space and the panel ALREADY lives in a
 sidebar (would have produced a sidebar-in-sidebar).
 
-**Source**: A4 Q1 lock. Implementation: `_renderEditor` /
+**Source**: locked during beta.9. Implementation: `_renderEditor` /
 `_renderDeleteConfirm` in `preview-translation.js` append a sibling
 element after the row in `_rowsContainer` and set `_expandedKey` +
 `_expandedMode` state. CSS in `admin.css`
@@ -2931,10 +2931,10 @@ about the language file changed). **`used / total_keys_in_translation_file`**
 (the literal definition of "unset" coverage). **Two separate
 percentages** — rejected, twice the chrome for marginal info value.
 
-**Source**: A4 Q2 lock. Implementation: `_render` in
-`preview-translation.js` computes the math; scope-aware (Slice 7 lock
-below) so the percentage drills down to per-page meaningful values
-when scoped.
+**Source**: locked during beta.9. Implementation: `_render` in
+`preview-translation.js` computes the math; scope-aware (see last
+entry below) so the percentage drills down to per-page meaningful
+values when scoped.
 
 ### Bulk delete safety — list-first confirm, no bare prompt (locked 2026-06-21)
 
@@ -2958,10 +2958,10 @@ re-translation).
 unsafe by definition for bulk ops. **Dry-run preview command +
 explicit second call to commit** — over-engineered for a client-side
 audit; the list IS the dry-run. **Soft-delete with undo** — would
-require server schema for tombstones and a 24h sweeper; out of A4
-scope, valid future direction.
+require server schema for tombstones and a 24h sweeper; out of scope
+for this iteration, valid future direction.
 
-**Source**: A4 Q4 lock. Implementation: `_renderBulkConfirm` +
+**Source**: locked during beta.9. Implementation: `_renderBulkConfirm` +
 `_renderDeleteConfirm` in `preview-translation.js`; CSS in `admin.css`
 (`.preview-contextual-translation__bulk-confirm` /
 `__row-confirm`). Multi-language opt-in (next section) compounds the
@@ -3002,7 +3002,7 @@ a wrong click wipes the key everywhere. **Hide checkbox in bulk
 (force all-langs)** — rejected, denies the legitimate case of "I'm
 only setting up FR now, leave EN alone."
 
-**Source**: A4 Slice 6+ lock. Implementation: `_renderMultiLangCheckbox`
+**Source**: locked during beta.9. Implementation: `_renderMultiLangCheckbox`
 in `preview-translation.js`; `_deleteAllLangs` / `_bulkDeleteAllLangs`
 state vars reset to safe default on each panel open.
 
@@ -3024,8 +3024,9 @@ serves two different roles depending on `MULTILINGUAL_SUPPORT`:
 **Reasoning**: A monolingual project's `LANGUAGES_SUPPORTED = ['en']`
 config does NOT mean `en.json` is the active file — the runtime
 deliberately reads `default.json` so monolingual sites work as a
-"single source of truth" without per-language sprawl. Pre-A4 the
-panel managed `en.json` while the runtime rendered from `default.json`,
+"single source of truth" without per-language sprawl. Before this
+fix the panel managed `en.json` while the runtime rendered from
+`default.json`,
 producing wildly wrong "unset" counts (e.g. 175 false positives on the
 test project) and silent edit-target drift. Surfacing the actual
 rendered file as the one being managed is the only correct behaviour.
@@ -3046,7 +3047,7 @@ the bug we just fixed (panel manages a file the runtime ignores).
 a deliberate convenience for single-language sites and we don't want
 to delete it.
 
-**Source**: A4 Slice 6+ lock. Five commands had to be patched to
+**Source**: locked during beta.9. Five commands had to be patched to
 accept `'default'` as a language code (`validateTranslations`,
 `getUnusedTranslationKeys`, `getTranslationKeys`, plus the existing
 bypass in `getTranslation` / `setTranslationKeys` /
@@ -3080,7 +3081,7 @@ inconsistent response shape. **Conflate components into a single
 `components` source** — rejected, loses the per-component drill-down
 that the scope picker wants.
 
-**Source**: A4 parallel slice. Implementation:
+**Source**: locked during beta.9. Implementation:
 `getTranslationKeys.php` section 3.5 (after menu/footer);
 `_populateScopeSelect` in `preview-translation.js` for the prefix
 routing.
@@ -3124,10 +3125,10 @@ one at a time** — rejected, whack-a-mole as explained.
 through strictness)** — rejected, risks breaking valid setters
 (workflow imports, AI tools) for no security gain. **Remove
 `translation_key_simple` from `RegexPatterns.php` entirely** —
-deferred, removing patterns is a wider sweep that doesn't belong in
-A4. The pattern is unused but harmless.
+deferred, removing patterns is a wider sweep. The pattern is unused
+but harmless.
 
-**Source**: A4 Slice 6 lock. Implementation: new helper in
+**Source**: locked during beta.9. Implementation: new helper in
 `translationHelpers.php`; `deleteTranslationKeys.php:83-95` switched
 over.
 
@@ -3162,7 +3163,7 @@ trigger** — rejected, scoping to an empty page should NOT suggest "you
 have no translations site-wide" (which would prompt the user to add
 text keys when they should instead change scope).
 
-**Source**: A4 Slice 7 lock. Implementation: `_applyScopeAndSubstring`
+**Source**: locked during beta.9. Implementation: `_applyScopeAndSubstring`
 + `_render` in `preview-translation.js`. The site-wide totals
 (`siteTotalKeys`, `siteUnusedCount`) are computed separately for the
 empty-state + bulk-button gates.
