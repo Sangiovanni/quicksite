@@ -1,10 +1,6 @@
 # QuickSite Management API
 
 > Reference for the Management API — the single HTTP surface every QuickSite client (admin panel, CLI, external apps) talks to.
->
-> _Last updated: 2026-06-09._
-
-> _Maintainers note:_ re-check this doc when changing `secure/management/routes.php` (command count), `secure/src/classes/ApiResponse.php` (response shape), `secure/src/classes/CommandRunner.php` (internal allowlist), `secure/management/command/setRouteResolver.php` (resolver body shapes — scalar / array / index / collision errors), `secure/management/command/cleanResolverCache.php` (cache invalidation surface), or `secure/management/command/addRoute.php` / `deleteRoute.php` / `editRoute.php` (route body shape — param syntax + warnings array).
 
 ## Endpoint
 
@@ -69,7 +65,7 @@ There is **no separate error envelope**. A failed call uses the same four fields
 
 The 133 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
 
-> **AI is browser-direct (BYOK).** As of v1.0.0-beta.6 there is no `callAi` / `testAiKey` / `detectProvider` / `listAiProviders` server command — the admin panel calls AI providers directly from the browser using credentials stored in `aiConnectionsV3` (localStorage). The Management API only handles workflow specs and command execution.
+> **AI is browser-direct (BYOK).** There is no `callAi` / `testAiKey` / `detectProvider` / `listAiProviders` server command — the admin panel calls AI providers directly from the browser using credentials stored in `aiConnectionsV3` (localStorage). The Management API only handles workflow specs and command execution.
 
 Each row enumerates the commands in that category — comma-separated, alphabetical within the category — followed by what the category covers. Categories are derived from `secure/management/routes.php`; if a command isn't here, it isn't routed.
 
@@ -102,7 +98,7 @@ Each row enumerates the commands in that category — comma-separated, alphabeti
 | **Server-side data resolvers** | `setRouteResolver`, `cleanResolverCache` — per-route declaration that fires a server-side fetch BEFORE template render and exposes the response as template variables (SEO/AEO/first-paint payoff). `setRouteResolver` is idempotent six-shape (set / clear / patch / append / remove single slot). File-based cache with TTL + auth-cacheable gating; manual invalidation via `cleanResolverCache`. Read via `getSiteMap` (per-route subset under `routeResolvers`). See [ADMIN_PANEL.md §9.7](ADMIN_PANEL.md). |
 | **System updates** | `checkForUpdates`, `applyUpdate` — pull engine updates, run migrations, inspect engine version. |
 | **System** | `getCommandHistory`, `clearCommandHistory`, `getSizeInfo`, `getIframeSandbox`, `setIframeSandbox`, `removeIframeSandbox` — engine-level state (audit log of executed commands, project size info, iframe sandbox config for the visual editor). |
-| **Workflow tooling** | `listWorkflowBlocks`, `lintWorkflows` — enumerate reusable prompt blocks in `secure/admin/workflows/{blocks,pins,warnings,examples}/` for the editor's multi-select dropdowns; report paragraphs that occur in 3+ workflow templates as candidates for extraction. Both are admin-tier (will move to superadmin once that role lands — beta.7 sub-task). |
+| **Workflow tooling** | `listWorkflowBlocks`, `lintWorkflows` — enumerate reusable prompt blocks in `secure/admin/workflows/{blocks,pins,warnings,examples}/` for the editor's multi-select dropdowns; report paragraphs that occur in 3+ workflow templates as candidates for extraction. Both are admin-tier. |
 
 ## Calling the API
 
@@ -180,7 +176,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 - Command handlers live in `secure/management/command/<command>.php`, one file per command.
 - The whitelist of valid commands is `secure/management/routes.php` (129 entries — this file is the single source of truth for which commands exist).
 - Shared helpers live in `secure/src/functions/utilsManagement.php` (e.g., `varExportNested()`, `SPECIAL_PAGES`, role helpers).
-- Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `secure/src/classes/CommandRunner.php`. CommandRunner currently carries a **hardcoded read-only allowlist** of ~50 `get*` / `list*` commands it will execute internally; this is a tech-debt shortcut and should eventually be replaced by reusing the role/permission helpers in `secure/src/functions/AuthManagement.php` so there is one source of truth for "what is safe to call internally".
+- Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `secure/src/classes/CommandRunner.php`. CommandRunner currently carries a **hardcoded read-only allowlist** of ~50 `get*` / `list*` commands it will execute internally.
 - Workflow execution adds its own role check via `WorkflowManager::setTokenInfo()` so steps respect the calling token's permissions.
 
 ## Update detection
@@ -192,7 +188,7 @@ Two commands manage in-place upgrades against the GitHub repo:
 | `checkForUpdates` | GET | Reads the local `VERSION` file, fetches the latest GitHub release tag, compares with PHP's `version_compare`. Returns `update_available`, `current_version`, `latest_version`, `release_url`, `install_method` (`git`\|`zip`). |
 | `applyUpdate` | POST (superadmin only) | Performs `git pull` (git installs) or downloads + extracts the release ZIP. |
 
-`version_compare` natively orders pre-release tags correctly: `1.0.0-beta.5 < 1.0.0-beta.10 < 1.0.0-rc.1 < 1.0.0`. **Always bump the `VERSION` file before tagging a release** — otherwise `checkForUpdates` will misreport the installed version.
+`version_compare` natively orders pre-release tags correctly: `1.0.0-beta.5 < 1.0.0-beta.10 < 1.0.0-rc.1 < 1.0.0`. The installed version is read from the local `VERSION` file, so that file's contents are what `checkForUpdates` compares against the latest GitHub release tag.
 
 ## See also
 

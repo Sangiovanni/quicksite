@@ -100,6 +100,9 @@ if (is_dir($componentsDir)) {
         
         <!-- ADD MODE Content -->
         <?php include __DIR__ . '/preview/contextual-add.php'; ?>
+
+        <!-- TRANSLATION MODE Content (Beta.9 A4) -->
+        <?php include __DIR__ . '/preview/contextual-translation.php'; ?>
     </div><!-- End preview-contextual-content -->
 </div><!-- End preview-contextual-area -->
 

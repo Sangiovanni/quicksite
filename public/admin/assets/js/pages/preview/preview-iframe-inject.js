@@ -2271,7 +2271,7 @@
         return currentMode === 'select'  || currentMode === 'drag' ||
                currentMode === 'text'    || currentMode === 'style' ||
                currentMode === 'js'      || currentMode === 'add'  ||
-               currentMode === 'preview';
+               currentMode === 'preview' || currentMode === 'translation';
     }
     function navTarget(el) {
         if (!el || !el.closest) return null;

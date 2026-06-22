@@ -351,20 +351,37 @@ switch ($action) {
         
         // Flatten all existing keys
         $allKeys = flattenTranslationKeysForSelect($translationResult['data']['translations'] ?? []);
-        
+
+        // Beta.9 A4 Slice 5: $missingKeys (from validateTranslations) treats
+        // empty-string leaves as "missing" (per keyExistsInTranslations_validate).
+        // But the same key still appears in $allKeys (flattenTranslationKeysForSelect
+        // returns ALL leaves, empty or not). Without this lookup, a key like
+        // 'page.titles.test' = "" lands in BOTH $used (because it's not in
+        // $unusedKeys) AND $unset (because validate flagged it missing).
+        // Surfaced by Slice 5 inline edit verification — saving a key to ""
+        // produced a duplicate 🟢+🔴 pair for the same key.
+        // The fix: skip keys that are in $missingKeys when partitioning, so
+        // empty-value referenced keys live only in $unset.
+        $missingLookup = array_flip($missingKeys);
+
         // Group existing keys into used/unused
         $usedKeys = [];
         $unused = [];
-        
+
         foreach ($allKeys as $keyData) {
+            if (isset($missingLookup[$keyData['value']])) {
+                // Already represented in $unset below — don't double-count.
+                continue;
+            }
             if (in_array($keyData['value'], $unusedKeys)) {
                 $unused[] = $keyData;
             } else {
                 $usedKeys[] = $keyData;
             }
         }
-        
-        // Format missing keys for select (these don't exist in translation yet)
+
+        // Format missing keys for select (these don't exist in translation
+        // yet OR exist with empty value — see comment above).
         $unset = array_map(function($key) {
             return ['value' => $key, 'label' => $key];
         }, $missingKeys);
@@ -1161,13 +1178,21 @@ function flattenTranslationKeysForSelect(array $translations, string $prefix = '
             $childKeys = flattenTranslationKeysForSelect($value, $fullKey);
             $keys = array_merge($keys, $childKeys);
         } else {
-            // Leaf node - add truncated preview
-            $preview = is_string($value) ? substr($value, 0, 40) : '';
-            if (strlen($value) > 40) $preview .= '...';
-            
+            // Leaf node - add truncated preview.
+            // Beta.9 A4: must be mb_substr / mb_strlen, NOT substr / strlen.
+            // Byte-aware substr() on UTF-8 with multi-byte chars (e.g. French
+            // é è à) can land mid-character at the 40-byte cut, producing
+            // broken UTF-8. json_encode silently returns false on invalid
+            // UTF-8 → the calling helper echoes nothing → the admin panel
+            // (and command-form.js's translation-key callsites) get an
+            // empty 200 body. This silently broke FR for months pre-A4.
+            $strValue = is_string($value) ? $value : '';
+            $preview = mb_substr($strValue, 0, 40, 'UTF-8');
+            if (mb_strlen($strValue, 'UTF-8') > 40) $preview .= '...';
+
             $keys[] = [
                 'value' => $fullKey,
-                'label' => $fullKey . ($preview ? ' = "' . $preview . '"' : '')
+                'label' => $fullKey . ($preview !== '' ? ' = "' . $preview . '"' : '')
             ];
         }
     }

@@ -2875,3 +2875,294 @@ PHP-array per-project data files (notably
 `secure/projects/<p>/management/routes.php`) flagged as migration
 candidates. Workflow rule mirrored in `CLAUDE.md` (Architecture
 Principles section). Behaviour: applies forward to every new data file.
+
+## A4 Translation Manager (beta.9)
+
+### Inline editor shape — row expansion, not modal (locked 2026-06-21)
+
+**Decision**: Click Edit/Set value on a row → an editor panel expands
+directly BELOW that row (textarea + Save/Cancel/inline error). Same
+mechanism reused by the Delete confirm panel (Q4 lock below). Only one
+row can be expanded at a time; toggling Edit on the open row closes it.
+Per-row Delete and Edit can swap modes on the same key without closing.
+
+**Reasoning**: Modal overlays disconnect the user from the row they're
+editing — context (scope, neighbours, status) is hidden. Row expansion
+keeps the surrounding rows visible, which matters when the user is
+mid-task ("I'm reviewing scope=home, updating 5 keys in sequence").
+Mirrors GitHub Issues' inline comment editor and Linear's row-expand
+patterns — both established for management/triage UX where you
+trust the column layout to carry context.
+
+**Alternatives considered**: **Modal dialog** — rejected, breaks
+context and the Esc/Ctrl-Enter shortcuts feel heavier in a modal.
+**Inline replace** (textarea replaces the row in place) — rejected,
+shifts row positions which is jarring when you've scrolled to a
+specific row. **Side panel** (slides in from the right) — rejected,
+takes too much horizontal space and the panel ALREADY lives in a
+sidebar (would have produced a sidebar-in-sidebar).
+
+**Source**: A4 Q1 lock. Implementation: `_renderEditor` /
+`_renderDeleteConfirm` in `preview-translation.js` append a sibling
+element after the row in `_rowsContainer` and set `_expandedKey` +
+`_expandedMode` state. CSS in `admin.css`
+(`.preview-contextual-translation__row-editor` / `__row-confirm`).
+
+### Coverage % math — used / (used + unset), unused excluded (locked 2026-06-21)
+
+**Decision**: Coverage percentage is `used / (used + unset)` per
+language. The "unused" bucket (keys in translation file but no structure
+references them) does NOT enter the denominator. Display:
+`Coverage: 78% (142/172)`. `0/0 → 100%` (nothing to translate = done,
+not 0% which would falsely suggest urgent work).
+
+**Reasoning**: "Unused" keys are orphans, not pending work. Including
+them in coverage would conflate "this language is incomplete" (action:
+translate) with "the project has orphans" (action: clean up keys).
+Those are unrelated jobs with different urgencies and different
+operators (a translator vs. a developer/architect). The chip toolbar
+already exposes the unused count separately so visibility isn't lost.
+
+**Alternatives considered**: **`used / (used + unset + unused)`** —
+rejected, mixes signals as above; also penalises a project that just
+deleted some structures (unused spikes, coverage drops, but nothing
+about the language file changed). **`used / total_keys_in_translation_file`**
+— rejected, ignores keys that structures want but the file lacks
+(the literal definition of "unset" coverage). **Two separate
+percentages** — rejected, twice the chrome for marginal info value.
+
+**Source**: A4 Q2 lock. Implementation: `_render` in
+`preview-translation.js` computes the math; scope-aware (Slice 7 lock
+below) so the percentage drills down to per-page meaningful values
+when scoped.
+
+### Bulk delete safety — list-first confirm, no bare prompt (locked 2026-06-21)
+
+**Decision**: "Remove all unused (site-wide)" replaces the row list
+with a confirm panel showing EVERY key about to be deleted, each with
+its value preview. User reviews the list, then Cancel or Delete-N.
+Per-row delete uses the same pattern at single-row scale (key + value
+shown before confirm). Native `window.confirm()` is never used.
+
+**Reasoning**: Bulk deletes are easy to regret. A bare "Are you sure?"
+prompt forces the user to make the irreversible decision based on
+memory of what they THINK is in the unused bucket. Showing the actual
+list converts the choice from a leap of faith into an audit: the user
+can spot the one key they forgot they were using and bail out without
+losing their place. The pattern costs ~10s of additional scroll but
+saves orders of magnitude more time on "wait that wasn't supposed to
+get deleted" recoveries (which often need backup-restore or manual
+re-translation).
+
+**Alternatives considered**: **Bare confirm dialog** — rejected,
+unsafe by definition for bulk ops. **Dry-run preview command +
+explicit second call to commit** — over-engineered for a client-side
+audit; the list IS the dry-run. **Soft-delete with undo** — would
+require server schema for tombstones and a 24h sweeper; out of A4
+scope, valid future direction.
+
+**Source**: A4 Q4 lock. Implementation: `_renderBulkConfirm` +
+`_renderDeleteConfirm` in `preview-translation.js`; CSS in `admin.css`
+(`.preview-contextual-translation__bulk-confirm` /
+`__row-confirm`). Multi-language opt-in (next section) compounds the
+safety — bulk-unused defaults to all languages, per-row defaults to
+current language.
+
+### Multi-language delete defaults — bulk ON, per-row OFF (locked 2026-06-22)
+
+**Decision**: Both per-row delete and bulk remove-unused expose a
+"Delete from all N languages" checkbox in the confirm panel. The
+checkbox is HIDDEN when only one language exists. Default state:
+- **Per-row delete: UNCHECKED** (current language only).
+- **Bulk delete: CHECKED** (all languages).
+
+The frontend loops `_availableLangs` and calls `deleteTranslationKeys`
+per-lang via `Promise.all`; partial failure is surfaced inline with
+per-language error breakdown.
+
+**Reasoning**: The two operations have different mental models that
+justify different defaults.
+- **Per-row delete** is usually "I want to delete this VALUE in this
+  language file" — the user is editing per-language content (e.g.
+  cleaning up a bad FR translation while keeping EN). Defaulting to
+  all-languages would surprise.
+- **Bulk remove-unused** acts on ORPHANED keys — and an orphan in one
+  language is an orphan in all (the "unused" status is structurally
+  determined, not per-language). Cleaning the orphan from only one
+  language leaves the other files dirty for no reason. Defaulting to
+  all-languages matches user intent.
+
+The asymmetric defaults are non-obvious from outside, hence the
+explicit checkbox in both — the user can always override.
+
+**Alternatives considered**: **Both default OFF (conservative)** —
+rejected, bulk-unused users always have to toggle, useless friction.
+**Both default ON (consistent)** — rejected, per-row gets dangerous;
+a wrong click wipes the key everywhere. **Hide checkbox in bulk
+(force all-langs)** — rejected, denies the legitimate case of "I'm
+only setting up FR now, leave EN alone."
+
+**Source**: A4 Slice 6+ lock. Implementation: `_renderMultiLangCheckbox`
+in `preview-translation.js`; `_deleteAllLangs` / `_bulkDeleteAllLangs`
+state vars reset to safe default on each panel open.
+
+### default.json — hide from picker (multi), use exclusively (mono) (locked 2026-06-22)
+
+**Decision**: The `default.json` file in `secure/projects/<p>/translate/`
+serves two different roles depending on `MULTILINGUAL_SUPPORT`:
+- **Multilingual** (`MULTILINGUAL_SUPPORT = true`): `default.json` is
+  plumbing — `Translator.php` uses it as the fallback when a key is
+  missing from the active language. The Translation Manager HIDES it
+  from the language picker (filtered out of `_availableLangs`).
+- **Monolingual** (`MULTILINGUAL_SUPPORT = false`): `Translator.php`
+  loads `default.json` exclusively and ignores per-language files
+  (even if `LANGUAGES_SUPPORTED` lists `'en'` or similar). The
+  Translation Manager detects this from `getLangList`'s
+  `multilingual_enabled` field and uses `default` as the single language,
+  hiding the picker + its label entirely.
+
+**Reasoning**: A monolingual project's `LANGUAGES_SUPPORTED = ['en']`
+config does NOT mean `en.json` is the active file — the runtime
+deliberately reads `default.json` so monolingual sites work as a
+"single source of truth" without per-language sprawl. Pre-A4 the
+panel managed `en.json` while the runtime rendered from `default.json`,
+producing wildly wrong "unset" counts (e.g. 175 false positives on the
+test project) and silent edit-target drift. Surfacing the actual
+rendered file as the one being managed is the only correct behaviour.
+
+For multilingual, `default.json` IS visible in the file system but
+conceptually it's an implementation detail of the fallback chain.
+Showing it as a "language" in the picker would invite users to edit
+it as if it were one, when the real intent is for those values to
+come from the active-language file. Full audit + possible removal is
+deferred to beta.10.
+
+**Alternatives considered**: **Show `default.json` in multilingual
+picker as "Default"** — rejected, conflates the fallback file with
+real languages and tempts users to maintain it manually.
+**Use `LANGUAGES_SUPPORTED[0]` in monolingual** — rejected, that's
+the bug we just fixed (panel manages a file the runtime ignores).
+**Force MULTILINGUAL_SUPPORT to be true** — rejected, monolingual is
+a deliberate convenience for single-language sites and we don't want
+to delete it.
+
+**Source**: A4 Slice 6+ lock. Five commands had to be patched to
+accept `'default'` as a language code (`validateTranslations`,
+`getUnusedTranslationKeys`, `getTranslationKeys`, plus the existing
+bypass in `getTranslation` / `setTranslationKeys` /
+`deleteTranslationKeys`). Two unrelated commands (`analyzeTranslations`,
+`editTitle`) still need the bypass — tracked as a chip.
+
+### Component textKey scanning — server-side extension, not client fetch (locked 2026-06-21)
+
+**Decision**: `getTranslationKeys.php` scans
+`secure/projects/<p>/templates/model/json/components/*.json` and emits
+each component's textKeys under the source key `'component:<basename>'`
+in `keys_by_source`. Single round-trip. The Translation Manager's scope
+picker routes the `'component:'` prefix into a "Components" optgroup.
+
+**Reasoning**: Considered (and rejected) doing this client-side as a
+per-component fetch when the user picks a Component scope. Server-side
+extension is one round-trip vs N (one per component); consumers other
+than the Translation Manager (e.g. `command-form.js`'s 4 callsites)
+benefit for free; the shape stays consistent with menu/footer/pages
+which already use a single grouped response. Components are flat
+single-file structures (one `.json` per component, no nesting) which
+matches the menu/footer scan pattern verbatim — code reuse is high.
+
+The `'component:'` prefix is necessary because page route names and
+component names share a flat namespace: a `home` page and a `home`
+component would collide in `keys_by_source` without it.
+
+**Alternatives considered**: **JS-side per-component fetch on scope
+change** — rejected, N round-trips, no benefit to other consumers,
+inconsistent response shape. **Conflate components into a single
+`components` source** — rejected, loses the per-component drill-down
+that the scope picker wants.
+
+**Source**: A4 parallel slice. Implementation:
+`getTranslationKeys.php` section 3.5 (after menu/footer);
+`_populateScopeSelect` in `preview-translation.js` for the prefix
+routing.
+
+### Translation key validation — permissive helper, no character whitelist (locked 2026-06-22)
+
+**Decision**: `deleteTranslationKeys.php` and any other command that
+validates a translation key uses
+`isValidTranslationKey()` in `secure/src/functions/translationHelpers.php`:
+- `is_string($key)`
+- Non-empty after `trim`
+- No null byte (`\0`)
+
+No character whitelist. The previous `translation_key_simple` regex
+(`/^[a-zA-Z0-9._-]+$/`) is kept in `RegexPatterns.php` for backward
+compatibility but is no longer referenced by the translation commands.
+
+**Reasoning**: Real translation keys legitimately include characters
+the old regex rejected:
+- `/` for nested-route title keys (e.g. `page.titles.documentation/commands`)
+- `$` for component template variables (e.g.
+  `default.test2.reassurance-item1.$icon`)
+- arbitrary UTF-8 for translator-chosen identifiers
+
+The runtime (`Translator.php`), `setTranslationKeys`, and the JSON
+storage all accept any non-empty string. Only `deleteTranslationKeys`
+was validating, producing an asymmetry that bit users every time a new
+legitimate character appeared in their keys. Adding chars to the
+whitelist one at a time was whack-a-mole; rejecting them outright was
+a barrier to legitimate work.
+
+The minimal security floor (no null bytes, non-empty string) is
+sufficient because the key is used for dot-notation array access, NOT
+filesystem operations — `..` / `/` / `$` are inert in that context.
+The `language` param IS used for a file path and has its own
+path-traversal guard separately.
+
+**Alternatives considered**: **Add chars to `translation_key_simple`
+one at a time** — rejected, whack-a-mole as explained.
+**Apply the same validation to `setTranslationKeys` (consistency
+through strictness)** — rejected, risks breaking valid setters
+(workflow imports, AI tools) for no security gain. **Remove
+`translation_key_simple` from `RegexPatterns.php` entirely** —
+deferred, removing patterns is a wider sweep that doesn't belong in
+A4. The pattern is unused but harmless.
+
+**Source**: A4 Slice 6 lock. Implementation: new helper in
+`translationHelpers.php`; `deleteTranslationKeys.php:83-95` switched
+over.
+
+### Chip counts + coverage are scope-aware, not lang-wide (locked 2026-06-22)
+
+**Decision**: The 🟢/🔴/🟡 chip counts and the coverage % reflect the
+user's CURRENT SCOPE + SUBSTRING filter (status excluded — each chip
+can't depend on its own checked state). Scope changes recompute counts;
+typing in the substring filter recomputes counts.
+
+The "no data" empty state (centered illustration + CTA) and the
+"Remove all unused" button enabled gate still use SITE-WIDE totals —
+they're global signals that scoping shouldn't suppress.
+
+**Reasoning**: A chip labelled `🟢 142` next to a row list showing 8
+filtered rows is misleading. The user expects chip counts to reflect
+the population that the rows are drawn from. Per-page coverage % is
+also more actionable than per-language: "home is 80% translated" tells
+you which page to work on next; "EN is 78%" just tells you to keep
+going.
+
+The asymmetric handling of the empty state + bulk button preserves the
+"this whole project has no translation keys" signal that scoping
+shouldn't drown out. If you scope to a page with 0 keys, the rows show
+"No keys match the current filters" (the standard filter-empty
+message), NOT the global "No translation keys yet — add a text key
+from Add Element → Text" message.
+
+**Alternatives considered**: **Lang-wide counts always** — rejected,
+misleading next to scoped rows. **Scope-aware including the "no data"
+trigger** — rejected, scoping to an empty page should NOT suggest "you
+have no translations site-wide" (which would prompt the user to add
+text keys when they should instead change scope).
+
+**Source**: A4 Slice 7 lock. Implementation: `_applyScopeAndSubstring`
++ `_render` in `preview-translation.js`. The site-wide totals
+(`siteTotalKeys`, `siteUnusedCount`) are computed separately for the
+empty-state + bulk-button gates.

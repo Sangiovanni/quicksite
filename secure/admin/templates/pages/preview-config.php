@@ -422,6 +422,34 @@ window.PreviewConfig = {
             saveKeyframeFailed: <?= json_encode(__admin('preview.saveKeyframeFailed', 'Failed to save keyframe')) ?>,
             states: <?= json_encode(__admin('preview.states', 'States')) ?>,
             toggleStates: <?= json_encode(__admin('preview.toggleStates', 'Toggle States')) ?>
+        },
+
+        // ── Translation manager panel (preview-translation.js — Beta.9 A4) ──
+        translation: {
+            translationScopeSite: <?= json_encode(__admin('preview.translationScopeSite', 'Whole site')) ?>,
+            translationScopePages: <?= json_encode(__admin('preview.translationScopePages', 'Pages')) ?>,
+            translationScopeComponents: <?= json_encode(__admin('preview.translationScopeComponents', 'Components')) ?>,
+            translationScopeLayout: <?= json_encode(__admin('preview.translationScopeLayout', 'Layout')) ?>,
+            translationCoverage: <?= json_encode(__admin('preview.translationCoverage', 'Coverage: {pct}% ({used}/{total})')) ?>,
+            translationLoading: <?= json_encode(__admin('preview.translationLoading', 'Loading…')) ?>,
+            translationActionEdit: <?= json_encode(__admin('preview.translationActionEdit', 'Edit')) ?>,
+            translationActionDelete: <?= json_encode(__admin('preview.translationActionDelete', 'Delete')) ?>,
+            translationActionSetValue: <?= json_encode(__admin('preview.translationActionSetValue', 'Set value')) ?>,
+            translationUnsetPlaceholder: <?= json_encode(__admin('preview.translationUnsetPlaceholder', '(not set)')) ?>,
+            translationNoMatches: <?= json_encode(__admin('preview.translationNoMatches', 'No keys match the current filters.')) ?>,
+            translationEditSave: <?= json_encode(__admin('preview.translationEditSave', 'Save')) ?>,
+            translationEditCancel: <?= json_encode(__admin('preview.translationEditCancel', 'Cancel')) ?>,
+            translationEditSaving: <?= json_encode(__admin('preview.translationEditSaving', 'Saving…')) ?>,
+            translationEditPlaceholder: <?= json_encode(__admin('preview.translationEditPlaceholder', 'Translation value…')) ?>,
+            translationEditSaveError: <?= json_encode(__admin('preview.translationEditSaveError', 'Failed to save: {error}')) ?>,
+            translationDeletePrompt: <?= json_encode(__admin('preview.translationDeletePrompt', 'Delete {key} from {lang}.json?')) ?>,
+            translationConfirmDelete: <?= json_encode(__admin('preview.translationConfirmDelete', 'Delete')) ?>,
+            translationDeleting: <?= json_encode(__admin('preview.translationDeleting', 'Deleting…')) ?>,
+            translationDeleteError: <?= json_encode(__admin('preview.translationDeleteError', 'Failed to delete: {error}')) ?>,
+            translationBulkDeleteHeader: <?= json_encode(__admin('preview.translationBulkDeleteHeader', 'These {n} unused keys will be deleted from {lang}.json:')) ?>,
+            translationBulkDeleteConfirm: <?= json_encode(__admin('preview.translationBulkDeleteConfirm', 'Delete {n} keys')) ?>,
+            translationDeleteAllLangs: <?= json_encode(__admin('preview.translationDeleteAllLangs', 'Delete from all {n} languages ({list})')) ?>,
+            translationDeleteMultiError: <?= json_encode(__admin('preview.translationDeleteMultiError', 'Failed for {n}/{total} languages: {details}')) ?>
         }
     }
 };
@@ -435,6 +463,7 @@ window.PreviewConfig = {
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-selectors.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-selectors.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-editor.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-editor.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-js-interactions.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-js-interactions.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-translation.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-translation.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-transition-editor.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-transition-editor.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-miniplayer.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-miniplayer.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-sidebar-resize.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-sidebar-resize.js') ?>"></script>

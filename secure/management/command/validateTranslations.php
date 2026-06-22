@@ -132,8 +132,14 @@ function __command_validateTranslations(array $params = [], array $urlParams = [
                 ]);
         }
         
-        // Format validation - supports ISO 639 and BCP 47 locale codes
-        if (!RegexPatterns::match('language_code_extended', $targetLang)) {
+        // Format validation - supports ISO 639 and BCP 47 locale codes.
+        // Also supports "default" for mono-language mode (per Beta.9 A4
+        // Slice 7 — was silently 400-ing on monolingual sites because
+        // 'default' fails the regex, causing the translation-keys-grouped
+        // helper to fall through with empty missing_keys, which made
+        // EVERY key appear as "used" in the Translation Manager).
+        $isDefault = ($targetLang === 'default');
+        if (!$isDefault && !RegexPatterns::match('language_code_extended', $targetLang)) {
             return ApiResponse::create(400, 'validation.invalid_format')
                 ->withMessage('Invalid language code format')
                 ->withErrors([RegexPatterns::validationError('language_code_extended', 'language', $targetLang)]);

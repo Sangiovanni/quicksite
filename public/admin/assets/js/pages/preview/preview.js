@@ -2935,7 +2935,18 @@
                 PreviewJsInteractions.setCurrentPage(null);
             }
         }
-        
+
+        // Beta.9 A4 — Translation Manager. enter() is idempotent + lazy;
+        // first entry triggers data load, subsequent entries are no-op
+        // unless a refresh is requested. leave() keeps the cache.
+        if (mode === 'translation' && window.PreviewTranslation) {
+            // Merge panel-specific i18n keys before the module renders.
+            ensureI18nPanel('translation');
+            PreviewTranslation.enter();
+        } else if (mode !== 'translation' && window.PreviewTranslation) {
+            PreviewTranslation.leave();
+        }
+
         // Reset debounce flag after a short delay
         requestAnimationFrame(() => {
             isSwitchingMode = false;

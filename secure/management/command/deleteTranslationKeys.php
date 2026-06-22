@@ -11,6 +11,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 
 $params = $trimParametersManagement->params();
 
@@ -80,22 +81,17 @@ if (!is_array($keysToDelete)) {
         ->send();
 }
 
-// Validate each key is a string and not empty
+// Validate each key via the shared helper. Permissive on purpose — matches
+// what the runtime + setTranslationKeys + JSON storage already accept.
+// See translationHelpers.php → isValidTranslationKey() for the rationale
+// (component {{$var}} placeholders, nested-route slashes, etc.).
 foreach ($keysToDelete as $index => $key) {
-    if (!is_string($key) || trim($key) === '') {
+    if (!isValidTranslationKey($key)) {
         ApiResponse::create(400, 'validation.invalid_type')
             ->withMessage("Invalid key at index {$index}")
             ->withErrors([
-                ['field' => "keys[{$index}]", 'reason' => 'must be a non-empty string']
+                ['field' => "keys[{$index}]", 'reason' => 'must be a non-empty string with no null bytes']
             ])
-            ->send();
-    }
-    
-    // SECURITY: Validate key format (alphanumeric, dots, underscores, hyphens)
-    if (!RegexPatterns::match('translation_key_simple', $key)) {
-        ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage("Invalid key format at index {$index}")
-            ->withErrors([RegexPatterns::validationError('translation_key_simple', "keys[{$index}]", $key)])
             ->send();
     }
 }

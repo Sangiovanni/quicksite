@@ -1,10 +1,6 @@
 # QuickSite Admin Panel
 
-_Last updated: 2026-06-09._
-
 > Canonical reference for the admin panel's JS architecture, boot flow, and module map. See [ARCHITECTURE.md](ARCHITECTURE.md) for the system-level overview, [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) for the workflow engine, and [COMMAND_API.md](COMMAND_API.md) for the API commands the panel calls.
-
-> _Maintainers note:_ re-check this doc when changing `public/admin/assets/js/core/storage-keys.js` (§6 storage keys), `secure/admin/templates/pages/preview/sidebar-tools.php` (§8.1 visual editor modes), `secure/admin/templates/layout.php` (§2 boot order), `public/admin/assets/js/pages/sitemap.js` / `secure/management/command/addRoute.php` (§9.8 sitemap + param-route authoring), the state-stores wizard's init source kinds in `public/admin/assets/js/pages/preview/preview-js-interactions.js` (§9.6), `secure/src/classes/DataResolver.php` / `secure/src/functions/serverFetch.php` / `secure/src/functions/resolverHelpers.php` / `secure/admin/templates/pages/sitemap-resolver*.php` (§9.7 server-side data resolvers), or the auth verbs in `public/scripts/qs.js` / `secure/src/functions/qsVerbCatalog.php` / `secure/src/classes/JsonToHtmlRenderer.php` `CHAIN_AWAITABLE` (§9.5 Tier 1+2+3 auth flows).
 
 The admin panel is a server-rendered PHP shell plus a set of vanilla JS modules loaded per route. There is **no module bundler**. Load order is controlled by `secure/admin/templates/layout.php` and is the single most important contract in the front end — reorder a `<script>` tag and the panel breaks silently.
 
@@ -83,7 +79,7 @@ Payload shape is implicit — there is no schema or version field.
 
 ## 5. File inventory
 
-File lists are grouped by role. Where useful, the entry point or main exported function is named in the Purpose column. The codebase is in active beta development — do not treat these tables as a contract; treat them as a map.
+File lists are grouped by role. Where useful, the entry point or main exported function is named in the Purpose column. Treat these tables as a map, not a contract.
 
 ### 5.1 Core
 
@@ -161,7 +157,7 @@ All analyzers consume an AST and emit suggestions with diff metadata.
 
 ## 6. Storage key registry
 
-Every localStorage / sessionStorage key is declared as a constant in `js/core/storage-keys.js`. Direct string-literal access in older page modules is the legacy pattern and should be migrated when those files are touched.
+Every localStorage / sessionStorage key is declared as a constant in `js/core/storage-keys.js`.
 
 | Constant | Storage | Used by |
 |---|---|---|
@@ -210,6 +206,7 @@ The sidebar exposes one action button (Refresh) plus five editing modes — six 
 | **Text** | Mode | Inline-edit a text node's translation **for the currently selected language**. Intentionally primitive: no rich text, no line breaks. Edits the value, never the key. |
 | **CSS** | Mode | Click an element → CSS panel; edits apply to the element's selector with full pseudo-state support. |
 | **Interactions** | Mode | Event editor (`preview-js-interactions.js`). Three CRUD-capable panels: **per-element interactions** (the selected node's `onclick`/`oninput`/etc.), **Page Events** (page-level `onload`/`onresize`/`onscroll`), and **State Stores** (page-scoped state). Each interaction is a `{{call:fn:args}}` chain using a QS.* verb from the catalog. |
+| **Translations** | Mode | Site-wide translation key manager (`preview-translation.js`). Per-language coverage % + counts, scope picker (Pages / Layout / Components), inline row-expand editor, per-row + bulk delete. Mono- and multi-lingual. See §8.9. |
 
 ### 8.2 Context selectors
 
@@ -251,7 +248,7 @@ Menu and footer are global — editing them in any page's preview applies site-w
 | Routes / structure | `getRoutes`, `getStructure`, `editStructure`, `addElement`, `deleteElement`, `addRoute`, `deleteRoute`, `editRoute`, `setLayout` |
 | Components | `listComponents`, `addComponent`, `editComponent`, `deleteComponent` |
 | Snippets | `saveSnippet`, `listSnippets`, `deleteSnippet` |
-| Translations | `getTranslation`, `editTranslation` |
+| Translations | `getTranslation`, `getLangList`, `getTranslationKeys`, `getUnusedTranslationKeys`, `validateTranslations`, `setTranslationKeys`, `deleteTranslationKeys`, `editTranslation` |
 | Styles | `getStyles`, `setStyle`, `addStyle`, `deleteStyle`, `listStyleRules` |
 | Theme | `getRootVariables`, `setRootVariables` |
 | Animations | `getKeyframes`, `setKeyframes`, `deleteKeyframes` |
@@ -334,7 +331,7 @@ Same auto-discovery pattern client-side — `preview-config.php` globs
 | `QSComplexWizard.createRowEditor` | Variable-cardinality row list with reorder/add/delete + keyboard nav. Used by every wizard that has a "list of N things" section (Select options, FormScaffold fields, List items). |
 | `QSComplexWizard.createTextKeyPicker` | Translation-key picker — searchable list of existing keys + inline "Create" form for new ones. Matches the component-variables panel UX. |
 
-**Built-in kinds** (beta.7)
+**Built-in kinds**
 
 | Kind | Emits | Notes |
 |---|---|---|
@@ -349,7 +346,7 @@ Same auto-discovery pattern client-side — `preview-config.php` globs
 | `accordion` | `<div class="accordion">` with N native `<details>` / `<summary>` disclosure items | No JS or ARIA wiring — browser handles toggling. Per-item `openByDefault` adds the `open` attribute. |
 | `nav-menu` | `<nav>` / `<ul>` with N `<li><a href="…">` items | Per-item **external** toggle adds `target="_blank" rel="noopener"`. Each `href` input attaches the shared routes datalist for autocomplete (external URLs still work). |
 | `breadcrumb` | `<nav aria-label="Breadcrumb">` / `<ol class="breadcrumb">` with N `<li>` | Last item auto-renders as plain text with `aria-current="page"` (no link); its href input is auto-greyed-out in the wizard. Same routes datalist as nav-menu for intermediate hrefs. |
-| `tab-set` | `<div class="tabset" id="<setId>">` + `<div role="tablist">` + N `<button role="tab">` + N `<div role="tabpanel">` | ARIA-correct tab semantics. Click-to-switch wired via existing QS verbs (`removeClass` / `addClass` / `hide` / `show` chain in each tab's `onclick`) — no new runtime needed. User-provided `setId` scopes the per-tab click chain so multiple tab sets coexist on one page. Each panel content is a single `<p>` with a `textKey` — edit further via the regular editor after save. Arrow-key keyboard nav between tabs is filed in BACKLOG. |
+| `tab-set` | `<div class="tabset" id="<setId>">` + `<div role="tablist">` + N `<button role="tab">` + N `<div role="tabpanel">` | ARIA-correct tab semantics. Click-to-switch wired via existing QS verbs (`removeClass` / `addClass` / `hide` / `show` chain in each tab's `onclick`) — no new runtime needed. User-provided `setId` scopes the per-tab click chain so multiple tab sets coexist on one page. Each panel content is a single `<p>` with a `textKey` — edit further via the regular editor after save. |
 | `paged-navigator` | `<nav class="paged-nav" data-state-pagenav="<storeId>" …>` (empty at build time; runtime populates buttons) | Numbered-page navigator bound to a state store. Reads the store's `totalPages` field to size itself, marks the current `page` with `aria-current="page"`. Smart-ellipsis windowing (`1 … 4 5 [6] 7 8 … 100`). Optional ‹ Prev / Next › chevrons. Hides itself when `totalPages` is missing or ≤ 1. Click delegation: one listener attached to the `<nav>` (via WeakSet guard) survives re-renders — calls `setState(storeId, pageField, N)` then `fetchState(storeId)`. Pair with an offset-pagination store (see §9.6). |
 
 **Adding a new kind — 2-file recipe**
@@ -401,7 +398,7 @@ Today only the Table builder stamps the markers. Future complex
 elements opt in by emitting the same two attributes on their root and
 either reusing the `kind: 'table'` handler in `importStructureTranslations`
 or adding a `case 'their-kind':` branch with the equivalent dimension
-scanner. See `BETA7_TABLE_TRANSLATION_CSV.md` for the design rationale.
+scanner.
 
 ### 8.8 Text authoring (Add → Text tab, inline edit, RAW + key)
 
@@ -410,12 +407,7 @@ a **translation key** (looked up against the language file at render time, e.g.
 `home.greeting`) and a **RAW literal** (`__RAW__`-prefixed, rendered verbatim —
 for separators / one-off labels like `" / "`, `"—"`). Both are first-class.
 
-**Tag elements add EMPTY.** The legacy auto-generated placeholder textKey on
-`addNode` was removed — it used to attach a translation-key child to every new
-tag to give zero-dimension elements a clickable footprint, but it produced
-span-in-span nesting when authoring bound elements (`data-state-*`, `data-bind`)
-and is no longer needed (empty elements get their own editor footprint). To add
-text to a tag, use **Add → Text** (below) or **Text mode** inline.
+**Tag elements add empty.** A new tag has no text child. To add text to a tag, use **Add → Text** (below) or **Text mode** inline.
 
 **Add → "Text" tab.** A 5th tab in the Add panel (alongside Snippet / Component /
 Complex / HTML Tag). Pick the type:
@@ -428,10 +420,7 @@ Complex / HTML Tag). Pick the type:
 - **RAW (literal)** — a plain value input. Stored as the node's `textKey` =
   `"__RAW__"+value`, rendered verbatim in every language.
 
-The Add button (bottom Cancel / Add — the legacy top quick-add button was
-removed) posts `addNode` with `nodeKind:"text"` plus either `textRaw:true + textValue`
-(RAW) or the picked `textKey` (key). Default position respects the radio
-(`after` / `inside` / `before`).
+The Add button (bottom Cancel / Add) posts `addNode` with `nodeKind:"text"` plus either `textRaw:true + textValue` (RAW) or the picked `textKey` (key). Default position respects the radio (`after` / `inside` / `before`).
 
 **Text mode — inline editing of both flavours.** The Text-mode tool clicks any
 text node in the preview and makes it `contenteditable`. On commit:
@@ -441,11 +430,10 @@ text node in the preview and makes it `contenteditable`. On commit:
   by updating the node's `textKey` to `"__RAW__"+value` — *not* a translation
   entry (literals don't have one).
 
-In the renderer (`JsonToHtmlRenderer::renderText`), editor mode now wraps both
+In the renderer (`JsonToHtmlRenderer::renderText`), editor mode wraps both
 key-based AND `__RAW__`/`__LIT__` text in the `data-qs-textkey` selection span
-(with a `data-qs-raw="true"` marker on literals). Without that, RAW text had
-no selection handle — that's why before this change, pages with literal
-separators were unselectable in Text mode.
+(with a `data-qs-raw="true"` marker on literals), so RAW text gets a selection
+handle just like translation-key text.
 
 | Concern | Where |
 |---|---|
@@ -455,6 +443,82 @@ separators were unselectable in Text mode.
 | Inline RAW-vs-key save branch | `preview.js` `handleTextEdited` + `saveRawTextEdit` |
 | Renderer editor wrapping | `secure/src/classes/JsonToHtmlRenderer.php` `renderText()` |
 | Backend insert | `secure/management/command/addNode.php` (`nodeKind:'text'` mode) |
+
+### 8.9 Translation Manager (Translations mode)
+
+A sixth editor mode that **manages translation keys site-wide for the current project** — a dense table view of every key the site references plus every key the chosen language file has, classified into three buckets. Complements Text mode: Text mode edits values inline on the rendered page; Translations mode is the bird's-eye where you find orphans, set bulk values, and audit coverage.
+
+**Where you land it from:** sidebar Translations icon → `setMode('translation')` → `#contextual-translation` shows + `PreviewTranslation.enter()` triggers the lazy data fetch on first entry.
+
+**Status taxonomy** — every key is one of:
+
+| Status | Definition | Lives where |
+|---|---|---|
+| 🟢 **Used** | Referenced by a page/menu/footer/component structure AND has a non-empty value in this language | translations + structures |
+| 🔴 **Unset** | Referenced by a structure but missing from translations OR has `""` value | structures only |
+| 🟡 **Unused** | In the translation file but no structure references it (orphan) | translations only |
+
+These three are mutually exclusive — a key never appears in more than one bucket.
+
+**Coverage math** — `used / (used + unset)`. Unused does NOT distort the denominator; orphaned translations are a clean-up concern, not a "translation done" signal. `0/0 → 100%` (nothing to translate = done).
+
+**Panel layout (top to bottom)**
+
+| Region | What it does |
+|---|---|
+| Toolbar — Language picker | Switches the language file being managed. Hidden when only one language exists (monolingual, or multilingual with a single config'd lang). |
+| Toolbar — Scope picker | "Whole site" / Pages optgroup (page routes) / Layout optgroup (menu, footer) / Components optgroup (`component:<name>`). |
+| Toolbar — Coverage strip | `Coverage: 78% (142/172)` text. Recomputed per-scope. |
+| Filter row — substring | Case-insensitive contains-match on key name. Counts in chips narrow with substring. |
+| Filter row — status chips | 🟢 Used / 🔴 Unset / 🟡 Unused, each with a count + visible label. Toggle to filter rows. Counts are scope-aware (and substring-aware) but NOT status-aware (a chip can't depend on its own checked state). |
+| Row list | One row per filtered key: status dot · `<code>key.name</code>` · value preview (100-char truncate, full value in `title=`) · hover-revealed Edit + Delete icon buttons. Alphabetical by key name. |
+| Bottom action | "Remove all unused (site-wide)" button. Enabled iff site-wide unused count > 0. Opens the bulk-confirm panel (replaces row list temporarily). |
+
+**Inline edit (row expansion, not modal)** — clicking the pencil icon on a row expands an editor panel directly below: textarea pre-filled with current value, Save + Cancel buttons. Saves via `setTranslationKeys` (dot-notation, server normalises to nested). Keyboard: **Esc** = cancel, **Ctrl/Cmd+Enter** = save. The textarea auto-focuses with cursor at the end of existing text.
+
+For unset rows the Edit icon becomes a `+` (Set value) icon and the panel pre-fills empty — the textarea is the same; the affordance just signals "this is fresh-set, not a re-edit".
+
+After save success the panel runs `_refetchAndRender()` so the row's status flips naturally (unset → used, etc. — the "stale-sibling sweep"), then calls `PreviewState.reloadPreview()` so the iframe shows the new value live.
+
+**Per-row delete (list-first confirm, no bare prompt)** — clicking the trash icon expands a red-bordered confirm panel below the row: `Delete {key} from {LANG}.json?` plus a value preview, then Cancel + Delete buttons. Multi-language opt-in checkbox appears beneath when ≥2 languages exist (default OFF — you're usually editing one language). Confirm runs `deleteTranslationKeys` for the target language(s) via `Promise.all`; 404 from a non-current language is treated as success (key already absent in that file).
+
+**Bulk remove-unused** — same list-first pattern applied at scale. Button opens a full-panel confirm that replaces the row list: header `These {n} unused keys will be deleted from {LANG}.json:`, scrollable list of every unused key + truncated value preview, multi-language opt-in (default ON — orphaned keys are orphaned everywhere), then Cancel + Delete-N buttons. Single `deleteTranslationKeys` call per target language, parallel.
+
+Partial failure (some languages succeed, others fail) is surfaced inline: `Failed for 1/2 languages: FR: <details>`. State stays restorable — user can retry without losing the confirm context.
+
+**Scope-aware counts** — chip counts + coverage % reflect the active scope + substring filter (status excluded). Site-wide totals drive ONLY: the "no translation keys yet" empty state, and the bulk-button enabled gate. So `Used 8` next to the chip when scoped to `home` page is correct ("8 keys on the home page are used"); the bulk button stays enabled iff *any* unused keys exist site-wide, not just on the scoped page.
+
+Unused keys naturally drop out for non-`site` scopes — they belong to no source by definition.
+
+**Monolingual mode (`MULTILINGUAL_SUPPORT = false`)** — the runtime ignores per-language files and loads `default.json` exclusively (see [Translator.php:25-27](../secure/src/classes/Translator.php#L25)). The panel detects this from `getLangList`'s `multilingual_enabled` field and:
+- Sets `_availableLangs = ['default']` (NOT the configured `LANGUAGES_SUPPORTED`)
+- Hides the language picker + its label
+- All writes target `default.json`
+- The multi-language checkbox auto-hides (one language, no choice to surface)
+
+This matters because `LANGUAGES_SUPPORTED` for monolingual projects often lists `'en'` or similar — managing `en.json` would be invisible to the rendered site, which loads `default.json`. All translation commands accept `'default'` as a valid language code for monolingual writes.
+
+**Default.json visibility (multilingual)** — hidden from the language picker. It's a plumbing file (mono-language fallback), not a user-facing translation target.
+
+**Live reload after writes** — every write path (save, per-row delete, bulk delete) ends with `_reloadPreviewIframe()` → `PreviewState.reloadPreview()`, the same hook every other write flow (style, JS interactions, animations) uses. Authoring feels real-time.
+
+**Iframe nav-guard** — translation mode is registered in `isEditorMode()` in `preview-iframe-inject.js` so link clicks + form submits in the preview are swallowed (same as select/text/style/js/add). Without this, accidentally clicking a link in the preview would navigate the iframe to a different page than the editor's "page" picker — silent edit-target drift.
+
+**Files**
+
+| Concern | Where |
+|---|---|
+| Panel template | `secure/admin/templates/pages/preview/contextual-translation.php` |
+| Sidebar mode button | `secure/admin/templates/pages/preview/sidebar-tools.php` |
+| JS module | `public/admin/assets/js/pages/preview/preview-translation.js` |
+| Mode wiring | `public/admin/assets/js/pages/preview/preview.js` (`setMode('translation')`) |
+| i18n keys exposed to JS | `secure/admin/templates/pages/preview-config.php` (`i18nPanels.translation` block) |
+| CSS | `public/admin/assets/admin.css` (`.preview-contextual-translation__*`) |
+| Server: read-side composing helper | `public/admin/api/index.php` case `'translation-keys-grouped'` |
+| Server: scan commands | `getTranslationKeys.php`, `getUnusedTranslationKeys.php`, `validateTranslations.php` |
+| Server: write commands | `setTranslationKeys.php`, `deleteTranslationKeys.php` |
+| Server: shared key validator | `secure/src/functions/translationHelpers.php` (`isValidTranslationKey`) |
+| Runtime translator | `secure/src/classes/Translator.php` (mono = `default.json`; multi = `{lang}.json`) |
 
 ---
 
@@ -499,9 +563,9 @@ is registered (see `PageManagement::render()`).
 | `path` | Relative to API `baseUrl`. May contain `:placeholders` (see below). |
 | `parameters` | Optional array of `{ name, type, required, description }`. Type ∈ `string / number / integer / boolean`. |
 | `auth` | Per-endpoint override: `none / inherit / required`. Inherits from API-level auth by default. |
-| `callableFrom` | Beta.8 A4 marker — `client` / `server` / `both`, or absent for auto-derive. Server-only endpoints are **filtered out of `qs-api-config.js`** at build emit time (clients literally can't call them). Auto-derive rule: `apiKey → server`; everything else → `both`. Set explicitly in the form via the "Callable from" select; "Auto" shows a live preview of the derived value. |
+| `callableFrom` | `client` / `server` / `both`, or absent for auto-derive. Server-only endpoints are **filtered out of `qs-api-config.js`** at build emit time (clients literally can't call them). Auto-derive rule: `apiKey → server`; everything else → `both`. Set explicitly in the form via the "Callable from" select; "Auto" shows a live preview of the derived value. |
 | `requestSchema` | Optional JSON Schema for POST/PUT/PATCH bodies. Drives the test modal's dynamic form. |
-| `responseSchema` | Optional JSON Schema. Drives the response-bindings picker (componentList / count / etc., see beta.7 work). |
+| `responseSchema` | Optional JSON Schema. Drives the response-bindings picker (componentList / count / etc.). |
 
 **Path templating** — `:name` placeholders in the `path` are
 substituted at fetch time. Example:
@@ -558,9 +622,7 @@ feeds which template variable, with optional enum resolution.
 
 The picker is part of the **JS Interactions** modal (per-element
 event handler authoring). Component-list mode appears when:
-- The interaction is in **Action Type: API Call** (not Function — see
-  the discoverability note in [BACKLOG.md](../NOTES/planning/BACKLOG.md)
-  → "fetch Function-vs-API-mode unification").
+- The interaction is in **Action Type: API Call** (not Function).
 - The selected endpoint has a `responseSchema`.
 - The selected field is an `array`.
 
@@ -757,14 +819,12 @@ What the runtime sees in `qs-api-config.js`:
 }
 ```
 
-**Multi-language limitation** (current beta.7)
+**Multi-language limitation**
 
 `qs-api-config.js` is project-scoped, not per-language. Translation
 happens once at `editApi` / `switchProject` / `build` time using
 whatever language is active in that request. Multi-language sites
-should re-trigger one of those after a language switch, OR ship the
-proper fix tracked in [BACKLOG.md](../NOTES/planning/BACKLOG.md)
-("Per-language count bindings via inline translation registry").
+should re-trigger one of those after a language switch.
 
 **Runtime flow**
 
@@ -899,9 +959,7 @@ form fields.
 **Toast keys on edit**: the saved chain has the *resolved* string
 (PHP translated it at compile time), not the key. The picker's
 textKey picker shows KEYS — so on edit, the toast pickers start
-empty. Re-picking re-emits the key. Documented limitation; the
-"save the key alongside the resolved string in api-endpoints.json"
-fix is filed in BACKLOG.md.
+empty. Re-picking re-emits the key.
 
 **Compile-time translation pattern (reusable)**
 
@@ -918,20 +976,14 @@ Future verbs that introduce translatable **kwargs** (e.g. `confirm`,
 each call's args and translates the value whenever the key is in
 the list.
 
-Parallel path for translatable **positional** args (beta.9 A2 Slice 6,
-catalog-driven): args declaring `inputType: 'translationKey'` in
-`qsVerbCatalog.php` are resolved automatically at render time —
-no per-verb code change required. See §9.9.7 + ARCHITECTURE §8.0.2
-for the resolution mechanics.
+Parallel path for translatable **positional** args (catalog-driven):
+args declaring `inputType: 'translationKey'` in `qsVerbCatalog.php` are
+resolved automatically at render time — no per-verb code change
+required. See §9.9.7 + ARCHITECTURE §8.0.2 for the resolution mechanics.
 
 ### 9.5 Auth flows — Tier 1 (token persistence), cookie pattern, Tier 2 (refresh on 401), Tier 3 (magic-link)
 
-Token-flow primitives across three shipped tiers (persistence + refresh
-+ magic-link) plus the cookie auth type. Tier 3 ships in beta.8 as
-**magic-link only**; OAuth follows in beta.9 (the design groundwork is
-preserved in `NOTES/planning/BETA8_AUTH_TIER_3.md`). The original
-"reserved /auth/* routes" plan was dropped in favour of user-owned
-routes guarded by `addRoute`'s conflict-detection rail (beta.8 A1).
+Token-flow primitives across four tiers (persistence + refresh + magic-link + OAuth) plus the cookie auth type. Auth routes are author-owned, with `addRoute`'s conflict-detection acting as the safety rail.
 
 #### `QS.saveToken(storage, key, path)` / `QS.clearToken(storage, key)`
 
@@ -994,8 +1046,7 @@ self-contained.
 
 What it doesn't do: CSRF token handling. If your API expects
 a CSRF token echoed in a header (e.g. `X-CSRF-Token` from a cookie),
-that's currently manual via a separate interaction. Documented
-limit; filed in BACKLOG for a future CSRF helper.
+that's currently manual via a separate interaction.
 
 `credentials: 'include'` also works cross-origin if the server sets
 the right CORS headers (`Access-Control-Allow-Credentials: true`
@@ -1076,7 +1127,7 @@ reserves for its own markers and strips from user params):
 | Attribute | Effect |
 |---|---|
 | `data-auth-show="in"` / `"out"` | show only when logged in / out. Token source from `data-auth-source` on the element or any ancestor (set once on a wrapper). |
-| `data-auth-show="connecting"` / `"failed"` | (Tier 3, beta.8) show during / after a magic-link exchange. Drives the "Signing you in…" + "invalid or expired link" messages in the `magic-link-handler` component. Driven by `qs:auth:exchange-started` / `qs:auth:exchange-failed` events from `QS.exchangeMagicLink`; cleared on `qs:auth:saved` (success path) or `qs:auth:cleared` (logout). |
+| `data-auth-show="connecting"` / `"failed"` | (Tier 3) show during / after a magic-link exchange. Drives the "Signing you in…" + "invalid or expired link" messages in the `magic-link-handler` component. Driven by `qs:auth:exchange-started` / `qs:auth:exchange-failed` events from `QS.exchangeMagicLink`; cleared on `qs:auth:saved` (success path) or `qs:auth:cleared` (logout). |
 | `data-storage-show="has:localStorage:key"` / `"missing:localStorage:key"` | generic presence show/hide for any storage key |
 | `data-storage-value="localStorage:key"` | sets the element's text to the stored value |
 
@@ -1085,11 +1136,7 @@ reserves for its own markers and strips from user params):
 **Gotcha**: the show/hide elements must be **siblings**, not nested — a
 hidden parent hides its children regardless of their own state.
 
-A scaffold workflow that emits this structure correctly, plus a generic
-`QS.store` verb (+ `qs:storage:changed` event) for non-auth writes, are
-filed in `BACKLOG.md` as the ergonomic follow-up.
-
-#### Tier 3 — Magic-link (beta.8)
+#### Tier 3 — Magic-link
 
 Magic-link sign-in: the user types their email, the auth API mails a
 single-use code, the user clicks the link, lands on `/auth/magic/<code>`,
@@ -1101,8 +1148,7 @@ in the URL leaks via email forwarding, browser history, corporate HTTPS
 proxy logs, and mail-client link prefetchers (many prefetch links for
 preview thumbnails, "consuming" the token before the user clicks). The
 URL value is a single-use code; the page exchanges it for the real token
-immediately on page load. See `NOTES/planning/BETA8_AUTH_TIER_3.md` for
-the full security analysis.
+immediately on page load.
 
 **The flow** — three phases, four actors:
 
@@ -1140,11 +1186,11 @@ Phase 3 — Page loads, exchange runs:
    │ (optional redirect)    │                    │
 ```
 
-**The verb family** (qs.js — added beta.8 A3):
+**The verb family** (qs.js):
 
 | Verb | Purpose | Typical chain |
 |---|---|---|
-| `QS.exchangeMagicLink(endpoint, paramName, returnTo?)` | Landing-page exchange. Reads `QS.routeParams[paramName]` (populated by the beta.8 A1 path matcher — see [ARCHITECTURE §5.3](ARCHITECTURE.md)), POSTs `{key:<code>}`, stores response in `QS._lastFetchResult`. Dispatches `qs:auth:exchange-started` before fetch + `qs:auth:exchange-failed` in catch so the `magic-link-handler` component's `data-auth-show="connecting"` / `"failed"` UI morphs. | `exchangeMagicLink` → `saveToken` × 2 → `redirect` |
+| `QS.exchangeMagicLink(endpoint, paramName, returnTo?)` | Landing-page exchange. Reads `QS.routeParams[paramName]` (populated by the path matcher — see [ARCHITECTURE §5.3](ARCHITECTURE.md)), POSTs `{key:<code>}`, stores response in `QS._lastFetchResult`. Dispatches `qs:auth:exchange-started` before fetch + `qs:auth:exchange-failed` in catch so the `magic-link-handler` component's `data-auth-show="connecting"` / `"failed"` UI morphs. | `exchangeMagicLink` → `saveToken` × 2 → `redirect` |
 | `QS.requestMagicLink(endpoint, email, returnTo?)` | Forward path. POSTs `{email}` to the issue endpoint. `email` accepts a literal address OR a `#selector` / `.selector` to read from an `<input>` (same convention as `setState`'s value arg). | `validate` → `requestMagicLink` → optional `redirect` to "check your email" page |
 | `QS.logoutServer(endpoint)` | Server-side logout — POST so the auth API can invalidate the session / revoke the refresh token. Thin wrapper over `QS.fetch` so registry bearer auth is applied. Errors are intentionally swallowed (the user wants out either way). | `logoutServer` BEFORE `clearToken` × 2 → `redirect` |
 
@@ -1225,20 +1271,18 @@ Any additional languages your project ships need the same shape.
 
 ##### Limitations / gotchas
 
-- **No built-in `/auth/*` reservation** — you author the routes yourself. The conflict-detection in `addRoute` (beta.8 A1) is the safety rail; conflicting param routes warn at create time.
+- **No built-in `/auth/*` reservation** — you author the routes yourself. The conflict-detection in `addRoute` is the safety rail; conflicting param routes warn at create time.
 - **Auto-redirect interplay** — `exchangeMagicLink`'s `returnTo` arg queues navigation IMMEDIATELY on success. Chained `saveToken` calls still run before the browser processes the navigation (they're sync, in the same microtask), but chained verbs that are themselves async would race. Keep auth-side state changes in synchronous `saveToken` calls; don't chain another async verb between exchange and redirect.
 - **Email enumeration oracle** — your `requestMagicLink` server-side endpoint should ALWAYS return 200, even for unknown emails. Don't let attackers probe your user list. Auth-API responsibility, not the verb's.
-- **OAuth deferred to beta.9** — magic-link covers the common "passwordless email login" case. OAuth (Google / Meta / Amazon / etc.) ships in beta.9 with the same `data-auth-show="connecting"` / `"failed"` UI primitives, a parallel verb family, and per-provider preset configs.
 
 | Concern | Where |
 |---|---|
 | Runtime verbs | `public/scripts/qs.js` (search for `QS.exchangeMagicLink`, `QS.requestMagicLink`, `QS.logoutServer`) |
-| Catalog metadata | `secure/src/functions/qsVerbCatalog.php` (added beta.8 A3) |
+| Catalog metadata | `secure/src/functions/qsVerbCatalog.php` |
 | Async-chain wrapping | `secure/src/classes/JsonToHtmlRenderer.php` `CHAIN_AWAITABLE` |
 | Lifecycle events | `qs:auth:exchange-started` / `qs:auth:exchange-failed` on `document`; cleared by `qs:auth:saved` / `qs:auth:cleared` |
-| Design groundwork | `NOTES/planning/BETA8_AUTH_TIER_3.md` |
 
-#### Tier 4 — OAuth (beta.9)
+#### Tier 4 — OAuth
 
 OAuth 2.0 Authorization Code + PKCE flow with provider-side identity
 (Google / Meta / Amazon / GitHub presets shipped; authors add others).
@@ -1382,8 +1426,7 @@ guard.
 | Provider listing | `secure/management/command/listOAuthProviders.php` (union of admin + per-project, with per-provider setup status) |
 | Visual element | `secure/src/classes/complexElements/OAuthButton.php` (builder) + `public/admin/.../contextual-complex/complex-oauth-button.js` (wizard) |
 | Template helpers | `secure/src/functions/oauthStateStore.php` (`isOAuthLoggedIn`, `getOAuthUser`) — loaded globally by `public/init.php` |
-| Locked decisions | `docs/DESIGN_DECISIONS.md` "OAuth (beta.9)" section (10+ entries — token custody, state generation, PKCE always-on, presets-as-JSON, per-project overrides, handleStart shape, handleCallback shape, logout shape, oauth-button shape) |
-| PII surface log | `NOTES/planning/DATA_FLOWS_INVENTORY.md` (running log of OAuth-stored fields) |
+| Locked design decisions | [docs/DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) — OAuth section |
 
 ---
 
@@ -1438,8 +1481,7 @@ rename input appears (seeded with `<id>_copy`); otherwise Import is enabled
 immediately. The import is an **independent duplicate** (deep-clone of the
 def via JSON round-trip); future edits to the source don't propagate. The
 live-shared cross-page store variant — one store referenced from multiple
-pages — is intentionally out of scope (touches the runtime emit + sidecar
-schema + lifecycle questions; deferred).
+pages — is intentionally out of scope.
 
 **Triggering.** `setState` and `fetchState` appear in the interaction picker's
 **Function** dropdown (both the element form and the page-event form). Their `store`
@@ -1543,8 +1585,7 @@ the exhausted flag and re-arms the trigger.
 > store has no built-in stopping condition there — it will thrash the API and
 > loop past end-of-list. `onScrollFetchState` is the safe equivalent.
 
-Both patterns are demonstrated in the test pages `test/paged` (offset) and
-`test/state` (cursor) — see `BETA7_ORDER.md` for the full beta.7 context.
+Both patterns are demonstrated in the test pages `test/paged` (offset) and `test/state` (cursor).
 
 ### 9.7 Server-side data resolvers
 
@@ -1560,8 +1601,7 @@ two executors.
 A route may have **one** resolver (the common case) or **multiple**
 resolvers firing in parallel (for pages that need data from several
 endpoints — comparison pages, multi-source mashups, content + metadata
-splits). Multi-resolver storage + execution + UI shipped in beta.8
-Slice 7.5.
+splits).
 
 | Concern | Where |
 |---|---|
@@ -1606,8 +1646,7 @@ Slice 7.5.
 }
 ```
 
-Backward compatibility: single-resolver routes written before
-beta.8 Slice 7.5 stay scalar; the runtime accepts both shapes via
+Single-resolver routes stay scalar; the runtime accepts both shapes via
 `getResolversForRoute()`, which always returns a normalised array.
 Write path picks the shape per length — scalar when one config, array
 when two or more.
@@ -1674,8 +1713,7 @@ share the cached response. A route's `resolver` declaration is a
 *trigger* (fires the resolver when this route is requested), not a
 *cache scope*.
 
-The **auth-cacheable rule** (locked in `BETA8_DATA_RESOLVER.md`
-Slice 4):
+The **auth-cacheable rule**:
 
 | Auth type | Cacheable? | Reason |
 |---|---|---|
@@ -1802,7 +1840,7 @@ without `render-empty` short-circuits the whole page.
 | Resolver fails + `onMiss: render-empty` + upstream 4xx/5xx | At least one resolver fails this way; all other failures are also `render-empty` | **200** — template renders with null vars for the failed resolver(s); template's `data-state-show-empty` (§10) drives the "no data" UI |
 | Resolver fails + no `onMiss` + upstream **4xx** | Any resolver fails this way | **404** — render the project's `templates/pages/404.php` (the slug doesn't exist; matches the `/products/red-vase` not-found pattern) |
 | Resolver fails + no `onMiss` + upstream **5xx or curl error** | Any resolver fails this way | **500** — render the project's `templates/pages/500.php` (the upstream is down; the page can't render meaningfully) |
-| Resolver fails + **config bug** (endpoint missing from registry, `apiKey` not set, `callableFrom: client` server-side call, etc.) | Any resolver fails this way | **500** — currently a verbose inline page surfacing the misconfig (route, error message, fix hint). Loud dev signal; **filed for dev-vs-prod presentation polish** before tag — see backlog. |
+| Resolver fails + **config bug** (endpoint missing from registry, `apiKey` not set, `callableFrom: client` server-side call, etc.) | Any resolver fails this way | **500** — verbose inline page surfacing the misconfig (route, error message, fix hint). |
 
 `$GLOBALS['__qs_resolver_failure']` is populated for `404` / `500`
 template branches with `{ route, status, error }` so the template can
@@ -1818,9 +1856,9 @@ fired**, and routeParams + resolved vars come from a base64-encoded
 panel (extended from the param-route emulation) provides:
 
 - **Inputs panel** — every route `:name` segment + every resolver
-  expose key, editable as text inputs. Schema-driven defaults
-  (Track 2d) pre-fill the expose inputs from the endpoint's
-  `responseSchema` when one is declared.
+  expose key, editable as text inputs. Schema-driven defaults pre-fill
+  the expose inputs from the endpoint's `responseSchema` when one is
+  declared.
 - **Live-data toggle** (`?_live=1`) — runs the REAL resolver instead
   of the emulation. Useful for validating the page against real API
   responses while still using the editor's emulated routeParams.
@@ -1929,12 +1967,10 @@ the route system). Save writes the file via `getSiteMap` + `save: true`.
 ### 9.9 Verb picker (interactions, page events, complex wizards)
 
 The structured authoring UI for every `{{call:verb:args}}` interaction in
-the admin. Lives in `preview-js-interactions.js`. Shipped in five iterative
-slices during beta.9 (track A2 of `NOTES/beta/1.0.0-beta.9_NOTES.txt`);
-this section documents the SURFACE — the catalog metadata + the picker UI
-contract — without re-explaining each slice's history (see
-`docs/DESIGN_DECISIONS.md` "Picker overhaul (beta.9)" for the design
-rationale + alternatives weighed).
+the admin. Lives in `preview-js-interactions.js`. This section documents
+the surface — the catalog metadata + the picker UI contract. See
+[docs/DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) "Picker overhaul" for the
+design rationale + alternatives weighed.
 
 **Where the picker appears**
 
@@ -1993,8 +2029,7 @@ reusable combobox primitive at
   the viewport. Re-anchors after every filter so a 1-item visible list
   hugs the trigger.
 
-`min-width: 200px` applied globally so short labels don't collapse the
-trigger (post-Slice-4 polish).
+`min-width: 200px` applied globally so short labels don't collapse the trigger.
 
 #### 9.9.3 Event filtering
 
@@ -2010,7 +2045,7 @@ picker filters the verb dropdown by the currently-edited event:
 
 A **Show all** checkbox above the verb picker overrides the filter for
 the unusual cases (e.g. authoring a custom event chain). The filter
-runs in `_filterFunctionsByEvent` (preview-js-interactions.js:~2629).
+runs in `_filterFunctionsByEvent` (`preview-js-interactions.js`).
 
 #### 9.9.4 inputType taxonomy — canonical reference
 
@@ -2041,7 +2076,6 @@ segments.
 | `route` | QSSearchableSelect of project routes; with `allowExternal: true`, a `Custom URL…` sentinel swaps the row to free-text input | `allowExternal: bool` (default `false`) | redirect.url *(allowExternal)*, exchangeMagicLink.returnTo, requestMagicLink.returnTo |
 | `routeParam` | QSSearchableSelect of `:name` segments extracted from the current page's route slug | — | exchangeMagicLink.paramName |
 | `translationKey` | `QSComplexWizard.createTextKeyPicker` (searchable tree + inline "Create new key" form); with `allowFreeText: true`, a `Custom text…` sentinel swaps the row to free-text input. Catalog-flagged positional args also get **compile-time resolution** at render (§9.9.7) | `allowFreeText: bool` (default `false`) | toast.message *(allowFreeText)* |
-| `storageKey` | *(planned)* — picker reads from a per-project storage registry (`localStorage` / `sessionStorage` / `cookie` declarations with scope / purpose / retention / consentRequired). See `NOTES/planning/BETA9_STORAGE_REGISTRY.md` | *(to be defined)* | saveToken.key, clearToken.key *(post-registry)* |
 
 #### 9.9.5 Hybrid-picker pattern (`allowExternal` / `allowFreeText`)
 
@@ -2094,8 +2128,7 @@ and walks the same argspec. Wired into `addInteraction`,
 `editInteraction`, `addPageEvent`, `editPageEvent`. Returns `400` with
 field-level `withErrors([{field, index, reason, hint}, ...])` when a
 required arg is empty, `422` when the verb itself is unknown to the
-catalog. Defense in depth for direct API callers, batch imports, and
-future client regressions.
+catalog. Defense in depth for direct API callers and batch imports.
 
 #### 9.9.7 Compile-time translation (catalog-driven)
 
@@ -2166,15 +2199,11 @@ Adding a new inputType is a four-touchpoint change:
    (e.g. `invalid_<type>`) and the constraint check.
 4. **Docs** — update the table in §9.9.4 above (this is the canonical
    reference; no parallel table exists in COMMAND_API.md). Append a
-   `DESIGN_DECISIONS.md` entry under "Picker overhaul (beta.9)"
-   capturing why this new type instead of overloading an existing
-   one.
+   `DESIGN_DECISIONS.md` entry under "Picker overhaul" capturing why
+   this new type instead of overloading an existing one.
 
 The minimum-viable new inputType is text-only — no metadata fields,
-no validation; just a rendered picker. Examples of "small" inputTypes
-shipped in beta.9: `enum`, `api`, `routeParam`. The larger ones
-(`route`, `translationKey`) added per-arg flags + compile-time
-behavior.
+no validation; just a rendered picker.
 
 ---
 
@@ -2185,10 +2214,10 @@ turn plain HTML elements into bindings (state-store readers, auth-state
 toggles, storage value displays, complex-element markers, …). Every
 attribute on this page is **catalogued in
 `secure/src/functions/qsDataAttributeCatalog.php`** — the single source
-of truth read by `GET /management/listDataBindings` and (late beta.7+)
-by the in-editor autocomplete + smart widgets, available on **both** the
-Add Element wizard's Advanced custom-params section AND the Edit Params
-surface (action panel button next to Add / Duplicate). The same picker —
+of truth read by `GET /management/listDataBindings` and by the in-editor
+autocomplete + smart widgets, available on **both** the Add Element
+wizard's Advanced custom-params section AND the Edit Params surface
+(action panel button next to Add / Duplicate). The same picker —
 autocomplete dropdown, per-attribute description box, smart widgets
 (store/field cascader, enum select, storage-spec composer), reserved-
 storage-key blocking — applies whether you're authoring a new element OR
@@ -2242,8 +2271,8 @@ Admin Panel → Visual Editor → Select mode (cursor icon in sidebar)
       data-state-show — toggles the standard hidden attribute on
       truthiness. Use to gate Prev/Next on cursors, Load-more on
       hasMore, counters on total > 0.
-  → VALUE field: type "people.nextPage" (or pick from the smart widget
-    when slice-5 ships — store picker → field picker)
+  → VALUE field: type "people.nextPage" (smart-widget store/field picker
+    auto-renders when the attribute's value shape is `store-field-ref`)
   → Save → Button hides automatically when people.nextPage is null
 ```
 
@@ -2259,7 +2288,7 @@ Admin Panel → Visual Editor → Select mode
     data-auth-source on element or ancestor."
   → VALUE field: select widget shows [in | out] (the catalog declares
     valueShape: enum). Pick "in".
-  → Companion hint (slice-7): "No data-auth-source found on element
+  → Companion hint: "No data-auth-source found on element
     or ancestors. + Add to <body>?"
   → Click "Add to <body>" → wires the source automatically
   → Done. Logout button shows only when localStorage.authToken is set.
@@ -2307,7 +2336,7 @@ Admin Panel → Visual Editor → Select mode
 
 **Out of scope on this surface**: tag swap (`<div>` → `<section>`),
 editing component-call params, editing pure text nodes. For tag swap,
-delete + recreate; BACKLOG carries the broader "Edit Element" entry.
+delete + recreate.
 
 ### 10.3 Companion attributes
 
@@ -2322,7 +2351,7 @@ Several attributes are designed to pair with another:
 | `data-bind` | A surrounding `data-state-list` OR `data-list-template` container |
 
 The catalog encodes these in each entry's `companion` field; the
-autocomplete (slice-7) surfaces them as "+ Add companion" hints.
+autocomplete surfaces them as "+ Add companion" hints.
 
 ### 10.4 Tldr by family
 
@@ -2354,36 +2383,11 @@ autocomplete (slice-7) surfaces them as "+ Add companion" hints.
 To add a new data-* attribute: implement the runtime hook (in `qs.js`
 or wherever), then add one entry to the catalog. The picker, this
 section, and any future renderer-side validation pick it up
-automatically. Same pattern as `qsVerbCatalog.php` (the verb catalog
-that shipped beta.7 commit `142c277`).
-
-_Maintainers note: the canonical attribute list lives in
-`secure/src/functions/qsDataAttributeCatalog.php`. If you add /
-rename / remove an entry there, re-check the table in §10.1 above and
-the cross-references in §8.7 / §9.5 / §9.6. The CLAUDE.md
-doc-maintenance trigger table also lists the catalog file._
+automatically. Same pattern as `qsVerbCatalog.php`.
 
 ---
 
-## 11. Risk hotspots
-
-These are the live concerns to keep in mind when touching the panel.
-
-| ID | Risk | Where |
-|---|---|---|
-| R1 | Mutable globals without contracts | `QUICKSITE_CONFIG` extended by 6+ PHP pages; `QuickSiteAdmin` mixes DOM + permissions state. |
-| R2 | Implicit boot load order | Sequential `<script>` tags; no module system; silent breakage on reorder. |
-| R3 | HTML-string rendering in JS | `preview-style-editor.js`, `sitemap.js`, `history.js` build large `innerHTML` strings without an enforced escape policy. |
-| R4 | Mixed API call patterns | Some files use `QuickSiteAdmin.apiRequest`, others go straight through `QuickSiteAPI.request`. |
-| R5 | Preview monolith | `preview.js` is 9,374 lines and growing. |
-| R6 | Async race on theme scope switch | Mitigated by `themeLoadSeq` guard; AbortController would be cleaner. |
-| R7 | `PreviewConfig` size | i18n + config grow with every preview feature. Per-panel lazy load would help. |
-| R8 | No `destroy()` contract on widgets | Color picker / event listeners can accumulate on panel re-renders. |
-| R9 | Inline `onclick` in generated HTML | Pollutes `window`. Replace with delegated `data-*` handlers. |
-
----
-
-## 12. PHP integration files
+## 11. PHP integration files
 
 | File | Role |
 |---|---|

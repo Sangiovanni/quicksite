@@ -1,10 +1,6 @@
 # QuickSite Architecture
 
-_Last updated: 2026-06-09._
-
 > Canonical high-level overview of how QuickSite is structured and how a request flows through it. For the admin panel internals, see [ADMIN_PANEL.md](ADMIN_PANEL.md). For the workflow engine, see [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md). For the full command reference, see [COMMAND_API.md](COMMAND_API.md). For the on-disk layout, see [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
-
-> _Maintainers note:_ re-check this doc when changing `secure/management/routes.php` (§3 command count), `secure/management/config/roles.php` (§3 roles), `secure/src/classes/JsonToHtmlRenderer.php` (§2 node kinds, §7 tag blacklist, §8 `CHAIN_AWAITABLE`), `secure/src/functions/qsVerbCatalog.php` (§8 QS.* registry — single source of truth for verb metadata, consumed by `listJsFunctions`, `JsonToHtmlRenderer`, and `JsonToPhpCompiler`; verb count + groups in §8 grow when entries are added), `public/scripts/qs.js` (§8 verb implementations + auth-state UI primitives), `secure/src/classes/DataResolver.php` / `secure/src/functions/serverFetch.php` / `secure/src/functions/resolverHelpers.php` (§8.4 server-side data resolvers — sidecar shape, parallel execution, namespaced addressing, hydration handoff), or `secure/src/classes/TrimParameters.php` / `secure/src/functions/routeHelpers.php` / a project's `secure/management/routes.php` schema (§5.3 routing — param syntax, matching algorithm, conflicts).
 
 QuickSite is a file-based, API-first website operations platform with a visual editor and workflow engine for deterministic and AI-assisted site changes. It is exportable and production-friendly, and while file-native by default, it is designed to integrate quickly with external client-side and server-side APIs when backend capabilities are needed.
 
@@ -197,7 +193,7 @@ Tokens are stored in `secure/management/config/auth.php` and mapped to one of:
 | `admin` | ✓ | ✓ | ✓ | ✓ | |
 | `*` (superadmin) | ✓ | ✓ | ✓ | ✓ | ✓ |
 
-> AI is no longer a permissioned column: AI calls happen in the browser via `QSAiCall` against per-user credentials in `aiConnectionsV3` (localStorage). Any authenticated admin can use the AI workspace; gating happens at the connection level, not the role level.
+> AI is not a permissioned column: AI calls happen in the browser via `QSAiCall` against per-user credentials in `aiConnectionsV3` (localStorage). Any authenticated admin can use the AI workspace; gating happens at the connection level, not the role level.
 
 Named roles (`viewer`, `editor`, `designer`, `developer`, `admin`) and any custom role live in `secure/management/config/roles.php`. The superadmin `*` is **hardcoded** in `secure/src/functions/AuthManagement.php` (and `AdminRouter.php`) — it bypasses the roles file entirely and gets unconditional access to every command, including token and role management. It is the only role that cannot be created, edited, or deleted at runtime. Permissions are checked before the command file is included.
 
@@ -292,7 +288,7 @@ The same pattern — parse → validate → mutate files → `ApiResponse` — i
 A route declared in a project's `secure/management/routes.php` is one of:
 
 - **Exact** — a literal path like `'about'` or `'blog/2026/announcement'`. Matches the URL bit-for-bit. The historical default; still the right choice for one-off pages.
-- **Parameterised** — a path with one or more `:name` segments, like `'products/:slug'` or `'users/:id/posts/:postId'`. One template serves many URLs; the captured values are exposed to PHP (`$slug`, `$id`) and to qs.js (`QS.routeParams.slug`). Introduced in beta.8.
+- **Parameterised** — a path with one or more `:name` segments, like `'products/:slug'` or `'users/:id/posts/:postId'`. One template serves many URLs; the captured values are exposed to PHP (`$slug`, `$id`) and to qs.js (`QS.routeParams.slug`).
 
 #### Param syntax
 
@@ -326,7 +322,7 @@ Captured values are URL-decoded before exposure, matching PHP's `$_GET` conventi
 #### How captured params flow
 
 - **Server (PHP)** — `Page::render()` injects each captured value as a template variable named after the param. Inside a page's PHP template, `$slug`, `$id`, etc. sit alongside `$translator` and other request-scoped variables. Inside renderer-driven JSON pages, a `{{param:NAME}}` placeholder is substituted in both raw text and translated text by `JsonToHtmlRenderer::renderTextNode`. The literal `param:` prefix is required so it doesn't collide with component-variable patterns.
-- **Client (qs.js)** — The build emits `public/scripts/qs-route-schema.js` listing every route's pattern + param shape. qs.js's synchronous IIFE walks the schema against `location.pathname` on load and exposes three globals: `QS.routeParams` (a dict of captured values), `QS.routePath` (the matched pattern), `QS.routeFound` (a boolean). State stores can initialise a field from `init: 'param:slug'` — a fifth source kind alongside the existing `query:` / `localStorage:` / `sessionStorage:` / literal. The matcher is purely client-side; for a deeper URL → live data loop (server-rendered authed pages, SEO) the beta.8 server data resolver builds on the same schema.
+- **Client (qs.js)** — The build emits `public/scripts/qs-route-schema.js` listing every route's pattern + param shape. qs.js's synchronous IIFE walks the schema against `location.pathname` on load and exposes three globals: `QS.routeParams` (a dict of captured values), `QS.routePath` (the matched pattern), `QS.routeFound` (a boolean). State stores can initialise a field from `init: 'param:slug'` — a fifth source kind alongside the existing `query:` / `localStorage:` / `sessionStorage:` / literal. The matcher is purely client-side; for a deeper URL → live data loop (server-rendered authed pages, SEO) the server data resolver builds on the same schema.
 
 #### Conflict detection
 
@@ -337,7 +333,7 @@ Captured values are URL-decoded before exposure, matching PHP's `$_GET` conventi
 
 The response carries a `warnings` array of `{ type, message }` entries. The sitemap UI renders each warning as a toast after the success toast.
 
-#### Out of scope for 1.0
+#### Limitations
 
 - **Wildcards** (`:*`, `**`). A param captures one segment.
 - **Per-param type matching** beyond string. The schema's optional `type` field is reserved for a future `'integer'` form but unused at the matcher today.
@@ -428,16 +424,14 @@ Beyond the `{{call:…}}` verbs, the auth-flows runtime adds **declarative bindi
 
 `QS.filter` accepts a polymorphic `matchAttr` (3rd arg): omit it (or pass `textContent`) to match the element's text; pass a `data-*` name to match an attribute; pass a CSS selector starting with `.`, `#`, `>` or space to match the concatenated `textContent` of one or more **descendant** elements (e.g. `.cmd-name, .cmd-description` for "search across both"). The descendant-text and textContent modes also highlight matches in place via an XSS-safe DOM walk (skipped above a 500-node budget).
 
-> _Roadmap note:_ this list will grow with beta.6 (interactions + search/filter), beta.7 (client-side API) and beta.8 (server-side API). Re-check this section when releasing those versions.
-
-A project-scoped "custom JS function" feature existed in earlier betas (`addJsFunction` / `qs-custom.js`); it was removed in beta.3 for security reasons. Custom logic is now expressed by composing the core functions or, for richer client behaviour, registered API endpoints (see `addApi` / `testApiEndpoint`).
+Custom logic is expressed by composing the core functions or, for richer client behaviour, registered API endpoints (see `addApi` / `testApiEndpoint`).
 
 #### 8.0.1 Chain execution & ordering
 
 Calls in a handler attribute (`{{call:a}};{{call:b}};…`) are compiled by `JsonToHtmlRenderer::transformCallSyntax` with three rules:
 
 1. **Sync prelude** — verbs in `CHAIN_SYNC_PRELUDE` (`validate`) emit first as plain `QS.foo(...)` statements. They run inside the event tick and can still call `event.preventDefault()` or `throw` to abort the rest.
-2. **Async wrap** — if the remaining body contains at least one verb from `CHAIN_AWAITABLE` (`fetch`, plus the Tier 3 magic-link verbs `exchangeMagicLink` / `requestMagicLink` / `logoutServer` added in beta.8) AND there is more than one call, the body is wrapped in `(async()=>{await A;await B;…})().catch(e=>console.warn('[QS] chain aborted:',e))`. Every call gets `await`'d, so "fetch then hide" — or "exchangeMagicLink then saveToken then redirect" — actually waits for the response.
+2. **Async wrap** — if the remaining body contains at least one verb from `CHAIN_AWAITABLE` (`fetch`, plus the Tier 3 magic-link verbs `exchangeMagicLink` / `requestMagicLink` / `logoutServer`) AND there is more than one call, the body is wrapped in `(async()=>{await A;await B;…})().catch(e=>console.warn('[QS] chain aborted:',e))`. Every call gets `await`'d, so "fetch then hide" — or "exchangeMagicLink then saveToken then redirect" — actually waits for the response.
 3. **Backward-compat** — a sole `{{call:fetch:...}}` (or a chain with no awaitable verb) stays as-is. Single-call handlers and pure-sync chains don't pay the microtask cost.
 
 Side channel: `QS.fetch` also dispatches `qs:fetch:loaded` / `qs:fetch:error` DOM events (with `detail.{ref, data}` or `detail.{ref, error}`) and caches the latest result per ref in `QS._fetchCache`. Use this when an action must react to a fetch fired from a different handler/page — see `QS.after(eventSuffix, handler)` and `QS.onceCached(eventSuffix, handler)` in `qs.js`. The chain rules above stay the default UX; events are the escape hatch.
@@ -452,7 +446,7 @@ Two parallel resolution paths in `JsonToHtmlRenderer::buildQsCallJs`:
 
 1. **Keyword-arg path** (the original) — a `TRANSLATABLE_KEYWORD_ARGS` const lists per-verb kwarg names. The first consumer was `fetch`'s `toastSuccessKey` / `toastErrorKey`. Pattern: `{{call:fetch:@api/ep,toastSuccessKey=form.contact.success}}` → resolved kwarg value substituted in the rendered call.
 
-2. **Positional-arg path** (added beta.9 A2 Slice 6, catalog-driven) — reads `qsVerbCatalog()` and collects positional indices flagged `inputType: 'translationKey'` per verb (cached per verb on first lookup). For each such arg in the chain, `Translator::translate(value)` is called; if the result is the missing marker (`{translation missing: <key>}`), the value passes through unchanged (the `allowFreeText` fallback path for raw Custom Text inputs).
+2. **Positional-arg path** (catalog-driven) — reads `qsVerbCatalog()` and collects positional indices flagged `inputType: 'translationKey'` per verb (cached per verb on first lookup). For each such arg in the chain, `Translator::translate(value)` is called; if the result is the missing marker (`{translation missing: <key>}`), the value passes through unchanged (the `allowFreeText` fallback path for raw Custom Text inputs).
 
 Today's positional users: `toast.message` (with `allowFreeText: true`). Future verbs declaring `inputType: 'translationKey'` on a positional arg are picked up automatically — no renderer code change required.
 
@@ -577,8 +571,8 @@ Interactions are otherwise stateless — a fetch fires, a response renders, noth
 is remembered. A **state store** gives them memory: a named, **page-scoped** client
 view-model bound to **one** endpoint, whose fields seed from somewhere, mutate on
 triggers, and update from responses. It underpins pagination, search, filters and
-infinite scroll, and is the client half of beta.8's planned server-side data
-resolver (the definition is runtime-agnostic JSON — one shape, two executors).
+infinite scroll, and is the client half of the server-side data resolver
+(the definition is runtime-agnostic JSON — one shape, two executors).
 
 | Concern | Where |
 |---|---|
@@ -680,7 +674,7 @@ list via `data-state-list`, not via that endpoint's `responseBindings`.
 
 ### 8.4 Server-side data resolvers
 
-Beta.8's server-rendering layer. Where state stores (§8.3) give interactions memory
+The server-rendering layer. Where state stores (§8.3) give interactions memory
 on the **client** post-load, a **resolver** declares "before this page renders,
 fetch from API X and expose its response as template variables." The initial HTML
 goes out with API data already baked in — SEO + AEO + first-paint win that state
@@ -702,10 +696,9 @@ crawlers are even more conservative about running JS).
 Sidecar shape supports both **scalar** (single config object) and **array** (list
 of configs, multi-resolver). The on-disk shape is the only thing that differs — both
 flow through the same `getResolversForRoute()` accessor which returns a normalised
-array. Single resolvers stay scalar on disk for backward compat with sidecars
-written before beta.8 Slice 7.5.
+array. Single resolvers stay scalar on disk for backward compat.
 
-Multi-resolver semantics (locked in `NOTES/planning/BETA8_MULTI_RESOLVER.md`):
+Multi-resolver semantics:
 - **Parallel execution** via `curl_multi_*`. Total latency = max(individuals).
 - **Cache key is endpoint + canonical inputs**, route-agnostic. Two routes — or two
   resolvers on one route — that hit the same endpoint with the same inputs share
@@ -724,9 +717,7 @@ Multi-resolver semantics (locked in `NOTES/planning/BETA8_MULTI_RESOLVER.md`):
 The headline architectural payoff: state-store JSON and resolver JSON are
 **runtime-agnostic** — one shape, two executors. The same declaration that drives
 a client-side store can drive a server-side resolver with minor extensions (the
-`param:` source kind and the optional `cacheTTL` / `onMiss` keys). Future
-unification (state-store → resolver promotion in the admin UI) is filed as
-beta.9+ polish.
+`param:` source kind and the optional `cacheTTL` / `onMiss` keys).
 
 **Auth gate vs auth data** — two distinct concepts that share a token/cookie
 but operate at different lifecycle positions:
@@ -752,11 +743,11 @@ configures data. Locked rationale in
 [DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) under "Auth-gate vs auth-data —
 distinct concepts".
 
-**Side-effect resolver kinds (beta.9 OAuth)** — `oauth-start`,
-`oauth-callback`, `oauth-logout` extend the resolver pattern with a
-new archetype: resolvers that **short-circuit the render** with a 302
-redirect + optional session cookie instead of feeding template vars.
-The dispatcher routes side-effect kinds to `OAuthHandler` BEFORE the
+**Side-effect resolver kinds** — `oauth-start`, `oauth-callback`,
+`oauth-logout` extend the resolver pattern with a new archetype:
+resolvers that **short-circuit the render** with a 302 redirect +
+optional session cookie instead of feeding template vars. The
+dispatcher routes side-effect kinds to `OAuthHandler` BEFORE the
 data-fetch path; `validateResolverConfigs` rejects mixing side-effect
 and data resolvers on the same route ("incoherent" — one short-
 circuits while the other expects render to proceed). Storage shape is
@@ -764,10 +755,9 @@ identical to data resolvers (per-route sidecar entry; scalar or array
 for single / multi). `RESOLVER_ALLOWED_KINDS` in
 `secure/src/functions/resolverHelpers.php` lists all four. The
 detailed flow + per-kind config schema lives in
-[ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) under "Tier 4 — OAuth (beta.9)";
-the rationale (kind dispatch, callback hook = resolver kind, BFF
-token custody) lives in
-[DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) "OAuth (beta.9)" section.
+[ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) — Tier 4 OAuth; the rationale
+(kind dispatch, callback hook = resolver kind, BFF token custody)
+lives in [DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) OAuth section.
 
 ---
 
@@ -821,11 +811,18 @@ project/translate/
 
 Files are nested JSON objects. `{ "textKey": "home.hero.title" }` resolves at render time via `Translator::translate('home.hero.title')`. Interpolation supports `{{name}}` placeholders.
 
+**Multilingual vs monolingual.** When `MULTILINGUAL_SUPPORT = true`, `Translator` loads `{active-lang}.json` (`default.json` is the fallback when a key is missing from the active language). When `MULTILINGUAL_SUPPORT = false`, `Translator` loads `default.json` exclusively — `LANGUAGES_SUPPORTED` entries are NOT consulted at render time. The admin's Translation Manager mode is `default.json`-aware in monolingual mode (the language picker hides and writes target `default.json`).
+
 Health is checked by dedicated commands:
 
 - `validateTranslations` — keys missing from a language.
 - `getUnusedTranslationKeys` — keys defined but never referenced.
 - `analyzeTranslations` — full report.
+- `getTranslationKeys` — scans every page / menu / footer / component structure and returns the union grouped by source (`keys_by_source: { 'home': [...], 'menu': [...], 'component:reassurance-item': [...] }`). Drives the Translation Manager's scope picker.
+
+The admin panel reads the **composed** view via `public/admin/api/index.php` case `'translation-keys-grouped'`, which calls `getTranslation` + `getUnusedTranslationKeys` + `validateTranslations` and partitions the result into `{used, unset, unused}`. See [ADMIN_PANEL.md §8.9](ADMIN_PANEL.md) for the Translation Manager UI.
+
+Key-format validation lives in `secure/src/functions/translationHelpers.php`'s `isValidTranslationKey()` — single source of truth, permissive (is_string + non-empty + no null byte). Translation values are user-controlled UTF-8 strings; the panel uses `textContent` everywhere (no `innerHTML`) to keep XSS off the table.
 
 ---
 

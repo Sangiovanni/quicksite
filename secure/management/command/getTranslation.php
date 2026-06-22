@@ -71,8 +71,39 @@ function __command_getTranslation(array $params = [], array $urlParams = []): Ap
 
     $translations_file = PROJECT_PATH . '/translate/' . $language . '.json';
 
-    // Check if file exists
+    // Beta.9 A4 Slice 1 — declared-but-missing tolerance.
+    // When a language is DECLARED in CONFIG['LANGUAGES_SUPPORTED'] but the
+    // <lang>.json file doesn't exist yet (fresh-language race — addLang
+    // succeeded, file write deferred or skipped), return 200 with empty
+    // translations so the Translation Manager panel can render "0%
+    // translated, all keys unset" instead of an opaque 404.
+    //
+    // Two cases stay 404:
+    //   1. Language not in LANGUAGES_SUPPORTED (truly unknown).
+    //   2. The 'default' pseudo-language with no file (mono-language
+    //      projects without translation seeds).
+    //
+    // The Translator class itself still uses `default.json` as the
+    // mono-language fallback; this tolerance only affects the API surface
+    // for the admin panel.
     if (!file_exists($translations_file)) {
+        $isSupported = !$isDefault
+            && defined('CONFIG')
+            && isset(CONFIG['LANGUAGES_SUPPORTED'])
+            && is_array(CONFIG['LANGUAGES_SUPPORTED'])
+            && in_array($language, CONFIG['LANGUAGES_SUPPORTED'], true);
+
+        if ($isSupported) {
+            return ApiResponse::create(200, 'operation.success')
+                ->withMessage('Translation file not yet created for declared language; returning empty.')
+                ->withData([
+                    'language' => $language,
+                    'translations' => [],
+                    'file' => $translations_file,
+                    'file_exists' => false,
+                ]);
+        }
+
         return ApiResponse::create(404, 'file.not_found')
             ->withMessage("Translation file not found for language: {$language}")
             ->withData([

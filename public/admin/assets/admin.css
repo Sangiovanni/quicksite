@@ -16847,3 +16847,419 @@ body[data-page="preview"] .global-miniplayer {
     padding: 0 4px;
     opacity: 0.6;
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   Translation Manager panel (Beta.9 A4)
+   See preview-translation.js + contextual-translation.php.
+   ───────────────────────────────────────────────────────────────── */
+
+.preview-contextual-translation__toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--admin-border);
+}
+.preview-contextual-translation__toolbar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.preview-contextual-translation__label {
+    font-size: 0.8rem;
+    color: var(--admin-text-muted);
+    font-weight: 500;
+}
+.preview-contextual-translation__select {
+    background: var(--admin-bg-secondary);
+    color: var(--admin-text);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    padding: 0.3rem 0.5rem;
+    font-size: 0.85rem;
+    min-width: 8rem;
+}
+.preview-contextual-translation__coverage {
+    font-size: 0.8rem;
+    color: var(--admin-text-muted);
+}
+.preview-contextual-translation__coverage-pct {
+    color: var(--admin-text);
+    font-weight: 500;
+}
+
+.preview-contextual-translation__filter-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--admin-border);
+}
+.preview-contextual-translation__filter {
+    flex: 1 1 auto;
+    background: var(--admin-bg-secondary);
+    color: var(--admin-text);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    padding: 0.35rem 0.5rem;
+    font-size: 0.85rem;
+    min-width: 6rem;
+}
+.preview-contextual-translation__filter:focus {
+    outline: none;
+    border-color: var(--admin-border-focus);
+}
+
+.preview-contextual-translation__chips {
+    display: flex;
+    gap: 0.35rem;
+    flex: 0 0 auto;
+}
+.preview-contextual-translation__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.5rem;
+    background: var(--admin-bg-secondary);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--admin-text);
+    user-select: none;
+    transition: background-color 120ms, border-color 120ms;
+}
+.preview-contextual-translation__chip:hover {
+    background: var(--admin-bg-tertiary);
+}
+.preview-contextual-translation__chip input[type="checkbox"] {
+    display: none;
+}
+.preview-contextual-translation__chip-dot {
+    font-size: 0.65rem;
+    line-height: 1;
+}
+.preview-contextual-translation__chip-label {
+    font-size: 0.8rem;
+}
+.preview-contextual-translation__chip-count {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+/* Inactive (unchecked) chip — dim everything. The checkbox is hidden
+   visually; this rule keys off :has() for modern browsers and falls
+   back to .is-off via a JS class if needed (not wired today). */
+.preview-contextual-translation__chip:has(input:not(:checked)) {
+    opacity: 0.45;
+}
+
+.preview-contextual-translation__list {
+    padding: 0.5rem 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    min-height: 0;
+}
+.preview-contextual-translation__rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.preview-contextual-translation__row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0.75rem;
+    border-left: 3px solid transparent;
+    transition: background-color 120ms;
+    position: relative;
+    min-height: 30px;
+}
+.preview-contextual-translation__row:hover {
+    background: var(--admin-bg-secondary);
+}
+.preview-contextual-translation__row--used {
+    border-left-color: var(--admin-success);
+}
+.preview-contextual-translation__row--unset {
+    border-left-color: var(--admin-error);
+}
+.preview-contextual-translation__row--unused {
+    border-left-color: var(--admin-warning);
+}
+
+.preview-contextual-translation__row-status {
+    font-size: 0.7rem;
+    line-height: 1;
+    flex: 0 0 auto;
+    opacity: 0.9;
+}
+
+.preview-contextual-translation__row-key {
+    font-family: ui-monospace, "SF Mono", Consolas, "Liberation Mono", monospace;
+    font-size: 0.78rem;
+    background: var(--admin-bg-tertiary);
+    color: var(--admin-text);
+    padding: 0.15rem 0.45rem;
+    border-radius: var(--radius-sm);
+    flex: 0 0 auto;
+    white-space: nowrap;
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.preview-contextual-translation__row-value {
+    flex: 1 1 auto;
+    color: var(--admin-text-muted);
+    font-size: 0.85rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+.preview-contextual-translation__row-value--unset {
+    color: var(--admin-text-light);
+    font-style: italic;
+}
+
+.preview-contextual-translation__row-actions {
+    display: flex;
+    gap: 0.15rem;
+    flex: 0 0 auto;
+    opacity: 0;
+    transition: opacity 120ms;
+}
+.preview-contextual-translation__row:hover .preview-contextual-translation__row-actions,
+.preview-contextual-translation__row:focus-within .preview-contextual-translation__row-actions {
+    opacity: 1;
+}
+
+.preview-contextual-translation__row-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: 0;
+    background: transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--admin-text-muted);
+    padding: 0;
+}
+.preview-contextual-translation__row-action:hover {
+    background: var(--admin-bg-tertiary);
+    color: var(--admin-text);
+}
+.preview-contextual-translation__row-action--danger:hover {
+    background: var(--admin-error-bg);
+    color: var(--admin-error);
+}
+.preview-contextual-translation__row-action svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.preview-contextual-translation__no-matches {
+    color: var(--admin-text-light);
+    text-align: center;
+    padding: 1.5rem 1rem;
+    font-style: italic;
+    margin: 0;
+}
+
+.preview-contextual-translation__empty {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--admin-text-muted);
+}
+.preview-contextual-translation__empty svg {
+    width: 48px;
+    height: 48px;
+    stroke: currentColor;
+    opacity: 0.5;
+    margin-bottom: 0.5rem;
+}
+.preview-contextual-translation__loading {
+    padding: 1rem;
+    text-align: center;
+    color: var(--admin-text-muted);
+    font-size: 0.85rem;
+}
+
+.preview-contextual-translation__actions {
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid var(--admin-border);
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Slice 5 — inline row-expand editor */
+.preview-contextual-translation__row-editor {
+    background: var(--admin-bg-secondary);
+    border-left: 3px solid var(--admin-accent);
+    padding: 0.6rem 0.75rem 0.6rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    /* Lift the editor visually so it reads as "attached" to the row above. */
+    margin: -1px 0 0.4rem 0;
+}
+.preview-contextual-translation__row-editor-textarea {
+    width: 100%;
+    min-height: 60px;
+    background: var(--admin-bg);
+    color: var(--admin-text);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    padding: 0.4rem 0.5rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    resize: vertical;
+    box-sizing: border-box;
+}
+.preview-contextual-translation__row-editor-textarea:focus {
+    outline: none;
+    border-color: var(--admin-border-focus);
+}
+.preview-contextual-translation__row-editor-textarea:disabled {
+    opacity: 0.6;
+    cursor: progress;
+}
+.preview-contextual-translation__row-editor-error {
+    color: var(--admin-error);
+    font-size: 0.8rem;
+    padding: 0.25rem 0.4rem;
+    background: var(--admin-error-bg);
+    border-radius: var(--radius-sm);
+}
+.preview-contextual-translation__row-editor-actions {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+/* Slice 6 — per-row delete confirm (mirrors editor mechanism with a
+   warning-tinted border instead of accent). */
+.preview-contextual-translation__row-confirm {
+    background: var(--admin-bg-secondary);
+    border-left: 3px solid var(--admin-error);
+    padding: 0.6rem 0.75rem 0.6rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: -1px 0 0.4rem 0;
+}
+.preview-contextual-translation__row-confirm-prompt {
+    color: var(--admin-text);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+.preview-contextual-translation__row-confirm-value {
+    color: var(--admin-text-muted);
+    font-size: 0.8rem;
+    font-style: italic;
+    padding: 0.25rem 0.5rem;
+    background: var(--admin-bg);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+/* Slice 6 — bulk delete confirm view (replaces the row list). */
+.preview-contextual-translation__bulk-confirm {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem 1rem 0.75rem;
+    gap: 0.75rem;
+    background: var(--admin-bg-secondary);
+    border-left: 3px solid var(--admin-error);
+    margin: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+}
+.preview-contextual-translation__bulk-confirm-header {
+    color: var(--admin-text);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+.preview-contextual-translation__bulk-confirm-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 320px;
+    overflow-y: auto;
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+}
+.preview-contextual-translation__bulk-confirm-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.3rem 0.6rem;
+    border-bottom: 1px solid var(--admin-border);
+    min-height: 28px;
+}
+.preview-contextual-translation__bulk-confirm-item:last-child {
+    border-bottom: 0;
+}
+.preview-contextual-translation__bulk-confirm-key {
+    font-family: ui-monospace, "SF Mono", Consolas, "Liberation Mono", monospace;
+    font-size: 0.78rem;
+    color: var(--admin-text);
+    flex: 0 0 auto;
+    white-space: nowrap;
+    max-width: 50%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.preview-contextual-translation__bulk-confirm-value {
+    color: var(--admin-text-muted);
+    font-size: 0.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.preview-contextual-translation__bulk-confirm-actions {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: flex-end;
+    align-items: center;
+    padding-top: 0.25rem;
+    border-top: 1px solid var(--admin-border);
+}
+
+/* Slice 6+ — "Delete from all N languages" opt-in checkbox.
+   Used in both per-row and bulk confirm panels. */
+.preview-contextual-translation__multi-lang {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+    user-select: none;
+}
+.preview-contextual-translation__multi-lang input[type="checkbox"] {
+    margin: 0;
+    accent-color: var(--admin-error);
+    cursor: pointer;
+}
+.preview-contextual-translation__multi-lang input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+}
+.preview-contextual-translation__multi-lang input[type="checkbox"]:disabled + span {
+    opacity: 0.5;
+}

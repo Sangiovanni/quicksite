@@ -116,7 +116,10 @@ function __command_getUnusedTranslationKeys(array $params = [], array $urlParams
                 ]);
         }
         
-        if (!RegexPatterns::match('language_code_extended', $targetLang)) {
+        // Also supports "default" for mono-language mode (per Beta.9 A4
+        // Slice 7 — see validateTranslations.php for the full context).
+        $isDefault = ($targetLang === 'default');
+        if (!$isDefault && !RegexPatterns::match('language_code_extended', $targetLang)) {
             return ApiResponse::create(400, 'validation.invalid_format')
                 ->withMessage('Invalid language code format')
                 ->withErrors([RegexPatterns::validationError('language_code_extended', 'language', $targetLang)]);
@@ -126,12 +129,21 @@ function __command_getUnusedTranslationKeys(array $params = [], array $urlParams
     // Get all keys used in structures
     $usedKeys = extractAllUsedKeys();
 
-    // Also include page.titles.{route} keys which are used dynamically
+    // Also include page.titles.{route} keys which are used dynamically.
+    // Pre-Beta.9 A4: this iterated `$routes as $route` which produced an
+    // "Array to string conversion" warning because routes.php is a NESTED
+    // structure (children are arrays, not strings). The warning leaked HTML
+    // into the response body of any caller that piped this command through
+    // the helper layer (admin/api/translation-keys-grouped), breaking JSON
+    // parsing. The fix iterates KEYS (the top-level route names) which is
+    // what was intended — only top-level pages have title keys today
+    // (page.titles.home / page.titles.atelier / etc.); nested-route title
+    // tracking is a separate concern.
     $routesFile = PROJECT_PATH . '/routes.php';
     if (file_exists($routesFile)) {
         $routes = include $routesFile;
         if (is_array($routes)) {
-            foreach ($routes as $route) {
+            foreach (array_keys($routes) as $route) {
                 $usedKeys[] = 'page.titles.' . $route;
             }
         }

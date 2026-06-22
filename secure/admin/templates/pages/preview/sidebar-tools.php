@@ -49,5 +49,16 @@
         </svg>
         <span><?= __admin('preview.toolJs') ?? 'Interactions' ?></span>
     </button>
+    <button type="button" class="preview-sidebar-tool" data-mode="translation" title="<?= __admin('preview.toolTranslation', 'Translations') ?>">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 8h12"/>
+            <path d="M9 4v4"/>
+            <path d="M11 16l3-8 3 8"/>
+            <path d="M12.5 13h3"/>
+            <path d="M9 8c0 4-2 6-5 8"/>
+            <path d="M7 12c1 2 3 4 5 5"/>
+        </svg>
+        <span><?= __admin('preview.toolTranslation', 'Translations') ?></span>
+    </button>
     </div>
 </div>

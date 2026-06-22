@@ -150,9 +150,16 @@ class RegexPatterns
         ],
         
         'translation_key_simple' => [
-            'pattern' => '/^[a-zA-Z0-9._-]+$/',
-            'description' => 'Translation key segment (alphanumeric, dots, underscores, hyphens)',
-            'examples' => ['nav.home', 'button_text', 'error-message']
+            // `/` is allowed because nested-route title keys naturally embed
+            // the route path (e.g. `page.titles.documentation/commands`).
+            // The runtime + setTranslationKeys + the translation files all
+            // accept these slashes; only deleteTranslationKeys was rejecting
+            // them via this pattern (Beta.9 A4 Slice 6 verification surfaced
+            // the inconsistency on quicksite-v2). The `/` never reaches a
+            // file path — dot-notation parsers split on `.` only.
+            'pattern' => '/^[a-zA-Z0-9._\-\/]+$/',
+            'description' => 'Translation key segment (alphanumeric, dots, underscores, hyphens, slashes for nested-route titles)',
+            'examples' => ['nav.home', 'button_text', 'error-message', 'page.titles.documentation/commands']
         ],
         
         'json_path' => [

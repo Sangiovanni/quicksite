@@ -56,7 +56,10 @@ function __command_getTranslationKeys(array $params = [], array $urlParams = [])
                 ->withMessage('Language code must not exceed 10 characters');
         }
         
-        if (!RegexPatterns::match('language_code_extended', $targetLang)) {
+        // Also supports "default" for mono-language mode (consistency with
+        // validateTranslations / getUnusedTranslationKeys — Beta.9 A4 Slice 7).
+        $isDefault = ($targetLang === 'default');
+        if (!$isDefault && !RegexPatterns::match('language_code_extended', $targetLang)) {
             return ApiResponse::create(400, 'validation.invalid_format')
                 ->withMessage('Invalid language code format')
                 ->withErrors([RegexPatterns::validationError('language_code_extended', 'language', $targetLang)]);
@@ -91,7 +94,11 @@ function __command_getTranslationKeys(array $params = [], array $urlParams = [])
                 }
             }
             
-            $allKeys[$pageInfo['route']] = array_unique($pageKeys);
+            // array_values() to drop the gappy indices array_unique() leaves
+            // behind when a structure has duplicate textKeys. Without it,
+            // json_encode emits an object (e.g. {"0":"a","2":"b"}) instead
+            // of an array, and the Translation Manager's .forEach blows up.
+            $allKeys[$pageInfo['route']] = array_values(array_unique($pageKeys));
             $scannedFiles['pages'][] = $pageInfo['route'];
         }
     }
@@ -107,7 +114,7 @@ function __command_getTranslationKeys(array $params = [], array $urlParams = [])
                 extractTextKeys($node, $menuKeys, 0, 20); // Max 20 levels depth
             }
         }
-        $allKeys['menu'] = array_unique($menuKeys);
+        $allKeys['menu'] = array_values(array_unique($menuKeys));
         $scannedFiles['menu'] = true;
     }
 
@@ -122,8 +129,30 @@ function __command_getTranslationKeys(array $params = [], array $urlParams = [])
                 extractTextKeys($node, $footerKeys, 0, 20); // Max 20 levels depth
             }
         }
-        $allKeys['footer'] = array_unique($footerKeys);
+        $allKeys['footer'] = array_values(array_unique($footerKeys));
         $scannedFiles['footer'] = true;
+    }
+
+    // 3.5. Scan component structures (flat directory, one file per component,
+    // file name = component name). Source key is prefixed with 'component:'
+    // because pages and components share a flat namespace (a 'home' page and
+    // a 'home' component would otherwise collide in keys_by_source).
+    // Each component file is a single root node, not an array (unlike menu/footer).
+    $componentDir = PROJECT_PATH . '/templates/model/json/components';
+    if (is_dir($componentDir)) {
+        $componentFiles = glob($componentDir . '/*.json') ?: [];
+        sort($componentFiles);
+        foreach ($componentFiles as $componentFile) {
+            $componentStructure = loadJsonStructure($componentFile);
+            if ($componentStructure === null || !is_array($componentStructure)) {
+                continue;
+            }
+            $componentKeys = [];
+            extractTextKeys($componentStructure, $componentKeys, 0, 20);
+            $componentName = basename($componentFile, '.json');
+            $allKeys['component:' . $componentName] = array_values(array_unique($componentKeys));
+            $scannedFiles['components'][] = $componentName;
+        }
     }
 
     // 4. Flatten all keys for easy comparison

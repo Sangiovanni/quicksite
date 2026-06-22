@@ -16,6 +16,33 @@
 if (!function_exists('convertDotNotationToNested')) {
 
 /**
+ * Translation-key validity check — single source of truth.
+ *
+ * Permissive on purpose. The runtime Translator + setTranslationKeys +
+ * the JSON storage all accept any non-empty string as a key. Per-character
+ * regexes (the old `translation_key_simple` pattern) tried to enforce
+ * `[a-zA-Z0-9._-]+$` but real keys legitimately include:
+ *   - `/` for nested-route titles (e.g. page.titles.documentation/commands)
+ *   - `$` for component template variables (e.g. reassurance-item1.$icon)
+ *   - any UTF-8 character a translator chose for an identifier
+ * Trying to keep a character whitelist was whack-a-mole — every new
+ * legitimate pattern broke deleteTranslationKeys. This helper replaces
+ * the per-character rule with the minimal security floor.
+ *
+ * Returns true iff `$key` is a string, non-empty after trim, and
+ * contains no null byte (PHP's filesystem path-traversal sentinel).
+ * The dot-notation key never reaches a filesystem path — only the
+ * `language` param does, which is validated separately — so we don't
+ * need to block `..` or `/` here.
+ */
+function isValidTranslationKey($key): bool {
+    if (!is_string($key)) return false;
+    if (trim($key) === '') return false;
+    if (strpos($key, "\0") !== false) return false;
+    return true;
+}
+
+/**
  * Convert flat dot-notation keys to a nested structure.
  * {"menu.home": "Home"} → {"menu": {"home": "Home"}}
  */
