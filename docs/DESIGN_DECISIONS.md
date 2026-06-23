@@ -924,7 +924,7 @@ weeks).
 **Source**: Beta.9 kickoff design round (2026-06-11). Behaviour lands
 across the beta.9 release; see the release notes at tag time.
 
-### Stylesheet editor — full scope committed, no fallback gate (locked 2026-06-11)
+### Stylesheet editor — full scope committed, no fallback gate (locked 2026-06-11, superseded 2026-06-22)
 
 **Decision**: The in-editor stylesheet editor ships at full scope —
 structured rules view plus editable raw view with two-way live sync
@@ -3167,3 +3167,142 @@ text keys when they should instead change scope).
 + `_render` in `preview-translation.js`. The site-wide totals
 (`siteTotalKeys`, `siteUnusedCount`) are computed separately for the
 empty-state + bulk-button gates.
+
+### Stylesheet editor — lightened scope (locked 2026-06-22)
+
+**Supersedes**: the entry above ("Stylesheet editor — full scope
+committed, no fallback gate", locked 2026-06-11).
+
+**Decision**: The in-editor stylesheet editor ships as a focused
+addition to the existing CSS sidebar tool, not as a new sidebar mode.
+Three deliverables:
+
+1. A **Source tab** as an advanced top-row view above the existing
+   Theme / Selectors / Animations tabs. Code-editor surface in the
+   canvas (textarea-over-pre with tokenizer + line gutter + search).
+   Saves via `editStyles` whole-file. Live iframe preview while
+   typing. Role-gated on `editStyles` permission (hidden, not
+   disabled, when missing). Dirty-state guard on tab-switch.
+2. A **Theme tab quick-add variable** action in the Colors / Fonts /
+   Spacing sections — inline name+value row that respects the
+   selected light/dark scope and writes via existing
+   `setRootVariables`.
+3. **CSS Refiner stays at `/admin/optimize`**, unchanged. Source has
+   a "Refine in CSS Refiner →" link.
+
+The Animations tab review (rename to Motion, reshape, three
+small features — apply-keyframe to selector, easing curve picker,
+transition wizard) is carved out as its own concern
+(`NOTES/planning/BETA9_MOTION_TAB.md`); it can ship in parallel
+with A3 or after.
+
+**Reasoning**: The 2026-06-11 lock committed to a two-pane structured
++ raw view with live two-way sync and an explicit "never `editStyles`
+from this panel" rule. Two facts surfaced after that lock that change
+the calculation:
+
+- The existing CSS sidebar tool ALREADY has a structured view — its
+  Theme / Selectors / Animations tabs are exactly the "Rules view"
+  the original doc was inventing. The new concern only needs to add
+  the raw escape hatch, not a parallel structured surface.
+- The race condition that justified "never `editStyles`" (raw write
+  clobbers a concurrent `setStyleRule` write) is theoretical — a
+  single session edits one surface at a time. A dirty-state guard on
+  tab-switch (both directions) handles the realistic case at far
+  lower cost than per-keystroke parsing + cross-pane reconciliation.
+
+Dropping the two-pane live sync removes the entire `CssParser`
+fidelity question from A3's critical path (`editStyles` is whole-file
+write; the parser is bypassed for the Source save path). The
+client-side CSS parser at
+`public/admin/assets/js/lib/css-refiner/css-parser.js` keeps its
+existing role inside the Refiner and is not pulled into A3.
+
+**Alternatives considered**:
+
+- **Keep the 2026-06-11 full-scope lock** (rejected — the
+  engineering risk was material, the user benefit over the lightened
+  shape is small once the existing structured tabs are credited as
+  the "structured view").
+- **Fold the Refiner into the canvas of the Source tab** (rejected —
+  loading the Refiner's library files into every editor session, plus
+  the canvas-swap state machine, is non-trivial plumbing for a
+  feature exercised occasionally. A "Refine in CSS Refiner →" link
+  preserves the in-context flow by opening `/admin/optimize` in a new
+  tab).
+- **Use a `contenteditable` div for the editor surface** (rejected —
+  caret position, IME, undo/redo, and paste handling are famously
+  fiddly with `contenteditable`. The textarea-over-pre pattern
+  delegates input handling to the native `<textarea>` and uses the
+  `<pre>` purely for visual rendering, keeping all the native
+  behaviour intact).
+- **Ship Source with a plain textarea, defer highlighting** (held
+  open — the textarea-over-pre pattern needs the tokenizer + `<pre>`
+  regardless, since the search-match overlay paints into the `<pre>`
+  layer; coloured tokens fall out for ~50 extra lines. Recommend
+  shipping highlighting from the start; design-doc Open question 1).
+
+**Source**: design round 2026-06-22 (this conversation). Doc:
+`NOTES/planning/BETA9_STYLESHEET_EDITOR.md` (rewritten same day).
+Behaviour at ship time: `docs/ADMIN_PANEL.md` §9 (style management)
+will gain a Source subsection.
+
+### Source / structured-tabs cross-tab cache invalidation (locked 2026-06-23)
+
+**Decision**: The Source view's save and Cancel actions in CSS mode
+invalidate the three sibling structured-tab caches (Theme variables,
+Selectors, Animations) by calling each module's `invalidate()` or
+`reset()`. The next view of any of those tabs triggers a fresh fetch
+from the server. Unsaved changes that the structured tab had pending
+when Source saved are LOST on that next view.
+
+The reverse direction — a structured tab's save invalidating Source's
+unsaved draft — is not implemented. (Source's own dirty-state guard
+already prompts before discarding Source edits when switching tabs.)
+
+**Reasoning**: Source's `editStyles` rewrites the entire `style.css`.
+The three structured tabs each read narrow slices of that file
+through separate commands and cache the result locally. Without
+invalidation, a Source save leaves the structured tabs showing stale
+data — and worse, an unaware user who then saves the structured tab
+sends only the diff against the stale baseline, which can SILENTLY
+OVERWRITE values Source just persisted. Invalidating + reloading on
+next view makes the divergence visible (the user sees fresh data) at
+the price of losing the structured tab's unsaved edits when those
+edits happened to coincide with a Source save.
+
+The realistic frequency of "Theme dirty + user opens Source + saves
+Source" is low — users typically work in one editing surface at a
+time, and Source's own outbound dirty guard already prompts when
+leaving Source with unsaved edits. A symmetric inbound guard would
+require dirty-state tracking on Theme / Selectors / Animations plus
+matching UI surfaces, which is meaningful engineering for an edge
+case most users won't hit.
+
+**Alternatives considered**:
+
+- **Symmetric dirty-state model across all four CSS surfaces** —
+  Theme / Selectors / Animations would each track their own dirty
+  state, expose `canLeave()`-equivalent guards, and gain Cancel
+  buttons. Rejected: three modules to touch, new UI surface in each,
+  extra confirms most users will never see, and the resulting
+  prompt-blizzard would itself feel hostile.
+- **No invalidation at all** — leave the structured tabs caching
+  whatever they have. Rejected: the silent-clobber failure mode (a
+  Theme save overwrites Source's changes) is the worst outcome
+  available; the user only discovers it after the second save, by
+  which point both writes are on disk and the loss is irreversible.
+- **Lock the structured tabs read-only while Source is dirty** —
+  rejected: overly restrictive; the user's editing session would
+  feel paused, and structured edits + Source edits are often
+  complementary (e.g., tweak a variable in Theme to see what it
+  does, then commit a final cleanup pass via Source).
+
+**Source**: A3 close (2026-06-23). Implementation:
+`invalidateStructuredTabs()` in
+`public/admin/assets/js/pages/preview/preview-style-source.js` (called
+from save + Cancel ok paths); consumed by the reload-on-stale check
+in `initStyleTabs` (`preview.js`) and in `deactivateSource()`
+(`preview.js`) — three exit paths from Source all converge on the
+same behaviour. Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §8.10.

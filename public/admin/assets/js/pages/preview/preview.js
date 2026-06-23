@@ -278,7 +278,15 @@
     const animationsCount = document.getElementById('animations-count');
     const animationsList = document.getElementById('animations-list');
     const animatedEmpty = document.getElementById('animated-empty');
-    
+
+    // Source panel elements (Beta.9 A3 — sidebar scaffold + role gate)
+    const sourcePanel       = document.getElementById('source-panel');
+    const sourceAdvancedRow = document.getElementById('contextual-style-advanced');
+    const sourceBtn         = document.getElementById('contextual-style-source-btn');
+    // Source canvas (A3 slice 2 — full-CSS editor host in the main area)
+    const sourceCanvas      = document.getElementById('preview-source-canvas');
+    const previewContainer  = document.getElementById('preview-container');
+
     // Keyframe Editor Modal elements
     const keyframeModal = document.getElementById('preview-keyframe-modal');
     const keyframeModalTitle = document.getElementById('keyframe-modal-title');
@@ -2850,6 +2858,14 @@
     function setMode(mode, preselect = null) {
         // Debounce rapid mode switches to prevent layout thrashing
         if (isSwitchingMode) return;
+        // Beta.9 A3 slice 4: dirty guard for Source. If leaving style mode
+        // while Source is active and has unsaved edits, prompt the user.
+        // canLeave() returns false if the user cancels the prompt.
+        if (currentMode === 'style' && mode !== 'style'
+            && window.PreviewStyleSource && PreviewStyleSource.isActive()
+            && !PreviewStyleSource.canLeave()) {
+            return;
+        }
         isSwitchingMode = true;
         
         // "Preview" mode: just reload the iframe to show the page as a real
@@ -2991,6 +3007,10 @@
         if (mode === 'style') {
             if (styleTabs) styleTabs.style.display = '';
             if (styleContent) styleContent.style.display = '';
+            // Beta.9 A3: advanced row (Source button) appears alongside the
+            // tabs. admin.js filterByPermissions has already hidden it if
+            // the role lacks editStyles.
+            if (sourceAdvancedRow) sourceAdvancedRow.style.display = '';
             // Merge theme panel i18n (default tab) before the module renders
             ensureI18nPanel('theme');
             // Load theme variables via module if not already loaded
@@ -3000,6 +3020,13 @@
         } else {
             if (styleTabs) styleTabs.style.display = 'none';
             if (styleContent) styleContent.style.display = 'none';
+            if (sourceAdvancedRow) sourceAdvancedRow.style.display = 'none';
+            // Beta.9 A3: leaving style mode also resets Source state — next
+            // entry lands on the tab view, not Source. The active tab's
+            // panel will be restored by the Source deactivation path.
+            if (window.PreviewStyleSource && PreviewStyleSource.isActive()) {
+                deactivateSource();
+            }
         }
     }
     
@@ -3339,43 +3366,136 @@
     // Theme variable editing is now handled by preview-style-theme.js module
     // See: public/admin/assets/js/pages/preview/preview-style-theme.js
 
+    // ==================== Source Tab (Beta.9 A3) ====================
+    // Slice 1: sidebar scaffold + role gate. The Source button sits in
+    // the advanced top row above the regular tabs and toggles a Source
+    // panel that hides the three regular tabs. The actual code editor
+    // mounts inside #source-panel in slice 2.
+
+    function activateSource() {
+        if (!sourcePanel || !window.PreviewStyleSource) return;
+        if (PreviewStyleSource.isActive()) return;
+        if (sourceBtn) sourceBtn.classList.add('preview-contextual-style-source-btn--active');
+        if (styleTabs) styleTabs.style.display = 'none';
+        if (themePanel) themePanel.style.display = 'none';
+        if (selectorsPanel) selectorsPanel.style.display = 'none';
+        if (animationsPanel) animationsPanel.style.display = 'none';
+        sourcePanel.style.display = '';
+        ensureI18nPanel('source');
+        // Slice 2: swap the main canvas — hide the iframe container,
+        // show the source canvas where the code editor mounts. Slice 5
+        // will revisit this to keep a small live-preview iframe pane
+        // visible alongside the editor.
+        if (previewContainer) previewContainer.style.display = 'none';
+        if (sourceCanvas) sourceCanvas.style.display = '';
+        PreviewStyleSource.enter();
+    }
+
+    function deactivateSource() {
+        if (!sourcePanel || !window.PreviewStyleSource) return;
+        if (!PreviewStyleSource.isActive()) return;
+        PreviewStyleSource.leave();
+        if (sourceBtn) sourceBtn.classList.remove('preview-contextual-style-source-btn--active');
+        sourcePanel.style.display = 'none';
+        // Slice 2: restore the iframe canvas.
+        if (sourceCanvas) sourceCanvas.style.display = 'none';
+        if (previewContainer) previewContainer.style.display = '';
+        // Restore the tabs row + the previously active tab's panel. Only
+        // restore tab visibility when we are still in style mode — when
+        // leaving style mode entirely, updateContextualSection has already
+        // hidden styleTabs and the panel toggles are no-ops in practice
+        // since the contextual section itself is hidden.
+        if (styleTabs) styleTabs.style.display = '';
+        if (themePanel) themePanel.style.display = activeStyleTab === 'theme' ? '' : 'none';
+        if (selectorsPanel) selectorsPanel.style.display = activeStyleTab === 'selectors' ? '' : 'none';
+        if (animationsPanel) animationsPanel.style.display = activeStyleTab === 'animations' ? '' : 'none';
+
+        // A3 slice 6 fix: when the Source button is used to toggle off,
+        // we don't go through the tab-click handler — so the reload-on-
+        // stale check there is skipped. Source's save / cancel may have
+        // invalidated the active tab's cache via invalidateStructuredTabs();
+        // re-run the check here so the panel shows fresh data. (Only
+        // fires when isLoaded() returns false, so a Source-open-and-exit
+        // without save preserves the active tab's unsaved edits.)
+        const moduleByTab = {
+            theme:      window.PreviewStyleTheme,
+            selectors:  window.PreviewSelectorBrowser,
+            animations: window.PreviewStyleAnimations
+        };
+        const activeMod = moduleByTab[activeStyleTab];
+        if (activeMod && activeMod.isLoaded && !activeMod.isLoaded() && activeMod.load) {
+            activeMod.load();
+        }
+    }
+
+    function initStyleSource() {
+        if (window.PreviewStyleSource) PreviewStyleSource.init();
+        if (!sourceBtn) return;
+        sourceBtn.addEventListener('click', () => {
+            if (!window.PreviewStyleSource) return;
+            if (PreviewStyleSource.isActive()) {
+                // A3 slice 4: dirty guard — confirm before discarding edits.
+                if (!PreviewStyleSource.canLeave()) return;
+                deactivateSource();
+            } else {
+                activateSource();
+            }
+        });
+    }
+
     /**
      * Initialize style tab switching
      */
     function initStyleTabs() {
         if (!styleTabs) return;
-        
+
         const tabs = styleTabs.querySelectorAll('.preview-contextual-style-tab');
         tabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 const tabName = tab.dataset.tab;
-                if (tabName === activeStyleTab) return;
-                
-                // Merge panel-specific i18n keys on first activation
+                // Beta.9 A3: clicking a tab while Source is active returns to
+                // the structured editor surface. Deactivate Source first so
+                // the tab panel becomes visible. Slice 4: prompt if Source
+                // has unsaved edits — user can cancel and stay.
+                if (window.PreviewStyleSource && PreviewStyleSource.isActive()) {
+                    if (!PreviewStyleSource.canLeave()) return;
+                    deactivateSource();
+                }
+
+                // Merge panel-specific i18n keys (cheap + idempotent).
                 ensureI18nPanel(tabName);
-                
+
+                // Beta.9 A3 slice 6 fix: reload-on-stale check must run
+                // BEFORE the `tabName === activeStyleTab` early return.
+                // After exiting Source, the user is typically clicking
+                // back to the same tab they were on — activeStyleTab is
+                // unchanged, but the module's cache may have been
+                // invalidated by Source's save / cancel. Each module's
+                // isLoaded() is the source of truth.
+                const moduleByTab = {
+                    theme:      window.PreviewStyleTheme,
+                    selectors:  window.PreviewSelectorBrowser,
+                    animations: window.PreviewStyleAnimations
+                };
+                const targetMod = moduleByTab[tabName];
+                if (targetMod && targetMod.isLoaded && !targetMod.isLoaded() && targetMod.load) {
+                    targetMod.load();
+                }
+
+                if (tabName === activeStyleTab) return;
+
                 // Update active tab button
                 tabs.forEach(t => t.classList.remove('preview-contextual-style-tab--active'));
                 tab.classList.add('preview-contextual-style-tab--active');
-                
+
                 // Show/hide panels
                 activeStyleTab = tabName;
                 if (themePanel) themePanel.style.display = tabName === 'theme' ? '' : 'none';
                 if (selectorsPanel) selectorsPanel.style.display = tabName === 'selectors' ? '' : 'none';
                 if (animationsPanel) animationsPanel.style.display = tabName === 'animations' ? '' : 'none';
-                
-                // Load selectors when switching to selectors tab (Phase 8.4)
-                if (tabName === 'selectors' && !selectorsLoaded) {
-                    loadStyleSelectors();
-                }
-                
-                // Load animations when switching to animations tab
-                if (tabName === 'animations' && !animationsLoaded) {
-                    loadAnimationsTab();
-                }
             });
         });
-        
+
         // Initialize animations group collapsing
         initAnimationsGroups();
     }
@@ -5074,6 +5194,7 @@
     // ==================== Module Initializations ====================
     
     initStyleTabs();
+    initStyleSource();
     initSelectorBrowser();
     initTransformEditorHandlers();
 

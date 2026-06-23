@@ -72,6 +72,32 @@ class CssParser {
     }
 
     /**
+     * Find the next `{` OR `;` starting at $from, skipping comments and
+     * string literals. Used to distinguish a regular rule / block-at-rule
+     * (which uses `{...}`) from a body-less at-rule like `@import url(...);`
+     * or `@charset "utf-8";` which ends at `;`. Without this distinction,
+     * the parser would treat `@import ... ; :root {...}` as a single
+     * at-rule whose body is the `:root` block — and `findTopLevelBlock(':root')`
+     * would then return null.
+     */
+    private function findNextBraceOrSemicolon(int $from): int|false {
+        $len = strlen($this->content);
+        $pos = $from;
+        while ($pos < $len) {
+            $ch = $this->content[$pos];
+            if ($ch === '/' && ($pos + 1) < $len && $this->content[$pos + 1] === '*') {
+                $end = strpos($this->content, '*/', $pos + 2);
+                $pos = ($end !== false) ? $end + 2 : $len;
+                continue;
+            }
+            if ($ch === '"' || $ch === "'") { $pos = $this->skipString($pos); continue; }
+            if ($ch === '{' || $ch === ';') return $pos;
+            $pos++;
+        }
+        return false;
+    }
+
+    /**
      * Given the position of `{`, find the position ONE PAST the matching `}`.
      * Properly handles nested braces, comments, and strings.
      */
@@ -137,11 +163,37 @@ class CssParser {
 
             $blockStart = $pos;
 
-            // Find the next opening brace (the prelude ends here)
-            $bracePos = $this->findNextOpenBrace($pos);
-            if ($bracePos === false) break;
+            // Look for whichever comes first: `;` (body-less at-rule
+            // terminator) or `{` (block opener). This handles
+            // `@import url(...);` and `@charset "utf-8";` without
+            // mistakenly merging them with the following rule.
+            $terminator = $this->findNextBraceOrSemicolon($pos);
+            if ($terminator === false) break;
 
-            $prelude = trim(substr($this->content, $pos, $bracePos - $pos));
+            // Body-less at-rule: terminates at ';' with no '{...}' body.
+            if ($this->content[$terminator] === ';') {
+                $preludeRaw = trim(substr($this->content, $pos, $terminator - $pos));
+                if ($preludeRaw !== '' && str_starts_with($preludeRaw, '@')) {
+                    preg_match('/^@([\w-]+)\s*(.*)/s', $preludeRaw, $m);
+                    $blocks[] = [
+                        'type'       => 'atrule',
+                        'keyword'    => $m[1] ?? '',
+                        'prelude'    => trim($m[2] ?? ''),
+                        'start'      => $blockStart,
+                        'end'        => $terminator + 1,
+                        'innerStart' => $terminator,   // no body
+                        'innerEnd'   => $terminator,
+                        'noBody'     => true,
+                    ];
+                }
+                // Whether it was a real at-rule or just a stray ';', advance past it.
+                $pos = $terminator + 1;
+                continue;
+            }
+
+            // Otherwise it's a `{` — a regular rule or block at-rule.
+            $bracePos = $terminator;
+            $prelude  = trim(substr($this->content, $pos, $bracePos - $pos));
             if ($prelude === '') {
                 // No prelude — malformed or an empty rule; skip past this brace
                 $pos = $bracePos + 1;

@@ -153,6 +153,15 @@ A self-contained CSS analysis library consumed exclusively by `pages/optimize.js
 
 All analyzers consume an AST and emit suggestions with diff metadata.
 
+### 5.7 Code editor library (`lib/code-editor/`)
+
+A small in-tree code-editor widget consumed by the Source view in CSS mode (§8.10):
+
+- **`code-editor.js`** — textarea-over-pre widget. A transparent `<textarea>` handles all input (caret, IME, undo/redo, paste, selection); a `<pre>` behind it renders the tokenizer's coloured output; a left-side `<div>` gutter paints line numbers. All three scroll in sync. Pluggable tokenizer via `QSCodeEditor.tokenizers.<langKey>`.
+- **`css-tokenizer.js`** — CSS tokenizer registered as `QSCodeEditor.tokenizers.css`. A frame stack tracks block nesting so selectors inside `@media` and other block at-rules classify as selectors, not properties. Token classes: `qs-tk-comment`, `qs-tk-string`, `qs-tk-atrule`, `qs-tk-selector`, `qs-tk-property`, `qs-tk-number`, `qs-tk-var`, `qs-tk-punct`.
+
+The widget exposes `getValue / setValue / focus / destroy / resetScroll / setMatches / clearMatches / scrollRangeIntoView / scrollToLine`. Search-match overlay (used by Source view) paints into a separate `<pre>` layer between the highlight and the textarea.
+
 ---
 
 ## 6. Storage key registry
@@ -172,6 +181,7 @@ Every localStorage / sessionStorage key is declared as a constant in `js/core/st
 | `AI_PERSIST` | localStorage | `ai-spec.js`, `settings.js` |
 | `AI_AUTO_PREVIEW` | localStorage | `settings.js`, `ai-spec.js` |
 | `AI_AUTO_EXECUTE` | localStorage | `settings.js`, `ai-spec.js` |
+| `STYLE_SOURCE_DRAFT` | localStorage | `preview-style-source.js` (visual-editor CSS mode → Source view; debounced draft of unsaved edits, restored on next entry, cleared on save / discard) |
 
 ---
 
@@ -204,7 +214,7 @@ The sidebar exposes one action button (Refresh) plus five editing modes — six 
 | **Select** | Mode | Click an element → inspect node, add a sibling/child, **edit its params + class + mandatory attrs in place** (via the Edit Params button), delete, duplicate, or save as snippet / component. |
 | **Drag** | Mode | Drag elements to reorder within parent (`preview-drag.js`). |
 | **Text** | Mode | Inline-edit a text node's translation **for the currently selected language**. Intentionally primitive: no rich text, no line breaks. Edits the value, never the key. |
-| **CSS** | Mode | Click an element → CSS panel; edits apply to the element's selector with full pseudo-state support. |
+| **CSS** | Mode | Click an element → CSS panel (Theme / Selectors / Animations tabs); edits apply to the element's selector with full pseudo-state support. The Theme tab includes an inline **+ Add variable** form per section (Colors / Fonts / Spacing) for scope-aware writes (current light/dark scope, optional "also other scope" when dark mode is enabled). Designer / developer / admin roles also see a top-row **Source** advanced view that opens the whole `style.css` in a code editor — see §8.10. |
 | **Interactions** | Mode | Event editor (`preview-js-interactions.js`). Three CRUD-capable panels: **per-element interactions** (the selected node's `onclick`/`oninput`/etc.), **Page Events** (page-level `onload`/`onresize`/`onscroll`), and **State Stores** (page-scoped state). Each interaction is a `{{call:fn:args}}` chain using a QS.* verb from the catalog. |
 | **Translations** | Mode | Site-wide translation key manager (`preview-translation.js`). Per-language coverage % + counts, scope picker (Pages / Layout / Components), inline row-expand editor, per-row + bulk delete. Mono- and multi-lingual. See §8.9. |
 
@@ -519,6 +529,69 @@ This matters because `LANGUAGES_SUPPORTED` for monolingual projects often lists 
 | Server: write commands | `setTranslationKeys.php`, `deleteTranslationKeys.php` |
 | Server: shared key validator | `secure/src/functions/translationHelpers.php` (`isValidTranslationKey`) |
 | Runtime translator | `secure/src/classes/Translator.php` (mono = `default.json`; multi = `{lang}.json`) |
+
+### 8.10 Source view (CSS mode)
+
+An advanced sub-view of CSS mode that exposes the entire `style.css` as a code-editor surface for designers / developers who need to read or edit the whole file in context, without leaving the visual editor. Hidden for roles without the `editStyles` permission.
+
+**Where you land it from:** CSS sidebar mode → top-row **Source** button above the Theme / Selectors / Animations tabs. Activating it hides the three tabs and swaps the iframe canvas for the editor; deactivating restores both.
+
+**Canvas (editor surface):**
+
+| Region | What it shows |
+|---|---|
+| Toolbar | Filename label (`style.css`) on the left; search bar on the right (Find input, ▲ ▼ nav buttons, match count). |
+| Gutter | Line numbers, scroll-synced with the editor. |
+| Editor | Textarea-over-pre widget (§5.7) — a transparent `<textarea>` handles input while a `<pre>` behind it renders the CSS tokenizer's coloured tokens. |
+
+**Sidebar (narrow column while Source is active):**
+
+| Element | What it shows / does |
+|---|---|
+| File row | Static `File: style.css` label. |
+| Status indicator | Green dot + "All saved" when content matches the server; amber dot + "Unsaved changes" otherwise. |
+| Save button | Disabled when clean. Saves via `editStyles` (whole-file write) then hot-reloads the iframe's `<link rel="stylesheet">`. |
+| Cancel button | Disabled when clean. Re-fetches the file from server with a confirm. |
+| "Refine in CSS Refiner →" link | Same-tab navigation to `/admin/optimize`. When dirty, a custom confirm prompts before navigating; the native `beforeunload` prompt is suppressed once to avoid a double-prompt. Modifier-clicks (Ctrl/Cmd/Shift/middle) skip the confirm — they don't leave the current page. |
+
+**Search bar:**
+
+| Action | Shortcut |
+|---|---|
+| Focus the Find input | `Ctrl/Cmd+F` (while Source is active) |
+| Focus with `:` prefilled (jump-to-line trigger) | `Ctrl/Cmd+G` |
+| Next match | `Enter` or ▼ button |
+| Previous match | `Shift+Enter` or ▲ button |
+| Close + clear matches | `Esc` |
+| Jump to line N | Type `:N` in the Find input + `Enter` |
+
+Match highlighting paints into a separate `<pre>` overlay layer (between the highlight and the textarea) so every match is visible at once; the current match gets a stronger amber + outline. Substring search is case-insensitive.
+
+**Live preview.** Every keystroke (debounced ~200ms) injects / updates a `<style id="qs-source-live-styles">` element appended to the iframe's `<head>`. The iframe is hidden while Source is active, but exiting Source (tab click, mode switch) immediately shows the unsaved edits applied — no save needed. The injection is removed on save (replaced by a real `hotReloadCss` of `style.css`) and on Cancel (the iframe reverts to the server file).
+
+**Draft persistence.** On every input the editor's content is debounced-written (500ms) to `localStorage` under `STYLE_SOURCE_DRAFT` (see §6). On the next Source entry, if the draft differs from the server file, a restore banner appears between the toolbar and the editor offering **Restore** (load the draft + mark dirty) or **Discard** (clear the draft). The draft is also cleared on successful save / Cancel.
+
+**Dirty guards:**
+- Switching from Source to Theme / Selectors / Animations while dirty → confirm before discarding.
+- Switching to another sidebar mode while dirty → same prompt (via `setMode`'s guard).
+- Closing the browser tab / refreshing while dirty → native `beforeunload` prompt.
+
+**Cross-tab cache invalidation.** A Source save / Cancel rewrites or re-reads the whole `style.css`, so the three structured tabs' caches are invalidated (`PreviewStyleTheme.invalidate()` + `PreviewSelectorBrowser.reset()` + `PreviewStyleAnimations.reset()`). The next view of any tab triggers a fresh fetch — visible both from the tab-click handler and from `deactivateSource()` so all exit paths converge. See `DESIGN_DECISIONS.md` "Source / structured-tabs cross-tab cache invalidation" for the accepted trade-off (a structured tab's unsaved edits are lost on the next view after a Source save).
+
+**Files**
+
+| Concern | Where |
+|---|---|
+| Source button + advanced row + sidebar panel | `secure/admin/templates/pages/preview/contextual-style.php` |
+| Canvas mount + toolbar + restore banner | `secure/admin/templates/pages/preview/main-area.php` |
+| JS module | `public/admin/assets/js/pages/preview/preview-style-source.js` |
+| Code-editor widget library | `public/admin/assets/js/lib/code-editor/` (see §5.7) |
+| Mode wiring + cross-tab guards | `public/admin/assets/js/pages/preview/preview.js` (`activateSource` / `deactivateSource` / `initStyleSource` / `initStyleTabs`) |
+| i18n keys exposed to JS | `secure/admin/templates/pages/preview-config.php` (`i18nPanels.source` block) |
+| CSS | `public/admin/assets/admin.css` (`.preview-source-canvas__*`, `.preview-source-sidebar__*`, `.preview-contextual-style-source-btn*`, `.qs-code-editor__*`, `.qs-tk-*`, `.qs-search-match*`) |
+| Storage key | `STYLE_SOURCE_DRAFT` in `js/core/storage-keys.js` (see §6) |
+| Server: read | `getStyles` (returns `{ content, file, size, modified }`) |
+| Server: write | `editStyles` (whole-file replace; basic CSS injection blacklist; writes both live + project copies) |
 
 ---
 

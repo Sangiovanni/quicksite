@@ -7507,6 +7507,442 @@ code.preview-contextual-info__value {
     font-size: var(--font-size-sm);
 }
 
+/* Style Mode — Source (advanced row above the tabs, Beta.9 A3) */
+.preview-contextual-style-advanced {
+    margin-bottom: var(--space-xs);
+}
+
+.preview-contextual-style-source-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+    width: 100%;
+    padding: 6px var(--space-sm);
+    background: transparent;
+    border: 1px dashed var(--admin-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.preview-contextual-style-source-btn:hover {
+    color: var(--admin-text);
+    background: var(--admin-hover);
+    border-color: var(--admin-text-muted);
+}
+
+.preview-contextual-style-source-btn--active {
+    color: var(--admin-primary);
+    background: var(--admin-hover);
+    border-color: var(--admin-primary);
+    border-style: solid;
+}
+
+.preview-source-panel {
+    padding: var(--space-sm) 0;
+}
+
+/* Sidebar layout when Source is active (A3 slice 2) */
+.preview-source-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-xs);
+}
+
+.preview-source-sidebar__row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--font-size-sm);
+}
+
+.preview-source-sidebar__label {
+    color: var(--admin-text-muted);
+    font-weight: 600;
+}
+
+.preview-source-sidebar__file {
+    color: var(--admin-text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    background: var(--admin-bg);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+}
+
+/* Dirty / clean indicator (A3 slice 4) */
+.preview-source-sidebar__status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px var(--space-xs);
+    font-size: var(--font-size-sm);
+    border-radius: var(--radius-sm);
+}
+
+.preview-source-sidebar__status--clean {
+    color: var(--admin-text-muted);
+}
+
+.preview-source-sidebar__status--clean .preview-source-sidebar__status-dot {
+    color: #6e9d6e;  /* muted green */
+}
+
+.preview-source-sidebar__status--dirty {
+    color: #e0b870;
+    background: rgba(224, 184, 112, 0.08);
+}
+
+.preview-source-sidebar__status--dirty .preview-source-sidebar__status-dot {
+    color: #e0b870;
+}
+
+.preview-source-sidebar__status-dot {
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+.preview-source-sidebar__actions {
+    display: flex;
+    gap: var(--space-xs);
+    margin-top: var(--space-xs);
+}
+
+.preview-source-sidebar__actions .admin-btn {
+    flex: 1;
+}
+
+/* admin-btn variants used here (primary + ghost) don't have generic
+   :disabled rules in admin.css, so the disabled HTML attribute would
+   leave them visually identical to the enabled state. Make them
+   clearly inert when clean. */
+.preview-source-sidebar__actions .admin-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.preview-source-sidebar__hint {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+}
+
+.preview-source-sidebar__refine-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: 6px var(--space-sm);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    color: var(--admin-text);
+    font-size: var(--font-size-sm);
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.preview-source-sidebar__refine-link:hover {
+    background: var(--admin-hover);
+    border-color: var(--admin-text-muted);
+}
+
+/* Canvas-area host for the full-CSS editor (A3 slice 2). Replaces the
+   iframe canvas while Source is active — preview.js toggles display on
+   #preview-source-canvas vs #preview-container. */
+.preview-source-canvas {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    background: var(--admin-bg);
+    overflow: hidden;
+}
+
+.preview-source-canvas__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-xs) var(--space-md);
+    background: var(--admin-bg-secondary);
+    border-bottom: 1px solid var(--admin-border);
+    flex: 0 0 auto;
+}
+
+.preview-source-canvas__file-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.preview-source-canvas__file-info code {
+    color: var(--admin-text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Search bar (A3 slice 3) */
+.preview-source-canvas__search {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.preview-source-canvas__search-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    color: var(--admin-text-muted);
+    min-width: 280px;
+}
+
+.preview-source-canvas__search-input-wrap:focus-within {
+    border-color: var(--admin-border-focus);
+}
+
+.preview-source-canvas__search-input {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    color: var(--admin-text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    padding: 0;
+}
+
+.preview-source-canvas__search-input::placeholder {
+    color: var(--admin-text-light);
+}
+
+.preview-source-canvas__search-count {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    color: var(--admin-text-muted);
+    min-width: 3em;
+    text-align: right;
+    user-select: none;
+}
+
+.preview-source-canvas__search-count--no-match {
+    color: #d97766;
+}
+
+.preview-source-canvas__search-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    background: transparent;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    color: var(--admin-text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.preview-source-canvas__search-btn:hover:not(:disabled) {
+    color: var(--admin-text);
+    background: var(--admin-hover);
+    border-color: var(--admin-text-muted);
+}
+
+.preview-source-canvas__search-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Restore-draft banner (A3 slice 4). Sits between the toolbar and the
+   editor mount when a localStorage draft exists. */
+.preview-source-canvas__restore-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: rgba(224, 184, 112, 0.12);
+    border-bottom: 1px solid rgba(224, 184, 112, 0.4);
+    color: var(--admin-text);
+    font-size: var(--font-size-sm);
+    flex: 0 0 auto;
+}
+
+.preview-source-canvas__restore-banner svg {
+    color: #e0b870;
+    flex: 0 0 auto;
+}
+
+.preview-source-canvas__restore-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.preview-source-canvas__restore-title {
+    font-weight: 600;
+}
+
+.preview-source-canvas__restore-detail {
+    color: var(--admin-text-muted);
+    font-size: 0.8rem;
+}
+
+.preview-source-canvas__restore-actions {
+    display: flex;
+    gap: var(--space-xs);
+    flex: 0 0 auto;
+}
+
+.preview-source-canvas__mount {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    position: relative;
+    overflow: hidden;
+}
+
+.preview-source-canvas__loading,
+.preview-source-canvas__error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    flex: 1 1 auto;
+    padding: var(--space-xl);
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-sm);
+    text-align: center;
+}
+
+.preview-source-canvas__error-title {
+    color: var(--admin-text);
+    font-weight: 600;
+}
+
+.preview-source-canvas__error-detail {
+    color: var(--admin-text-muted);
+    font-size: 0.8rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* QSCodeEditor widget — textarea-over-pre with line-number gutter.
+   Token colours kept close to the warm/dark admin theme. */
+.qs-code-editor {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--admin-bg);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow: hidden;
+}
+
+.qs-code-editor__gutter {
+    flex: 0 0 auto;
+    width: 3.5em;
+    padding: 12px 8px 12px 0;
+    text-align: right;
+    color: var(--admin-text-light);
+    background: var(--admin-bg-secondary);
+    border-right: 1px solid var(--admin-border);
+    user-select: none;
+    overflow: hidden;
+    /* Match the wrap's font + line-height so line-numbers align */
+}
+
+.qs-code-editor__line-number {
+    height: calc(13px * 1.5);
+    line-height: calc(13px * 1.5);
+}
+
+.qs-code-editor__wrap {
+    flex: 1 1 auto;
+    position: relative;
+    overflow: hidden;
+}
+
+.qs-code-editor__highlight,
+.qs-code-editor__search-overlay,
+.qs-code-editor__input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 12px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    white-space: pre;
+    word-wrap: normal;
+    overflow-wrap: normal;
+    tab-size: 4;
+    -moz-tab-size: 4;
+}
+
+.qs-code-editor__highlight {
+    pointer-events: none;
+    color: var(--admin-text);
+    overflow: hidden;
+}
+
+/* Search overlay: text transparent (the tokenised pre below shows the
+   colours); only match-spans paint a visible background. The textarea
+   above still owns input + caret + native selection. */
+.qs-code-editor__search-overlay {
+    pointer-events: none;
+    color: transparent;
+    overflow: hidden;
+}
+
+.qs-search-match {
+    background: rgba(224, 184, 112, 0.25);  /* warm amber tint */
+    border-radius: 2px;
+}
+
+.qs-search-match--current {
+    background: rgba(224, 184, 112, 0.55);
+    box-shadow: 0 0 0 1px rgba(224, 184, 112, 0.9);
+}
+
+.qs-code-editor__input {
+    color: transparent;
+    caret-color: var(--admin-text);
+    resize: none;
+    overflow: auto;
+    /* Selection still highlights as the browser default — readable
+       against the transparent text. */
+}
+
+/* Token colours — kept distinct but readable against admin-bg */
+.qs-tk-comment  { color: #7a6b5e; font-style: italic; }
+.qs-tk-string   { color: #d99977; }
+.qs-tk-atrule   { color: #c08fd6; font-weight: 600; }
+.qs-tk-selector { color: #9bc4e2; }
+.qs-tk-property { color: #8fb88b; }
+.qs-tk-number   { color: #e0b870; }
+.qs-tk-var      { color: #88c0c0; }
+.qs-tk-punct    { color: var(--admin-text-muted); }
+
 /* Style Mode Tabs (segmented control style) */
 .preview-contextual-style-tabs {
     display: flex;
@@ -7605,6 +8041,115 @@ code.preview-contextual-info__value {
 .preview-theme-section__title svg,
 .asset-card:hover .asset-card__rename {
     opacity: 0.6;
+}
+
+/* Theme quick-add variable (A3 slice 6) — sits below the grid in each
+   of the Colors / Fonts / Spacing sections. Collapsed by default; the
+   toggle button expands an inline form with scope-aware writes. */
+.preview-theme-add {
+    margin-top: var(--space-xs);
+}
+
+.preview-theme-add__toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 6px var(--space-sm);
+    background: transparent;
+    border: 1px dashed var(--admin-border);
+    border-radius: var(--radius-sm);
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.preview-theme-add__toggle:hover {
+    color: var(--admin-text);
+    background: var(--admin-hover);
+    border-color: var(--admin-text-muted);
+}
+
+.preview-theme-add__form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding: var(--space-sm);
+    margin-top: var(--space-xs);
+    background: var(--admin-bg-secondary);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+}
+
+.preview-theme-add__form[hidden] {
+    display: none;
+}
+
+.preview-theme-add__scope-banner {
+    padding: 4px var(--space-xs);
+    background: rgba(155, 196, 226, 0.10);
+    border-left: 2px solid #9bc4e2;
+    border-radius: 2px;
+    color: var(--admin-text);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.preview-theme-add__also-other {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+    user-select: none;
+}
+
+.preview-theme-add__also-other[hidden] {
+    display: none;
+}
+
+.preview-theme-add__also-other input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.preview-theme-add__row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.preview-theme-add__input {
+    width: 100%;
+    padding: 4px 6px;
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    color: var(--admin-text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+}
+
+.preview-theme-add__input:focus {
+    outline: none;
+    border-color: var(--admin-border-focus);
+}
+
+.preview-theme-add__actions {
+    display: flex;
+    gap: var(--space-xs);
+}
+
+.preview-theme-add__actions .admin-btn {
+    flex: 1;
+}
+
+.preview-theme-add__actions .admin-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
 }
 
 /* Theme Variables Grid */

@@ -575,6 +575,12 @@
         if (themeSaveBtn) themeSaveBtn.disabled = true;
         if (themeResetBtn) themeResetBtn.disabled = true;
         loadThemeVariables();
+
+        // A3 slice 6 — any open quick-add forms now show a stale scope
+        // banner. Easiest correct behaviour: close them. Refreshing the
+        // banners mid-edit is also possible but risks the user submitting
+        // against the wrong scope they intended.
+        closeAllAddForms();
     }
 
     // Wire scope switcher buttons (inside style panel)
@@ -690,22 +696,217 @@
         });
     }
 
+    // ==================== Quick-add variable (A3 slice 6) ====================
+    // Each Theme section (Colors / Fonts / Spacing) carries an inline
+    // `.preview-theme-add` container with a toggle + form. Clicking the
+    // toggle opens the form, which is scope-aware (banner reflects the
+    // currently-selected light/dark scope) and, when dark mode is
+    // enabled, offers an "Also add to the other scope" checkbox so the
+    // user can populate both scopes in one action. Writes go through
+    // the existing `setRootVariables` command.
+
+    const SECTION_PREFIXES = {
+        colors:  '--color-',
+        fonts:   '--font-',
+        spacing: '--spacing-'
+    };
+
+    function initThemeAddForms() {
+        const containers = document.querySelectorAll('.preview-theme-add');
+        containers.forEach(wireThemeAddForm);
+    }
+
+    function wireThemeAddForm(container) {
+        const section = container.dataset.section;
+        const toggle  = container.querySelector('[data-action="toggle"]');
+        const form    = container.querySelector('[data-form]');
+        const banner  = container.querySelector('[data-scope-banner]');
+        const alsoOtherCb = container.querySelector('[data-also-other]');
+        const nameInput   = container.querySelector('[data-input-name]');
+        const valueInput  = container.querySelector('[data-input-value]');
+        const cancelBtn   = container.querySelector('[data-action="cancel"]');
+        const submitBtn   = container.querySelector('[data-action="submit"]');
+        if (!toggle || !form || !nameInput || !valueInput) return;
+
+        const prefix = SECTION_PREFIXES[section] || '--';
+
+        function openForm() {
+            form.hidden = false;
+            updateScopeBanner(banner);
+            if (alsoOtherCb) alsoOtherCb.checked = false;
+            nameInput.value = prefix;
+            valueInput.value = '';
+            nameInput.focus();
+            try { nameInput.setSelectionRange(prefix.length, prefix.length); } catch (e) { /* no-op */ }
+        }
+
+        function closeForm() {
+            form.hidden = true;
+            nameInput.value = '';
+            valueInput.value = '';
+        }
+
+        toggle.addEventListener('click', function () {
+            if (form.hidden) openForm(); else closeForm();
+        });
+        if (cancelBtn) cancelBtn.addEventListener('click', closeForm);
+        if (submitBtn) submitBtn.addEventListener('click', function () {
+            submitThemeAddVariable(container, nameInput, valueInput, alsoOtherCb, submitBtn, closeForm);
+        });
+        nameInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); valueInput.focus(); }
+            else if (e.key === 'Escape') { e.preventDefault(); closeForm(); }
+        });
+        valueInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submitThemeAddVariable(container, nameInput, valueInput, alsoOtherCb, submitBtn, closeForm);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeForm();
+            }
+        });
+    }
+
+    function updateScopeBanner(banner) {
+        if (!banner) return;
+        const i18n = getI18n();
+        banner.textContent = currentScope === 'dark'
+            ? (i18n.themeAddVariableTargetDark  || 'Adding to: Dark scope')
+            : (i18n.themeAddVariableTargetLight || 'Adding to: Light scope');
+    }
+
+    function refreshAllScopeBanners() {
+        document.querySelectorAll('.preview-theme-add [data-scope-banner]').forEach(updateScopeBanner);
+    }
+
+    function closeAllAddForms() {
+        document.querySelectorAll('.preview-theme-add [data-form]').forEach(function (form) {
+            form.hidden = true;
+            const c = form.closest('.preview-theme-add');
+            if (!c) return;
+            const n = c.querySelector('[data-input-name]');
+            const v = c.querySelector('[data-input-value]');
+            if (n) n.value = '';
+            if (v) v.value = '';
+        });
+    }
+
+    async function submitThemeAddVariable(container, nameInput, valueInput, alsoOtherCb, submitBtn, closeForm) {
+        const i18n = getI18n();
+        let name = (nameInput.value || '').trim();
+        const value = (valueInput.value || '').trim();
+
+        if (!name || name === '--') {
+            showToast(i18n.themeAddVariableNameRequired || 'Variable name is required', 'warning');
+            nameInput.focus();
+            return;
+        }
+        if (!value) {
+            showToast(i18n.themeAddVariableValueRequired || 'Value is required', 'warning');
+            valueInput.focus();
+            return;
+        }
+        if (!name.startsWith('--')) name = '--' + name;
+
+        if (Object.prototype.hasOwnProperty.call(originalThemeVariables, name)
+            || Object.prototype.hasOwnProperty.call(currentThemeVariables, name)) {
+            const msg = (i18n.themeAddVariableNameExists || 'Variable {name} already exists').replace('{name}', name);
+            showToast(msg, 'warning');
+            nameInput.focus();
+            return;
+        }
+
+        const alsoOther = !!(alsoOtherCb && alsoOtherCb.checked);
+        if (submitBtn) submitBtn.disabled = true;
+        try {
+            await postSetRootVariable(name, value, currentScope);
+            if (alsoOther) {
+                const otherScope = (currentScope === 'dark') ? 'light' : 'dark';
+                await postSetRootVariable(name, value, otherScope);
+            }
+
+            // Local state: only the current-scope value matters for the
+            // editor's diff baseline. The other-scope write is a no-op
+            // for our in-memory state (we'd see it on next scope switch).
+            originalThemeVariables[name] = value;
+            currentThemeVariables[name] = value;
+
+            // Re-render to include the new variable in the appropriate
+            // section's grid. The add-form containers live OUTSIDE the
+            // grid divs that get cleared, so they stay intact.
+            populateThemeEditor(originalThemeVariables);
+
+            const tpl = alsoOther
+                ? (i18n.themeAddVariableAddedBoth || 'Variable {name} added to both scopes')
+                : (i18n.themeAddVariableAdded     || 'Variable {name} added');
+            showToast(tpl.replace('{name}', name), 'success');
+            hotReloadCss();
+            closeForm();
+        } catch (err) {
+            const tpl = i18n.themeAddVariableAddError || 'Failed to add variable: {error}';
+            showToast(tpl.replace('{error}', (err && err.message) || ''), 'error');
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    }
+
+    async function postSetRootVariable(name, value, scope) {
+        const body = { variables: { [name]: value } };
+        if (scope === 'dark') body.themeTarget = 'dark';
+
+        if (window.QuickSiteAPI && QuickSiteAPI.request) {
+            const result = await QuickSiteAPI.request('setRootVariables', 'POST', body);
+            if (!result.ok) {
+                throw new Error((result.data && (result.data.message || result.data.error)) || 'Save failed');
+            }
+            return result.data;
+        }
+        const headers = { 'Content-Type': 'application/json' };
+        const authToken = getAuthToken();
+        if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+        const response = await fetch(getManagementUrl() + 'setRootVariables', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(body)
+        });
+        const data = await response.json();
+        if (data.status !== 200 && data.status !== 201) {
+            throw new Error(data.message || 'Save failed');
+        }
+        return data;
+    }
+
     // ==================== Event Listeners ====================
-    
+
     if (themeResetBtn) {
         themeResetBtn.addEventListener('click', resetThemeVariables);
     }
-    
+
     if (themeSaveBtn) {
         themeSaveBtn.addEventListener('click', saveThemeVariables);
     }
-    
+
+    // A3 slice 6 — wire all `.preview-theme-add` toggles + forms.
+    initThemeAddForms();
+
     // ==================== Public API ====================
     
+    /**
+     * Mark the in-memory cache stale so the next view triggers a fresh
+     * fetch. Used by Source (A3 slice 6 fix) when its save / cancel
+     * rewrites style.css — without this, the Theme tab would keep
+     * showing the variables it loaded before the Source write.
+     */
+    function invalidate() {
+        themeVariablesLoaded = false;
+    }
+
     window.PreviewStyleTheme = {
         load: loadThemeVariables,
         save: saveThemeVariables,
         reset: resetThemeVariables,
+        invalidate,
         switchScope,
         getScope: () => currentScope,
         isLoaded: () => themeVariablesLoaded,

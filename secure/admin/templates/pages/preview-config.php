@@ -367,7 +367,21 @@ window.PreviewConfig = {
             variableCollisionChildHint: <?= json_encode(__admin('preview.variableCollisionChildHint', 'is used by:')) ?>,
             variableCollisionHint: <?= json_encode(__admin('preview.variableCollisionHint', 'These variables exist in both parent and child:')) ?>,
             variableDuplicate: <?= json_encode(__admin('preview.variableDuplicate', 'Duplicate variable!')) ?>,
-            variableDuplicateHint: <?= json_encode(__admin('preview.variableDuplicateHint', 'already exists in this component.')) ?>
+            variableDuplicateHint: <?= json_encode(__admin('preview.variableDuplicateHint', 'already exists in this component.')) ?>,
+            // A3 slice 6 — Theme quick-add
+            themeAddVariable: <?= json_encode(__admin('preview.themeAddVariable', 'Add variable')) ?>,
+            themeAddVariableNameLabel: <?= json_encode(__admin('preview.themeAddVariableNameLabel', 'Name')) ?>,
+            themeAddVariableValueLabel: <?= json_encode(__admin('preview.themeAddVariableValueLabel', 'Value')) ?>,
+            themeAddVariableSubmit: <?= json_encode(__admin('preview.themeAddVariableSubmit', 'Add')) ?>,
+            themeAddVariableTargetLight: <?= json_encode(__admin('preview.themeAddVariableTargetLight', 'Adding to: Light scope')) ?>,
+            themeAddVariableTargetDark: <?= json_encode(__admin('preview.themeAddVariableTargetDark', 'Adding to: Dark scope')) ?>,
+            themeAddVariableAlsoOtherScope: <?= json_encode(__admin('preview.themeAddVariableAlsoOtherScope', 'Also add to the other scope')) ?>,
+            themeAddVariableNameRequired: <?= json_encode(__admin('preview.themeAddVariableNameRequired', 'Variable name is required')) ?>,
+            themeAddVariableValueRequired: <?= json_encode(__admin('preview.themeAddVariableValueRequired', 'Value is required')) ?>,
+            themeAddVariableNameExists: <?= json_encode(__admin('preview.themeAddVariableNameExists', 'Variable {name} already exists')) ?>,
+            themeAddVariableAdded: <?= json_encode(__admin('preview.themeAddVariableAdded', 'Variable {name} added')) ?>,
+            themeAddVariableAddedBoth: <?= json_encode(__admin('preview.themeAddVariableAddedBoth', 'Variable {name} added to both scopes')) ?>,
+            themeAddVariableAddError: <?= json_encode(__admin('preview.themeAddVariableAddError', 'Failed to add variable: {error}'))  ?>
         },
 
         // ── Selectors tab (preview-style-selectors.js) ──
@@ -424,6 +438,36 @@ window.PreviewConfig = {
             toggleStates: <?= json_encode(__admin('preview.toggleStates', 'Toggle States')) ?>
         },
 
+        // ── Source tab (preview-style-source.js — Beta.9 A3) ──
+        source: {
+            styleSource: <?= json_encode(__admin('preview.styleSource', 'Source')) ?>,
+            styleSourceHint: <?= json_encode(__admin('preview.styleSourceHint', 'Edit the full style.css source')) ?>,
+            styleSourceComingSoon: <?= json_encode(__admin('preview.styleSourceComingSoon', 'Source editor coming in the next slice')) ?>,
+            styleSourceRefine: <?= json_encode(__admin('preview.styleSourceRefine', 'Refine in CSS Refiner')) ?>,
+            styleSourceFile: <?= json_encode(__admin('preview.styleSourceFile', 'File')) ?>,
+            styleSourceEditInCanvas: <?= json_encode(__admin('preview.styleSourceEditInCanvas', 'Edit style.css in the canvas')) ?>,
+            styleSourceLoading: <?= json_encode(__admin('preview.styleSourceLoading', 'Loading style.css…')) ?>,
+            styleSourceLoadError: <?= json_encode(__admin('preview.styleSourceLoadError', 'Failed to load style.css')) ?>,
+            styleSourceFindPlaceholder: <?= json_encode(__admin('preview.styleSourceFindPlaceholder', 'Find… (type :N to jump to line N)')) ?>,
+            styleSourceFindPrev: <?= json_encode(__admin('preview.styleSourceFindPrev', 'Previous match (Shift+Enter)')) ?>,
+            styleSourceFindNext: <?= json_encode(__admin('preview.styleSourceFindNext', 'Next match (Enter)')) ?>,
+            styleSourceFindNoMatch: <?= json_encode(__admin('preview.styleSourceFindNoMatch', 'No match')) ?>,
+            styleSourceFindCount: <?= json_encode(__admin('preview.styleSourceFindCount', '{current}/{total}')) ?>,
+            styleSourceSave: <?= json_encode(__admin('preview.styleSourceSave', 'Save')) ?>,
+            styleSourceCancel: <?= json_encode(__admin('preview.styleSourceCancel', 'Cancel')) ?>,
+            styleSourceDirty: <?= json_encode(__admin('preview.styleSourceDirty', 'Unsaved changes')) ?>,
+            styleSourceClean: <?= json_encode(__admin('preview.styleSourceClean', 'All saved')) ?>,
+            styleSourceSaving: <?= json_encode(__admin('preview.styleSourceSaving', 'Saving…')) ?>,
+            styleSourceSaved: <?= json_encode(__admin('preview.styleSourceSaved', 'style.css saved')) ?>,
+            styleSourceSaveError: <?= json_encode(__admin('preview.styleSourceSaveError', 'Save failed: {error}')) ?>,
+            styleSourceCancelConfirm: <?= json_encode(__admin('preview.styleSourceCancelConfirm', 'Discard unsaved changes and reload style.css from the server?')) ?>,
+            styleSourceSwitchConfirm: <?= json_encode(__admin('preview.styleSourceSwitchConfirm', 'You have unsaved Source edits. Discard them and switch?')) ?>,
+            styleSourceRestoreTitle: <?= json_encode(__admin('preview.styleSourceRestoreTitle', 'Unsaved draft available')) ?>,
+            styleSourceRestoreDetail: <?= json_encode(__admin('preview.styleSourceRestoreDetail', 'From {time}')) ?>,
+            styleSourceRestoreAccept: <?= json_encode(__admin('preview.styleSourceRestoreAccept', 'Restore')) ?>,
+            styleSourceRestoreDecline: <?= json_encode(__admin('preview.styleSourceRestoreDecline', 'Discard')) ?>
+        },
+
         // ── Translation manager panel (preview-translation.js — Beta.9 A4) ──
         translation: {
             translationScopeSite: <?= json_encode(__admin('preview.translationScopeSite', 'Whole site')) ?>,
@@ -462,6 +506,10 @@ window.PreviewConfig = {
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-animations.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-animations.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-selectors.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-selectors.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-editor.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-editor.js') ?>"></script>
+<!-- A3 lib/code-editor — order matters: core widget first, tokenizers register on top -->
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/lib/code-editor/code-editor.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/lib/code-editor/code-editor.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/lib/code-editor/css-tokenizer.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/lib/code-editor/css-tokenizer.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-source.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-source.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-js-interactions.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-js-interactions.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-translation.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-translation.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-transition-editor.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-transition-editor.js') ?>"></script>

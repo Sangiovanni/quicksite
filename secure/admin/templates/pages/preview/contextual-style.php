@@ -7,6 +7,19 @@
         <span><?= __admin('preview.styleModeHint') ?? 'Click an element to edit its style, or use the sections below' ?></span>
     </div>
     <!-- Style sections will be added in Phase 8.3+ -->
+    <!-- Advanced top row: Source (raw stylesheet editor). Role-gated on
+         editStyles — admin.js filterByPermissions adds .admin-hidden-permission
+         when the user lacks the command. Hidden until Style mode activates
+         (preview.js toggles display alongside the tabs row). -->
+    <div class="preview-contextual-style-advanced" id="contextual-style-advanced" data-requires-command="editStyles" style="display: none;">
+        <button type="button" class="preview-contextual-style-source-btn" id="contextual-style-source-btn" data-tab="source" title="<?= __admin('preview.styleSourceHint', 'Edit the full style.css source') ?>">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <polyline points="16 18 22 12 16 6"/>
+                <polyline points="8 6 2 12 8 18"/>
+            </svg>
+            <span><?= __admin('preview.styleSource', 'Source') ?></span>
+        </button>
+    </div>
     <div class="preview-contextual-style-tabs" id="contextual-style-tabs" style="display: none;">
         <button type="button" class="preview-contextual-style-tab preview-contextual-style-tab--active" data-tab="theme">
             <?= __admin('preview.themeVariables') ?? 'Theme' ?>
@@ -90,8 +103,44 @@
                     <div class="preview-theme-grid preview-theme-grid--colors" id="theme-colors-grid">
                         <!-- Color inputs populated by JS -->
                     </div>
+                    <!-- A3 slice 6 — quick-add variable -->
+                    <div class="preview-theme-add" data-section="colors">
+                        <button type="button" class="preview-theme-add__toggle" data-action="toggle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            <span><?= __admin('preview.themeAddVariable', 'Add variable') ?></span>
+                        </button>
+                        <div class="preview-theme-add__form" data-form hidden>
+                            <div class="preview-theme-add__scope-banner" data-scope-banner></div>
+                            <label class="preview-theme-add__also-other" data-also-other-row<?= (CONFIG['THEME_MODE_ENABLED'] ?? false) ? '' : ' hidden' ?>>
+                                <input type="checkbox" data-also-other>
+                                <span><?= __admin('preview.themeAddVariableAlsoOtherScope', 'Also add to the other scope') ?></span>
+                            </label>
+                            <div class="preview-theme-add__row">
+                                <input type="text"
+                                       class="preview-theme-add__input preview-theme-add__input--name"
+                                       data-input-name
+                                       placeholder="--color-name"
+                                       aria-label="<?= __admin('preview.themeAddVariableNameLabel', 'Name') ?>">
+                                <input type="text"
+                                       class="preview-theme-add__input preview-theme-add__input--value"
+                                       data-input-value
+                                       placeholder="<?= __admin('preview.themeAddVariableValueExampleColor', 'e.g. #c2703e') ?>"
+                                       aria-label="<?= __admin('preview.themeAddVariableValueLabel', 'Value') ?>">
+                            </div>
+                            <div class="preview-theme-add__actions">
+                                <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" data-action="cancel">
+                                    <?= __admin('common.cancel') ?? 'Cancel' ?>
+                                </button>
+                                <button type="button" class="admin-btn admin-btn--primary admin-btn--sm" data-action="submit">
+                                    <?= __admin('preview.themeAddVariableSubmit', 'Add') ?>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                
+
                 <!-- Fonts Section -->
                 <div class="preview-theme-section" id="theme-fonts-section">
                     <h4 class="preview-theme-section__title">
@@ -103,8 +152,44 @@
                     <div class="preview-theme-grid preview-theme-grid--fonts" id="theme-fonts-grid">
                         <!-- Font inputs populated by JS -->
                     </div>
+                    <!-- A3 slice 6 — quick-add variable -->
+                    <div class="preview-theme-add" data-section="fonts">
+                        <button type="button" class="preview-theme-add__toggle" data-action="toggle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            <span><?= __admin('preview.themeAddVariable', 'Add variable') ?></span>
+                        </button>
+                        <div class="preview-theme-add__form" data-form hidden>
+                            <div class="preview-theme-add__scope-banner" data-scope-banner></div>
+                            <label class="preview-theme-add__also-other" data-also-other-row<?= (CONFIG['THEME_MODE_ENABLED'] ?? false) ? '' : ' hidden' ?>>
+                                <input type="checkbox" data-also-other>
+                                <span><?= __admin('preview.themeAddVariableAlsoOtherScope', 'Also add to the other scope') ?></span>
+                            </label>
+                            <div class="preview-theme-add__row">
+                                <input type="text"
+                                       class="preview-theme-add__input preview-theme-add__input--name"
+                                       data-input-name
+                                       placeholder="--font-name"
+                                       aria-label="<?= __admin('preview.themeAddVariableNameLabel', 'Name') ?>">
+                                <input type="text"
+                                       class="preview-theme-add__input preview-theme-add__input--value"
+                                       data-input-value
+                                       placeholder="<?= __admin('preview.themeAddVariableValueExampleFont', 'e.g. Roboto, sans-serif') ?>"
+                                       aria-label="<?= __admin('preview.themeAddVariableValueLabel', 'Value') ?>">
+                            </div>
+                            <div class="preview-theme-add__actions">
+                                <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" data-action="cancel">
+                                    <?= __admin('common.cancel') ?? 'Cancel' ?>
+                                </button>
+                                <button type="button" class="admin-btn admin-btn--primary admin-btn--sm" data-action="submit">
+                                    <?= __admin('preview.themeAddVariableSubmit', 'Add') ?>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                
+
                 <!-- Spacing Section -->
                 <div class="preview-theme-section" id="theme-spacing-section">
                     <h4 class="preview-theme-section__title">
@@ -116,8 +201,44 @@
                     <div class="preview-theme-grid preview-theme-grid--spacing" id="theme-spacing-grid">
                         <!-- Spacing inputs populated by JS -->
                     </div>
+                    <!-- A3 slice 6 — quick-add variable -->
+                    <div class="preview-theme-add" data-section="spacing">
+                        <button type="button" class="preview-theme-add__toggle" data-action="toggle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            <span><?= __admin('preview.themeAddVariable', 'Add variable') ?></span>
+                        </button>
+                        <div class="preview-theme-add__form" data-form hidden>
+                            <div class="preview-theme-add__scope-banner" data-scope-banner></div>
+                            <label class="preview-theme-add__also-other" data-also-other-row<?= (CONFIG['THEME_MODE_ENABLED'] ?? false) ? '' : ' hidden' ?>>
+                                <input type="checkbox" data-also-other>
+                                <span><?= __admin('preview.themeAddVariableAlsoOtherScope', 'Also add to the other scope') ?></span>
+                            </label>
+                            <div class="preview-theme-add__row">
+                                <input type="text"
+                                       class="preview-theme-add__input preview-theme-add__input--name"
+                                       data-input-name
+                                       placeholder="--spacing-name"
+                                       aria-label="<?= __admin('preview.themeAddVariableNameLabel', 'Name') ?>">
+                                <input type="text"
+                                       class="preview-theme-add__input preview-theme-add__input--value"
+                                       data-input-value
+                                       placeholder="<?= __admin('preview.themeAddVariableValueExampleSpacing', 'e.g. 1rem, 16px') ?>"
+                                       aria-label="<?= __admin('preview.themeAddVariableValueLabel', 'Value') ?>">
+                            </div>
+                            <div class="preview-theme-add__actions">
+                                <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" data-action="cancel">
+                                    <?= __admin('common.cancel') ?? 'Cancel' ?>
+                                </button>
+                                <button type="button" class="admin-btn admin-btn--primary admin-btn--sm" data-action="submit">
+                                    <?= __admin('preview.themeAddVariableSubmit', 'Add') ?>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                
+
                 <!-- Other Variables Section -->
                 <div class="preview-theme-section" id="theme-other-section" style="display: none;">
                     <h4 class="preview-theme-section__title">
@@ -404,6 +525,70 @@
             </div>
         </div>
         
+        <!-- Source Panel (A3 — sidebar controls). The actual code editor
+             mounts in the canvas (#preview-source-canvas); this sidebar
+             carries the metadata, Save/Cancel actions, dirty indicator,
+             and Refine link. -->
+        <div class="preview-source-panel" id="source-panel" data-tab="source" style="display: none;">
+            <div class="preview-source-sidebar">
+                <div class="preview-source-sidebar__row">
+                    <span class="preview-source-sidebar__label"><?= __admin('preview.styleSourceFile', 'File') ?>:</span>
+                    <code class="preview-source-sidebar__file" id="source-sidebar-file">style.css</code>
+                </div>
+                <!-- Dirty indicator. Hidden when content === server. JS toggles
+                     the --dirty modifier when state changes. -->
+                <div class="preview-source-sidebar__status preview-source-sidebar__status--clean" id="source-sidebar-status">
+                    <span class="preview-source-sidebar__status-dot" aria-hidden="true">●</span>
+                    <span class="preview-source-sidebar__status-text" id="source-sidebar-status-text"><?= __admin('preview.styleSourceClean', 'All saved') ?></span>
+                </div>
+                <div class="preview-source-sidebar__hint">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                    <span><?= __admin('preview.styleSourceEditInCanvas', 'Edit style.css in the canvas') ?></span>
+                </div>
+                <div class="preview-source-sidebar__actions">
+                    <button type="button"
+                            id="source-sidebar-save-btn"
+                            class="admin-btn admin-btn--primary admin-btn--sm"
+                            disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                            <polyline points="17 21 17 13 7 13 7 21"/>
+                            <polyline points="7 3 7 8 15 8"/>
+                        </svg>
+                        <span id="source-sidebar-save-label"><?= __admin('preview.styleSourceSave', 'Save') ?></span>
+                    </button>
+                    <button type="button"
+                            id="source-sidebar-cancel-btn"
+                            class="admin-btn admin-btn--ghost admin-btn--sm"
+                            disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <polyline points="1 4 1 10 7 10"/>
+                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                        </svg>
+                        <span><?= __admin('preview.styleSourceCancel', 'Cancel') ?></span>
+                    </button>
+                </div>
+                <!-- Refine link navigates in the SAME tab (slice 4 review).
+                     Opening in a new tab risked the user refining there + coming
+                     back here with stale content unaware. JS click handler shows
+                     the dirty-confirm prompt if needed; native beforeunload is
+                     suppressed for this one navigation via _navigationConsented. -->
+                <a class="preview-source-sidebar__refine-link"
+                   id="source-sidebar-refine-link"
+                   href="<?= rtrim(BASE_URL, '/') ?>/admin/optimize">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                    <span><?= __admin('preview.styleSourceRefine', 'Refine in CSS Refiner') ?></span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="opacity: 0.6;">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+
         <!-- Style Editor Panel (Phase 8.5) - shows when editing a selector -->
         <div class="preview-style-editor" id="style-editor" style="display: none;">
             <div class="preview-style-editor__header">
