@@ -428,49 +428,25 @@
                 <span><?= __admin('common.loading') ?>...</span>
             </div>
             
-            <!-- Animations Content -->
+            <!-- Motion Content (A3-companion: reordered + relabeled. DOM ids
+                 stay on the old "animations" / "triggers" / "keyframes" names
+                 since the JS module's internal wiring is unchanged — only the
+                 user-facing labels move via i18n. Selectors-with-motion comes
+                 first (primary editing surface); Keyframes library is the
+                 secondary "toolbox" view below it. -->
             <div class="preview-animations-content" id="animations-content" style="display: none;">
-                
-                <!-- @keyframes Library Section -->
-                <div class="preview-animations-section" id="keyframes-section">
-                    <div class="preview-animations-section__header">
-                        <h4 class="preview-animations-section__title">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <polygon points="5 3 19 12 5 21 5 3"/>
-                            </svg>
-                            <?= __admin('preview.keyframesLibrary') ?? '@keyframes Library' ?>
-                        </h4>
-                        <span class="preview-animations-section__count" id="keyframes-count">0</span>
-                        <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="keyframe-add-btn" title="<?= __admin('preview.createKeyframe') ?? 'Create new @keyframes' ?>">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                            </svg>
-                        </button>
-                    </div>
-                    
-                    <div class="preview-animations-empty" id="keyframes-empty" style="display: none;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
-                            <polygon points="5 3 19 12 5 21 5 3"/>
-                        </svg>
-                        <span><?= __admin('preview.noKeyframes') ?? 'No @keyframes defined yet' ?></span>
-                    </div>
-                    
-                    <div class="preview-keyframes-list" id="keyframes-list">
-                        <!-- Keyframe items will be populated by JS -->
-                    </div>
-                </div>
-                
-                <!-- Animated Selectors Section -->
+
+                <!-- Selectors with motion (primary, expanded by default) -->
                 <div class="preview-animations-section" id="animated-selectors-section">
                     <div class="preview-animations-section__header">
                         <h4 class="preview-animations-section__title">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                             </svg>
-                            <?= __admin('preview.animatedSelectors') ?? 'Animated Selectors' ?>
+                            <?= __admin('preview.animatedSelectors') ?? 'Selectors with motion' ?>
                         </h4>
                     </div>
-                    
+
                     <!-- Transitions Group -->
                     <div class="preview-animations-group" data-group="transitions">
                         <button type="button" class="preview-animations-group__header preview-animations-group__header--expanded">
@@ -484,7 +460,7 @@
                             <!-- Transition selectors will be populated by JS -->
                         </div>
                     </div>
-                    
+
                     <!-- Animations Group -->
                     <div class="preview-animations-group" data-group="animations">
                         <button type="button" class="preview-animations-group__header preview-animations-group__header--expanded">
@@ -498,22 +474,27 @@
                             <!-- Animation selectors will be populated by JS -->
                         </div>
                     </div>
-                    
-                    <!-- Triggers Without Transition Group (pseudo-states that change properties without transition) -->
-                    <div class="preview-animations-group preview-animations-group--triggers" data-group="triggers">
+
+                    <!-- Hover-state-only Group (pseudo-state property changes
+                         without a transition declared). data-group="triggers"
+                         + DOM ids kept for backward compat with the JS module. -->
+                    <div class="preview-animations-group preview-animations-group--triggers" data-group="triggers" title="<?= htmlspecialchars(__admin('preview.hoverStateOnlyTooltip', 'Selectors that change appearance in :hover, :focus, etc., without a transition declared.'), ENT_QUOTES) ?>">
                         <button type="button" class="preview-animations-group__header">
                             <svg class="preview-animations-group__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                                 <polyline points="6 9 12 15 18 9"/>
                             </svg>
-                            <span class="preview-animations-group__title"><?= __admin('preview.triggersNoTransition') ?? 'Triggers (No Transition)' ?></span>
+                            <span class="preview-animations-group__title"><?= __admin('preview.triggersNoTransition') ?? 'Hover-state-only' ?></span>
+                            <svg class="preview-animations-group__info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                            </svg>
                             <span class="preview-animations-group__count preview-animations-group__count--muted" id="triggers-count">0</span>
                         </button>
                         <div class="preview-animations-group__list preview-animations-group__list--collapsed" id="triggers-list">
                             <!-- Trigger-only selectors will be populated by JS -->
                         </div>
                     </div>
-                    
-                    <!-- Empty State for Animated Selectors -->
+
+                    <!-- Empty State for Selectors with motion -->
                     <div class="preview-animations-empty" id="animated-empty" style="display: none;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
                             <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
@@ -521,7 +502,36 @@
                         <span><?= __admin('preview.noAnimatedSelectors') ?? 'No selectors with transitions or animations' ?></span>
                     </div>
                 </div>
-                
+
+                <!-- Keyframes library (secondary, browse the toolbox) -->
+                <div class="preview-animations-section" id="keyframes-section">
+                    <div class="preview-animations-section__header">
+                        <h4 class="preview-animations-section__title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                            <?= __admin('preview.keyframesLibrary') ?? 'Keyframes library' ?>
+                        </h4>
+                        <span class="preview-animations-section__count" id="keyframes-count">0</span>
+                        <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="keyframe-add-btn" title="<?= __admin('preview.createKeyframe') ?? 'Create new @keyframes' ?>">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="preview-animations-empty" id="keyframes-empty" style="display: none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        <span><?= __admin('preview.noKeyframes') ?? 'No @keyframes defined yet' ?></span>
+                    </div>
+
+                    <div class="preview-keyframes-list" id="keyframes-list">
+                        <!-- Keyframe items will be populated by JS -->
+                    </div>
+                </div>
+
             </div>
         </div>
         

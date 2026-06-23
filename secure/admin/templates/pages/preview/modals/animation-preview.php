@@ -40,6 +40,19 @@
                         <option value="ease-out">ease-out</option>
                         <option value="ease-in-out">ease-in-out</option>
                     </select>
+                    <!-- A3-companion Motion Slice 3 — opens QSEasingPicker with
+                         the select's current value pre-loaded; confirm adds the
+                         resulting cubic-bezier as a new option + selects it. -->
+                    <button type="button"
+                            class="admin-btn admin-btn--ghost admin-btn--sm"
+                            id="animation-preview-timing-custom"
+                            title="<?= __admin('preview.easingPickerTitle', 'Easing curve') ?>">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                            <path d="M3 18 C 9 18, 9 6, 21 6"/>
+                            <circle cx="3" cy="18" r="1.5" fill="currentColor"/>
+                            <circle cx="21" cy="6" r="1.5" fill="currentColor"/>
+                        </svg>
+                    </button>
                 </div>
                 
                 <!-- Delay -->

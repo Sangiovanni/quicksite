@@ -435,7 +435,46 @@ window.PreviewConfig = {
             previewingAnimation: <?= json_encode(__admin('preview.previewingAnimation', 'Previewing animation')) ?>,
             saveKeyframeFailed: <?= json_encode(__admin('preview.saveKeyframeFailed', 'Failed to save keyframe')) ?>,
             states: <?= json_encode(__admin('preview.states', 'States')) ?>,
-            toggleStates: <?= json_encode(__admin('preview.toggleStates', 'Toggle States')) ?>
+            toggleStates: <?= json_encode(__admin('preview.toggleStates', 'Toggle States')) ?>,
+            // Motion Slice 2 — apply-keyframe-to-selector
+            applyKeyframeToSelector: <?= json_encode(__admin('preview.applyKeyframeToSelector', 'Apply to selector…')) ?>,
+            applyKeyframeTitle: <?= json_encode(__admin('preview.applyKeyframeTitle', 'Apply')) ?>,
+            applyKeyframeTitleTo: <?= json_encode(__admin('preview.applyKeyframeTitleTo', 'to selector')) ?>,
+            applyKeyframeAction: <?= json_encode(__admin('preview.applyKeyframeAction', 'Apply')) ?>,
+            applyKeyframeNoSelectors: <?= json_encode(__admin('preview.applyKeyframeNoSelectors', 'No selectors yet — add one via the Selectors tab.')) ?>,
+            applyKeyframeNoMatch: <?= json_encode(__admin('preview.applyKeyframeNoMatch', 'No selector matches.')) ?>,
+            applyKeyframeAdded: <?= json_encode(__admin('preview.applyKeyframeAdded', '{name} applied to {selector}')) ?>,
+            applyKeyframeError: <?= json_encode(__admin('preview.applyKeyframeError', 'Failed to apply: {error}')) ?>,
+            // Motion Slice 2b — keyframe used-by + remove
+            keyframeUsedByCount: <?= json_encode(__admin('preview.keyframeUsedByCount', 'used by {n}')) ?>,
+            keyframeUsedByTitle: <?= json_encode(__admin('preview.keyframeUsedByTitle', 'Show selectors using this keyframe')) ?>,
+            keyframeRemoveFromSelector: <?= json_encode(__admin('preview.keyframeRemoveFromSelector', 'Remove animation from this selector')) ?>,
+            keyframeRemoveConfirm: <?= json_encode(__admin('preview.keyframeRemoveConfirm', 'Remove animation from {selector}?')) ?>,
+            keyframeRemoved: <?= json_encode(__admin('preview.keyframeRemoved', 'Animation removed from {selector}')) ?>,
+            keyframeRemoveError: <?= json_encode(__admin('preview.keyframeRemoveError', 'Failed to remove: {error}')) ?>,
+            // Motion Slice 3 — easing picker (top-level keys for the lib)
+            easingPickerTitle: <?= json_encode(__admin('preview.easingPickerTitle', 'Easing curve')) ?>,
+            easingPickerReplay: <?= json_encode(__admin('preview.easingPickerReplay', '▶ Replay')) ?>,
+            easingPickerCustom: <?= json_encode(__admin('preview.easingPickerCustom', 'Custom…'))   ?>,
+            // Motion Slice 4 — transition wizard
+            addTransition: <?= json_encode(__admin('preview.addTransition', 'Add transition')) ?>,
+            addTransitionTitle: <?= json_encode(__admin('preview.addTransitionTitle', 'Add transition')) ?>,
+            addTransitionSelector: <?= json_encode(__admin('preview.addTransitionSelector', 'Selector')) ?>,
+            addTransitionProperty: <?= json_encode(__admin('preview.addTransitionProperty', 'Property')) ?>,
+            addTransitionDuration: <?= json_encode(__admin('preview.addTransitionDuration', 'Duration')) ?>,
+            addTransitionEasing: <?= json_encode(__admin('preview.addTransitionEasing', 'Easing')) ?>,
+            addTransitionDelay: <?= json_encode(__admin('preview.addTransitionDelay', 'Delay')) ?>,
+            addTransitionMs: <?= json_encode(__admin('preview.addTransitionMs', 'ms')) ?>,
+            addTransitionPropertyPlaceholder: <?= json_encode(__admin('preview.addTransitionPropertyPlaceholder', 'or type a custom property')) ?>,
+            addTransitionSelectorSearchPlaceholder: <?= json_encode(__admin('preview.addTransitionSelectorSearchPlaceholder', 'Search selectors…')) ?>,
+            addTransitionEasingEditBtn: <?= json_encode(__admin('preview.addTransitionEasingEditBtn', 'Edit curve…')) ?>,
+            addTransitionSubmit: <?= json_encode(__admin('preview.addTransitionSubmit', 'Add transition')) ?>,
+            addTransitionPreviewLabel: <?= json_encode(__admin('preview.addTransitionPreviewLabel', 'Preview')) ?>,
+            addTransitionExistingHint: <?= json_encode(__admin('preview.addTransitionExistingHint', 'This selector already has a transition. Submitting will overwrite it.')) ?>,
+            addTransitionAdded: <?= json_encode(__admin('preview.addTransitionAdded', 'Transition added to {selector}')) ?>,
+            addTransitionError: <?= json_encode(__admin('preview.addTransitionError', 'Failed to add transition: {error}')) ?>,
+            addTransitionPropertyRequired: <?= json_encode(__admin('preview.addTransitionPropertyRequired', 'Property is required')) ?>,
+            addTransitionSelectorRequired: <?= json_encode(__admin('preview.addTransitionSelectorRequired', 'Pick a selector first')) ?>
         },
 
         // ── Source tab (preview-style-source.js — Beta.9 A3) ──
@@ -503,12 +542,14 @@ window.PreviewConfig = {
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-state.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-state.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-navigation.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-navigation.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-theme.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-theme.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-animations.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-animations.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-motion.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-motion.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-selectors.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-selectors.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-editor.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-editor.js') ?>"></script>
 <!-- A3 lib/code-editor — order matters: core widget first, tokenizers register on top -->
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/lib/code-editor/code-editor.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/lib/code-editor/code-editor.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/lib/code-editor/css-tokenizer.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/lib/code-editor/css-tokenizer.js') ?>"></script>
+<!-- A3-companion Motion Slice 3 lib — cubic-bezier easing picker -->
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/lib/easing-picker/easing-picker.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/lib/easing-picker/easing-picker.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-source.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-source.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-js-interactions.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-js-interactions.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-translation.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-translation.js') ?>"></script>

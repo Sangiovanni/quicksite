@@ -2098,7 +2098,7 @@
                 }
             });
             PreviewTransitionEditor.setOpenAnimationPreviewModal(
-                window.PreviewStyleAnimations?.openAnimationPreviewModal || function() {}
+                window.PreviewStyleMotion?.openAnimationPreviewModal || function() {}
             );
             PreviewTransitionEditor.setGetKeyframesData(() => keyframesData);
             PreviewTransitionEditor.setGetThemeVariables(() => {
@@ -3420,7 +3420,7 @@
         const moduleByTab = {
             theme:      window.PreviewStyleTheme,
             selectors:  window.PreviewSelectorBrowser,
-            animations: window.PreviewStyleAnimations
+            animations: window.PreviewStyleMotion
         };
         const activeMod = moduleByTab[activeStyleTab];
         if (activeMod && activeMod.isLoaded && !activeMod.isLoaded() && activeMod.load) {
@@ -3475,7 +3475,7 @@
                 const moduleByTab = {
                     theme:      window.PreviewStyleTheme,
                     selectors:  window.PreviewSelectorBrowser,
-                    animations: window.PreviewStyleAnimations
+                    animations: window.PreviewStyleMotion
                 };
                 const targetMod = moduleByTab[tabName];
                 if (targetMod && targetMod.isLoaded && !targetMod.isLoaded() && targetMod.load) {
@@ -3503,17 +3503,17 @@
     // ==================== Animations Tab ====================
     // Animation functionality has been extracted to preview-style-animations.js
     // See: /admin/assets/js/pages/preview/preview-style-animations.js
-    // Public API: PreviewStyleAnimations.init(), .load(), .isLoaded(), .reset()
+    // Public API: PreviewStyleMotion.init(), .load(), .isLoaded(), .reset()
     
     // Delegate to animations module
     function loadAnimationsTab() {
-        if (window.PreviewStyleAnimations) {
-            PreviewStyleAnimations.load();
+        if (window.PreviewStyleMotion) {
+            PreviewStyleMotion.load();
         }
     }
     
     function initAnimationsGroups() {
-        // Handled by PreviewStyleAnimations module during init
+        // Handled by PreviewStyleMotion module during init
     }
     
     // ==================== Selector Browser (Phase 8.4) ====================

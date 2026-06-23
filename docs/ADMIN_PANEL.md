@@ -162,6 +162,14 @@ A small in-tree code-editor widget consumed by the Source view in CSS mode (§8.
 
 The widget exposes `getValue / setValue / focus / destroy / resetScroll / setMatches / clearMatches / scrollRangeIntoView / scrollToLine`. Search-match overlay (used by Source view) paints into a separate `<pre>` layer between the highlight and the textarea.
 
+### 5.8 Easing picker library (`lib/easing-picker/`)
+
+A self-contained `cubic-bezier()` curve picker consumed by the Motion tab (§8.11) — the Animation Preview modal's timing-function field and the Transition wizard's easing input both open it.
+
+- **`easing-picker.js`** — popover dialog with a 220×220 SVG curve canvas, two `pointer`-event-driven control-point handles, 5 preset chips (`linear` / `ease` / `ease-in` / `ease-out` / `ease-in-out`), 4 numeric inputs (`x1`, `y1`, `x2`, `y2`) and an animated dot preview that runs the current curve over a horizontal bar (replay button to retrigger). Anchor-positioned (clamps to viewport, flips above the anchor if no room below) or centered fallback when no anchor is supplied.
+
+Public API: `QSEasingPicker.open({ anchor, value, onConfirm, onCancel })` → on confirm returns the resulting easing string (named preset if values match exactly, otherwise `cubic-bezier(x1, y1, x2, y2)`). Also exposes `close()`, `PRESETS` (name → `[x1, y1, x2, y2]` array), and `parseValue(string)`.
+
 ---
 
 ## 6. Storage key registry
@@ -214,7 +222,7 @@ The sidebar exposes one action button (Refresh) plus five editing modes — six 
 | **Select** | Mode | Click an element → inspect node, add a sibling/child, **edit its params + class + mandatory attrs in place** (via the Edit Params button), delete, duplicate, or save as snippet / component. |
 | **Drag** | Mode | Drag elements to reorder within parent (`preview-drag.js`). |
 | **Text** | Mode | Inline-edit a text node's translation **for the currently selected language**. Intentionally primitive: no rich text, no line breaks. Edits the value, never the key. |
-| **CSS** | Mode | Click an element → CSS panel (Theme / Selectors / Animations tabs); edits apply to the element's selector with full pseudo-state support. The Theme tab includes an inline **+ Add variable** form per section (Colors / Fonts / Spacing) for scope-aware writes (current light/dark scope, optional "also other scope" when dark mode is enabled). Designer / developer / admin roles also see a top-row **Source** advanced view that opens the whole `style.css` in a code editor — see §8.10. |
+| **CSS** | Mode | Click an element → CSS panel (Theme / Selectors / Motion tabs); edits apply to the element's selector with full pseudo-state support. The Theme tab includes an inline **+ Add variable** form per section (Colors / Fonts / Spacing) for scope-aware writes (current light/dark scope, optional "also other scope" when dark mode is enabled). The Motion tab (formerly Animations) is reshaped around two sections: **Selectors with motion** (transitions + animations + a "hover-state-only" diagnostic) and the **Keyframes library** below — see §8.11. Designer / developer / admin roles also see a top-row **Source** advanced view that opens the whole `style.css` in a code editor — see §8.10. |
 | **Interactions** | Mode | Event editor (`preview-js-interactions.js`). Three CRUD-capable panels: **per-element interactions** (the selected node's `onclick`/`oninput`/etc.), **Page Events** (page-level `onload`/`onresize`/`onscroll`), and **State Stores** (page-scoped state). Each interaction is a `{{call:fn:args}}` chain using a QS.* verb from the catalog. |
 | **Translations** | Mode | Site-wide translation key manager (`preview-translation.js`). Per-language coverage % + counts, scope picker (Pages / Layout / Components), inline row-expand editor, per-row + bulk delete. Mono- and multi-lingual. See §8.9. |
 
@@ -592,6 +600,68 @@ Match highlighting paints into a separate `<pre>` overlay layer (between the hig
 | Storage key | `STYLE_SOURCE_DRAFT` in `js/core/storage-keys.js` (see §6) |
 | Server: read | `getStyles` (returns `{ content, file, size, modified }`) |
 | Server: write | `editStyles` (whole-file replace; basic CSS injection blacklist; writes both live + project copies) |
+
+### 8.11 Motion tab (CSS mode)
+
+The third tab of CSS mode — manages CSS transitions, animations, and the `@keyframes` library for the current project. Renamed from "Animations" (the old label collided with the inner "animations" sub-group and led to the "Animations > Animations" head-scratcher).
+
+**Where you land it from:** CSS sidebar mode → click the **Motion** tab.
+
+**Two top-level sections:**
+
+| Section | Default state | Content |
+|---|---|---|
+| **Selectors with motion** | Expanded | Transitions / Animations / Hover-state-only sub-groups. Lists every selector currently using a `transition:` or `animation:` declaration. |
+| **Keyframes library** | Expanded | Every `@keyframes` rule in the stylesheet, with per-row actions to preview, apply to a selector, edit, and delete. |
+
+**Selectors with motion** lists three sub-groups:
+
+| Sub-group | What goes here |
+|---|---|
+| **Transitions** | Selectors with a `transition:` declaration. Tops the list with a "+ Add transition" button that opens the Transition wizard (below). |
+| **Animations** | Selectors with an `animation:` declaration. |
+| **Hover-state-only** | Diagnostic group (collapsed by default). Selectors that change appearance in `:hover` / `:focus` / etc. without declaring a `transition` — common authoring oversight. The header carries an ⓘ icon + tooltip explaining what the group means. |
+
+Clicking any row opens the existing State & Animation Editor (`modals/transition.php`) scoped to that selector.
+
+**Keyframes library** lists `@keyframes` rules with four row actions:
+
+| Action | What it does |
+|---|---|
+| ▶ Preview | Opens the existing Animation Preview modal (`modals/animation-preview.php`) running the keyframe over a sample logo. |
+| → Apply to selector… | Opens the **Apply-keyframe modal** — pick a selector from a searchable list; writes `animation: <name> 1s ease;` to that rule via `setStyleRule`. Default value is one-shot; users can refine via Selectors → Edit Styles. |
+| ✎ Edit | Opens the keyframe editor (`modals/keyframe.php`) on this keyframe. |
+| 🗑 Delete | Removes the `@keyframes` rule via `deleteKeyframes`. |
+
+If the keyframe is used by ≥ 1 selector, a **used by N** chip appears next to the frame count. Clicking it expands an inline list below the row, each line showing a selector + an ✕ remove button that strips the `animation:` declaration from that rule (via `setStyleRule` with `removeProperties: ['animation']`). The data is pivoted from the same `animatedSelectorsData.animations` cache that drives the Animations sub-group, so the badge count updates immediately on any apply / remove inside the session.
+
+**Transition wizard** (modal opened from "+ Add transition" at the top of the Transitions sub-group):
+
+| Field | Affordance |
+|---|---|
+| Selector | Search input + filterable list (same source as the Selectors tab). |
+| Property | Preset chips (opacity / transform / color / background-color / border-color / box-shadow / all) plus a free-text input for any custom CSS property. Chip and input stay in sync. |
+| Duration | Number input (ms; default 300). |
+| Easing | Button showing the current value; opens `QSEasingPicker` (see §5.8) pre-loaded with that value. |
+| Delay | Number input (ms; default 0; omitted from the output when 0). |
+
+If the picked selector already has a transition, the form pre-fills from `animatedSelectorsData.transitions[i].parsed[0]` (CSS times normalised to integer ms) + an amber "will overwrite" hint appears. Submit writes `transition: <prop> <dur>ms <easing> <delay>ms;` via `setStyleRule`. The structured-tabs caches invalidate so the new entry surfaces in the Transitions sub-group on the next view; `PreviewState.hotReloadCss()` flushes the iframe's stylesheet.
+
+**Easing picker** (`QSEasingPicker`, §5.8) is shared between the wizard's easing field and the Animation Preview modal's Timing Function "custom curve" button.
+
+**Files**
+
+| Concern | Where |
+|---|---|
+| Panel template (sections + groups + tooltip) | `secure/admin/templates/pages/preview/contextual-style.php` |
+| JS module | `public/admin/assets/js/pages/preview/preview-style-motion.js` (renamed from `preview-style-animations.js`; window global `PreviewStyleMotion`) |
+| Apply-keyframe modal | `secure/admin/templates/pages/preview/modals/apply-keyframe.php` |
+| Add-transition wizard modal | `secure/admin/templates/pages/preview/modals/add-transition.php` |
+| Easing picker | `public/admin/assets/js/lib/easing-picker/` (see §5.8) |
+| i18n keys exposed to JS | `secure/admin/templates/pages/preview-config.php` (`i18nPanels.animations` block — the panel key is kept on the old "animations" name for backward compat with the existing routing) |
+| CSS | `public/admin/assets/admin.css` (`.preview-keyframe-item*`, `.preview-animations-*`, `.apply-keyframe-modal*`, `.add-transition-modal*`, `.qs-easing-picker*`) |
+| Server: read | `listKeyframes`, `getAnimatedSelectors` |
+| Server: write | `setStyleRule` (apply-keyframe, remove-from-selector, add-transition all go through it; the remove path uses `removeProperties: ['animation']`); `setKeyframes`, `deleteKeyframes` |
 
 ---
 

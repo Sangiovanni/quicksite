@@ -122,6 +122,8 @@ if (is_dir($componentsDir)) {
 <?php include __DIR__ . '/preview/modals/transform.php'; ?>
 <?php include __DIR__ . '/preview/modals/transition.php'; ?>
 <?php include __DIR__ . '/preview/modals/animation-preview.php'; ?>
+<?php include __DIR__ . '/preview/modals/apply-keyframe.php'; ?>
+<?php include __DIR__ . '/preview/modals/add-transition.php'; ?>
 <?php include __DIR__ . '/preview/modals/translate-csv.php'; ?>
 
 <script src="<?= $baseUrl ?>/admin/assets/js/components/colorpicker.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/components/colorpicker.js') ?>"></script>

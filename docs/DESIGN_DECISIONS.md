@@ -3306,3 +3306,121 @@ in `initStyleTabs` (`preview.js`) and in `deactivateSource()`
 (`preview.js`) — three exit paths from Source all converge on the
 same behaviour. Behaviour:
 [ADMIN_PANEL.md](ADMIN_PANEL.md) §8.10.
+
+### Motion tab — partial rename, public surface only (locked 2026-06-23)
+
+**Decision**: The Animations tab rename to Motion changes only the
+**user-facing label** + the **external JS API** + a few section
+identifiers. The internal DOM ids (`#animations-panel`,
+`#animations-content`, `#animations-loading`, `#keyframes-section`,
+`#keyframes-list`, `#transitions-list`, `#animations-list`, `#triggers-list`,
+the `data-group` attribute values, etc.), the tab-routing key
+(`data-tab="animations"`), the i18n panel name (`PreviewConfig.i18nPanels.animations`),
+and the JS internal function names (`loadAnimationsTab`, `populateAnimatedSelectorsList`, …)
+all stay on the old `animations` name. The JS module file renamed
+(`preview-style-animations.js` → `preview-style-motion.js`) and the
+window global renamed (`PreviewStyleAnimations` → `PreviewStyleMotion`).
+
+**Reasoning**: The DOM ids appear in ~12 CSS selectors and a dozen
+`document.getElementById` lookups. The routing key + i18n panel name
+appear in `preview.js`'s tab dispatch table, in `ensureI18nPanel`
+calls, and in `preview-config.php`'s `i18nPanels` block. Renaming all
+of them would touch ~25 callsites for zero user-visible payoff — the
+tab label is what users see, and that's i18n-driven. The public API
+(file path + window global) IS user-visible to module callers and
+matches the new conceptual name; renaming there is worth the small
+churn (3 callers).
+
+**Alternatives considered**:
+
+- **Full rename** (DOM ids, routing key, i18n panel name, internal
+  function names all to `motion`) — rejected as scope creep. ~25
+  callsites; risk of subtle breakage from missed references for no
+  user benefit.
+- **No rename at all, just relabel via i18n** — rejected. The file
+  name `preview-style-animations.js` carrying a window global
+  `PreviewStyleAnimations` while the user-facing label says "Motion"
+  is confusing for anyone reading the codebase fresh.
+
+**Source**: A3-companion Slice 1 (2026-06-23). Implementation:
+`git mv` for the file rename; class-name replace via
+`Edit replace_all` for the 3 callers + the script tag in
+`preview-config.php`. Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §8.11.
+
+### Apply-keyframe + Add-transition — write through setStyleRule with opinionated defaults (locked 2026-06-23)
+
+**Decision**: The Motion tab's two write surfaces — "Apply keyframe to
+selector" (Slice 2) and the Transition wizard (Slice 4) — write
+through `setStyleRule` with single opinionated defaults rather than
+exposing every CSS knob in the modal:
+
+- **Apply keyframe** writes `animation: <name> 1s ease;` — one-shot
+  (no iteration count), 1-second duration, default easing. Users
+  refine via Selectors → Edit Styles.
+- **Add transition** writes `transition: <prop> <dur>ms <easing> <delay>ms;`
+  with the form's collected values. Delay is omitted when 0. The
+  picked selector's existing transition (if any) is overwritten —
+  the modal surfaces a hint to make this explicit.
+
+**Reasoning**: The Motion tab is about quick affordances ("apply this
+keyframe over there"). A long form with iteration-count / fill-mode /
+direction / play-state inputs would make the most common case
+(one-shot apply, sensible duration) feel heavy. The existing
+Selectors → Edit Styles path remains available for the full
+shorthand. The "overwrite existing" choice over "merge / append a
+second transition" mirrors the underlying CssParser merge semantics
+(setStyleRule merges by property name, and `transition` is a single
+property), avoids surprising the user with two transitions stacking
+silently, and keeps the wizard idempotent (run it twice with the
+same inputs → same result).
+
+**Alternatives considered**:
+
+- **Full-shorthand form** (every animation/transition sub-property as
+  an input) — rejected as scope. The wizard would become its own
+  panel rather than a small modal; the value would be marginal over
+  the existing Edit Styles flow.
+- **Append rather than overwrite** for transitions — rejected.
+  `setStyleRule` merges by property name, so appending would require
+  client-side concatenation of the existing transition value with
+  the new one, plus deduplication of the property field — fragile
+  and rarely the user's intent (they think "set the transition for
+  this selector", not "add another transition layer").
+
+**Source**: A3-companion Slices 2 + 4 (2026-06-23). Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §8.11.
+
+### Section ordering — Selectors-with-motion primary, Keyframes library secondary (locked 2026-06-23)
+
+**Decision**: The Motion tab orders **Selectors with motion** above
+**Keyframes library**. Both sections are expanded by default.
+
+**Reasoning**: The intent flow at the editing surface is "I want to
+animate X" → pick a selector → reach for keyframes — selector-first
+matches the goal. Library-first inverts the panel against the common
+intent (browse all keyframes before deciding which to use), which
+is a less common authoring mode. The library is reachable as the
+second section without scrolling on most viewports.
+
+The balance shifts somewhat between slices: after the apply-keyframe
++ used-by features (Slices 2 + 2b) landed, the Keyframes library
+gained more affordances than Selectors-with-motion offered. Slices 3
++ 4 (easing picker + transition wizard) restored the balance by
+putting the transition-authoring weight back on
+Selectors-with-motion. Revisit the ordering after Slice 5 close if
+the felt-balance disagrees with the design intent.
+
+**Alternatives considered**:
+
+- **Keyframes library first** — rejected. The transient impression
+  during Slices 2 + 2b that the library felt "heavier" was an
+  artifact of the implementation order, not the user's intent.
+- **Collapsible-by-default for the secondary section** — rejected
+  for now. Both sections fit on a typical viewport without
+  collapsing; forcing a click adds friction. Open as a follow-up if
+  it ever becomes crowded.
+
+**Source**: A3-companion (locked at design 2026-06-22, confirmed
+post-implementation 2026-06-23). Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §8.11.

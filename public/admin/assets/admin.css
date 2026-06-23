@@ -8514,6 +8514,882 @@ code.preview-contextual-info__value {
     text-align: left;
 }
 
+/* Info icon next to a group title (A3-companion Motion Slice 1 — used by
+   the Hover-state-only group; native tooltip on parent's title= attribute). */
+.preview-animations-group__info {
+    color: var(--admin-text-muted);
+    opacity: 0.6;
+    flex: 0 0 auto;
+    margin-right: 4px;
+}
+
+/* Apply-keyframe-to-selector modal (Motion Slice 2). Opens from any
+   keyframe row in the Keyframes library → picks a selector → writes
+   `animation: <name> 1s ease;` via setStyleRule. Sits above the canvas. */
+.apply-keyframe-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.apply-keyframe-modal[hidden] {
+    display: none;
+}
+
+.apply-keyframe-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: #00000080;
+    backdrop-filter: blur(2px);
+}
+
+.apply-keyframe-modal__dialog {
+    position: relative;
+    width: min(520px, 92vw);
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--admin-bg-secondary);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+}
+
+.apply-keyframe-modal__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--admin-bg-tertiary);
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.apply-keyframe-modal__title {
+    flex: 1;
+    margin: 0;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--admin-text);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.apply-keyframe-modal__title code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85em;
+    background: var(--admin-bg);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    color: var(--admin-text);
+}
+
+.apply-keyframe-modal__close {
+    background: transparent;
+    border: 0;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.apply-keyframe-modal__close:hover {
+    background: var(--admin-hover);
+    color: var(--admin-text);
+}
+
+.apply-keyframe-modal__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    overflow: hidden;
+}
+
+.apply-keyframe-modal__search {
+    flex: 0 0 auto;
+}
+
+.apply-keyframe-modal__list {
+    flex: 1 1 auto;
+    min-height: 200px;
+    max-height: 50vh;
+    overflow-y: auto;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    background: var(--admin-bg);
+    display: flex;
+    flex-direction: column;
+}
+
+.apply-keyframe-modal__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 8px var(--space-sm);
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--admin-border);
+    color: var(--admin-text);
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+
+.apply-keyframe-modal__item:last-child {
+    border-bottom: 0;
+}
+
+.apply-keyframe-modal__item:hover {
+    background: var(--admin-hover);
+}
+
+.apply-keyframe-modal__item--selected,
+.apply-keyframe-modal__item--selected:hover {
+    background: rgba(155, 196, 226, 0.18);
+}
+
+.apply-keyframe-modal__item code {
+    flex: 1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    color: var(--admin-text);
+}
+
+.apply-keyframe-modal__item-mq {
+    flex: 0 0 auto;
+    font-size: 0.7rem;
+    color: var(--admin-text-muted);
+    background: var(--admin-bg-tertiary);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.apply-keyframe-modal__empty {
+    padding: var(--space-xl) var(--space-md);
+    text-align: center;
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.apply-keyframe-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--admin-bg-tertiary);
+    border-top: 1px solid var(--admin-border);
+}
+
+.apply-keyframe-modal__footer .admin-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Keyframe "used by N" badge + inline user list (Motion Slice 2b). The
+   badge sits next to the keyframe name + frame count; clicking it toggles
+   the expansion below the row, each user-line carries an ✕ remove button. */
+.preview-keyframe-item__used-by {
+    flex: 0 0 auto;
+    margin-left: var(--space-xs);
+    padding: 2px 8px;
+    background: rgba(155, 196, 226, 0.12);
+    border: 1px solid rgba(155, 196, 226, 0.35);
+    border-radius: 999px;
+    color: var(--admin-text);
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.preview-keyframe-item__used-by:hover {
+    background: rgba(155, 196, 226, 0.22);
+}
+
+.preview-keyframe-item__used-by--open {
+    background: rgba(155, 196, 226, 0.30);
+    border-color: rgba(155, 196, 226, 0.6);
+}
+
+/* Force the users list onto its own line below __info + __actions. The
+   parent .preview-keyframe-item is a flex row — we wrap it so the user
+   list can sit on row 2 spanning the full width. */
+.preview-keyframe-item {
+    flex-wrap: wrap;
+}
+
+.preview-keyframe-item__users {
+    flex: 0 0 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: var(--space-xs);
+    padding: var(--space-xs);
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+}
+
+.preview-keyframe-item__users[hidden] {
+    display: none;
+}
+
+.preview-keyframe-item__user {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    transition: background 0.12s;
+}
+
+.preview-keyframe-item__user:hover {
+    background: var(--admin-hover);
+}
+
+.preview-keyframe-item__user code {
+    flex: 1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    color: var(--admin-text);
+}
+
+.preview-keyframe-item__user-remove {
+    flex: 0 0 auto;
+    background: transparent;
+    border: 0;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+    padding: 2px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.preview-keyframe-item__user-remove:hover {
+    color: #d97766;
+    background: rgba(217, 119, 102, 0.12);
+}
+
+/* QSEasingPicker — cubic-bezier easing picker (Motion Slice 3). */
+.qs-easing-picker {
+    position: fixed;
+    inset: 0;
+    z-index: 10002;
+}
+
+.qs-easing-picker[hidden] {
+    display: none;
+}
+
+.qs-easing-picker__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.qs-easing-picker__dialog {
+    position: relative;
+    width: 320px;
+    margin: 80px auto;
+    background: var(--admin-bg-secondary);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+}
+
+.qs-easing-picker__dialog--anchored {
+    /* When anchored, JS sets inline position:fixed + left/top — clear
+       the centering margin so it doesn't fight the anchor placement. */
+    margin: 0;
+}
+
+.qs-easing-picker__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--admin-bg-tertiary);
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.qs-easing-picker__title {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--admin-text);
+}
+
+.qs-easing-picker__close {
+    background: transparent;
+    border: 0;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+}
+
+.qs-easing-picker__close:hover {
+    background: var(--admin-hover);
+    color: var(--admin-text);
+}
+
+.qs-easing-picker__body {
+    padding: var(--space-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.qs-easing-picker__canvas-wrap {
+    display: flex;
+    justify-content: center;
+}
+
+.qs-easing-picker__canvas {
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    cursor: default;
+    touch-action: none;  /* let pointer events drive drag, not scroll */
+}
+
+.qs-easing-picker__grid {
+    fill: none;
+    stroke: var(--admin-border);
+    stroke-width: 1;
+}
+
+.qs-easing-picker__diag {
+    stroke: var(--admin-text-light);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    opacity: 0.5;
+}
+
+.qs-easing-picker__leg {
+    stroke: var(--admin-text-muted);
+    stroke-width: 1;
+    opacity: 0.55;
+}
+
+.qs-easing-picker__curve {
+    fill: none;
+    stroke: var(--admin-accent, #c2703e);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+}
+
+.qs-easing-picker__anchor {
+    fill: var(--admin-text-light);
+}
+
+.qs-easing-picker__handle-group {
+    cursor: grab;
+}
+
+.qs-easing-picker__handle-group:active {
+    cursor: grabbing;
+}
+
+.qs-easing-picker__handle-hit {
+    fill: transparent;
+    pointer-events: all;
+}
+
+.qs-easing-picker__handle {
+    fill: var(--admin-accent, #c2703e);
+    stroke: var(--admin-bg-secondary);
+    stroke-width: 2;
+    pointer-events: none;  /* handled by the hit-area circle */
+}
+
+.qs-easing-picker__presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.qs-easing-picker__preset {
+    flex: 0 0 auto;
+    padding: 3px 10px;
+    background: transparent;
+    border: 1px solid var(--admin-border);
+    border-radius: 999px;
+    color: var(--admin-text-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.qs-easing-picker__preset:hover {
+    color: var(--admin-text);
+    background: var(--admin-hover);
+    border-color: var(--admin-text-muted);
+}
+
+.qs-easing-picker__preset--active {
+    color: var(--admin-text);
+    background: var(--admin-bg);
+    border-color: var(--admin-accent, #c2703e);
+}
+
+.qs-easing-picker__inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-xs);
+}
+
+.qs-easing-picker__input-col {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.qs-easing-picker__input-label {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    color: var(--admin-text-muted);
+    width: 2em;
+}
+
+.qs-easing-picker__input {
+    flex: 1;
+    padding: 3px 6px;
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    color: var(--admin-text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    min-width: 0;
+}
+
+.qs-easing-picker__input:focus {
+    outline: none;
+    border-color: var(--admin-border-focus);
+}
+
+.qs-easing-picker__value {
+    display: block;
+    padding: 6px 10px;
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    color: var(--admin-text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    text-align: center;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.qs-easing-picker__preview {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.qs-easing-picker__preview-bar {
+    position: relative;
+    flex: 1;
+    height: 6px;
+    background: var(--admin-bg);
+    border-radius: 999px;
+}
+
+.qs-easing-picker__preview-dot {
+    position: absolute;
+    top: -3px;
+    left: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--admin-accent, #c2703e);
+}
+
+/* The dot animates by sliding `left` from 0 to (bar width − dot width).
+   Using `left` here (not `transform`) lets us anchor to the bar's edges
+   via percentages without knowing the bar's pixel width. */
+@keyframes qs-easing-picker-preview {
+    from { left: 0; }
+    to   { left: calc(100% - 12px); }
+}
+
+.qs-easing-picker__replay {
+    flex: 0 0 auto;
+    padding: 3px 10px;
+    background: transparent;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    color: var(--admin-text-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.qs-easing-picker__replay:hover {
+    color: var(--admin-text);
+    background: var(--admin-hover);
+}
+
+.qs-easing-picker__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--admin-bg-tertiary);
+    border-top: 1px solid var(--admin-border);
+}
+
+/* "+ Add transition" trigger button — prepended to the Transitions list
+   (Motion Slice 4). Sits inside .preview-animations-group__list so it
+   inherits the collapse behaviour. */
+.preview-animations-group__add {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 6px var(--space-sm);
+    margin-bottom: 4px;
+    background: transparent;
+    border: 1px dashed var(--admin-border);
+    border-radius: var(--radius-sm);
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.preview-animations-group__add:hover {
+    color: var(--admin-text);
+    background: var(--admin-hover);
+    border-color: var(--admin-text-muted);
+}
+
+/* Add-transition wizard modal (Motion Slice 4). Mirrors the apply-keyframe
+   modal structure but with form fields for property / duration / easing /
+   delay. Easing slot opens QSEasingPicker. */
+.add-transition-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.add-transition-modal[hidden] {
+    display: none;
+}
+
+.add-transition-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+}
+
+.add-transition-modal__dialog {
+    position: relative;
+    width: min(540px, 94vw);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--admin-bg-secondary);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+}
+
+.add-transition-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--admin-bg-tertiary);
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.add-transition-modal__title {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--admin-text);
+}
+
+.add-transition-modal__close {
+    background: transparent;
+    border: 0;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.add-transition-modal__close:hover {
+    background: var(--admin-hover);
+    color: var(--admin-text);
+}
+
+.add-transition-modal__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--space-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.add-transition-modal__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.add-transition-modal__field--inline {
+    flex: 1;
+}
+
+.add-transition-modal__row {
+    display: flex;
+    gap: var(--space-sm);
+}
+
+.add-transition-modal__label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--admin-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.add-transition-modal__search {
+    flex: 0 0 auto;
+}
+
+.add-transition-modal__selector-list {
+    max-height: 180px;
+    overflow-y: auto;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    background: var(--admin-bg);
+}
+
+.add-transition-modal__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    width: 100%;
+    padding: 6px var(--space-sm);
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--admin-border);
+    color: var(--admin-text);
+    text-align: left;
+    cursor: pointer;
+}
+
+.add-transition-modal__item:last-child {
+    border-bottom: 0;
+}
+
+.add-transition-modal__item:hover {
+    background: var(--admin-hover);
+}
+
+.add-transition-modal__item--selected,
+.add-transition-modal__item--selected:hover {
+    background: rgba(155, 196, 226, 0.18);
+}
+
+.add-transition-modal__item code {
+    flex: 1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+}
+
+.add-transition-modal__item-mq {
+    flex: 0 0 auto;
+    font-size: 0.7rem;
+    color: var(--admin-text-muted);
+    background: var(--admin-bg-tertiary);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.add-transition-modal__empty {
+    padding: var(--space-md);
+    text-align: center;
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.add-transition-modal__existing-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background: rgba(224, 184, 112, 0.10);
+    border: 1px solid rgba(224, 184, 112, 0.35);
+    border-radius: var(--radius-sm);
+    color: var(--admin-text);
+    font-size: 0.75rem;
+}
+
+.add-transition-modal__existing-hint[hidden] {
+    display: none;
+}
+
+.add-transition-modal__existing-hint svg {
+    color: #e0b870;
+    flex: 0 0 auto;
+}
+
+.add-transition-modal__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.add-transition-modal__chip {
+    padding: 3px 10px;
+    background: transparent;
+    border: 1px solid var(--admin-border);
+    border-radius: 999px;
+    color: var(--admin-text-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.add-transition-modal__chip:hover {
+    color: var(--admin-text);
+    background: var(--admin-hover);
+    border-color: var(--admin-text-muted);
+}
+
+.add-transition-modal__chip--active {
+    color: var(--admin-text);
+    background: var(--admin-bg);
+    border-color: var(--admin-accent, #c2703e);
+}
+
+.add-transition-modal__property-input {
+    width: 100%;
+}
+
+.add-transition-modal__number-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.add-transition-modal__number {
+    flex: 1;
+    min-width: 0;
+}
+
+.add-transition-modal__unit {
+    font-size: 0.75rem;
+    color: var(--admin-text-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.add-transition-modal__easing-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 6px var(--space-sm);
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    color: var(--admin-text);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s;
+}
+
+.add-transition-modal__easing-btn:hover {
+    border-color: var(--admin-text-muted);
+}
+
+.add-transition-modal__easing-value {
+    flex: 1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+}
+
+.add-transition-modal__easing-edit {
+    color: var(--admin-text-muted);
+    font-size: 0.7rem;
+}
+
+.add-transition-modal__preview {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 8px var(--space-sm);
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+}
+
+.add-transition-modal__preview-label {
+    font-size: 0.7rem;
+    color: var(--admin-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex: 0 0 auto;
+}
+
+.add-transition-modal__preview-value {
+    flex: 1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    color: var(--admin-text);
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.add-transition-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--admin-bg-tertiary);
+    border-top: 1px solid var(--admin-border);
+}
+
+.add-transition-modal__footer .admin-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .preview-selectors-group__count {
     font-size: var(--font-size-xs);
     color: var(--admin-text-muted);

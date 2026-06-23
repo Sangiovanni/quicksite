@@ -554,8 +554,8 @@
             }
         } catch (e) { /* no-op */ }
         try {
-            if (window.PreviewStyleAnimations && PreviewStyleAnimations.reset) {
-                PreviewStyleAnimations.reset();
+            if (window.PreviewStyleMotion && PreviewStyleMotion.reset) {
+                PreviewStyleMotion.reset();
             }
         } catch (e) { /* no-op */ }
     }

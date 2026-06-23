@@ -1,12 +1,18 @@
 /**
- * Preview Style Animations Module
- * Handles the Animations tab in Style mode (keyframes, animated selectors)
- * 
+ * Preview Style Motion Module (renamed from Animations — A3-companion)
+ *
+ * Hosts the Motion tab in CSS mode. Section ordering: "Selectors with motion"
+ * (transitions + animations + hover-state-only) primary; "Keyframes library"
+ * secondary. The internal DOM ids (#animations-panel, #keyframes-*, etc.) and
+ * the tab routing key (data-tab="animations") are intentionally kept on the
+ * old "animations" name to avoid touching every CSS selector + JS lookup;
+ * the user-facing label "Motion" comes through i18n.
+ *
  * Dependencies:
  * - PreviewConfig global (from preview-config.php)
  * - PreviewState global (from preview-state.js)
- * 
- * @version 1.0.0
+ *
+ * @version 1.1.0
  */
 (function() {
     'use strict';
@@ -198,28 +204,31 @@
             
             const keyframesData_response = await keyframesResponse.json();
             const selectorsData = await selectorsResponse.json();
-            
-            // Process keyframes
-            if (keyframesData_response.status === 200 && keyframesData_response.data?.keyframes) {
-                keyframesData = keyframesData_response.data.keyframes;
-                populateKeyframesList();
-            } else {
-                keyframesData = [];
-                populateKeyframesList();
-            }
-            
-            // Process animated selectors
+
+            // Process animated selectors FIRST — populateKeyframesList()
+            // (below) reads animatedSelectorsData to compute the
+            // keyframe→users map for the "used by N" badges. Reversing
+            // the order means the badges would render against stale /
+            // empty cache and stay wrong until the next refresh.
             if (selectorsData.status === 200 && selectorsData.data) {
                 animatedSelectorsData = {
                     transitions: selectorsData.data.transitions || [],
                     animations: selectorsData.data.animations || [],
                     triggersWithoutTransition: selectorsData.data.triggersWithoutTransition || []
                 };
-                populateAnimatedSelectorsList();
             } else {
                 animatedSelectorsData = { transitions: [], animations: [], triggersWithoutTransition: [] };
-                populateAnimatedSelectorsList();
             }
+            populateAnimatedSelectorsList();
+
+            // Process keyframes — now animatedSelectorsData is fresh, so
+            // the used-by map is accurate.
+            if (keyframesData_response.status === 200 && keyframesData_response.data?.keyframes) {
+                keyframesData = keyframesData_response.data.keyframes;
+            } else {
+                keyframesData = [];
+            }
+            populateKeyframesList();
             
             animationsLoaded = true;
             
@@ -251,43 +260,84 @@
         }
         
         keyframesEmpty.style.display = 'none';
-        
-        keyframesList.innerHTML = keyframesData.map(kf => `
+
+        // Build keyframe→users map from cached animatedSelectorsData
+        // (no extra fetch — same data drives the Animations sub-group).
+        const usersMap = computeKeyframeUsersMap();
+
+        keyframesList.innerHTML = keyframesData.map(kf => {
+            const users = usersMap[kf.name] || [];
+            const usedByCount = users.length;
+            const tplCount = PreviewConfig.i18n.keyframeUsedByCount || 'used by {n}';
+            const usedByLabel = tplCount.replace('{n}', String(usedByCount));
+            const usedByTitle = PreviewConfig.i18n.keyframeUsedByTitle || 'Show selectors using this keyframe';
+            const removeTitle = PreviewConfig.i18n.keyframeRemoveFromSelector || 'Remove animation from this selector';
+            const usedByBadge = usedByCount > 0
+                ? `<button type="button" class="preview-keyframe-item__used-by" data-action="toggle-users" title="${escapeHtml(usedByTitle)}">${escapeHtml(usedByLabel)}</button>`
+                : '';
+            const usersListHtml = usedByCount > 0
+                ? `<div class="preview-keyframe-item__users" data-users hidden>
+                    ${users.map(sel => `
+                        <div class="preview-keyframe-item__user">
+                            <code>${escapeHtml(sel)}</code>
+                            <button type="button" class="preview-keyframe-item__user-remove" data-action="remove-user" data-target="${escapeHtml(sel)}" title="${escapeHtml(removeTitle)}">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="12" height="12">
+                                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>`
+                : '';
+        return `
             <div class="preview-keyframe-item" data-keyframe="${escapeHtml(kf.name)}">
                 <div class="preview-keyframe-item__info">
                     <span class="preview-keyframe-item__name">@keyframes ${escapeHtml(kf.name)}</span>
                     <span class="preview-keyframe-item__frames">${kf.frameCount} ${kf.frameCount === 1 ? PreviewConfig.i18n.frame : PreviewConfig.i18n.frames}</span>
+                    ${usedByBadge}
                 </div>
                 <div class="preview-keyframe-item__actions">
-                    <button type="button" class="preview-keyframe-item__btn preview-keyframe-item__btn--preview" 
+                    <button type="button" class="preview-keyframe-item__btn preview-keyframe-item__btn--preview"
                             data-action="preview" title="${PreviewConfig.i18n.previewAnimation}">
                         ${QuickSiteUtils.iconPlay(14)}
                     </button>
-                    <button type="button" class="preview-keyframe-item__btn preview-keyframe-item__btn--edit" 
+                    <button type="button" class="preview-keyframe-item__btn preview-keyframe-item__btn--apply"
+                            data-action="apply" title="${PreviewConfig.i18n.applyKeyframeToSelector || 'Apply to selector…'}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                            <polyline points="13 6 19 12 13 18"/>
+                        </svg>
+                    </button>
+                    <button type="button" class="preview-keyframe-item__btn preview-keyframe-item__btn--edit"
                             data-action="edit" title="${PreviewConfig.i18n.edit}">
                         ${QuickSiteUtils.iconEdit()}
                     </button>
-                    <button type="button" class="preview-keyframe-item__btn preview-keyframe-item__btn--delete" 
+                    <button type="button" class="preview-keyframe-item__btn preview-keyframe-item__btn--delete"
                             data-action="delete" title="${PreviewConfig.i18n.delete}">
                         ${QuickSiteUtils.iconTrash()}
                     </button>
                 </div>
+                ${usersListHtml}
             </div>
-        `).join('');
+        `;
+        }).join('');
         
-        // Add event listeners
+        // Add event listeners — row actions (preview / apply / edit / delete)
         keyframesList.querySelectorAll('.preview-keyframe-item__btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const item = btn.closest('.preview-keyframe-item');
                 const keyframeName = item?.dataset.keyframe;
                 const action = btn.dataset.action;
-                
+
                 if (!keyframeName) return;
-                
+
                 switch (action) {
                     case 'preview':
                         previewKeyframe(keyframeName);
+                        break;
+                    case 'apply':
+                        applyKeyframeToSelector(keyframeName);
                         break;
                     case 'edit':
                         editKeyframe(keyframeName);
@@ -296,6 +346,31 @@
                         deleteKeyframe(keyframeName);
                         break;
                 }
+            });
+        });
+
+        // Slice 2b — "used by N" badge toggles the inline user list.
+        keyframesList.querySelectorAll('.preview-keyframe-item__used-by').forEach(badge => {
+            badge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const item = badge.closest('.preview-keyframe-item');
+                const usersDiv = item?.querySelector('[data-users]');
+                if (!usersDiv) return;
+                usersDiv.hidden = !usersDiv.hidden;
+                badge.classList.toggle('preview-keyframe-item__used-by--open', !usersDiv.hidden);
+            });
+        });
+
+        // Slice 2b — ✕ button on each user row removes the animation from
+        // that selector via setStyleRule + removeProperties.
+        keyframesList.querySelectorAll('.preview-keyframe-item__user-remove').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const item = btn.closest('.preview-keyframe-item');
+                const keyframeName = item?.dataset.keyframe;
+                const targetSelector = btn.dataset.target;
+                if (!keyframeName || !targetSelector) return;
+                removeKeyframeFromSelector(keyframeName, targetSelector);
             });
         });
     }
@@ -349,13 +424,36 @@
         if (transitionsList && transitionsCount) {
             const transitions = animatedSelectorsData.transitions || [];
             transitionsCount.textContent = transitions.length;
-            
+
+            // Slice 4 — "+ Add transition" button prepended to the list so it
+            // shows whether the group has existing transitions or not, and
+            // hides naturally when the group is collapsed (same parent).
+            const addBtnHtml = `
+                <button type="button" class="preview-animations-group__add" data-action="add-transition">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    <span>${PreviewConfig.i18n.addTransition || 'Add transition'}</span>
+                </button>
+            `;
+
             if (transitions.length === 0) {
-                transitionsList.innerHTML = `<p class="preview-animated-empty">${PreviewConfig.i18n.noTransitions}</p>`;
+                transitionsList.innerHTML = addBtnHtml +
+                    `<p class="preview-animated-empty">${PreviewConfig.i18n.noTransitions}</p>`;
             } else {
-                transitionsList.innerHTML = transitions.map(item => 
+                transitionsList.innerHTML = addBtnHtml + transitions.map(item =>
                     renderAnimatedSelectorGroup(item, 'transition')
                 ).join('');
+            }
+
+            // Wire the add-transition trigger (re-queried because innerHTML
+            // just rebuilt the list).
+            const addBtn = transitionsList.querySelector('[data-action="add-transition"]');
+            if (addBtn) {
+                addBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openTransitionWizard();
+                });
             }
         }
         
@@ -666,6 +764,35 @@
             }
         });
         
+        // A3-companion Motion Slice 3 — wire "Custom curve…" button to the
+        // QSEasingPicker. Pre-loads the picker with the select's current
+        // value; on confirm, adds the resulting cubic-bezier as an <option>
+        // (if not already present) + selects it + dispatches change so the
+        // existing updateAnimationPreviewCss listener re-fires.
+        const timingCustomBtn = document.getElementById('animation-preview-timing-custom');
+        if (timingCustomBtn && animationPreviewTiming && window.QSEasingPicker) {
+            timingCustomBtn.addEventListener('click', () => {
+                const currentValue = animationPreviewTiming.value || 'ease';
+                QSEasingPicker.open({
+                    anchor: timingCustomBtn,
+                    value:  currentValue,
+                    onConfirm: (newValue) => {
+                        // Ensure an option exists for the chosen value.
+                        let opt = Array.from(animationPreviewTiming.options)
+                            .find(o => o.value === newValue);
+                        if (!opt) {
+                            opt = document.createElement('option');
+                            opt.value = newValue;
+                            opt.textContent = newValue;
+                            animationPreviewTiming.appendChild(opt);
+                        }
+                        animationPreviewTiming.value = newValue;
+                        animationPreviewTiming.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                });
+            });
+        }
+
         if (animationPreviewInfinite) {
             animationPreviewInfinite.addEventListener('change', () => {
                 if (animationPreviewCount) {
@@ -1408,9 +1535,669 @@
         }
     }
 
+    // ==================== Apply-keyframe-to-selector (Motion Slice 2) ====================
+    // Modal that lists every selector in style.css (sourced from
+    // PreviewSelectorBrowser's cache, same data the Selectors tab uses),
+    // filtered by substring. On confirm, writes `animation: <name> 1s ease;`
+    // to the chosen selector via setStyleRule + hot-reloads the iframe.
+    // Default value is one-shot (no iteration count); users can refine via
+    // Selectors → Edit Styles afterwards.
+
+    const _apply = {
+        modal:        null,
+        backdrop:     null,
+        closeBtn:     null,
+        cancelBtn:    null,
+        applyBtn:     null,
+        nameEl:       null,
+        searchInput:  null,
+        list:         null,
+        keyframe:     null,    // name of the keyframe being applied
+        selected:     null,    // currently-highlighted selector
+        wired:        false
+    };
+
+    function initApplyKeyframeModal() {
+        if (_apply.wired) return;
+        _apply.modal       = document.getElementById('apply-keyframe-modal');
+        _apply.backdrop    = document.getElementById('apply-keyframe-modal-backdrop');
+        _apply.closeBtn    = document.getElementById('apply-keyframe-modal-close');
+        _apply.cancelBtn   = document.getElementById('apply-keyframe-modal-cancel');
+        _apply.applyBtn    = document.getElementById('apply-keyframe-modal-apply');
+        _apply.nameEl      = document.getElementById('apply-keyframe-modal-name');
+        _apply.searchInput = document.getElementById('apply-keyframe-modal-search');
+        _apply.list        = document.getElementById('apply-keyframe-modal-list');
+        if (!_apply.modal) return;
+
+        _apply.closeBtn   && _apply.closeBtn.addEventListener('click', closeApplyKeyframeModal);
+        _apply.cancelBtn  && _apply.cancelBtn.addEventListener('click', closeApplyKeyframeModal);
+        _apply.backdrop   && _apply.backdrop.addEventListener('click', closeApplyKeyframeModal);
+        _apply.searchInput && _apply.searchInput.addEventListener('input', () => {
+            renderApplyKeyframeList(_apply.searchInput.value);
+        });
+        _apply.searchInput && _apply.searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { e.preventDefault(); closeApplyKeyframeModal(); }
+            else if (e.key === 'Enter' && _apply.selected) {
+                e.preventDefault();
+                submitApplyKeyframe();
+            }
+        });
+        _apply.applyBtn && _apply.applyBtn.addEventListener('click', submitApplyKeyframe);
+        _apply.wired = true;
+    }
+
+    async function applyKeyframeToSelector(keyframeName) {
+        initApplyKeyframeModal();
+        if (!_apply.modal) return;
+        _apply.keyframe = keyframeName;
+        _apply.selected = null;
+        if (_apply.nameEl) _apply.nameEl.textContent = '@keyframes ' + keyframeName;
+        if (_apply.searchInput) _apply.searchInput.value = '';
+        if (_apply.applyBtn) _apply.applyBtn.disabled = true;
+        // Show modal first with a loading placeholder — the selector cache
+        // is lazy-loaded on first Selectors-tab visit; if the user jumped
+        // straight from Motion → Apply without going through Selectors,
+        // we need to fetch the data before rendering. Otherwise the list
+        // would show the "No selectors yet" empty state spuriously.
+        _apply.modal.hidden = false;
+        if (_apply.list) {
+            _apply.list.innerHTML = '';
+            const loading = document.createElement('div');
+            loading.className = 'apply-keyframe-modal__empty';
+            loading.textContent = (PreviewConfig.i18n && PreviewConfig.i18n.loading) || 'Loading…';
+            _apply.list.appendChild(loading);
+        }
+        await ensureSelectorsLoaded();
+        renderApplyKeyframeList('');
+        if (_apply.searchInput) _apply.searchInput.focus();
+    }
+
+    async function ensureSelectorsLoaded() {
+        if (!window.PreviewSelectorBrowser) return;
+        const loadedFn = PreviewSelectorBrowser.isLoaded;
+        if (loadedFn && loadedFn()) return;
+        if (PreviewSelectorBrowser.loadData) {
+            try { await PreviewSelectorBrowser.loadData(); }
+            catch (e) { /* renderApplyKeyframeList will show empty state */ }
+        }
+    }
+
+    function closeApplyKeyframeModal() {
+        if (!_apply.modal) return;
+        _apply.modal.hidden = true;
+        _apply.keyframe = null;
+        _apply.selected = null;
+    }
+
+    function renderApplyKeyframeList(filter) {
+        if (!_apply.list) return;
+        const i18n = PreviewConfig.i18n || {};
+        // Source the selector list from PreviewSelectorBrowser if available.
+        // It exposes getAllSelectors() returning the unified list the
+        // Selectors tab uses — which matches the user's mental model
+        // ("apply to any selector I can otherwise edit").
+        let selectors = [];
+        if (window.PreviewSelectorBrowser && PreviewSelectorBrowser.getAllSelectors) {
+            try { selectors = PreviewSelectorBrowser.getAllSelectors() || []; }
+            catch (e) { selectors = []; }
+        }
+        if (!selectors.length) {
+            _apply.list.innerHTML = '';
+            const empty = document.createElement('div');
+            empty.className = 'apply-keyframe-modal__empty';
+            empty.textContent = i18n.applyKeyframeNoSelectors || 'No selectors yet — add one via the Selectors tab.';
+            _apply.list.appendChild(empty);
+            return;
+        }
+        const needle = String(filter || '').toLowerCase().trim();
+        const matched = needle
+            ? selectors.filter(s => (s.selector || s).toLowerCase().indexOf(needle) !== -1)
+            : selectors.slice();
+
+        _apply.list.innerHTML = '';
+        if (!matched.length) {
+            const empty = document.createElement('div');
+            empty.className = 'apply-keyframe-modal__empty';
+            empty.textContent = i18n.applyKeyframeNoMatch || 'No selector matches.';
+            _apply.list.appendChild(empty);
+            return;
+        }
+        const frag = document.createDocumentFragment();
+        matched.forEach(s => {
+            const sel = s.selector || s;
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'apply-keyframe-modal__item';
+            item.dataset.selector = sel;
+            item.setAttribute('role', 'option');
+            const code = document.createElement('code');
+            code.textContent = sel;
+            item.appendChild(code);
+            // Show a small media-query badge if the selector lives inside one,
+            // so the user picks the right occurrence.
+            const mq = s.mediaQuery;
+            if (mq) {
+                const badge = document.createElement('span');
+                badge.className = 'apply-keyframe-modal__item-mq';
+                badge.textContent = '@media ' + mq;
+                item.appendChild(badge);
+            }
+            item.addEventListener('click', () => selectApplyKeyframeItem(sel, item));
+            frag.appendChild(item);
+        });
+        _apply.list.appendChild(frag);
+    }
+
+    function selectApplyKeyframeItem(selector, itemEl) {
+        // Clear previous highlight
+        _apply.list.querySelectorAll('.apply-keyframe-modal__item--selected')
+            .forEach(el => el.classList.remove('apply-keyframe-modal__item--selected'));
+        itemEl.classList.add('apply-keyframe-modal__item--selected');
+        _apply.selected = selector;
+        if (_apply.applyBtn) _apply.applyBtn.disabled = false;
+    }
+
+    async function submitApplyKeyframe() {
+        if (!_apply.keyframe || !_apply.selected) return;
+        const i18n = PreviewConfig.i18n || {};
+        const keyframe = _apply.keyframe;
+        const selector = _apply.selected;
+        if (_apply.applyBtn) _apply.applyBtn.disabled = true;
+        try {
+            // Sensible defaults — one-shot at 1s with `ease`. Users can fine-tune
+            // via Selectors → Edit Styles, where the full animation shorthand is
+            // editable.
+            const body = {
+                selector: selector,
+                styles:   'animation: ' + keyframe + ' 1s ease;'
+            };
+            let ok = false;
+            let errMsg = '';
+            if (window.QuickSiteAPI && QuickSiteAPI.request) {
+                const result = await QuickSiteAPI.request('setStyleRule', 'POST', body);
+                ok = !!result.ok;
+                errMsg = (result.data && (result.data.message || result.data.error)) || '';
+            } else {
+                const response = await fetch(managementUrl + 'setStyleRule', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(authToken ? { 'Authorization': 'Bearer ' + authToken } : {})
+                    },
+                    body: JSON.stringify(body)
+                });
+                const data = await response.json();
+                ok = (data.status === 200 || data.status === 201);
+                errMsg = data.message || '';
+            }
+            if (!ok) throw new Error(errMsg || 'setStyleRule failed');
+
+            const tpl = i18n.applyKeyframeAdded || '{name} applied to {selector}';
+            showToast(tpl.replace('{name}', keyframe).replace('{selector}', selector), 'success');
+            closeApplyKeyframeModal();
+
+            // Refresh the Selectors / Motion caches so the new animation
+            // shows up under "Animations" in this same tab + any selector
+            // listings elsewhere.
+            if (window.PreviewSelectorBrowser && PreviewSelectorBrowser.reset) {
+                PreviewSelectorBrowser.reset();
+            }
+            animationsLoaded = false;
+            loadAnimationsTab();
+
+            // Live preview — the iframe needs to pick up the new animation
+            // rule from style.css.
+            if (window.PreviewState && PreviewState.hotReloadCss) {
+                PreviewState.hotReloadCss();
+            }
+        } catch (err) {
+            const tpl = i18n.applyKeyframeError || 'Failed to apply: {error}';
+            showToast(tpl.replace('{error}', (err && err.message) || ''), 'error');
+            if (_apply.applyBtn) _apply.applyBtn.disabled = false;
+        }
+    }
+
+    // ==================== Used-by + remove (Motion Slice 2b) ====================
+    // The Apply flow has an inverse: from a keyframe, see which selectors
+    // are using it and remove the `animation:` property from any of them.
+    // The data is already in `animatedSelectorsData.animations`
+    // (parsed[].name carries the keyframe name) — no extra fetch needed.
+
+    function computeKeyframeUsersMap() {
+        const map = {};
+        const animations = (animatedSelectorsData && animatedSelectorsData.animations) || [];
+        animations.forEach(item => {
+            const sel = item.baseSelector || item.selector;
+            if (!sel) return;
+            const parsedArr = Array.isArray(item.parsed) ? item.parsed : [];
+            parsedArr.forEach(p => {
+                if (!p || !p.name) return;
+                if (!map[p.name]) map[p.name] = [];
+                // De-duplicate — a selector with two animations referencing
+                // the same keyframe shouldn't appear twice in this list.
+                if (map[p.name].indexOf(sel) === -1) map[p.name].push(sel);
+            });
+        });
+        return map;
+    }
+
+    async function removeKeyframeFromSelector(keyframeName, selector) {
+        const i18n = PreviewConfig.i18n || {};
+        const confirmTpl = i18n.keyframeRemoveConfirm || 'Remove animation from {selector}?';
+        if (!confirm(confirmTpl.replace('{selector}', selector))) return;
+
+        try {
+            // Empty styles + removeProperties:['animation'] tells setStyleRule
+            // to strip the `animation` declaration while leaving every other
+            // declaration on the rule untouched. The whole rule is removed
+            // server-side only if the resulting declaration list is empty.
+            const body = {
+                selector: selector,
+                styles: '',
+                removeProperties: ['animation']
+            };
+            let ok = false;
+            let errMsg = '';
+            if (window.QuickSiteAPI && QuickSiteAPI.request) {
+                const result = await QuickSiteAPI.request('setStyleRule', 'POST', body);
+                ok = !!result.ok;
+                errMsg = (result.data && (result.data.message || result.data.error)) || '';
+            } else {
+                const response = await fetch(managementUrl + 'setStyleRule', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(authToken ? { 'Authorization': 'Bearer ' + authToken } : {})
+                    },
+                    body: JSON.stringify(body)
+                });
+                const data = await response.json();
+                ok = (data.status === 200 || data.status === 201);
+                errMsg = data.message || '';
+            }
+            if (!ok) throw new Error(errMsg || 'setStyleRule failed');
+
+            const tpl = i18n.keyframeRemoved || 'Animation removed from {selector}';
+            showToast(tpl.replace('{selector}', selector), 'success');
+
+            // Refresh: animatedSelectorsData feeds the users map; reload it
+            // so the badge count drops + the row disappears.
+            if (window.PreviewSelectorBrowser && PreviewSelectorBrowser.reset) {
+                PreviewSelectorBrowser.reset();
+            }
+            animationsLoaded = false;
+            loadAnimationsTab();
+
+            // Live preview: iframe re-fetches style.css.
+            if (window.PreviewState && PreviewState.hotReloadCss) {
+                PreviewState.hotReloadCss();
+            }
+        } catch (err) {
+            const tpl = i18n.keyframeRemoveError || 'Failed to remove: {error}';
+            showToast(tpl.replace('{error}', (err && err.message) || ''), 'error');
+        }
+    }
+
+    // ==================== Transition Wizard (Motion Slice 4) ====================
+    // "+ Add transition" → modal. Pick a selector, a property (preset chips
+    // + free-text), duration, easing (via QSEasingPicker), delay. Submit
+    // writes `transition: <prop> <dur>ms <ease> <delay>ms` via setStyleRule.
+    // If the selected selector already has a transition, pre-fill from
+    // animatedSelectorsData.transitions[].parsed[0] + show a "will overwrite"
+    // hint. No new server fetch — same cache the rest of Motion tab uses.
+
+    const _wizard = {
+        modal:         null,
+        backdrop:      null,
+        closeBtn:      null,
+        cancelBtn:     null,
+        submitBtn:     null,
+        selectorSearch: null,
+        selectorList:  null,
+        existingHint:  null,
+        propertyChips: null,
+        propertyInput: null,
+        durationInput: null,
+        delayInput:    null,
+        easingBtn:     null,
+        easingValueEl: null,
+        previewEl:     null,
+        // State
+        selectedSelector: null,
+        property:    'opacity',
+        duration:    300,
+        easing:      'ease',
+        delay:       0,
+        existingTransition: false,
+        wired: false
+    };
+
+    function initTransitionWizard() {
+        if (_wizard.wired) return;
+        _wizard.modal          = document.getElementById('add-transition-modal');
+        _wizard.backdrop       = document.getElementById('add-transition-modal-backdrop');
+        _wizard.closeBtn       = document.getElementById('add-transition-modal-close');
+        _wizard.cancelBtn      = document.getElementById('add-transition-modal-cancel');
+        _wizard.submitBtn      = document.getElementById('add-transition-modal-submit');
+        _wizard.selectorSearch = document.getElementById('add-transition-selector-search');
+        _wizard.selectorList   = document.getElementById('add-transition-selector-list');
+        _wizard.existingHint   = document.getElementById('add-transition-existing-hint');
+        _wizard.propertyChips  = document.getElementById('add-transition-property-chips');
+        _wizard.propertyInput  = document.getElementById('add-transition-property-input');
+        _wizard.durationInput  = document.getElementById('add-transition-duration');
+        _wizard.delayInput     = document.getElementById('add-transition-delay');
+        _wizard.easingBtn      = document.getElementById('add-transition-easing-btn');
+        _wizard.easingValueEl  = document.getElementById('add-transition-easing-value');
+        _wizard.previewEl      = document.getElementById('add-transition-preview-value');
+        if (!_wizard.modal) return;
+
+        _wizard.closeBtn  && _wizard.closeBtn .addEventListener('click', closeTransitionWizard);
+        _wizard.cancelBtn && _wizard.cancelBtn.addEventListener('click', closeTransitionWizard);
+        _wizard.backdrop  && _wizard.backdrop .addEventListener('click', closeTransitionWizard);
+        _wizard.submitBtn && _wizard.submitBtn.addEventListener('click', submitTransitionWizard);
+
+        _wizard.selectorSearch && _wizard.selectorSearch.addEventListener('input', () => {
+            renderWizardSelectorList(_wizard.selectorSearch.value);
+        });
+
+        // Property chips: clicking sets the active chip + property + clears input.
+        _wizard.propertyChips && _wizard.propertyChips.querySelectorAll('[data-property]').forEach(chip => {
+            chip.addEventListener('click', () => {
+                _wizard.property = chip.dataset.property;
+                if (_wizard.propertyInput) _wizard.propertyInput.value = '';
+                refreshWizardChips();
+                updateWizardPreview();
+            });
+        });
+        // Free-text input: typing deselects chips + sets property.
+        _wizard.propertyInput && _wizard.propertyInput.addEventListener('input', () => {
+            _wizard.property = (_wizard.propertyInput.value || '').trim();
+            refreshWizardChips();
+            updateWizardPreview();
+        });
+
+        _wizard.durationInput && _wizard.durationInput.addEventListener('input', () => {
+            const v = parseInt(_wizard.durationInput.value, 10);
+            _wizard.duration = isFinite(v) ? Math.max(0, v) : 0;
+            updateWizardPreview();
+        });
+        _wizard.delayInput && _wizard.delayInput.addEventListener('input', () => {
+            const v = parseInt(_wizard.delayInput.value, 10);
+            _wizard.delay = isFinite(v) ? Math.max(0, v) : 0;
+            updateWizardPreview();
+        });
+
+        _wizard.easingBtn && _wizard.easingBtn.addEventListener('click', () => {
+            if (!window.QSEasingPicker) return;
+            QSEasingPicker.open({
+                anchor: _wizard.easingBtn,
+                value:  _wizard.easing,
+                onConfirm: (newValue) => {
+                    _wizard.easing = newValue;
+                    if (_wizard.easingValueEl) _wizard.easingValueEl.textContent = newValue;
+                    updateWizardPreview();
+                }
+            });
+        });
+
+        _wizard.wired = true;
+    }
+
+    async function openTransitionWizard() {
+        initTransitionWizard();
+        if (!_wizard.modal) return;
+        // Reset form to defaults each open.
+        _wizard.selectedSelector = null;
+        _wizard.property = 'opacity';
+        _wizard.duration = 300;
+        _wizard.easing   = 'ease';
+        _wizard.delay    = 0;
+        _wizard.existingTransition = false;
+        if (_wizard.selectorSearch) _wizard.selectorSearch.value = '';
+        if (_wizard.propertyInput)  _wizard.propertyInput.value  = '';
+        if (_wizard.durationInput)  _wizard.durationInput.value  = '300';
+        if (_wizard.delayInput)     _wizard.delayInput.value     = '0';
+        if (_wizard.easingValueEl)  _wizard.easingValueEl.textContent = 'ease';
+        if (_wizard.existingHint)   _wizard.existingHint.hidden = true;
+        if (_wizard.submitBtn)      _wizard.submitBtn.disabled = true;
+        refreshWizardChips();
+        updateWizardPreview();
+        _wizard.modal.hidden = false;
+        // Selector list shows "Loading…" until the cache is ready.
+        if (_wizard.selectorList) {
+            _wizard.selectorList.innerHTML = '';
+            const loading = document.createElement('div');
+            loading.className = 'add-transition-modal__empty';
+            loading.textContent = (PreviewConfig.i18n && PreviewConfig.i18n.loading) || 'Loading…';
+            _wizard.selectorList.appendChild(loading);
+        }
+        await ensureSelectorsLoaded();
+        renderWizardSelectorList('');
+        if (_wizard.selectorSearch) _wizard.selectorSearch.focus();
+    }
+
+    function closeTransitionWizard() {
+        if (_wizard.modal) _wizard.modal.hidden = true;
+    }
+
+    function renderWizardSelectorList(filter) {
+        if (!_wizard.selectorList) return;
+        const i18n = PreviewConfig.i18n || {};
+        let selectors = [];
+        if (window.PreviewSelectorBrowser && PreviewSelectorBrowser.getAllSelectors) {
+            try { selectors = PreviewSelectorBrowser.getAllSelectors() || []; }
+            catch (e) { selectors = []; }
+        }
+        if (!selectors.length) {
+            _wizard.selectorList.innerHTML = '';
+            const empty = document.createElement('div');
+            empty.className = 'add-transition-modal__empty';
+            empty.textContent = i18n.applyKeyframeNoSelectors || 'No selectors yet — add one via the Selectors tab.';
+            _wizard.selectorList.appendChild(empty);
+            return;
+        }
+        const needle = String(filter || '').toLowerCase().trim();
+        const matched = needle
+            ? selectors.filter(s => (s.selector || s).toLowerCase().indexOf(needle) !== -1)
+            : selectors.slice();
+
+        _wizard.selectorList.innerHTML = '';
+        if (!matched.length) {
+            const empty = document.createElement('div');
+            empty.className = 'add-transition-modal__empty';
+            empty.textContent = i18n.applyKeyframeNoMatch || 'No selector matches.';
+            _wizard.selectorList.appendChild(empty);
+            return;
+        }
+        const frag = document.createDocumentFragment();
+        matched.forEach(s => {
+            const sel = s.selector || s;
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'add-transition-modal__item';
+            item.dataset.selector = sel;
+            item.setAttribute('role', 'option');
+            const code = document.createElement('code');
+            code.textContent = sel;
+            item.appendChild(code);
+            if (s.mediaQuery) {
+                const badge = document.createElement('span');
+                badge.className = 'add-transition-modal__item-mq';
+                badge.textContent = '@media ' + s.mediaQuery;
+                item.appendChild(badge);
+            }
+            item.addEventListener('click', () => selectWizardSelector(sel, item));
+            frag.appendChild(item);
+        });
+        _wizard.selectorList.appendChild(frag);
+    }
+
+    function selectWizardSelector(selector, itemEl) {
+        _wizard.selectorList.querySelectorAll('.add-transition-modal__item--selected')
+            .forEach(el => el.classList.remove('add-transition-modal__item--selected'));
+        itemEl.classList.add('add-transition-modal__item--selected');
+        _wizard.selectedSelector = selector;
+
+        // Check if this selector already has a transition; pre-fill from it
+        // if so, and surface the overwrite hint.
+        const existing = findExistingTransitionFor(selector);
+        if (existing) {
+            _wizard.existingTransition = true;
+            applyExistingTransition(existing);
+            if (_wizard.existingHint) _wizard.existingHint.hidden = false;
+        } else {
+            _wizard.existingTransition = false;
+            if (_wizard.existingHint) _wizard.existingHint.hidden = true;
+        }
+
+        if (_wizard.submitBtn) _wizard.submitBtn.disabled = false;
+        updateWizardPreview();
+    }
+
+    function findExistingTransitionFor(selector) {
+        const transitions = (animatedSelectorsData && animatedSelectorsData.transitions) || [];
+        for (let i = 0; i < transitions.length; i++) {
+            const item = transitions[i];
+            const itemSel = item.baseSelector || item.selector;
+            if (itemSel === selector && Array.isArray(item.parsed) && item.parsed.length) {
+                return item.parsed[0]; // first transition entry
+            }
+        }
+        return null;
+    }
+
+    function applyExistingTransition(parsed) {
+        // parsed: { property, duration, timingFunction, delay } — durations
+        // are CSS strings like "1s" or "300ms"; normalise to ms numbers.
+        if (parsed.property) {
+            _wizard.property = parsed.property;
+            // Match a chip if possible, otherwise drop the value into the input.
+            const knownChips = ['opacity', 'transform', 'color', 'background-color', 'border-color', 'box-shadow', 'all'];
+            if (knownChips.indexOf(parsed.property) !== -1) {
+                if (_wizard.propertyInput) _wizard.propertyInput.value = '';
+            } else if (_wizard.propertyInput) {
+                _wizard.propertyInput.value = parsed.property;
+            }
+            refreshWizardChips();
+        }
+        if (parsed.duration) {
+            _wizard.duration = cssTimeToMs(parsed.duration);
+            if (_wizard.durationInput) _wizard.durationInput.value = String(_wizard.duration);
+        }
+        if (parsed.timingFunction) {
+            _wizard.easing = parsed.timingFunction;
+            if (_wizard.easingValueEl) _wizard.easingValueEl.textContent = parsed.timingFunction;
+        }
+        if (parsed.delay) {
+            _wizard.delay = cssTimeToMs(parsed.delay);
+            if (_wizard.delayInput) _wizard.delayInput.value = String(_wizard.delay);
+        }
+    }
+
+    // Converts CSS time tokens ('1s' / '300ms') to integer ms.
+    function cssTimeToMs(t) {
+        if (t == null) return 0;
+        const s = String(t).trim();
+        const m = s.match(/^([\d.]+)\s*(ms|s)?$/i);
+        if (!m) return 0;
+        const num = parseFloat(m[1]);
+        if (!isFinite(num)) return 0;
+        return ((m[2] || 'ms').toLowerCase() === 's') ? Math.round(num * 1000) : Math.round(num);
+    }
+
+    function refreshWizardChips() {
+        if (!_wizard.propertyChips) return;
+        const chips = _wizard.propertyChips.querySelectorAll('[data-property]');
+        const inputVal = (_wizard.propertyInput && _wizard.propertyInput.value || '').trim();
+        chips.forEach(chip => {
+            // Active iff property matches AND input is empty (input wins when populated)
+            const active = !inputVal && chip.dataset.property === _wizard.property;
+            chip.classList.toggle('add-transition-modal__chip--active', active);
+        });
+    }
+
+    function effectivePropertyName() {
+        const inputVal = (_wizard.propertyInput && _wizard.propertyInput.value || '').trim();
+        return inputVal || _wizard.property || '';
+    }
+
+    function updateWizardPreview() {
+        if (!_wizard.previewEl) return;
+        const prop = effectivePropertyName() || '<property>';
+        const value = buildTransitionValue(prop);
+        _wizard.previewEl.textContent = 'transition: ' + value + ';';
+    }
+
+    function buildTransitionValue(prop) {
+        const parts = [prop, _wizard.duration + 'ms', _wizard.easing];
+        if (_wizard.delay && _wizard.delay > 0) parts.push(_wizard.delay + 'ms');
+        return parts.join(' ');
+    }
+
+    async function submitTransitionWizard() {
+        const i18n = PreviewConfig.i18n || {};
+        if (!_wizard.selectedSelector) {
+            showToast(i18n.addTransitionSelectorRequired || 'Pick a selector first', 'warning');
+            return;
+        }
+        const prop = effectivePropertyName();
+        if (!prop) {
+            showToast(i18n.addTransitionPropertyRequired || 'Property is required', 'warning');
+            return;
+        }
+        const value = buildTransitionValue(prop);
+        const selector = _wizard.selectedSelector;
+        if (_wizard.submitBtn) _wizard.submitBtn.disabled = true;
+        try {
+            const body = {
+                selector: selector,
+                styles:   'transition: ' + value + ';'
+            };
+            let ok = false;
+            let errMsg = '';
+            if (window.QuickSiteAPI && QuickSiteAPI.request) {
+                const result = await QuickSiteAPI.request('setStyleRule', 'POST', body);
+                ok = !!result.ok;
+                errMsg = (result.data && (result.data.message || result.data.error)) || '';
+            } else {
+                const response = await fetch(managementUrl + 'setStyleRule', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(authToken ? { 'Authorization': 'Bearer ' + authToken } : {})
+                    },
+                    body: JSON.stringify(body)
+                });
+                const data = await response.json();
+                ok = (data.status === 200 || data.status === 201);
+                errMsg = data.message || '';
+            }
+            if (!ok) throw new Error(errMsg || 'setStyleRule failed');
+
+            const tpl = i18n.addTransitionAdded || 'Transition added to {selector}';
+            showToast(tpl.replace('{selector}', selector), 'success');
+            closeTransitionWizard();
+
+            // Refresh the data + iframe so the new transition surfaces in
+            // the Transitions group and any visible elements pick it up.
+            if (window.PreviewSelectorBrowser && PreviewSelectorBrowser.reset) {
+                PreviewSelectorBrowser.reset();
+            }
+            animationsLoaded = false;
+            loadAnimationsTab();
+            if (window.PreviewState && PreviewState.hotReloadCss) {
+                PreviewState.hotReloadCss();
+            }
+        } catch (err) {
+            const tpl = i18n.addTransitionError || 'Failed to add transition: {error}';
+            showToast(tpl.replace('{error}', (err && err.message) || ''), 'error');
+            if (_wizard.submitBtn) _wizard.submitBtn.disabled = false;
+        }
+    }
+
     // ==================== Public API ====================
-    
-    window.PreviewStyleAnimations = {
+
+    window.PreviewStyleMotion = {
         init: init,
         load: loadAnimationsTab,
         isLoaded: function() { return animationsLoaded; },
