@@ -3424,3 +3424,275 @@ the felt-balance disagrees with the design intent.
 **Source**: A3-companion (locked at design 2026-06-22, confirmed
 post-implementation 2026-06-23). Behaviour:
 [ADMIN_PANEL.md](ADMIN_PANEL.md) §8.11.
+
+---
+
+## API import — OpenAPI 3.x converter (beta.9)
+
+### Detect OpenAPI 3.x; route Swagger 2.0 to an external converter (locked 2026-06-24)
+
+**Decision**: The import detector recognises documents whose top-level
+`openapi` field matches `3.x.x`. Documents declaring `swagger: "2.0"`
+are detected separately and the preview shows a clear error pointing
+the user at `converter.swagger.io` to convert to 3.x first, rather
+than half-converting them.
+
+**Reasoning**: OpenAPI 3.x is the dominant authoring format in 2026.
+Swagger 2.0's shape diverges meaningfully (`host` + `basePath` instead
+of `servers`, `definitions` instead of `components.schemas`,
+`parameters[in=body]` instead of `requestBody`). Supporting both adds
+roughly a third to converter complexity for a shrinking population of
+specs. The explicit "convert first" hint moves the work to a
+battle-tested external converter and avoids opaque "unsupported"
+messages.
+
+**Alternatives considered**: Convert both 2.0 and 3.x — rejected
+(complexity vs. value mismatch). Treat 2.0 specs as "unknown" with the
+generic error — rejected (the user has to guess what's wrong).
+
+**Source**:
+[openapi-converter.js](../public/admin/assets/js/pages/api-import/openapi-converter.js)
+`detectOpenApi`. Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §9.1.
+
+---
+
+### `servers[0].url` becomes the API `baseUrl`; relative URLs require an explicit override (locked 2026-06-24)
+
+**Decision**: The converter takes `servers[0].url` as the API's
+`baseUrl`. When more than one server is declared, only the first is
+used; a preview note surfaces the alternatives. When the URL is
+relative (e.g. `/api/v3`), a dedicated baseUrl input appears in the
+preview above the JSON dump, mirrors edits back into the JSON dump,
+and blocks Import until the URL is absolute (`http://` or `https://`).
+
+**Reasoning**: QuickSite stores one baseUrl per API; picking the first
+server matches the OpenAPI spec's own preference order (declaration
+order). Relative URLs are common in published specs but unusable as
+the base of an external API call from a QuickSite site, and the
+server-side `addApi` validation enforces this. A dedicated input field
+is far more discoverable than a "edit the JSON" hint, and validating
+client-side gives a clearer error than the server's generic 400.
+
+**Alternatives considered**: Auto-prepend `https://` with a placeholder
+host — rejected (silently locks in a wrong host the user might miss
+in the preview). Block in the converter — rejected (preserves spec
+fidelity in the preview; lets the user see exactly what the source
+declared before fixing it).
+
+**Source**:
+[openapi-converter.js](../public/admin/assets/js/pages/api-import/openapi-converter.js)
+`convertOpenApi`,
+[apis.js](../public/admin/assets/js/pages/apis.js) `_renderBaseUrlFixer`.
+Behaviour: [ADMIN_PANEL.md](ADMIN_PANEL.md) §9.1.
+
+---
+
+### Endpoint ID — `operationId` slugified to dash-case, with collision suffix (locked 2026-06-24)
+
+**Decision**: When OpenAPI declares an `operationId`, the converter
+slugifies it to dash-case, splitting camelCase / PascalCase first
+(`findPetsByStatus` → `find-pets-by-status`). When `operationId` is
+absent, the fallback is `<lowercase-method>-<slugified-path>` (e.g.
+`GET /users/{id}` → `get-users-id`). If the generated ID collides
+with one already produced in the same conversion, the converter
+appends `-2`, `-3`, ... and surfaces the suffix in a preview note.
+
+**Reasoning**: Dash-case matches the convention of existing native
+endpoint IDs in `api-endpoints.json` (`auth-login`, `list-paged`). The
+camelCase splitter handles the common OpenAPI authoring style without
+mangling acronyms (`OpenAPI` stays as `open-api`, not `openapi`). The
+collision suffix handles the realistic case where `/users/{id}` and a
+literal `/users/id` documentation route co-exist — both would slugify
+to `get-users-id` without the suffix.
+
+**Alternatives considered**: Underscore separators (a common OpenAPI
+convention) — rejected (mixes conventions inside one project). Numeric
+suffix on every ID by default — rejected (uglier `-1` on every ID;
+surprising in the common no-collision case).
+
+**Source**:
+[openapi-converter.js](../public/admin/assets/js/pages/api-import/openapi-converter.js)
+`_slugify`, `_makeSlugAllocator`. Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §9.1.
+
+---
+
+### API-level auth — pick the most-used `securityScheme` (locked 2026-06-24)
+
+**Decision**: When `components.securitySchemes` declares multiple
+schemes, the converter picks one as the API-level `auth` by tallying
+references across global `security` (weighted ×100) and per-operation
+`security`. The first scheme that maps to a QuickSite auth shape
+(apiKey / bearer / basic / cookie) wins. Other schemes referenced by
+some endpoints are surfaced as a note pointing at the preview's
+auth-edit field.
+
+**Reasoning**: QuickSite stores one auth type per API; OpenAPI allows
+multiple per endpoint. A naive "first declared" picker produces the
+wrong default when the spec's declaration order doesn't match its
+usage pattern. The Petstore spec is a working example: it declares
+oauth2 first and an alternate apiKey second, with eight ops using the
+oauth2 flow and two using apiKey — usage tally picks the right
+majority. Weighting global security ×100 ensures an explicit
+document-level default beats any per-op pattern.
+
+**Alternatives considered**: First declared — produces the wrong
+default when declaration order doesn't match usage. Splitting one API
+into multiple by scheme — rejected (loses the shared `info` + baseUrl
+context the spec author signed up for; doubles the post-import
+authoring burden).
+
+**Source**:
+[openapi-converter.js](../public/admin/assets/js/pages/api-import/openapi-converter.js)
+`_pickApiAuth`, `_mapSecurityScheme`. Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §9.1.
+
+---
+
+### Per-endpoint auth — inherit by default; override only where the spec disagrees (locked 2026-06-24)
+
+**Decision**: Each endpoint's `auth` is derived from the effective
+OpenAPI security (op-level if present, falling back to global). Empty
+effective security emits `auth: 'none'`. Effective security that
+references the picked API-level scheme emits `auth: 'inherit'`.
+Effective security that uses a different scheme emits `auth:
+'required'`, and the converter tracks the alternate scheme name for a
+preview note.
+
+**Reasoning**: `inherit` is the cleanest default — it lets the API's
+auth config flow through without redundant per-endpoint declarations.
+Only differences from the picked scheme are worth marking explicitly.
+QuickSite's endpoint `auth` field can't carry the actual alternate
+scheme identity (the runtime sends whatever the API-level auth
+provides), so `required` is the closest available shape; the
+converter's preview note tells the author where manual refinement is
+needed after import.
+
+**Alternatives considered**: Always emit explicit `required` on
+secured endpoints — rejected (clutters the saved JSON; hides
+inherited-from-API intent). Always emit `inherit` regardless of op
+security — rejected (silently misses public-override endpoints
+declared with `security: []`).
+
+**Source**:
+[openapi-converter.js](../public/admin/assets/js/pages/api-import/openapi-converter.js)
+`_resolveEndpointAuth`. Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §9.1.
+
+---
+
+### Cookie-session security — detect, map best-effort, warn (locked 2026-06-24)
+
+**Decision**: A `securitySchemes.<name>` declared as
+`{type: apiKey, in: cookie}` maps to QuickSite's
+`auth: { type: 'cookie' }`. The preview surfaces a warning that the
+server's session cookie shape should be verified against QuickSite's
+same-origin session-cookie expectations (browser owns the cookie, no
+client-side token retrieval).
+
+**Reasoning**: Not every OpenAPI cookie scheme matches QuickSite's
+specific cookie auth pattern. Mapping plus a warning honours the
+spec's intent while flagging the boundary the converter can't verify
+on its own. Silent failure (treating cookie schemes as unsupported)
+loses information; strict rejection blocks specs that ARE compatible.
+
+**Alternatives considered**: Strict map (no warning) — rejected
+(authors miss the "verify before going live" cue). Reject cookie
+schemes outright — rejected (compatible specs would have to be
+hand-corrected after import).
+
+**Source**:
+[openapi-converter.js](../public/admin/assets/js/pages/api-import/openapi-converter.js)
+`_mapSecurityScheme`. Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §9.1.
+
+---
+
+### Schema examples — keep by default; strip on credential-named keys (locked 2026-06-24)
+
+**Decision**: When walking schemas, the converter copies `example`
+fields by default. Examples on properties whose name matches
+`/^(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|token|secret|bearer|password|authorization)$/i`
+are stripped, and so is anything under `securitySchemes.*`. Counts of
+kept vs. stripped examples are surfaced in a preview note.
+
+**Reasoning**: OpenAPI specs commonly ship `example: "12345"` on a
+`password` property or `example: "Bearer eyJ..."` on an `Authorization`
+header. Carrying those into QuickSite-stored schemas risks an author
+mistaking a real-looking test token for a production credential.
+Property-name matching catches the common cases without the heavier
+engineering of value-pattern detection (which would also catch
+synthesised credentials, but at much higher false-positive risk). The
+note tells the author exactly how many examples each path took.
+
+**Alternatives considered**: No stripping — rejected (the
+"production-looking test bearer" risk is genuine; defaults shouldn't
+favour leakage). Value-pattern stripping (JWT regex, "Bearer ..."
+prefix) — deferred (catches more cases but at a complexity cost the
+common case doesn't pay for).
+
+**Source**:
+[openapi-converter.js](../public/admin/assets/js/pages/api-import/openapi-converter.js)
+`_isCredentialKey`, `_walkProperties`. Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §9.1.
+
+---
+
+### No pagination-envelope schema unwrap (locked 2026-06-24)
+
+**Decision**: When an OpenAPI response wraps the resource in a
+pagination envelope (e.g. `{data: {...}, meta: {...}}`), the converter
+stores the schema verbatim. No heuristic detects the inner "primary"
+schema. The response-bindings authoring layer handles envelope
+navigation at bind time.
+
+**Reasoning**: Heuristics that infer the "real" payload from envelope
+shapes are inherently brittle — every API team picks slightly
+different wrappers (`data` vs. `results` vs. `items` vs. `payload`),
+and false positives (e.g. a non-paginated response that happens to
+have a `data` property) corrupt the schema. The response-bindings
+picker already navigates JSON Schema cleanly via dot-paths; one extra
+click during binding is a small cost compared to silent schema
+mangling.
+
+**Alternatives considered**: Detect common envelope patterns and offer
+the inner schema as a hint — rejected (false-positive risk; author
+trust erosion when the hint is wrong). Strip envelopes entirely —
+rejected (data loss in the saved schema).
+
+**Source**:
+[openapi-converter.js](../public/admin/assets/js/pages/api-import/openapi-converter.js)
+`_walkSchema`. Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §9.1.
+
+---
+
+### Preview UI — tree view with per-endpoint checkboxes (locked 2026-06-24)
+
+**Decision**: The import preview renders a tree of APIs and endpoints
+with a per-endpoint checkbox (checked by default) and a per-API
+select-all that tracks tri-state. The header count reads as
+`15 / 19 endpoints` when partial and `19 endpoints` when full. The
+raw JSON textarea is preserved in a collapsed `<details>` "Advanced"
+panel for power-user edits; tree selection and textarea edits are
+both honoured at Import time.
+
+**Reasoning**: OpenAPI fan-out is meaningful — a typical REST API has
+10–40 endpoints, and authors rarely want all of them on first import
+(noise endpoints, legacy paths, debug routes). Checkboxes give the
+"pick what I need" affordance directly. Relegating raw-JSON editing
+to an advanced panel preserves the power-user path without crowding
+the common one. Tree state owns endpoint selection; the JSON textarea
+owns everything else (descriptions, schemas) — a clean ownership
+boundary at Import time.
+
+**Alternatives considered**: Flat checkbox list with no API grouping
+— rejected (multi-API imports lose hierarchy clarity). JSON textarea
+only — rejected (per-endpoint exclusion requires JSON-editing
+knowledge most authors don't have).
+
+**Source**:
+[apis.js](../public/admin/assets/js/pages/apis.js) `_renderImportTree`,
+`_filterApisByTreeSelection`. Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §9.1.

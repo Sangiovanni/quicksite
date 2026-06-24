@@ -11,6 +11,7 @@
 $baseUrl = rtrim(BASE_URL, '/');
 ?>
 
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/api-import/openapi-converter.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/api-import/openapi-converter.js') ?>"></script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/apis.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/apis.js') ?>"></script>
 
 <div class="admin-page-header">
@@ -492,10 +493,27 @@ $baseUrl = rtrim(BASE_URL, '/');
             <!-- Screen 2: preview-and-confirm -->
             <div id="import-screen-preview" style="display:none;">
                 <div id="import-preview-summary" class="admin-alert admin-alert--info"></div>
-                <div class="admin-form-group">
-                    <label class="admin-label"><?= __admin('apis.importModal.previewJson', 'Converted JSON (read-only)') ?></label>
-                    <textarea class="admin-input admin-input--code" id="import-preview-json" rows="14" readonly></textarea>
+                <!-- Shown only when one or more APIs have a relative baseUrl
+                     (common with OpenAPI specs whose servers[0].url is a path
+                     like /api/v3). Rows are built dynamically in apis.js. -->
+                <div id="import-baseurl-fixer" class="admin-form-group" style="display:none;">
+                    <label class="admin-label"><?= __admin('apis.importModal.baseUrlFixer', 'Set absolute base URL (must start with http:// or https://)') ?></label>
+                    <div id="import-baseurl-fixer-rows"></div>
                 </div>
+                <!-- Tree view: one section per API + per-endpoint checkboxes
+                     so the author can deselect endpoints before importing.
+                     Built dynamically in apis.js. -->
+                <div class="admin-form-group">
+                    <label class="admin-label"><?= __admin('apis.importModal.treeLabel', 'Endpoints to import (uncheck to exclude)') ?></label>
+                    <div id="import-tree"></div>
+                </div>
+                <details class="admin-collapsible">
+                    <summary class="admin-collapsible__summary"><?= __admin('apis.importModal.advancedJson', 'Advanced: raw JSON') ?></summary>
+                    <div class="admin-form-group">
+                        <textarea class="admin-input admin-input--code" id="import-preview-json" rows="14"></textarea>
+                        <p class="admin-hint"><?= __admin('apis.importModal.previewJsonHint', 'Edits here take effect on Import. Use this to fine-tune schemas or descriptions before saving.') ?></p>
+                    </div>
+                </details>
             </div>
         </div>
         <div class="admin-modal__footer">

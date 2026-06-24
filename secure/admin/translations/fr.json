@@ -2319,7 +2319,13 @@
         "importModal": {
             "warning": "L'import fusionnera avec les APIs existantes. Les APIs avec le même ID seront écrasées.",
             "pasteJson": "Coller le JSON",
-            "button": "Importer"
+            "button": "Importer",
+            "previewTitle": "Aperçu et confirmation",
+            "baseUrlFixer": "Définir une URL de base absolue (doit commencer par http:// ou https://)",
+            "treeLabel": "Endpoints à importer (décocher pour exclure)",
+            "advancedJson": "Avancé : JSON brut",
+            "previewJson": "JSON converti (modifier avant l'import si nécessaire)",
+            "previewJsonHint": "Les modifications ici prennent effet à l'import. Utilisez ce champ pour ajuster les schémas ou les descriptions avant l'enregistrement."
         }
     }
 }

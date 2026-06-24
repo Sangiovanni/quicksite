@@ -740,19 +740,50 @@ as query-string parameters. Example:
 storage / validation, so a Windows-paste like `"http://test.api\\"`
 round-trips cleanly.
 
-**Import**: two-screen modal (paste → preview → confirm).
-Auto-detects foreign formats (currently: a file-manager-style JSON
-with `endpoints.{public, secured, ...}` groups) and converts to our
-shape before saving. The converter:
-- Iterates **every** top-level group under `endpoints`; each becomes
-  its own API named `<base>-<group>`.
-- Group with `{ authentication: {...}, endpoints: [...] }` shape →
-  bearer/basic/apiKey auth based on `type`.
-- Group as a flat array → no auth.
-- Rebuilds each endpoint's path with `:placeholders` based on its
-  declared parameters and the API's `route_format` hint
-  (`"path segments"` → `/name/:name`; otherwise leaves params as
-  query-string-bound).
+**Import**: two-screen modal (paste → preview → confirm). The paste
+screen accepts JSON in three shapes; the detector inspects the
+top-level keys and picks the appropriate converter:
+
+| Detected when | Format | Notes |
+|---|---|---|
+| Top-level `apis: {...}` | Native | Pasted as-is. The shape exported by the page's Export button. |
+| Top-level `openapi: "3.x"` | OpenAPI 3.x | Converted by the OpenAPI converter (below). |
+| Top-level `swagger: "2.0"` | Swagger 2.0 | Detected and explicitly unsupported — the preview points the user at `converter.swagger.io` to convert to 3.x first. |
+| Top-level `endpoints.{public, secured, ...}` | File-manager | Legacy converter — each group becomes its own API named `<base>-<group>`; bearer/basic/apiKey auth derived from the group's `authentication.type`; `:placeholders` rebuilt from each endpoint's declared parameters + `route_format`. |
+
+**OpenAPI 3.x converter** (`openapi-converter.js`). Maps an OpenAPI
+document to one QuickSite API + one endpoint per `paths.<path>.<method>`:
+
+| OpenAPI field | QuickSite field | Notes |
+|---|---|---|
+| `info.title` | API `name` | Slugified into the `apiId`. |
+| `servers[0].url` | API `baseUrl` | Relative URLs surface a dedicated input in the preview (must be made absolute before Import). |
+| `components.securitySchemes` | API `auth` | Most-used scheme wins; first-mappable becomes the API auth. apiKey-in-header → `apiKey` + `tokenSource: 'header:<name>'`. http-bearer / oauth2 / openIdConnect → `bearer`. http-basic → `basic`. apiKey-in-cookie → `cookie` (with a "verify Pattern X" warning). |
+| `paths.<p>.<method>.operationId` | Endpoint `id` | Slugified to dash-case. Falls back to `<method>-<slugified-path>` if absent. Collisions append `-2`, `-3`, ... and are noted in the preview. |
+| `paths.<p>.<method>.summary` | Endpoint `name` | Falls back to `operationId`, then to `<METHOD> <path>`. |
+| `paths.<p>.<method>.description` | Endpoint `description` | |
+| `paths.<p>.<method>.parameters[in=path \| query]` | Endpoint `parameters[]` | `in: header` is dropped (QuickSite carries headers at the API level via `auth.tokenSource`); the count is surfaced in a note. `$ref` parameters are resolved against `components.parameters`. |
+| `paths.<p>.<method>.requestBody.content.<media>.schema` | Endpoint `requestSchema` | First declared content-type wins (`application/json` preferred). `$ref` is inlined; `allOf` is merged into a flat object schema; `oneOf` / `anyOf` are skipped with a note. |
+| `paths.<p>.<method>.responses.2xx.content.<media>.schema` | Endpoint `responseSchema` | Status preference: `200` → `201` → `202` → `204` → `default` → any other 2xx. |
+| `paths.<p>.<method>.security` (vs spec-level `security`) | Endpoint `auth` | `inherit` when the operation references the picked API scheme. `none` when effective security is empty (op explicitly `[]` or no security anywhere). `required` when the operation references a different scheme — the preview notes which alternates were seen. |
+| `example:` on a schema property | Copied | Stripped on credential-named keys (`token`, `accessToken`, `password`, `apiKey`, `secret`, `bearer`, `authorization`, etc.) and on anything under `securitySchemes`. Kept-vs-stripped counts appear in the preview. |
+| `$ref: "#/components/..."` | Inlined | Local refs only; external URL refs are skipped with a note. Cycles are broken by emitting an empty-object placeholder so a circular schema doesn't infinite-loop. |
+| `xml` metadata on schemas | Dropped | OpenAPI-specific; meaningless to QuickSite. |
+
+**Preview screen** (after the converter runs):
+
+1. **Summary line** — detected format, API count, endpoint count, and notes (alternate auth schemes, dropped header params, schema-example counts, slug collisions, etc.).
+2. **Base URL fixer** — appears when any API has a relative `baseUrl`. One labeled input per affected API; edits mirror live into the JSON dump; Import is blocked until every baseUrl matches `http(s)://`.
+3. **Tree view** — one section per API. The header has a select-all checkbox, the API name + ID, and a count badge that reads `19 endpoints` when all are selected and `15 / 19 endpoints` when partial. Each endpoint row shows: a checkbox (default checked), method badge, endpoint ID, path, auth indicator (`public` / `🔐 inherit (bearer)` / `🔐 required`), and `req` / `resp` chips when the endpoint has schemas attached. Unchecked endpoints are dropped at Import.
+4. **Advanced: raw JSON** — collapsed by default. The full converted JSON, editable. Edits here take effect on Import alongside the tree-selection state.
+
+**After import** — the converter is intentionally lossy in a few places
+that need authoring on top:
+
+- **Response bindings** (which fields feed which DOM selectors / state stores) are project-specific and authored in the visual editor — the imported schemas drive the binding picker, but no bindings are emitted.
+- **OAuth handler config** — when a security scheme is `oauth2` or `openIdConnect`, the converter sets the API auth to `bearer` (oauth2 yields a bearer token at runtime). Configure the OAuth handler details via the API edit form.
+- **Auth token storage** — the converter sets sensible `tokenSource` defaults (`localStorage:token` for bearer, `localStorage:basicAuth` for basic, `header:<name>` for apiKey). The actual token value is entered per-API in the registry card's Auth Token field.
+- **Alternate security schemes** — endpoints flagged `auth: 'required'` (different scheme from the API default) need manual refinement. The preview's notes name which schemes were seen.
 
 ### 9.2 Component list binding
 

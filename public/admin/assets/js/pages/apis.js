@@ -1459,6 +1459,16 @@
         // Clear inline error
         const errBox = document.getElementById('import-parse-error');
         if (errBox) { errBox.style.display = 'none'; errBox.textContent = ''; }
+        // Reset preview-only widgets when returning to paste so a fresh
+        // conversion starts from a clean slate.
+        if (isPaste) {
+            const fixerRows = document.getElementById('import-baseurl-fixer-rows');
+            const fixerWrap = document.getElementById('import-baseurl-fixer');
+            if (fixerRows) fixerRows.replaceChildren();
+            if (fixerWrap) fixerWrap.style.display = 'none';
+            const tree = document.getElementById('import-tree');
+            if (tree) tree.replaceChildren();
+        }
     }
 
     // Provides a single ready-to-edit example so new users don't face a
@@ -1504,7 +1514,9 @@
 
     /**
      * Detect the foreign-format signature of a parsed JSON object.
-     * Returns one of: 'ours' | 'testapi-filemanager' | 'unknown'.
+     * Returns: 'ours' | 'testapi-filemanager' | 'openapi-3' | 'swagger-2'
+     * | 'unknown'. Swagger 2.0 is recognised distinctly so the caller can
+     * surface a "convert to 3.x first" hint instead of a generic error.
      */
     function detectImportFormat(data) {
         if (!data || typeof data !== 'object') return 'unknown';
@@ -1516,6 +1528,11 @@
             (Array.isArray(data.endpoints.public) ||
              (data.endpoints.secured && Array.isArray(data.endpoints.secured.endpoints)))) {
             return 'testapi-filemanager';
+        }
+        if (window.QSApiImport && typeof window.QSApiImport.detectOpenApi === 'function') {
+            const kind = window.QSApiImport.detectOpenApi(data);
+            if (kind === 'openapi-3') return 'openapi-3';
+            if (kind === 'swagger-2') return 'swagger-2';
         }
         return 'unknown';
     }
@@ -1590,6 +1607,10 @@
      * Convert a foreign-format payload to our native shape:
      *   { apis: { "<apiId>": { name, baseUrl, auth, endpoints: [...] } } }
      *
+     * Returns { converted, notes } where `notes` is a list of
+     * human-readable strings the preview should surface (e.g. slug
+     * collisions, dropped header params, relative base URLs).
+     *
      * For the test.api file-manager format, EVERY group under
      * `endpoints` (public, auth, pagination, secured, ...) becomes its
      * own API named `test-api-<group>`. Groups can be either a flat
@@ -1597,7 +1618,7 @@
      * (the bearer-auth shape).
      */
     function convertImportPayload(data, format) {
-        if (format === 'ours') return data;
+        if (format === 'ours') return { converted: data, notes: [] };
 
         if (format === 'testapi-filemanager') {
             const baseUrl = String(data.base_url || '').trim();
@@ -1638,27 +1659,382 @@
                 };
             }
 
-            return { apis };
+            return { converted: { apis }, notes: [] };
+        }
+
+        if (format === 'openapi-3' && window.QSApiImport
+                && typeof window.QSApiImport.convertOpenApi === 'function') {
+            return window.QSApiImport.convertOpenApi(data);
         }
 
         return null;
     }
 
-    function summarisePayload(converted, format) {
-        const apis = converted?.apis || {};
+    /**
+     * Build the import preview summary as a DOM Element. The caller is
+     * expected to use `container.replaceChildren(summarisePayload(...))`,
+     * not innerHTML. Notes (slug collisions, dropped header params, etc.)
+     * render as a bullet list under the summary line.
+     */
+    function summarisePayload(converted, format, notes) {
+        notes = Array.isArray(notes) ? notes : [];
+        const apis = (converted && converted.apis) || {};
         const apiIds = Object.keys(apis);
         const totalEndpoints = apiIds.reduce(
-            (n, id) => n + (apis[id].endpoints?.length || 0), 0);
+            (n, id) => n + ((apis[id].endpoints && apis[id].endpoints.length) || 0), 0);
         const existing = apiIds.filter(id => apisData[id]);
-        const fmtLabel = format === 'ours' ? 'native' :
-            format === 'testapi-filemanager' ? 'test.api file-manager' : 'unknown';
-        const overwriteNote = existing.length > 0
-            ? ` Replaces ${existing.length} existing: ${existing.join(', ')}.`
-            : '';
-        return `Detected format: <strong>${fmtLabel}</strong>. ` +
-            `Will create ${apiIds.length} API${apiIds.length === 1 ? '' : 's'}, ` +
-            `${totalEndpoints} endpoint${totalEndpoints === 1 ? '' : 's'}.` +
-            overwriteNote;
+        const fmtLabel = format === 'ours' ? 'native'
+            : format === 'testapi-filemanager' ? 'test.api file-manager'
+            : format === 'openapi-3' ? 'OpenAPI 3.x'
+            : 'unknown';
+
+        const root = document.createElement('div');
+        root.className = 'apis-import-summary';
+
+        const line = document.createElement('p');
+        line.className = 'apis-import-summary__line';
+        line.appendChild(document.createTextNode('Detected format: '));
+        const strong = document.createElement('strong');
+        strong.textContent = fmtLabel;
+        line.appendChild(strong);
+        line.appendChild(document.createTextNode(
+            '. Will create ' + apiIds.length + ' API' + (apiIds.length === 1 ? '' : 's') +
+            ', ' + totalEndpoints + ' endpoint' + (totalEndpoints === 1 ? '' : 's') + '.'
+        ));
+        if (existing.length > 0) {
+            line.appendChild(document.createTextNode(
+                ' Replaces ' + existing.length + ' existing: ' + existing.join(', ') + '.'
+            ));
+        }
+        root.appendChild(line);
+
+        if (notes.length) {
+            const list = document.createElement('ul');
+            list.className = 'apis-import-notes';
+            for (const note of notes) {
+                const li = document.createElement('li');
+                li.textContent = note;
+                list.appendChild(li);
+            }
+            root.appendChild(list);
+        }
+
+        return root;
+    }
+
+    const METHOD_BADGE_CLASS = {
+        GET: 'admin-badge--success',
+        POST: 'admin-badge--primary',
+        PUT: 'admin-badge--warning',
+        PATCH: 'admin-badge--warning',
+        DELETE: 'admin-badge--danger',
+        HEAD: 'admin-badge--default',
+        OPTIONS: 'admin-badge--default',
+        TRACE: 'admin-badge--default'
+    };
+
+    /**
+     * Build the per-API + per-endpoint checkbox tree. Tree state is the
+     * source of truth for which endpoints get sent on Import; the raw
+     * JSON textarea handles everything else (descriptions, schemas).
+     *
+     * Selection model: checked = include. A "select all" checkbox in
+     * each API header toggles all of its endpoint checkboxes; endpoint
+     * checkboxes feed back into the header's indeterminate / checked
+     * state. Defaults to all-checked.
+     */
+    function _renderImportTree(converted) {
+        const host = document.getElementById('import-tree');
+        if (!host) return;
+        host.replaceChildren();
+
+        const apis = (converted && converted.apis) || {};
+        const apiIds = Object.keys(apis);
+        if (apiIds.length === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'admin-text-muted';
+            empty.textContent = 'No APIs to import.';
+            host.appendChild(empty);
+            return;
+        }
+
+        for (const apiId of apiIds) {
+            host.appendChild(_renderImportTreeApi(apiId, apis[apiId] || {}));
+        }
+    }
+
+    function _renderImportTreeApi(apiId, apiData) {
+        const section = document.createElement('div');
+        section.className = 'admin-card import-tree-api';
+        section.dataset.apiId = apiId;
+        section.style.padding = 'var(--space-sm)';
+        section.style.marginBottom = 'var(--space-sm)';
+
+        const endpoints = Array.isArray(apiData.endpoints) ? apiData.endpoints : [];
+
+        // ─ Header: select-all + name + apiId + endpoint count ────────────
+        const header = document.createElement('div');
+        header.className = 'import-tree-api__header';
+        header.style.display = 'flex';
+        header.style.alignItems = 'center';
+        header.style.gap = 'var(--space-sm)';
+        header.style.marginBottom = 'var(--space-xs)';
+
+        const selectAll = document.createElement('input');
+        selectAll.type = 'checkbox';
+        selectAll.checked = true;
+        selectAll.dataset.apiSelectAll = apiId;
+        header.appendChild(selectAll);
+
+        const titleWrap = document.createElement('div');
+        titleWrap.style.flex = '1';
+        const title = document.createElement('strong');
+        title.textContent = apiData.name || apiId;
+        titleWrap.appendChild(title);
+        titleWrap.appendChild(document.createTextNode(' '));
+        const idCode = document.createElement('code');
+        idCode.style.fontSize = 'var(--font-sm)';
+        idCode.textContent = apiId;
+        titleWrap.appendChild(idCode);
+        header.appendChild(titleWrap);
+
+        const countBadge = document.createElement('span');
+        countBadge.className = 'admin-badge admin-badge--default';
+        header.appendChild(countBadge);
+
+        section.appendChild(header);
+
+        const total = endpoints.length;
+        const suffix = ' endpoint' + (total === 1 ? '' : 's');
+
+        // Single source of truth for the header state: recomputes the
+        // select-all tri-state AND the count badge ("19" vs "15 / 19")
+        // from the current endpoint checkboxes. Called on every toggle.
+        function refreshState() {
+            const boxes = section.querySelectorAll('input[type="checkbox"][data-endpoint-id]');
+            let checked = 0;
+            for (const b of boxes) if (b.checked) checked += 1;
+            if (boxes.length === 0 || checked === boxes.length) {
+                selectAll.checked = boxes.length > 0;
+                selectAll.indeterminate = false;
+            } else if (checked === 0) {
+                selectAll.checked = false;
+                selectAll.indeterminate = false;
+            } else {
+                selectAll.checked = false;
+                selectAll.indeterminate = true;
+            }
+            countBadge.textContent = (checked === total)
+                ? total + suffix
+                : checked + ' / ' + total + suffix;
+        }
+
+        selectAll.addEventListener('change', () => {
+            const boxes = section.querySelectorAll('input[type="checkbox"][data-endpoint-id]');
+            for (const b of boxes) b.checked = selectAll.checked;
+            refreshState();
+        });
+
+        // ─ Endpoint list ────────────────────────────────────────────────
+        if (total === 0) {
+            const note = document.createElement('p');
+            note.className = 'admin-text-muted';
+            note.style.margin = '0';
+            note.style.fontSize = 'var(--font-sm)';
+            note.textContent = 'No endpoints in this API.';
+            section.appendChild(note);
+            refreshState();
+            return section;
+        }
+
+        const list = document.createElement('ul');
+        list.className = 'import-tree-endpoints';
+        list.style.listStyle = 'none';
+        list.style.padding = '0';
+        list.style.margin = '0';
+
+        const apiAuthType = (apiData.auth && apiData.auth.type) || 'none';
+        for (const ep of endpoints) {
+            list.appendChild(_renderImportTreeEndpoint(apiId, ep, apiAuthType, refreshState));
+        }
+        section.appendChild(list);
+        refreshState();
+
+        return section;
+    }
+
+    function _renderImportTreeEndpoint(apiId, endpoint, apiAuthType, onToggle) {
+        const li = document.createElement('li');
+        li.className = 'import-tree-endpoint';
+        li.style.display = 'flex';
+        li.style.alignItems = 'center';
+        li.style.gap = 'var(--space-xs)';
+        li.style.padding = 'var(--space-xs) 0';
+
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = true;
+        cb.dataset.apiId = apiId;
+        cb.dataset.endpointId = endpoint.id || '';
+        cb.addEventListener('change', onToggle);
+        li.appendChild(cb);
+
+        const methodBadge = document.createElement('span');
+        const methodClass = METHOD_BADGE_CLASS[endpoint.method] || 'admin-badge--default';
+        methodBadge.className = 'admin-badge ' + methodClass;
+        methodBadge.style.minWidth = '54px';
+        methodBadge.style.textAlign = 'center';
+        methodBadge.textContent = endpoint.method || '?';
+        li.appendChild(methodBadge);
+
+        const idCode = document.createElement('code');
+        idCode.style.fontSize = 'var(--font-sm)';
+        idCode.textContent = endpoint.id || '';
+        li.appendChild(idCode);
+
+        const pathCode = document.createElement('code');
+        pathCode.className = 'admin-text-muted';
+        pathCode.style.fontSize = 'var(--font-sm)';
+        pathCode.style.flex = '1';
+        pathCode.textContent = endpoint.path || '';
+        li.appendChild(pathCode);
+
+        // Auth indicator — surface inherit vs required vs none. The card
+        // table later (post-import) collapses inherit + required when the
+        // API has auth, but in the preview we want the converter's intent
+        // visible so the author can spot scheme-divergence at a glance.
+        const authEl = document.createElement('span');
+        authEl.className = 'admin-badge admin-badge--default';
+        authEl.style.fontSize = '0.7em';
+        const epAuth = endpoint.auth || 'inherit';
+        if (epAuth === 'none') {
+            authEl.textContent = 'public';
+        } else if (epAuth === 'required') {
+            authEl.textContent = '🔐 required';
+            authEl.title = 'Operation declares a security scheme different from the API auth — refine after import.';
+        } else {
+            // inherit
+            authEl.textContent = apiAuthType === 'none' ? 'inherit' : ('🔐 inherit (' + apiAuthType + ')');
+        }
+        li.appendChild(authEl);
+
+        if (endpoint.requestSchema) {
+            const reqBadge = document.createElement('span');
+            reqBadge.className = 'admin-badge admin-badge--info';
+            reqBadge.style.fontSize = '0.7em';
+            reqBadge.title = 'Has request schema';
+            reqBadge.textContent = 'req';
+            li.appendChild(reqBadge);
+        }
+        if (endpoint.responseSchema) {
+            const respBadge = document.createElement('span');
+            respBadge.className = 'admin-badge admin-badge--info';
+            respBadge.style.fontSize = '0.7em';
+            respBadge.title = 'Has response schema';
+            respBadge.textContent = 'resp';
+            li.appendChild(respBadge);
+        }
+
+        return li;
+    }
+
+    /**
+     * Walk the tree's checkboxes and produce a filtered `apis` map.
+     * Endpoints unchecked are dropped; APIs with zero remaining endpoints
+     * are dropped entirely. Endpoints present in `toImport.apis` but not
+     * in the tree (e.g. added via the raw-JSON advanced edit after the
+     * tree was rendered) default to included — the tree is opt-OUT, not
+     * opt-IN.
+     */
+    function _filterApisByTreeSelection(toImport) {
+        const sourceApis = (toImport && toImport.apis) || {};
+        const filtered = { apis: {} };
+
+        for (const apiId of Object.keys(sourceApis)) {
+            const apiData = sourceApis[apiId];
+            const endpoints = Array.isArray(apiData.endpoints) ? apiData.endpoints : [];
+
+            const excluded = new Set();
+            const boxes = document.querySelectorAll(
+                '#import-tree input[type="checkbox"][data-endpoint-id][data-api-id="' +
+                _cssEscape(apiId) + '"]'
+            );
+            for (const b of boxes) {
+                if (!b.checked) excluded.add(b.dataset.endpointId);
+            }
+
+            const kept = endpoints.filter(ep => !excluded.has(ep.id));
+            if (kept.length === 0) continue;
+            filtered.apis[apiId] = Object.assign({}, apiData, { endpoints: kept });
+        }
+        return filtered;
+    }
+
+    /** CSS.escape polyfill — for apiIds with `.`/`:` we don't expect, but
+     *  cheap insurance for the selector lookup. */
+    function _cssEscape(s) {
+        if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') return CSS.escape(s);
+        return String(s).replace(/(["'\\.])/g, '\\$1');
+    }
+
+    /**
+     * Build an editable "Base URL: <input>" row per API whose baseUrl
+     * isn't absolute (http:// or https://). Keeps the JSON preview in
+     * sync as the user types, so the textarea + the input never disagree.
+     * Returns true when at least one row was rendered.
+     */
+    function _renderBaseUrlFixer(converted) {
+        const wrap = document.getElementById('import-baseurl-fixer');
+        const rows = document.getElementById('import-baseurl-fixer-rows');
+        if (!wrap || !rows) return false;
+        rows.replaceChildren();
+
+        const apis = (converted && converted.apis) || {};
+        let shown = 0;
+        for (const apiId of Object.keys(apis)) {
+            const url = (apis[apiId] && apis[apiId].baseUrl) || '';
+            if (/^https?:\/\//i.test(url)) continue;
+
+            const row = document.createElement('div');
+            row.className = 'admin-form-group admin-form-group--compact';
+
+            const label = document.createElement('label');
+            label.className = 'admin-label';
+            label.appendChild(document.createTextNode(apiId + ' baseUrl:'));
+
+            const input = document.createElement('input');
+            input.type = 'url';
+            input.className = 'admin-input';
+            input.value = url;
+            input.placeholder = 'https://api.example.com' + (url || '');
+            input.dataset.apiId = apiId;
+            input.addEventListener('input', () => _syncBaseUrlToJson(apiId, input.value));
+
+            row.appendChild(label);
+            row.appendChild(input);
+            rows.appendChild(row);
+            shown += 1;
+        }
+
+        wrap.style.display = shown > 0 ? '' : 'none';
+        return shown > 0;
+    }
+
+    /**
+     * Mirror a baseUrl-fixer input value into the JSON preview textarea
+     * so the two surfaces stay aligned. Silently no-ops when the textarea
+     * is mid-edit and unparseable — user owns the JSON surface.
+     */
+    function _syncBaseUrlToJson(apiId, newUrl) {
+        const ta = document.getElementById('import-preview-json');
+        if (!ta) return;
+        let parsed;
+        try { parsed = JSON.parse(ta.value); }
+        catch { return; }
+        if (parsed && parsed.apis && parsed.apis[apiId]) {
+            parsed.apis[apiId].baseUrl = newUrl;
+            ta.value = JSON.stringify(parsed, null, 2);
+        }
     }
 
     /** Screen 1 → Screen 2: parse, detect, convert, render preview. */
@@ -1678,21 +2054,35 @@
             return;
         }
         const fmt = detectImportFormat(data);
-        if (fmt === 'unknown') {
-            errBox.innerHTML = 'Unrecognised format. Expected <code>{"apis": {...}}</code> ' +
-                'or a known foreign format (currently: test.api file-manager).';
+        if (fmt === 'swagger-2') {
+            errBox.innerHTML = 'Swagger 2.0 detected — not yet supported. ' +
+                'Convert your spec to OpenAPI 3.x first ' +
+                '(e.g. <a href="https://converter.swagger.io" target="_blank" rel="noopener">converter.swagger.io</a>).';
             errBox.style.display = '';
             return;
         }
-        const converted = convertImportPayload(data, fmt);
-        if (!converted) {
+        if (fmt === 'unknown') {
+            errBox.innerHTML = 'Unrecognised format. Expected <code>{"apis": {...}}</code>, ' +
+                'OpenAPI 3.x (<code>openapi: "3.x.x"</code>), ' +
+                'or test.api file-manager (<code>endpoints.public</code> / <code>endpoints.secured</code>).';
+            errBox.style.display = '';
+            return;
+        }
+        const result = convertImportPayload(data, fmt);
+        if (!result || !result.converted) {
             errBox.textContent = 'Converter returned no APIs.';
             errBox.style.display = '';
             return;
         }
-        _importPending = { converted, format: fmt };
+        const converted = result.converted;
+        const notes = Array.isArray(result.notes) ? result.notes : [];
+        _importPending = { converted, format: fmt, notes };
         document.getElementById('import-preview-json').value = JSON.stringify(converted, null, 2);
-        document.getElementById('import-preview-summary').innerHTML = summarisePayload(converted, fmt);
+        document.getElementById('import-preview-summary').replaceChildren(
+            summarisePayload(converted, fmt, notes)
+        );
+        _renderBaseUrlFixer(converted);
+        _renderImportTree(converted);
         showImportScreen('preview');
     }
 
@@ -1704,7 +2094,54 @@
     /** Screen 2 confirm: save APIs + endpoints, then reload list. */
     async function handleImportConfirm() {
         if (!_importPending) return;
-        const apis = _importPending.converted?.apis || {};
+
+        // Re-parse from the preview textarea so manual edits the author
+        // made (fixing a relative baseUrl, dropping endpoints, adjusting
+        // auth) actually take effect. Empty textarea falls back to the
+        // original converted payload — anything else must be valid JSON
+        // with a top-level `apis` object, else we block with a clear error.
+        let toImport = _importPending.converted;
+        const previewText = document.getElementById('import-preview-json').value.trim();
+        if (previewText) {
+            let parsed;
+            try { parsed = JSON.parse(previewText); }
+            catch (err) {
+                showToast('Preview JSON is invalid: ' + err.message, 'error');
+                return;
+            }
+            if (!parsed || typeof parsed !== 'object' || !parsed.apis || typeof parsed.apis !== 'object') {
+                showToast('Preview JSON must have a top-level "apis" object', 'error');
+                return;
+            }
+            toImport = parsed;
+        }
+
+        // Overlay any baseUrl-fixer input values onto the parsed payload
+        // (they take precedence over the JSON-derived baseUrl), then
+        // filter by tree selection — endpoints the author unchecked are
+        // dropped here, APIs with zero selected endpoints are removed
+        // entirely. Finally preflight every remaining API for an absolute
+        // URL so the server doesn't 400 mid-import-loop.
+        const fixerInputs = document.querySelectorAll('#import-baseurl-fixer-rows input[data-api-id]');
+        for (const inp of fixerInputs) {
+            const apiId = inp.dataset.apiId;
+            const v = inp.value.trim();
+            if (toImport.apis && toImport.apis[apiId] && v) toImport.apis[apiId].baseUrl = v;
+        }
+        const filtered = _filterApisByTreeSelection(toImport);
+        const apis = filtered.apis;
+        if (Object.keys(apis).length === 0) {
+            showToast('Nothing selected — check at least one endpoint to import.', 'error');
+            return;
+        }
+        for (const apiId of Object.keys(apis)) {
+            const u = (apis[apiId] && apis[apiId].baseUrl) || '';
+            if (!/^https?:\/\//i.test(u)) {
+                showToast('Base URL for "' + apiId + '" must start with http:// or https:// — set it in the form above the JSON preview.', 'error');
+                return;
+            }
+        }
+
         const btn = document.getElementById('btn-import-confirm');
         btn.disabled = true;
         const origLabel = btn.textContent;

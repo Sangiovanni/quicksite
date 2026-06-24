@@ -2305,7 +2305,13 @@
         "importModal": {
             "warning": "Importing will merge with existing APIs. APIs with the same ID will be overwritten.",
             "pasteJson": "Paste JSON",
-            "button": "Import"
+            "button": "Import",
+            "previewTitle": "Preview & confirm",
+            "baseUrlFixer": "Set absolute base URL (must start with http:// or https://)",
+            "treeLabel": "Endpoints to import (uncheck to exclude)",
+            "advancedJson": "Advanced: raw JSON",
+            "previewJson": "Converted JSON (edit before import if needed)",
+            "previewJsonHint": "Edits here take effect on Import. Use this to fine-tune schemas or descriptions before saving."
         }
     }
 }
