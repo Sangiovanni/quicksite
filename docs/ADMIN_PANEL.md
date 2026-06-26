@@ -742,7 +742,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | **Sitemap** (`sitemap.js`) | Route tree, reachability, ordering. |
 | **Embed security** (`embed-security.js`) | `getEmbedSecurity` / `setEmbedSecurity`. |
 | **Optimize** (`optimize.js`) | UI for the CSS Refiner library; runs analyzers, presents diffs, applies edits via `editStyles` / `setRootVariables`. |
-| **AI workspace** (`pages/ai/*`) | Listing, editing, executing AI workflow specs against `/admin/api/ai-spec/*`, `/admin/api/workflow/*`, `/admin/api/batch/execute`. AI dispatch itself is browser-direct (`QSAiCall`). See [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md). |
+| **Workflow editor** (`pages/ai/ai-editor.js`) | Authoring surface for custom workflows. The browser + per-spec runner pages were folded into the visual editor's AI tools mode (§8.12); only the editor (`/admin/workflows/new`, `/admin/workflows/edit/{id}`) remains. Reachable via the **New workflow** button at the top of the AI tools panel; bare `/admin/workflows` URLs redirect to the editor mode. |
 
 ### 9.1 API Registry (/admin/apis)
 

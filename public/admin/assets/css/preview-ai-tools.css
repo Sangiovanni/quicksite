@@ -11,6 +11,27 @@
     padding: 12px;
 }
 
+/* Import + New workflow actions row (below backup banner) */
+.preview-contextual-ai-tools__workflow-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: stretch;
+}
+.preview-contextual-ai-tools__workflow-actions .preview-contextual-ai-tools__small-btn {
+    flex: 1 1 auto;
+    text-align: center;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+.preview-contextual-ai-tools__small-btn--label {
+    /* file-input label must be tab-focusable */
+    cursor: pointer;
+}
+
 /* Backup-first warning banner (top of AI tools panel) */
 .preview-contextual-ai-tools__backup-banner {
     display: flex;
@@ -261,6 +282,30 @@
     line-height: 1;
     opacity: 0.7;
     cursor: help;
+}
+
+/* Delete icon on custom workflow cards (top-right) */
+.preview-contextual-ai-tools__tool-card-delete {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--admin-text-muted);
+    border: 1px solid transparent;
+    border-radius: 3px;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+.preview-contextual-ai-tools__tool-card-delete:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.3);
 }
 
 .preview-contextual-ai-tools__tool-card-desc {

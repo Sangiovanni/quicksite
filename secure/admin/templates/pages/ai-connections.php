@@ -71,16 +71,10 @@ $libBase = PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/lib/';
             </div>
             <div class="admin-form-group">
                 <label class="admin-checkbox">
-                    <input type="checkbox" id="qsac-auto-preview">
-                    <span class="admin-checkbox__label">Auto-preview commands when valid JSON is detected</span>
-                </label>
-            </div>
-            <div class="admin-form-group">
-                <label class="admin-checkbox">
                     <input type="checkbox" id="qsac-auto-execute">
-                    <span class="admin-checkbox__label">Auto-execute commands after preview</span>
+                    <span class="admin-checkbox__label">Auto-execute commands after the AI response is parsed</span>
                 </label>
-                <p class="admin-hint"><strong>Use with caution.</strong></p>
+                <p class="admin-hint"><strong>Use with caution.</strong> Applies in the AI tools panel (Preview → AI tools) and the workflow runner.</p>
             </div>
         </div>
     </div>

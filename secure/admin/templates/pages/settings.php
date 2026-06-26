@@ -148,14 +148,9 @@ window.QUICKSITE_CONFIG.quicksiteVersion = '<?= htmlspecialchars($version, ENT_Q
             <label class="admin-label">Automation Options</label>
             <p class="admin-hint" style="margin-bottom: var(--space-sm);">These settings apply when using AI specs.</p>
             
-            <div class="admin-checkbox-group" style="margin-bottom: var(--space-sm);">
-                <input type="checkbox" id="ai-auto-preview" class="admin-checkbox" onchange="updateAiAutomation('autoPreview', this.checked)">
-                <label for="ai-auto-preview" class="admin-checkbox-label">Auto-preview commands when valid JSON is detected</label>
-            </div>
-            
             <div class="admin-checkbox-group">
                 <input type="checkbox" id="ai-auto-execute" class="admin-checkbox" onchange="updateAiAutomation('autoExecute', this.checked)">
-                <label for="ai-auto-execute" class="admin-checkbox-label">Auto-execute commands after preview <span style="color: var(--admin-warning);">(use with caution)</span></label>
+                <label for="ai-auto-execute" class="admin-checkbox-label">Auto-execute commands after the AI response is parsed <span style="color: var(--admin-warning);">(use with caution)</span></label>
             </div>
         </div>
     </div>

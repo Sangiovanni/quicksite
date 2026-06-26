@@ -179,7 +179,6 @@
 
     function bindGlobalControls() {
         const persist = document.getElementById('qsac-persist');
-        const autoPrev = document.getElementById('qsac-auto-preview');
         const autoExec = document.getElementById('qsac-auto-execute');
         if (persist) {
             persist.checked = localStorage.getItem(STORAGE.aiPersist) === 'true';
@@ -187,14 +186,8 @@
                 localStorage.setItem(STORAGE.aiPersist, persist.checked ? 'true' : 'false');
             });
         }
-        if (autoPrev) {
-            autoPrev.checked = localStorage.getItem(STORAGE.aiAutoPreview) !== 'false';
-            autoPrev.addEventListener('change', () => {
-                localStorage.setItem(STORAGE.aiAutoPreview, autoPrev.checked ? 'true' : 'false');
-            });
-        }
         if (autoExec) {
-            autoExec.checked = localStorage.getItem(STORAGE.aiAutoExecute) === 'true';
+            autoExec.checked = localStorage.getItem(STORAGE.aiAutoExecute) !== 'false';
             autoExec.addEventListener('change', () => {
                 localStorage.setItem(STORAGE.aiAutoExecute, autoExec.checked ? 'true' : 'false');
             });

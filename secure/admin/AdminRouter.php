@@ -359,26 +359,21 @@ class AdminRouter {
         // Determine which template to load
         $templatePath = SECURE_FOLDER_PATH . '/admin/templates/pages/' . $this->page . '.php';
         
-        // Special handling for workflows with workflowId
-        if ($this->page === 'workflows' && $this->workflowId !== null) {
-            // Check for editor routes (new or edit/*)
-            if ($this->workflowId === 'new' || str_starts_with($this->workflowId, 'edit/')) {
+        // Workflows: only the editor (new + edit/*) is reachable here now.
+        // The browser (was: index.php) and per-spec runner (was: spec.php)
+        // are subsumed by the in-editor AI tools mode at /admin/preview.
+        // Bookmarks to the old URLs land on the editor via redirect.
+        if ($this->page === 'workflows') {
+            if ($this->workflowId === 'new' || str_starts_with((string)$this->workflowId, 'edit/')) {
                 $editorPath = SECURE_FOLDER_PATH . '/admin/templates/pages/workflows/editor.php';
                 if (file_exists($editorPath)) {
                     $templatePath = $editorPath;
                 }
             } else {
-                // Load workflow-specific template for viewing
-                $workflowTemplatePath = SECURE_FOLDER_PATH . '/admin/templates/pages/workflows/spec.php';
-                if (file_exists($workflowTemplatePath)) {
-                    $templatePath = $workflowTemplatePath;
-                }
-            }
-        } elseif ($this->page === 'workflows' && $this->workflowId === null) {
-            // Load workflows index (browser) if it exists
-            $indexPath = SECURE_FOLDER_PATH . '/admin/templates/pages/workflows/index.php';
-            if (file_exists($indexPath)) {
-                $templatePath = $indexPath;
+                // /admin/workflows  or  /admin/workflows/{specId}  (non-edit)
+                // → moved to the AI tools panel in the visual editor.
+                $this->redirect('preview');
+                return;
             }
         }
         

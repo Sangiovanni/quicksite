@@ -22,7 +22,6 @@
         keysV2: QuickSiteStorageKeys.aiKeysV2,
         defaultProvider: QuickSiteStorageKeys.aiDefaultProvider,
         persist: QuickSiteStorageKeys.aiPersist,
-        autoPreview: QuickSiteStorageKeys.aiAutoPreview,
         autoExecute: QuickSiteStorageKeys.aiAutoExecute
     };
     
@@ -59,10 +58,8 @@
         const storage = persist ? localStorage : sessionStorage;
         
         // Load automation settings
-        const autoPreviewEl = document.getElementById('ai-auto-preview');
         const autoExecuteEl = document.getElementById('ai-auto-execute');
-        if (autoPreviewEl) autoPreviewEl.checked = localStorage.getItem(AI_STORAGE_KEYS.autoPreview) === 'true';
-        if (autoExecuteEl) autoExecuteEl.checked = localStorage.getItem(AI_STORAGE_KEYS.autoExecute) === 'true';
+        if (autoExecuteEl) autoExecuteEl.checked = localStorage.getItem(AI_STORAGE_KEYS.autoExecute) !== 'false';
         
         // Check for configured providers
         const storedData = storage.getItem(AI_STORAGE_KEYS.keysV2);
@@ -98,9 +95,9 @@
      * Update AI automation settings
      */
     window.updateAiAutomation = function(setting, value) {
-        const key = setting === 'autoPreview' ? AI_STORAGE_KEYS.autoPreview : AI_STORAGE_KEYS.autoExecute;
-        localStorage.setItem(key, value);
-        QuickSiteAdmin.showToast(`${setting === 'autoPreview' ? 'Auto-preview' : 'Auto-execute'} ${value ? 'enabled' : 'disabled'}`, 'success');
+        if (setting !== 'autoExecute') return;
+        localStorage.setItem(AI_STORAGE_KEYS.autoExecute, value);
+        QuickSiteAdmin.showToast(`Auto-execute ${value ? 'enabled' : 'disabled'}`, 'success');
     };
     
     /**

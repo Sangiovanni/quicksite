@@ -555,27 +555,6 @@ switch ($action) {
     // AI Spec System Endpoints
     // ========================================================================
     
-    case 'ai-specs':
-        // List all available AI specs
-        require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
-        $manager = new WorkflowManager();
-        $specs = $manager->listWorkflows();
-        
-        // Return just the metadata for listing
-        $specList = array_map(function($spec) {
-            return [
-                'id' => $spec['id'],
-                'version' => $spec['version'],
-                'meta' => $spec['meta'],
-                'source' => $spec['_source'] ?? 'core',
-                'relatedCommands' => $spec['relatedCommands'] ?? [],
-                'hasSteps' => !empty($spec['steps'])
-            ];
-        }, $specs);
-        
-        echo json_encode(['success' => true, 'data' => $specList]);
-        break;
-    
     case 'ai-spec':
         // Get a specific AI spec (rendered with data)
         if (empty($params[0])) {
@@ -880,30 +859,25 @@ switch ($action) {
             ]
         ]);
         break;
-    
+
     case 'workflow-delete':
-        // Delete a custom workflow
+        // Delete a custom workflow (and its sidecar md + translations).
+        // Core workflows can't be deleted.
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(405);
             echo json_encode(['error' => 'Method not allowed']);
             break;
         }
-        
         $input = json_decode(file_get_contents('php://input'), true);
         $deleteId = $input['id'] ?? '';
-        
         if (!$deleteId || !preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/', $deleteId)) {
             http_response_code(400);
             echo json_encode(['error' => 'Invalid workflow ID']);
             break;
         }
-        
-        // Only custom workflows can be deleted
         $customFolder = SECURE_FOLDER_PATH . '/admin/workflows/custom';
         $jsonPath = $customFolder . '/' . $deleteId . '.json';
-        
         if (!file_exists($jsonPath)) {
-            // Check if it's a core workflow
             $coreFolder = SECURE_FOLDER_PATH . '/admin/workflows/core';
             if (file_exists($coreFolder . '/' . $deleteId . '.json')) {
                 http_response_code(403);
@@ -914,33 +888,25 @@ switch ($action) {
             }
             break;
         }
-        
-        // Delete all associated files
         $deleted = [];
         unlink($jsonPath);
         $deleted[] = $deleteId . '.json';
-        
         $mdPath = $customFolder . '/' . $deleteId . '.md';
         if (file_exists($mdPath)) {
             unlink($mdPath);
             $deleted[] = $deleteId . '.md';
         }
-        
         $transPath = $customFolder . '/' . $deleteId . '.translations.json';
         if (file_exists($transPath)) {
             unlink($transPath);
             $deleted[] = $deleteId . '.translations.json';
         }
-        
         echo json_encode([
             'success' => true,
-            'data' => [
-                'id' => $deleteId,
-                'deletedFiles' => $deleted
-            ]
+            'data' => ['id' => $deleteId, 'deletedFiles' => $deleted]
         ]);
         break;
-    
+
     case 'workflow-generate-steps':
         // Generate steps for a manual workflow
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -1015,78 +981,7 @@ switch ($action) {
         echo json_encode($response);
         break;
     
-    case 'workflow-phases':
-        // Get execution phases for a workflow (metadata only)
-        if (empty($params[0])) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Missing workflow ID']);
-            break;
-        }
-        
-        require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
-        $manager = new WorkflowManager();
-        if ($tokenInfo) $manager->setTokenInfo($tokenInfo);
-        
-        $workflow = $manager->loadWorkflow($params[0]);
-        if (!$workflow) {
-            http_response_code(404);
-            echo json_encode(['error' => 'Workflow not found: ' . $params[0]]);
-            break;
-        }
-        
-        // Get user params from query string
-        $userParams = [];
-        foreach ($_GET as $key => $value) {
-            if (!in_array($key, ['action'])) {
-                $userParams[$key] = $value;
-            }
-        }
-        
-        $phases = $manager->getWorkflowPhases($workflow, $userParams);
-        
-        echo json_encode([
-            'success' => true,
-            'data' => [
-                'workflowId' => $params[0],
-                'phases' => $phases
-            ]
-        ]);
-        break;
-    
-    case 'workflow-resolve-phase':
-        // Resolve a single sub-workflow phase with fresh data
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            http_response_code(405);
-            echo json_encode(['error' => 'Method not allowed']);
-            break;
-        }
-        
-        $input = json_decode(file_get_contents('php://input'), true);
-        if (!$input || !isset($input['workflowId'])) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Missing workflowId']);
-            break;
-        }
-        
-        require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
-        $manager = new WorkflowManager();
-        if ($tokenInfo) $manager->setTokenInfo($tokenInfo);
-        
-        $result = $manager->resolveSubWorkflow($input['workflowId'], $input['params'] ?? []);
-        
-        if (isset($result['error'])) {
-            http_response_code(404);
-            echo json_encode(['error' => $result['error']]);
-            break;
-        }
-        
-        echo json_encode([
-            'success' => true,
-            'data' => $result
-        ]);
-        break;
-        
-    default:
+default:
         http_response_code(404);
         echo json_encode(['error' => 'Unknown action: ' . $action]);
 }
