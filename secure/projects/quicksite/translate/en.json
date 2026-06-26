@@ -38,9 +38,7 @@
             "get-started": "Get Started - QuickSite",
             "privacy": "Privacy Policy - QuickSite",
             "terms": "Terms of Use - QuickSite",
-            "guides": "Guides - QuickSite",
-            "test": "test title",
-            "404": "Page Not Found - QuickSite"
+            "guides": "Guides - QuickSite"
         }
     },
     "footer": {
@@ -93,8 +91,7 @@
             "project": "Project Management",
             "ai": "AI Integration",
             "roles": "Roles & Permissions",
-            "storage": "Storage Monitoring",
-            "snippets": "Snippets"
+            "storage": "Storage Monitoring"
         },
         "cmd": {
             "addRoute": {
@@ -215,8 +212,7 @@
                 "desc": "Uploads a file to the assets folder. Supports multipart upload or HTTPS URL download.",
                 "params": {
                     "category": "images, font, audio, or videos",
-                    "file": "File upload (multipart/form-data)",
-                    "url": "HTTPS URL to download (alternative to file upload)"
+                    "file": "File upload (multipart/form-data)"
                 }
             },
             "deleteAsset": {
@@ -232,15 +228,6 @@
                     "filename": "Name of the file to update metadata for",
                     "description": "Description for AI context (max 500 chars)",
                     "alt": "Alt text for images/accessibility (max 200 chars)"
-                }
-            },
-            "editAsset": {
-                "desc": "Edit an existing asset: rename, update description or alt text. Category is auto-detected.",
-                "params": {
-                    "filename": "Current filename of the asset to edit",
-                    "newFilename": "New filename (must keep same extension)",
-                    "description": "Description for AI context (max 500 chars)",
-                    "alt": "Alt text for images/accessibility (max 250 chars)"
                 }
             },
             "getStyles": {
@@ -323,7 +310,6 @@
             "build": {
                 "desc": "Creates a production-ready build with compiled PHP files, optional folder renaming, config sanitization, and ZIP archive creation",
                 "params": {
-                    "name": "Custom build folder name (auto-generated if omitted)",
                     "public": "Custom public folder name/path",
                     "secure": "Custom secure folder name (single level)",
                     "space": "PUBLIC_FOLDER_SPACE subdirectory"
@@ -530,50 +516,6 @@
                 "params": {
                     "name": "Name of the role to delete",
                     "force": "Reassign tokens to viewer role if in use"
-                }
-            },
-            "listSnippets": {
-                "desc": "Lists all available snippets (core + project) organized by category",
-                "params": {}
-            },
-            "getSnippet": {
-                "desc": "Gets a single snippet with full structure, translations, and CSS",
-                "params": {
-                    "id": "Snippet ID to retrieve"
-                }
-            },
-            "createSnippet": {
-                "desc": "Creates a new user snippet in the project snippets folder",
-                "params": {
-                    "id": "Unique snippet ID",
-                    "name": "Display name",
-                    "category": "Category folder (nav, forms, cards, layouts)",
-                    "structure": "The snippet structure",
-                    "description": "Optional description",
-                    "translations": "Optional translation keys"
-                }
-            },
-            "deleteSnippet": {
-                "desc": "Deletes a user snippet (core snippets cannot be deleted)",
-                "params": {
-                    "id": "Snippet ID to delete"
-                }
-            },
-            "duplicateSnippet": {
-                "desc": "Copies a core snippet to project snippets for editing",
-                "params": {
-                    "sourceId": "ID of snippet to duplicate",
-                    "newId": "New ID for the copy (optional)"
-                }
-            },
-            "insertSnippet": {
-                "desc": "Inserts a snippet into a page or component with unique textKeys",
-                "params": {
-                    "snippetId": "ID of snippet to insert",
-                    "targetType": "Target type (page, component, menu, footer)",
-                    "targetName": "Target name",
-                    "targetNodeId": "Target node ID (dot-separated path)",
-                    "position": "Insertion position (inside, before, after)"
                 }
             }
         },

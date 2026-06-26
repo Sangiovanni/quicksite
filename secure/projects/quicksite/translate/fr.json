@@ -1,17 +1,5 @@
 {
-    "cta": {
-        "viewDocs": "Documentation",
-        "github": "GitHub",
-        "getStarted": "Commencer",
-        "learnMore": "En savoir plus"
-    },
-    "site": {
-        "tagline": "CMS base fichiers",
-        "name": "Quicksite"
-    },
     "home": {
-        "welcomeMessage": "Un CMS PHP moderne base sur JSON avec une API REST puissante. Parfait pour les landing pages, portfolios et microsites.",
-        "title": "Creez des sites rapidement.",
         "hero": {
             "title": "QuickSite",
             "subtitle": "Créez et gérez vos sites web entièrement via une API REST. Aucun framework frontend requis.",
@@ -45,19 +33,15 @@
     },
     "page": {
         "titles": {
-            "about": "A propos - Quicksite",
-            "features": "Fonctionnalites - Quicksite",
             "home": "QuickSite - Créez des sites web par API",
             "docs": "Documentation - QuickSite",
             "get-started": "Commencer - QuickSite",
             "privacy": "Politique de confidentialité - QuickSite",
             "terms": "Conditions d'utilisation - QuickSite",
-            "404": "Page non trouvée - QuickSite",
             "guides": "Guides - QuickSite"
         }
     },
     "footer": {
-        "madeWith": "Fait avec amour pour les developpeurs",
         "language": "Langue :",
         "terms": "Conditions d'utilisations",
         "privacy": "Politique de confidentialité",
@@ -69,9 +53,6 @@
         "pageNotFound": "Page Non Trouvée"
     },
     "menu": {
-        "about": "A propos",
-        "features": "Fonctionnalites",
-        "terms": "Conditions",
         "home": "Accueil",
         "docs": "Documentation",
         "getstarted": "Commencer",
@@ -110,8 +91,7 @@
             "project": "Gestion des Projets",
             "ai": "Intégration IA",
             "roles": "Rôles & Permissions",
-            "storage": "Surveillance du Stockage",
-            "snippets": "Snippets"
+            "storage": "Surveillance du Stockage"
         },
         "cmd": {
             "addRoute": {
@@ -232,8 +212,7 @@
                 "desc": "Upload un fichier vers le dossier assets. Supporte l'upload multipart ou le téléchargement par URL HTTPS.",
                 "params": {
                     "category": "images, font, audio, ou videos",
-                    "file": "Upload de fichier (multipart/form-data)",
-                    "url": "URL HTTPS à télécharger (alternative à l'upload de fichier)"
+                    "file": "Upload de fichier (multipart/form-data)"
                 }
             },
             "deleteAsset": {
@@ -249,15 +228,6 @@
                     "filename": "Nom du fichier à mettre à jour",
                     "description": "Description pour contexte IA (max 500 caractères)",
                     "alt": "Texte alternatif pour images/accessibilité (max 200 caractères)"
-                }
-            },
-            "editAsset": {
-                "desc": "Modifie un asset existant : renommer, mettre à jour la description ou le texte alternatif. Catégorie auto-détectée.",
-                "params": {
-                    "filename": "Nom de fichier actuel de l'asset à modifier",
-                    "newFilename": "Nouveau nom de fichier (doit garder la même extension)",
-                    "description": "Description pour contexte IA (max 500 caractères)",
-                    "alt": "Texte alternatif pour images/accessibilité (max 250 caractères)"
                 }
             },
             "getStyles": {
@@ -332,7 +302,6 @@
             "build": {
                 "desc": "Crée un build prêt pour la production avec des fichiers PHP compilés, renommage optionnel des dossiers, nettoyage de la config et création d'archive ZIP",
                 "params": {
-                    "name": "Nom personnalisé du dossier de build (auto-généré si omis)",
                     "public": "Nom/chemin personnalisé du dossier public",
                     "secure": "Nom personnalisé du dossier secure (un seul niveau)",
                     "space": "Sous-répertoire PUBLIC_FOLDER_SPACE"
@@ -539,50 +508,6 @@
                 "params": {
                     "name": "Nom du rôle à supprimer",
                     "force": "Réassigner les tokens au rôle viewer si utilisé"
-                }
-            },
-            "listSnippets": {
-                "desc": "Liste tous les snippets disponibles (système + projet) par catégorie",
-                "params": {}
-            },
-            "getSnippet": {
-                "desc": "Récupère un snippet avec sa structure, traductions et CSS",
-                "params": {
-                    "id": "ID du snippet à récupérer"
-                }
-            },
-            "createSnippet": {
-                "desc": "Crée un nouveau snippet utilisateur dans le dossier snippets du projet",
-                "params": {
-                    "id": "ID unique du snippet",
-                    "name": "Nom d'affichage",
-                    "category": "Dossier de catégorie (nav, forms, cards, layouts)",
-                    "structure": "Structure du snippet",
-                    "description": "Description optionnelle",
-                    "translations": "Clés de traduction optionnelles"
-                }
-            },
-            "deleteSnippet": {
-                "desc": "Supprime un snippet utilisateur (les snippets système ne peuvent pas être supprimés)",
-                "params": {
-                    "id": "ID du snippet à supprimer"
-                }
-            },
-            "duplicateSnippet": {
-                "desc": "Copie un snippet système vers les snippets du projet pour modification",
-                "params": {
-                    "sourceId": "ID du snippet à dupliquer",
-                    "newId": "Nouvel ID pour la copie (optionnel)"
-                }
-            },
-            "insertSnippet": {
-                "desc": "Insère un snippet dans une page ou composant avec des textKeys uniques",
-                "params": {
-                    "snippetId": "ID du snippet à insérer",
-                    "targetType": "Type de cible (page, component, menu, footer)",
-                    "targetName": "Nom de la cible",
-                    "targetNodeId": "ID du nœud cible (chemin séparé par des points)",
-                    "position": "Position d'insertion (inside, before, after)"
                 }
             }
         },
