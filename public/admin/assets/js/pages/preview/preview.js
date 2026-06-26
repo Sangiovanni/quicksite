@@ -342,6 +342,8 @@
     const addMandatoryParamsContainer = document.getElementById('add-mandatory-params-container');
     const addClassField = document.getElementById('add-class-field');
     const addClassInput = document.getElementById('add-class');
+    const addIdField = document.getElementById('add-id-field');
+    const addIdInput = document.getElementById('add-id-input');
     const addCustomParamsContainer = document.getElementById('add-custom-params-container');
     const addAdvancedSection = document.getElementById('add-advanced-section');
     const addPreviewSection = document.getElementById('add-preview-section');
@@ -377,6 +379,7 @@
     const addComponentNoVars = document.getElementById('add-component-no-vars');
     const addCancelBtn = document.getElementById('add-cancel');
     const addConfirmBtn = document.getElementById('add-confirm');
+    const addConfirmAnotherBtn = document.getElementById('add-confirm-another');
     // Edit-Params mode wiring: type-tab wrapper (hidden in edit mode),
     // header text span (swapped to "Edit Params: <tag>"), bottom-button
     // text span (swapped to "Save").
@@ -5302,6 +5305,7 @@
         setAddPosition('after');
         if (classCombobox) classCombobox.reset();
         else if (addClassInput) addClassInput.value = '';
+        if (addIdInput) addIdInput.value = '';
         if (addCustomParamsList) addCustomParamsList.innerHTML = '';
         if (addComponentSelector) addComponentSelector.reset();
         else if (addComponentSelect) addComponentSelect.value = '';
@@ -5345,6 +5349,34 @@
         if (contextualAddDefault) contextualAddDefault.style.display = '';
         if (contextualAddForm) contextualAddForm.style.display = 'none';
         setMode('select');
+    }
+
+    // Save-&-add-another mode flag — set while the "Save & add another"
+    // button drives an add, so the success path keeps the form open.
+    let addAnotherMode = false;
+
+    /**
+     * Finalize a successful add. Normal mode: close the form (return false so
+     * the caller runs its own live-insert / reload). Save-&-add-another mode:
+     * keep the form open, run the optional per-type field reset, and reload
+     * the preview — a plain reload preserves the target selection so repeated
+     * adds land at the same anchor — then return true so the caller skips its
+     * own refresh.
+     */
+    function _finalizeAdd(perTypeReset) {
+        if (!addAnotherMode) {
+            hideSidebarAddForm();
+            return false;
+        }
+        if (typeof perTypeReset === 'function') perTypeReset();
+        reloadPreview();
+        return true;
+    }
+
+    // HTML id validation — CSS-selector-safe subset: start with a letter or
+    // underscore, then letters / digits / hyphens / underscores; no spaces.
+    function _isValidElementId(v) {
+        return /^[A-Za-z_][A-Za-z0-9_-]*$/.test(v);
     }
 
     // ---------- Edit Params (form-reuse in 'edit' mode) ----------
@@ -5457,6 +5489,7 @@
         // Reset the three target widgets before pre-populating.
         if (classCombobox) classCombobox.reset();
         else if (addClassInput) addClassInput.value = '';
+        if (addIdInput) addIdInput.value = '';
         if (addCustomParamsList) addCustomParamsList.innerHTML = '';
 
         // Tear down any prior Complex wizard mount. #add-complex-body is a
@@ -5479,6 +5512,8 @@
         if (addComplexField) addComplexField.style.display = 'none';
         if (addComponentVars) addComponentVars.style.display = 'none';
         if (addClassField) addClassField.style.display = 'block';
+        if (addIdField) addIdField.style.display = 'none';
+        if (addConfirmAnotherBtn) addConfirmAnotherBtn.style.display = 'none';
         if (addAdvancedSection) addAdvancedSection.style.display = '';
 
         // Build mandatory-param widgets for this tag (the helper reads
@@ -5748,6 +5783,9 @@
         if (addComponentField) addComponentField.style.display = isComponent ? 'block' : 'none';
         if (addSnippetField) addSnippetField.style.display = isSnippet ? 'block' : 'none';
         if (addClassField) addClassField.style.display = isTag ? 'block' : 'none';
+        if (addIdField) addIdField.style.display = isTag ? 'block' : 'none';
+        // Save & add another applies to tag / component / complex only.
+        if (addConfirmAnotherBtn) addConfirmAnotherBtn.style.display = (isTag || isComponent || isComplex) ? '' : 'none';
         // Text node tab — value input + Raw/Translation-key toggle.
         if (addTextField) addTextField.style.display = isText ? 'block' : 'none';
         // The "Advanced — custom params" section is shared between the
@@ -7819,6 +7857,43 @@
         }
     });
 
+    // Save & add another — same add, kept open for the next one. Hidden for
+    // Text + Snippet types (updateSidebarAddNodeTypeUI manages visibility).
+    addConfirmAnotherBtn?.addEventListener('click', async function() {
+        if (selectedStruct == null || selectedNode == null) {
+            showToast(PreviewConfig.i18n.selectNodeFirst, 'warning');
+            return;
+        }
+        if (contextualAddMode === 'edit') return;
+        addAnotherMode = true;
+        try {
+            if (sidebarAddNodeType === 'tag') {
+                await addTagNode();
+            } else if (sidebarAddNodeType === 'component') {
+                await addComponentNode();
+            } else if (sidebarAddNodeType === 'complex') {
+                await addComplexNode();
+            }
+        } catch (error) {
+            console.error('[Preview] Add another error:', error);
+            showToast(error.message || PreviewConfig.i18n.addNodeError, 'error');
+        } finally {
+            addAnotherMode = false;
+        }
+    });
+
+    // Live ID validation — flag an invalid id on blur, clear it as the user
+    // corrects it. The hard block still fires at add time in addTagNode.
+    addIdInput?.addEventListener('blur', function() {
+        const v = (addIdInput.value || '').trim();
+        addIdInput.classList.toggle('admin-input--error', !!v && !_isValidElementId(v));
+    });
+    addIdInput?.addEventListener('input', function() {
+        if (!addIdInput.classList.contains('admin-input--error')) return;
+        const v = (addIdInput.value || '').trim();
+        if (!v || _isValidElementId(v)) addIdInput.classList.remove('admin-input--error');
+    });
+
     /**
      * Save the currently-active Complex Element wizard.
      * The controller (returned by the kind's renderWizard) drives
@@ -7884,9 +7959,10 @@
         }
         const data = result.data || {};
         showToast(data.message || 'Complex element added', 'success');
-        hideSidebarAddForm();
-        // Refresh the iframe so the new subtree appears.
-        if (typeof reloadPreview === 'function') reloadPreview();
+        // Save & add another (complex): keep the wizard as-is (prefilled with
+        // the same config) so the next instance starts from these values.
+        const keptOpen = _finalizeAdd(null);
+        if (!keptOpen && typeof reloadPreview === 'function') reloadPreview();
         broadcastStructureChanged();
     }
     
@@ -7931,7 +8007,25 @@
             const value = row.querySelector('.preview-contextual-form__param-value')?.value?.trim();
             if (key && value) params[key] = value;
         });
-        
+
+        // Optional ID — dedicated convenience field (wins over any Advanced
+        // custom `id` row). Validated against CSS-safe HTML id rules.
+        const idVal = (addIdInput?.value || '').trim();
+        if (addIdInput) addIdInput.classList.remove('admin-input--error');
+        if (idVal) {
+            if (!_isValidElementId(idVal)) {
+                if (addIdInput) {
+                    addIdInput.classList.add('admin-input--error');
+                    addIdInput.focus();
+                }
+                throw new Error(
+                    PreviewConfig.i18n.invalidId
+                    || 'Invalid ID — start with a letter or underscore; letters, digits, hyphens and underscores only (no spaces).'
+                );
+            }
+            params.id = idVal;
+        }
+
         // Parse struct to get type and name
         const structInfo = parseStruct(selectedStruct);
         if (!structInfo || !structInfo.type) {
@@ -7959,21 +8053,29 @@
             const targetNode = selectedNode;
             
             showToast(PreviewConfig.i18n.nodeAdded || 'Element added', 'success');
-            hideSidebarAddForm();
-            
-            // Live DOM update if HTML returned
-            if (data.html && targetNode) {
-                console.log('[Preview] Live DOM insert:', { struct: targetStruct, targetNode, position, newNodeId: data.newNodeId });
-                sendToIframe('insertNode', {
-                    struct: targetStruct,
-                    targetNode: targetNode,
-                    position: position,
-                    html: data.html,
-                    newNodeId: data.newNodeId
-                });
-            } else {
-                console.log('[Preview] No HTML returned, reloading preview. Data:', data);
-                reloadPreview();
+
+            // Save & add another (tag): keep the form open, clear instance
+            // fields (id + mandatory + custom params), keep tag + class. A
+            // plain reload preserves the target so the next add lands here too.
+            const keptOpen = _finalizeAdd(function() {
+                if (addIdInput) { addIdInput.value = ''; addIdInput.classList.remove('admin-input--error'); }
+                (addMandatoryParamsContainer?.querySelectorAll('input, select') || []).forEach(f => { f.value = ''; });
+                if (addCustomParamsList) addCustomParamsList.innerHTML = '';
+                if (addIdInput) addIdInput.focus();
+            });
+            if (!keptOpen) {
+                // Live DOM update if HTML returned (auto-selects the new node).
+                if (data.html && targetNode) {
+                    sendToIframe('insertNode', {
+                        struct: targetStruct,
+                        targetNode: targetNode,
+                        position: position,
+                        html: data.html,
+                        newNodeId: data.newNodeId
+                    });
+                } else {
+                    reloadPreview();
+                }
             }
             broadcastStructureChanged();
         } else {
@@ -8115,21 +8217,23 @@
             const targetNode = selectedNode;
             
             showToast(PreviewConfig.i18n.componentAdded || 'Component added', 'success');
-            hideSidebarAddForm();
-            
-            // Live DOM update if HTML returned
-            if (data.html && targetNode) {
-                console.log('[Preview] Live DOM insert component:', { struct: targetStruct, targetNode, position, newNodeId: data.nodeId });
-                sendToIframe('insertNode', {
-                    struct: targetStruct,
-                    targetNode: targetNode,
-                    position: position,
-                    html: data.html,
-                    newNodeId: data.nodeId
-                });
-            } else {
-                console.log('[Preview] No component HTML returned, reloading preview. Data:', data);
-                reloadPreview();
+
+            // Save & add another (component): keep the variable inputs as-is
+            // (prefilled with the same values) for the next instance.
+            const keptOpen = _finalizeAdd(null);
+            if (!keptOpen) {
+                // Live DOM update if HTML returned.
+                if (data.html && targetNode) {
+                    sendToIframe('insertNode', {
+                        struct: targetStruct,
+                        targetNode: targetNode,
+                        position: position,
+                        html: data.html,
+                        newNodeId: data.nodeId
+                    });
+                } else {
+                    reloadPreview();
+                }
             }
             broadcastStructureChanged();
         } else {

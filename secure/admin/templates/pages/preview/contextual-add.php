@@ -242,7 +242,17 @@
             </div>
             <input type="hidden" id="add-class" value="">
         </div>
-        
+
+        <!-- ID field (optional, HTML Tag only). Plain text input — no
+             combobox. Dedicated convenience field mirroring CSS Class;
+             id stays settable via Advanced custom params in edit flows. -->
+        <div class="preview-contextual-form__field" id="add-id-field" style="display: none;">
+            <label for="add-id-input"><?= __admin('preview.elementId', 'ID') ?> <small>(<?= __admin('common.optional') ?? 'optional' ?>)</small>:</label>
+            <input type="text" class="admin-input" id="add-id-input"
+                   placeholder="<?= __admin('preview.elementIdPlaceholder', 'unique-id') ?>"
+                   autocomplete="off" spellcheck="false">
+        </div>
+
         <!-- COLLAPSIBLE: Advanced / Custom Parameters (for tags only) -->
         <div class="preview-contextual-form__collapsible" id="add-advanced-section" style="display: none;">
             <button type="button" class="preview-contextual-form__collapsible-header" data-storage-key="qs-add-advanced-expanded">
@@ -286,6 +296,15 @@
         <!-- BOTTOM Action Buttons -->
         <div class="preview-contextual-form__actions preview-contextual-form__actions--bottom">
             <button type="button" class="admin-btn admin-btn--ghost" id="add-cancel"><?= __admin('common.cancel') ?></button>
+            <!-- Save & add another — keeps the form open for the next add.
+                 Shown for HTML Tag / Component / Complex only (JS-managed). -->
+            <button type="button" class="admin-btn admin-btn--outline" id="add-confirm-another" style="display: none;" title="<?= __admin('preview.saveAndAddAnother', 'Save & add another') ?>">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span><?= __admin('preview.saveAndAddAnother', 'Save & add another') ?></span>
+            </button>
             <button type="button" class="admin-btn admin-btn--success" id="add-confirm">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                     <line x1="12" y1="5" x2="12" y2="19"/>

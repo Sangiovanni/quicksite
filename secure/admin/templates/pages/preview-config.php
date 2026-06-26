@@ -318,6 +318,7 @@ window.PreviewConfig = {
         eventsAdvanced: <?= json_encode(__admin('preview.eventsAdvanced', 'Advanced')) ?>,
         functionExample: <?= json_encode(__admin('preview.functionExample', 'Example')) ?>,
         nameRequiredForInput: <?= json_encode(__admin('preview.nameRequiredForInput', 'A name is required so the field is submitted with the form.')) ?>,
+        invalidId: <?= json_encode(__admin('preview.invalidId', 'Invalid ID — start with a letter or underscore; letters, digits, hyphens and underscores only (no spaces).')) ?>,
         optional: <?= json_encode(__admin('preview.optional', 'Optional')) ?>,
         eventTooltips: <?= json_encode(AdminTranslation::getInstance()->getRaw('preview.eventTooltips') ?: new stdClass()) ?>,
         selectNodeFirst: <?= json_encode(__admin('preview.selectNodeFirst', 'Select an element first')) ?>,

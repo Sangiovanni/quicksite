@@ -227,6 +227,10 @@ The sidebar exposes eight modes, each backed by a `data-mode="..."` button. Sour
 | **Translations** | `translation` | Site-wide translation key manager (`preview-translation.js`). Per-language coverage % + counts, scope picker (Pages / Layout / Components), inline row-expand editor, per-row + bulk delete. Mono- and multi-lingual. See §8.9. |
 | **AI tools** | `ai-tools` | In-editor workflow runner. Searchable + tag-filtered list of workflow specs grouped by category; picking one swaps the panel into a 3-zone runner (INPUTS / AI EXCHANGE / EXECUTION). Element clicks in the iframe behave as in Select mode — workflows with a `selector` parameter auto-fill from the current selection. See §8.12. |
 
+**Add-flow + canvas cues.** Adding an element (sibling/child) **auto-selects the newly inserted node** and scrolls it into view, so consecutive adds chain naturally without re-clicking. Empty / zero-size elements get a faint dashed outline — a min-size "empty-element hint" — so they stay visible and clickable on the canvas; it clears once the element gains content. (The hint reveals *empty* elements, not `display:none` ones.)
+
+**Add-Element conveniences.** The HTML Tag flow carries an optional **ID** field beside CSS Class — validated against CSS-safe id rules (starts with a letter or underscore; then letters, digits, hyphens, underscores; no spaces), flagged red on blur and hard-blocked at add time. A **Save & add another** button (beside Add) keeps the form open for repeated adds — available for HTML Tag, Component, and Complex (not Text or Snippet). For **Tag** it clears the id + params but keeps the tag + class; for **Component** and **Complex** it leaves the previous values in place so the next instance starts pre-filled. In all three the target selection is preserved, so repeated adds land at the same anchor.
+
 ### 8.2 Context selectors
 
 The toolbar carries a **Page** dropdown (any route in `routes.php`) and a **Language** dropdown (any active language). Switching either reloads the iframe; in Text mode the language dropdown decides which translation file is being edited.
