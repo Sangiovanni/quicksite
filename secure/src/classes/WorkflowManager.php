@@ -204,8 +204,96 @@ class WorkflowManager {
     }
     
     /**
+     * Resolve `default` template references in workflow parameters.
+     *
+     * Parameter authors can write `default: "{{data.X}}"` to seed an
+     * initial value from a fetched dataRequirement. This walks the
+     * parameter list and substitutes any such templates against the
+     * provided `data` (and optional `userParams`) context.
+     *
+     * Templates inside literal-string defaults that are NOT a full
+     * `{{path}}` placeholder fall through `resolveStepParamValue`'s
+     * inline-substitution path — useful for `default: "Hello {{param.name}}"`.
+     *
+     * Mutates the workflow in place. Idempotent (safe to call twice).
+     * Schema addition for beta.9 Phase C+.
+     *
+     * @param array $workflow The workflow (modified in place)
+     * @param array $data     Fetched dataRequirements keyed by id
+     * @param array $userParams Optional — preserved across `param.X` refs
+     */
+    public function resolveParameterDefaults(array &$workflow, array $data, array $userParams = []): void {
+        if (empty($workflow['parameters']) || !is_array($workflow['parameters'])) return;
+        $context = [
+            'param'  => $userParams,
+            'data'   => $data,
+            'config' => defined('CONFIG') ? CONFIG : []
+        ];
+        foreach ($workflow['parameters'] as &$param) {
+            if (!isset($param['default'])) continue;
+            $default = $param['default'];
+            if (!is_string($default)) continue;
+            if (strpos($default, '{{') === false) continue;
+            $resolved = $this->resolveStepParamValue($default, $context);
+            $param['default'] = $resolved;
+        }
+        unset($param);
+    }
+
+    /**
+     * Resolve all *Key fields in a loaded workflow into their non-Key
+     * siblings using __workflow(). Walks meta + parameters + nested
+     * option lists. Idempotent — existing non-Key fields stay untouched.
+     *
+     * Output additions:
+     *   meta.title, meta.description
+     *   parameters[*].label, parameters[*].help, parameters[*].placeholder
+     *   parameters[*].options[*].label
+     *
+     * @param array $workflow The workflow definition (modified in place)
+     * @return void
+     */
+    public static function resolveLabelsInPlace(array &$workflow): void {
+        if (!function_exists('__workflow')) {
+            require_once SECURE_FOLDER_PATH . '/admin/functions/AdminTranslation.php';
+        }
+        if (isset($workflow['meta'])) {
+            $meta = &$workflow['meta'];
+            if (isset($meta['titleKey']) && !isset($meta['title'])) {
+                $meta['title'] = __workflow($workflow, $meta['titleKey'], $workflow['id'] ?? '');
+            }
+            if (isset($meta['descriptionKey']) && !isset($meta['description'])) {
+                $meta['description'] = __workflow($workflow, $meta['descriptionKey'], '');
+            }
+            unset($meta);
+        }
+        if (!empty($workflow['parameters']) && is_array($workflow['parameters'])) {
+            foreach ($workflow['parameters'] as &$param) {
+                if (isset($param['labelKey']) && !isset($param['label'])) {
+                    $param['label'] = __workflow($workflow, $param['labelKey'], $param['id'] ?? '');
+                }
+                if (isset($param['helpKey']) && !isset($param['help'])) {
+                    $param['help'] = __workflow($workflow, $param['helpKey'], '');
+                }
+                if (isset($param['placeholderKey']) && !isset($param['placeholder'])) {
+                    $param['placeholder'] = __workflow($workflow, $param['placeholderKey'], '');
+                }
+                if (!empty($param['options']) && is_array($param['options'])) {
+                    foreach ($param['options'] as &$opt) {
+                        if (isset($opt['labelKey']) && !isset($opt['label'])) {
+                            $opt['label'] = __workflow($workflow, $opt['labelKey'], $opt['value'] ?? '');
+                        }
+                    }
+                    unset($opt);
+                }
+            }
+            unset($param);
+        }
+    }
+
+    /**
      * Fetch all data requirements for a workflow
-     * 
+     *
      * @param array $workflow The workflow definition
      * @param array $userParams User-provided parameters (for condition evaluation)
      * @return array Fetched data keyed by requirement ID
@@ -772,7 +860,7 @@ class WorkflowManager {
             $leftPath = $matches[1];
             $operator = $matches[2];
             $rightValue = trim($matches[3]);
-            
+
             // Resolve left side (handle $key, $value, $value.field)
             if ($leftPath === '$key') {
                 $leftResolved = $key;
@@ -784,14 +872,14 @@ class WorkflowManager {
             } else {
                 $leftResolved = $this->resolveDataPath(ltrim($leftPath, '$'), $itemContext);
             }
-            
+
             // Parse right value - also handle {{dataPath}} references
             if (preg_match('/^\{\{(.+)\}\}$/', $rightValue, $dataMatch)) {
                 $rightParsed = $this->resolveDataPath($dataMatch[1], $itemContext);
             } else {
                 $rightParsed = $this->parseFilterValue($rightValue);
             }
-            
+
             return match($operator) {
                 '=', '==' => $leftResolved == $rightParsed,
                 '===' => $leftResolved === $rightParsed,
@@ -799,7 +887,59 @@ class WorkflowManager {
                 default => false
             };
         }
-        
+
+        // Membership operators: `in` and `not_in`. Useful for diff-style
+        // forEach steps such as "delete every existing language that the
+        // user no longer has selected":
+        //
+        //   "forEach": "data.langData.languages",
+        //   "filter": "{{$value}} not_in {{param.languages}}",
+        //   "command": "deleteLang", "params": { "code": "{{$value}}" }
+        //
+        // Added in beta.9 Phase C+ (workflow framework upgrades).
+        if (preg_match('/^(.+?)\s+(in|not_in)\s+(.+)$/', $expr, $matches)) {
+            $leftRaw = trim($matches[1]);
+            $operator = $matches[2];
+            $rightRaw = trim($matches[3]);
+
+            // Resolve left value
+            if ($leftRaw === '$key') {
+                $leftValue = $key;
+            } elseif ($leftRaw === '$value' || $leftRaw === '$item') {
+                $leftValue = $value;
+            } elseif (str_starts_with($leftRaw, '$value.') || str_starts_with($leftRaw, '$item.')) {
+                $fieldPath = substr($leftRaw, strpos($leftRaw, '.') + 1);
+                $leftValue = is_array($value) ? ($value[$fieldPath] ?? null) : null;
+            } elseif (preg_match('/^\{\{(.+)\}\}$/', $leftRaw, $leftTpl)) {
+                $leftValue = $this->resolveDataPath(trim($leftTpl[1]), $itemContext);
+            } else {
+                // Bare path or literal — try data path first, fall back to literal.
+                $leftValue = $this->resolveDataPath($leftRaw, $itemContext);
+                if ($leftValue === null) {
+                    $leftValue = $this->parseFilterValue($leftRaw);
+                }
+            }
+
+            // Resolve right side as an array
+            if (preg_match('/^\{\{(.+)\}\}$/', $rightRaw, $rightTpl)) {
+                $rightArr = $this->resolveDataPath(trim($rightTpl[1]), $itemContext);
+            } else {
+                $rightArr = $this->resolveDataPath($rightRaw, $itemContext);
+            }
+
+            // If the right side isn't an array (e.g., the data path didn't
+            // resolve, or the workflow author pointed at a scalar), `in`
+            // returns false and `not_in` returns true — matching the
+            // intuitive read of "is X in this list?" / "is X NOT in this list?"
+            // when the list is empty.
+            if (!is_array($rightArr)) {
+                return $operator === 'not_in';
+            }
+
+            $isMember = in_array($leftValue, $rightArr, true);
+            return $operator === 'in' ? $isMember : !$isMember;
+        }
+
         // No operator - truthy check
         return true;
     }

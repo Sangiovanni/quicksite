@@ -214,17 +214,18 @@ The visual editor is the panel's flagship feature. It runs as a sidebar UI in th
 
 ### 8.1 Modes
 
-The sidebar exposes one action button (Refresh) plus five editing modes — six toolbar buttons total. Source: `secure/admin/templates/pages/preview/sidebar-tools.php`.
+The sidebar exposes eight modes, each backed by a `data-mode="..."` button. Source: `secure/admin/templates/pages/preview/sidebar-tools.php`.
 
-| Button | Type | What it does |
+| Button | Mode | What it does |
 |---|---|---|
-| **Refresh** | Action | Reloads the preview iframe. |
-| **Select** | Mode | Click an element → inspect node, add a sibling/child, **edit its params + class + mandatory attrs in place** (via the Edit Params button), delete, duplicate, or save as snippet / component. |
-| **Drag** | Mode | Drag elements to reorder within parent (`preview-drag.js`). |
-| **Text** | Mode | Inline-edit a text node's translation **for the currently selected language**. Intentionally primitive: no rich text, no line breaks. Edits the value, never the key. |
-| **CSS** | Mode | Click an element → CSS panel (Theme / Selectors / Motion tabs); edits apply to the element's selector with full pseudo-state support. The Theme tab includes an inline **+ Add variable** form per section (Colors / Fonts / Spacing) for scope-aware writes (current light/dark scope, optional "also other scope" when dark mode is enabled). The Motion tab (formerly Animations) is reshaped around two sections: **Selectors with motion** (transitions + animations + a "hover-state-only" diagnostic) and the **Keyframes library** below — see §8.11. Designer / developer / admin roles also see a top-row **Source** advanced view that opens the whole `style.css` in a code editor — see §8.10. |
-| **Interactions** | Mode | Event editor (`preview-js-interactions.js`). Three CRUD-capable panels: **per-element interactions** (the selected node's `onclick`/`oninput`/etc.), **Page Events** (page-level `onload`/`onresize`/`onscroll`), and **State Stores** (page-scoped state). Each interaction is a `{{call:fn:args}}` chain using a QS.* verb from the catalog. |
-| **Translations** | Mode | Site-wide translation key manager (`preview-translation.js`). Per-language coverage % + counts, scope picker (Pages / Layout / Components), inline row-expand editor, per-row + bulk delete. Mono- and multi-lingual. See §8.9. |
+| **Preview** | `preview` | Reloads the iframe and re-enters preview-only behaviour (no selection / hover overlays). |
+| **Select** | `select` | Click an element → inspect node, add a sibling/child, **edit its params + class + mandatory attrs in place** (via the Edit Params button), delete, duplicate, or save as snippet / component. |
+| **Drag** | `drag` | Drag elements to reorder within parent (`preview-drag.js`). |
+| **Text** | `text` | Inline-edit a text node's translation **for the currently selected language**. Intentionally primitive: no rich text, no line breaks. Edits the value, never the key. |
+| **CSS** | `style` | Click an element → CSS panel (Theme / Selectors / Motion tabs); edits apply to the element's selector with full pseudo-state support. The Theme tab includes an inline **+ Add variable** form per section (Colors / Fonts / Spacing) for scope-aware writes (current light/dark scope, optional "also other scope" when dark mode is enabled). The Motion tab (formerly Animations) is reshaped around two sections: **Selectors with motion** (transitions + animations + a "hover-state-only" diagnostic) and the **Keyframes library** below — see §8.11. Designer / developer / admin roles also see a top-row **Source** advanced view that opens the whole `style.css` in a code editor — see §8.10. |
+| **Interactions** | `js` | Event editor (`preview-js-interactions.js`). Three CRUD-capable panels: **per-element interactions** (the selected node's `onclick`/`oninput`/etc.), **Page Events** (page-level `onload`/`onresize`/`onscroll`), and **State Stores** (page-scoped state). Each interaction is a `{{call:fn:args}}` chain using a QS.* verb from the catalog. |
+| **Translations** | `translation` | Site-wide translation key manager (`preview-translation.js`). Per-language coverage % + counts, scope picker (Pages / Layout / Components), inline row-expand editor, per-row + bulk delete. Mono- and multi-lingual. See §8.9. |
+| **AI tools** | `ai-tools` | In-editor workflow runner. Searchable + tag-filtered list of workflow specs grouped by category; picking one swaps the panel into a 3-zone runner (INPUTS / AI EXCHANGE / EXECUTION). Element clicks in the iframe behave as in Select mode — workflows with a `selector` parameter auto-fill from the current selection. See §8.12. |
 
 ### 8.2 Context selectors
 
@@ -662,6 +663,68 @@ If the picked selector already has a transition, the form pre-fills from `animat
 | CSS | `public/admin/assets/admin.css` (`.preview-keyframe-item*`, `.preview-animations-*`, `.apply-keyframe-modal*`, `.add-transition-modal*`, `.qs-easing-picker*`) |
 | Server: read | `listKeyframes`, `getAnimatedSelectors` |
 | Server: write | `setStyleRule` (apply-keyframe, remove-from-selector, add-transition all go through it; the remove path uses `removeProperties: ['animation']`); `setKeyframes`, `deleteKeyframes` |
+
+### 8.12 AI tools (mode `ai-tools`)
+
+The AI tools mode lets the operator pick a workflow spec, fill its parameters, and run it without leaving the visual editor. Workflows expose themselves as a searchable + tag-filtered list; picking one swaps the panel into a runner organised in three zones — INPUTS, AI EXCHANGE, EXECUTION.
+
+#### Backup-first banner
+
+A persistent amber-bordered banner sits at the top of the panel: `⚠ AI tools modify your site directly. Changes cannot be easily reverted. We recommend creating a backup before running any workflow you're not sure about.` The banner is not dismissable. The button calls the existing `backupProject` command (timestamped folder copy into `secure/projects/<active>/backups/<timestamp>/`) and confirms via toast on success or failure.
+
+#### Workflow list
+
+- **Search** — case-insensitive substring across title, description, tags
+- **Tag chip filter** with a `Match: Any | All` toggle (toggle row appears only when ≥2 chips are active). Chips show the top 6 tags by frequency plus a `+N more` expander; any active chip outside the top 6 stays visible so it can always be deselected
+- **Category grouping** — canonical order `Creation → Template → Modification → Content → Style → Advanced → WIP`. Sub-headers between groups; alphabetical within
+- **`Show 10 more` pagination** at the end of the list — global across categories
+- **Cards** carry the workflow's emoji icon, title, AI 🤖 / Steps 📦 badge, 2-line description, colour-coded difficulty chip (`beginner` green, `intermediate` amber, `advanced` red), and a violet `custom` chip when the workflow is user-authored
+
+#### Runner — INPUTS zone (accent border)
+
+- **Your prompt** (AI workflows only) — free-form textarea for the user's request, appended to the assembled prompt after a `**User Request:**` marker
+- **Parameters** — workflow-declared input form; types include `text`, `textarea`, `select` (inline options or `optionsFrom` data-driven), `tag-select` (scrollable checkbox list), `checkbox` (rendered inline `[☑] Label / help`), `number`, `selector` (read-only card showing the current iframe selection), `hidden`. Validation surfaces per-param with red border + error text; Run is gated on no visible-param validation failing
+- **Model: [dropdown]** (BYOK only) — inline above the action buttons; writes to the active connection's `defaultModel` via `QSConnectionsStore`
+- **Primary action button** — context-aware label: `Run` (deterministic) / `Run with AI` (BYOK + auto-execute on) / `Send to AI` (BYOK + auto-execute off) / `Generate prompt` (no BYOK). Label morphs through phases during execution: `Generating prompt…` → `Sending to {model}…` → `Running…`
+- **Secondary `Generate for copy` button** (AI + BYOK) — assembles the prompt without sending; auto-expands + scrolls + focuses the General prompt section + auto-copies the result to the clipboard with a toast confirmation. Lets BYOK users still inspect / re-use the prompt elsewhere
+
+#### Runner — AI EXCHANGE zone (dashed border, AI workflows only)
+
+- **General prompt** — read-only textarea showing the assembled final prompt (rendered template + user prompt). Copy button. Auto-populates during BYOK pipelines; manually filled by the Generate-for-copy or no-BYOK Generate path
+- **AI response** — textarea that doubles as paste target (no BYOK) or live stream sink (BYOK). Status line below the textarea cycles through `Sending to {model}… (X.Xs)` → `Receiving from {model}… (N chars, X.Xs)` → `N commands ready ✓` (green) or `Invalid JSON: …` / `No commands found in response.` (red). When no BYOK is configured, contextual hints appear under the textareas (`Copy this to your AI assistant, then paste the reply below.` / `Paste the JSON reply here.`)
+
+#### Runner — EXECUTION zone (dashed border)
+
+- **Auto-execute toggle** (AI workflows only) — when checked, valid responses fire a 1.5s grace timer (`Auto-executing in 1.5s — edit response to cancel`); any textarea edit cancels and reschedules
+- **Batch (collapsible)** — auto-populates with the upcoming command list the moment the AI response parses (or, for deterministic workflows, the moment params resolve server-side via `/api/workflow-generate-steps`). State header cycles `Idle` → `N commands ready` → `Running 2/N` → `Done (N succeeded)` or `Done (X/N succeeded, Y failed)`. Each row shows the command name + a truncated `key: "value" • …` params summary; clicking the row toggles the full params JSON inline
+- **Execute commands button** — visible only when commands are queued AND auto-execute is off (covers the BYOK-stop-after-send and no-BYOK-paste flows)
+
+After at least one command succeeds, the iframe reloads via `window.PreviewManager.reload()` so visual changes appear immediately. The `quicksite:workflow-complete` window event also fires for any listening sibling module (the miniplayer, etc.).
+
+#### Footer
+
+Single line: `Touches: cmd1, cmd2, cmd3` — the workflow's `relatedCommands` listed inline in mono font. Model is in the INPUTS zone, not the footer.
+
+#### Element selection
+
+AI tools mode forwards as `select` to the iframe overlay, so hover-highlight + click-to-select work just like in Select mode. The footer/menu structure-mismatch confirm prompts are suppressed — selection in AI tools is informational, not edit-context-switching. The current selection is available through `window.PreviewManager.getSelectedNode()` as `{ struct, node, component, tag, classes }`. Workflows declaring a `selector` parameter receive this object as the param value and refresh live as the user picks different elements; see [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) for the parameter-type contract.
+
+#### BYOK calls
+
+The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets/js/pages/ai/lib/ai-call.js`). When the active connection has streaming enabled (default), the response fills the AI response textarea token-by-token through the `onChunk` callback; status line ticks chars + elapsed seconds every 300ms. No PHP proxy hop — the API key never touches the server.
+
+#### Files
+
+| Concern | File |
+|---|---|
+| Panel logic | `public/admin/assets/js/pages/preview/preview-ai-tools.js` |
+| DOM scaffold | `secure/admin/templates/pages/preview/contextual-ai-tools.php` |
+| Styles | `public/admin/assets/css/preview-ai-tools.css` |
+| Workflow detail endpoint | `public/admin/api/index.php` (`ai-spec-raw`, `ai-spec`) |
+| Deterministic resolver endpoint | `public/admin/api/index.php` (`workflow-generate-steps`) |
+| Per-command execution | direct `POST /management/{command}` |
+| AI dispatch | `public/admin/assets/js/pages/ai/lib/ai-call.js` (+ `provider-catalog.js`, `connections-store.js`, `stream-parsers.js`) |
+| Workflow framework | `secure/src/classes/WorkflowManager.php` |
 
 ---
 

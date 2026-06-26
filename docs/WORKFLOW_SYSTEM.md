@@ -199,19 +199,36 @@ User input form fields. Each parameter:
 }
 ```
 
-**Validation constraints** (mapped to HTML input attributes, enforced by the browser):
+**Validation constraints**:
 - `minLength` / `maxLength` — character count limits (for `text` and `textarea`)
 - `pattern` — a JavaScript regular expression the value must match (for `text`). The browser anchors it automatically; for example, the pattern in the snippet above restricts input to lowercase letters only.
 - `min` / `max` — numeric range limits (for `number`)
+- `minItems` / `maxItems` — array-length limits (for `tag-select`)
+
+Hidden parameters (those failing their own `condition`) skip validation entirely — useful for "Languages must contain ≥2 entries, but only when Multilingual is checked" style rules.
 
 **Parameter types:**
 - `text` — single-line input
 - `textarea` — multi-line input
 - `select` — dropdown (needs `options` or `optionsFrom`)
+- `tag-select` — multi-select (needs `optionsFrom`; backed by an array value)
 - `checkbox` — boolean toggle
 - `number` — numeric input (renders `<input type="number">`)
-- `nodeSelector` — visual node picker from page structures
+- `nodeSelector` — visual node picker from page structures (admin spec page only)
+- `selector` — auto-fills from the visual editor's current iframe selection. Read-only display in the editor's AI tools panel; the param value is a structured object `{ tag, classes, struct, node }`. Workflow steps reference subfields with `{{param.X.tag}}`, `{{param.X.struct}}`, etc. On the standalone workflow spec page (no iframe), it renders a hint that the workflow needs to be run from the editor.
 - `hidden` — not shown in UI, value set programmatically
+
+**Default values from data**: `default` accepts either a literal value or a template string referencing fetched `dataRequirements`. For example:
+
+```json
+{
+    "id": "languages",
+    "type": "tag-select",
+    "default": "{{data.langData.languages}}"
+}
+```
+
+`WorkflowManager` resolves the template against the fetched data before serving the spec to the UI, so the parameter initializes with live system state. Use this to make workflows context-aware — e.g. preselect the project's current languages, current default route, current theme — instead of static seeds.
 
 **Static options:**
 ```json
@@ -235,10 +252,15 @@ Shorthand — uses the data array directly as values.
     "data": "routes",
     "value": "path",
     "label": "title",
-    "prepend": [{ "value": "", "label": "None" }]
+    "prepend": [{ "value": "", "label": "None" }],
+    "filterFrom": "languages"
 }
 ```
 Full form — `data` references a `dataRequirements` ID, `value`/`label` pick fields from each item, `prepend` adds fixed options at the top.
+
+`filterFrom` cascades the resolved options from another parameter's value: the option list is restricted to entries whose `value` appears in the referenced parameter's current selection. The cascade only applies when the referenced parameter is currently visible (its own `condition` is truthy) AND has a non-empty value — otherwise the full list is used. The auto-correct rule: when the cascade narrows the option set and the dependent's current value is no longer valid, the dependent flips to the first available option.
+
+Example: setup-languages's `defaultLanguage` uses `filterFrom: "languages"`. With Multilingual unchecked, Languages is hidden, so the cascade is skipped and Default language shows all 40 languages. Check Multilingual and pick `[en, fr]` in Languages, and Default language re-renders with just English + Français.
 
 **Conditional visibility:** `"condition": "multilingual === true"` — references another parameter's ID (not prefixed with `param.`).
 
@@ -342,6 +364,24 @@ For manual workflows. Each step:
     "retryDelayMs": 500
 }
 ```
+
+**Filter operators**:
+- `===`, `!==`, `==`, `!=` — equality comparison on the forEach `$value` / `$value.field` / `$key`. Right side accepts literals, `{{$value}}` placeholders, or `{{path}}` references resolved against the context.
+- `in`, `not_in` — membership check against an array. Left is a value, right is an array reference (typically `{{data.X}}` or `{{param.X}}`). The right side must resolve to an array; otherwise `in` returns false and `not_in` returns true (matches the intuitive read of an empty list).
+- Multiple sub-expressions can be chained with `&&` (AND). All must pass for the item to be kept.
+
+The `in` / `not_in` operators are the foundation of diff-style workflows. For example, a "remove only the languages the user un-picked" step in setup-languages:
+
+```json
+{
+    "forEach": "data.langData.languages",
+    "filter": "{{$value}} not_in {{param.languages}}",
+    "command": "deleteLang",
+    "params": { "code": "{{$value}}" }
+}
+```
+
+Paired with the symmetric `not_in` step against `param.languages` filtered by `data.langData.languages`, this lets a workflow synchronise the project state with the user's selection — only adding new items and only deleting absent ones, leaving the rest untouched.
 
 #### `preWorkflows` / `postWorkflows` (array)
 Sub-workflows to run before/after. Can be a simple string ID or an object with `id`, `params`, and `condition`.

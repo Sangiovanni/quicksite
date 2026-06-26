@@ -3696,3 +3696,346 @@ knowledge most authors don't have).
 [apis.js](../public/admin/assets/js/pages/apis.js) `_renderImportTree`,
 `_filterApisByTreeSelection`. Behaviour:
 [ADMIN_PANEL.md](ADMIN_PANEL.md) §9.1.
+
+---
+
+## AI tools integration (beta.9)
+
+### AI tools as a visual-editor mode (locked 2026-06-24)
+
+**Decision**: The AI tools surface lives inside the visual editor as a
+sidebar mode (`data-mode="ai-tools"`), reusing the existing
+contextual-section infrastructure. Workflow runner UX consolidates into
+this mode; `/admin/workflows/{spec}` keeps its standalone runner as a
+secondary surface but is no longer the primary path.
+
+**Reasoning**: The original AI workspace required the operator to leave
+the editor to invoke a workflow, then navigate back to see the result.
+That round-trip is the most expensive part of any AI-assisted edit on
+a small site. Folding the runner into the editor sidebar cuts the
+loop time roughly in half and keeps the iframe preview visible during
+execution so the change appears live.
+
+**Alternatives considered**: Standalone `/admin/ai` page kept as the
+only surface — rejected (the context switch was the real friction).
+Full rebuild with a hierarchical AI orchestrator (multi-layer
+goal-to-tools planner) — rejected for now (high implementation cost,
+speculative value at the current catalog size of ~25 workflows; can
+be revisited when usage data shows demand).
+
+**Source**:
+`secure/admin/templates/pages/preview/sidebar-tools.php` (mode button),
+`public/admin/assets/js/pages/preview/preview-ai-tools.js` (panel
+logic),
+`secure/admin/templates/pages/preview/contextual-ai-tools.php`
+(scaffold). Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §8.12.
+
+### 3-zone runner layout — INPUTS / AI EXCHANGE / EXECUTION (locked 2026-06-25)
+
+**Decision**: The runner view is split into three visually distinct
+zones rather than a flat list of collapsibles. INPUTS (accent border)
+holds Your prompt + Parameters + the primary action button(s). AI
+EXCHANGE (dashed border) holds Generated prompt + AI response. EXECUTION
+(dashed border) holds the auto-execute toggle, the Batch preview /
+results, and the optional Execute button.
+
+**Reasoning**: Workflows are a sequence of phases — assemble input →
+exchange with the AI → execute commands. Grouping by phase matches
+the user's mental model better than a uniform stack of seven
+collapsibles. The visual distinction (border colour + style) makes the
+panel scannable at a glance — the user knows where to look for "the
+input I'm filling" vs "the response that just arrived" without reading
+section titles.
+
+**Alternatives considered**: Wizard-style step-by-step (one zone
+visible at a time) — rejected (hides context power users want).
+Uniform accordion list with smart open/close defaults — was the
+starting point, replaced after user testing showed the lack of phase
+boundaries was disorienting.
+
+**Source**:
+`public/admin/assets/js/pages/preview/preview-ai-tools.js`
+(`_renderInputsZone`, `_renderAiExchangeZone`, `_renderExecutionZone`);
+`public/admin/assets/css/preview-ai-tools.css`
+(`.preview-contextual-ai-tools__zone--*`). Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §8.12.
+
+### Backup-first warning banner over a dry-run + Apply/Revert system (locked 2026-06-26)
+
+**Decision**: Instead of building a per-command dry-run engine plus an
+Apply/Revert UI on top of the runner, the panel surfaces a persistent
+warning banner at the top — `AI tools modify your site directly.
+Changes cannot be easily reverted. We recommend creating a backup
+before running any workflow you're not sure about.` — paired with a
+one-click `Create backup now` button that calls the existing
+`backupProject` command.
+
+**Reasoning**: A dry-run + Apply/Revert layer would re-introduce a
+two-step pre-commit gate on top of the streamlined Run pipeline
+(generate → send → execute → iframe reload), pulling the UX in the
+opposite direction from where users wanted it. The genuine safety
+concern is "I can't easily undo a bad AI run", and that is answered
+more honestly and pragmatically by explicit project backups than by
+visual previews — backups give full restore, preview only shows what
+would happen. The banner makes the trade-off legible: the user is
+told the system is destructive and given a one-click tool to mitigate
+it. The cost is borne every panel open; the discipline is the user's.
+
+**Alternatives considered**: Per-command dry-run + Apply/Revert as
+originally scoped — rejected on cost (~3-5 days for 5 commands, each
+with custom predict-state logic on server + matching delta-apply on
+client) and UX direction (added friction). Force-confirm carve-out
+for `delete*` commands only — rejected as a half-measure that doesn't
+address the "bad AI run" recovery story for non-delete commands like
+mass `editStyles` overwrites. No safety surface at all — rejected
+(genuine user-facing risk needs at least an advisory).
+
+**Source**:
+`secure/admin/templates/pages/preview/contextual-ai-tools.php`
+(banner markup),
+`public/admin/assets/js/pages/preview/preview-ai-tools.js`
+(`_onBackupClick`), `secure/management/command/backupProject.php`
+(backup command — existed). Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §8.12 "Backup-first banner".
+
+### Unified 1.5s grace timer for auto-execute (locked 2026-06-26)
+
+**Decision**: When the AI response is valid and Auto-execute is on,
+the panel waits 1.5 seconds before firing the execution. Any edit to
+the response textarea cancels and reschedules the timer. The grace
+applies to both the BYOK send pipeline and the manual paste flow — one
+behaviour for the user to learn. A status-area hint announces the
+wait: `Auto-executing in 1.5s — edit response to cancel`.
+
+**Reasoning**: Auto-execute is a "trust the system" affordance; users
+who enable it shouldn't have to click a second button to commit. But
+they also need a window to abort if the AI's reply looks off — a sub-
+second window would feel like a glitch, a multi-second window would
+feel like the system stalled. 1.5s is enough to scan the textarea +
+the Batch preview and intervene with a keystroke, while still feeling
+prompt for users who don't need to inspect.
+
+**Alternatives considered**: Fire immediately on valid response —
+rejected (no abort window; pastes that turn out wrong execute before
+the user can react). Modal confirm dialog — rejected (re-introduces
+the friction Auto-execute is meant to eliminate). 600ms paste-only
+debounce — was the v1 shape; raised to 1.5s + unified across paths
+after user feedback that the paste-only debounce was too short to
+inspect and was inconsistent with the BYOK pipeline which auto-fired
+synchronously.
+
+**Source**:
+`public/admin/assets/js/pages/preview/preview-ai-tools.js`
+(`_scheduleAutoExecute`, `_cancelAutoExecute`). Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §8.12 "Runner — EXECUTION zone".
+
+### Tag-based suggested workflows dropped (locked 2026-06-26)
+
+**Decision**: The "Suggested" section that scored workflows by token
+overlap between the iframe selection and each workflow's `tags` array
+is removed. The selection-aware capability stays — element clicks
+still update `PreviewState` and remain available for workflows that
+declare a `selector` parameter — but no suggestion ranking is
+performed on top.
+
+**Reasoning**: Workflow tags describe high-level intents (`style`,
+`redesign`, `i18n`) rather than element shapes (`button`, `form`,
+`input`). The scoring engine was mechanically sound but fed on inputs
+that mostly didn't exist in the catalog and weren't expected to in
+future authoring. The "what to do with the selection" question is
+better answered by **passing the selection into the workflow as an
+input** — via the `selector` parameter type — than by guessing which
+workflow to surface based on it. Suggestions assume the user already
+knows roughly what they want and just needs a shortcut; selection-as-
+input lets the workflow define what it does once it has the element.
+
+**Alternatives considered**: Keep the scoring but tune the matching
+algorithm (synonyms, semantic embeddings) — rejected (more code on a
+foundation that doesn't fit the catalog shape). Keep the scoring code
+dormant in case the catalog evolves — rejected (dead code; the
+re-introduction cost when actually needed is no higher than fresh
+implementation).
+
+**Source**: Removed from
+`public/admin/assets/js/pages/preview/preview-ai-tools.js`
+(`_renderSuggested`, `_scoreWorkflow`, related DOM refs) and
+`secure/admin/templates/pages/preview/contextual-ai-tools.php`
+(Suggested section markup, All-workflows header). What stayed:
+`PreviewManager.getSelectedNode()` returns `tag` + `classes`; the
+iframe forwards `ai-tools` as `select` mode for hover/click;
+footer/menu structure-mismatch prompts are suppressed in ai-tools
+mode. Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §8.12 "Element selection".
+
+### `selector` parameter type — selection as workflow input (locked 2026-06-26)
+
+**Decision**: New parameter type `selector` auto-fills from the
+visual editor's current iframe selection. The param value is a
+structured object `{ tag, classes, struct, node }`; workflow steps
+access subfields via `{{param.X.tag}}`, `{{param.X.struct}}`, etc.
+The runner subscribes to `PreviewState.selectedNode` and re-renders
+the param's read-only display whenever the user picks a different
+element. On the standalone workflow spec page (no iframe context),
+the param renders a hint that the workflow needs to be run from the
+editor's AI tools panel.
+
+**Reasoning**: Element-acting workflows ("move this", "edit this
+attribute", "delete this") need the selection as a first-class input,
+not as metadata that gates suggestion ranking. Treating it as a
+parameter lets workflow authors declare exactly what they need and
+gives them template access to the selection's fields, the same way
+they access any other dataRequirement or user-provided param. The
+read-only display + live refresh mirrors how authors expect a
+"selected element" widget to behave from other tools (Figma, Inspect
+in DevTools, etc.).
+
+**Alternatives considered**: Expose the selection as an implicit
+global (`{{selection.tag}}`) without param declaration — rejected
+(no opt-in; every workflow sees it whether or not it's relevant; no
+spec-level documentation of what the workflow needs). Build a
+dedicated "element actions" surface separate from the workflow
+framework — rejected (duplicates the runner; selector-as-param folds
+into the existing parameter system cleanly).
+
+**Source**:
+`secure/admin/workflows/schema.json` (`type: "selector"`),
+`public/admin/assets/js/pages/preview/preview-ai-tools.js`
+(`_renderSelectorInput`, `_refreshSelectorDisplay`,
+`_readSelectionForSelector`),
+`secure/admin/templates/pages/workflows/spec.php` (editor-only hint),
+`public/admin/api/index.php` (`/api/ai-spec` JSON-decode of
+selector-shaped query values). Behaviour:
+[WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) "Parameter types".
+
+### `default: "{{data.X}}"` template resolution (locked 2026-06-26)
+
+**Decision**: A parameter's `default` field accepts template strings
+referencing fetched `dataRequirements` — e.g.
+`"default": "{{data.langData.languages}}"`. `WorkflowManager` resolves
+the template against `data` (and `param` for cross-references) before
+serving the spec to the UI, so the parameter initializes with live
+system state instead of a static seed.
+
+**Reasoning**: A workflow that operates on existing project state
+(setup-languages, restyle, migrate-route) should default to the
+current state, not to an arbitrary literal. Otherwise the user is
+asked to re-enter information the system already has, and any
+"compute the diff between what I picked and what's there" logic has
+to fall back to literal-as-baseline (which won't match reality). The
+template syntax is identical to what step `params` and prompt bodies
+already use, so workflow authors don't learn a second resolution
+language.
+
+**Alternatives considered**: A separate `defaultFromData` field — re-
+jected (forces authors to pick between two ways to express defaults).
+A JavaScript expression evaluator on the server — rejected (heavier,
+opens an arbitrary-code surface for a value-fill use case).
+
+**Source**:
+`secure/src/classes/WorkflowManager.php`
+(`resolveParameterDefaults`),
+`public/admin/api/index.php` (`/api/ai-spec-raw` call site).
+Behaviour: [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) "Default values
+from data".
+
+### `in` / `not_in` filter operators for diff-style forEach (locked 2026-06-26)
+
+**Decision**: The `forEach` `filter` expression syntax gains two
+membership operators: `in` and `not_in`. Left side is a value (a
+forEach `$value` reference or any context path); right side is an
+array reference (typically `{{data.X}}` or `{{param.X}}`). The
+operators evaluate the left-in-right membership and negate
+respectively. When the right side doesn't resolve to an array, `in`
+returns false and `not_in` returns true.
+
+**Reasoning**: Diff-style workflows ("add the items the user picked
+that aren't already in the project; delete the items currently in the
+project that the user un-picked") need a way to express "X is not in
+this array" inside a forEach filter. The existing filter parser is
+regex-based (intentionally — keeping it declarative + sandboxed,
+not a JS eval), and the equality operators alone don't compose into
+membership checks. Adding two purpose-built operators keeps the
+declarative shape and is small enough to extend the parser without
+introducing eval-class surface.
+
+**Alternatives considered**: Switch the filter evaluator to a real
+expression parser (peg / hand-rolled) supporting `indexOf()`,
+arithmetic, etc. — rejected (much larger surface area, security
+exposure, marginal payoff for the use case at hand). Add a server-side
+helper that pre-filters the array before forEach — rejected (workflow
+authors would have to reach for a separate concept; the filter
+expression is the natural place).
+
+**Source**:
+`secure/src/classes/WorkflowManager.php`
+(`evaluateSingleFilterExpr` — membership branch).
+Behaviour: [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) "Filter
+operators".
+
+### `optionsFrom.filterFrom` cascade with visible + non-empty semantics (locked 2026-06-25)
+
+**Decision**: A `select` / `tag-select` with dynamic
+`optionsFrom` can cascade from another parameter by declaring
+`optionsFrom.filterFrom: "<otherParamId>"`. The cascade narrows the
+resolved options to entries whose value appears in the referenced
+parameter's current selection. The narrowing applies only when the
+referenced parameter is currently visible (its `condition` is truthy)
+AND its value is non-empty — otherwise the full list is used.
+
+**Reasoning**: Cascading selects are a common UX pattern (state →
+city, language list → default language) and previously required
+either two separate dataRequirements with different commands or a
+post-hoc filter in the workflow's steps. Folding it into the
+parameter declaration is one line of JSON per cascade and keeps the
+form intelligible to the user. The visible-AND-non-empty rule means
+the cascade naturally "turns off" when its source isn't relevant
+(e.g., when the multilingual flag is unchecked, Languages is hidden,
+so Default language reverts to showing all options) instead of
+narrowing-to-empty.
+
+**Alternatives considered**: Always apply the cascade regardless of
+source visibility — rejected (when source is hidden the dependent
+loses all its options, which is hostile to the no-config path).
+Require an explicit `filterWhen` condition on the cascade — rejected
+(verbose; the visibility-chain rule covers the common case
+implicitly).
+
+**Source**:
+`secure/admin/workflows/schema.json` (`optionsFrom.filterFrom`),
+`public/admin/assets/js/pages/preview/preview-ai-tools.js`
+(`_resolveOptionsFromData`, `_updateDependentSelects`). Behaviour:
+[WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) "Dynamic options via
+optionsFrom".
+
+### `validation.minItems` / `maxItems` for tag-select, with visible-only enforcement (locked 2026-06-25)
+
+**Decision**: Parameter `validation` accepts `minItems` and
+`maxItems` integers for `tag-select` arrays, in addition to the
+existing `minLength`/`maxLength` (text) and `min`/`max` (number).
+Validation is skipped entirely when the parameter's own `condition`
+fails — hidden parameters never fail validation.
+
+**Reasoning**: The setup-languages workflow needs "if multilingual is
+on, the user must pick at least two languages, otherwise the workflow
+is meaningless". This is a per-array-length constraint conditional on
+another parameter. The visible-only rule makes the conditional half
+of the constraint free — the workflow author doesn't have to express
+"validate only when X" explicitly, because the `condition` they
+already wrote on the parameter naturally gates validation. Run is
+blocked while any visible parameter fails its declared validation,
+with the failing parameter shown in red and an inline message.
+
+**Alternatives considered**: A separate `validation.condition` field
+— rejected (duplicates the parameter's existing `condition`). Run
+unconditionally with server-side post-execution validation — rejected
+(the user only sees the error after the AI call / partial commit has
+already happened).
+
+**Source**:
+`secure/admin/workflows/schema.json` (`validation.minItems`,
+`validation.maxItems`),
+`public/admin/assets/js/pages/preview/preview-ai-tools.js`
+(`_validateAllParams`, `_validateParam`, `_renderParamErrors`).
+Behaviour: [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) "Validation
+constraints".

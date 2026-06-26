@@ -13,6 +13,78 @@
 require_once SECURE_FOLDER_PATH . '/src/functions/resolverHelpers.php';
 $__previewRouteResolvers = loadResolversSidecar();
 
+// AI tools mode workflow metadata. Loaded server-side (mirrors
+// /admin/workflows pattern) with the same role-based filter applied.
+require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+$__previewAiToolsWorkflows = [];
+try {
+    $__aiToolsManager = new WorkflowManager();
+    $__aiToolsSpecs = $__aiToolsManager->listWorkflows();
+    $__aiToolsAllowed = null;
+    $__aiToolsToken = $router->getToken();
+    if ($__aiToolsToken) {
+        $__aiToolsAuthCfg = loadAuthConfig();
+        $__aiToolsTokens = $__aiToolsAuthCfg['authentication']['tokens'] ?? [];
+        if (isset($__aiToolsTokens[$__aiToolsToken])) {
+            $__aiToolsInfo = normalizeTokenInfo($__aiToolsTokens[$__aiToolsToken]);
+            $__aiToolsPerms = getTokenPermissions($__aiToolsInfo);
+            $__aiToolsAllowed = $__aiToolsPerms['commands'] ?? null;
+        }
+    }
+    $__aiToolsCategoryOrder = ['creation', 'template', 'modification', 'content', 'style', 'advanced', 'wip'];
+    $__aiToolsCategoryIndex = array_flip($__aiToolsCategoryOrder);
+    foreach ($__aiToolsSpecs as $__aiToolsSpec) {
+        if ($__aiToolsAllowed !== null) {
+            $__aiToolsRequired = $__aiToolsSpec['relatedCommands'] ?? [];
+            if (!empty($__aiToolsSpec['steps'])) {
+                foreach ($__aiToolsSpec['steps'] as $__aiToolsStep) {
+                    if (!empty($__aiToolsStep['command'])) {
+                        $__aiToolsRequired[] = $__aiToolsStep['command'];
+                    }
+                }
+            }
+            $__aiToolsSkip = false;
+            foreach (array_unique($__aiToolsRequired) as $__aiToolsCmd) {
+                if (!in_array($__aiToolsCmd, $__aiToolsAllowed, true)) {
+                    $__aiToolsSkip = true;
+                    break;
+                }
+            }
+            if ($__aiToolsSkip) continue;
+        }
+        $__aiToolsMeta = $__aiToolsSpec['meta'] ?? [];
+        $__aiToolsHasSteps = !empty($__aiToolsSpec['steps']);
+        $__aiToolsHasPrompt = !empty($__aiToolsSpec['promptTemplate']);
+        $__aiToolsCategory = $__aiToolsMeta['category'] ?? 'other';
+        $__aiToolsDifficulty = $__aiToolsMeta['difficulty'] ?? 'intermediate';
+        $__previewAiToolsWorkflows[] = [
+            'id'              => $__aiToolsSpec['id'],
+            'icon'            => $__aiToolsMeta['icon'] ?? '📋',
+            'title'           => $__aiToolsMeta['name']
+                                  ?? __workflow($__aiToolsSpec, $__aiToolsMeta['titleKey'] ?? '', $__aiToolsSpec['id']),
+            'description'     => $__aiToolsMeta['description']
+                                  ?? __workflow($__aiToolsSpec, $__aiToolsMeta['descriptionKey'] ?? '', ''),
+            'category'        => $__aiToolsCategory,
+            'categoryLabel'   => __admin('ai.categories.' . $__aiToolsCategory . '.title', ucfirst($__aiToolsCategory)),
+            'tags'            => array_values($__aiToolsMeta['tags'] ?? []),
+            'difficulty'      => $__aiToolsDifficulty,
+            'difficultyLabel' => __admin('ai.difficulty.' . $__aiToolsDifficulty, ucfirst($__aiToolsDifficulty)),
+            'source'          => $__aiToolsSpec['_source'] ?? 'core',
+            'isAI'            => $__aiToolsHasPrompt,
+            'isManual'        => $__aiToolsHasSteps && !$__aiToolsHasPrompt,
+        ];
+    }
+    usort($__previewAiToolsWorkflows, function ($a, $b) use ($__aiToolsCategoryIndex) {
+        $aIdx = $__aiToolsCategoryIndex[$a['category']] ?? 999;
+        $bIdx = $__aiToolsCategoryIndex[$b['category']] ?? 999;
+        if ($aIdx !== $bIdx) return $aIdx - $bIdx;
+        return strcasecmp($a['title'], $b['title']);
+    });
+} catch (\Throwable $__aiToolsErr) {
+    error_log('[PreviewAiTools] Failed to load workflow list: ' . $__aiToolsErr->getMessage());
+}
+
 // Beta.8 A2 Track 2d — per-route schema-driven default values for the
 // emulation panel. For each resolver-bound route, walk the endpoint's
 // responseSchema (if defined in /admin/apis) and generate sample values
@@ -48,6 +120,10 @@ window.PreviewConfig = {
     // responseSchema. Empty per-route map when the endpoint has no
     // schema declared in /admin/apis.
     routeResolverDefaults: <?= json_encode($__previewResolverDefaults ?: new stdClass()) ?>,
+
+    // AI tools panel — pre-resolved workflow metadata. Role-filtered
+    // (matches /admin/workflows). One entry per visible workflow.
+    aiToolsWorkflows: <?= json_encode($__previewAiToolsWorkflows) ?>,
     projectStyleUrl: <?= json_encode(rtrim(BASE_URL, '/') . '/style/style.css') ?>,
     authToken: <?= json_encode($router->getToken()) ?>,
     structureUrl: <?= json_encode($router->url('structure')) ?>,
@@ -507,6 +583,99 @@ window.PreviewConfig = {
             styleSourceRestoreDecline: <?= json_encode(__admin('preview.styleSourceRestoreDecline', 'Discard')) ?>
         },
 
+        // ── AI tools panel (preview-ai-tools.js) ──
+        aiTools: {
+            aiBadgeTooltip: <?= json_encode(__admin('preview.aiToolsAiBadgeTooltip', 'AI workflow — generates a prompt')) ?>,
+            manualBadgeTooltip: <?= json_encode(__admin('preview.aiToolsManualBadgeTooltip', 'Steps-only workflow — runs commands without AI')) ?>,
+            sourceCustom: <?= json_encode(__admin('preview.aiToolsSourceCustom', 'custom')) ?>,
+            showMoreLabel: <?= json_encode(__admin('preview.aiToolsShowMore', 'Show more')) ?>,
+            showMoreCount: <?= json_encode(__admin('preview.aiToolsShowMoreCount', 'Show {n} more')) ?>,
+            tagShowMore: <?= json_encode(__admin('preview.aiToolsTagShowMore', '+{n} more')) ?>,
+            tagShowLess: <?= json_encode(__admin('preview.aiToolsTagShowLess', 'Show less')) ?>,
+            backToList: <?= json_encode(__admin('preview.aiToolsBackToList', '← Back')) ?>,
+            sectionYourPrompt: <?= json_encode(__admin('preview.aiToolsSectionYourPrompt', 'Your prompt')) ?>,
+            sectionParameters: <?= json_encode(__admin('preview.aiToolsSectionParameters', 'Parameters')) ?>,
+            sectionGeneralPrompt: <?= json_encode(__admin('preview.aiToolsSectionGeneralPrompt', 'General prompt')) ?>,
+            sectionGeneralPromptHint: <?= json_encode(__admin('preview.aiToolsSectionGeneralPromptHint', 'The final prompt will appear here after you click Run.')) ?>,
+            sectionModel: <?= json_encode(__admin('preview.aiToolsSectionModel', 'Model')) ?>,
+            sectionModelNone: <?= json_encode(__admin('preview.aiToolsSectionModelNone', 'No AI connection configured.')) ?>,
+            sectionModelConfigure: <?= json_encode(__admin('preview.aiToolsSectionModelConfigure', 'Configure one in the AI Connections page.')) ?>,
+            sectionRelatedCommands: <?= json_encode(__admin('preview.aiToolsSectionRelatedCommands', 'Related commands')) ?>,
+            sectionAiResponse: <?= json_encode(__admin('preview.aiToolsSectionAiResponse', 'AI response')) ?>,
+            sectionBatch: <?= json_encode(__admin('preview.aiToolsSectionBatch', 'Steps')) ?>,
+            stateIdle: <?= json_encode(__admin('preview.aiToolsStateIdle', 'Idle')) ?>,
+            stateRunning: <?= json_encode(__admin('preview.aiToolsStateRunning', 'Running…')) ?>,
+            stateDone: <?= json_encode(__admin('preview.aiToolsStateDone', 'Done')) ?>,
+            autoPreviewLabel: <?= json_encode(__admin('preview.aiToolsAutoPreviewLabel', 'Auto-preview')) ?>,
+            autoExecuteLabel: <?= json_encode(__admin('preview.aiToolsAutoExecuteLabel', 'Auto-execute')) ?>,
+            runButton: <?= json_encode(__admin('preview.aiToolsRunButton', 'Run')) ?>,
+            paramOptionsDeferred: <?= json_encode(__admin('preview.aiToolsParamOptionsDeferred', 'Options loaded when you run the workflow.')) ?>,
+            runnerLoading: <?= json_encode(__admin('preview.aiToolsRunnerLoading', 'Loading workflow…')) ?>,
+            runnerError: <?= json_encode(__admin('preview.aiToolsRunnerError', 'Failed to load workflow: {error}')) ?>,
+            yourPromptPlaceholder: <?= json_encode(__admin('preview.aiToolsYourPromptPlaceholder', 'Describe what you want — type, style, content, anything specific.')) ?>,
+            generalPromptPlaceholder: <?= json_encode(__admin('preview.aiToolsGeneralPromptPlaceholder', 'Click Generate to assemble the final prompt.')) ?>,
+            generateBtn: <?= json_encode(__admin('preview.aiToolsGenerateBtn', 'Generate')) ?>,
+            generatingPrompt: <?= json_encode(__admin('preview.aiToolsGeneratingPrompt', 'Generating…')) ?>,
+            generateError: <?= json_encode(__admin('preview.aiToolsGenerateError', 'Generate failed: {error}')) ?>,
+            copyBtn: <?= json_encode(__admin('preview.aiToolsCopyBtn', 'Copy')) ?>,
+            copied: <?= json_encode(__admin('preview.aiToolsCopied', 'Copied!')) ?>,
+            paramOptionsEmpty: <?= json_encode(__admin('preview.aiToolsParamOptionsEmpty', 'No options available.')) ?>,
+            zoneInputs: <?= json_encode(__admin('preview.aiToolsZoneInputs', 'Inputs')) ?>,
+            zoneExchange: <?= json_encode(__admin('preview.aiToolsZoneExchange', 'AI exchange')) ?>,
+            zoneExecution: <?= json_encode(__admin('preview.aiToolsZoneExecution', 'Run')) ?>,
+            aiResponseHint: <?= json_encode(__admin('preview.aiToolsAiResponseHint', "Paste the AI's JSON reply here.")) ?>,
+            aiResponsePlaceholder: <?= json_encode(__admin('preview.aiToolsAiResponsePlaceholder', '{"commands": [...]}')) ?>,
+            aiResponseValid: <?= json_encode(__admin('preview.aiToolsAiResponseValid', '{n} commands ready')) ?>,
+            aiResponseInvalid: <?= json_encode(__admin('preview.aiToolsAiResponseInvalid', 'Invalid JSON: {error}')) ?>,
+            aiResponseEmpty: <?= json_encode(__admin('preview.aiToolsAiResponseEmpty', 'No commands found in response.')) ?>,
+            footerModel: <?= json_encode(__admin('preview.aiToolsFooterModel', 'Model')) ?>,
+            footerTouches: <?= json_encode(__admin('preview.aiToolsFooterTouches', 'Touches')) ?>,
+            validationRequired: <?= json_encode(__admin('preview.aiToolsValidationRequired', 'Required')) ?>,
+            validationMinItems: <?= json_encode(__admin('preview.aiToolsValidationMinItems', 'Pick at least {n}')) ?>,
+            validationMaxItems: <?= json_encode(__admin('preview.aiToolsValidationMaxItems', 'Pick at most {n}')) ?>,
+            validationMinLength: <?= json_encode(__admin('preview.aiToolsValidationMinLength', 'At least {n} characters')) ?>,
+            validationMaxLength: <?= json_encode(__admin('preview.aiToolsValidationMaxLength', 'At most {n} characters')) ?>,
+            validationPattern: <?= json_encode(__admin('preview.aiToolsValidationPattern', "Doesn't match the required pattern")) ?>,
+            validationMin: <?= json_encode(__admin('preview.aiToolsValidationMin', 'Minimum {n}')) ?>,
+            validationMax: <?= json_encode(__admin('preview.aiToolsValidationMax', 'Maximum {n}')) ?>,
+            runBlockedTooltip: <?= json_encode(__admin('preview.aiToolsRunBlockedTooltip', 'Fix the highlighted parameters before running.')) ?>,
+            runBlockedAiResponse: <?= json_encode(__admin('preview.aiToolsRunBlockedAiResponse', "Paste the AI's JSON reply (or click Generate + Send first).")) ?>,
+            sendingToAi: <?= json_encode(__admin('preview.aiToolsSendingToAi', 'Sending to {model}…')) ?>,
+            sendFailed: <?= json_encode(__admin('preview.aiToolsSendFailed', 'Send failed: {error}')) ?>,
+            executionRunning: <?= json_encode(__admin('preview.aiToolsExecutionRunning', 'Running {current}/{total}')) ?>,
+            executionDone: <?= json_encode(__admin('preview.aiToolsExecutionDone', 'Done ({ok} succeeded)')) ?>,
+            executionDoneWithErrors: <?= json_encode(__admin('preview.aiToolsExecutionDoneWithErrors', 'Done ({ok}/{total} succeeded, {fail} failed)')) ?>,
+            stepPending: <?= json_encode(__admin('preview.aiToolsStepPending', 'Pending')) ?>,
+            stepRunning: <?= json_encode(__admin('preview.aiToolsStepRunning', 'Running…')) ?>,
+            stepError: <?= json_encode(__admin('preview.aiToolsStepError', 'Failed: {error}')) ?>,
+            runActive: <?= json_encode(__admin('preview.aiToolsRunActive', 'Running…')) ?>,
+            actionRunWithAi: <?= json_encode(__admin('preview.aiToolsActionRunWithAi', 'Run with AI')) ?>,
+            actionSendToAi: <?= json_encode(__admin('preview.aiToolsActionSendToAi', 'Send to AI')) ?>,
+            actionGeneratePrompt: <?= json_encode(__admin('preview.aiToolsActionGeneratePrompt', 'Generate prompt')) ?>,
+            actionRun: <?= json_encode(__admin('preview.aiToolsActionRun', 'Run')) ?>,
+            actionExecute: <?= json_encode(__admin('preview.aiToolsActionExecute', 'Execute commands')) ?>,
+            actionGenerateForCopy: <?= json_encode(__admin('preview.aiToolsActionGenerateForCopy', 'Generate for copy')) ?>,
+            modelLabel: <?= json_encode(__admin('preview.aiToolsModelLabel', 'Model:')) ?>,
+            phaseGenerating: <?= json_encode(__admin('preview.aiToolsPhaseGenerating', 'Generating prompt…')) ?>,
+            copyHint: <?= json_encode(__admin('preview.aiToolsCopyHint', 'Copy this to your AI assistant, then paste the reply below.')) ?>,
+            pasteHint: <?= json_encode(__admin('preview.aiToolsPasteHint', 'Paste the JSON reply here.')) ?>,
+            stepsReady: <?= json_encode(__admin('preview.aiToolsStepsReady', '{n} commands ready')) ?>,
+            stepsParseError: <?= json_encode(__admin('preview.aiToolsStepsParseError', 'No commands available from current response.')) ?>,
+            batchTitle: <?= json_encode(__admin('preview.aiToolsBatchTitle', 'Batch')) ?>,
+            streaming: <?= json_encode(__admin('preview.aiToolsStreaming', 'Receiving from {model}… ({chars} chars)')) ?>,
+            sendingWithElapsed: <?= json_encode(__admin('preview.aiToolsSendingWithElapsed', 'Sending to {model}… ({sec}s)')) ?>,
+            streamingWithElapsed: <?= json_encode(__admin('preview.aiToolsStreamingWithElapsed', 'Receiving from {model}… ({chars} chars, {sec}s)')) ?>,
+            backupBtn: <?= json_encode(__admin('preview.aiToolsBackupBtn', 'Create backup now')) ?>,
+            backupCreating: <?= json_encode(__admin('preview.aiToolsBackupCreating', 'Creating backup…')) ?>,
+            backupSuccess: <?= json_encode(__admin('preview.aiToolsBackupSuccess', 'Backup created ({path})')) ?>,
+            backupFailed: <?= json_encode(__admin('preview.aiToolsBackupFailed', 'Backup failed: {error}')) ?>,
+            selectorEmpty: <?= json_encode(__admin('preview.aiToolsSelectorEmpty', 'No element selected — click one in the iframe.')) ?>,
+            selectorIn: <?= json_encode(__admin('preview.aiToolsSelectorIn', 'in')) ?>,
+            autoExecHint: <?= json_encode(__admin('preview.aiToolsAutoExecHint', 'Auto-executing in 1.5s — edit response to cancel')) ?>,
+            copiedToast: <?= json_encode(__admin('preview.aiToolsCopiedToast', 'Prompt copied to clipboard')) ?>,
+            copyFailedToast: <?= json_encode(__admin('preview.aiToolsCopyFailedToast', 'Could not auto-copy — use the Copy button or Ctrl+C')) ?>
+        },
+
         // ── Translation manager panel (preview-translation.js — Beta.9 A4) ──
         translation: {
             translationScopeSite: <?= json_encode(__admin('preview.translationScopeSite', 'Whole site')) ?>,
@@ -553,6 +722,15 @@ window.PreviewConfig = {
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-source.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-source.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-js-interactions.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-js-interactions.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-translation.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-translation.js') ?>"></script>
+<!-- AI libs: BYOK connection store + provider catalog + caller. Read-only
+     here (full management UI lives on /admin/ai-connections). Load order
+     matters: catalog + presets before store; store + catalog before caller. -->
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/provider-catalog.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/lib/provider-catalog.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/local-presets.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/lib/local-presets.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/connections-store.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/lib/connections-store.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/stream-parsers.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/lib/stream-parsers.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/ai-call.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/lib/ai-call.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-ai-tools.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-ai-tools.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-transition-editor.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-transition-editor.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-miniplayer.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-miniplayer.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-sidebar-resize.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-sidebar-resize.js') ?>"></script>

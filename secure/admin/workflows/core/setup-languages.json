@@ -16,7 +16,7 @@
             "type": "checkbox",
             "labelKey": "workflows.specs.setupLanguages.params.multilingual.label",
             "helpKey": "workflows.specs.setupLanguages.params.multilingual.help",
-            "default": false
+            "default": "{{data.langData.multilingual_enabled}}"
         },
         {
             "id": "languages",
@@ -28,8 +28,11 @@
                 "value": "code",
                 "label": "name"
             },
-            "default": "en",
-            "condition": "multilingual === true"
+            "default": "{{data.langData.languages}}",
+            "condition": "multilingual === true",
+            "validation": {
+                "minItems": 2
+            }
         },
         {
             "id": "defaultLanguage",
@@ -39,9 +42,10 @@
             "optionsFrom": {
                 "data": "allLanguages",
                 "value": "code",
-                "label": "name"
+                "label": "name",
+                "filterFrom": "languages"
             },
-            "default": "en"
+            "default": "{{data.langData.default_language}}"
         }
     ],
     "dataRequirements": [
@@ -59,16 +63,35 @@
     "relatedCommands": ["addLang", "deleteLang", "setDefaultLang", "setMultilingual"],
     "steps": [
         {
-            "comment": "=== PHASE 1a: Add all selected languages (multilingual mode) ===",
+            "comment": "=== MULTI-LANG PHASE 1: Enable multilingual support ===",
+            "condition": "param.multilingual === true",
+            "command": "setMultilingual",
+            "params": {
+                "enabled": true
+            }
+        },
+        {
+            "comment": "=== MULTI-LANG PHASE 2: Add only the languages the user picked that aren't already present ===",
             "condition": "param.multilingual === true",
             "forEach": "param.languages",
+            "filter": "{{$value}} not_in {{data.langData.languages}}",
             "command": "addLang",
             "params": {
                 "code": "{{$value}}"
             }
         },
         {
-            "comment": "=== PHASE 1b: Add the chosen base language (single-language mode) ===",
+            "comment": "=== MULTI-LANG PHASE 3: Remove only the languages currently present that the user un-picked ===",
+            "condition": "param.multilingual === true",
+            "forEach": "data.langData.languages",
+            "filter": "{{$value}} not_in {{param.languages}}",
+            "command": "deleteLang",
+            "params": {
+                "code": "{{$value}}"
+            }
+        },
+        {
+            "comment": "=== SINGLE-LANG PHASE 1: Add the chosen base language (no-op if already present) ===",
             "condition": "param.multilingual !== true",
             "command": "addLang",
             "params": {
@@ -76,15 +99,7 @@
             }
         },
         {
-            "comment": "=== PHASE 2a: Enable multilingual support (user wants it) ===",
-            "condition": "param.multilingual === true",
-            "command": "setMultilingual",
-            "params": {
-                "enabled": true
-            }
-        },
-        {
-            "comment": "=== PHASE 2b: Temporarily enable multilingual to change default (single-language mode) ===",
+            "comment": "=== SINGLE-LANG PHASE 2: Temporarily enable multilingual so we can change the default + delete extras ===",
             "condition": "param.multilingual !== true && param.defaultLanguage !== langData.default_language",
             "command": "setMultilingual",
             "params": {
@@ -92,7 +107,7 @@
             }
         },
         {
-            "comment": "=== PHASE 3: Set default language (only if different from current) ===",
+            "comment": "=== SHARED PHASE 4: Set default language (only when different from current) ===",
             "condition": "param.defaultLanguage !== langData.default_language",
             "command": "setDefaultLang",
             "params": {
@@ -100,9 +115,9 @@
             }
         },
         {
-            "comment": "=== PHASE 4a: Delete old languages (single-language mode, after changing default) ===",
-            "condition": "param.multilingual !== true && param.defaultLanguage !== langData.default_language",
-            "forEach": "langData.languages",
+            "comment": "=== SINGLE-LANG PHASE 5: Delete every existing language except the chosen default ===",
+            "condition": "param.multilingual !== true",
+            "forEach": "data.langData.languages",
             "filter": "{{$value}} !== {{param.defaultLanguage}}",
             "command": "deleteLang",
             "params": {
@@ -110,8 +125,8 @@
             }
         },
         {
-            "comment": "=== PHASE 4b: Disable multilingual (single-language mode, after cleanup) ===",
-            "condition": "param.multilingual !== true && param.defaultLanguage !== langData.default_language",
+            "comment": "=== SINGLE-LANG PHASE 6: Disable multilingual now that only one language remains ===",
+            "condition": "param.multilingual !== true",
             "command": "setMultilingual",
             "params": {
                 "enabled": false

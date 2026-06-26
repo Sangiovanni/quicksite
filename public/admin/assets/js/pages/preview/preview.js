@@ -2900,8 +2900,11 @@
         // Update container class for mode-specific styling
         container.dataset.mode = mode;
         
-        // Send mode change to iframe
-        sendToIframe('setMode', { mode });
+        // Send mode change to iframe. AI tools mode reuses select-mode
+        // behavior in the iframe (hover highlight + click to select) so
+        // the user can pick elements directly while seeing Suggested
+        // tools in the rail — without round-tripping through select mode.
+        sendToIframe('setMode', { mode: mode === 'ai-tools' ? 'select' : mode });
         
         // Store preselection for style mode (used in Phase 8.4+)
         if (mode === 'style' && preselect) {
@@ -2961,6 +2964,13 @@
             PreviewTranslation.enter();
         } else if (mode !== 'translation' && window.PreviewTranslation) {
             PreviewTranslation.leave();
+        }
+
+        if (mode === 'ai-tools' && window.PreviewAiTools) {
+            ensureI18nPanel('aiTools');
+            PreviewAiTools.enter();
+        } else if (mode !== 'ai-tools' && window.PreviewAiTools) {
+            PreviewAiTools.leave();
         }
 
         // Reset debounce flag after a short delay
@@ -3580,7 +3590,12 @@
     function showNodePanel(data) {
         // Check if user clicked a menu/footer element while editing a different target
         const clickedStruct = data.struct || null;
-        if (clickedStruct && currentEditType !== 'layout') {
+        // AI tools mode forwards click handling as select-mode in the iframe
+        // but doesn't care which structure is being edited — selection is
+        // purely informational (no edit-context switch). Skip the
+        // structure-mismatch prompts entirely when in ai-tools mode.
+        const skipStructPrompts = (currentMode === 'ai-tools');
+        if (!skipStructPrompts && clickedStruct && currentEditType !== 'layout') {
             // User is editing a page/component but clicked on menu or footer
             if (clickedStruct === 'menu' || clickedStruct === 'footer') {
                 const structLabel = clickedStruct === 'menu' ? 'Menu' : 'Footer';
@@ -3595,9 +3610,9 @@
                 return;
             }
         }
-        
+
         // Reverse: user is editing layout (menu/footer) but clicked a page element
-        if (clickedStruct && currentEditType === 'layout' && clickedStruct.startsWith('page-')) {
+        if (!skipStructPrompts && clickedStruct && currentEditType === 'layout' && clickedStruct.startsWith('page-')) {
             const routeName = clickedStruct.substring(5);
             const msg = `This element belongs to the page "${routeName}". Switch to page editing?`;
             if (confirm(msg)) {
@@ -4181,7 +4196,8 @@
                 setTimeout(() => {
                     console.log('[Preview] Sending setMode to iframe:', currentMode);
                     // Use sendToIframe to ensure source is included (required by iframe handler)
-                    sendToIframe('setMode', { mode: currentMode });
+                    // AI tools mode reuses select-mode iframe behavior (see setMode comment).
+                    sendToIframe('setMode', { mode: currentMode === 'ai-tools' ? 'select' : currentMode });
                     if (currentMode !== 'select') {
                         sendToIframe('clearSelection', {});
                     }
@@ -11122,7 +11138,15 @@
         getCurrentDevice: () => currentDevice,
         getCurrentMode: () => currentMode,
         highlightNode: (struct, node) => sendToIframe('highlightNode', { struct, node }),
-        getSelectedNode: () => ({ struct: selectedStruct, node: selectedNode, component: selectedComponent }),
+        getSelectedNode: () => ({
+            struct: selectedStruct,
+            node: selectedNode,
+            component: selectedComponent,
+            tag: selectedElementTag || null,
+            classes: selectedElementClasses
+                ? String(selectedElementClasses).split(/\s+/).filter(Boolean)
+                : []
+        }),
         // Miniplayer API — delegates to preview-miniplayer.js module
         toggleMiniplayer: () => window.PreviewMiniplayer && window.PreviewMiniplayer.toggle(),
         isMiniplayer: () => window.PreviewMiniplayer ? window.PreviewMiniplayer.isEnabled() : false,

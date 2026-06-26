@@ -123,7 +123,14 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
         </div>
         <?php endif; ?>
     </header>
-    
+
+    <div class="ai-spec__editor-hint" style="margin: var(--space-md) 0; padding: 8px 12px; background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 4px; font-size: 13px; color: var(--admin-text-muted);">
+        💡 <?= __admin('workflows.spec.editorHint', 'You can also run this workflow without leaving the visual editor — open <strong>Preview → AI tools</strong>.') ?>
+        <a href="<?= $router->url('preview') ?>" style="margin-left: 4px;">
+            <?= __admin('workflows.spec.openEditor', 'Open editor →') ?>
+        </a>
+    </div>
+
     <?php if ($isAiWorkflow && !$isPasteOnly): ?>
     <!-- Examples + User Prompt Section (AI workflows only) -->
     <div class="ai-spec-user-prompt<?= empty($examples) ? ' ai-spec-user-prompt--single' : '' ?>">
@@ -470,8 +477,13 @@ $hasCreateTag = !empty($meta['tags']) && in_array('create', $meta['tags']);
                                 <!-- Hidden input for combined value -->
                                 <input type="hidden" name="<?= htmlspecialchars($param['id']) ?>" id="param-<?= htmlspecialchars($param['id']) ?>" />
                             </div>
+                            <?php elseif (($param['type'] ?? 'text') === 'selector'): ?>
+                            <div class="ai-spec-form__help" style="padding: 6px 8px; border: 1px dashed var(--admin-border); border-radius: 4px; font-style: italic;">
+                                <?= __admin('ai.spec.selectorEditorOnly', 'This workflow uses a `selector` parameter — run it from the visual editor (AI tools panel) so it can pick up the current iframe selection.') ?>
+                            </div>
+                            <input type="hidden" name="<?= htmlspecialchars($param['id']) ?>" id="param-<?= htmlspecialchars($param['id']) ?>" value="" />
                             <?php else: ?>
-                            <input 
+                            <input
                                 type="<?= ($param['type'] ?? 'text') === 'number' ? 'number' : 'text' ?>"
                                 id="param-<?= htmlspecialchars($param['id']) ?>"
                                 name="<?= htmlspecialchars($param['id']) ?>"

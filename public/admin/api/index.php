@@ -607,12 +607,23 @@ switch ($action) {
             break;
         }
         
-        // Get user parameters from query string
+        // Get user parameters from query string. Selector-type params (and
+        // any other structured value) ship as a JSON-stringified blob from
+        // the frontend so the workflow can access subfields via
+        // {{param.X.tag}}. Detect `{`/`[`-prefixed strings and decode them
+        // back into PHP arrays before passing into the workflow context.
         $userParams = [];
         foreach ($_GET as $key => $value) {
-            if (!in_array($key, ['action'])) {
-                $userParams[$key] = $value;
+            if (in_array($key, ['action'])) continue;
+            if (is_string($value) && strlen($value) > 0
+                && ($value[0] === '{' || $value[0] === '[')) {
+                $decoded = json_decode($value, true);
+                if ($decoded !== null) {
+                    $userParams[$key] = $decoded;
+                    continue;
+                }
             }
+            $userParams[$key] = $value;
         }
         
         // Fetch data requirements (pass userParams for condition evaluation)
@@ -660,15 +671,35 @@ switch ($action) {
         $templateFile = $spec['promptTemplate'] ?? $spec['id'] . '.md';
         $templatePath = $spec['_folder'] . '/' . $templateFile;
         $templateContent = file_exists($templatePath) ? file_get_contents($templatePath) : null;
-        
-        echo json_encode([
-            'success' => true,
-            'data' => [
-                'spec' => $spec,
-                'template' => $templateContent,
-                'validation' => $manager->validateWorkflow($spec)
-            ]
-        ]);
+
+        // Resolve *Key fields into their non-Key siblings so JS consumers
+        // don't have to round-trip i18n lookups. Additive; existing keys
+        // stay in place.
+        WorkflowManager::resolveLabelsInPlace($spec);
+
+        $response = [
+            'spec' => $spec,
+            'template' => $templateContent,
+            'validation' => $manager->validateWorkflow($spec)
+        ];
+
+        // ?withData=1 — also fetch unconditional dataRequirements so JS
+        // can populate optionsFrom selects without an extra round-trip.
+        // Conditional dataRequirements (those with a `condition` referencing
+        // user params) are still evaluated against empty params here; the
+        // runner re-fetches via /api/ai-spec on user action.
+        if (!empty($_GET['withData'])) {
+            $response['fetchedData'] = $manager->fetchDataRequirements($spec, []);
+            // Resolve any `default: "{{data.X}}"` template references so the
+            // frontend receives concrete initial values (e.g. setup-languages
+            // pre-fills the languages picker from the project's current
+            // language list). Mutates $spec in place; re-serialize the
+            // updated spec into the response.
+            $manager->resolveParameterDefaults($spec, $response['fetchedData']);
+            $response['spec'] = $spec;
+        }
+
+        echo json_encode(['success' => true, 'data' => $response]);
         break;
     
     case 'ai-spec-preview':

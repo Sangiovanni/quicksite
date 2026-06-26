@@ -60,5 +60,13 @@
         </svg>
         <span><?= __admin('preview.toolTranslation', 'Translations') ?></span>
     </button>
+    <button type="button" class="preview-sidebar-tool" data-mode="ai-tools" title="<?= __admin('preview.toolAiTools', 'AI tools') ?>">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/>
+            <path d="M19 14l.5 1.5L21 16l-1.5.5L19 18l-.5-1.5L17 16l1.5-.5z"/>
+            <path d="M5 16l.5 1.5L7 18l-1.5.5L5 20l-.5-1.5L3 18l1.5-.5z"/>
+        </svg>
+        <span><?= __admin('preview.toolAiTools', 'AI tools') ?></span>
+    </button>
     </div>
 </div>

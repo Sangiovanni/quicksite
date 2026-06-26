@@ -103,6 +103,9 @@ if (is_dir($componentsDir)) {
 
         <!-- TRANSLATION MODE Content (Beta.9 A4) -->
         <?php include __DIR__ . '/preview/contextual-translation.php'; ?>
+
+        <!-- AI TOOLS MODE Content -->
+        <?php include __DIR__ . '/preview/contextual-ai-tools.php'; ?>
     </div><!-- End preview-contextual-content -->
 </div><!-- End preview-contextual-area -->
 
