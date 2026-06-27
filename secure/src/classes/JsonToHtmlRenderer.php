@@ -123,6 +123,27 @@ class JsonToHtmlRenderer {
     }
 
     /**
+     * Render the consent layer (banner + popup) — global structures seeded by
+     * generateConsentLayer, rendered on every page like menu/footer. Returns ''
+     * when the layer hasn't been generated (files absent). qs.js controls
+     * show/hide; the structures are hidden by default (the `hidden` attribute).
+     */
+    public function renderConsentLayer(): string {
+        $out = '';
+        foreach (['consent-banner', 'consent-popup'] as $name) {
+            $rel = '/templates/model/json/' . $name . '.json';
+            if (!file_exists(PROJECT_PATH . $rel)) {
+                continue;
+            }
+            $this->currentStructure = $name;
+            $this->currentNodePath = [];
+            $this->inComponent = false;
+            $out .= $this->renderJsonFile($rel);
+        }
+        return $out;
+    }
+
+    /**
      * Render a component in isolation (for component editor preview)
      * 
      * @param string $componentName Name of the component to render

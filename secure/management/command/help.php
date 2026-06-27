@@ -4615,6 +4615,27 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Read-only. Drives the /admin/storage Scan view; incomplete keys get a one-click Declare (addStorageItem with inferred scope). Dangling reads are flagged, not auto-removed.'
     ],
 
+    'generateConsentLayer' => [
+        'description' => 'Generate (or re-generate) the consent banner + popup structures from the registry and enable the consent layer (data/consent.json enabled=true). Writes templates/model/json/consent-banner.json + consent-popup.json — one popup toggle row per DECLARED non-essential category — and seeds EN/FR default copy for the textKeys (NEW keys only, never clobbering edited copy). The structures render globally like menu/footer and are styleable/editable in the visual editor.',
+        'method' => 'POST',
+        'parameters' => [
+            'policyRoute' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Route the generated cookie-policy page lives at (banner links to it). Persisted to consent.json.',
+                'example' => '/cookies'
+            ],
+        ],
+        'example_post' => 'POST \management\generateConsentLayer {"policyRoute":"/cookies"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'success',
+            'data' => ['categories' => '[declared non-essential categories]', 'languagesSeeded' => '{lang: keysAdded}', 'policyRoute' => 'string|null', 'enabled' => true]
+        ],
+        'error_responses' => [],
+        'notes' => 'Idempotent. Runtime write-gating only activates once this enables the layer. Drives the /admin/storage "Generate consent layer" button.'
+    ],
+
     'getApiEndpoint' => [
         'description' => 'Gets a single endpoint by ID, including the parent API\'s auth configuration.',
         'method' => 'GET',

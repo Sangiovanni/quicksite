@@ -137,6 +137,12 @@ class PageManagement {
             $body .= $renderer->renderFooter();
         }
 
+        // Consent layer (banner + popup) — global, site-wide (not per-route like
+        // menu/footer). Rendered whenever generated; '' otherwise. Hidden by
+        // default; qs.js shows it on the live site, the editor toolbar toggles
+        // it for styling. See generateConsentLayer + consentLayerHelpers.php.
+        $body .= $renderer->renderConsentLayer();
+
         // Beta.8 A1 Build Slice 2 — emit routes schema BEFORE qs.js so the
         // client-side path matcher (which runs synchronously in qs.js's
         // IIFE) can read window.QS_ROUTES and populate QS.routeParams +
@@ -149,6 +155,15 @@ class PageManagement {
 
         // Always include QuickSite core library for {{call:...}} interactions
         $body .= '<script src="' . BASE_URL . '/scripts/qs.js"></script>';
+
+        // Consent layer hydration (window.QS_CONSENT) — live site only. Drives
+        // qs.js write-gating: emits the key→category map + version when the
+        // project has enabled the consent layer (data/consent.json). Empty
+        // string (nothing emitted) keeps gating dormant. qs.js reads it lazily.
+        if (!$editorMode) {
+            require_once SECURE_FOLDER_PATH . '/src/functions/consentHelpers.php';
+            $body .= consentHydrationScript();
+        }
 
         // Inject theme toggle behaviour when THEME_USER_TOGGLE_ENABLED is true.
         // Finds all [data-theme-toggle] buttons, updates icon/label on load and

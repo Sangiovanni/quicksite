@@ -40,6 +40,12 @@ $baseUrl = rtrim(BASE_URL, '/');
             </svg>
             Scan / reconcile
         </button>
+        <button type="button" class="admin-btn admin-btn--ghost" id="btn-generate-consent">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/>
+            </svg>
+            Generate consent layer
+        </button>
         <button type="button" class="admin-btn admin-btn--ghost" id="btn-refresh-storage">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <path d="M23 4v6h-6M1 20v-6h6"/>

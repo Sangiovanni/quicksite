@@ -178,7 +178,7 @@ function getCommandCategories(): array {
         'storage_registry' => [
             'label' => 'Storage Registry',
             'icon' => 'database',
-            'commands' => ['listStorageItems', 'addStorageItem', 'editStorageItem', 'deleteStorageItem', 'scanStorageUsage']
+            'commands' => ['listStorageItems', 'addStorageItem', 'editStorageItem', 'deleteStorageItem', 'scanStorageUsage', 'generateConsentLayer']
         ],
         'snippet_management' => [
             'label' => 'Snippets',

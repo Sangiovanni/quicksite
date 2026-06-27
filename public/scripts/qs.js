@@ -966,6 +966,209 @@
         return { storage: ref.slice(0, idx), key: ref.slice(idx + 1) };
     }
 
+    // =========================================================================
+    // CONSENT — GDPR write-gating (beta.9 Phase 2)
+    //
+    // Reads the `consent_prefs` cookie + window.QS_CONSENT (the key→category map,
+    // emitted server-side ONLY when the project enabled the consent layer). When
+    // the layer is off, gating is fully dormant. When on, non-essential storage
+    // writes are skipped unless the visitor consented to that key's category.
+    // =========================================================================
+
+    /** Parse the consent_prefs cookie → object, or null. */
+    function _readConsentCookie() {
+        try {
+            var m = document.cookie.match(/(?:^|;\s*)consent_prefs=([^;]*)/);
+            if (!m) return null;
+            var obj = JSON.parse(decodeURIComponent(m[1]));
+            return (obj && typeof obj === 'object') ? obj : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /** Current consent choices (empty object when none set). */
+    QS.getConsent = function() {
+        return _readConsentCookie() || {};
+    };
+
+    /** essential is always granted; every other category needs an explicit true. */
+    QS.hasConsent = function(category) {
+        if (category === 'essential') return true;
+        var prefs = _readConsentCookie();
+        return !!(prefs && prefs[category] === true);
+    };
+
+    /**
+     * Persist the visitor's consent choice (used by the banner — slice 7).
+     * 180-day life, Path=/, SameSite=Lax, Secure on https. Fires
+     * `qs:consent:changed` so the banner/gated UI can react.
+     * @param {{functional?:boolean, analytics?:boolean, marketing?:boolean}} prefs
+     */
+    QS.setConsent = function(prefs) {
+        var cfg = (window.QS_CONSENT && window.QS_CONSENT.enabled) ? window.QS_CONSENT : null;
+        var payload = {
+            v: cfg ? (cfg.version || 1) : 1,
+            functional: !!(prefs && prefs.functional),
+            analytics: !!(prefs && prefs.analytics),
+            marketing: !!(prefs && prefs.marketing)
+        };
+        var maxAge = 180 * 24 * 60 * 60; // 180 days
+        var secure = (location.protocol === 'https:') ? '; Secure' : '';
+        document.cookie = 'consent_prefs=' + encodeURIComponent(JSON.stringify(payload)) +
+            '; Max-Age=' + maxAge + '; Path=/; SameSite=Lax' + secure;
+        document.dispatchEvent(new CustomEvent('qs:consent:changed', { detail: payload }));
+        return payload;
+    };
+
+    /**
+     * Gate a storage WRITE by key. Returns true when the write may proceed.
+     * Dormant (always true) unless the project enabled the consent layer
+     * (window.QS_CONSENT). Then: essential always passes; a declared non-
+     * essential key needs consent; an UNDECLARED key is fail-closed (blocked) —
+     * GDPR-safe per the locked design.
+     */
+    function _consentAllowsWrite(key) {
+        var cfg = window.QS_CONSENT;
+        if (!cfg || !cfg.enabled) return true;          // layer off → no gating
+        var category = (cfg.categories && cfg.categories[key]) || null;
+        if (category === 'essential') return true;
+        if (category === null) {                         // undeclared → fail-closed
+            _consentBlocked(key, null);
+            return false;
+        }
+        if (QS.hasConsent(category)) return true;
+        _consentBlocked(key, category);
+        return false;
+    }
+
+    function _consentBlocked(key, category) {
+        try {
+            document.dispatchEvent(new CustomEvent('qs:consent:blocked', {
+                detail: { key: key, category: category }
+            }));
+        } catch (e) { /* no-op */ }
+        if (window.console && console.debug) {
+            console.debug('[QS] consent: write to "' + key + '" skipped (category=' + (category || 'undeclared') + ')');
+        }
+    }
+
+    // ---- Banner + popup controller (slice 7) ------------------------------
+    // Wires the generated consent-banner / consent-popup structures (reserved
+    // ids + data-consent-action / data-consent-toggle). The structures carry
+    // the markup (styleable/editable); this drives behaviour.
+
+    var CONSENT_TOGGLE_CATS = ['functional', 'analytics', 'marketing'];
+
+    function _consentShow(el) { if (el) el.hidden = false; }
+    function _consentHide(el) { if (el) el.hidden = true; }
+
+    function _consentSyncToggles(popup, prefs) {
+        if (!popup) return;
+        popup.querySelectorAll('[data-consent-toggle]').forEach(function (cb) {
+            var cat = cb.getAttribute('data-consent-toggle');
+            cb.checked = !!(prefs && prefs[cat] === true);
+        });
+    }
+
+    function _consentReadToggles(popup) {
+        var out = {};
+        CONSENT_TOGGLE_CATS.forEach(function (c) { out[c] = false; });
+        if (popup) {
+            popup.querySelectorAll('[data-consent-toggle]').forEach(function (cb) {
+                out[cb.getAttribute('data-consent-toggle')] = !!cb.checked;
+            });
+        }
+        return out;
+    }
+
+    /** Engine default styles, injected once so the layer is usable un-styled.
+     *  Authors override via their own stylesheet (later: seed into style.css). */
+    function _consentInjectStyles() {
+        if (document.getElementById('qs-consent-styles')) return;
+        if (!document.getElementById('qs-consent-banner') && !document.getElementById('qs-consent-popup')) return;
+        var css =
+            // Respect the `hidden` attribute — a class selector's display would
+            // otherwise override the UA [hidden]{display:none}, so both layers
+            // would always show. This rule (higher specificity) wins.
+            '.qs-consent-banner[hidden],.qs-consent-popup[hidden]{display:none}' +
+            '.qs-consent-banner{position:fixed;left:0;right:0;bottom:0;z-index:9999;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;background:#1d1f23;color:#f3f4f6;box-shadow:0 -2px 16px rgba(0,0,0,.25);font-size:14px}' +
+            '.qs-consent-banner__text{margin:0;flex:1 1 320px;line-height:1.45}' +
+            '.qs-consent-banner__policy{color:#9ecbff;margin-left:6px}' +
+            '.qs-consent-banner__actions{display:flex;flex-wrap:wrap;gap:8px}' +
+            '.qs-consent-btn{cursor:pointer;border:1px solid transparent;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:600}' +
+            '.qs-consent-btn--ghost{background:transparent;border-color:#4b5563;color:#f3f4f6}' +
+            '.qs-consent-btn--primary{background:#2563eb;color:#fff}' +
+            '.qs-consent-popup{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.5)}' +
+            '.qs-consent-popup__dialog{background:#fff;color:#1d1f23;border-radius:12px;max-width:440px;width:100%;padding:20px 22px;box-shadow:0 12px 48px rgba(0,0,0,.35)}' +
+            '.qs-consent-popup__head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}' +
+            '.qs-consent-popup__title{margin:0;font-size:18px}' +
+            '.qs-consent-popup__close{background:none;border:0;font-size:18px;cursor:pointer;color:#6b7280}' +
+            '.qs-consent-popup__intro{margin:0 0 14px;color:#4b5563;font-size:13px}' +
+            '.qs-consent-popup__rows{display:flex;flex-direction:column;gap:4px;margin-bottom:16px}' +
+            '.qs-consent-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px}' +
+            '.qs-consent-row__name{font-weight:600;flex:1}' +
+            '.qs-consent-row__note{font-size:12px;color:#6b7280}' +
+            '.qs-consent-row__toggle{width:18px;height:18px}' +
+            '.qs-consent-row--locked{opacity:.7}' +
+            '.qs-consent-popup__actions{display:flex;justify-content:flex-end;gap:8px}';
+        var style = document.createElement('style');
+        style.id = 'qs-consent-styles';
+        style.textContent = css;
+        (document.head || document.documentElement).appendChild(style);
+    }
+
+    function _wireConsentActions(scope, banner, popup) {
+        if (!scope) return;
+        scope.querySelectorAll('[data-consent-action]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                switch (btn.getAttribute('data-consent-action')) {
+                    case 'accept-all':
+                        QS.setConsent({ functional: true, analytics: true, marketing: true });
+                        _consentHide(banner); _consentHide(popup);
+                        break;
+                    case 'refuse-all':
+                        QS.setConsent({ functional: false, analytics: false, marketing: false });
+                        _consentHide(banner); _consentHide(popup);
+                        break;
+                    case 'customize':
+                        _consentSyncToggles(popup, QS.getConsent());
+                        _consentShow(popup);
+                        break;
+                    case 'save':
+                        QS.setConsent(_consentReadToggles(popup));
+                        _consentHide(popup); _consentHide(banner);
+                        break;
+                    case 'close':
+                        _consentHide(popup);
+                        break;
+                }
+            });
+        });
+    }
+
+    function _initConsentBanner() {
+        var banner = document.getElementById('qs-consent-banner');
+        var popup = document.getElementById('qs-consent-popup');
+        if (!banner && !popup) return;
+        _consentInjectStyles();
+        _wireConsentActions(banner, banner, popup);
+        _wireConsentActions(popup, banner, popup);
+        // Auto-show the banner when the layer is enabled (live site) and the
+        // visitor hasn't chosen yet. QS_CONSENT is emitted live-only, so the
+        // banner never auto-pops in the editor (the toolbar toggle shows it).
+        if (window.QS_CONSENT && window.QS_CONSENT.enabled && !_readConsentCookie()) {
+            _consentShow(banner);
+        }
+    }
+
+    /** Re-open the preferences popup (e.g. a footer "Cookie settings" link). */
+    QS.openConsent = function () {
+        var popup = document.getElementById('qs-consent-popup');
+        _consentSyncToggles(popup, QS.getConsent());
+        _consentShow(popup);
+    };
+
     /**
      * Write a token value to browser storage and fire qs:auth:saved.
      * Shared by QS.saveToken and the Tier 2 refresh flow.
@@ -973,6 +1176,7 @@
      */
     function setStoredToken(storage, key, value) {
         if (storage !== 'localStorage' && storage !== 'sessionStorage') return false;
+        if (!_consentAllowsWrite(key)) return true;   // consent-gated: skip, not an error
         try {
             window[storage].setItem(key, String(value));
         } catch (e) {
@@ -1662,6 +1866,7 @@
             console.warn('[QS] store: path resolved to empty value:', path);
             return;
         }
+        if (!_consentAllowsWrite(key)) return;   // consent-gated: skip the write + event
         try {
             window[storage].setItem(key, String(value));
         } catch (e) {
@@ -2188,6 +2393,24 @@
             el.style.display = ((mode === 'has') ? present : !present) ? '' : 'none';
         });
 
+        // Consent-gated visibility: "granted:<category>" / "denied:<category>".
+        // Sibling to data-auth-show — shows an element only when the visitor has
+        // (or hasn't) consented to a category. For inline "enable analytics to
+        // view" placeholders. Independent of whether the layer is enabled
+        // (hasConsent is essential→true / else cookie-driven).
+        document.querySelectorAll('[data-consent-show]').forEach(function (el) {
+            const spec = el.getAttribute('data-consent-show') || '';
+            const idx = spec.indexOf(':');
+            const mode = idx === -1 ? '' : spec.slice(0, idx);
+            const category = idx === -1 ? '' : spec.slice(idx + 1);
+            if ((mode !== 'granted' && mode !== 'denied') || !category) {
+                console.warn('[QS] data-consent-show: expected "granted:category" or "denied:category", got', spec);
+                return;
+            }
+            const granted = QS.hasConsent(category);
+            el.style.display = ((mode === 'granted') ? granted : !granted) ? '' : 'none';
+        });
+
         // Generic value display: element text = the stored value.
         document.querySelectorAll('[data-storage-value]').forEach(function (el) {
             const v = getTokenValue(el.getAttribute('data-storage-value'));
@@ -2215,6 +2438,11 @@
     document.addEventListener('qs:storage:changed', function () {
         applyAuthState();
     });
+    // qs:consent:changed → the visitor updated consent; re-scan data-consent-show
+    // bindings so gated placeholders reflect the new choice.
+    document.addEventListener('qs:consent:changed', function () {
+        applyAuthState();
+    });
     // Beta.8 A3 — exchange lifecycle events dispatched by
     // QS.exchangeMagicLink. The cursor drives 'connecting' / 'failed'
     // visibility; the welcome path goes via qs:auth:saved (above) which
@@ -2227,10 +2455,14 @@
         _exchangeState = 'failed';
         applyAuthState();
     });
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', applyAuthState);
-    } else {
+    function _qsAuthAndConsentInit() {
         applyAuthState();
+        _initConsentBanner();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _qsAuthAndConsentInit);
+    } else {
+        _qsAuthAndConsentInit();
     }
 
     // =========================================================================

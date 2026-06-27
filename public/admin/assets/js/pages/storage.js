@@ -659,6 +659,75 @@
     }
 
     // ====================================================================
+    // Generate consent layer (slice 7)
+    // ====================================================================
+
+    function _declaredNonEssentialCategories() {
+        var set = {};
+        state.items.forEach(function (it) {
+            var c = it.category || 'functional';
+            if (c !== 'essential') set[c] = true;
+        });
+        return Object.keys(set);
+    }
+
+    function openGenerateConsentModal() {
+        var dialog = _renderModalShell('Generate consent layer', closeModal);
+        if (!dialog) return;
+
+        var cats = _declaredNonEssentialCategories();
+        var body = _el('div');
+        body.appendChild(_renderHint('Generates (or refreshes) the cookie banner + preferences popup from your declared keys, seeds EN/FR default copy (new keys only), and enables the consent layer. Both render on every page and are editable in the visual editor.'));
+        body.appendChild(_el('p', {
+            class: 'admin-hint',
+            text: cats.length
+                ? 'Popup toggle rows: ' + cats.join(', ') + ' (Essential is always-on, locked).'
+                : 'No non-essential keys declared yet — the popup shows only the locked Essential row. Re-generate after declaring analytics/marketing/functional keys.',
+        }));
+        var resultBox = _el('div', { class: 'storage-modal-actions__error' });
+        resultBox.style.color = 'var(--admin-success)';
+        resultBox.hidden = true;
+        body.appendChild(resultBox);
+        var errBox = _el('div', { class: 'storage-modal-actions__error' });
+        errBox.hidden = true;
+        body.appendChild(errBox);
+        dialog.appendChild(body);
+
+        var actions = _el('div', { class: 'storage-modal-actions' });
+        actions.appendChild(_el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Close', onclick: closeModal }));
+        var genBtn = _el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Generate' });
+        actions.appendChild(genBtn);
+        dialog.appendChild(actions);
+
+        genBtn.addEventListener('click', async function () {
+            errBox.hidden = true; errBox.textContent = '';
+            resultBox.hidden = true;
+            genBtn.disabled = true;
+            try {
+                var r = await api('generateConsentLayer', 'POST', {});
+                if (!r || !r.ok) {
+                    errBox.hidden = false;
+                    errBox.textContent = (r && r.data && r.data.message) || 'Generation failed';
+                    genBtn.disabled = false;
+                    return;
+                }
+                var d = (r.data && (r.data.data || r.data)) || {};
+                var langs = d.languagesSeeded ? Object.keys(d.languagesSeeded) : [];
+                resultBox.hidden = false;
+                resultBox.textContent = 'Consent layer generated and enabled.' +
+                    (langs.length ? ' Seeded copy: ' + langs.join(', ') + '.' : '') +
+                    ' Preview a page to see the banner.';
+                genBtn.textContent = 'Re-generate';
+                genBtn.disabled = false;
+            } catch (e) {
+                errBox.hidden = false;
+                errBox.textContent = (e && e.message) || 'Network error';
+                genBtn.disabled = false;
+            }
+        });
+    }
+
+    // ====================================================================
     // Init
     // ====================================================================
 
@@ -669,6 +738,8 @@
         if (refreshBtn) refreshBtn.addEventListener('click', refresh);
         var scanBtn = document.getElementById('btn-scan-storage');
         if (scanBtn) scanBtn.addEventListener('click', runScan);
+        var genConsentBtn = document.getElementById('btn-generate-consent');
+        if (genConsentBtn) genConsentBtn.addEventListener('click', openGenerateConsentModal);
         refresh();
     }
     if (document.readyState === 'loading') {

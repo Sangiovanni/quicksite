@@ -165,6 +165,12 @@
     const layoutTogglesContainer = document.getElementById('preview-layout-toggles');
     const toggleMenuCheckbox = document.getElementById('preview-toggle-menu');
     const toggleFooterCheckbox = document.getElementById('preview-toggle-footer');
+    // Consent layer (banner + popup) preview toggles — preview-only (site-wide,
+    // not per-route), shown only when the layer has been generated.
+    const toggleConsentBannerCheckbox = document.getElementById('preview-toggle-consent-banner');
+    const toggleConsentPopupCheckbox = document.getElementById('preview-toggle-consent-popup');
+    const toggleConsentBannerLabel = document.getElementById('preview-toggle-consent-banner-label');
+    const toggleConsentPopupLabel = document.getElementById('preview-toggle-consent-popup-label');
     const createComponentBtn = document.getElementById('preview-create-component');
 
     // Back to Select button (in add form)
@@ -2703,8 +2709,30 @@
             
             if (toggleMenuCheckbox) toggleMenuCheckbox.checked = !!menuEl;
             if (toggleFooterCheckbox) toggleFooterCheckbox.checked = !!footerEl;
+
+            // Consent layer: reveal the toggles only when the layer is present
+            // in the iframe. They reflect the element's current hidden state and
+            // are preview-only (no persistence).
+            const bannerEl = iframeDoc.getElementById('qs-consent-banner');
+            const popupEl = iframeDoc.getElementById('qs-consent-popup');
+            if (toggleConsentBannerLabel) toggleConsentBannerLabel.style.display = bannerEl ? '' : 'none';
+            if (toggleConsentPopupLabel) toggleConsentPopupLabel.style.display = popupEl ? '' : 'none';
+            if (toggleConsentBannerCheckbox && bannerEl) toggleConsentBannerCheckbox.checked = !bannerEl.hidden;
+            if (toggleConsentPopupCheckbox && popupEl) toggleConsentPopupCheckbox.checked = !popupEl.hidden;
         } catch (e) {
             console.warn('[Preview] Could not read layout state from iframe:', e);
+        }
+    }
+
+    /** Show/hide a consent-layer element in the preview iframe (preview-only). */
+    function handleConsentToggle(which, show) {
+        try {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            if (!iframeDoc) return;
+            const el = iframeDoc.getElementById(which === 'banner' ? 'qs-consent-banner' : 'qs-consent-popup');
+            if (el) el.hidden = !show;
+        } catch (e) {
+            console.warn('[Preview] Consent toggle failed:', e);
         }
     }
     
@@ -2773,6 +2801,12 @@
     }
     if (toggleFooterCheckbox) {
         toggleFooterCheckbox.addEventListener('change', () => handleLayoutToggleChange('footer'));
+    }
+    if (toggleConsentBannerCheckbox) {
+        toggleConsentBannerCheckbox.addEventListener('change', () => handleConsentToggle('banner', toggleConsentBannerCheckbox.checked));
+    }
+    if (toggleConsentPopupCheckbox) {
+        toggleConsentPopupCheckbox.addEventListener('change', () => handleConsentToggle('popup', toggleConsentPopupCheckbox.checked));
     }
     
     // ==================== Create Component ====================
