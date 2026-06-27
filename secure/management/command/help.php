@@ -4519,7 +4519,89 @@ $GLOBALS['__help_commands'] = [
         ],
         'notes' => 'Removing a PROJECT-scope OVERRIDE (when an admin entry with the same id exists) skips the in-use check — the admin entry survives, so consumers still resolve. data.was_override = true in that case.'
     ],
-    
+
+    'listStorageItems' => [
+        'description' => 'List the project storage registry — every declared browser-storage key (localStorage / sessionStorage / cookie) with category, retention, translatable description, and derived consentRequired. Drives /admin/storage + the storageKey picker. The GDPR / cookie-consent data layer.',
+        'method' => 'POST',
+        'parameters' => [],
+        'example_post' => 'POST \management\listStorageItems',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'success',
+            'data' => ['items' => '[{id, scope, category, description?, retention?, consentRequired, ...}]', 'count' => 0, 'scopes' => ['localStorage', 'sessionStorage', 'cookie'], 'categories' => ['essential', 'functional', 'analytics', 'marketing']]
+        ],
+        'error_responses' => [],
+        'notes' => 'consentRequired is derived (essential => false, else => true), never stored. The key VALUE is provided by the site visitor at runtime; the registry never holds it.'
+    ],
+    'addStorageItem' => [
+        'description' => 'Declare a new storage key in the project registry. id is the key name; scope + category required. Cookie scope accepts domain/path/secure/sameSite. description is a translatable {lang: text} map.',
+        'method' => 'POST',
+        'parameters' => [
+            'id' => ['required' => true, 'type' => 'string', 'description' => 'Storage key name (no whitespace).', 'example' => 'cartSession'],
+            'scope' => ['required' => true, 'type' => 'string', 'enum' => ['localStorage', 'sessionStorage', 'cookie']],
+            'category' => ['required' => true, 'type' => 'string', 'enum' => ['essential', 'functional', 'analytics', 'marketing']],
+            'description' => ['required' => false, 'type' => 'object', 'description' => '{lang: text} translatable purpose.'],
+            'retention' => ['required' => false, 'type' => 'string', 'description' => 'session | 30d | 1y | custom.'],
+            'domain' => ['required' => false, 'type' => 'string', 'description' => 'Cookie scope only.'],
+            'path' => ['required' => false, 'type' => 'string', 'description' => 'Cookie scope only.'],
+            'secure' => ['required' => false, 'type' => 'boolean', 'description' => 'Cookie scope only.'],
+            'sameSite' => ['required' => false, 'type' => 'string', 'enum' => ['Strict', 'Lax', 'None'], 'description' => 'Cookie scope only.']
+        ],
+        'example_post' => 'POST \management\addStorageItem with {"id":"cartSession","scope":"localStorage","category":"functional","description":{"en":"Saved cart"},"retention":"30d"}',
+        'success_response' => [
+            'status' => 201,
+            'code' => 'storage.created',
+            'data' => ['item' => '{id, scope, category, ..., consentRequired}']
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'id missing',
+            '400.validation.invalid' => 'Invalid scope/category/etc. — see errors[]',
+            '409.storage.duplicate' => 'An item with this id already exists; use editStorageItem'
+        ],
+        'notes' => 'Writes data/storage.json. consentRequired is derived from category.'
+    ],
+    'editStorageItem' => [
+        'description' => 'Update (replace-all on fields) and optionally rename a storage item. Pass newId to rename. Read the current entry first if you want a field-level merge.',
+        'method' => 'POST',
+        'parameters' => [
+            'id' => ['required' => true, 'type' => 'string', 'description' => 'Existing key name.'],
+            'newId' => ['required' => false, 'type' => 'string', 'description' => 'New key name (rename).'],
+            'scope' => ['required' => true, 'type' => 'string', 'enum' => ['localStorage', 'sessionStorage', 'cookie']],
+            'category' => ['required' => true, 'type' => 'string', 'enum' => ['essential', 'functional', 'analytics', 'marketing']],
+            'description' => ['required' => false, 'type' => 'object'],
+            'retention' => ['required' => false, 'type' => 'string']
+        ],
+        'example_post' => 'POST \management\editStorageItem with {"id":"cartSession","scope":"localStorage","category":"functional","retention":"90d"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'storage.updated',
+            'data' => ['item' => '{...}', 'renamedFrom' => null]
+        ],
+        'error_responses' => [
+            '404.storage.not_found' => 'No item with this id',
+            '409.storage.duplicate' => 'newId already taken',
+            '400.validation.invalid' => 'Invalid fields — see errors[]'
+        ],
+        'notes' => 'Cookie-only fields (domain/path/secure/sameSite) accepted when scope is cookie.'
+    ],
+    'deleteStorageItem' => [
+        'description' => 'Remove a storage item from the project registry.',
+        'method' => 'POST',
+        'parameters' => [
+            'id' => ['required' => true, 'type' => 'string']
+        ],
+        'example_post' => 'POST \management\deleteStorageItem with {"id":"cartSession"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'storage.deleted',
+            'data' => ['id' => 'cartSession']
+        ],
+        'error_responses' => [
+            '404.storage.not_found' => 'No item with this id'
+        ],
+        'notes' => 'Does not check in-use references yet — the scan/reconcile slice surfaces dangling reads.'
+    ],
+
     'getApiEndpoint' => [
         'description' => 'Gets a single endpoint by ID, including the parent API\'s auth configuration.',
         'method' => 'GET',

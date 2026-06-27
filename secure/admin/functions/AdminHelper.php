@@ -175,6 +175,11 @@ function getCommandCategories(): array {
             'icon' => 'shield',
             'commands' => ['listOAuthProviders', 'addOAuthProvider', 'editOAuthProvider', 'deleteOAuthProvider']
         ],
+        'storage_registry' => [
+            'label' => 'Storage Registry',
+            'icon' => 'database',
+            'commands' => ['listStorageItems', 'addStorageItem', 'editStorageItem', 'deleteStorageItem']
+        ],
         'snippet_management' => [
             'label' => 'Snippets',
             'icon' => 'puzzle',
