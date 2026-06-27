@@ -18,6 +18,7 @@
     // Slice 5: project routes (loaded via getRoutes; stored WITHOUT
     // leading "/"). Used by the route inputType picker.
     let availableRoutes = [];
+    let availableStorageItems = [];  // storage registry items — storageKey picker (slice 3)
     let currentAvailableEvents = [];
     // Bucketed events from listInteractions (beta.6+):
     //   { common: [...], lessCommon: [...], advanced: [...] }
@@ -1000,6 +1001,14 @@
                                 return;
                             }
                         }
+                        // Storage registry picker — same hidden-input delegation.
+                        if (input.type === 'hidden' && input.dataset.inputType === 'storageKey') {
+                            const skp = input.parentElement && input.parentElement._qsStorageKeyPicker;
+                            if (skp) {
+                                skp.setValue(params[i]);
+                                return;
+                            }
+                        }
                         // For <select> form inputs (e.g. eventArg picker), if the
                         // saved value isn't in the options list, inject it as a
                         // "(legacy)" option so the user can still see/edit it.
@@ -1867,6 +1876,11 @@
             var tkWrap = _renderTranslationKeyArgRow(arg, paramIndex, updateFn);
             row.appendChild(tkWrap);
             tkWrap._qsTranslationKeyPicker.mount();
+        } else if (inputType === 'storageKey') {
+            // Storage registry — <select> of declared keys + inline create.
+            var skWrap = _renderStorageKeyArgRow(arg, paramIndex, updateFn);
+            row.appendChild(skWrap);
+            skWrap._qsStorageKeyPicker.mount();
         } else if (usePicker && (inputType === 'selector' || inputType === 'class' || inputType === 'matchTarget')) {
             var picker = createSearchablePicker(inputType, arg, paramIndex);
             row.appendChild(picker);
@@ -2796,6 +2810,250 @@
             console.error('[PreviewJsInteractions] Failed to load routes:', error);
             availableRoutes = [];
         }
+    }
+
+    // ==================== Storage registry (slice 3 storageKey picker) ====================
+
+    /**
+     * Lazy-load the project storage registry into availableStorageItems.
+     * Mirrors fetchRoutes — raw fetch + Bearer, defensive envelope unwrap.
+     */
+    async function fetchStorageItems() {
+        try {
+            const response = await fetch('/management/listStorageItems', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${PreviewConfig.authToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: '{}'
+            });
+            if (!response.ok) throw new Error('Failed to fetch storage items');
+            const result = await response.json();
+            const payload = (result && result.data && (result.data.data || result.data)) || {};
+            availableStorageItems = Array.isArray(payload.items) ? payload.items : [];
+        } catch (error) {
+            console.error('[PreviewJsInteractions] Failed to load storage items:', error);
+            availableStorageItems = [];
+        }
+    }
+
+    /**
+     * storageKey inputType row — a <select> of declared storage keys (filtered
+     * to localStorage / sessionStorage, the only scopes saveToken/clearToken
+     * write) plus an inline "Create new key" mini-form that calls
+     * addStorageItem. The hidden input carries the chosen key for the generic
+     * param collector; the wrapper exposes
+     * _qsStorageKeyPicker = { mount, setValue }.
+     */
+    function _renderStorageKeyArgRow(arg, paramIndex, updateFn) {
+        var CREATE_SENTINEL = '__create__';
+        var scopeFrom = arg.scopeFrom || null;  // sibling arg whose value constrains the scope
+        var skSearchPicker = null;              // QSSearchableSelect combobox wrapper
+
+        var wrap = document.createElement('div');
+        wrap.className = 'qs-storage-key-picker';
+
+        // Hidden input is the value target read by the generic param collector.
+        var hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.className = 'preview-contextual-js-form-input';
+        hidden.dataset.paramIndex = paramIndex;
+        hidden.dataset.paramName = arg.name || '';
+        hidden.dataset.inputType = 'storageKey';
+        wrap.appendChild(hidden);
+
+        var select = document.createElement('select');
+        select.className = 'admin-input qs-storage-key-picker__select';
+        wrap.appendChild(select);
+
+        // Inline create mini-form (shown when the sentinel option is chosen).
+        var createForm = document.createElement('div');
+        createForm.className = 'qs-storage-key-picker__create';
+        createForm.style.display = 'none';
+
+        var nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'admin-input';
+        nameInput.placeholder = 'new key name, e.g. authToken';
+
+        var scopeSel = document.createElement('select');
+        scopeSel.className = 'admin-input';
+        ['localStorage', 'sessionStorage'].forEach(function (s) {
+            var o = document.createElement('option'); o.value = s; o.textContent = s; scopeSel.appendChild(o);
+        });
+
+        var catSel = document.createElement('select');
+        catSel.className = 'admin-input';
+        ['essential', 'functional', 'analytics', 'marketing'].forEach(function (c) {
+            var o = document.createElement('option'); o.value = c; o.textContent = c; catSel.appendChild(o);
+        });
+        catSel.value = 'functional';
+
+        var createBtn = document.createElement('button');
+        createBtn.type = 'button';
+        createBtn.className = 'admin-btn admin-btn--primary admin-btn--sm';
+        createBtn.textContent = 'Create key';
+
+        var errSpan = document.createElement('span');
+        errSpan.className = 'qs-storage-key-picker__err';
+
+        createForm.appendChild(nameInput);
+        createForm.appendChild(scopeSel);
+        createForm.appendChild(catSel);
+        createForm.appendChild(createBtn);
+        createForm.appendChild(errSpan);
+        wrap.appendChild(createForm);
+
+        // Find the sibling scope <select> (e.g. saveToken's 'storage' arg) by
+        // walking up to the shared form container. A concrete value filters the
+        // key list to that scope; empty (placeholder) → all local/session keys.
+        function findScopeSelect() {
+            if (!scopeFrom) return null;
+            var node = wrap.parentElement;
+            while (node && node !== document.body) {
+                var s = node.querySelector('[data-param-name="' + scopeFrom + '"][data-input-type="enum"]');
+                if (s) return s;
+                node = node.parentElement;
+            }
+            return null;
+        }
+
+        function repopulate(selectedKey) {
+            select.textContent = '';
+            var ph = document.createElement('option');
+            ph.value = ''; ph.textContent = '— pick a storage key —';
+            select.appendChild(ph);
+
+            var scopeSel = findScopeSelect();
+            var scopeFilter = (scopeSel && scopeSel.value) ? scopeSel.value : null;
+            var items = availableStorageItems.filter(function (it) {
+                if (!it) return false;
+                if (scopeFilter) return it.scope === scopeFilter;
+                return it.scope === 'localStorage' || it.scope === 'sessionStorage';
+            });
+            items.forEach(function (it) {
+                var o = document.createElement('option');
+                o.value = it.id;
+                o.textContent = it.id + '  (' + it.scope + ' · ' + it.category + ')';
+                select.appendChild(o);
+            });
+
+            var cur = (selectedKey != null) ? selectedKey : hidden.value;
+            if (cur && !items.some(function (it) { return it.id === cur; })) {
+                var o = document.createElement('option');
+                o.value = cur;
+                o.textContent = cur + '  (undeclared)';
+                select.appendChild(o);
+            }
+
+            var co = document.createElement('option');
+            co.value = CREATE_SENTINEL;
+            co.textContent = '➕ Create new key…';
+            select.appendChild(co);
+
+            select.value = cur || '';
+            if (skSearchPicker) skSearchPicker.refresh();
+        }
+
+        select.addEventListener('change', function () {
+            if (select.value === CREATE_SENTINEL) {
+                createForm.style.display = '';
+                select.value = hidden.value || '';
+                if (skSearchPicker) skSearchPicker.refresh();
+                if (!nameInput.value) nameInput.focus();
+                return;
+            }
+            createForm.style.display = 'none';
+            hidden.value = select.value;
+            updateFn();
+        });
+
+        createBtn.addEventListener('click', async function () {
+            errSpan.textContent = '';
+            var id = nameInput.value.trim();
+            if (id === '' || /\s/.test(id)) {
+                errSpan.textContent = 'Key name required (no spaces).';
+                return;
+            }
+            createBtn.disabled = true;
+            try {
+                var response = await fetch('/management/addStorageItem', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${PreviewConfig.authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ id: id, scope: scopeSel.value, category: catSel.value })
+                });
+                var result = await response.json().catch(function () { return null; });
+                if (!response.ok) {
+                    errSpan.textContent = (result && result.message) || (result && result.data && result.data.message) || 'Create failed';
+                    createBtn.disabled = false;
+                    return;
+                }
+                availableStorageItems.push({
+                    id: id, scope: scopeSel.value, category: catSel.value,
+                    consentRequired: catSel.value !== 'essential'
+                });
+                hidden.value = id;
+                // Align the sibling storage arg with the new key's scope, so the
+                // filter matches (and saveToken writes to the right storage).
+                var siblingStorage = findScopeSelect();
+                if (siblingStorage && siblingStorage.value !== scopeSel.value) {
+                    siblingStorage.value = scopeSel.value;
+                    siblingStorage.dispatchEvent(new Event('change'));
+                }
+                repopulate(id);
+                createForm.style.display = 'none';
+                nameInput.value = '';
+                createBtn.disabled = false;
+                updateFn();
+            } catch (e) {
+                errSpan.textContent = (e && e.message) || 'Network error';
+                createBtn.disabled = false;
+            }
+        });
+
+        wrap._qsStorageKeyPicker = {
+            mount: function () {
+                repopulate();
+                // Searchable combobox (mirrors the function picker). refresh()
+                // re-reads the options after each repopulate.
+                if (window.QSSearchableSelect && !skSearchPicker) {
+                    try {
+                        skSearchPicker = new window.QSSearchableSelect(select, {
+                            placeholder: '— pick a storage key —',
+                            searchPlaceholder: (PreviewConfig.i18n && PreviewConfig.i18n.searchStorageKeys) || 'Search storage keys…',
+                            emptyText: (PreviewConfig.i18n && PreviewConfig.i18n.noStorageKeysMatch) || 'No keys match',
+                        });
+                    } catch (e) {
+                        console.warn('[PreviewJsInteractions] QSSearchableSelect mount failed for storageKey:', e);
+                    }
+                }
+                // Bind the sibling scope arg AFTER the synchronous form build —
+                // during mount this row isn't attached to the container yet, so
+                // findScopeSelect() can't reach the 'storage' <select>. Defer one
+                // tick, then bind + apply the current filter.
+                setTimeout(function () {
+                    var scopeSel = findScopeSelect();
+                    if (scopeSel && !scopeSel._qsStorageScopeBound) {
+                        scopeSel._qsStorageScopeBound = true;
+                        scopeSel.addEventListener('change', function () { repopulate(); });
+                    }
+                    repopulate();
+                }, 0);
+                if (availableStorageItems.length === 0) {
+                    fetchStorageItems().then(function () { repopulate(); });
+                }
+            },
+            setValue: function (v) {
+                hidden.value = v || '';
+                repopulate(v || '');
+            }
+        };
+
+        return wrap;
     }
 
     // ==================== Dropdown Population ====================

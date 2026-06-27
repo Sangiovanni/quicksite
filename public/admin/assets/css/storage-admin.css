@@ -146,3 +146,21 @@
     border-color: var(--admin-error);
     color: #fff;
 }
+
+/* storageKey picker — in the interactions editor (slice 3) */
+.qs-storage-key-picker { display: flex; flex-direction: column; gap: 6px; }
+.qs-storage-key-picker__create {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    border: 0.5px dashed var(--admin-border);
+    border-radius: 6px;
+}
+.qs-storage-key-picker__create .admin-input { flex: 1 1 auto; min-width: 110px; }
+.qs-storage-key-picker__err {
+    flex-basis: 100%;
+    color: var(--admin-error);
+    font-size: 12px;
+}
