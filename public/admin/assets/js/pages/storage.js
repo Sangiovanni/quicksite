@@ -26,6 +26,15 @@
         filter: 'all',
     };
 
+    // Scan / reconcile state. `data` holds the last scanStorageUsage payload
+    // ({ buckets, counts }); `expanded` tracks the two collapsible sections.
+    var scan = {
+        data: null,
+        loading: false,
+        error: null,
+        expanded: { ok: false, orphan: false },
+    };
+
     function api(cmd, method, body) {
         var adminApi = window.QuickSiteAdmin;
         if (!adminApi || typeof adminApi.apiRequest !== 'function') {
@@ -262,9 +271,12 @@
         return sel;
     }
 
-    function _openModal(mode, item) {
+    function _openModal(mode, item, prefill) {
         var isEdit = (mode === 'edit');
-        var titleText = isEdit ? 'Edit "' + item.id + '"' : 'Add storage key';
+        // Declare-from-scan: the key name is fixed by usage, only used when the
+        // scope couldn't be inferred (one-click declare needs a scope).
+        var isDeclare = (!isEdit && prefill && prefill.id);
+        var titleText = isEdit ? 'Edit "' + item.id + '"' : (isDeclare ? 'Declare "' + prefill.id + '"' : 'Add storage key');
         var dialog = _renderModalShell(titleText, closeModal);
         if (!dialog) return;
 
@@ -272,13 +284,16 @@
         var idInput = _el('input', {
             type: 'text', class: 'admin-input', autocomplete: 'off',
             placeholder: 'key name, e.g. cartSession',
-            value: isEdit ? item.id : '',
+            value: isEdit ? item.id : (isDeclare ? prefill.id : ''),
         });
+        if (isDeclare) idInput.readOnly = true;
         dialog.appendChild(_renderGroup(_renderLabel('Key name', true), idInput,
-            _renderHint('The storage key as written in code. No spaces. The value is provided by the visitor at runtime — never stored here.')));
+            _renderHint(isDeclare
+                ? 'Found in the build by the scan — declaring it adds it to the registry. The value is provided by the visitor at runtime — never stored here.'
+                : 'The storage key as written in code. No spaces. The value is provided by the visitor at runtime — never stored here.')));
 
         // scope
-        var scopeSelect = _renderSelect(state.scopes, isEdit ? item.scope : 'localStorage');
+        var scopeSelect = _renderSelect(state.scopes, isEdit ? item.scope : ((isDeclare && prefill.scope) ? prefill.scope : 'localStorage'));
         dialog.appendChild(_renderGroup(_renderLabel('Scope', true), scopeSelect));
 
         // category
@@ -379,6 +394,7 @@
                 }
                 closeModal();
                 await refresh();
+                if (scan.data) await runScan();
             } catch (e) {
                 errBox.textContent = (e && e.message) || 'Network error';
                 saveBtn.disabled = false;
@@ -424,12 +440,222 @@
                 }
                 closeModal();
                 await refresh();
+                if (scan.data) await runScan();
             } catch (e) {
                 errPanel.hidden = false;
                 errPanel.textContent = (e && e.message) || 'Network error';
                 confirmBtn.disabled = false;
             }
         });
+    }
+
+    // ====================================================================
+    // Scan / reconcile
+    // ====================================================================
+
+    // A labelled group of location chips ("writes" / "reads" / "clears" + the
+    // page/component/menu labels the scan engine returns). Null when empty.
+    function _renderRefChips(label, list) {
+        if (!list || !list.length) return null;
+        var wrap = _el('span', { class: 'storage-refs' });
+        wrap.appendChild(_el('span', { class: 'storage-refs__label', text: label }));
+        list.forEach(function (loc) {
+            wrap.appendChild(_el('span', { class: 'storage-loc', text: loc }));
+        });
+        return wrap;
+    }
+
+    // One row in a scan bucket. `opts.declare` adds the one-click Declare button
+    // (incomplete bucket only).
+    function _renderScanRow(row, opts) {
+        var r = _el('div', { class: 'storage-scan-row' });
+
+        var mainCol = _el('div', { class: 'storage-scan-row__main' });
+        var head = _el('div', { class: 'storage-scan-row__head' });
+        head.appendChild(_el('span', { class: 'storage-card__id', text: row.id }));
+        var scope = row.inferredScope || row.scope;
+        if (scope) head.appendChild(_renderPill(scope, 'scope'));
+        if (row.category) head.appendChild(_renderPill(row.category, 'cat-' + row.category));
+        mainCol.appendChild(head);
+
+        var refs = _el('div', { class: 'storage-scan-row__refs' });
+        var w = _renderRefChips('writes', row.writers);
+        var c = _renderRefChips('clears', row.clearers);
+        var rd = _renderRefChips('reads', row.readers);
+        if (w) refs.appendChild(w);
+        if (c) refs.appendChild(c);
+        if (rd) refs.appendChild(rd);
+        if (refs.childNodes.length) mainCol.appendChild(refs);
+        r.appendChild(mainCol);
+
+        if (opts && opts.declare) {
+            var act = _el('div', { class: 'storage-scan-row__action' });
+            var btn = _el('button', {
+                class: 'admin-btn admin-btn--primary storage-scan-row__declare',
+                type: 'button', text: 'Declare',
+            });
+            btn.addEventListener('click', function () { declareIncomplete(row, btn); });
+            act.appendChild(btn);
+            r.appendChild(act);
+        }
+        return r;
+    }
+
+    function _renderScanSecHead(title, count, subtitle) {
+        var head = _el('div', { class: 'storage-scan-sec__head' });
+        head.appendChild(_el('h3', { class: 'storage-scan-sec__title', text: title + ' (' + count + ')' }));
+        if (subtitle) head.appendChild(_el('p', { class: 'storage-scan-sec__sub', text: subtitle }));
+        return head;
+    }
+
+    // Incomplete = used-but-undeclared (the GDPR gap). Most prominent; always open.
+    function _renderIncompleteSection(list) {
+        var sec = _el('section', { class: 'storage-scan-sec storage-scan-sec--incomplete' });
+        sec.appendChild(_renderScanSecHead('Undeclared keys', list.length,
+            'Used in the build but not in the registry — the GDPR gap. Declare each to add it.'));
+        if (!list.length) {
+            sec.appendChild(_el('div', { class: 'storage-scan__ok-note', text: 'All used keys are declared. ✓' }));
+        } else {
+            list.forEach(function (row) { sec.appendChild(_renderScanRow(row, { declare: true })); });
+        }
+        return sec;
+    }
+
+    // Dangling reads = read by a binding but never written. Not a GDPR item; a
+    // likely-leftover flag. No Declare.
+    function _renderDanglingSection(list) {
+        var sec = _el('section', { class: 'storage-scan-sec storage-scan-sec--dangling' });
+        sec.appendChild(_renderScanSecHead('Dangling reads', list.length,
+            'Read by a binding but never written anywhere — likely a leftover after the writer was deleted. Review these.'));
+        list.forEach(function (row) { sec.appendChild(_renderScanRow(row, null)); });
+        return sec;
+    }
+
+    // OK / Orphan — collapsible, ignorable-by-default sections.
+    function _renderCollapsibleSection(key, title, list, subtitle) {
+        var sec = _el('section', { class: 'storage-scan-sec storage-scan-sec--' + key });
+        var toggle = _el('button', { class: 'storage-scan-sec__toggle', type: 'button' });
+        var open = !!scan.expanded[key];
+        toggle.appendChild(_el('span', { class: 'storage-scan-sec__chevron', text: open ? '▾' : '▸' }));
+        toggle.appendChild(_el('span', { text: title + ' (' + list.length + ')' }));
+        toggle.addEventListener('click', function () {
+            scan.expanded[key] = !scan.expanded[key];
+            renderScanPanel();
+        });
+        sec.appendChild(toggle);
+        if (open) {
+            if (subtitle) sec.appendChild(_el('p', { class: 'storage-scan-sec__sub', text: subtitle }));
+            if (!list.length) {
+                sec.appendChild(_el('div', { class: 'storage-scan__empty-note', text: 'None.' }));
+            } else {
+                list.forEach(function (row) { sec.appendChild(_renderScanRow(row, null)); });
+            }
+        }
+        return sec;
+    }
+
+    function _renderScanHeader() {
+        var h = _el('div', { class: 'storage-scan__header' });
+        h.appendChild(_el('h2', { class: 'storage-scan__title', text: 'Scan results' }));
+        var dismiss = _el('button', {
+            class: 'admin-btn admin-btn--ghost storage-scan__dismiss',
+            type: 'button', 'aria-label': 'Dismiss scan results',
+            onclick: dismissScan,
+        });
+        dismiss.appendChild(_renderSvgIcon(ICON_X, 16));
+        h.appendChild(dismiss);
+        return h;
+    }
+
+    function dismissScan() {
+        scan.data = null;
+        scan.error = null;
+        var root = document.getElementById('storage-scan-panel');
+        if (root) { root.textContent = ''; root.hidden = true; }
+    }
+
+    function renderScanPanel() {
+        var root = document.getElementById('storage-scan-panel');
+        if (!root) return;
+        root.textContent = '';
+
+        if (!scan.loading && !scan.error && !scan.data) {
+            root.hidden = true;
+            return;
+        }
+        root.hidden = false;
+        root.appendChild(_renderScanHeader());
+
+        if (scan.loading) {
+            root.appendChild(_el('div', { class: 'storage-scan__loading', text: 'Scanning the build…' }));
+            return;
+        }
+        if (scan.error) {
+            root.appendChild(_el('div', { class: 'storage-scan__error', text: scan.error }));
+            return;
+        }
+
+        var b = scan.data.buckets || {};
+        root.appendChild(_renderIncompleteSection(b.incomplete || []));
+        if ((b.dangling_read || []).length) {
+            root.appendChild(_renderDanglingSection(b.dangling_read));
+        }
+        root.appendChild(_renderCollapsibleSection('ok', 'OK', b.ok || [],
+            'Declared and written in the build — nothing to do.'));
+        root.appendChild(_renderCollapsibleSection('orphan', 'Orphans', b.orphan || [],
+            'Declared but not referenced in the build. Safe to keep — may be parked.'));
+    }
+
+    async function runScan() {
+        scan.loading = true;
+        scan.error = null;
+        renderScanPanel();
+        try {
+            var r = await api('scanStorageUsage', 'POST');
+            var payload = (r && r.data && (r.data.data || r.data)) || {};
+            scan.data = (payload && payload.buckets)
+                ? payload
+                : { buckets: { ok: [], incomplete: [], dangling_read: [], orphan: [] }, counts: {} };
+        } catch (e) {
+            console.warn('[storage] scan failed:', e);
+            scan.error = (e && e.message) || 'Scan failed';
+        } finally {
+            scan.loading = false;
+        }
+        renderScanPanel();
+    }
+
+    // One-click Declare for an incomplete key (safe defaults: inferred scope +
+    // category 'functional'; refine later on the list). When the scope couldn't
+    // be inferred, fall back to the prefilled add modal since scope is required.
+    async function declareIncomplete(row, btn) {
+        if (!row.inferredScope) {
+            _openModal('add', null, { id: row.id });
+            return;
+        }
+        if (btn) { btn.disabled = true; btn.textContent = 'Declaring…'; }
+        try {
+            var r = await api('addStorageItem', 'POST', {
+                id: row.id,
+                scope: row.inferredScope,
+                category: 'functional',
+            });
+            if (!r || !r.ok) {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Declare';
+                    var msg = (r && r.data && r.data.message) || 'Declare failed';
+                    var err = _el('span', { class: 'storage-scan-row__err', text: msg });
+                    if (btn.parentNode) btn.parentNode.appendChild(err);
+                }
+                return;
+            }
+            await refresh();
+            await runScan();
+        } catch (e) {
+            console.warn('[storage] declare failed:', e);
+            if (btn) { btn.disabled = false; btn.textContent = 'Declare'; }
+        }
     }
 
     // ====================================================================
@@ -441,6 +667,8 @@
         if (addBtn) addBtn.addEventListener('click', openAddModal);
         var refreshBtn = document.getElementById('btn-refresh-storage');
         if (refreshBtn) refreshBtn.addEventListener('click', refresh);
+        var scanBtn = document.getElementById('btn-scan-storage');
+        if (scanBtn) scanBtn.addEventListener('click', runScan);
         refresh();
     }
     if (document.readyState === 'loading') {

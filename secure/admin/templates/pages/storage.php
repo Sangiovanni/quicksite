@@ -34,6 +34,12 @@ $baseUrl = rtrim(BASE_URL, '/');
             </svg>
             Add storage key
         </button>
+        <button type="button" class="admin-btn admin-btn--ghost" id="btn-scan-storage">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            Scan / reconcile
+        </button>
         <button type="button" class="admin-btn admin-btn--ghost" id="btn-refresh-storage">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <path d="M23 4v6h-6M1 20v-6h6"/>
@@ -44,6 +50,8 @@ $baseUrl = rtrim(BASE_URL, '/');
     </div>
     <div class="admin-toolbar__right" id="storage-filter-bar"></div>
 </div>
+
+<div id="storage-scan-panel" class="storage-scan" role="region" aria-label="Storage scan results" hidden></div>
 
 <div id="storage-list" class="storage-list" role="region" aria-label="Storage registry list">
     <div class="storage-list__loading" style="padding: 24px; color: var(--admin-text-muted, #555);">Loading storage registry…</div>

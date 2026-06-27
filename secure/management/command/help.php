@@ -4601,6 +4601,19 @@ $GLOBALS['__help_commands'] = [
         ],
         'notes' => 'Does not check in-use references yet — the scan/reconcile slice surfaces dangling reads.'
     ],
+    'scanStorageUsage' => [
+        'description' => 'Scan the build for storage-key references and reconcile against the declared registry. Triggered, warn-style check (not blocking). Walks structures (data-storage-* attrs + saveToken/store/clearToken chains), api-endpoints auth sources, page-events handler chains, and state-store init. Buckets keys into ok / incomplete (used but undeclared) / dangling_read (read but never written) / orphan (declared but unreferenced).',
+        'method' => 'POST',
+        'parameters' => [],
+        'example_post' => 'POST \management\scanStorageUsage',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'success',
+            'data' => ['buckets' => '{ok, incomplete, dangling_read, orphan: [{id, declared, inferredScope, writers, readers, clearers}]}', 'counts' => '{ok, incomplete, dangling_read, orphan}']
+        ],
+        'error_responses' => [],
+        'notes' => 'Read-only. Drives the /admin/storage Scan view; incomplete keys get a one-click Declare (addStorageItem with inferred scope). Dangling reads are flagged, not auto-removed.'
+    ],
 
     'getApiEndpoint' => [
         'description' => 'Gets a single endpoint by ID, including the parent API\'s auth configuration.',
