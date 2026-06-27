@@ -1,0 +1,148 @@
+/* Storage registry admin page (beta.9). Structure mirrors oauth-admin.css.
+   All colors use the --admin-* variables defined in admin.css (theme-aware). */
+
+.storage-header-icon { width: 28px; height: 28px; flex-shrink: 0; }
+
+.storage-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 0 24px;
+}
+.storage-list__empty {
+    padding: 32px 24px;
+    text-align: center;
+    color: var(--admin-text-muted);
+    border: 1px dashed var(--admin-border);
+    border-radius: 8px;
+}
+
+.storage-card {
+    border: 0.5px solid var(--admin-border);
+    border-radius: 8px;
+    background: var(--admin-card-bg);
+    color: var(--admin-text);
+    padding: 12px 14px;
+}
+.storage-card__row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+.storage-card__main { min-width: 0; flex: 1; }
+.storage-card__pills {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+.storage-card__id {
+    font-family: var(--font-mono, ui-monospace, Menlo, Consolas, monospace);
+    font-weight: 600;
+    color: var(--admin-text);
+    margin-right: 4px;
+}
+.storage-card__summary {
+    margin-top: 6px;
+    color: var(--admin-text-muted);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.storage-card__actions { display: flex; gap: 4px; flex-shrink: 0; }
+.storage-card__action { padding: 6px; }
+
+/* Pills — semantic admin colors */
+.storage-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+.storage-pill--scope     { background: var(--admin-bg-tertiary); color: var(--admin-text-muted); }
+.storage-pill--retention { background: var(--admin-bg-tertiary); color: var(--admin-text-muted); }
+.storage-pill--consent   { background: var(--admin-warning-bg); color: var(--admin-warning); }
+.storage-pill--essential { background: var(--admin-success-bg); color: var(--admin-success); }
+.storage-pill--cat-essential  { background: var(--admin-success-bg); color: var(--admin-success); }
+.storage-pill--cat-functional { background: var(--admin-info-bg);    color: var(--admin-info); }
+.storage-pill--cat-analytics  { background: var(--admin-warning-bg); color: var(--admin-warning); }
+.storage-pill--cat-marketing  { background: var(--admin-error-bg);   color: var(--admin-error); }
+
+/* Filter bar */
+.storage-filter-bar { display: flex; flex-wrap: wrap; gap: 6px; }
+.storage-filter-bar__btn--active {
+    background: var(--admin-bg-tertiary);
+    border-color: var(--admin-accent);
+    color: var(--admin-text);
+}
+
+/* Modal */
+.storage-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 48px 16px;
+    overflow-y: auto;
+    z-index: 1000;
+}
+.storage-modal-dialog {
+    background: var(--admin-bg-secondary);
+    color: var(--admin-text);
+    border: 0.5px solid var(--admin-border);
+    border-radius: 10px;
+    width: 100%;
+    max-width: 560px;
+    padding: 18px 20px 20px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.35);
+}
+.storage-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+.storage-modal-header__title { margin: 0; font-size: 17px; color: var(--admin-text); }
+.storage-modal-header__close { padding: 6px; }
+
+/* Retention: select on top, custom input full-width below (stacked, robust) */
+.storage-retention { display: block; }
+.storage-retention .storage-retention-custom {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 8px;
+}
+
+.storage-cookie-fields {
+    border-top: 0.5px solid var(--admin-border);
+    margin-top: 8px;
+    padding-top: 10px;
+}
+.storage-cookie-secure { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--admin-text); }
+
+.storage-modal-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+.storage-modal-actions__error {
+    flex: 1;
+    color: var(--admin-error);
+    font-size: 13px;
+}
+.storage-modal-actions__btn--danger {
+    background: var(--admin-error);
+    border-color: var(--admin-error);
+    color: #fff;
+}

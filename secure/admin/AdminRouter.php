@@ -25,6 +25,7 @@ class AdminRouter {
         'preview',     // Visual Editor (route kept as 'preview' for URL compatibility)
         'apis',        // External API Registry
         'oauth-providers', // OAuth Provider catalogue + per-project overrides (beta.9 A1 Slice 8)
+        'storage',     // Storage registry — GDPR / cookie-consent data layer (beta.9)
         'assets',      // Asset Management page
         'sitemap',     // Visual Sitemap & Route Management
         'optimize',    // Optimization Tools
@@ -189,6 +190,7 @@ class AdminRouter {
         // (Old 'ai-settings' route 301-redirects to it in dispatch().)
         'apis'           => ['listApiEndpoints'],
         'oauth-providers'=> ['listOAuthProviders'],
+        'storage'        => ['listStorageItems'],
         'embed-security' => ['getIframeSandbox'],
         // 'workflows' is no longer gated by callAi: AI calls now happen in
         // the browser via QSAiCall (no PHP proxy). Any admin user can open
