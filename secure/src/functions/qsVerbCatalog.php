@@ -278,6 +278,19 @@ function qsVerbCatalog(): array {
             'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup']
         ],
         [
+            'name' => 'store',
+            'category' => 'state-store',
+            'signature' => 'QS.store(storage, key, path)',
+            'args' => [
+                ['name' => 'storage', 'type' => 'string', 'required' => true, 'description' => 'localStorage (persists across restarts) or sessionStorage (clears on tab close).', 'inputType' => 'enum', 'options' => ['localStorage', 'sessionStorage']],
+                ['name' => 'key', 'type' => 'string', 'required' => true, 'description' => 'Storage key name. Declared in the storage registry (/admin/storage) — pick an existing one or create it inline.', 'inputType' => 'storageKey', 'scopeFrom' => 'storage'],
+                ['name' => 'path', 'type' => 'string', 'required' => true, 'description' => 'Dot-notation path into the last fetch result (e.g. data.theme).']
+            ],
+            'description' => 'Generic storage write — the non-auth sibling of saveToken. Reads a value from the last fetch response (QS._lastFetchResult) and stashes it in localStorage / sessionStorage, firing `qs:storage:changed` so data-storage-* bindings re-render. Use for non-token values (preferences, saved drafts, …) that the storage registry tracks.',
+            'example' => '{{call:fetch:@prefs-api/get}};{{call:store:localStorage,themePref,data.theme}}',
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onsubmit', 'onload']
+        ],
+        [
             'name' => 'refresh',
             'category' => 'auth',
             'signature' => 'QS.refresh(apiRef)',

@@ -1627,6 +1627,53 @@
     };
 
     /**
+     * Generic storage write — the non-auth sibling of saveToken. Reads a value
+     * from the last fetch result (QS._lastFetchResult) via `path` and stashes it
+     * in localStorage / sessionStorage, firing `qs:storage:changed` so
+     * data-storage-* bindings re-render. Use for non-token values (preferences,
+     * saved drafts, …) that the storage registry tracks. Forgiving by design:
+     * warn + no-op on bad input, never throws (won't abort a chain).
+     *
+     * @param {string} storage  'localStorage' or 'sessionStorage'
+     * @param {string} key       Storage key name (declared in /admin/storage)
+     * @param {string} path      Dot-path into QS._lastFetchResult
+     */
+    QS.store = function(storage, key, path) {
+        if (storage !== 'localStorage' && storage !== 'sessionStorage') {
+            console.warn('[QS] store: invalid storage type:', storage,
+                '(must be localStorage or sessionStorage)');
+            return;
+        }
+        if (typeof key !== 'string' || key === '') {
+            console.warn('[QS] store: key is required');
+            return;
+        }
+        if (typeof path !== 'string' || path === '') {
+            console.warn('[QS] store: path is required (e.g. "data.preference")');
+            return;
+        }
+        var src = QS._lastFetchResult;
+        if (src == null) {
+            console.warn('[QS] store: no fetch result to read from (call after a QS.fetch)');
+            return;
+        }
+        var value = getNestedValue(src, path);
+        if (value === undefined || value === null || value === '') {
+            console.warn('[QS] store: path resolved to empty value:', path);
+            return;
+        }
+        try {
+            window[storage].setItem(key, String(value));
+        } catch (e) {
+            console.warn('[QS] store: storage write failed');
+            return;
+        }
+        document.dispatchEvent(new CustomEvent('qs:storage:changed', {
+            detail: { storage: storage, key: key, value: String(value) }
+        }));
+    };
+
+    /**
      * Remove a stored token from localStorage / sessionStorage. Fires
      * `qs:auth:cleared` on document with detail.{ storage, key, tokenKey }.
      *
@@ -2161,6 +2208,11 @@
     // so the user sees a clean logged-out UI on the next render.
     document.addEventListener('qs:auth:cleared', function () {
         _exchangeState = null;
+        applyAuthState();
+    });
+    // qs:storage:changed → a non-auth QS.store write; re-scan data-storage-*
+    // bindings so they reflect the new value (the auth events already do this).
+    document.addEventListener('qs:storage:changed', function () {
         applyAuthState();
     });
     // Beta.8 A3 — exchange lifecycle events dispatched by
