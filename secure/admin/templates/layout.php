@@ -264,7 +264,26 @@ $langNames = [
         </nav>
         
         <div class="admin-header__actions">
-            <?php 
+            <?php
+            // Active project badge — always show which project is being edited
+            // (you switch a lot during testing). Reads config/target.php, the
+            // same source getActiveProjectName() uses.
+            $activeProjectName = null;
+            $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
+            if (file_exists($targetFile)) {
+                $target = @include $targetFile;
+                $activeProjectName = is_array($target) ? ($target['project'] ?? null) : (is_string($target) ? $target : null);
+            }
+            ?>
+            <?php if ($activeProjectName): ?>
+            <a href="<?= $router->url('dashboard') ?>" class="admin-btn admin-btn--ghost admin-project-badge" title="<?= __admin('common.activeProject', 'Active project') ?>">
+                <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+                <span><?= adminEscape($activeProjectName) ?></span>
+            </a>
+            <?php endif; ?>
+            <?php
             // Build the correct site URL - include default language if multilingual
             $siteUrl = rtrim($baseUrl, '/') . '/';
             if (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) {

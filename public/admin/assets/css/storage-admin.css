@@ -164,3 +164,8 @@
     color: var(--admin-error);
     font-size: 12px;
 }
+
+/* Active-project badge in the admin header (general admin chrome — lives here
+   for now since this stylesheet loads on every admin page). */
+.admin-project-badge { font-weight: 600; }
+.admin-project-badge .admin-btn__icon { color: var(--admin-accent); }
