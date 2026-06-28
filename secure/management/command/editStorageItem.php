@@ -33,6 +33,9 @@ if (!is_string($id) || $id === '') {
 
 $registry = loadStorageRegistry();
 
+// Converge any not-yet-keyed descriptions into translate/ before writing.
+storageMigrateInlineDescriptions($registry);
+
 if (!isset($registry['items'][$id])) {
     ApiResponse::create(404, 'storage.not_found')
         ->withMessage("No storage item '{$id}' — use addStorageItem to create it")
@@ -72,9 +75,24 @@ if (!saveStorageRegistry($registry)) {
         ->send();
 }
 
+// Persist the description into translate/ (keyed). Replace-all semantic: a
+// missing/empty description clears the key. On rename the old key is left to
+// the orphan-translation cleanup (the new key carries the submitted copy).
+if ($targetId !== $id) {
+    storageClearDescription($id);
+}
+if (!empty($result['description'])) {
+    storageWriteDescription($targetId, $result['description']);
+} else {
+    storageClearDescription($targetId);
+}
+
 $stored = $result['item'];
 $stored['id'] = $targetId;
 $stored['consentRequired'] = storageConsentRequired($result['item']);
+if (!empty($result['description'])) {
+    $stored['description'] = $result['description']; // echo for the admin card
+}
 
 ApiResponse::create(200, 'storage.updated')
     ->withMessage("Storage item '{$targetId}' updated" . ($targetId !== $id ? " (renamed from '{$id}')" : ''))

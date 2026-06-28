@@ -194,40 +194,6 @@ function consentOAuthLinks(): array {
     return $out;
 }
 
-/** Per-item description in the given language, with fallback to any present. */
-function _consentItemDescription(array $item, string $lang): string {
-    $d = $item['description'] ?? null;
-    if (!is_array($d)) return '';
-    if (isset($d[$lang]) && is_string($d[$lang]) && $d[$lang] !== '') return $d[$lang];
-    foreach ($d as $v) {
-        if (is_string($v) && $v !== '') return $v;
-    }
-    return '';
-}
-
-/** Translation key for an item's policy-table description cell. */
-function _consentDescKey(string $id): string {
-    return 'consent.policy.desc.' . preg_replace('/[^a-z0-9_]/i', '_', $id);
-}
-
-/**
- * Per-language description seed for the policy table — { descKey => text } for
- * every item that has a description, resolved in $lang (fallback to any present).
- * These keys are REFRESHED from the registry on each regenerate (storage.json is
- * the source of truth), unlike the structural copy which is author-editable.
- */
-function consentPolicyDescSeed(array $items, string $lang): array {
-    $out = [];
-    foreach ($items as $id => $item) {
-        if (!is_array($item)) continue;
-        $desc = _consentItemDescription($item, $lang);
-        if ($desc !== '') {
-            $out[_consentDescKey((string) $id)] = $desc;
-        }
-    }
-    return $out;
-}
-
 /**
  * Cookie-policy page structure (array of nodes) — a deterministic table built
  * from the registry, plus an OAuth-provider privacy-link section and a legal
@@ -252,16 +218,17 @@ function buildCookiePolicyStructure(array $items, array $oauthLinks): array {
         $cat = $item['category'] ?? 'functional';
         $consentKey = ($cat === 'essential') ? 'consent.policy.no' : 'consent.policy.yes';
         $retention = $item['retention'] ?? '';
-        // Description cell: a translatable key when the item has a description
-        // (seeded per-language from the registry), an empty cell otherwise.
-        $hasDesc = _consentItemDescription($item, 'en') !== '';
+        // Description cell references the storage registry's canonical
+        // description key (translate/ — storageDescKey), resolved live at render.
+        // Empty cell when the item has no description.
+        $hasDesc = storageItemDescription((string) $id, $item, storageDefaultLang()) !== '';
         $bodyRows[] = _cNode('tr', [], [
             _cNode('td', ['class' => 'qs-cookie-policy__key'], [_cRaw((string) $id)]),
             _cNode('td', [], [_cRaw((string) ($item['scope'] ?? ''))]),
             _cNode('td', [], [_cText('consent.category.' . $cat)]),
             _cNode('td', [], [_cRaw($retention !== '' ? (string) $retention : '—')]),
             _cNode('td', [], [_cText($consentKey)]),
-            _cNode('td', [], $hasDesc ? [_cText(_consentDescKey((string) $id))] : []),
+            _cNode('td', [], $hasDesc ? [_cText(storageDescKey((string) $id))] : []),
         ]);
     }
     $table = _cNode('table', ['class' => 'qs-cookie-policy'], [$thead, _cNode('tbody', [], $bodyRows)]);

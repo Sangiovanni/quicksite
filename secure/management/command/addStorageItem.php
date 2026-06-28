@@ -43,6 +43,9 @@ if (!is_string($id) || $id === '') {
 
 $registry = loadStorageRegistry();
 
+// Converge any not-yet-keyed descriptions into translate/ before writing.
+storageMigrateInlineDescriptions($registry);
+
 if (isset($registry['items'][$id])) {
     ApiResponse::create(409, 'storage.duplicate')
         ->withMessage("A storage item '{$id}' already exists — use editStorageItem to change it")
@@ -65,9 +68,17 @@ if (!saveStorageRegistry($registry)) {
         ->send();
 }
 
+// Persist the description (if any) into translate/, keyed — not inline.
+if (!empty($result['description'])) {
+    storageWriteDescription($id, $result['description']);
+}
+
 $stored = $result['item'];
 $stored['id'] = $id;
 $stored['consentRequired'] = storageConsentRequired($result['item']);
+if (!empty($result['description'])) {
+    $stored['description'] = $result['description']; // echo for the admin card
+}
 
 ApiResponse::create(201, 'storage.created')
     ->withMessage("Storage item '{$id}' declared")

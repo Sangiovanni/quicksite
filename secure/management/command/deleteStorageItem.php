@@ -45,6 +45,9 @@ if (!saveStorageRegistry($registry)) {
         ->send();
 }
 
+// Drop the item's keyed description from translate/ (no orphan left behind).
+storageClearDescription($id);
+
 ApiResponse::create(200, 'storage.deleted')
     ->withMessage("Storage item '{$id}' deleted")
     ->withData(['id' => $id])

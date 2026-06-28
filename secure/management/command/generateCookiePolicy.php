@@ -53,7 +53,13 @@ foreach ($segments as $seg) {
 }
 
 // ---- Build the page structure --------------------------------------------
-$items = loadStorageRegistry()['items'];
+// Ensure every item's description is keyed in translate/ before the page
+// references storageDescKey() — converges any not-yet-migrated inline copies.
+$registry = loadStorageRegistry();
+if (storageMigrateInlineDescriptions($registry)) {
+    saveStorageRegistry($registry);
+}
+$items = $registry['items'];
 $structure = buildCookiePolicyStructure($items, consentOAuthLinks());
 
 $jsonRel = '/templates/model/json/pages/' . implode('/', $segments) . '/' . end($segments) . '.json';
@@ -136,10 +142,11 @@ foreach ($languages as $lc) {
     foreach ($catKeys as $ck) {
         if (isset($cats[$ck])) $structural[$ck] = $cats[$ck];
     }
-    // Structural copy is author-editable (new keys only); per-key descriptions
-    // are refreshed from the registry every regenerate (storage.json wins).
+    // Structural copy is author-editable (new keys only). Per-item descriptions
+    // are NOT seeded here — they live independently in translate/ under
+    // storageDescKey(), authored via the storage registry and resolved live.
     $newOnly = consentFilterNewKeys($lc, $structural);
-    $finalFlat = array_merge($newOnly, consentPolicyDescSeed($items, $lc));
+    $finalFlat = $newOnly;
     if (empty($finalFlat)) continue;
     $res = writeTranslationsToFile($lc, convertDotNotationToNested($finalFlat), false);
     if (!empty($res['ok'])) $languagesSeeded[$lc] = $res['keysAdded'] ?? count($finalFlat);

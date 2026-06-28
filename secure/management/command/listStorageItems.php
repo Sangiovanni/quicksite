@@ -19,14 +19,21 @@ require_once SECURE_FOLDER_PATH . '/src/functions/storageHelpers.php';
 
 $registry = loadStorageRegistry();
 
+$defaultLang = storageDefaultLang();
+
 $out = [];
 foreach ($registry['items'] as $id => $item) {
     if (!is_array($item)) {
         continue;
     }
     $row = $item;
+    unset($row['description']); // not stored inline anymore — resolve from translate/
     $row['id'] = $id;
     $row['consentRequired'] = storageConsentRequired($item);
+    $desc = storageItemDescription((string) $id, $item, $defaultLang);
+    if ($desc !== '') {
+        $row['description'] = [$defaultLang => $desc];
+    }
     $out[] = $row;
 }
 
