@@ -4725,6 +4725,63 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Drives the /admin/privacy page. An atom = a (endpoint, field) the site is configured to send outward; map it to a collected datum to cover it. undeclaredBody flags POST/PUT/PATCH endpoints with no requestSchema.'
     ],
 
+    'setCollectedDatum' => [
+        'description' => 'Create or update a "data collected" entry in data/privacy.json. The id is a stable slug (atoms map to it); label + purpose are prose authored in the registry description language and stored in translate/ under privacy.collected.<id>.label / .purpose. Editing label/purpose is live (no regenerate).',
+        'method' => 'POST',
+        'parameters' => [
+            'id' => ['required' => true, 'type' => 'string', 'description' => 'Stable slug: letters, numbers, hyphens, underscores.'],
+            'label' => ['required' => true, 'type' => 'string', 'description' => 'Display name, e.g. "Email address".'],
+            'purpose' => ['required' => false, 'type' => 'string', 'description' => 'What you do with it (empty clears).']
+        ],
+        'example_post' => 'POST \management\setCollectedDatum with {"id":"email","label":"Email address","purpose":"To send login links"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'success',
+            'data' => ['datum' => ['id' => 'email', 'label' => 'Email address', 'purpose' => 'To send login links']]
+        ],
+        'error_responses' => [
+            '400.validation.invalid' => 'Invalid id slug',
+            '400.validation.required' => 'Missing id or label'
+        ],
+        'notes' => '201 when new, 200 on update. Drives the /admin/privacy collected-data editor.'
+    ],
+    'deleteCollectedDatum' => [
+        'description' => 'Remove a "data collected" entry. Nulls any atom mappings that pointed at it and clears its label/purpose keys from translate/.',
+        'method' => 'POST',
+        'parameters' => [
+            'id' => ['required' => true, 'type' => 'string']
+        ],
+        'example_post' => 'POST \management\deleteCollectedDatum with {"id":"email"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'success',
+            'data' => ['id' => 'email']
+        ],
+        'error_responses' => [
+            '404.privacy.not_found' => 'No collected datum with this id'
+        ],
+        'notes' => 'Mappings that referenced it become unset (null), not deleted.'
+    ],
+    'setPrivacyDescLang' => [
+        'description' => 'Change the language collected-data prose is authored in (descLang on data/privacy.json). Mirrors setStorageDescLang: MOVES every datum label + purpose from the current language to the target in translate/ (empty-not-delete on the source), OVERWRITING existing target values. Two-step: call without confirm to preview (409 needsConfirm with moved/overwrites), then re-call with confirm:true.',
+        'method' => 'POST',
+        'parameters' => [
+            'lang' => ['required' => true, 'type' => 'string', 'description' => 'Target language, must be in LANGUAGES_SUPPORTED.'],
+            'confirm' => ['required' => false, 'type' => 'boolean', 'description' => 'Execute the move (defaults false → preview only).']
+        ],
+        'example_post' => 'POST \management\setPrivacyDescLang with {"lang":"fr","confirm":true}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'success',
+            'data' => ['descLang' => 'fr', 'moved' => 4, 'overwrites' => 0]
+        ],
+        'error_responses' => [
+            '409.privacy.desclang_confirm' => 'Confirmation required — data: {from, to, moved, overwrites, needsConfirm}',
+            '400.validation.invalid' => 'Language not in LANGUAGES_SUPPORTED'
+        ],
+        'notes' => 'No-op (200) when lang already active. Drives the /admin/privacy description-language selector.'
+    ],
+
     'getApiEndpoint' => [
         'description' => 'Gets a single endpoint by ID, including the parent API\'s auth configuration.',
         'method' => 'GET',

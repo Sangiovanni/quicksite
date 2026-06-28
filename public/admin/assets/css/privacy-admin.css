@@ -51,10 +51,19 @@
 }
 .privacy-section__head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 8px;
     margin-bottom: 10px;
 }
+.privacy-section__actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.privacy-desclang__label { font-size: 12px; color: var(--admin-text-muted, #666); }
+.privacy-desclang__select { width: auto; min-width: 64px; }
+.privacy-add-btn { white-space: nowrap; }
 .privacy-section__title { font-size: 14px; font-weight: 600; margin: 0; }
 .privacy-section__count {
     font-size: 12px;
@@ -68,14 +77,38 @@
 .privacy-collected { display: flex; flex-direction: column; gap: 8px; }
 .privacy-collected__card {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
     padding: 8px 10px;
     border-radius: 6px;
     background: var(--admin-surface-alt, rgba(127,127,127,0.05));
 }
+.privacy-collected__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .privacy-collected__label { font-weight: 600; font-size: 13px; }
 .privacy-collected__purpose { font-size: 12px; color: var(--admin-text-muted, #666); }
+.privacy-collected__actions { display: flex; gap: 4px; flex-shrink: 0; }
+.privacy-collected__action { padding: 4px 6px; }
+
+/* Modal */
+.privacy-modal-backdrop {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.45);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+}
+.privacy-modal-dialog {
+    width: 100%; max-width: 460px;
+    background: var(--admin-bg, #fff);
+    border: 0.5px solid var(--admin-border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    display: flex; flex-direction: column; gap: 8px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+}
+.privacy-modal__title { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
+.privacy-modal__error { color: var(--admin-error, #c62828); font-size: 12px; }
+.privacy-modal__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
 
 /* Hosts */
 .privacy-hosts { display: flex; flex-direction: column; gap: 8px; }

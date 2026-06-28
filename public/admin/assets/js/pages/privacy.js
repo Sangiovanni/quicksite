@@ -91,18 +91,160 @@
 
     // ---- collected data ---------------------------------------------------
 
-    function _renderCollected(list) {
+    function _slug(s) {
+        return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    }
+    function _svgIcon(pathD) {
+        var ns = 'http://www.w3.org/2000/svg';
+        var svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor');
+        svg.setAttribute('stroke-width', '2'); svg.setAttribute('width', '14'); svg.setAttribute('height', '14');
+        svg.setAttribute('aria-hidden', 'true');
+        var p = document.createElementNS(ns, 'path'); p.setAttribute('d', pathD); svg.appendChild(p);
+        return svg;
+    }
+    var ICON_EDIT = 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z';
+    var ICON_TRASH = 'M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2';
+
+    function _renderSelect(options, selected) {
+        var sel = _el('select', { class: 'admin-input' });
+        options.forEach(function (opt) {
+            var o = _el('option', { value: opt, text: opt });
+            if (opt === selected) o.selected = true;
+            sel.appendChild(o);
+        });
+        return sel;
+    }
+
+    function _iconBtn(pathD, label, onClick) {
+        var b = _el('button', { class: 'admin-btn admin-btn--ghost privacy-collected__action', 'aria-label': label, title: label, type: 'button', onclick: onClick });
+        b.appendChild(_svgIcon(pathD));
+        return b;
+    }
+
+    function _renderCollectedSection(list) {
+        var s = _el('section', { class: 'privacy-section' });
+        var head = _el('div', { class: 'privacy-section__head' });
+        head.appendChild(_el('h2', { class: 'privacy-section__title', text: 'Data collected' }));
+        head.appendChild(_el('span', { class: 'privacy-section__count', text: String(list.length) }));
+
+        var actions = _el('div', { class: 'privacy-section__actions' });
+        if (state.languages.length > 1) {
+            actions.appendChild(_el('span', { class: 'privacy-desclang__label', text: 'Language:' }));
+            var langSel = _renderSelect(state.languages, state.descLang);
+            langSel.classList.add('privacy-desclang__select');
+            langSel.addEventListener('change', function () { onDescLangChange(langSel); });
+            actions.appendChild(langSel);
+        }
+        actions.appendChild(_el('button', { class: 'admin-btn admin-btn--primary privacy-add-btn', type: 'button', text: '+ Add data collected', onclick: function () { openDatumModal(null); } }));
+        head.appendChild(actions);
+        s.appendChild(head);
+
         if (!list.length) {
-            return _el('p', { class: 'privacy-empty', text: 'No "data collected" entries yet. (Authoring lands in the next slice.)' });
+            s.appendChild(_el('p', { class: 'privacy-empty', text: 'No "data collected" entries yet. Add one, then map the fields below to it.' }));
+            return s;
         }
         var wrap = _el('div', { class: 'privacy-collected' });
         list.forEach(function (d) {
             var card = _el('div', { class: 'privacy-collected__card' });
-            card.appendChild(_el('span', { class: 'privacy-collected__label', text: d.label || d.id }));
-            card.appendChild(_el('span', { class: 'privacy-collected__purpose', text: d.purpose || '—' }));
+            var body = _el('div', { class: 'privacy-collected__body' });
+            body.appendChild(_el('span', { class: 'privacy-collected__label', text: d.label || d.id }));
+            body.appendChild(_el('span', { class: 'privacy-collected__purpose', text: d.purpose || '—' }));
+            card.appendChild(body);
+            var acts = _el('div', { class: 'privacy-collected__actions' });
+            acts.appendChild(_iconBtn(ICON_EDIT, 'Edit', function () { openDatumModal(d); }));
+            acts.appendChild(_iconBtn(ICON_TRASH, 'Delete', function () { onDeleteDatum(d); }));
+            card.appendChild(acts);
             wrap.appendChild(card);
         });
-        return wrap;
+        s.appendChild(wrap);
+        return s;
+    }
+
+    // ---- collected-data modal + actions -----------------------------------
+
+    function closeModal() {
+        var root = document.getElementById('privacy-modal-root');
+        if (root) root.textContent = '';
+    }
+
+    function openDatumModal(datum) {
+        var isEdit = !!datum;
+        var root = document.getElementById('privacy-modal-root');
+        if (!root) return;
+        root.textContent = '';
+
+        var backdrop = _el('div', { class: 'privacy-modal-backdrop', onclick: function (e) { if (e.target === backdrop) closeModal(); } });
+        var dialog = _el('div', { class: 'privacy-modal-dialog' });
+        dialog.appendChild(_el('h2', { class: 'privacy-modal__title', text: isEdit ? 'Edit data collected' : 'Add data collected' }));
+
+        var labelInput = _el('input', { type: 'text', class: 'admin-input', autocomplete: 'off', placeholder: 'e.g. Email address', value: isEdit ? (datum.label || '') : '' });
+        dialog.appendChild(_el('label', { class: 'admin-label', text: 'Label (' + state.descLang + ')' }));
+        dialog.appendChild(labelInput);
+
+        var purposeInput = _el('input', { type: 'text', class: 'admin-input', autocomplete: 'off', placeholder: 'What you do with it', value: isEdit ? (datum.purpose || '') : '' });
+        dialog.appendChild(_el('label', { class: 'admin-label', text: 'Purpose (' + state.descLang + ')' }));
+        dialog.appendChild(purposeInput);
+        dialog.appendChild(_el('p', { class: 'admin-hint', text: isEdit ? 'Editing is live — no regenerate needed.' : 'A stable id is derived from the label; the label stays editable afterwards.' }));
+
+        var errBox = _el('div', { class: 'privacy-modal__error', hidden: 'hidden' });
+        dialog.appendChild(errBox);
+
+        var actions = _el('div', { class: 'privacy-modal__actions' });
+        actions.appendChild(_el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
+        var saveBtn = _el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: isEdit ? 'Save' : 'Add' });
+        actions.appendChild(saveBtn);
+        dialog.appendChild(actions);
+
+        saveBtn.addEventListener('click', async function () {
+            errBox.hidden = true; errBox.textContent = '';
+            var label = labelInput.value.trim();
+            if (!label) { errBox.hidden = false; errBox.textContent = 'A label is required.'; return; }
+            var id = isEdit ? datum.id : _slug(label);
+            if (!id) { errBox.hidden = false; errBox.textContent = 'Could not derive an id from that label — use letters or numbers.'; return; }
+            saveBtn.disabled = true;
+            try {
+                var r = await api('setCollectedDatum', 'POST', { id: id, label: label, purpose: purposeInput.value.trim() });
+                if (!r || !r.ok) {
+                    errBox.hidden = false; errBox.textContent = (r && r.data && r.data.message) || 'Save failed'; saveBtn.disabled = false; return;
+                }
+                closeModal();
+                await refresh();
+            } catch (e) {
+                errBox.hidden = false; errBox.textContent = (e && e.message) || 'Network error'; saveBtn.disabled = false;
+            }
+        });
+
+        backdrop.appendChild(dialog);
+        root.appendChild(backdrop);
+        labelInput.focus();
+    }
+
+    async function onDeleteDatum(d) {
+        if (!window.confirm('Delete "' + (d.label || d.id) + '"? Any field mapped to it becomes unset.')) return;
+        try {
+            var r = await api('deleteCollectedDatum', 'POST', { id: d.id });
+            if (!r || !r.ok) { window.alert((r && r.data && r.data.message) || 'Delete failed'); return; }
+            await refresh();
+        } catch (e) { window.alert((e && e.message) || 'Network error'); }
+    }
+
+    async function onDescLangChange(sel) {
+        var target = sel.value, current = state.descLang;
+        if (target === current) return;
+        sel.disabled = true;
+        try {
+            var preview = await api('setPrivacyDescLang', 'POST', { lang: target });
+            var pdata = (preview && preview.data && (preview.data.data || preview.data)) || {};
+            var moved = pdata.moved || 0, overwrites = pdata.overwrites || 0;
+            var msg = 'Change description language from "' + current + '" to "' + target + '"?\n\nThis moves ' + moved + ' value' + (moved === 1 ? '' : 's') + ' into "' + target + '".';
+            if (overwrites > 0) msg += '\n\n⚠ ' + overwrites + ' existing "' + target + '" value' + (overwrites === 1 ? '' : 's') + ' will be OVERWRITTEN.';
+            if (!window.confirm(msg)) { sel.value = current; sel.disabled = false; return; }
+            var done = await api('setPrivacyDescLang', 'POST', { lang: target, confirm: true });
+            if (!done || !done.ok) { sel.value = current; sel.disabled = false; window.alert((done && done.data && done.data.message) || 'Failed to change language'); return; }
+            await refresh();
+        } catch (e) { sel.value = current; sel.disabled = false; console.warn('[privacy] descLang change failed:', e); }
     }
 
     // ---- hosts ------------------------------------------------------------
@@ -218,7 +360,7 @@
         }
         root.appendChild(_renderCoverage(s.coverage));
         root.appendChild(_renderCookieNote(s));
-        root.appendChild(_section('Data collected', String(s.collectedData.length), _renderCollected(s.collectedData)));
+        root.appendChild(_renderCollectedSection(s.collectedData));
         root.appendChild(_section('API hosts', String(s.hosts.length), _renderHosts(s.hosts)));
         root.appendChild(_section('Detected sign-in', null, _renderAuthSeed(s.authSeed)));
         root.appendChild(_section('Endpoints sending data', String(s.endpoints.length), _renderEndpoints(s.endpoints)));
