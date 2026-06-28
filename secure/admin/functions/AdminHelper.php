@@ -180,6 +180,11 @@ function getCommandCategories(): array {
             'icon' => 'database',
             'commands' => ['listStorageItems', 'addStorageItem', 'editStorageItem', 'deleteStorageItem', 'setStorageDescLang', 'scanStorageUsage', 'getConsentStatus', 'generateConsentLayer', 'generateCookiePolicy', 'deleteCookiePolicy']
         ],
+        'privacy_registry' => [
+            'label' => 'Privacy',
+            'icon' => 'shield',
+            'commands' => ['getPrivacyStatus']
+        ],
         'snippet_management' => [
             'label' => 'Snippets',
             'icon' => 'puzzle',

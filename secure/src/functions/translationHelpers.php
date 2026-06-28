@@ -312,4 +312,63 @@ function writeTranslationsToFile(string $language, array $newNested, bool $repla
     ];
 }
 
+/**
+ * Read a single dot-notation key from translate/<lang>.json. Returns null if the
+ * file is missing/invalid, the key is absent, or the value isn't a string. Reads
+ * ONLY that language file (no fallback) — callers layer their own fallback.
+ */
+function translationGetKey(string $lang, string $dotKey): ?string {
+    $file = PROJECT_PATH . '/translate/' . $lang . '.json';
+    if (!file_exists($file)) return null;
+    $decoded = json_decode((string) @file_get_contents($file), true);
+    if (!is_array($decoded)) return null;
+    $cur = $decoded;
+    foreach (explode('.', $dotKey) as $part) {
+        if (!is_array($cur) || !array_key_exists($part, $cur)) return null;
+        $cur = $cur[$part];
+    }
+    return is_string($cur) ? $cur : null;
+}
+
+/**
+ * Set a single dot-notation key in translate/<lang>.json to a literal value,
+ * creating parents as needed. Edits ONLY that language file — no default.json
+ * sync (unlike writeTranslationsToFile) — used to empty/patch one key in place.
+ */
+function translationSetKey(string $lang, string $dotKey, string $value): void {
+    $file = PROJECT_PATH . '/translate/' . $lang . '.json';
+    if (!file_exists($file)) return;
+    $decoded = json_decode((string) @file_get_contents($file), true);
+    if (!is_array($decoded)) return;
+    $parts = explode('.', $dotKey);
+    $leaf  = array_pop($parts);
+    $cur = &$decoded;
+    foreach ($parts as $part) {
+        if (!isset($cur[$part]) || !is_array($cur[$part])) { $cur[$part] = []; }
+        $cur = &$cur[$part];
+    }
+    $cur[$leaf] = $value;
+    unset($cur);
+    file_put_contents($file, json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
+}
+
+/** Unset a single dot-notation key from translate/<lang>.json (best-effort). */
+function translationUnsetKey(string $lang, string $dotKey): void {
+    $file = PROJECT_PATH . '/translate/' . $lang . '.json';
+    if (!file_exists($file)) return;
+    $decoded = json_decode((string) @file_get_contents($file), true);
+    if (!is_array($decoded)) return;
+    $parts = explode('.', $dotKey);
+    $leaf  = array_pop($parts);
+    $cur = &$decoded;
+    foreach ($parts as $part) {
+        if (!is_array($cur) || !isset($cur[$part]) || !is_array($cur[$part])) return;
+        $cur = &$cur[$part];
+    }
+    if (!array_key_exists($leaf, $cur)) return;
+    unset($cur[$leaf]);
+    unset($cur);
+    file_put_contents($file, json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
+}
+
 } // end if (!function_exists('convertDotNotationToNested'))

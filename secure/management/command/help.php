@@ -4699,6 +4699,32 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Deletes the leaf route + its page files; parent routes stay. routeDeleted=false means the route was already gone (stale reference cleared).'
     ],
 
+    'getPrivacyStatus' => [
+        'description' => 'Full privacy-helper state for /admin/privacy: the privacy registry (collected data, per-baseUrl host classifications, cookieSection, privacyRoute) joined with a live scan of the API registry (data/api-endpoints.json) for outbound data atoms — (endpoint, field) pairs from declared parameters + requestSchema.properties (response schemas ignored) — plus coverage (unmapped atoms, body-bearing endpoints with no request schema, unclassified hosts) and the cookie-page cross-link signal. Read-only; the scan never guesses undeclared fields.',
+        'method' => 'POST',
+        'parameters' => [],
+        'example_post' => 'POST \management\getPrivacyStatus',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'success',
+            'data' => [
+                'descLang' => 'en',
+                'languages' => ['en', 'fr'],
+                'collectedData' => '[{id, label, purpose}]',
+                'hosts' => '[{baseUrl, kind:self|third-party|null, apiIds, name?, privacyUrl?}]',
+                'endpoints' => '[{apiId, endpointId, key, name, method, path, baseUrl, fields:[{field, datum|null}], undeclaredBody}]',
+                'coverage' => '{totalAtoms, mappedAtoms, unmappedAtoms, unmapped:[{endpoint,field}], undeclaredEndpoints:[{endpoint,method}], unclassifiedHosts, complete}',
+                'authSeed' => '{oauth:{wired, providers:[{name,url}], collectedSuggestions}, magicLink:{wired, collectedSuggestions}}',
+                'privacyRoute' => 'string|null',
+                'privacyRouteExists' => 'bool',
+                'cookieSection' => 'auto|omit',
+                'cookie' => '{policyRoute, policyRouteExists}'
+            ]
+        ],
+        'error_responses' => [],
+        'notes' => 'Drives the /admin/privacy page. An atom = a (endpoint, field) the site is configured to send outward; map it to a collected datum to cover it. undeclaredBody flags POST/PUT/PATCH endpoints with no requestSchema.'
+    ],
+
     'getApiEndpoint' => [
         'description' => 'Gets a single endpoint by ID, including the parent API\'s auth configuration.',
         'method' => 'GET',
