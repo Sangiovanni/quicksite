@@ -123,43 +123,36 @@ if ($jsonOk === false) {
 // ---- Record the route + seed copy ----------------------------------------
 saveConsentConfig(array_merge(loadConsentConfig(), ['policyRoute' => '/' . $route]));
 
+// Seed structural copy (NEW keys only) for the project DEFAULT language only.
+// Other languages are translated via the Translation Manager (the textKeys
+// surface there as missing). Per-item descriptions are NOT seeded here — they
+// live independently in translate/ under storageDescKey(), authored via the
+// storage registry and resolved live.
 $seed = cookiePolicyTranslationSeed();
 $catSeed = consentTranslationSeed(); // category labels used by the table
-$languages = (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) && is_array(CONFIG['LANGUAGES_SUPPORTED']))
-    ? CONFIG['LANGUAGES_SUPPORTED'] : ['en'];
+$defaultLang = (defined('CONFIG') && isset(CONFIG['LANGUAGE_DEFAULT']) && is_string(CONFIG['LANGUAGE_DEFAULT']))
+    ? CONFIG['LANGUAGE_DEFAULT'] : 'en';
 $languagesSeeded = [];
-$languagesFallback = [];
-foreach ($languages as $lc) {
-    if ($lc === 'default') continue;
-    if (!in_array($lc, ['en', 'fr'], true)) {
-        $languagesFallback[] = $lc;
-    }
-    $base = ($lc === 'fr') ? $seed['fr'] : $seed['en'];
-    $cats = ($lc === 'fr') ? $catSeed['fr'] : $catSeed['en'];
-    // Only the category labels the table needs.
-    $catKeys = ['consent.category.essential', 'consent.category.functional', 'consent.category.analytics', 'consent.category.marketing'];
-    $structural = $base;
-    foreach ($catKeys as $ck) {
-        if (isset($cats[$ck])) $structural[$ck] = $cats[$ck];
-    }
-    // Structural copy is author-editable (new keys only). Per-item descriptions
-    // are NOT seeded here — they live independently in translate/ under
-    // storageDescKey(), authored via the storage registry and resolved live.
-    $newOnly = consentFilterNewKeys($lc, $structural);
-    $finalFlat = $newOnly;
-    if (empty($finalFlat)) continue;
-    $res = writeTranslationsToFile($lc, convertDotNotationToNested($finalFlat), false);
-    if (!empty($res['ok'])) $languagesSeeded[$lc] = $res['keysAdded'] ?? count($finalFlat);
+$base = ($defaultLang === 'fr') ? $seed['fr'] : $seed['en'];
+$cats = ($defaultLang === 'fr') ? $catSeed['fr'] : $catSeed['en'];
+$catKeys = ['consent.category.essential', 'consent.category.functional', 'consent.category.analytics', 'consent.category.marketing'];
+$structural = $base;
+foreach ($catKeys as $ck) {
+    if (isset($cats[$ck])) $structural[$ck] = $cats[$ck];
+}
+$newOnly = consentFilterNewKeys($defaultLang, $structural);
+if (!empty($newOnly)) {
+    $res = writeTranslationsToFile($defaultLang, convertDotNotationToNested($newOnly), false);
+    if (!empty($res['ok'])) $languagesSeeded[$defaultLang] = $res['keysAdded'] ?? count($newOnly);
 }
 
 ApiResponse::create(200, 'success')
     ->withMessage($overwritten ? "Cookie-policy page regenerated at /$route (existing route overwritten)" : "Cookie-policy page created at /$route")
     ->withData([
-        'route'             => '/' . $route,
-        'overwritten'       => $overwritten,
-        'rows'              => count($items),
-        'languagesSeeded'   => $languagesSeeded,
-        'languagesFallback' => $languagesFallback,
+        'route'           => '/' . $route,
+        'overwritten'     => $overwritten,
+        'rows'            => count($items),
+        'languagesSeeded' => $languagesSeeded,
     ])
     ->send();
 

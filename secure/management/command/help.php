@@ -4635,7 +4635,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'generateConsentLayer' => [
-        'description' => 'Generate (or re-generate) the consent banner + popup structures from the registry and enable the consent layer (data/consent.json enabled=true). Writes templates/model/json/consent-banner.json + consent-popup.json — one popup toggle row per DECLARED non-essential category — and seeds EN/FR default copy for the textKeys (NEW keys only, never clobbering edited copy). The banner links to the cookie-policy route recorded in consent.json (owned by generateCookiePolicy). The structures render globally like menu/footer and are styleable/editable in the visual editor.',
+        'description' => 'Generate (or re-generate) the consent banner + popup structures from the registry and enable the consent layer (data/consent.json enabled=true). Writes templates/model/json/consent-banner.json + consent-popup.json — one popup toggle row per DECLARED non-essential category — and seeds default-language copy for the textKeys (NEW keys only, never clobbering edited copy; other languages are translated via the Translation Manager). The banner links to the cookie-policy route recorded in consent.json (owned by generateCookiePolicy). The structures render globally like menu/footer and are styleable/editable in the visual editor.',
         'method' => 'POST',
         'parameters' => [],
         'example_post' => 'POST \management\generateConsentLayer',
@@ -4649,7 +4649,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'generateCookiePolicy' => [
-        'description' => 'Generate (or overwrite) the cookie-policy page at an author-chosen route — a deterministic table built from the registry (one row per declared key) plus an OAuth-provider privacy-link section and a legal-review note. Seeds EN/FR copy (new keys only) and records the route in data/consent.json so the banner links to it.',
+        'description' => 'Generate (or overwrite) the cookie-policy page at an author-chosen route — a deterministic table built from the registry (one row per declared key) plus an OAuth-provider privacy-link section and a legal-review note. Seeds default-language structural copy (new keys only; other languages translate via the Translation Manager) and records the route in data/consent.json so the banner links to it. Per-item descriptions are not seeded here — they live in translate/ under storage.desc.<id>, authored via the storage registry and resolved live.',
         'method' => 'POST',
         'parameters' => [
             'route' => [

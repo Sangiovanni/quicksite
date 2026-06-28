@@ -318,6 +318,9 @@
 }
 .storage-desc-lang-bar__select { width: auto; min-width: 64px; }
 
+/* Persistent description-language hint above the toolbar. */
+.storage-desclang-hint { margin: 0 0 14px; }
+
 /* Active-project badge in the admin header (general admin chrome — lives here
    for now since this stylesheet loads on every admin page). */
 .admin-project-badge { font-weight: 600; }

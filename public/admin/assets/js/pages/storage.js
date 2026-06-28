@@ -229,11 +229,24 @@
         }
         renderList();
         renderDescLangBar();
+        renderDescLangHint();
     }
 
     // ====================================================================
     // Description-language selector (page-level; multilingual projects only)
     // ====================================================================
+
+    // Persistent hint above the toolbar: descriptions are authored + generated in
+    // the description language; other languages translate via the language tool.
+    function renderDescLangHint() {
+        var host = document.getElementById('storage-desclang-hint');
+        if (!host) return;
+        if (state.languages.length <= 1) { host.hidden = true; host.textContent = ''; return; }
+        host.hidden = false;
+        host.textContent = 'Descriptions are authored in your description language ("' + state.descLang
+            + '") and generated onto the cookie/privacy page in that language. Translate the other languages '
+            + 'with the visual-editor language tool — edits are live, no need to regenerate.';
+    }
 
     function renderDescLangBar() {
         var host = document.getElementById('storage-desc-lang-bar');
@@ -887,12 +900,10 @@
             }
             var d = (r.data && (r.data.data || r.data)) || {};
             var langs = d.languagesSeeded ? Object.keys(d.languagesSeeded) : [];
-            var fallback = (d.languagesFallback && d.languagesFallback.length) ? d.languagesFallback : [];
 
             var msg = 'Consent layer ' + (opts.isUpdate ? 'updated' : 'generated and enabled') + '.' +
                 (langs.length ? ' Seeded copy: ' + langs.join(', ') + '.' : '') +
                 policyMsg +
-                (fallback.length ? ' Note: ' + fallback.join(', ') + ' have no built-in consent copy — seeded with English; translate them in the Translation Manager.' : '') +
                 ' Preview a page to see the banner.';
             // Re-render from fresh status — flips to the locked route + Update/
             // Delete once a page exists, so a re-generate can't change the route.

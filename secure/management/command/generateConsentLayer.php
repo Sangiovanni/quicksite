@@ -53,29 +53,19 @@ if ($wroteBanner === false || $wrotePopup === false) {
         ->send();
 }
 
-// 2. Seed default copy (NEW keys only) for each supported language.
-//    fr → French map; every other language → English map.
+// 2. Seed default copy (NEW keys only) for the project DEFAULT language only.
+//    Other languages are translated via the Translation Manager (the textKeys
+//    surface there as missing). fr default → French map; otherwise English.
 $seed = consentTranslationSeed();
-$languages = (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) && is_array(CONFIG['LANGUAGES_SUPPORTED']))
-    ? CONFIG['LANGUAGES_SUPPORTED']
-    : ['en'];
+$defaultLang = (defined('CONFIG') && isset(CONFIG['LANGUAGE_DEFAULT']) && is_string(CONFIG['LANGUAGE_DEFAULT']))
+    ? CONFIG['LANGUAGE_DEFAULT'] : 'en';
 $languagesSeeded = [];
-// Languages we ship built-in copy for; everything else falls back to English
-// (usable) and is surfaced so the author knows to translate it.
-$builtInLangs = ['en', 'fr'];
-$languagesFallback = [];
-foreach ($languages as $lang) {
-    if ($lang === 'default') continue;
-    if (!in_array($lang, $builtInLangs, true)) {
-        $languagesFallback[] = $lang;
-    }
-    $flat = ($lang === 'fr') ? $seed['fr'] : $seed['en'];
-    $newOnly = consentFilterNewKeys($lang, $flat);
-    if (empty($newOnly)) continue;
-    $nested = convertDotNotationToNested($newOnly);
-    $res = writeTranslationsToFile($lang, $nested, false);
+$flat = ($defaultLang === 'fr') ? $seed['fr'] : $seed['en'];
+$newOnly = consentFilterNewKeys($defaultLang, $flat);
+if (!empty($newOnly)) {
+    $res = writeTranslationsToFile($defaultLang, convertDotNotationToNested($newOnly), false);
     if (!empty($res['ok'])) {
-        $languagesSeeded[$lang] = $res['keysAdded'] ?? count($newOnly);
+        $languagesSeeded[$defaultLang] = $res['keysAdded'] ?? count($newOnly);
     }
 }
 
@@ -85,10 +75,9 @@ saveConsentConfig(array_merge($config, ['enabled' => true]));
 ApiResponse::create(200, 'success')
     ->withMessage('Consent layer generated and enabled')
     ->withData([
-        'categories'        => $categories,
-        'languagesSeeded'   => $languagesSeeded,
-        'languagesFallback' => $languagesFallback,
-        'policyRoute'       => $policyRoute,
-        'enabled'           => true,
+        'categories'      => $categories,
+        'languagesSeeded' => $languagesSeeded,
+        'policyRoute'     => $policyRoute,
+        'enabled'         => true,
     ])
     ->send();

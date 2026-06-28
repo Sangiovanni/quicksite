@@ -26,6 +26,8 @@ $baseUrl = rtrim(BASE_URL, '/');
     <p class="admin-page-header__subtitle">Every browser-storage key the site uses (localStorage / sessionStorage / cookie). The GDPR / cookie-consent data layer and the storageKey picker source.</p>
 </div>
 
+<p id="storage-desclang-hint" class="admin-hint storage-desclang-hint" hidden></p>
+
 <div class="admin-toolbar storage-toolbar">
     <div class="admin-toolbar__left">
         <button type="button" class="admin-btn admin-btn--primary" id="btn-add-storage-item">
