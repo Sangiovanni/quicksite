@@ -54,8 +54,7 @@ foreach ($segments as $seg) {
 
 // ---- Build the page structure --------------------------------------------
 $items = loadStorageRegistry()['items'];
-$lang = (defined('CONFIG') && !empty(CONFIG['LANGUAGE_DEFAULT'])) ? CONFIG['LANGUAGE_DEFAULT'] : 'en';
-$structure = buildCookiePolicyStructure($items, consentOAuthLinks(), $lang);
+$structure = buildCookiePolicyStructure($items, consentOAuthLinks());
 
 $jsonRel = '/templates/model/json/pages/' . implode('/', $segments) . '/' . end($segments) . '.json';
 $phpRel  = '/templates/pages/' . implode('/', $segments) . '/' . end($segments) . '.php';
@@ -133,14 +132,17 @@ foreach ($languages as $lc) {
     $cats = ($lc === 'fr') ? $catSeed['fr'] : $catSeed['en'];
     // Only the category labels the table needs.
     $catKeys = ['consent.category.essential', 'consent.category.functional', 'consent.category.analytics', 'consent.category.marketing'];
-    $merged = $base;
+    $structural = $base;
     foreach ($catKeys as $ck) {
-        if (isset($cats[$ck])) $merged[$ck] = $cats[$ck];
+        if (isset($cats[$ck])) $structural[$ck] = $cats[$ck];
     }
-    $newOnly = consentFilterNewKeys($lc, $merged);
-    if (empty($newOnly)) continue;
-    $res = writeTranslationsToFile($lc, convertDotNotationToNested($newOnly), false);
-    if (!empty($res['ok'])) $languagesSeeded[$lc] = $res['keysAdded'] ?? count($newOnly);
+    // Structural copy is author-editable (new keys only); per-key descriptions
+    // are refreshed from the registry every regenerate (storage.json wins).
+    $newOnly = consentFilterNewKeys($lc, $structural);
+    $finalFlat = array_merge($newOnly, consentPolicyDescSeed($items, $lc));
+    if (empty($finalFlat)) continue;
+    $res = writeTranslationsToFile($lc, convertDotNotationToNested($finalFlat), false);
+    if (!empty($res['ok'])) $languagesSeeded[$lc] = $res['keysAdded'] ?? count($finalFlat);
 }
 
 ApiResponse::create(200, 'success')

@@ -2448,6 +2448,71 @@ no validation; just a rendered picker.
 
 ---
 
+### 9.10 Storage registry & cookie consent (/admin/storage)
+
+The storage registry is the single declared list of every browser-storage key
+the site uses (`localStorage` / `sessionStorage` / `cookie`), and the source for
+the GDPR cookie-consent layer generated from it. It is **browser-storage only** —
+third-party data sharing is a separate, later concern.
+
+**Registry CRUD.** Each entry has `id` (the key name), `scope`, a GDPR `category`
+(`essential` / `functional` / `analytics` / `marketing`), an optional `retention`
+(enum + custom), and a translatable `description`. Picking `cookie` scope reveals
+`domain` / `path` / `secure` / `sameSite`. `consentRequired` is derived —
+`essential` never needs consent; everything else does. Commands:
+`listStorageItems` / `addStorageItem` / `editStorageItem` / `deleteStorageItem`.
+Storage-referencing fields elsewhere (e.g. `saveToken` / `QS.store` `key` args)
+use the `storageKey` picker, which selects a declared key or creates one inline.
+
+**Scan / reconcile.** The toolbar's **Scan / reconcile** button runs
+`scanStorageUsage`, which walks the build (structure `data-storage-*` attrs +
+`saveToken` / `store` / `clearToken` chains, page-events handler chains,
+api-endpoints auth sources, state-store init) and reconciles against the
+registry into four buckets:
+
+| Bucket | Meaning | Action |
+|---|---|---|
+| **OK** | declared + written in the build | none (collapsible) |
+| **Undeclared** | written/referenced but not in the registry — the GDPR gap | one-click **Declare** (uses inferred scope + `functional` default) |
+| **Dangling read** | read by a binding but never written | review (likely a leftover) — not a GDPR item |
+| **Orphan** | declared but unreferenced | ignore (collapsible) — never nagged to delete |
+
+**Generate the consent layer.** The **Generate consent layer** button (modal)
+runs `generateConsentLayer`, which seeds two global structures —
+`consent-banner.json` + `consent-popup.json` — from the registry (one popup
+toggle row per *declared* non-essential category; Essential is always-on, locked)
+and enables runtime gating. They render on every page via `renderConsentLayer()`
+(the menu/footer pattern), are styleable in the stylesheet editor and editable in
+the visual editor, and `qs.js` wires the **Accept all / Refuse all / Customize**
+actions. The visual editor toolbar gains two preview-only **Cookie banner** /
+**Cookie popup** toggles beside Menu/Footer (they reveal the layers in the canvas
+for styling; they don't persist).
+
+**Runtime gating.** Once enabled, a non-essential storage write is **skipped**
+unless the visitor consented to that key's category — just that write, not the
+surrounding chain. Undeclared keys are fail-closed (blocked). Consent lives in a
+`consent_prefs` cookie; the `data-consent-show="granted|denied:<category>"`
+binding shows/hides elements on consent state. The layer is dormant until
+generated, so existing projects are unaffected until they opt in.
+
+**Cookie-policy page.** In the same modal, an optional route field generates a
+deterministic policy page (`generateCookiePolicy`) — a table of every declared
+key (name / scope / category / retention / needs-consent / purpose), an OAuth
+provider privacy-link section (sourced from the project's wired OAuth resolvers),
+and a legal-review note. The route is recorded in `consent.json`; once a page
+exists the modal locks the route and offers **Update** + **Delete page**
+(`getConsentStatus` / `deleteCookiePolicy` drive this), so there is exactly one
+policy page and no accidental duplicates. Overwriting an existing route asks for
+confirmation.
+
+**Languages.** The banner / popup / policy copy ships built-in for **en + fr**;
+any other configured language is seeded with English (and reported so the author
+can translate it in the Translation Manager) — never a placeholder on the live
+site. Per-key descriptions in the policy table are translation keys refreshed
+from the registry on each regenerate.
+
+---
+
 ## 10. Data attribute reference
 
 QuickSite's runtime understands a small set of `data-*` attributes that
@@ -2482,6 +2547,7 @@ deep-dive.
 | `data-auth-source` | auth | `localStorage:key` | Where the token lives for `data-auth-show` resolution | §9.5 |
 | `data-storage-show` | storage | `has:loc:key` / `missing:loc:key` | Generic show/hide on any storage key presence | §9.5 |
 | `data-storage-value` | storage | `localStorage:key` | Element text = the stored value | §9.5 |
+| `data-consent-show` | consent | `granted:<cat>` / `denied:<cat>` | Show/hide on cookie-consent state for a category (e.g. `granted:analytics`) | §9.10 |
 | `data-bind` | template | field name | Per-item template field (inside `data-state-list` OR componentList) | §9.2 |
 | `data-bind-attr` | template | attribute name | Variant of `data-bind` — sets the named attribute instead of textContent | §9.2 |
 | `data-list-template` | template | `true` | Marks a hidden element as the per-item template for componentList | §9.2 |

@@ -71,13 +71,13 @@
                 <input type="checkbox" id="preview-toggle-footer" checked>
                 <span class="preview-toolbar__toggle-label"><?= __admin('preview.footerToggle') ?? 'Footer' ?></span>
             </label>
-            <label class="preview-toolbar__toggle" id="preview-toggle-consent-banner-label" style="display: none;" title="Show or hide the cookie banner in this preview (does not persist)">
+            <label class="preview-toolbar__toggle" id="preview-toggle-consent-banner-label" style="display: none;" title="<?= __admin('preview.consentBannerToggleHint', 'Show or hide the cookie banner in this preview (does not persist)') ?>">
                 <input type="checkbox" id="preview-toggle-consent-banner">
-                <span class="preview-toolbar__toggle-label">Cookie banner</span>
+                <span class="preview-toolbar__toggle-label"><?= __admin('preview.consentBannerToggle', 'Cookie banner') ?></span>
             </label>
-            <label class="preview-toolbar__toggle" id="preview-toggle-consent-popup-label" style="display: none;" title="Show or hide the cookie preferences popup in this preview (does not persist)">
+            <label class="preview-toolbar__toggle" id="preview-toggle-consent-popup-label" style="display: none;" title="<?= __admin('preview.consentPopupToggleHint', 'Show or hide the cookie preferences popup in this preview (does not persist)') ?>">
                 <input type="checkbox" id="preview-toggle-consent-popup">
-                <span class="preview-toolbar__toggle-label">Cookie popup</span>
+                <span class="preview-toolbar__toggle-label"><?= __admin('preview.consentPopupToggle', 'Cookie popup') ?></span>
             </label>
         </div>
     </div>

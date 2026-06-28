@@ -4039,3 +4039,112 @@ already happened).
 (`_validateAllParams`, `_validateParam`, `_renderParamErrors`).
 Behaviour: [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) "Validation
 constraints".
+
+### Storage registry is browser-storage-only; privacy policy is a separate concern (locked 2026-06-27)
+
+**Decision**: The storage registry (`data/storage.json`) covers exactly what the
+site stores on the visitor's device — `localStorage` / `sessionStorage` /
+`cookie` — with a GDPR `category` (`essential` / `functional` / `analytics` /
+`marketing`) and `retention` per key. `consentRequired` is **derived** (anything
+non-`essential`), never stored. Third-party data sharing / "what a provider
+collects" is explicitly out of scope (a later privacy-policy concern).
+
+**Reasoning**: Drawing the line at "data on the device" keeps the feature
+coherent and shippable: it's the cookie-consent surface a GDPR banner actually
+governs. Capturing the category at declare-time is far cheaper than
+retro-classifying later. Deriving `consentRequired` avoids a second field that
+could disagree with `category`.
+
+**Alternatives considered**: One combined privacy+storage inventory — rejected as
+too broad for one beta (the "data leaves the device" surface is a distinct
+concern). Storing `consentRequired` explicitly — rejected (derivable, avoids
+drift).
+
+**Source**: `secure/src/functions/storageHelpers.php`
+(`storageConsentRequired`), `secure/management/command/*StorageItem.php`,
+`scanStorageUsage`. Behaviour: [ADMIN_PANEL.md](ADMIN_PANEL.md) storage registry,
+`NOTES/planning/BETA9_STORAGE_REGISTRY.md`.
+
+### Consent gating skips the individual write, fail-closed, at two choke points (locked 2026-06-27)
+
+**Decision**: Runtime consent gating no-ops the **single storage write** whose
+key is non-`essential` and unconsented — not the surrounding interaction chain.
+It is enforced at exactly two `qs.js` choke points (`setStoredToken`, shared by
+`saveToken` + the token-refresh flow, and `QS.store`); removers (`clearToken`,
+logout) are never gated. An **undeclared** key is **fail-closed** (blocked). The
+guard is dormant unless the project enabled the consent layer (`window.QS_CONSENT`
+is emitted live-only when enabled). Consent choices live in a `consent_prefs`
+cookie (itself an `essential` item) so the server can respect them too.
+
+**Reasoning**: Skipping just the write keeps a `fetch → store → showResult` chain
+working (only the gated write drops) — the least-surprise behaviour. Two choke
+points cover the entire write surface (verified: other verbs delegate to these or
+don't touch storage). Fail-closed on undeclared keys matches the registry's "no
+storage write without a declared entry" model and is the GDPR-safe default. The
+dormant-until-enabled rule means existing projects are unaffected until they opt
+in.
+
+**Alternatives considered**: Abort the whole chain on a gated write — rejected
+(breaks unrelated steps). Fail-open on undeclared keys — rejected (GDPR-unsafe).
+Gate per-verb everywhere — unnecessary (the two choke points are complete).
+
+**Source**: `public/scripts/qs.js` (`_consentAllowsWrite`, `hasConsent`,
+`setConsent`), `secure/src/functions/consentHelpers.php`,
+`secure/src/classes/PageManagement.php` (hydration emit).
+
+### Consent banner + popup follow the menu/footer global-layer pattern, not a component (locked 2026-06-27)
+
+**Decision**: The banner + preferences popup are two ordinary project structures
+(`templates/model/json/consent-banner.json` + `consent-popup.json`) generated
+from the registry and rendered on every page by the engine
+(`renderConsentLayer()`, beside `renderMenu`/`renderFooter`) — not a Complex
+Element / component. `qs.js` wires reserved `data-consent-action` /
+`data-consent-toggle` attributes; the structures carry the styleable markup. The
+visual editor exposes two preview-only toggles beside Menu/Footer.
+
+**Reasoning**: A component needs a host node; the consent layer is
+page-independent, exactly like menu/footer. Reusing that pattern makes the layer
+styleable in the stylesheet editor and editable in the visual editor for free,
+and keeps it independent of per-page footer toggles. Visitor copy uses `textKey`s
+so it renders in the visitor's language from day one.
+
+**Alternatives considered**: A consent "Complex Element" — rejected (needs a host
+node, not page-global). Hardcoded engine markup — rejected (not author-styleable).
+
+**Source**: `secure/src/functions/consentLayerHelpers.php`
+(`buildConsentBannerStructure` / `buildConsentPopupStructure`),
+`secure/src/classes/JsonToHtmlRenderer.php` (`renderConsentLayer`),
+`secure/management/command/generateConsentLayer.php`. Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md).
+
+### Cookie-policy page: author-chosen route, registry-owned; consent copy is EN/FR-built-in with English fallback (locked 2026-06-27)
+
+**Decision**: `generateCookiePolicy` writes a deterministic policy table to a
+route the author chooses (warning + confirm before overwriting an existing
+route). The route is recorded in `consent.json` and **owned by**
+`generateCookiePolicy` / `deleteCookiePolicy` — `generateConsentLayer` only reads
+it for the banner link, so a cancelled overwrite never wires up an unrelated
+route. Default copy ships built-in for **en + fr**; any other configured language
+is seeded with English and reported (`languagesFallback`) so the author can
+translate it — never a `{{translation missing}}` placeholder on the live site.
+Per-key descriptions are `consent.policy.desc.<key>` textKeys refreshed from the
+registry on every regenerate (storage.json is the source of truth), while
+structural copy stays author-editable.
+
+**Reasoning**: Author-chosen route keeps the page in the sitemap + SEO and lets
+the author place/translate it. Single-ownership of the route prevents the
+home-page-overwrite hazard. English fallback is friendlier than a placeholder for
+visitors; the admin gets the "translate these" nudge instead. Refreshing
+descriptions from the registry avoids two sources of truth for the same text.
+
+**Alternatives considered**: A reserved fixed route — rejected (author can't
+choose URL / placement). Erroring on non-EN/FR languages — rejected (breaks
+monolingual / no-French sites). `{{translation missing}}` on the live page —
+rejected (worse visitor experience than English). Baking descriptions per page —
+rejected (not translatable).
+
+**Source**: `secure/management/command/generateCookiePolicy.php`,
+`generateConsentLayer.php`, `deleteCookiePolicy.php`, `getConsentStatus.php`;
+`secure/src/functions/consentLayerHelpers.php` (`buildCookiePolicyStructure`,
+`consentPolicyDescSeed`, `consentOAuthLinks`). Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md).
