@@ -4616,17 +4616,10 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'generateConsentLayer' => [
-        'description' => 'Generate (or re-generate) the consent banner + popup structures from the registry and enable the consent layer (data/consent.json enabled=true). Writes templates/model/json/consent-banner.json + consent-popup.json — one popup toggle row per DECLARED non-essential category — and seeds EN/FR default copy for the textKeys (NEW keys only, never clobbering edited copy). The structures render globally like menu/footer and are styleable/editable in the visual editor.',
+        'description' => 'Generate (or re-generate) the consent banner + popup structures from the registry and enable the consent layer (data/consent.json enabled=true). Writes templates/model/json/consent-banner.json + consent-popup.json — one popup toggle row per DECLARED non-essential category — and seeds EN/FR default copy for the textKeys (NEW keys only, never clobbering edited copy). The banner links to the cookie-policy route recorded in consent.json (owned by generateCookiePolicy). The structures render globally like menu/footer and are styleable/editable in the visual editor.',
         'method' => 'POST',
-        'parameters' => [
-            'policyRoute' => [
-                'required' => false,
-                'type' => 'string',
-                'description' => 'Route the generated cookie-policy page lives at (banner links to it). Persisted to consent.json.',
-                'example' => '/cookies'
-            ],
-        ],
-        'example_post' => 'POST \management\generateConsentLayer {"policyRoute":"/cookies"}',
+        'parameters' => [],
+        'example_post' => 'POST \management\generateConsentLayer',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
@@ -4634,6 +4627,57 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [],
         'notes' => 'Idempotent. Runtime write-gating only activates once this enables the layer. Drives the /admin/storage "Generate consent layer" button.'
+    ],
+
+    'generateCookiePolicy' => [
+        'description' => 'Generate (or overwrite) the cookie-policy page at an author-chosen route — a deterministic table built from the registry (one row per declared key) plus an OAuth-provider privacy-link section and a legal-review note. Seeds EN/FR copy (new keys only) and records the route in data/consent.json so the banner links to it.',
+        'method' => 'POST',
+        'parameters' => [
+            'route' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Route to host the policy page (1-5 lowercase literal segments). If it already exists, its structure is overwritten.',
+                'example' => 'cookies'
+            ],
+        ],
+        'example_post' => 'POST \management\generateCookiePolicy {"route":"cookies"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'success',
+            'data' => ['route' => '/cookies', 'overwritten' => false, 'rows' => 'int', 'languagesSeeded' => '{lang: keysAdded}']
+        ],
+        'error_responses' => [],
+        'notes' => 'Creates the route (cascading parents) when missing; overwrites the structure when it exists (warned). Pairs with generateConsentLayer (which links the banner to this route).'
+    ],
+
+    'getConsentStatus' => [
+        'description' => 'Current consent-layer state for the active project: whether it is enabled, whether the banner/popup structures are generated, the recorded cookie-policy route, and whether that route still exists. Read-only; drives the /admin/storage generate modal (pre-fill + Generate/Update/Delete).',
+        'method' => 'POST',
+        'parameters' => [],
+        'example_post' => 'POST \management\getConsentStatus',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'success',
+            'data' => ['enabled' => true, 'generated' => true, 'policyRoute' => '/cookies', 'policyRouteExists' => true]
+        ],
+        'error_responses' => [],
+        'notes' => 'policyRouteExists=false with a non-null policyRoute means the page was deleted manually (stale reference).'
+    ],
+
+    'deleteCookiePolicy' => [
+        'description' => 'Delete the generated cookie-policy page (the route recorded in consent.json), clear the recorded route, and regenerate the banner without its policy link. No body — the route is read from consent.json so an unrelated route can not be deleted by accident.',
+        'method' => 'POST',
+        'parameters' => [],
+        'example_post' => 'POST \management\deleteCookiePolicy',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'success',
+            'data' => ['route' => '/cookies', 'routeDeleted' => true]
+        ],
+        'error_responses' => [
+            '400 consent.no_policy_route' => 'No cookie-policy route is configured',
+        ],
+        'notes' => 'Deletes the leaf route + its page files; parent routes stay. routeDeleted=false means the route was already gone (stale reference cleared).'
     ],
 
     'getApiEndpoint' => [

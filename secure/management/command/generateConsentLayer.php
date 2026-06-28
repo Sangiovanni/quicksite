@@ -25,15 +25,12 @@ require_once SECURE_FOLDER_PATH . '/src/functions/consentHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/consentLayerHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 
-$params = $trimParametersManagement->params();
-
-// Resolve the policy route: explicit param → existing config → null.
+// The policy route is owned by generateCookiePolicy / deleteCookiePolicy (set
+// only when a page actually exists). Here we just read it for the banner link
+// so a half-finished route never gets wired up.
 $config = loadConsentConfig();
-$policyRoute = $params['policyRoute'] ?? ($config['policyRoute'] ?? null);
-if (is_string($policyRoute)) {
-    $policyRoute = trim($policyRoute);
-    if ($policyRoute === '') $policyRoute = null;
-} else {
+$policyRoute = $config['policyRoute'] ?? null;
+if (!is_string($policyRoute) || trim($policyRoute) === '') {
     $policyRoute = null;
 }
 
@@ -63,7 +60,15 @@ $languages = (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) && is_ar
     ? CONFIG['LANGUAGES_SUPPORTED']
     : ['en'];
 $languagesSeeded = [];
+// Languages we ship built-in copy for; everything else falls back to English
+// (usable) and is surfaced so the author knows to translate it.
+$builtInLangs = ['en', 'fr'];
+$languagesFallback = [];
 foreach ($languages as $lang) {
+    if ($lang === 'default') continue;
+    if (!in_array($lang, $builtInLangs, true)) {
+        $languagesFallback[] = $lang;
+    }
     $flat = ($lang === 'fr') ? $seed['fr'] : $seed['en'];
     $newOnly = consentFilterNewKeys($lang, $flat);
     if (empty($newOnly)) continue;
@@ -74,15 +79,16 @@ foreach ($languages as $lang) {
     }
 }
 
-// 3. Enable the layer.
-saveConsentConfig(array_merge($config, ['enabled' => true, 'policyRoute' => $policyRoute]));
+// 3. Enable the layer (policyRoute is left untouched — owned elsewhere).
+saveConsentConfig(array_merge($config, ['enabled' => true]));
 
 ApiResponse::create(200, 'success')
     ->withMessage('Consent layer generated and enabled')
     ->withData([
-        'categories'      => $categories,
-        'languagesSeeded' => $languagesSeeded,
-        'policyRoute'     => $policyRoute,
-        'enabled'         => true,
+        'categories'        => $categories,
+        'languagesSeeded'   => $languagesSeeded,
+        'languagesFallback' => $languagesFallback,
+        'policyRoute'       => $policyRoute,
+        'enabled'           => true,
     ])
     ->send();

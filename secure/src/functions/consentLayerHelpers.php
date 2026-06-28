@@ -38,6 +38,19 @@ function consentLayerGenerated(): bool {
     return file_exists(consentBannerPath()) && file_exists(consentPopupPath());
 }
 
+/** Whether a route (slash path) currently exists in the ROUTES structure. */
+function consentRouteExists(string $route): bool {
+    if (!defined('ROUTES') || !is_array(ROUTES)) return false;
+    $segs = array_values(array_filter(explode('/', trim($route, '/')), fn($s) => $s !== ''));
+    if (empty($segs)) return false;
+    $cur = ROUTES;
+    foreach ($segs as $s) {
+        if (!is_array($cur) || !isset($cur[$s])) return false;
+        $cur = $cur[$s];
+    }
+    return true;
+}
+
 /** Distinct non-essential categories actually declared in the registry. */
 function consentDeclaredCategories(): array {
     $items = loadStorageRegistry()['items'];
@@ -129,6 +142,173 @@ function buildConsentPopupStructure(array $categories): array {
                 ]),
             ]),
         ]),
+    ];
+}
+
+// Privacy-policy URLs for the common OAuth presets. Custom providers list
+// without a link (a per-provider override field is a possible later addition).
+const CONSENT_OAUTH_PRIVACY_URLS = [
+    'google'    => 'https://policies.google.com/privacy',
+    'github'    => 'https://docs.github.com/site-policy/privacy-policies/github-privacy-statement',
+    'meta'      => 'https://www.facebook.com/privacy/policy',
+    'facebook'  => 'https://www.facebook.com/privacy/policy',
+    'amazon'    => 'https://www.amazon.com/gp/help/customer/display.html?nodeId=GX7NJQ4ZB8MHFRNJ',
+    'microsoft' => 'https://privacy.microsoft.com/privacystatement',
+];
+
+/**
+ * OAuth providers THIS project actually offers sign-in with, as
+ * [['name','url'|null]]. The signal is the project's route-resolvers wiring an
+ * oauth-start/callback/logout flow to a literal provider id — NOT the presence
+ * of (possibly global/admin) credentials. So a project that hasn't wired any
+ * OAuth login returns [] (no third-party section). Mirrors the in-use scan in
+ * listOAuthProviders.
+ */
+function consentOAuthLinks(): array {
+    if (!defined('PROJECT_PATH')) return [];
+    $sidecar = PROJECT_PATH . '/data/route-resolvers.json';
+    if (!file_exists($sidecar)) return [];
+    $all = json_decode((string) @file_get_contents($sidecar), true);
+    if (!is_array($all)) return [];
+
+    $providers = [];
+    foreach ($all as $entry) {
+        // Single resolver = scalar config; multi = array of configs.
+        $configs = (isset($entry['kind']) && is_string($entry['kind'])) ? [$entry] : $entry;
+        if (!is_array($configs)) continue;
+        foreach ($configs as $config) {
+            if (!is_array($config)) continue;
+            $kind = $config['kind'] ?? null;
+            if ($kind !== 'oauth-start' && $kind !== 'oauth-callback' && $kind !== 'oauth-logout') continue;
+            $provider = $config['provider'] ?? null;
+            // Skip empty + param-placeholder providers ('{:provider}').
+            if (!is_string($provider) || $provider === '' || preg_match('/^\{:\w+\}$/', $provider)) continue;
+            $providers[$provider] = true;
+        }
+    }
+
+    $out = [];
+    foreach (array_keys($providers) as $pid) {
+        $out[] = ['name' => ucfirst($pid), 'url' => CONSENT_OAUTH_PRIVACY_URLS[strtolower($pid)] ?? null];
+    }
+    return $out;
+}
+
+/** Per-item description in the given language, with fallback. */
+function _consentItemDescription(array $item, string $lang): string {
+    $d = $item['description'] ?? null;
+    if (!is_array($d)) return '';
+    if (isset($d[$lang]) && is_string($d[$lang])) return $d[$lang];
+    foreach ($d as $v) {
+        if (is_string($v) && $v !== '') return $v;
+    }
+    return '';
+}
+
+/**
+ * Cookie-policy page structure (array of nodes) — a deterministic table built
+ * from the registry, plus an OAuth-provider privacy-link section and a legal
+ * note. Structural copy uses textKeys; per-key data (name/scope/retention/
+ * description) is baked from the registry at generation time (re-generate to
+ * refresh). $oauthLinks = [['name'=>..,'url'=>..|null], ...].
+ */
+function buildCookiePolicyStructure(array $items, array $oauthLinks, string $lang): array {
+    // Table header row.
+    $headCols = ['key', 'scope', 'category', 'retention', 'consent', 'description'];
+    $headCells = [];
+    foreach ($headCols as $c) {
+        $headCells[] = _cNode('th', [], [_cText('consent.policy.col_' . $c)]);
+    }
+    $thead = _cNode('thead', [], [_cNode('tr', [], $headCells)]);
+
+    // One body row per declared key (stable order).
+    ksort($items);
+    $bodyRows = [];
+    foreach ($items as $id => $item) {
+        if (!is_array($item)) continue;
+        $cat = $item['category'] ?? 'functional';
+        $consentKey = ($cat === 'essential') ? 'consent.policy.no' : 'consent.policy.yes';
+        $retention = $item['retention'] ?? '';
+        $desc = _consentItemDescription($item, $lang);
+        $bodyRows[] = _cNode('tr', [], [
+            _cNode('td', ['class' => 'qs-cookie-policy__key'], [_cRaw((string) $id)]),
+            _cNode('td', [], [_cRaw((string) ($item['scope'] ?? ''))]),
+            _cNode('td', [], [_cText('consent.category.' . $cat)]),
+            _cNode('td', [], [_cRaw($retention !== '' ? (string) $retention : '—')]),
+            _cNode('td', [], [_cText($consentKey)]),
+            _cNode('td', [], [_cRaw($desc)]),
+        ]);
+    }
+    $table = _cNode('table', ['class' => 'qs-cookie-policy'], [$thead, _cNode('tbody', [], $bodyRows)]);
+
+    $children = [
+        _cNode('h1', [], [_cText('consent.policy.title')]),
+        _cNode('p', ['class' => 'qs-cookie-policy__intro'], [_cText('consent.policy.intro')]),
+        $table,
+    ];
+
+    // OAuth provider privacy-policy links (only when providers exist).
+    if (!empty($oauthLinks)) {
+        $liItems = [];
+        foreach ($oauthLinks as $p) {
+            $name = (string) ($p['name'] ?? '');
+            if ($name === '') continue;
+            if (!empty($p['url'])) {
+                $liItems[] = _cNode('li', [], [
+                    _cRaw($name . ' — '),
+                    _cNode('a', ['href' => (string) $p['url'], 'target' => '_blank', 'rel' => 'noopener'], [_cText('consent.policy.provider_link')]),
+                ]);
+            } else {
+                $liItems[] = _cNode('li', [], [_cRaw($name)]);
+            }
+        }
+        if (!empty($liItems)) {
+            $children[] = _cNode('h2', [], [_cText('consent.policy.oauth_title')]);
+            $children[] = _cNode('p', ['class' => 'qs-cookie-policy__oauth-intro'], [_cText('consent.policy.oauth_intro')]);
+            $children[] = _cNode('ul', ['class' => 'qs-cookie-policy__providers'], $liItems);
+        }
+    }
+
+    $children[] = _cNode('p', ['class' => 'qs-cookie-policy__disclaimer'], [_cText('consent.policy.disclaimer')]);
+
+    return [_cNode('main', ['class' => 'container qs-cookie-policy-page'], $children)];
+}
+
+/** Default EN/FR copy for the cookie-policy page textKeys. */
+function cookiePolicyTranslationSeed(): array {
+    return [
+        'en' => [
+            'consent.policy.title' => 'Cookie policy',
+            'consent.policy.intro' => 'This page lists the browser storage this site uses, generated from the site\'s storage registry.',
+            'consent.policy.col_key' => 'Name',
+            'consent.policy.col_scope' => 'Storage',
+            'consent.policy.col_category' => 'Category',
+            'consent.policy.col_retention' => 'Retention',
+            'consent.policy.col_consent' => 'Needs consent',
+            'consent.policy.col_description' => 'Purpose',
+            'consent.policy.yes' => 'Yes',
+            'consent.policy.no' => 'No',
+            'consent.policy.oauth_title' => 'Third-party sign-in',
+            'consent.policy.oauth_intro' => 'This site offers sign-in via the following providers. See each provider\'s own privacy policy for what they collect.',
+            'consent.policy.provider_link' => 'Privacy policy',
+            'consent.policy.disclaimer' => 'This summary is generated from the site\'s storage registry and is provided for transparency. It is not legal advice — obtain your own legal review.',
+        ],
+        'fr' => [
+            'consent.policy.title' => 'Politique des cookies',
+            'consent.policy.intro' => 'Cette page liste les données de stockage que ce site utilise, générée à partir du registre de stockage du site.',
+            'consent.policy.col_key' => 'Nom',
+            'consent.policy.col_scope' => 'Stockage',
+            'consent.policy.col_category' => 'Catégorie',
+            'consent.policy.col_retention' => 'Conservation',
+            'consent.policy.col_consent' => 'Consentement requis',
+            'consent.policy.col_description' => 'Finalité',
+            'consent.policy.yes' => 'Oui',
+            'consent.policy.no' => 'Non',
+            'consent.policy.oauth_title' => 'Connexion tierce',
+            'consent.policy.oauth_intro' => 'Ce site propose la connexion via les fournisseurs suivants. Consultez la politique de confidentialité de chaque fournisseur pour savoir ce qu\'il collecte.',
+            'consent.policy.provider_link' => 'Politique de confidentialité',
+            'consent.policy.disclaimer' => 'Ce résumé est généré à partir du registre de stockage du site et fourni à titre de transparence. Il ne constitue pas un avis juridique — faites réaliser votre propre vérification juridique.',
+        ],
     ];
 }
 

@@ -671,60 +671,172 @@
         return Object.keys(set);
     }
 
-    function openGenerateConsentModal() {
-        var dialog = _renderModalShell('Generate consent layer', closeModal);
+    async function openGenerateConsentModal() {
+        var dialog = _renderModalShell('Consent layer', closeModal);
         if (!dialog) return;
+        // All body content lives in one container we can clear + rebuild as the
+        // state changes (after Generate / Update / Delete), so the modal always
+        // reflects the real status (e.g. locks the route once a page exists).
+        var content = _el('div', { class: 'storage-consent-content' });
+        dialog.appendChild(content);
+        content.appendChild(_el('p', { class: 'admin-hint', text: 'Loading…' }));
+        await _refreshConsentContent(content, '');
+    }
+
+    // Re-fetch consent status and (re)render the modal body, optionally showing
+    // a success message at the top.
+    async function _refreshConsentContent(content, message) {
+        var status = {};
+        try {
+            var s = await api('getConsentStatus', 'POST');
+            status = (s && s.data && (s.data.data || s.data)) || {};
+        } catch (e) { /* treat as fresh */ }
+        if (!content.isConnected) return; // modal closed during the fetch
+        _renderConsentContent(content, status, message);
+    }
+
+    function _renderConsentContent(content, status, message) {
+        content.textContent = '';
+
+        // A policy page is "present" only when its route still exists.
+        var hasPage = !!(status && status.policyRoute && status.policyRouteExists);
+        var staleRoute = (status && status.policyRoute && !status.policyRouteExists)
+            ? String(status.policyRoute).replace(/^\/+/, '') : '';
 
         var cats = _declaredNonEssentialCategories();
-        var body = _el('div');
-        body.appendChild(_renderHint('Generates (or refreshes) the cookie banner + preferences popup from your declared keys, seeds EN/FR default copy (new keys only), and enables the consent layer. Both render on every page and are editable in the visual editor.'));
-        body.appendChild(_el('p', {
+        content.appendChild(_renderHint('Generates (or refreshes) the cookie banner + preferences popup from your declared keys, seeds EN/FR default copy (new keys only), and enables the consent layer. Both render on every page and are editable in the visual editor.'));
+        content.appendChild(_el('p', {
             class: 'admin-hint',
             text: cats.length
                 ? 'Popup toggle rows: ' + cats.join(', ') + ' (Essential is always-on, locked).'
-                : 'No non-essential keys declared yet — the popup shows only the locked Essential row. Re-generate after declaring analytics/marketing/functional keys.',
+                : 'No non-essential keys declared yet — the popup shows only the locked Essential row.',
         }));
+
+        // Policy-page section: locked (display only) when a page exists, an
+        // input otherwise — so an existing page can't be duplicated by a typo.
+        var routeInput = null;
+        if (hasPage) {
+            var fixed = _el('div', { class: 'storage-consent-policy' });
+            fixed.appendChild(_el('span', { class: 'admin-label', text: 'Cookie-policy page' }));
+            fixed.appendChild(_el('code', { class: 'storage-consent-policy__route', text: status.policyRoute }));
+            content.appendChild(_renderGroup(null, fixed,
+                _renderHint('Update refreshes this page from the registry. To move it to another route, delete it and generate again.')));
+        } else {
+            routeInput = _el('input', {
+                type: 'text', class: 'admin-input', autocomplete: 'off',
+                placeholder: 'e.g. cookies (leave blank to skip the policy page)',
+                value: staleRoute,
+            });
+            content.appendChild(_renderGroup(_renderLabel('Cookie-policy page route'), routeInput,
+                _renderHint(staleRoute
+                    ? 'The previous route "' + staleRoute + '" no longer exists — generate to recreate it, or type a different one.'
+                    : 'Optional. Generates a deterministic cookie-policy page at this route (the banner links to it).')));
+        }
+
         var resultBox = _el('div', { class: 'storage-modal-actions__error' });
         resultBox.style.color = 'var(--admin-success)';
-        resultBox.hidden = true;
-        body.appendChild(resultBox);
+        if (message) { resultBox.textContent = message; } else { resultBox.hidden = true; }
+        content.appendChild(resultBox);
         var errBox = _el('div', { class: 'storage-modal-actions__error' });
         errBox.hidden = true;
-        body.appendChild(errBox);
-        dialog.appendChild(body);
+        content.appendChild(errBox);
 
         var actions = _el('div', { class: 'storage-modal-actions' });
         actions.appendChild(_el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Close', onclick: closeModal }));
-        var genBtn = _el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Generate' });
-        actions.appendChild(genBtn);
-        dialog.appendChild(actions);
 
-        genBtn.addEventListener('click', async function () {
-            errBox.hidden = true; errBox.textContent = '';
-            resultBox.hidden = true;
-            genBtn.disabled = true;
-            try {
-                var r = await api('generateConsentLayer', 'POST', {});
-                if (!r || !r.ok) {
+        if (hasPage) {
+            var delBtn = _el('button', { class: 'admin-btn admin-btn--ghost storage-modal-actions__btn--danger', type: 'button', text: 'Delete page' });
+            delBtn.addEventListener('click', async function () {
+                if (!window.confirm('Delete the cookie-policy page at ' + status.policyRoute + '? This removes the route and its page.')) return;
+                delBtn.disabled = true; errBox.hidden = true;
+                try {
+                    var dr = await api('deleteCookiePolicy', 'POST', {});
+                    if (!dr || !dr.ok) {
+                        errBox.hidden = false;
+                        errBox.textContent = (dr && dr.data && dr.data.message) || 'Delete failed';
+                        delBtn.disabled = false;
+                        return;
+                    }
+                    await _refreshConsentContent(content, 'Cookie-policy page deleted. The banner no longer links to it.');
+                } catch (e) {
                     errBox.hidden = false;
-                    errBox.textContent = (r && r.data && r.data.message) || 'Generation failed';
-                    genBtn.disabled = false;
-                    return;
+                    errBox.textContent = (e && e.message) || 'Network error';
+                    delBtn.disabled = false;
                 }
-                var d = (r.data && (r.data.data || r.data)) || {};
-                var langs = d.languagesSeeded ? Object.keys(d.languagesSeeded) : [];
-                resultBox.hidden = false;
-                resultBox.textContent = 'Consent layer generated and enabled.' +
-                    (langs.length ? ' Seeded copy: ' + langs.join(', ') + '.' : '') +
-                    ' Preview a page to see the banner.';
-                genBtn.textContent = 'Re-generate';
-                genBtn.disabled = false;
-            } catch (e) {
-                errBox.hidden = false;
-                errBox.textContent = (e && e.message) || 'Network error';
-                genBtn.disabled = false;
-            }
+            });
+            actions.appendChild(delBtn);
+        }
+
+        var genBtn = _el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: hasPage ? 'Update' : 'Generate' });
+        actions.appendChild(genBtn);
+        content.appendChild(actions);
+
+        genBtn.addEventListener('click', function () {
+            var policyRoute = hasPage
+                ? String(status.policyRoute).replace(/^\/+|\/+$/g, '')
+                : (routeInput ? routeInput.value.trim().replace(/^\/+|\/+$/g, '') : '');
+            _runConsentGenerate({
+                policyRoute: policyRoute, isUpdate: hasPage,
+                content: content, genBtn: genBtn, resultBox: resultBox, errBox: errBox,
+            });
         });
+    }
+
+    async function _runConsentGenerate(opts) {
+        var genBtn = opts.genBtn, resultBox = opts.resultBox, errBox = opts.errBox;
+        var policyRoute = opts.policyRoute;
+        errBox.hidden = true; errBox.textContent = '';
+        resultBox.hidden = true;
+        genBtn.disabled = true;
+        try {
+            // 1. Policy page FIRST — it owns consent.json.policyRoute, so the
+            //    route is only wired up when a page is actually created. If the
+            //    user cancels an overwrite, nothing points at that route.
+            var policyMsg = '';
+            if (policyRoute) {
+                var pr = await api('generateCookiePolicy', 'POST', opts.isUpdate ? { route: policyRoute, overwrite: true } : { route: policyRoute });
+                var pd = (pr && pr.data && (pr.data.data || pr.data)) || {};
+                if (pr && !pr.ok && pd.needsConfirm) {
+                    if (window.confirm('Route /' + policyRoute + ' already exists. Overwrite its content with the cookie-policy page?')) {
+                        pr = await api('generateCookiePolicy', 'POST', { route: policyRoute, overwrite: true });
+                        pd = (pr && pr.data && (pr.data.data || pr.data)) || {};
+                    } else {
+                        pr = null;
+                        policyMsg = ' (Cookie-policy page skipped — route exists, not overwritten.)';
+                    }
+                }
+                if (pr && pr.ok) {
+                    policyMsg = ' Cookie-policy page ' + (pd.overwritten ? 'updated' : 'created') + ' at ' + (pd.route || ('/' + policyRoute)) + '.';
+                } else if (pr) {
+                    policyMsg = ' (Cookie-policy page failed: ' + ((pr.data && pr.data.message) || 'error') + '.)';
+                }
+            }
+
+            // 2. Consent layer — banner reads the (now-updated) policy route.
+            var r = await api('generateConsentLayer', 'POST', {});
+            if (!r || !r.ok) {
+                errBox.hidden = false;
+                errBox.textContent = (r && r.data && r.data.message) || 'Generation failed';
+                genBtn.disabled = false;
+                return;
+            }
+            var d = (r.data && (r.data.data || r.data)) || {};
+            var langs = d.languagesSeeded ? Object.keys(d.languagesSeeded) : [];
+            var fallback = (d.languagesFallback && d.languagesFallback.length) ? d.languagesFallback : [];
+
+            var msg = 'Consent layer ' + (opts.isUpdate ? 'updated' : 'generated and enabled') + '.' +
+                (langs.length ? ' Seeded copy: ' + langs.join(', ') + '.' : '') +
+                policyMsg +
+                (fallback.length ? ' Note: ' + fallback.join(', ') + ' have no built-in consent copy — seeded with English; translate them in the Translation Manager.' : '') +
+                ' Preview a page to see the banner.';
+            // Re-render from fresh status — flips to the locked route + Update/
+            // Delete once a page exists, so a re-generate can't change the route.
+            await _refreshConsentContent(opts.content, msg);
+        } catch (e) {
+            errBox.hidden = false;
+            errBox.textContent = (e && e.message) || 'Network error';
+            genBtn.disabled = false;
+        }
     }
 
     // ====================================================================

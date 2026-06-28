@@ -1111,7 +1111,15 @@
             '.qs-consent-row__note{font-size:12px;color:#6b7280}' +
             '.qs-consent-row__toggle{width:18px;height:18px}' +
             '.qs-consent-row--locked{opacity:.7}' +
-            '.qs-consent-popup__actions{display:flex;justify-content:flex-end;gap:8px}';
+            '.qs-consent-popup__actions{display:flex;justify-content:flex-end;gap:8px}' +
+            // Cookie-policy page (rendered on the same pages as the global banner).
+            '.qs-cookie-policy-page{max-width:900px;margin:0 auto;padding:24px 16px}' +
+            '.qs-cookie-policy{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}' +
+            '.qs-cookie-policy th,.qs-cookie-policy td{border:1px solid #e5e7eb;padding:8px 10px;text-align:left;vertical-align:top}' +
+            '.qs-cookie-policy th{background:#f9fafb;font-weight:600}' +
+            '.qs-cookie-policy__key{font-family:ui-monospace,Menlo,Consolas,monospace}' +
+            '.qs-cookie-policy__providers{line-height:1.7}' +
+            '.qs-cookie-policy__disclaimer{margin-top:20px;font-size:12px;color:#6b7280;font-style:italic}';
         var style = document.createElement('style');
         style.id = 'qs-consent-styles';
         style.textContent = css;

@@ -147,6 +147,17 @@
     color: #fff;
 }
 
+/* Locked cookie-policy route display in the generate modal */
+.storage-consent-policy { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.storage-consent-policy__route {
+    font-family: var(--font-mono, ui-monospace, Menlo, Consolas, monospace);
+    background: var(--admin-bg-tertiary);
+    color: var(--admin-text);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
 /* Scan / reconcile panel (slice 5 Stage B) */
 .storage-scan {
     border: 0.5px solid var(--admin-border);
