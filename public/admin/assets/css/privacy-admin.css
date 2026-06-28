@@ -1,0 +1,142 @@
+/* Privacy helper admin page (beta.9). Colors via --admin-* variables (theme-aware).
+   Mirrors storage-admin.css conventions. */
+
+.privacy-header-icon { width: 28px; height: 28px; flex-shrink: 0; }
+.privacy-desclang-hint { margin: 0 0 14px; }
+
+.privacy-root {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 4px 0 24px;
+}
+.privacy-empty {
+    color: var(--admin-text-muted, #666);
+    font-size: 13px;
+    padding: 6px 0;
+}
+
+/* Coverage summary */
+.privacy-coverage {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 12px;
+    border: 0.5px solid var(--admin-border);
+    border-radius: 8px;
+    background: var(--admin-surface, transparent);
+}
+.privacy-coverage--ok { border-color: var(--admin-success, #2e7d32); }
+.privacy-coverage__cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 120px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: var(--admin-surface-alt, rgba(127,127,127,0.06));
+}
+.privacy-coverage__cell--warn { color: var(--admin-warning, #b26a00); }
+.privacy-coverage__value { font-size: 20px; font-weight: 700; }
+.privacy-coverage__label { font-size: 11px; color: var(--admin-text-muted, #666); }
+.privacy-coverage__status { margin-left: auto; display: flex; align-items: center; }
+
+/* Sections */
+.privacy-section {
+    border: 0.5px solid var(--admin-border);
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+.privacy-section__head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.privacy-section__title { font-size: 14px; font-weight: 600; margin: 0; }
+.privacy-section__count {
+    font-size: 12px;
+    color: var(--admin-text-muted, #666);
+    background: var(--admin-surface-alt, rgba(127,127,127,0.08));
+    border-radius: 10px;
+    padding: 1px 8px;
+}
+
+/* Collected data */
+.privacy-collected { display: flex; flex-direction: column; gap: 8px; }
+.privacy-collected__card {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: var(--admin-surface-alt, rgba(127,127,127,0.05));
+}
+.privacy-collected__label { font-weight: 600; font-size: 13px; }
+.privacy-collected__purpose { font-size: 12px; color: var(--admin-text-muted, #666); }
+
+/* Hosts */
+.privacy-hosts { display: flex; flex-direction: column; gap: 8px; }
+.privacy-host {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: var(--admin-surface-alt, rgba(127,127,127,0.05));
+}
+.privacy-host__main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.privacy-host__url { font-size: 12px; }
+.privacy-host__apis { font-size: 11px; color: var(--admin-text-muted, #666); }
+
+/* Endpoints + atoms */
+.privacy-endpoints { display: flex; flex-direction: column; gap: 8px; }
+.privacy-endpoint {
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: var(--admin-surface-alt, rgba(127,127,127,0.05));
+}
+.privacy-endpoint__head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.privacy-endpoint__key { font-size: 12px; }
+.privacy-endpoint__nofields { font-size: 11px; color: var(--admin-text-muted, #666); }
+.privacy-endpoint__atoms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.privacy-atom {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 0.5px solid var(--admin-border);
+}
+.privacy-atom--unset { border-style: dashed; color: var(--admin-warning, #b26a00); }
+.privacy-atom--mapped { border-color: var(--admin-success, #2e7d32); }
+.privacy-atom__field { font-weight: 600; }
+.privacy-atom__datum { color: var(--admin-text-muted, #666); }
+
+/* Auth seed */
+.privacy-authseed { display: flex; flex-direction: column; gap: 6px; }
+.privacy-authseed__row { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.privacy-authseed__name { font-weight: 600; font-size: 13px; }
+.privacy-authseed__detail { font-size: 12px; color: var(--admin-text-muted, #666); }
+
+.privacy-cookie-note { margin: -6px 0 0; }
+
+/* Pills */
+.privacy-pill {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: var(--admin-surface-alt, rgba(127,127,127,0.12));
+}
+.privacy-pill--method { font-family: var(--admin-font-mono, monospace); letter-spacing: 0.3px; }
+.privacy-pill--self { background: rgba(46,125,50,0.14); color: var(--admin-success, #2e7d32); }
+.privacy-pill--third { background: rgba(178,106,0,0.14); color: var(--admin-warning, #b26a00); }
+.privacy-pill--warn { background: rgba(178,106,0,0.14); color: var(--admin-warning, #b26a00); }
+.privacy-pill--ok { background: rgba(46,125,50,0.14); color: var(--admin-success, #2e7d32); }

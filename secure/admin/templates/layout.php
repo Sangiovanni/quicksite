@@ -84,6 +84,7 @@ $langNames = [
     <link rel="stylesheet" href="<?= $versionedAsset('/css/tag-examples.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/oauth-admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/storage-admin.css') ?>">
+    <link rel="stylesheet" href="<?= $versionedAsset('/css/privacy-admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/searchable-select.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/preview-ai-tools.css') ?>">
     <!-- Storage key registry — must load before any page script that references QuickSiteStorageKeys -->
@@ -114,9 +115,11 @@ $langNames = [
             // component-list bindings), not a config setting.
             $buildPages = ['workflows', 'command', 'preview', 'apis'];
             $settingsPages = ['settings', 'ai-settings', 'ai-connections', 'embed-security'];
+            $compliancePages = ['storage', 'privacy'];
             $isBuildActive = in_array($currentPage, $buildPages);
             $isSettingsActive = in_array($currentPage, $settingsPages);
             $isAssetsActive = ($currentPage === 'assets');
+            $isComplianceActive = in_array($currentPage, $compliancePages);
         ?>
         <nav class="admin-nav">
             <a href="<?= $router->url('dashboard') ?>" 
@@ -202,15 +205,36 @@ $langNames = [
                 <span>Authentication</span>
             </a>
 
-            <!-- Storage registry - Top-level tab (beta.9 — GDPR / cookie-consent data layer) -->
-            <a href="<?= $router->url('storage') ?>"
-               class="admin-nav__link<?= $currentPage === 'storage' ? ' admin-nav__link--active' : '' ?>"
-               data-requires-command="listStorageItems">
-                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>
-                </svg>
-                <span>Storage</span>
-            </a>
+            <!-- Compliance Group - Storage + Privacy (beta.9 — data layer + data sharing) -->
+            <div class="admin-nav__group<?= $isComplianceActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="compliance" data-requires-command="listStorageItems">
+                <a href="<?= $router->url('storage') ?>" class="admin-nav__group-toggle" data-requires-command="listStorageItems">
+                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/>
+                    </svg>
+                    <span>Compliance</span>
+                    <svg class="admin-nav__group-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </a>
+                <div class="admin-nav__group-dropdown">
+                    <a href="<?= $router->url('storage') ?>"
+                       class="admin-nav__link<?= $currentPage === 'storage' ? ' admin-nav__link--active' : '' ?>"
+                       data-requires-command="listStorageItems">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>
+                        </svg>
+                        <span>Storage</span>
+                    </a>
+                    <a href="<?= $router->url('privacy') ?>"
+                       class="admin-nav__link<?= $currentPage === 'privacy' ? ' admin-nav__link--active' : '' ?>"
+                       data-requires-command="getPrivacyStatus">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/>
+                        </svg>
+                        <span>Privacy</span>
+                    </a>
+                </div>
+            </div>
 
             <!-- Optimize - Top-level tab -->
             <a href="<?= $router->url('optimize') ?>" 
