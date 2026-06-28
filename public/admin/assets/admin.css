@@ -13193,27 +13193,20 @@ code.preview-node-panel__value {
     gap: 6px;
 }
 .preview-contextual-js-form-action-row {
-    display: flex;
-    gap: 6px;
-    align-items: flex-start;
     padding: 6px;
     border: 1px solid var(--admin-border);
     border-radius: var(--radius-sm);
     background: var(--admin-bg, transparent);
 }
 .preview-contextual-js-form-action-verb {
-    flex: 0 0 130px;
     font-size: 0.7rem;
 }
 .preview-contextual-js-form-action-args {
-    flex: 1;
-    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 .preview-contextual-js-form-action-delete {
-    flex: 0 0 22px;
     width: 22px;
     height: 22px;
     border: none;

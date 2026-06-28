@@ -326,11 +326,34 @@
             });
 
             if (this.allItemEls.length === 0) {
-                const empty = document.createElement('div');
-                empty.className = 'qs-searchable-select__empty';
-                empty.textContent = filterLower ? ('No matches for "' + filterLower + '"') : this.emptyText;
-                this.listEl.appendChild(empty);
-                this.focusedIndex = -1;
+                // create-from-search: when nothing matches a typed query and the
+                // consumer supplied onCreateFromSearch, offer an actionable
+                // "➕ Create '<query>'" row (keyboard-selectable) instead of a
+                // dead "no matches" message.
+                const rawQuery = this.searchInputEl ? this.searchInputEl.value.trim() : '';
+                if (this.options.onCreateFromSearch && rawQuery) {
+                    const createItem = document.createElement('button');
+                    createItem.type = 'button';
+                    createItem.className = 'qs-searchable-select__item qs-searchable-select__create';
+                    createItem.setAttribute('role', 'option');
+                    createItem.textContent = this.options.createLabel
+                        ? this.options.createLabel(rawQuery)
+                        : ('➕ Create "' + rawQuery + '"');
+                    createItem.addEventListener('click', () => {
+                        this.close();
+                        this.options.onCreateFromSearch(rawQuery);
+                    });
+                    this.listEl.appendChild(createItem);
+                    this.allItemEls.push(createItem);
+                    this.focusedIndex = 0;
+                    this._updateFocusedItem();
+                } else {
+                    const empty = document.createElement('div');
+                    empty.className = 'qs-searchable-select__empty';
+                    empty.textContent = filterLower ? ('No matches for "' + filterLower + '"') : this.emptyText;
+                    this.listEl.appendChild(empty);
+                    this.focusedIndex = -1;
+                }
             } else {
                 this.focusedIndex = 0;
                 this._updateFocusedItem();

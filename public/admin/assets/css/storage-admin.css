@@ -281,6 +281,11 @@
     color: var(--admin-text-muted);
 }
 
+/* responsePath picker — saveToken/store `path` arg in the interactions editor */
+.qs-response-path-picker { display: flex; flex-direction: column; gap: 6px; }
+.qs-response-path-picker__select,
+.qs-response-path-picker__custom { width: 100%; box-sizing: border-box; }
+
 /* storageKey picker — in the interactions editor (slice 3) */
 .qs-storage-key-picker { display: flex; flex-direction: column; gap: 6px; }
 .qs-storage-key-picker__create {

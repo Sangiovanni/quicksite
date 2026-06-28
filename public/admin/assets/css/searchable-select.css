@@ -175,3 +175,11 @@
     font-size: 13px;
     font-style: italic;
 }
+
+/* create-from-search action row (shown when a typed query has no match) */
+.qs-searchable-select__create {
+    width: 100%;
+    text-align: left;
+    color: var(--admin-accent, #2563eb);
+    font-weight: 600;
+}

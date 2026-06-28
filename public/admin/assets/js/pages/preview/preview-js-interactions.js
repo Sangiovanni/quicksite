@@ -1502,6 +1502,60 @@
     }
 
     /**
+     * Populate a verb <select> with the QS catalog, grouped into category
+     * optgroups (name + data-args/description/example per option, so the
+     * searchable combobox shows + matches descriptions). Shared by the main
+     * Function picker and the post-fetch action verb pickers so they are
+     * identical. `fns` is the pre-filtered verb list; `placeholderText` is the
+     * blank first option.
+     */
+    function _populateVerbSelect(selectEl, fns, placeholderText) {
+        selectEl.innerHTML = '';
+        var placeholderOpt = document.createElement('option');
+        placeholderOpt.value = '';
+        placeholderOpt.textContent = placeholderText;
+        selectEl.appendChild(placeholderOpt);
+
+        var grouped = {};
+        (fns || []).forEach(function (fn) {
+            if (!fn || !fn.name) return;
+            var cat = fn.category || 'uncategorized';
+            if (!grouped[cat]) grouped[cat] = [];
+            grouped[cat].push(fn);
+        });
+
+        var KNOWN_CATEGORY_ORDER = ['dom-toggle', 'form', 'fetch', 'auth', 'nav', 'state-store', 'focus', 'display', 'general'];
+        var CATEGORY_LABELS = {
+            'dom-toggle': 'DOM toggles', 'form': 'Forms', 'fetch': 'Fetch / network',
+            'auth': 'Auth', 'nav': 'Navigation', 'state-store': 'State stores',
+            'focus': 'DOM focus', 'display': 'Rendering / display', 'general': 'General',
+            'uncategorized': 'Uncategorized'
+        };
+        var renderOrder = KNOWN_CATEGORY_ORDER.slice();
+        Object.keys(grouped)
+            .filter(function (c) { return c !== 'uncategorized' && KNOWN_CATEGORY_ORDER.indexOf(c) === -1; })
+            .sort()
+            .forEach(function (c) { renderOrder.push(c); });
+        if (grouped.uncategorized) renderOrder.push('uncategorized');
+
+        renderOrder.forEach(function (cat) {
+            if (!grouped[cat] || grouped[cat].length === 0) return;
+            var optgroup = document.createElement('optgroup');
+            optgroup.label = CATEGORY_LABELS[cat] || cat;
+            grouped[cat].forEach(function (fn) {
+                var option = document.createElement('option');
+                option.value = fn.name;
+                option.textContent = fn.name;
+                option.dataset.args = JSON.stringify(fn.args || []);
+                option.dataset.description = fn.description || '';
+                option.dataset.example = fn.example || '';
+                optgroup.appendChild(option);
+            });
+            selectEl.appendChild(optgroup);
+        });
+    }
+
+    /**
      * Build one action row. The row stays bound to its state object;
      * mutations from inputs update the state in place and call
      * updatePreview.
@@ -1510,22 +1564,15 @@
         var row = document.createElement('div');
         row.className = 'preview-contextual-js-form-action-row';
 
-        // Verb dropdown
+        // Verb dropdown — identical to the main Function picker (category
+        // optgroups + descriptions, wrapped in the searchable combobox below).
+        // Skip 'fetch': fetch-then-fetch is better authored as its own interaction.
         var verbSelect = document.createElement('select');
         verbSelect.className = 'preview-contextual-js-form-action-verb';
-        var blank = document.createElement('option');
-        blank.value = '';
-        blank.textContent = '-- pick verb --';
-        verbSelect.appendChild(blank);
-        availableFunctions.forEach(function(fn) {
-            // Skip 'fetch' — fetch-then-fetch is unusual and easier to
-            // author as a separate top-level interaction.
-            if (!fn || !fn.name || fn.name === 'fetch') return;
-            var opt = document.createElement('option');
-            opt.value = fn.name;
-            opt.textContent = fn.name;
-            verbSelect.appendChild(opt);
+        var actionFns = (availableFunctions || []).filter(function (fn) {
+            return fn && fn.name && fn.name !== 'fetch';
         });
+        _populateVerbSelect(verbSelect, actionFns, '-- pick verb --');
         verbSelect.value = action.verb || '';
 
         // Args container — re-rendered when verb changes.
@@ -1580,6 +1627,20 @@
         });
 
         row.appendChild(verbSelect);
+        // Wrap in the same searchable combobox the main Function picker uses, so
+        // the two are identical (verbSelect must be in its parent first — the
+        // wrapper inserts its trigger as a sibling).
+        if (window.QSSearchableSelect) {
+            try {
+                new window.QSSearchableSelect(verbSelect, {
+                    placeholder: (PreviewConfig && PreviewConfig.i18n && PreviewConfig.i18n.selectFunction) || '-- pick verb --',
+                    searchPlaceholder: (PreviewConfig.i18n && PreviewConfig.i18n.searchFunctions) || 'Search functions… (matches name + description)',
+                    emptyText: (PreviewConfig.i18n && PreviewConfig.i18n.noFunctionsMatch) || 'No functions match',
+                });
+            } catch (e) {
+                console.warn('[PreviewJsInteractions] Failed to wrap action verb select:', e);
+            }
+        }
         row.appendChild(argsContainer);
         row.appendChild(del);
         rerenderArgs();
@@ -1881,6 +1942,13 @@
             var skWrap = _renderStorageKeyArgRow(arg, paramIndex, updateFn);
             row.appendChild(skWrap);
             skWrap._qsStorageKeyPicker.mount();
+        } else if (inputType === 'responsePath') {
+            // saveToken/store `path` — <select> of the main fetch endpoint's
+            // responseSchema dot-paths (typo-proof), with a "Custom path…" escape.
+            // Falls back to free text when the endpoint declares no schema.
+            var rpWrap = _renderResponsePathArgRow(arg, paramIndex, updateFn);
+            row.appendChild(rpWrap);
+            rpWrap._qsResponsePathPicker.mount();
         } else if (usePicker && (inputType === 'selector' || inputType === 'class' || inputType === 'matchTarget')) {
             var picker = createSearchablePicker(inputType, arg, paramIndex);
             row.appendChild(picker);
@@ -2890,6 +2958,13 @@
         });
         catSel.value = 'functional';
 
+        // Optional description — capture it here so the author doesn't have to
+        // remember to fill it in later on /admin/storage.
+        var descInput = document.createElement('input');
+        descInput.type = 'text';
+        descInput.className = 'admin-input qs-storage-key-picker__desc';
+        descInput.placeholder = 'description (optional)';
+
         var createBtn = document.createElement('button');
         createBtn.type = 'button';
         createBtn.className = 'admin-btn admin-btn--primary admin-btn--sm';
@@ -2901,6 +2976,7 @@
         createForm.appendChild(nameInput);
         createForm.appendChild(scopeSel);
         createForm.appendChild(catSel);
+        createForm.appendChild(descInput);
         createForm.appendChild(createBtn);
         createForm.appendChild(errSpan);
         wrap.appendChild(createForm);
@@ -2956,12 +3032,23 @@
             if (skSearchPicker) skSearchPicker.refresh();
         }
 
+        // Reveal the inline create form. `prefill` (from create-from-search) seeds
+        // the key name so the author doesn't retype what they just searched for.
+        function showCreateForm(prefill) {
+            createForm.style.display = '';
+            select.value = hidden.value || '';
+            if (skSearchPicker) skSearchPicker.refresh();
+            if (prefill != null && prefill !== '') {
+                nameInput.value = prefill;
+                createBtn.focus();
+            } else if (!nameInput.value) {
+                nameInput.focus();
+            }
+        }
+
         select.addEventListener('change', function () {
             if (select.value === CREATE_SENTINEL) {
-                createForm.style.display = '';
-                select.value = hidden.value || '';
-                if (skSearchPicker) skSearchPicker.refresh();
-                if (!nameInput.value) nameInput.focus();
+                showCreateForm();
                 return;
             }
             createForm.style.display = 'none';
@@ -2977,6 +3064,13 @@
                 return;
             }
             createBtn.disabled = true;
+            var skBody = { id: id, scope: scopeSel.value, category: catSel.value };
+            var skDesc = descInput.value.trim();
+            if (skDesc) {
+                var skLang = (window.PreviewConfig && window.PreviewConfig.defaultLang) || 'en';
+                skBody.description = {};
+                skBody.description[skLang] = skDesc;
+            }
             try {
                 var response = await fetch('/management/addStorageItem', {
                     method: 'POST',
@@ -2984,7 +3078,7 @@
                         'Authorization': `Bearer ${PreviewConfig.authToken}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ id: id, scope: scopeSel.value, category: catSel.value })
+                    body: JSON.stringify(skBody)
                 });
                 var result = await response.json().catch(function () { return null; });
                 if (!response.ok) {
@@ -3007,6 +3101,7 @@
                 repopulate(id);
                 createForm.style.display = 'none';
                 nameInput.value = '';
+                descInput.value = '';
                 createBtn.disabled = false;
                 updateFn();
             } catch (e) {
@@ -3026,6 +3121,10 @@
                             placeholder: '— pick a storage key —',
                             searchPlaceholder: (PreviewConfig.i18n && PreviewConfig.i18n.searchStorageKeys) || 'Search storage keys…',
                             emptyText: (PreviewConfig.i18n && PreviewConfig.i18n.noStorageKeysMatch) || 'No keys match',
+                            // create-from-search: typing a new key name offers an
+                            // inline "➕ Create" that prefills the create form.
+                            createLabel: function (q) { return '➕ Create key "' + q + '"'; },
+                            onCreateFromSearch: function (q) { showCreateForm(q); },
                         });
                     } catch (e) {
                         console.warn('[PreviewJsInteractions] QSSearchableSelect mount failed for storageKey:', e);
@@ -3056,8 +3155,110 @@
         return wrap;
     }
 
+    /**
+     * Render the saveToken/store `path` arg as a <select> of the main fetch
+     * endpoint's responseSchema dot-paths (typo-proof), with a "Custom path…"
+     * escape to free text. Falls back to a plain text input when the endpoint
+     * declares no responseSchema. The hidden input is the value target read by
+     * the generic param collector; mount() syncs the display after pre-fill.
+     */
+    function _renderResponsePathArgRow(arg, paramIndex, updateFn) {
+        var CUSTOM_SENTINEL = '__custom__';
+        var wrap = document.createElement('div');
+        wrap.className = 'qs-response-path-picker';
+
+        var hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.className = 'preview-contextual-js-form-input';
+        hidden.dataset.paramIndex = paramIndex;
+        hidden.dataset.paramName = arg.name || '';
+        wrap.appendChild(hidden);
+
+        var select = document.createElement('select');
+        select.className = 'admin-input qs-response-path-picker__select';
+        wrap.appendChild(select);
+
+        var customInput = document.createElement('input');
+        customInput.type = 'text';
+        customInput.className = 'admin-input qs-response-path-picker__custom';
+        customInput.placeholder = arg.description || 'e.g. data.access_token';
+        customInput.style.display = 'none';
+        wrap.appendChild(customInput);
+
+        function schemaPaths() {
+            var epData = _findEndpointData(jsFormApi, jsFormEndpoint);
+            if (!epData || !epData.responseSchema || !epData.responseSchema.properties) return [];
+            try {
+                return Object.keys(_flattenSchema(epData.responseSchema.properties));
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function showCustom(val) {
+            select.style.display = 'none';
+            customInput.style.display = '';
+            if (val != null) customInput.value = val;
+            customInput.focus();
+        }
+
+        function repopulate(selected) {
+            var paths = schemaPaths();
+            var cur = (selected != null) ? selected : hidden.value;
+            // No declared schema → plain free text (current behaviour).
+            if (paths.length === 0) {
+                select.style.display = 'none';
+                customInput.style.display = '';
+                if (cur != null) customInput.value = cur;
+                return;
+            }
+            select.style.display = '';
+            customInput.style.display = 'none';
+            select.textContent = '';
+            var ph = document.createElement('option');
+            ph.value = ''; ph.textContent = '— pick a response field —';
+            select.appendChild(ph);
+            paths.forEach(function (p) {
+                var o = document.createElement('option');
+                o.value = p; o.textContent = p;
+                select.appendChild(o);
+            });
+            // Keep a current value that isn't in the schema selectable.
+            if (cur && paths.indexOf(cur) === -1) {
+                var co = document.createElement('option');
+                co.value = cur; co.textContent = cur + '  (custom)';
+                select.appendChild(co);
+            }
+            var cs = document.createElement('option');
+            cs.value = CUSTOM_SENTINEL; cs.textContent = '✎ Custom path…';
+            select.appendChild(cs);
+            select.value = cur || '';
+        }
+
+        select.addEventListener('change', function () {
+            if (select.value === CUSTOM_SENTINEL) {
+                hidden.value = '';
+                showCustom('');
+                updateFn();
+                return;
+            }
+            hidden.value = select.value;
+            updateFn();
+        });
+        customInput.addEventListener('input', function () {
+            hidden.value = customInput.value.trim();
+            updateFn();
+        });
+
+        // Deferred so it runs AFTER the action-row pre-fill sets hidden.value.
+        wrap._qsResponsePathPicker = {
+            mount: function () { setTimeout(function () { repopulate(); }, 0); }
+        };
+        return wrap;
+    }
+
     // ==================== Dropdown Population ====================
-    
+
     /**
      * Plain-English tooltips per event name. Sourced from the admin
      * translation file (preview.eventTooltips), with the inline map below
@@ -3188,67 +3389,7 @@
         } else {
             placeholderText = PreviewConfig.i18n?.selectFunction || '-- Select function --';
         }
-        jsFormFunction.innerHTML = '';
-        var placeholderOpt = document.createElement('option');
-        placeholderOpt.value = '';
-        placeholderOpt.textContent = placeholderText;
-        jsFormFunction.appendChild(placeholderOpt);
-
-        // Beta.9 A2 Slice 1: group by verb category (replaces the old
-        // type=core/custom/other split — `core` was vestigial after the
-        // custom-functions plan was dropped; see DESIGN_DECISIONS.md
-        // "Picker categorisation"). category is OPTIONAL on catalog
-        // entries: missing → "Uncategorized" (defensive bucket — visually
-        // flags forgotten declarations); 'general' is the intentional
-        // cross-cutting bucket (e.g. toast).
-        const grouped = {};
-        fnsToShow.forEach(fn => {
-            const cat = fn.category || 'uncategorized';
-            if (!grouped[cat]) grouped[cat] = [];
-            grouped[cat].push(fn);
-        });
-
-        const KNOWN_CATEGORY_ORDER = [
-            'dom-toggle', 'form', 'fetch', 'auth', 'nav',
-            'state-store', 'focus', 'display', 'general'
-        ];
-        const CATEGORY_LABELS = {
-            'dom-toggle':  'DOM toggles',
-            'form':        'Forms',
-            'fetch':       'Fetch / network',
-            'auth':        'Auth',
-            'nav':         'Navigation',
-            'state-store': 'State stores',
-            'focus':       'DOM focus',
-            'display':     'Rendering / display',
-            'general':     'General',
-            'uncategorized': 'Uncategorized'
-        };
-        // Render known categories first in the locked order, then any
-        // unknown declared categories alphabetically, then the
-        // uncategorized bucket LAST so authors notice missing declarations.
-        const renderOrder = KNOWN_CATEGORY_ORDER.slice();
-        Object.keys(grouped)
-            .filter(c => c !== 'uncategorized' && KNOWN_CATEGORY_ORDER.indexOf(c) === -1)
-            .sort()
-            .forEach(c => renderOrder.push(c));
-        if (grouped.uncategorized) renderOrder.push('uncategorized');
-
-        renderOrder.forEach(cat => {
-            if (!grouped[cat] || grouped[cat].length === 0) return;
-            const optgroup = document.createElement('optgroup');
-            optgroup.label = CATEGORY_LABELS[cat] || cat;
-            grouped[cat].forEach(fn => {
-                const option = document.createElement('option');
-                option.value = fn.name;
-                option.textContent = fn.name;
-                option.dataset.args = JSON.stringify(fn.args || []);
-                option.dataset.description = fn.description || '';
-                option.dataset.example = fn.example || '';
-                optgroup.appendChild(option);
-            });
-            jsFormFunction.appendChild(optgroup);
-        });
+        _populateVerbSelect(jsFormFunction, fnsToShow, placeholderText);
 
         // Slice 2 combobox: sync the wrapper now that the native select
         // has been rebuilt. No-op if the wrapper isn't mounted yet.

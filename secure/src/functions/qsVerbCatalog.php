@@ -259,7 +259,7 @@ function qsVerbCatalog(): array {
             'args' => [
                 ['name' => 'storage', 'type' => 'string', 'required' => true, 'description' => 'Where to store the token: localStorage (persists across browser restarts) or sessionStorage (clears on tab close).', 'inputType' => 'enum', 'options' => ['localStorage', 'sessionStorage']],
                 ['name' => 'key', 'type' => 'string', 'required' => true, 'description' => 'Storage key name (e.g. authToken). Matches the auth.tokenSource configured for downstream API calls.', 'inputType' => 'storageKey', 'scopeFrom' => 'storage'],
-                ['name' => 'path', 'type' => 'string', 'required' => true, 'description' => 'Dot-notation path into the last fetch result (e.g. token, data.access_token).']
+                ['name' => 'path', 'type' => 'string', 'required' => true, 'description' => 'Dot-notation path into the last fetch result (e.g. token, data.access_token).', 'inputType' => 'responsePath']
             ],
             'description' => 'Read a value from the last fetch response (QS._lastFetchResult) and stash it in localStorage / sessionStorage. Typical use: chain after a login fetch to persist the returned token so subsequent calls pick it up via the endpoint\'s auth.tokenSource. Fires `qs:auth:saved` on document with detail.{storage, key, tokenKey, value}.',
             'example' => '{{call:fetch:@auth-api/login,body=#login-form}};{{call:saveToken:localStorage,authToken,token}}',
@@ -284,7 +284,7 @@ function qsVerbCatalog(): array {
             'args' => [
                 ['name' => 'storage', 'type' => 'string', 'required' => true, 'description' => 'localStorage (persists across restarts) or sessionStorage (clears on tab close).', 'inputType' => 'enum', 'options' => ['localStorage', 'sessionStorage']],
                 ['name' => 'key', 'type' => 'string', 'required' => true, 'description' => 'Storage key name. Declared in the storage registry (/admin/storage) — pick an existing one or create it inline.', 'inputType' => 'storageKey', 'scopeFrom' => 'storage'],
-                ['name' => 'path', 'type' => 'string', 'required' => true, 'description' => 'Dot-notation path into the last fetch result (e.g. data.theme).']
+                ['name' => 'path', 'type' => 'string', 'required' => true, 'description' => 'Dot-notation path into the last fetch result (e.g. data.theme).', 'inputType' => 'responsePath']
             ],
             'description' => 'Generic storage write — the non-auth sibling of saveToken. Reads a value from the last fetch response (QS._lastFetchResult) and stashes it in localStorage / sessionStorage, firing `qs:storage:changed` so data-storage-* bindings re-render. Use for non-token values (preferences, saved drafts, …) that the storage registry tracks.',
             'example' => '{{call:fetch:@prefs-api/get}};{{call:store:localStorage,themePref,data.theme}}',
