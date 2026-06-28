@@ -221,7 +221,7 @@ function buildCookiePolicyStructure(array $items, array $oauthLinks): array {
         // Description cell references the storage registry's canonical
         // description key (translate/ — storageDescKey), resolved live at render.
         // Empty cell when the item has no description.
-        $hasDesc = storageItemDescription((string) $id, $item, storageDefaultLang()) !== '';
+        $hasDesc = storageItemDescription((string) $id, $item, storageDescLang()) !== '';
         $bodyRows[] = _cNode('tr', [], [
             _cNode('td', ['class' => 'qs-cookie-policy__key'], [_cRaw((string) $id)]),
             _cNode('td', [], [_cRaw((string) ($item['scope'] ?? ''))]),

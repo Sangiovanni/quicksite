@@ -54,7 +54,10 @@ $baseUrl = rtrim(BASE_URL, '/');
             Refresh
         </button>
     </div>
-    <div class="admin-toolbar__right" id="storage-filter-bar"></div>
+    <div class="admin-toolbar__right">
+        <div id="storage-desc-lang-bar" class="storage-desc-lang-bar"></div>
+        <div id="storage-filter-bar"></div>
+    </div>
 </div>
 
 <div id="storage-scan-panel" class="storage-scan" role="region" aria-label="Storage scan results" hidden></div>

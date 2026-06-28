@@ -304,6 +304,20 @@
     font-size: 12px;
 }
 
+/* Page-level "description language" selector (multilingual projects only). The
+   language storage descriptions are authored in; changing it moves the values. */
+.storage-desc-lang-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.storage-desc-lang-bar__label {
+    font-size: 12px;
+    color: var(--admin-text-muted, #555);
+    white-space: nowrap;
+}
+.storage-desc-lang-bar__select { width: auto; min-width: 64px; }
+
 /* Active-project badge in the admin header (general admin chrome — lives here
    for now since this stylesheet loads on every admin page). */
 .admin-project-badge { font-weight: 600; }

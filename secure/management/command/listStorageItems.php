@@ -19,7 +19,13 @@ require_once SECURE_FOLDER_PATH . '/src/functions/storageHelpers.php';
 
 $registry = loadStorageRegistry();
 
-$defaultLang = storageDefaultLang();
+$descLang = storageDescLang($registry);
+$languages = (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) && is_array(CONFIG['LANGUAGES_SUPPORTED']))
+    ? array_values(array_filter(CONFIG['LANGUAGES_SUPPORTED'], fn($l) => is_string($l) && $l !== '' && $l !== 'default'))
+    : [$descLang];
+if (empty($languages)) {
+    $languages = [$descLang];
+}
 
 $out = [];
 foreach ($registry['items'] as $id => $item) {
@@ -27,13 +33,22 @@ foreach ($registry['items'] as $id => $item) {
         continue;
     }
     $row = $item;
-    unset($row['description']); // not stored inline anymore — resolve from translate/
+    unset($row['description']); // structure-only now — descriptions live in translate/
     $row['id'] = $id;
     $row['consentRequired'] = storageConsentRequired($item);
-    $desc = storageItemDescription((string) $id, $item, $defaultLang);
-    if ($desc !== '') {
-        $row['description'] = [$defaultLang => $desc];
+
+    // Card description shows the storage description-language value (raw — no
+    // cross-language fallback), with an inline seed only for a not-yet-migrated
+    // item. Authoring/translation of other languages happens via the language tool.
+    $key = storageDescKey((string) $id);
+    $desc = _storageReadTranslationKey($descLang, $key);
+    if (($desc === null || $desc === '') && isset($item['description'][$descLang]) && is_string($item['description'][$descLang])) {
+        $desc = $item['description'][$descLang];
     }
+    if ($desc !== null && $desc !== '') {
+        $row['description'] = [$descLang => $desc];
+    }
+
     $out[] = $row;
 }
 
@@ -44,5 +59,7 @@ ApiResponse::create(200, 'success')
         'count'      => count($out),
         'scopes'     => STORAGE_SCOPES,
         'categories' => STORAGE_CATEGORIES,
+        'languages'  => $languages,
+        'descLang'   => $descLang,
     ])
     ->send();

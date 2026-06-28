@@ -64,7 +64,9 @@ function loadStorageRegistry(): array {
     return $decoded;
 }
 
-/** Write the registry. Creates `data/` if missing. Stable key order. */
+/** Write the registry. Creates `data/` if missing. Stable key order. Preserves
+ *  the registry-level `descLang` (the language storage descriptions are authored
+ *  in) when present. */
 function saveStorageRegistry(array $registry): bool {
     $path = getStorageRegistryPath();
     $dir = dirname($path);
@@ -73,15 +75,63 @@ function saveStorageRegistry(array $registry): bool {
     }
     $items = (isset($registry['items']) && is_array($registry['items'])) ? $registry['items'] : [];
     ksort($items);
-    if (empty($items)) {
-        $json = "{\n    \"items\": {}\n}\n";
-    } else {
-        $json = json_encode(
-            ['items' => $items],
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
-        );
+    $out = [];
+    if (isset($registry['descLang']) && is_string($registry['descLang']) && $registry['descLang'] !== '') {
+        $out['descLang'] = $registry['descLang'];
     }
+    $out['items'] = empty($items) ? (object) [] : $items;
+    $json = json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     return file_put_contents($path, $json, LOCK_EX) !== false;
+}
+
+/**
+ * The language storage descriptions are authored in (registry-level setting).
+ * Defaults to the website default until the author changes it on /admin/storage.
+ */
+function storageDescLang(?array $registry = null): string {
+    if ($registry === null) {
+        $registry = loadStorageRegistry();
+    }
+    $l = $registry['descLang'] ?? null;
+    return (is_string($l) && $l !== '') ? $l : storageDefaultLang();
+}
+
+/**
+ * Move every item's description from language $from to language $to in the
+ * translate files (true move — the source value is removed). When $execute is
+ * false, nothing is written; the return only reports what WOULD happen.
+ *
+ * @return array{moved:int, overwrites:int} moved = items with a $from value;
+ *               overwrites = of those, how many already had a $to value.
+ */
+function storageMoveDescriptions(string $from, string $to, bool $execute = true): array {
+    $registry = loadStorageRegistry();
+    $moved = 0;
+    $overwrites = 0;
+    if ($from === $to) {
+        return ['moved' => 0, 'overwrites' => 0];
+    }
+    foreach (array_keys($registry['items']) as $id) {
+        $key = storageDescKey((string) $id);
+        $val = _storageReadTranslationKey($from, $key);
+        if ($val === null || $val === '') {
+            continue;
+        }
+        $existingTarget = _storageReadTranslationKey($to, $key);
+        if ($existingTarget !== null && $existingTarget !== '') {
+            $overwrites++;
+        }
+        $moved++;
+        if ($execute) {
+            writeTranslationsToFile($to, convertDotNotationToNested([$key => $val]), false);
+            // Empty the source key, don't delete it: keeping it present (as "")
+            // makes the translate tooling flag the old language as a MISSING
+            // translation (the desired re-translation signal) and avoids leaving
+            // an empty-object artifact. The privacy helper's move must do the same.
+            _storageSetTranslationKey($from, $key, '');
+        }
+    }
+    return ['moved' => $moved, 'overwrites' => $overwrites];
 }
 
 /** consentRequired is derived — essential never needs consent. */
@@ -137,6 +187,29 @@ function _storageUnsetTranslationKey(string $lang, string $dotKey): void {
     }
     if (!array_key_exists($leaf, $cur)) return;
     unset($cur[$leaf]);
+    unset($cur);
+    file_put_contents($file, json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
+}
+
+/**
+ * Set a single dot-notation key in translate/<lang>.json to a literal value,
+ * creating parents as needed. Edits ONLY that language file (no default.json
+ * sync, unlike writeTranslationsToFile) — used to EMPTY a moved-away key so it
+ * surfaces as a missing translation rather than vanishing.
+ */
+function _storageSetTranslationKey(string $lang, string $dotKey, string $value): void {
+    $file = PROJECT_PATH . '/translate/' . $lang . '.json';
+    if (!file_exists($file)) return;
+    $decoded = json_decode((string) @file_get_contents($file), true);
+    if (!is_array($decoded)) return;
+    $parts = explode('.', $dotKey);
+    $leaf  = array_pop($parts);
+    $cur = &$decoded;
+    foreach ($parts as $part) {
+        if (!isset($cur[$part]) || !is_array($cur[$part])) { $cur[$part] = []; }
+        $cur = &$cur[$part];
+    }
+    $cur[$leaf] = $value;
     unset($cur);
     file_put_contents($file, json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
 }
@@ -229,23 +302,29 @@ function validateStorageItem(string $id, array $input): array {
         $item['category'] = $category;
     }
 
-    // description — optional map of lang => string. NOT stored inline; returned
-    // separately so the caller persists it into translate/ via
-    // storageWriteDescription() and the stored item stays structure-only.
+    // description — authored prose for the storage description-language. Accepts
+    // a plain string (stored under storageDescLang()) or a {lang: string} map
+    // (API callers). NOT stored inline; returned separately so the caller
+    // persists it into translate/ via storageWriteDescription().
     $description = null;
     if (isset($input['description'])) {
-        if (!is_array($input['description'])) {
-            $errors[] = ['field' => 'description', 'reason' => 'invalid_type', 'expected' => 'object {lang: string}'];
-        } else {
+        if (is_string($input['description'])) {
+            $t = trim($input['description']);
+            if ($t !== '') {
+                $description = [storageDescLang() => $t];
+            }
+        } elseif (is_array($input['description'])) {
             $desc = [];
             foreach ($input['description'] as $lang => $text) {
-                if (is_string($lang) && is_string($text)) {
+                if (is_string($lang) && is_string($text) && $text !== '') {
                     $desc[$lang] = $text;
                 }
             }
             if (!empty($desc)) {
                 $description = $desc;
             }
+        } else {
+            $errors[] = ['field' => 'description', 'reason' => 'invalid_type', 'expected' => 'string or {lang: string}'];
         }
     }
 

@@ -4599,7 +4599,26 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '404.storage.not_found' => 'No item with this id'
         ],
-        'notes' => 'Does not check in-use references yet — the scan/reconcile slice surfaces dangling reads.'
+        'notes' => 'Does not check in-use references yet — the scan/reconcile slice surfaces dangling reads. Also clears the item description key from translate/.'
+    ],
+    'setStorageDescLang' => [
+        'description' => 'Change the language storage descriptions are authored in (registry-level descLang on data/storage.json). MOVES every item description from the current language to the target in the translate files (true move — source cleared), OVERWRITING any existing target-language values. Two-step: call without confirm to preview (409 needsConfirm with moved/overwrites counts), then re-call with confirm:true to execute. Descriptions are page content (textKeys) so the move is live — no regenerate needed.',
+        'method' => 'POST',
+        'parameters' => [
+            'lang' => ['required' => true, 'type' => 'string', 'description' => 'Target language, must be in LANGUAGES_SUPPORTED.'],
+            'confirm' => ['required' => false, 'type' => 'boolean', 'description' => 'Execute the move (defaults false → preview only).']
+        ],
+        'example_post' => 'POST \management\setStorageDescLang with {"lang":"fr","confirm":true}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'success',
+            'data' => ['descLang' => 'fr', 'moved' => 3, 'overwrites' => 1]
+        ],
+        'error_responses' => [
+            '409.storage.desclang_confirm' => 'Confirmation required — data: {from, to, moved, overwrites, needsConfirm}',
+            '400.validation.invalid' => 'Language not in LANGUAGES_SUPPORTED'
+        ],
+        'notes' => 'No-op (200) when lang already active. Drives the /admin/storage description-language selector.'
     ],
     'scanStorageUsage' => [
         'description' => 'Scan the build for storage-key references and reconcile against the declared registry. Triggered, warn-style check (not blocking). Walks structures (data-storage-* attrs + saveToken/store/clearToken chains), api-endpoints auth sources, page-events handler chains, and state-store init. Buckets keys into ok / incomplete (used but undeclared) / dangling_read (read but never written) / orphan (declared but unreferenced).',

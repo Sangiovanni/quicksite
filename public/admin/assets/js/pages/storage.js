@@ -23,6 +23,8 @@
         items: [],
         scopes: ['localStorage', 'sessionStorage', 'cookie'],
         categories: ['essential', 'functional', 'analytics', 'marketing'],
+        languages: [DEFAULT_LANG],
+        descLang: DEFAULT_LANG,   // registry-level: language descriptions are authored in
         filter: 'all',
     };
 
@@ -111,7 +113,7 @@
     function _descOf(item) {
         var d = item.description;
         if (!d || typeof d !== 'object') return '';
-        if (d[DEFAULT_LANG]) return d[DEFAULT_LANG];
+        if (d[state.descLang]) return d[state.descLang];
         var keys = Object.keys(d);
         return keys.length ? String(d[keys[0]] || '') : '';
     }
@@ -219,11 +221,63 @@
             state.items = Array.isArray(payload.items) ? payload.items : [];
             if (Array.isArray(payload.scopes) && payload.scopes.length) state.scopes = payload.scopes;
             if (Array.isArray(payload.categories) && payload.categories.length) state.categories = payload.categories;
+            if (Array.isArray(payload.languages) && payload.languages.length) state.languages = payload.languages;
+            if (typeof payload.descLang === 'string' && payload.descLang) state.descLang = payload.descLang;
         } catch (e) {
             console.warn('[storage] load failed:', e);
             state.items = [];
         }
         renderList();
+        renderDescLangBar();
+    }
+
+    // ====================================================================
+    // Description-language selector (page-level; multilingual projects only)
+    // ====================================================================
+
+    function renderDescLangBar() {
+        var host = document.getElementById('storage-desc-lang-bar');
+        if (!host) return;
+        host.textContent = '';
+        if (state.languages.length <= 1) return; // monolingual: nothing to choose
+        host.appendChild(_el('span', { class: 'storage-desc-lang-bar__label', text: 'Description language:' }));
+        var sel = _renderSelect(state.languages, state.descLang);
+        sel.classList.add('storage-desc-lang-bar__select');
+        sel.addEventListener('change', function () { onDescLangChange(sel); });
+        host.appendChild(sel);
+    }
+
+    async function onDescLangChange(sel) {
+        var target = sel.value;
+        var current = state.descLang;
+        if (target === current) return;
+        sel.disabled = true;
+        try {
+            // First call previews (409 needsConfirm) — report the move + overwrites.
+            var preview = await api('setStorageDescLang', 'POST', { lang: target });
+            var pdata = (preview && preview.data && (preview.data.data || preview.data)) || {};
+            var moved = pdata.moved || 0;
+            var overwrites = pdata.overwrites || 0;
+            var msg = 'Change the description language from "' + current + '" to "' + target + '"?\n\n'
+                + 'This moves ' + moved + ' description' + (moved === 1 ? '' : 's') + ' into "' + target + '".';
+            if (overwrites > 0) {
+                msg += '\n\n⚠ ' + overwrites + ' existing "' + target + '" description'
+                    + (overwrites === 1 ? '' : 's') + ' will be OVERWRITTEN.';
+            }
+            if (!window.confirm(msg)) {
+                sel.value = current; sel.disabled = false; return;
+            }
+            var done = await api('setStorageDescLang', 'POST', { lang: target, confirm: true });
+            if (!done || !done.ok) {
+                sel.value = current; sel.disabled = false;
+                window.alert((done && done.data && done.data.message) || 'Failed to change description language');
+                return;
+            }
+            await refresh();
+        } catch (e) {
+            sel.value = current; sel.disabled = false;
+            console.warn('[storage] descLang change failed:', e);
+        }
     }
 
     // ====================================================================
@@ -319,14 +373,17 @@
         dialog.appendChild(_renderGroup(_renderLabel('Retention'), retentionWrap,
             _renderHint('How long the key lives — disclosed on the cookie/privacy page.')));
 
-        // description (single language)
+        // description — authored in the registry's description language (the
+        // page-level selector). Value lives in translate/ (keyed); editing is
+        // live (no regenerate needed). Other languages are translated separately
+        // via the visual-editor language tool.
         var descInput = _el('input', {
             type: 'text', class: 'admin-input', autocomplete: 'off',
             placeholder: 'What this key is used for',
             value: isEdit ? _descOf(item) : '',
         });
-        dialog.appendChild(_renderGroup(_renderLabel('Description (' + DEFAULT_LANG + ')'), descInput,
-            _renderHint('Shown on the generated cookie/privacy page. Other languages are filled later.')));
+        dialog.appendChild(_renderGroup(_renderLabel('Description (' + state.descLang + ')'), descInput,
+            _renderHint('Shown on the generated cookie/privacy page, in the description language. Edits are live — no regenerate needed. Other languages: use the visual-editor language tool.')));
 
         // cookie-only conditional fields
         var cookieWrap = _el('div', { class: 'storage-cookie-fields' });
@@ -371,8 +428,16 @@
             };
             var retention = retentionSelect.value === '__custom__' ? retentionCustom.value.trim() : retentionSelect.value;
             if (retention) body.retention = retention;
+
+            // Description is a plain string in the registry's description language.
+            // On edit, always send it (empty clears — replace-all); on add, only
+            // when non-empty.
             var descText = descInput.value.trim();
-            if (descText) { body.description = {}; body.description[DEFAULT_LANG] = descText; }
+            if (isEdit) {
+                body.description = descText;
+            } else if (descText) {
+                body.description = descText;
+            }
             if (scopeSelect.value === 'cookie') {
                 if (domainInput.value.trim()) body.domain = domainInput.value.trim();
                 if (pathInput.value.trim()) body.path = pathInput.value.trim();

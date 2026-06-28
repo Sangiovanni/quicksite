@@ -178,7 +178,7 @@ function getCommandCategories(): array {
         'storage_registry' => [
             'label' => 'Storage Registry',
             'icon' => 'database',
-            'commands' => ['listStorageItems', 'addStorageItem', 'editStorageItem', 'deleteStorageItem', 'scanStorageUsage', 'getConsentStatus', 'generateConsentLayer', 'generateCookiePolicy', 'deleteCookiePolicy']
+            'commands' => ['listStorageItems', 'addStorageItem', 'editStorageItem', 'deleteStorageItem', 'setStorageDescLang', 'scanStorageUsage', 'getConsentStatus', 'generateConsentLayer', 'generateCookiePolicy', 'deleteCookiePolicy']
         ],
         'snippet_management' => [
             'label' => 'Snippets',
