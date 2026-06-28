@@ -80,8 +80,10 @@ function privacyScanEndpoints(): array {
                 'path'           => is_string($ep['path'] ?? null) ? $ep['path'] : '',
                 'baseUrl'        => $baseUrl,
                 'fields'         => array_keys($fields),
-                // Body-bearing method with no declared request body = blind spot.
-                'undeclaredBody' => in_array($method, PRIVACY_BODY_METHODS, true) && !$hasReqSchema,
+                // Blind spot: a body-bearing method that declares NO fields at all
+                // (no parameters, no request schema). An endpoint that declares
+                // fields — even via path params — is not "undeclared".
+                'undeclaredBody' => in_array($method, PRIVACY_BODY_METHODS, true) && empty($fields),
             ];
         }
     }
