@@ -4822,6 +4822,46 @@ $GLOBALS['__help_commands'] = [
         ],
         'notes' => 'Drives the /admin/privacy host-classification UI. name/privacyUrl are ignored for kind=self.'
     ],
+    'generatePrivacyPolicy' => [
+        'description' => 'Generate (or overwrite) the privacy-policy page at an author-chosen route, deterministically from the privacy registry + API scan. Builds a "data we collect" table (collected-data label/purpose textKeys), a per-third-party "data sharing" section (derived from atom mappings + host classification), an OAuth sign-in section, a cookie cross-link (link if a cookie page exists / hint if not / omitted when cookieSection=omit), and a legal disclaimer. Records the route in data/privacy.json and seeds default-language structural copy.',
+        'method' => 'POST',
+        'parameters' => [
+            'route' => ['required' => true, 'type' => 'string', 'description' => 'Route to host the page (1-5 lowercase literal segments). Existing route is overwritten with overwrite:true.', 'example' => 'privacy'],
+            'overwrite' => ['required' => false, 'type' => 'boolean', 'description' => 'Confirm overwriting an existing route.']
+        ],
+        'example_post' => 'POST \management\generatePrivacyPolicy {"route":"privacy"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'success',
+            'data' => ['route' => '/privacy', 'overwritten' => false, 'collected' => 3, 'thirdParties' => 1, 'cookieMode' => 'link', 'languagesSeeded' => '{lang: keysAdded}']
+        ],
+        'error_responses' => [
+            '409.route.exists' => 'Route exists — re-call with overwrite:true (data.needsConfirm)',
+            '400.route.invalid' => 'Route must have 1-5 segments',
+            '400.route.invalid_segment' => 'Invalid route segment'
+        ],
+        'notes' => 'Descriptions resolve live (textKeys); regenerate only for data changes (new mappings, host re-classification). Drives the /admin/privacy Generate/Update flow.'
+    ],
+    'deletePrivacyPolicy' => [
+        'description' => 'Delete the generated privacy-policy page (the route recorded in data/privacy.json) and clear the recorded route. No body — the route is read from privacy.json so an unrelated route cannot be deleted by accident. Deletes the leaf route + its page files; parent routes stay.',
+        'method' => 'POST',
+        'parameters' => [],
+        'example_post' => 'POST \management\deletePrivacyPolicy',
+        'success_response' => ['status' => 200, 'code' => 'success', 'data' => ['route' => '/privacy', 'routeDeleted' => true]],
+        'error_responses' => ['400 privacy.no_policy_route' => 'No privacy-policy route is configured'],
+        'notes' => 'routeDeleted=false means the route was already gone (stale reference cleared).'
+    ],
+    'setPrivacyCookieSection' => [
+        'description' => 'Set how the generated privacy page treats cookies: "auto" (link the cookie policy if one exists, else hint to make one) or "omit" (no cookie section — for sites that handle cookies elsewhere or use none).',
+        'method' => 'POST',
+        'parameters' => [
+            'cookieSection' => ['required' => true, 'type' => 'string', 'enum' => ['auto', 'omit']]
+        ],
+        'example_post' => 'POST \management\setPrivacyCookieSection with {"cookieSection":"omit"}',
+        'success_response' => ['status' => 200, 'code' => 'success', 'data' => ['cookieSection' => 'omit']],
+        'error_responses' => ['400.validation.invalid' => 'cookieSection must be auto or omit'],
+        'notes' => 'Applies on the next generate/update. Drives the /admin/privacy cookie-section toggle.'
+    ],
 
     'getApiEndpoint' => [
         'description' => 'Gets a single endpoint by ID, including the parent API\'s auth configuration.',

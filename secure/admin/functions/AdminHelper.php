@@ -183,7 +183,7 @@ function getCommandCategories(): array {
         'privacy_registry' => [
             'label' => 'Privacy',
             'icon' => 'shield',
-            'commands' => ['getPrivacyStatus', 'setCollectedDatum', 'deleteCollectedDatum', 'setPrivacyDescLang', 'setPrivacyMapping', 'setPrivacyHost']
+            'commands' => ['getPrivacyStatus', 'setCollectedDatum', 'deleteCollectedDatum', 'setPrivacyDescLang', 'setPrivacyMapping', 'setPrivacyHost', 'generatePrivacyPolicy', 'deletePrivacyPolicy', 'setPrivacyCookieSection']
         ],
         'snippet_management' => [
             'label' => 'Snippets',

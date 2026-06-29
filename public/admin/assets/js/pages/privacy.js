@@ -468,6 +468,74 @@
         return note;
     }
 
+    // ---- privacy page generation (Generate / Update / Delete) -------------
+
+    function _renderPrivacyPageSection(s) {
+        var sec = _el('section', { class: 'privacy-section' });
+        var head = _el('div', { class: 'privacy-section__head' });
+        head.appendChild(_el('h2', { class: 'privacy-section__title', text: 'Privacy page' }));
+        sec.appendChild(head);
+
+        var hasPage = !!(s.privacyRoute && s.privacyRouteExists);
+        if (hasPage) {
+            var routeRow = _el('div', { class: 'privacy-page-gen' });
+            routeRow.appendChild(_el('span', { class: 'admin-label', text: 'Generated at' }));
+            routeRow.appendChild(_el('code', { class: 'privacy-host__url', text: s.privacyRoute }));
+            sec.appendChild(routeRow);
+            var acts = _el('div', { class: 'privacy-page-actions' });
+            acts.appendChild(_el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Update', onclick: function () { onGeneratePrivacy(String(s.privacyRoute).replace(/^\/+|\/+$/g, ''), true); } }));
+            acts.appendChild(_el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Delete', onclick: onDeletePrivacy }));
+            sec.appendChild(acts);
+            sec.appendChild(_el('p', { class: 'admin-hint', text: 'Update refreshes the page from the current data. Descriptions edit live; regenerate only after data changes (new mappings, host changes).' }));
+        } else {
+            var input = _el('input', { type: 'text', class: 'admin-input', placeholder: 'e.g. privacy', value: s.privacyRoute ? String(s.privacyRoute).replace(/^\/+/, '') : '' });
+            var gen = _el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Generate', onclick: function () { var r = input.value.trim().replace(/^\/+|\/+$/g, ''); if (!r) { window.alert('Enter a route, e.g. privacy'); return; } onGeneratePrivacy(r, false); } });
+            sec.appendChild(_el('label', { class: 'admin-label', text: 'Page route' }));
+            sec.appendChild(_el('div', { class: 'privacy-page-gen' }, [input, gen]));
+            if (s.privacyRoute && !s.privacyRouteExists) {
+                sec.appendChild(_el('p', { class: 'admin-hint', text: 'The previous route "' + s.privacyRoute + '" no longer exists — generate to recreate it.' }));
+            }
+        }
+
+        var cb = _el('input', { type: 'checkbox' });
+        if (s.cookieSection === 'omit') cb.checked = true;
+        cb.addEventListener('change', function () { onToggleCookieSection(cb.checked); });
+        sec.appendChild(_el('label', { class: 'privacy-radio privacy-cookie-toggle' }, [cb, ' Don’t mention cookies on this page']));
+        sec.appendChild(_renderCookieNote(s));
+        return sec;
+    }
+
+    function onGeneratePrivacy(route, overwrite) {
+        var body = overwrite ? { route: route, overwrite: true } : { route: route };
+        return api('generatePrivacyPolicy', 'POST', body).then(function (r) {
+            var d = (r && r.data && (r.data.data || r.data)) || {};
+            if (r && !r.ok && d.needsConfirm) {
+                if (!window.confirm('Route /' + route + ' already exists. Overwrite its content with the privacy-policy page?')) return;
+                return api('generatePrivacyPolicy', 'POST', { route: route, overwrite: true }).then(function (r2) {
+                    if (!r2 || !r2.ok) { window.alert((r2 && r2.data && r2.data.message) || 'Generate failed'); return; }
+                    return refresh();
+                });
+            }
+            if (!r || !r.ok) { window.alert((r && r.data && r.data.message) || 'Generate failed'); return; }
+            return refresh();
+        }).catch(function (e) { window.alert((e && e.message) || 'Network error'); });
+    }
+
+    function onDeletePrivacy() {
+        if (!window.confirm('Delete the generated privacy page? This removes the route and its page.')) return;
+        return api('deletePrivacyPolicy', 'POST', {}).then(function (r) {
+            if (!r || !r.ok) { window.alert((r && r.data && r.data.message) || 'Delete failed'); return; }
+            return refresh();
+        }).catch(function (e) { window.alert((e && e.message) || 'Network error'); });
+    }
+
+    function onToggleCookieSection(omit) {
+        return api('setPrivacyCookieSection', 'POST', { cookieSection: omit ? 'omit' : 'auto' }).then(function (r) {
+            if (!r || !r.ok) { window.alert((r && r.data && r.data.message) || 'Failed to update cookie section'); }
+            return refresh();
+        }).catch(function (e) { window.alert((e && e.message) || 'Network error'); });
+    }
+
     function renderHint() {
         var host = document.getElementById('privacy-desclang-hint');
         if (!host) return;
@@ -488,7 +556,7 @@
             return;
         }
         root.appendChild(_renderCoverage(s.coverage));
-        root.appendChild(_renderCookieNote(s));
+        root.appendChild(_renderPrivacyPageSection(s));
         root.appendChild(_renderCollectedSection(s.collectedData));
         root.appendChild(_section('API hosts', String(s.hosts.length), _renderHosts(s.hosts)));
         root.appendChild(_section('Detected sign-in', null, _renderAuthSeed(s.authSeed)));

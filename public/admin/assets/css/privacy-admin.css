@@ -166,7 +166,13 @@
 .privacy-authseed__name { font-weight: 600; font-size: 13px; }
 .privacy-authseed__detail { font-size: 12px; color: var(--admin-text-muted, #666); }
 
-.privacy-cookie-note { margin: -6px 0 0; }
+.privacy-cookie-note { margin: 4px 0 0; }
+
+/* Privacy page generate/update/delete */
+.privacy-page-gen { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.privacy-page-gen .admin-input { flex: 1 1 auto; min-width: 160px; }
+.privacy-page-actions { display: flex; gap: 8px; margin-bottom: 8px; }
+.privacy-cookie-toggle { margin: 8px 0 2px; }
 
 /* Atom mapping menu (click an atom chip) */
 .privacy-atom-menu {
