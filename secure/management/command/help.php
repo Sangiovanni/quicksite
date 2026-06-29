@@ -4781,6 +4781,26 @@ $GLOBALS['__help_commands'] = [
         ],
         'notes' => 'No-op (200) when lang already active. Drives the /admin/privacy description-language selector.'
     ],
+    'setPrivacyMapping' => [
+        'description' => 'Map a scanned atom (endpoint, field) to a collected datum, or unset it. The atom comes from the API request-schema scan (getPrivacyStatus); the datum must already exist (setCollectedDatum). The recipient (your server vs a third party) is derived from the endpoint host classification, never stored on the mapping.',
+        'method' => 'POST',
+        'parameters' => [
+            'endpoint' => ['required' => true, 'type' => 'string', 'description' => 'Atom endpoint key, "apiId/endpointId".'],
+            'field' => ['required' => true, 'type' => 'string', 'description' => 'Field name sent by that endpoint.'],
+            'datum' => ['required' => false, 'type' => 'string', 'description' => 'Collected-data id; empty / "__unset__" clears the mapping.']
+        ],
+        'example_post' => 'POST \management\setPrivacyMapping with {"endpoint":"test-api-auth/login","field":"login","datum":"email"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'success',
+            'data' => ['endpoint' => 'test-api-auth/login', 'field' => 'login', 'datum' => 'email']
+        ],
+        'error_responses' => [
+            '400.privacy.unknown_datum' => 'datum is not a declared collected-data id',
+            '400.validation.required' => 'Missing endpoint or field'
+        ],
+        'notes' => 'Drives the /admin/privacy atom-mapping UI. Mapping an atom reduces the unmapped-coverage count.'
+    ],
 
     'getApiEndpoint' => [
         'description' => 'Gets a single endpoint by ID, including the parent API\'s auth configuration.',

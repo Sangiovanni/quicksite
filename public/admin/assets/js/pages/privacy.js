@@ -169,7 +169,8 @@
         if (root) root.textContent = '';
     }
 
-    function openDatumModal(datum) {
+    function openDatumModal(datum, opts) {
+        opts = opts || {};
         var isEdit = !!datum;
         var root = document.getElementById('privacy-modal-root');
         if (!root) return;
@@ -179,7 +180,7 @@
         var dialog = _el('div', { class: 'privacy-modal-dialog' });
         dialog.appendChild(_el('h2', { class: 'privacy-modal__title', text: isEdit ? 'Edit data collected' : 'Add data collected' }));
 
-        var labelInput = _el('input', { type: 'text', class: 'admin-input', autocomplete: 'off', placeholder: 'e.g. Email address', value: isEdit ? (datum.label || '') : '' });
+        var labelInput = _el('input', { type: 'text', class: 'admin-input', autocomplete: 'off', placeholder: 'e.g. Email address', value: isEdit ? (datum.label || '') : (opts.prefillLabel || '') });
         dialog.appendChild(_el('label', { class: 'admin-label', text: 'Label (' + state.descLang + ')' }));
         dialog.appendChild(labelInput);
 
@@ -210,7 +211,8 @@
                     errBox.hidden = false; errBox.textContent = (r && r.data && r.data.message) || 'Save failed'; saveBtn.disabled = false; return;
                 }
                 closeModal();
-                await refresh();
+                if (typeof opts.afterSave === 'function') { await opts.afterSave(id); }
+                else { await refresh(); }
             } catch (e) {
                 errBox.hidden = false; errBox.textContent = (e && e.message) || 'Network error'; saveBtn.disabled = false;
             }
@@ -245,6 +247,63 @@
             if (!done || !done.ok) { sel.value = current; sel.disabled = false; window.alert((done && done.data && done.data.message) || 'Failed to change language'); return; }
             await refresh();
         } catch (e) { sel.value = current; sel.disabled = false; console.warn('[privacy] descLang change failed:', e); }
+    }
+
+    // ---- atom -> datum mapping (click an atom chip) -----------------------
+
+    var _atomMenuEl = null;
+    function _closeAtomMenu() {
+        if (_atomMenuEl && _atomMenuEl.parentNode) _atomMenuEl.parentNode.removeChild(_atomMenuEl);
+        _atomMenuEl = null;
+        document.removeEventListener('mousedown', _onMenuOutside, true);
+    }
+    function _onMenuOutside(e) {
+        if (_atomMenuEl && !_atomMenuEl.contains(e.target)) _closeAtomMenu();
+    }
+
+    function openAtomMenu(endpoint, field, currentDatum, anchorEl) {
+        _closeAtomMenu();
+        var menu = _el('div', { class: 'privacy-atom-menu' });
+        menu.appendChild(_el('div', { class: 'privacy-atom-menu__head', text: 'Map "' + field + '" to:' }));
+        var listing = _el('div', { class: 'privacy-atom-menu__list' });
+        var data = (state.status && state.status.collectedData) || [];
+        if (!data.length) {
+            listing.appendChild(_el('div', { class: 'privacy-atom-menu__empty', text: 'No data collected yet.' }));
+        }
+        data.forEach(function (d) {
+            listing.appendChild(_el('button', {
+                type: 'button',
+                class: 'privacy-atom-menu__item' + (d.id === currentDatum ? ' privacy-atom-menu__item--active' : ''),
+                text: d.label || d.id,
+                onclick: function () { _closeAtomMenu(); setMapping(endpoint, field, d.id); },
+            }));
+        });
+        menu.appendChild(listing);
+        if (currentDatum) {
+            menu.appendChild(_el('button', { type: 'button', class: 'privacy-atom-menu__action', text: 'Unset', onclick: function () { _closeAtomMenu(); setMapping(endpoint, field, null); } }));
+        }
+        menu.appendChild(_el('button', {
+            type: 'button', class: 'privacy-atom-menu__action privacy-atom-menu__action--new',
+            text: '+ New data collected from this field',
+            onclick: function () { _closeAtomMenu(); openDatumModal(null, { prefillLabel: field, afterSave: function (id) { return setMapping(endpoint, field, id); } }); },
+        }));
+
+        document.body.appendChild(menu);
+        var rect = anchorEl.getBoundingClientRect();
+        menu.style.position = 'fixed';
+        menu.style.top = (rect.bottom + 4) + 'px';
+        menu.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - menu.offsetWidth - 12)) + 'px';
+        _atomMenuEl = menu;
+        setTimeout(function () { document.addEventListener('mousedown', _onMenuOutside, true); }, 0);
+    }
+
+    function setMapping(endpoint, field, datumId) {
+        return api('setPrivacyMapping', 'POST', { endpoint: endpoint, field: field, datum: datumId || '__unset__' })
+            .then(function (r) {
+                if (!r || !r.ok) { window.alert((r && r.data && r.data.message) || 'Mapping failed'); return; }
+                return refresh();
+            })
+            .catch(function (e) { window.alert((e && e.message) || 'Network error'); });
     }
 
     // ---- hosts ------------------------------------------------------------
@@ -288,9 +347,14 @@
                 var atoms = _el('div', { class: 'privacy-endpoint__atoms' });
                 ep.fields.forEach(function (f) {
                     var mapped = f.datum != null;
-                    var chip = _el('span', { class: 'privacy-atom' + (mapped ? ' privacy-atom--mapped' : ' privacy-atom--unset') });
+                    var chip = _el('button', {
+                        type: 'button',
+                        class: 'privacy-atom' + (mapped ? ' privacy-atom--mapped' : ' privacy-atom--unset'),
+                        title: 'Click to map',
+                    });
                     chip.appendChild(_el('span', { class: 'privacy-atom__field', text: f.field }));
                     chip.appendChild(_el('span', { class: 'privacy-atom__datum', text: mapped ? '→ ' + f.datum : 'unset' }));
+                    chip.addEventListener('click', function () { openAtomMenu(ep.key, f.field, f.datum, chip); });
                     atoms.appendChild(chip);
                 });
                 card.appendChild(atoms);
