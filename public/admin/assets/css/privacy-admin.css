@@ -121,9 +121,14 @@
     border-radius: 6px;
     background: var(--admin-surface-alt, rgba(127,127,127,0.05));
 }
-.privacy-host__main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.privacy-host__main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .privacy-host__url { font-size: 12px; }
 .privacy-host__apis { font-size: 11px; color: var(--admin-text-muted, #666); }
+.privacy-host__classify { flex-shrink: 0; }
+
+/* Host classify modal */
+.privacy-radio { display: flex; align-items: center; gap: 6px; font-size: 13px; padding: 2px 0; cursor: pointer; }
+.privacy-host-tp { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 
 /* Endpoints + atoms */
 .privacy-endpoints { display: flex; flex-direction: column; gap: 8px; }

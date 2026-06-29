@@ -223,6 +223,66 @@
         labelInput.focus();
     }
 
+    function openHostModal(h) {
+        var root = document.getElementById('privacy-modal-root');
+        if (!root) return;
+        root.textContent = '';
+        var backdrop = _el('div', { class: 'privacy-modal-backdrop', onclick: function (e) { if (e.target === backdrop) closeModal(); } });
+        var dialog = _el('div', { class: 'privacy-modal-dialog' });
+        dialog.appendChild(_el('h2', { class: 'privacy-modal__title', text: 'Classify host' }));
+        dialog.appendChild(_el('code', { class: 'privacy-host__url', text: h.baseUrl }));
+
+        var kind = h.kind || 'self';
+        var selfRadio = _el('input', { type: 'radio', name: 'privacy-host-kind', value: 'self' });
+        if (kind === 'self') selfRadio.checked = true;
+        var selfLabel = _el('label', { class: 'privacy-radio' }, [selfRadio, ' A server you operate']);
+        var thirdRadio = _el('input', { type: 'radio', name: 'privacy-host-kind', value: 'third-party' });
+        if (kind === 'third-party') thirdRadio.checked = true;
+        var thirdLabel = _el('label', { class: 'privacy-radio' }, [thirdRadio, ' A third party']);
+        dialog.appendChild(selfLabel);
+        dialog.appendChild(thirdLabel);
+
+        var tpWrap = _el('div', { class: 'privacy-host-tp' });
+        var nameInput = _el('input', { type: 'text', class: 'admin-input', placeholder: 'Name, e.g. Mailchimp', value: h.name || '' });
+        var urlInput = _el('input', { type: 'text', class: 'admin-input', placeholder: 'https://…/privacy', value: h.privacyUrl || '' });
+        tpWrap.appendChild(_el('label', { class: 'admin-label', text: 'Third-party name' }));
+        tpWrap.appendChild(nameInput);
+        tpWrap.appendChild(_el('label', { class: 'admin-label', text: 'Privacy-policy URL' }));
+        tpWrap.appendChild(urlInput);
+        dialog.appendChild(tpWrap);
+        function syncTp() { tpWrap.style.display = thirdRadio.checked ? '' : 'none'; }
+        selfRadio.addEventListener('change', syncTp);
+        thirdRadio.addEventListener('change', syncTp);
+        syncTp();
+
+        var errBox = _el('div', { class: 'privacy-modal__error', hidden: 'hidden' });
+        dialog.appendChild(errBox);
+        var actions = _el('div', { class: 'privacy-modal__actions' });
+        actions.appendChild(_el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
+        var saveBtn = _el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Save' });
+        actions.appendChild(saveBtn);
+        dialog.appendChild(actions);
+
+        saveBtn.addEventListener('click', async function () {
+            errBox.hidden = true; errBox.textContent = '';
+            var k = thirdRadio.checked ? 'third-party' : 'self';
+            var body = { baseUrl: h.baseUrl, kind: k };
+            if (k === 'third-party') { body.name = nameInput.value.trim(); body.privacyUrl = urlInput.value.trim(); }
+            saveBtn.disabled = true;
+            try {
+                var r = await api('setPrivacyHost', 'POST', body);
+                if (!r || !r.ok) { errBox.hidden = false; errBox.textContent = (r && r.data && r.data.message) || 'Save failed'; saveBtn.disabled = false; return; }
+                closeModal();
+                await refresh();
+            } catch (e) {
+                errBox.hidden = false; errBox.textContent = (e && e.message) || 'Network error'; saveBtn.disabled = false;
+            }
+        });
+
+        backdrop.appendChild(dialog);
+        root.appendChild(backdrop);
+    }
+
     async function onDeleteDatum(d) {
         if (!window.confirm('Delete "' + (d.label || d.id) + '"? Any field mapped to it becomes unset.')) return;
         try {
@@ -321,8 +381,13 @@
                 : h.kind === 'self' ? _pill('your server', 'self')
                 : _pill('unclassified', 'warn');
             main.appendChild(kind);
+            main.appendChild(_el('span', { class: 'privacy-host__apis', text: (h.apiIds || []).join(', ') }));
             row.appendChild(main);
-            row.appendChild(_el('span', { class: 'privacy-host__apis', text: (h.apiIds || []).join(', ') }));
+            row.appendChild(_el('button', {
+                class: 'admin-btn admin-btn--ghost privacy-host__classify', type: 'button',
+                text: h.kind ? 'Edit' : 'Classify',
+                onclick: function () { openHostModal(h); },
+            }));
             wrap.appendChild(row);
         });
         return wrap;

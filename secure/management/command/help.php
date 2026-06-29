@@ -4801,6 +4801,27 @@ $GLOBALS['__help_commands'] = [
         ],
         'notes' => 'Drives the /admin/privacy atom-mapping UI. Mapping an atom reduces the unmapped-coverage count.'
     ],
+    'setPrivacyHost' => [
+        'description' => 'Classify an API host (baseUrl) as a server you operate ("self") or a third party. Third parties carry an optional display name + privacy-policy URL, rendered on the privacy page data-sharing section. Classification is author-declared (QuickSite cannot derive it). Reduces the unclassified-hosts coverage count.',
+        'method' => 'POST',
+        'parameters' => [
+            'baseUrl' => ['required' => true, 'type' => 'string', 'description' => 'The API baseUrl to classify (from getPrivacyStatus.hosts).'],
+            'kind' => ['required' => true, 'type' => 'string', 'enum' => ['self', 'third-party']],
+            'name' => ['required' => false, 'type' => 'string', 'description' => 'Third-party display name.'],
+            'privacyUrl' => ['required' => false, 'type' => 'string', 'description' => 'Third-party privacy-policy URL.']
+        ],
+        'example_post' => 'POST \management\setPrivacyHost with {"baseUrl":"https://hooks.x.com","kind":"third-party","name":"X","privacyUrl":"https://x.com/privacy"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'success',
+            'data' => ['host' => ['baseUrl' => 'https://hooks.x.com', 'kind' => 'third-party', 'name' => 'X', 'privacyUrl' => 'https://x.com/privacy']]
+        ],
+        'error_responses' => [
+            '400.validation.invalid' => 'kind must be self or third-party',
+            '400.validation.required' => 'Missing baseUrl'
+        ],
+        'notes' => 'Drives the /admin/privacy host-classification UI. name/privacyUrl are ignored for kind=self.'
+    ],
 
     'getApiEndpoint' => [
         'description' => 'Gets a single endpoint by ID, including the parent API\'s auth configuration.',
