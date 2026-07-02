@@ -2452,17 +2452,28 @@ no validation; just a rendered picker.
 
 The storage registry is the single declared list of every browser-storage key
 the site uses (`localStorage` / `sessionStorage` / `cookie`), and the source for
-the GDPR cookie-consent layer generated from it. It is **browser-storage only** —
-third-party data sharing is a separate, later concern.
+the GDPR cookie-consent layer generated from it. It is **browser-storage only**;
+third-party data sharing — what the site sends to APIs and sign-in providers — is
+the **privacy helper** (§9.11). The two sit together under the **Compliance** menu
+group.
 
 **Registry CRUD.** Each entry has `id` (the key name), `scope`, a GDPR `category`
 (`essential` / `functional` / `analytics` / `marketing`), an optional `retention`
-(enum + custom), and a translatable `description`. Picking `cookie` scope reveals
+(enum + custom), and a `description`. Picking `cookie` scope reveals
 `domain` / `path` / `secure` / `sameSite`. `consentRequired` is derived —
 `essential` never needs consent; everything else does. Commands:
 `listStorageItems` / `addStorageItem` / `editStorageItem` / `deleteStorageItem`.
 Storage-referencing fields elsewhere (e.g. `saveToken` / `QS.store` `key` args)
 use the `storageKey` picker, which selects a declared key or creates one inline.
+
+**Descriptions + language.** Descriptions are authored in one registry-level
+**description language** — a selector at the top of the page, defaulting to the
+site default — and stored as translation keys, not inline. Editing a description
+is therefore live (it updates the generated policy page without regenerating), and
+the other languages are filled with the visual-editor language tool. Changing the
+description language moves every description to the new language, keeping the old
+one as an empty (missing) translation so it can be re-done; it warns before
+overwriting existing values (`setStorageDescLang`).
 
 **Scan / reconcile.** The toolbar's **Scan / reconcile** button runs
 `scanStorageUsage`, which walks the build (structure `data-storage-*` attrs +
@@ -2505,11 +2516,71 @@ exists the modal locks the route and offers **Update** + **Delete page**
 policy page and no accidental duplicates. Overwriting an existing route asks for
 confirmation.
 
-**Languages.** The banner / popup / policy copy ships built-in for **en + fr**;
-any other configured language is seeded with English (and reported so the author
-can translate it in the Translation Manager) — never a placeholder on the live
-site. Per-key descriptions in the policy table are translation keys refreshed
-from the registry on each regenerate.
+**Languages.** Structural banner / popup / policy copy is seeded in the site's
+**default language** only (built-in en/fr wording, or English text when the
+default is another language); the remaining configured languages surface as
+missing in the Translation Manager for translation there. Per-key descriptions in
+the policy table are rendered live from the registry's description language, so
+editing a description updates the page immediately — regeneration is only needed
+for data changes (new keys, category / retention edits).
+
+---
+
+### 9.11 Privacy helper (/admin/privacy)
+
+The privacy helper is the data-**sharing** half of the compliance story: what the
+site sends *out* — to the APIs in the registry and to sign-in providers. It sits
+beside the storage registry under the **Compliance** menu group and mirrors its
+shape: a per-project registry (`data/privacy.json`) reconciled against a live scan,
+then a generated page.
+
+**What it scans.** The page reads the API registry (`data/api-endpoints.json`) and
+enumerates every outbound field — an **atom** = a `(endpoint, field)` pair drawn
+from each endpoint's declared `parameters` + `requestSchema` (response schemas are
+ignored — those are the storage registry's concern). The scan never guesses:
+a body-bearing endpoint (POST/PUT/PATCH) that declares no fields at all is flagged
+**unverifiable** rather than assumed empty.
+
+**Data collected.** The author declares "data collected" entries — a **label** +
+**purpose** — authored in a registry-level description language (a page-level
+selector, defaulting to the site default) and stored as translation keys, so
+editing is live and other languages translate via the language tool. Commands:
+`setCollectedDatum` / `deleteCollectedDatum`; `setPrivacyDescLang` moves the prose
+to a new authoring language with an overwrite-warning confirm.
+
+**Mapping.** Each scanned atom is mapped to a collected datum by clicking it and
+picking from a menu — or creating a new datum from that field in one step;
+`setPrivacyMapping` records `(endpoint, field) → datum`, or unsets it.
+
+**Host classification.** Each API `baseUrl` is classified as a **server you
+operate** or a **third party** (with a name + privacy-policy URL). QuickSite can't
+derive this, so it is author-declared (`setPrivacyHost`). A datum's recipient is
+*derived* from the atom → endpoint → host chain, never stored on the mapping.
+
+**Coverage.** A summary reports mapped atoms, unverifiable endpoints, and
+unclassified hosts, and reads **Complete** only when none remain. OAuth and
+magic-link sign-in are auto-detected and surfaced as known data-collection sources
+(each collects a fixed field set) plus their third-party links.
+
+**Generate the page.** `generatePrivacyPolicy` writes a deterministic page at an
+author-chosen route: a **data-we-collect** table (label / purpose), a per-third-
+party **data-sharing** section (derived from the mappings + host classification),
+a third-party sign-in section (the wired OAuth providers), a **cookies** section,
+and a legal-review note. The cookies section links the cookie-policy page when one
+exists, hints to create one when it doesn't, or is omitted when the author ticks
+*"Don't mention cookies on this page"* (`setPrivacyCookieSection`). Once a page
+exists the section offers **Update** + **Delete** (`deletePrivacyPolicy`) and the
+route is recorded in `privacy.json`. Descriptions render live from `translate/`;
+regeneration is only needed after data changes (new mappings, host
+re-classification).
+
+**Import prefill.** A native API import (`/admin/apis` → Import) may carry optional
+`privacy` blocks that populate the registry in one pass: an API-level
+`{ host, name, url, collects: [{label, purpose}] }` and per-endpoint
+`{ fields: { <field>: <label> } }`. Labels resolve to collected-data entries
+(deduped across APIs); an endpoint field referencing a label the API didn't declare
+is flagged in the import preview and skipped. Native format only — OpenAPI / Swagger
+imports classify and map afterward in the UI.
 
 ---
 

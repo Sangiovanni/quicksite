@@ -20,7 +20,7 @@ The API documents itself. Once installed:
 GET /management/help
 ```
 
-returns full documentation for **all 142 commands** — parameters, examples, validation rules, and error codes. For a specific command:
+returns full documentation for **all 152 commands** — parameters, examples, validation rules, and error codes. For a specific command:
 
 ```
 GET /management/help/addRoute
@@ -63,7 +63,7 @@ There is **no separate error envelope**. A failed call uses the same four fields
 
 ## Command catalogue
 
-The 142 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
+The 152 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
 
 > **AI is browser-direct (BYOK).** There is no `callAi` / `testAiKey` / `detectProvider` / `listAiProviders` server command — the admin panel calls AI providers directly from the browser using credentials stored in `aiConnectionsV3` (localStorage). The Management API only handles workflow specs and command execution.
 
@@ -94,7 +94,8 @@ Each row enumerates the commands in that category — comma-separated, alphabeti
 | **Page events** | `getPageEvents`, `addPageEvent`, `editPageEvent`, `deletePageEvent` — page-level lifecycle hooks (`onload`, `onresize`, `onscroll`) per route. |
 | **API endpoints** | `listApiEndpoints`, `getApiEndpoint`, `addApi`, `editApi`, `deleteApi`, `testApiEndpoint` — manage external API integrations callable from page interactions; live test endpoint with replay capture. |
 | **Authentication** | `listOAuthProviders`, `addOAuthProvider`, `editOAuthProvider`, `deleteOAuthProvider` — OAuth provider preset CRUD. `listOAuthProviders` returns the union of admin + per-project presets (from `oauth-presets.json`) with a per-provider `setup` summary describing whether the `/auth/oauth/<provider>/start` + `/callback` routes already exist. Drives the `oauth-button` Complex Element wizard. The OAuth flow itself runs through route-resolvers (`oauth-start` / `oauth-callback` / `oauth-logout` kinds) attached via `setRouteResolver` — not standalone commands. See [ADMIN_PANEL.md §9.5 "Tier 4 — OAuth"](ADMIN_PANEL.md). |
-| **Storage & consent** | `listStorageItems`, `addStorageItem`, `editStorageItem`, `deleteStorageItem`, `scanStorageUsage`, `getConsentStatus`, `generateConsentLayer`, `generateCookiePolicy`, `deleteCookiePolicy` — the browser-storage registry (every `localStorage` / `sessionStorage` / `cookie` key the site uses, with a GDPR `category` + `retention`) and the cookie-consent layer generated from it. CRUD the registry (`*StorageItem`); `scanStorageUsage` reconciles declared keys against actual build usage (ok / undeclared / dangling-read / orphan); `generateConsentLayer` builds the banner + preferences popup (rendered globally like menu/footer) and enables runtime write-gating; `generateCookiePolicy` writes a deterministic cookie-policy page from the registry; `getConsentStatus` + `deleteCookiePolicy` drive the `/admin/storage` consent management UI. See [ADMIN_PANEL.md](ADMIN_PANEL.md). |
+| **Storage & consent** | `listStorageItems`, `addStorageItem`, `editStorageItem`, `deleteStorageItem`, `setStorageDescLang`, `scanStorageUsage`, `getConsentStatus`, `generateConsentLayer`, `generateCookiePolicy`, `deleteCookiePolicy` — the browser-storage registry (every `localStorage` / `sessionStorage` / `cookie` key the site uses, with a GDPR `category` + `retention`) and the cookie-consent layer generated from it. CRUD the registry (`*StorageItem`); descriptions are keyed in `translate/` and authored in one description language (`setStorageDescLang` moves them); `scanStorageUsage` reconciles declared keys against actual build usage (ok / undeclared / dangling-read / orphan); `generateConsentLayer` builds the banner + preferences popup (rendered globally like menu/footer) and enables runtime write-gating; `generateCookiePolicy` writes a deterministic cookie-policy page from the registry; `getConsentStatus` + `deleteCookiePolicy` drive the `/admin/storage` consent management UI. See [ADMIN_PANEL.md §9.10](ADMIN_PANEL.md). |
+| **Privacy** | `getPrivacyStatus`, `setCollectedDatum`, `deleteCollectedDatum`, `setPrivacyDescLang`, `setPrivacyMapping`, `setPrivacyHost`, `setPrivacyCookieSection`, `generatePrivacyPolicy`, `deletePrivacyPolicy` — the data-**sharing** half of compliance (what the site sends to APIs + sign-in providers), a per-project registry (`data/privacy.json`) reconciled against a scan of the API registry. `getPrivacyStatus` returns the registry joined with the scan — outbound `(endpoint, field)` atoms from declared `parameters` + `requestSchema`, coverage (unmapped atoms / body endpoints with no schema / unclassified hosts), and OAuth/magic-link auto-seed. Author "data collected" entries (`setCollectedDatum` / `deleteCollectedDatum`, prose keyed in `translate/`; `setPrivacyDescLang` moves the language), map atoms to them (`setPrivacyMapping`), classify each API host as your server or a third party (`setPrivacyHost`), then `generatePrivacyPolicy` writes a deterministic page (collect table + per-third-party sharing + OAuth + cookie cross-link + disclaimer); `setPrivacyCookieSection` chooses whether the page links / hints / omits the cookie policy; `deletePrivacyPolicy` removes it. See [ADMIN_PANEL.md §9.11](ADMIN_PANEL.md). |
 | **State stores** | `getStateStores`, `setStateStores` — per-page named client state bound to one API endpoint; fields with direction (request/response/both), init source, and response path. Gives interactions memory (pagination, search, filters, infinite scroll). |
 | **Server-side data resolvers** | `setRouteResolver`, `cleanResolverCache` — per-route declaration that fires a server-side fetch BEFORE template render and exposes the response as template variables (SEO/AEO/first-paint payoff). `setRouteResolver` is idempotent six-shape (set / clear / patch / append / remove single slot). File-based cache with TTL + auth-cacheable gating; manual invalidation via `cleanResolverCache`. Read via `getSiteMap` (per-route subset under `routeResolvers`). See [ADMIN_PANEL.md §9.7](ADMIN_PANEL.md). |
 | **System updates** | `checkForUpdates`, `applyUpdate` — pull engine updates, run migrations, inspect engine version. |
@@ -175,7 +176,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 ## Internals
 
 - Command handlers live in `secure/management/command/<command>.php`, one file per command.
-- The whitelist of valid commands is `secure/management/routes.php` (142 entries — this file is the single source of truth for which commands exist).
+- The whitelist of valid commands is `secure/management/routes.php` (152 entries — this file is the single source of truth for which commands exist).
 - Shared helpers live in `secure/src/functions/utilsManagement.php` (e.g., `varExportNested()`, `SPECIAL_PAGES`, role helpers).
 - Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `secure/src/classes/CommandRunner.php`. CommandRunner currently carries a **hardcoded read-only allowlist** of ~50 `get*` / `list*` commands it will execute internally.
 - Workflow execution adds its own role check via `WorkflowManager::setTokenInfo()` so steps respect the calling token's permissions.

@@ -4117,7 +4117,7 @@ node, not page-global). Hardcoded engine markup — rejected (not author-styleab
 `secure/management/command/generateConsentLayer.php`. Behaviour:
 [ADMIN_PANEL.md](ADMIN_PANEL.md).
 
-### Cookie-policy page: author-chosen route, registry-owned; consent copy is EN/FR-built-in with English fallback (locked 2026-06-27)
+### Cookie-policy page: author-chosen route, registry-owned; consent copy is EN/FR-built-in with English fallback (locked 2026-06-27; consent-copy i18n superseded 2026-07-02)
 
 **Decision**: `generateCookiePolicy` writes a deterministic policy table to a
 route the author chooses (warning + confirm before overwriting an existing
@@ -4148,3 +4148,117 @@ rejected (not translatable).
 `secure/src/functions/consentLayerHelpers.php` (`buildCookiePolicyStructure`,
 `consentPolicyDescSeed`, `consentOAuthLinks`). Behaviour:
 [ADMIN_PANEL.md](ADMIN_PANEL.md).
+
+### Registry descriptions are keyed translations, authored in one language; generated copy is default-language only (locked 2026-07-02)
+
+**Supersedes**: the consent-copy i18n portion of the "Cookie-policy page …" entry
+above (route ownership there is unchanged).
+
+**Decision**: Storage- and privacy-registry descriptions are **not** stored inline
+per language. They are `translate/` textKeys (`storage.desc.<id>`,
+`privacy.collected.<id>.label` / `.purpose`) authored in one registry-level
+**description language** — a page-level selector defaulting to the site default.
+Editing a description is live (the generated policy page re-renders it without
+regeneration); regeneration is only for data changes. Changing the description
+language **moves** every description to the new language and leaves the old key as
+an empty (missing) translation — never deletes it — warning before overwriting
+existing target values. Generated *structural* copy (banner / popup / policy
+chrome) is seeded for the **default language only** (built-in en/fr wording, or
+English text when the default is another language); other languages surface as
+missing in the Translation Manager.
+
+**Reasoning**: One source of truth (`translate/`) instead of an inline copy plus a
+derived projection refreshed on every regenerate — kills the dual-source clobber
+hazard and makes description edits live. Completeness is delegated to the existing
+translation tooling (`analyzeTranslations` / `validateTranslations`), which already
+treats empty as missing — so the move empties rather than deletes, turning a
+moved-away language into an actionable "translate me" rather than a silent gap. The
+old English-fallback seed put English text on a non-English page pretending a
+translation existed; default-language-only + the Translation-Manager nudge is
+honest and matches how the rest of QuickSite localises.
+
+**Alternatives considered**: Inline `{lang: text}` descriptions refreshed from the
+registry on regenerate (the prior model) — rejected (two sources, non-live, clobber
+hazard). Seeding all configured languages with English fallback — rejected (silent
+wrong-language copy on the live page). Pre-creating empty keys for every language —
+rejected (clutter; the tooling already reports absent == missing). A per-item stored
+source-language field — rejected (which language a value is in is already recorded
+by which `translate/` file holds it; one registry-level language suffices).
+
+**Source**: `secure/src/functions/storageHelpers.php`,
+`privacyHelpers.php`, `translationHelpers.php` (`translationGetKey` /
+`translationSetKey` / `translationUnsetKey`);
+`setStorageDescLang.php` / `setPrivacyDescLang.php`;
+`generateCookiePolicy.php` / `generateConsentLayer.php` /
+`generatePrivacyPolicy.php`. Behaviour: [ADMIN_PANEL.md §9.10-9.11](ADMIN_PANEL.md).
+
+### Privacy helper: data-sharing compliance derived from the API surface (locked 2026-07-02)
+
+**Decision**: A second compliance registry (`data/privacy.json`) mirrors the
+storage registry but covers data **sharing** — what the site sends *out* to APIs
+and sign-in providers. It **scans** the API registry (`api-endpoints.json`) into
+**atoms** — `(endpoint, field)` pairs from each endpoint's declared `parameters` +
+`requestSchema` (response schemas ignored). The author declares **data collected**
+(label + purpose), **maps** atoms to those entries, and **classifies** each API
+`baseUrl` as a server they operate or a third party (name + privacy URL). A datum's
+recipient is **derived** (atom → endpoint → host), never stored on the mapping.
+Coverage flags unmapped atoms, body-bearing endpoints that declare no fields
+(*unverifiable*), and unclassified hosts. OAuth / magic-link sign-in are
+auto-detected as known collection sources. `generatePrivacyPolicy` emits a
+deterministic page (collect table + per-third-party sharing + OAuth links + a
+cookie cross-link that links / hints / omits + a legal note).
+
+**Reasoning**: GDPR ⊂ privacy policy — the storage registry generated the cookie
+half; this generates the rest, deterministically from data the project already
+declares. A human-in-the-loop mapping supplies the PII judgment QuickSite can't
+derive (it cannot know `startId` isn't personal but `email` is). Schema-driven,
+not runtime-observed, so it also serves headless / app targets and is a stable
+contract; response-side data that is persisted is already the storage registry's
+job, so responses are ignored here. "Third party" cannot be derived, so host
+classification is author-declared; the UI says "servers you operate" so a processor
+isn't under-disclosed.
+
+**Alternatives considered**: Auto-emitting a host/field table with no human mapping
+— rejected (can't classify PII). Folding sharing into the storage registry —
+rejected (different data model; muddies a clean feature). Scanning runtime calls
+instead of schemas — rejected (schema is the deterministic contract and works
+without the site being wired). Deriving third-party status from same-origin
+heuristics — rejected (a project runs several first-party hosts; only the author
+knows).
+
+**Source**: `secure/src/functions/privacyHelpers.php`, `privacyScanHelpers.php`,
+`privacyPageHelpers.php`, `policyPageHelpers.php`;
+`secure/management/command/getPrivacyStatus.php` + the `setCollectedDatum` /
+`deleteCollectedDatum` / `setPrivacyMapping` / `setPrivacyHost` /
+`setPrivacyCookieSection` / `generatePrivacyPolicy` / `deletePrivacyPolicy`
+commands. Behaviour: [ADMIN_PANEL.md §9.11](ADMIN_PANEL.md).
+
+### Privacy prefill rides the native API import (locked 2026-07-02)
+
+**Decision**: A native API import may carry optional namespaced `privacy` blocks —
+API-level `{ host, name, url, collects: [{label, purpose}] }` and endpoint-level
+`{ fields: { <field>: <label> } }` — that populate the privacy registry in one
+pass, applied through the existing privacy commands after each API is created.
+Labels resolve to slug ids (deduped across APIs); an endpoint field referencing a
+label the API didn't declare is **flagged in the import preview and skipped**, not
+fatal. **Native format only** — OpenAPI / Swagger imports classify + map in the UI
+afterward.
+
+**Reasoning**: Lets a single import stand up an API *and* its privacy story.
+Reuses the shipped commands (`setCollectedDatum` / `setPrivacyHost` /
+`setPrivacyMapping`) — the import is client-orchestrated, so there is no backend
+import command to extend, and the existing preview step is the natural home for the
+validation flags. Labels are the friendly authoring surface, resolved to ids once
+at import. Named `privacy`, **not** `tier` — "tier" already means the magic-link
+Tier 1/2/3 flow and would confuse. Flag-and-skip keeps a partial import useful.
+
+**Alternatives considered**: Hard-failing on unknown labels — rejected (a partial
+import is still useful; the preview shows what will be skipped). Referencing datums
+by id in the schema — rejected (labels are friendlier; resolve once). Building
+OpenAPI `x-` vendor extensions now — rejected (deferred until asked; most specs
+carry no privacy intent). A dedicated backend import command — rejected (the
+importer is client-orchestrated; the apply rides existing commands).
+
+**Source**: `public/admin/assets/js/pages/apis.js` (`_applyImportPrivacy`,
+`_computeImportPrivacy`, `handleImportConfirm`). Behaviour:
+[ADMIN_PANEL.md §9.11](ADMIN_PANEL.md).
