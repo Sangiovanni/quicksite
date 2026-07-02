@@ -1671,6 +1671,55 @@
     }
 
     /**
+     * Slug a collected-data label into a stable id (mirrors privacy.js / the
+     * server-side _privacySanitizeId convention closely enough for matching).
+     */
+    function _privSlug(label) {
+        return String(label || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    }
+
+    /**
+     * Inspect optional `privacy` blocks in a (native) import payload for the
+     * preview: counts of data-collected / classified hosts / field mappings, plus
+     * ⚠ flags for endpoint fields referencing labels not declared in their API's
+     * `collects`, and per-baseUrl host-kind conflicts across APIs.
+     */
+    function _computeImportPrivacy(apis) {
+        const datumIds = {};
+        const hostSet = {};
+        const hostKinds = {};
+        let mappings = 0;
+        const flags = [];
+        for (const apiId of Object.keys(apis)) {
+            const a = apis[apiId] || {};
+            const p = a.privacy || {};
+            const labels = {};
+            if (Array.isArray(p.collects)) {
+                for (const c of p.collects) {
+                    if (c && c.label) { labels[c.label] = true; datumIds[_privSlug(c.label)] = true; }
+                }
+            }
+            if (p.host === 'self' || p.host === 'third-party') {
+                hostSet[a.baseUrl] = true;
+                if (hostKinds[a.baseUrl] && hostKinds[a.baseUrl] !== p.host) {
+                    flags.push('Host "' + a.baseUrl + '" is classified both ways across APIs — the last import wins.');
+                }
+                hostKinds[a.baseUrl] = p.host;
+            }
+            for (const ep of (a.endpoints || [])) {
+                const f = ep.privacy && ep.privacy.fields;
+                if (!f) continue;
+                const epId = ep.id || ep.name || ep.path;
+                for (const field of Object.keys(f)) {
+                    if (labels[f[field]]) mappings++;
+                    else flags.push('Endpoint "' + apiId + '/' + epId + '" field "' + field + '" → label "' + f[field] + '" not in this API\'s collects — will be skipped.');
+                }
+            }
+        }
+        return { datums: Object.keys(datumIds).length, hosts: Object.keys(hostSet).length, mappings, flags };
+    }
+
+    /**
      * Build the import preview summary as a DOM Element. The caller is
      * expected to use `container.replaceChildren(summarisePayload(...))`,
      * not innerHTML. Notes (slug collisions, dropped header params, etc.)
@@ -1708,10 +1757,24 @@
         }
         root.appendChild(line);
 
-        if (notes.length) {
+        // Optional privacy blocks (native format): summary line + ⚠ flags.
+        const priv = _computeImportPrivacy(apis);
+        if (priv.datums || priv.hosts || priv.mappings || priv.flags.length) {
+            const pLine = document.createElement('p');
+            pLine.className = 'apis-import-summary__line';
+            pLine.appendChild(document.createTextNode(
+                'Privacy: will create ' + priv.datums + ' data-collected, classify ' +
+                priv.hosts + ' host' + (priv.hosts === 1 ? '' : 's') + ', map ' +
+                priv.mappings + ' field' + (priv.mappings === 1 ? '' : 's') + '.'
+            ));
+            root.appendChild(pLine);
+        }
+
+        const allNotes = notes.concat(priv.flags.map(f => '⚠ ' + f));
+        if (allNotes.length) {
             const list = document.createElement('ul');
             list.className = 'apis-import-notes';
-            for (const note of notes) {
+            for (const note of allNotes) {
                 const li = document.createElement('li');
                 li.textContent = note;
                 list.appendChild(li);
@@ -2092,6 +2155,47 @@
     }
 
     /** Screen 2 confirm: save APIs + endpoints, then reload list. */
+    /**
+     * Apply a native import's optional `privacy` blocks to the privacy registry,
+     * via the existing setCollectedDatum / setPrivacyHost / setPrivacyMapping
+     * commands. Labels are resolved to slug ids; endpoint fields referencing a
+     * label not in this API's `collects` are skipped (flagged in the preview).
+     * Best-effort — failures here don't abort the API import.
+     */
+    async function _applyImportPrivacy(apiId, apiData) {
+        const p = (apiData && apiData.privacy) || {};
+        const labelToId = {};
+        if (Array.isArray(p.collects)) {
+            for (const c of p.collects) {
+                if (!c || !c.label) continue;
+                const id = _privSlug(c.label);
+                if (!id) continue;
+                labelToId[c.label] = id;
+                try {
+                    await QuickSiteAdmin.apiRequest('setCollectedDatum', 'POST', { id, label: c.label, purpose: c.purpose || '' });
+                } catch (e) { console.warn('[apis] setCollectedDatum failed', id, e); }
+            }
+        }
+        if (p.host === 'self' || p.host === 'third-party') {
+            try {
+                await QuickSiteAdmin.apiRequest('setPrivacyHost', 'POST', { baseUrl: apiData.baseUrl, kind: p.host, name: p.name || '', privacyUrl: p.url || '' });
+            } catch (e) { console.warn('[apis] setPrivacyHost failed', apiData.baseUrl, e); }
+        }
+        for (const endpoint of (apiData.endpoints || [])) {
+            const fields = endpoint.privacy && endpoint.privacy.fields;
+            if (!fields) continue;
+            const epId = endpoint.id || endpoint.name || endpoint.path;
+            if (!epId) continue;
+            for (const field of Object.keys(fields)) {
+                const id = labelToId[fields[field]];
+                if (!id) continue; // unknown label — flagged in preview, skip
+                try {
+                    await QuickSiteAdmin.apiRequest('setPrivacyMapping', 'POST', { endpoint: apiId + '/' + epId, field: field, datum: id });
+                } catch (e) { console.warn('[apis] setPrivacyMapping failed', apiId, epId, field, e); }
+            }
+        }
+    }
+
     async function handleImportConfirm() {
         if (!_importPending) return;
 
@@ -2166,12 +2270,18 @@
                 });
                 if (!addRes.ok) { errors++; continue; }
                 // Then attach endpoints one by one (validation runs per endpoint).
+                // Strip any optional `privacy` block so it never lands in
+                // api-endpoints.json — it is applied to the privacy registry below.
                 for (const endpoint of (apiData.endpoints || [])) {
+                    const epClean = Object.assign({}, endpoint);
+                    delete epClean.privacy;
                     await QuickSiteAdmin.apiRequest('editApi', 'POST', {
                         apiId,
-                        addEndpoint: endpoint
+                        addEndpoint: epClean
                     });
                 }
+                // Apply optional privacy blocks (collects + host + field mappings).
+                await _applyImportPrivacy(apiId, apiData);
                 imported++;
             } catch (err) {
                 console.error('Import error for', apiId, err);
