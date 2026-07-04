@@ -157,6 +157,19 @@ class TagRegistry
         return in_array(strtolower($tag), self::BLOCKED_TAGS, true);
     }
 
+    /**
+     * Single "may this tag be emitted at all?" gate — the shared policy both
+     * the renderer AND the compiler enforce so preview and build agree
+     * (beta.10 F-g/F-h). Renderable iff the name is well-formed, the tag is
+     * NOT blocked, AND it is on the allowlist.
+     */
+    public static function isRenderable(string $tag): bool
+    {
+        return (bool) preg_match('/^[a-z0-9-]+$/i', $tag)
+            && !self::isBlocked($tag)
+            && self::isAllowed($tag);
+    }
+
     public static function isSelfClosing(string $tag): bool
     {
         return in_array(strtolower($tag), self::SELF_CLOSING_TAGS, true);

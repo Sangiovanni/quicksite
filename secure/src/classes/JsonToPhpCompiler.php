@@ -2,6 +2,9 @@
 
 require_once __DIR__ . '/../functions/qsVerbCatalog.php';
 require_once __DIR__ . '/Translator.php';
+require_once __DIR__ . '/UrlPolicy.php';
+require_once __DIR__ . '/CallTransformer.php';
+require_once __DIR__ . '/TagRegistry.php';
 
 /**
  * JsonToPhpCompiler
@@ -104,10 +107,10 @@ class JsonToPhpCompiler {
             if (!empty($events[$eventName]) && is_array($events[$eventName])) {
                 $calls = [];
                 foreach ($events[$eventName] as $callSyntax) {
-                    $transformed = $this->transformCallSyntax($callSyntax);
+                    $transformed = CallTransformer::transform($callSyntax);
                     // Include any transformed result (real QS.* call OR a
                     // console.warn for an unknown verb — see
-                    // transformCallSyntax). Only skip when nothing was
+                    // CallTransformer::transform). Only skip when nothing was
                     // actually transformed.
                     if ($transformed && $transformed !== $callSyntax) {
                         $calls[] = $transformed;
@@ -307,7 +310,17 @@ class JsonToPhpCompiler {
      * Compile a tag node to PHP code
      */
     private function compileTagNode(array $node, bool $echo = false): string {
-        $tag = $node['tag'];
+        $tag = $node['tag'] ?? '';
+
+        // SECURITY (beta.10 F-h): the compiler previously emitted ANY tag, so a
+        // stored blocked <script>/<style> shipped to the build even though the
+        // renderer drops it. Enforce the SAME gate as the renderer here so
+        // preview and deploy agree (name well-formed + not blocked + allowed).
+        if (!TagRegistry::isRenderable($tag)) {
+            error_log("Compiler skipped non-renderable tag: {$tag}");
+            return '';
+        }
+
         $params = $node['params'] ?? [];
         $children = $node['children'] ?? [];
         $prefix = $echo ? 'echo ' : '$content .= ';
@@ -322,15 +335,14 @@ class JsonToPhpCompiler {
             // Tag with attributes - need to handle system placeholders
             $output .= $prefix . '"<' . $tag;
             
-            // URL attributes that need processing
-            $urlAttributes = ['href', 'src', 'data', 'poster', 'action', 'formaction', 'cite', 'srcset'];
-            
+            // URL-sink recognition + rewriting scope come from the shared
+            // UrlPolicy (R-6, same class the renderer uses) — see per-attr below.
             foreach ($params as $attrName => $attrValue) {
                 // Handle event handler attributes (on*) - only allow {{call:...}} syntax
                 if (preg_match('/^on[a-z]+$/i', $attrName)) {
                     if (is_string($attrValue) && strpos($attrValue, '{{call:') !== false) {
-                        $transformedValue = $this->transformCallSyntax($attrValue);
-                        if ($this->isValidTransformedHandler($transformedValue)) {
+                        $transformedValue = CallTransformer::transform($attrValue);
+                        if (CallTransformer::isValidHandler($transformedValue)) {
                             $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(';
                             $output .= var_export($transformedValue, true);
                             $output .= ', ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
@@ -341,8 +353,11 @@ class JsonToPhpCompiler {
                     continue;
                 }
                 
-                // Check if this is a URL attribute that needs language prefix
-                $needsUrlProcessing = in_array($attrName, $urlAttributes, true);
+                // Scheme safety applies to ANY URL sink (namespace-aware, e.g.
+                // xlink:href); BASE_URL/language rewriting only to the classic
+                // set (unchanged behaviour).
+                $isUrlAttr    = UrlPolicy::isUrlAttribute($attrName);
+                $needsRewrite = UrlPolicy::isRewritableUrlAttribute($attrName);
                 
                 // Check if value contains system placeholders
                 if (is_string($attrValue) && strpos($attrValue, '{{__') !== false) {
@@ -352,17 +367,26 @@ class JsonToPhpCompiler {
                     // Check if this is a buildLanguageSwitchUrl() call - these return complete URLs
                     $isLanguageSwitch = strpos($phpValue, 'buildLanguageSwitchUrl(') !== false;
                     
-                    if ($needsUrlProcessing && !$isLanguageSwitch) {
-                        // Wrap with processUrl function (but not for language switch URLs)
+                    if ($needsRewrite && !$isLanguageSwitch) {
+                        // Wrap with processUrl (BASE_URL/lang). Placeholders are
+                        // system-generated URLs, not attacker-controlled schemes.
                         $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(processUrl(' . $phpValue . ', $__lang), ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
                     } else {
                         $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(' . $phpValue . ', ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
                     }
                 } else {
-                    // Static value
-                    if ($needsUrlProcessing && is_string($attrValue)) {
-                        // Process URL at compile time for static values, or generate runtime code
-                        $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(processUrl(' . var_export($attrValue, true) . ', $__lang), ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
+                    // Static value — the attacker-controlled case. Make it
+                    // scheme-SAFE at COMPILE time (shared UrlPolicy) so the
+                    // deployed literal can never carry a dangerous scheme; this
+                    // covers the non-rewritable sinks (xlink:href, …) too.
+                    if ($isUrlAttr && is_string($attrValue)) {
+                        $safeValue = UrlPolicy::sanitize($attrValue);
+                        if ($needsRewrite) {
+                            // Still BASE_URL/lang-rewritten at deploy, on a safe value.
+                            $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(processUrl(' . var_export($safeValue, true) . ', $__lang), ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
+                        } else {
+                            $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(' . var_export($safeValue, true) . ', ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
+                        }
                     } else {
                         $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(';
                         $output .= var_export($attrValue, true);
@@ -571,128 +595,5 @@ class JsonToPhpCompiler {
         return implode(' . ', $phpParts);
     }
 
-    /**
-     * Transform {{call:functionName:arg1,arg2}} syntax to QS.functionName('arg1', 'arg2')
-     * Same logic as JsonToHtmlRenderer::transformCallSyntax()
-     * 
-     * Special keywords (not quoted): event, this
-     * 
-     * @param string $value The attribute value containing {{call:...}} placeholders
-     * @return string Transformed JavaScript code
-     */
-    /**
-     * Beta.9 A2 Slice 6 — POSITIONAL translation-key resolution cache
-     * (mirrors JsonToHtmlRenderer::$translatablePositionalCache; the two
-     * compile paths read the same qsVerbCatalog so kept in sync via
-     * catalog metadata, not via a shared base class).
-     */
-    private static array $translatablePositionalCache = [];
-
-    private static function getTranslatablePositionalIndices(string $fn): array {
-        if (isset(self::$translatablePositionalCache[$fn])) {
-            return self::$translatablePositionalCache[$fn];
-        }
-        $indices = [];
-        foreach (qsVerbCatalog() as $entry) {
-            if (($entry['name'] ?? '') !== $fn) continue;
-            foreach (($entry['args'] ?? []) as $i => $arg) {
-                if (($arg['inputType'] ?? '') === 'translationKey') {
-                    $indices[] = $i;
-                }
-            }
-            break;
-        }
-        return self::$translatablePositionalCache[$fn] = $indices;
-    }
-
-    private static function resolveTranslationKeyOrFallback(string $value): string {
-        $translated = Translator::translate($value);
-        if (strpos($translated, '{translation missing:') === 0) {
-            return $value;
-        }
-        return $translated;
-    }
-
-    private function transformCallSyntax(string $value): string {
-        return preg_replace_callback(
-            '/\{\{call:([a-zA-Z][a-zA-Z0-9]*)(:[^}]*)?\}\}/',
-            function ($matches) {
-                $functionName = $matches[1];
-                $argsString = isset($matches[2]) ? substr($matches[2], 1) : '';
-
-                // Get allowed function names dynamically (core + custom)
-                $allowedFunctions = $this->getAllowedJsFunctions();
-
-                if (!in_array($functionName, $allowedFunctions, true)) {
-                    // Loud failure: emit a console.warn into the compiled
-                    // output instead of swallowing the call as a comment.
-                    // $functionName is `[a-zA-Z][a-zA-Z0-9]*` (matched
-                    // above) so safe to inline into a single-quoted JS
-                    // string with no escaping.
-                    error_log("Unknown QS function at compile: {$functionName}");
-                    return "console.warn('[QS] unknown verb {{call:{$functionName}:...}} dropped at compile — verb missing from secure/src/functions/qsVerbCatalog.php')";
-                }
-
-                if (empty($argsString)) {
-                    return "QS.{$functionName}()";
-                }
-
-                // Special keywords that should not be quoted (JS variables)
-                $jsKeywords = ['event', 'this'];
-
-                $args = array_map('trim', explode(',', $argsString));
-
-                // Beta.9 A2 Slice 6 — POSITIONAL translation-key resolution
-                // (catalog-driven; same logic as JsonToHtmlRenderer).
-                $translatablePositions = self::getTranslatablePositionalIndices($functionName);
-                foreach ($translatablePositions as $idx) {
-                    if (!isset($args[$idx]) || $args[$idx] === '') continue;
-                    if (strpos($args[$idx], '=') !== false) continue;
-                    $args[$idx] = self::resolveTranslationKeyOrFallback($args[$idx]);
-                }
-
-                $quotedArgs = array_map(function($arg) use ($jsKeywords) {
-                    if (in_array($arg, $jsKeywords, true)) {
-                        return $arg;
-                    }
-                    $escaped = str_replace("'", "\\'", $arg);
-                    return "'{$escaped}'";
-                }, $args);
-
-                return "QS.{$functionName}(" . implode(', ', $quotedArgs) . ")";
-            },
-            $value
-        );
-    }
-
-    /**
-     * Get all allowed JS function names (core + custom)
-     * Cached for performance within single compile
-     * 
-     * @return array
-     */
-    private function getAllowedJsFunctions(): array {
-        // Source of truth: secure/src/functions/qsVerbCatalog.php
-        // (also consumed by listJsFunctions command + JsonToHtmlRenderer).
-        // `applyAuthState` is not yet in the catalog but is exposed in qs.js;
-        // keep the temporary local addition until it's promoted to the
-        // catalog with full args/example/events metadata.
-        return array_merge(qsVerbNames(), ['applyAuthState']);
-    }
-
-    /**
-     * Validate that a transformed event handler only contains safe QS.* calls
-     * Same logic as JsonToHtmlRenderer::isValidTransformedHandler()
-     * 
-     * @param string $handler The transformed handler string
-     * @return bool True if safe, false if suspicious
-     */
-    private function isValidTransformedHandler(string $handler): bool {
-        $stripped = preg_replace('/QS\.[a-zA-Z]+\([^)]*\)/', '', $handler);
-        $stripped = preg_replace('/[;\s]/', '', $stripped);
-        $stripped = preg_replace('/\/\*[^*]*\*\//', '', $stripped);
-        
-        return empty($stripped);
-    }
 
 }

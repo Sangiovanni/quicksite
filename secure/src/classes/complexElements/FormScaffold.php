@@ -32,8 +32,8 @@
  *   - submitLabelKey  string, required — textKey for the submit button.
  *
  * Notes:
- *   - The onsubmit chain compiles via JsonToHtmlRenderer's
- *     transformCallSyntax (see docs/ARCHITECTURE.md §8.0.1):
+ *   - The onsubmit chain compiles via the shared CallTransformer
+ *     (see docs/ARCHITECTURE.md §8.0.1):
  *     `validate` runs as a sync prelude, `fetch` is awaited inside an
  *     async IIFE. Validation throw aborts the rest of the chain.
  *   - For URL mode we currently reject commas in the URL — the call

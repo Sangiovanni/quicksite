@@ -7,6 +7,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 /**
  * editNode - Edits an existing node in a structure
@@ -136,6 +137,15 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
         return ApiResponse::create(400, 'validation.reserved_attribute')
             ->withMessage("Cannot use reserved attribute '{$reservedQsParam}'. Attributes starting with 'data-qs-' are reserved for QuickSite. Use a different prefix like 'data-custom-' or 'data-app-'.")
             ->withErrors([['field' => 'addParams.' . $reservedQsParam, 'reason' => 'reserved_attribute']]);
+    }
+
+    // SECURITY (beta.10): reject raw on* handlers + dangerous URL schemes on
+    // write — the renderer enforces the same at render (reject-on-store companion).
+    $unsafeParam = firstUnsafeParam($addParams);
+    if ($unsafeParam !== null) {
+        return ApiResponse::create(400, 'validation.unsafe_param')
+            ->withMessage($unsafeParam)
+            ->withErrors([['field' => 'addParams', 'reason' => 'unsafe_value']]);
     }
 
     // SECURITY: Reject reserved-namespace storage keys in

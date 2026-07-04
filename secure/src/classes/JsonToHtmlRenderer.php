@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/TagRegistry.php';
+require_once __DIR__ . '/UrlPolicy.php';
+require_once __DIR__ . '/CallTransformer.php';
 require_once __DIR__ . '/IframeSandbox.php';
 require_once __DIR__ . '/Translator.php';
 require_once __DIR__ . '/../functions/qsVerbCatalog.php';
@@ -658,6 +660,15 @@ class JsonToHtmlRenderer {
             return "<!-- Blocked tag -->";
         }
 
+        // SECURITY (beta.10 F-g): only ALLOWED tags render — non-allowed tags
+        // (e.g. raw SVG <rect>/<text>/<set>, <foreignObject>) are dropped, so
+        // the renderer, the compiler, and the writers all agree. SVG stays a
+        // decorative-only container.
+        if (!TagRegistry::isAllowed($tag)) {
+            error_log("Tag not allowed (skipped): {$tag}");
+            return "<!-- Tag not allowed -->";
+        }
+
         $params = $node['params'] ?? [];
         $children = $node['children'] ?? null;
 
@@ -754,10 +765,10 @@ class JsonToHtmlRenderer {
         // Block raw JS, but allow {{call:...}} syntax which gets transformed to safe QS.* calls
         if (preg_match('/^on[a-z]+$/i', $name)) {
             if (is_string($value) && strpos($value, '{{call:') !== false) {
-                // Transform {{call:...}} to QS.* function calls
-                $transformedValue = $this->transformCallSyntax($value);
+                // Transform {{call:...}} to QS.* function calls (shared R-6 helper)
+                $transformedValue = CallTransformer::transform($value);
                 // Double-check the result doesn't contain suspicious patterns
-                if ($this->isValidTransformedHandler($transformedValue)) {
+                if (CallTransformer::isValidHandler($transformedValue)) {
                     $escapedValue = htmlspecialchars($transformedValue, ENT_QUOTES | ENT_HTML5, 'UTF-8');
                     return ' ' . htmlspecialchars($name, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '="' . $escapedValue . '"';
                 }
@@ -804,16 +815,21 @@ class JsonToHtmlRenderer {
             }
         }
 
-        // Special handling for URL attributes
-        $urlAttributes = ['href', 'src', 'data', 'poster', 'action', 'formaction', 'cite', 'srcset'];
-        if (in_array($name, $urlAttributes, true) && is_string($value) && !empty($value)) {
+        // Special handling for URL attributes. Scheme safety is value-based +
+        // namespace-aware (covers xlink:href, ping, …) via the shared UrlPolicy
+        // (R-6, the same class the compiler uses). BASE_URL/language rewriting
+        // stays scoped to the classic rewritable set. Closes F-b + F-d.
+        if (UrlPolicy::isUrlAttribute($name) && is_string($value) && $value !== '') {
             // Process placeholders first (e.g., {{__current_page;lang=en}})
             if (strpos($value, '{{__') !== false) {
                 $value = $this->processDataPlaceholders($value);
             }
-            // Then process URL (add base URL, language prefix, etc.)
-            // Only if the value doesn't already look like a complete URL after placeholder processing
-            if (!preg_match('/^(https?:)?\/\//i', $value)) {
+            // Scheme safety FIRST: allowlist + strip/deny control chars.
+            $value = UrlPolicy::sanitize($value);
+            // Then rewrite (add base URL, language prefix, etc.) — classic set
+            // only, and only if not already a complete URL.
+            if (UrlPolicy::isRewritableUrlAttribute($name)
+                && !preg_match('/^(https?:)?\/\//i', $value)) {
                 $value = $this->processUrl($value);
             }
         }
@@ -844,276 +860,9 @@ class JsonToHtmlRenderer {
      * @return string Transformed JavaScript code
      */
     public function transformCallSyntaxPublic(string $value): string {
-        return $this->transformCallSyntax($value);
+        return CallTransformer::transform($value);
     }
 
-    /**
-     * Transform {{call:...}} syntax into safe QS.*() JavaScript calls (internal)
-     * 
-     * @param string $value The attribute value containing {{call:...}} placeholders
-     * @return string Transformed JavaScript code
-     */
-    /**
-     * Verbs that MUST run synchronously inside the event tick (before any
-     * microtask boundary) — typically because they call event.preventDefault()
-     * or throw to abort the chain. These get pulled out of the async wrapper
-     * and emitted as a sync prelude.
-     */
-    private const CHAIN_SYNC_PRELUDE = ['validate'];
-
-    /**
-     * Verbs known to return a Promise. If any awaitable call appears in the
-     * chain body, the body is wrapped in an async IIFE and each call gets
-     * `await` so "fetch then hide" actually waits.
-     */
-    private const CHAIN_AWAITABLE = ['fetch', 'exchangeMagicLink', 'requestMagicLink', 'logoutServer'];
-
-    /**
-     * Per-verb metadata: which keyword-arg names carry translation KEYS
-     * that should be resolved at compile time. The compiled JS receives
-     * the resolved STRING, never the key — PHP stays the only translation
-     * engine.
-     *
-     * Shape: ['verbName' => ['kwarg1', 'kwarg2', ...]]
-     *
-     * Example: `{{call:fetch:@api/ep,toastSuccessKey=form.contact.success}}`
-     * → `QS.fetch('@api/ep', 'toastSuccessKey=Message sent')` (EN)
-     * → `QS.fetch('@api/ep', 'toastSuccessKey=Message envoyé')` (FR)
-     *
-     * Multi-language works out of the box: each page render runs
-     * transformCallSyntax with the current request's language, so the
-     * compiled chain in the page HTML is always in the right language.
-     *
-     * Future verbs that introduce translatable kwargs (toast direct,
-     * confirm prompts, etc.) add one line here.
-     */
-    private const TRANSLATABLE_KEYWORD_ARGS = [
-        'fetch' => ['toastSuccessKey', 'toastErrorKey'],
-    ];
-
-    /**
-     * Beta.9 A2 Slice 6 — POSITIONAL translation-key resolution.
-     *
-     * Per-verb cache of positional-arg indices that carry a translation
-     * key (inputType: 'translationKey' in qsVerbCatalog). Built lazily on
-     * first lookup per verb so the catalog walk is O(N) once per render
-     * cycle instead of per-{{call}}.
-     *
-     * Today's user: toast.message (message arg at index 0). Future verbs
-     * gain compile-time translation automatically by declaring the
-     * inputType in the catalog — no renderer change required.
-     */
-    private static array $translatablePositionalCache = [];
-
-    /**
-     * Look up which positional args of a verb carry translation keys.
-     * Empty array = no translatable positional args (most verbs).
-     */
-    private static function getTranslatablePositionalIndices(string $fn): array {
-        if (isset(self::$translatablePositionalCache[$fn])) {
-            return self::$translatablePositionalCache[$fn];
-        }
-        $indices = [];
-        foreach (qsVerbCatalog() as $entry) {
-            if (($entry['name'] ?? '') !== $fn) continue;
-            foreach (($entry['args'] ?? []) as $i => $arg) {
-                if (($arg['inputType'] ?? '') === 'translationKey') {
-                    $indices[] = $i;
-                }
-            }
-            break;
-        }
-        return self::$translatablePositionalCache[$fn] = $indices;
-    }
-
-    /**
-     * Try to resolve a value as a translation key; fall back to the
-     * original value if it's not a known key. This makes the verb's
-     * `allowFreeText` mode work without renderer-side flagging — a Custom
-     * Text value like "Hello world!" returns itself; a key like
-     * "home.welcome" returns its translation.
-     *
-     * Translator::translate returns "{translation missing: <key>}" on
-     * miss; that marker is the trigger to fall back. False positives are
-     * possible if the user types raw text that ACCIDENTALLY matches a
-     * declared key — accepted: the picker is the primary path, and the
-     * collision is a feature (user wanted the key, just typed it raw).
-     */
-    private static function resolveTranslationKeyOrFallback(string $value): string {
-        $translated = Translator::translate($value);
-        if (strpos($translated, '{translation missing:') === 0) {
-            return $value;
-        }
-        return $translated;
-    }
-
-    private function transformCallSyntax(string $value): string {
-        // Capture every {{call:...}} in order; non-call text is dropped (the
-        // validator below already rejects it, this just makes the boundary
-        // explicit so the chain wrapper isn't broken by intervening tokens).
-        if (!preg_match_all('/\{\{call:([a-zA-Z][a-zA-Z0-9]*)(:[^}]*)?\}\}/', $value, $matches, PREG_SET_ORDER)) {
-            return $value;
-        }
-
-        $allowedFunctions = $this->getAllowedJsFunctions();
-        $syncPrelude = [];
-        $body = [];
-        $hasAwaitable = false;
-
-        foreach ($matches as $m) {
-            $fn = $m[1];
-            $argsString = isset($m[2]) ? substr($m[2], 1) : '';
-
-            if (!in_array($fn, $allowedFunctions, true)) {
-                // Loud failure: surface to the browser console so
-                // misconfigurations don't disappear into PHP's error log.
-                // $fn is `[a-zA-Z][a-zA-Z0-9]*` (matched above) so safe to
-                // inline into a single-quoted JS string with no escaping.
-                error_log("Unknown QS function: {$fn}");
-                $syncPrelude[] = "console.warn('[QS] unknown verb {{call:{$fn}:...}} dropped at render — verb missing from secure/src/functions/qsVerbCatalog.php')";
-                continue;
-            }
-
-            $callJs = $this->buildQsCallJs($fn, $argsString);
-
-            if (in_array($fn, self::CHAIN_SYNC_PRELUDE, true)) {
-                $syncPrelude[] = $callJs;
-            } else {
-                $body[] = $callJs;
-                if (in_array($fn, self::CHAIN_AWAITABLE, true)) {
-                    $hasAwaitable = true;
-                }
-            }
-        }
-
-        $parts = [];
-        if (!empty($syncPrelude)) {
-            $parts[] = implode(';', $syncPrelude);
-        }
-        if (!empty($body)) {
-            // Wrap in async IIFE whenever there's an awaitable verb in the
-            // chain — even alone. A single fetch ALSO gets wrapped now so
-            // future post-fetch actions (toast, redirect, hide form, …)
-            // appended via the picker await it correctly without the chain
-            // suddenly changing shape between "fetch only" and "fetch +
-            // more". The wrap cost for a single fetch is one microtask
-            // hop, invisible in practice. Pure-sync chains (hide/show/etc.)
-            // still emit straight statements — no needless wrap.
-            if ($hasAwaitable) {
-                $awaited = array_map(function ($c) { return 'await ' . $c; }, $body);
-                $parts[] = "(async()=>{" . implode(';', $awaited) . "})().catch(e=>console.warn('[QS] chain aborted:',e))";
-            } else {
-                $parts[] = implode(';', $body);
-            }
-        }
-
-        return implode(';', $parts);
-    }
-
-    /**
-     * Build a single `QS.functionName(arg1, arg2, ...)` JS expression from
-     * the parsed function name and argument string. Handles comma-escaping
-     * (`\,`) and the unquoted JS keywords (`event`, `this`).
-     */
-    private function buildQsCallJs(string $fn, string $argsString): string {
-        if ($argsString === '') {
-            return "QS.{$fn}()";
-        }
-        $jsKeywords = ['event', 'this'];
-        $args = preg_split('/(?<!\\\\),/', $argsString);
-        $args = array_map(function ($a) {
-            return trim(str_replace('\\,', ',', $a));
-        }, $args);
-
-        // Translate keyword-arg values whose key is in this verb's
-        // translatable list (see TRANSLATABLE_KEYWORD_ARGS docblock).
-        // Pattern matched: `key=value`. The value is treated as a
-        // translation key and resolved server-side via Translator.
-        // The compiled JS gets the translated string verbatim.
-        $translatableKwargs = self::TRANSLATABLE_KEYWORD_ARGS[$fn] ?? [];
-        if (!empty($translatableKwargs)) {
-            $args = array_map(function ($arg) use ($translatableKwargs) {
-                $eq = strpos($arg, '=');
-                if ($eq === false) return $arg;
-                $key = substr($arg, 0, $eq);
-                $val = substr($arg, $eq + 1);
-                if ($val === '' || !in_array($key, $translatableKwargs, true)) {
-                    return $arg;
-                }
-                return $key . '=' . Translator::translate($val);
-            }, $args);
-        }
-
-        // Beta.9 A2 Slice 6 — POSITIONAL translation-key resolution.
-        // Catalog-driven (inputType: 'translationKey' on the arg). Skip
-        // kwarg-shape values that landed in positional slots (defensive).
-        // Empty values stay empty — no point translating a non-value.
-        $translatablePositions = self::getTranslatablePositionalIndices($fn);
-        foreach ($translatablePositions as $idx) {
-            if (!isset($args[$idx]) || $args[$idx] === '') continue;
-            if (strpos($args[$idx], '=') !== false) continue;
-            $args[$idx] = self::resolveTranslationKeyOrFallback($args[$idx]);
-        }
-
-        $quoted = array_map(function ($arg) use ($jsKeywords) {
-            if (in_array($arg, $jsKeywords, true)) return $arg;
-            return "'" . str_replace("'", "\\'", $arg) . "'";
-        }, $args);
-        return "QS.{$fn}(" . implode(', ', $quoted) . ")";
-    }
-
-    /**
-     * Get all allowed JS function names (core + custom)
-     * Cached for performance within single render
-     * 
-     * @return array
-     */
-    private function getAllowedJsFunctions(): array {
-        // Source of truth: secure/src/functions/qsVerbCatalog.php
-        // (also consumed by listJsFunctions command + JsonToPhpCompiler).
-        // `applyAuthState` is not yet in the catalog but is exposed in qs.js;
-        // keep the temporary local addition until it's promoted to the catalog
-        // with full args/example/events metadata.
-        return array_merge(qsVerbNames(), ['applyAuthState']);
-    }
-
-    /**
-     * Validate that a transformed event handler only contains safe QS.* calls
-     * 
-     * @param string $handler The transformed handler string
-     * @return bool True if safe, false if suspicious
-     */
-    private function isValidTransformedHandler(string $handler): bool {
-        $stripped = $handler;
-
-        // Strip the async-chain wrapper emitted by transformCallSyntax when
-        // the chain contains awaitable verbs (see CHAIN_AWAITABLE). The
-        // wrapper template is fully under our control — its tokens are
-        // fixed and don't carry user input — so removing them before the
-        // general check is safe.
-        $stripped = preg_replace(
-            "/\\(async\\(\\)=>\\{(.+?)\\}\\)\\(\\)\\.catch\\(e=>console\\.warn\\('\\[QS\\] chain aborted:',\\s*e\\)\\)/s",
-            '$1',
-            $stripped
-        );
-        // Strip await keywords introduced inside the wrapper.
-        $stripped = preg_replace('/\bawait\s+/', '', $stripped);
-
-        // Remove all valid QS.functionName(...) calls.
-        $stripped = preg_replace('/QS\.[a-zA-Z]+\([^)]*\)/', '', $stripped);
-
-        // After removing QS calls, only semicolons, spaces, and comments should remain.
-        $stripped = preg_replace('/[;\s]/', '', $stripped);
-        $stripped = preg_replace('/\/\*[^*]*\*\//', '', $stripped);
-
-        // If anything else remains, it's suspicious.
-        if (!empty($stripped)) {
-            error_log("Suspicious content in transformed handler: {$stripped}");
-            return false;
-        }
-
-        return true;
-    }
 
     /**
      * Load a component template from file

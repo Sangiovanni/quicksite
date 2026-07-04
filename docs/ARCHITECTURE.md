@@ -376,8 +376,8 @@ Other layered protections:
 | Concern | Protection |
 |---|---|
 | Path traversal | All file paths normalised and checked against `..`; whitelisted base directories; helpers in `secure/src/functions/PathManagement.php`. |
-| XSS in JSON content | Tag blacklist (`script`, `noscript`, `style`, `template`, `slot`, `object`, `embed`, `applet`); attribute escaping in renderer. |
-| Inline JS injection | `on*` attributes only accept the `{{call:fn:args}}` syntax (see §8). Raw JS is rejected. |
+| XSS in JSON content | Only allowlisted tags render: a tag must be on `TagRegistry::ALLOWED_TAGS` and off the blacklist (`script`, `noscript`, `style`, `template`, `slot`, `object`, `embed`, `applet`) — anything else is dropped. URL attributes (`href`, `src`, `xlink:href`, `ping`, `srcset`, …) accept only `http` / `https` / `mailto` / `tel` schemes plus relative / anchor / protocol-relative values; everything else becomes `#`. All attribute values are HTML-escaped. The renderer and the compiler enforce this identically (`TagRegistry::isRenderable`, `UrlPolicy`), so preview and built output agree. |
+| Inline JS injection | `on*` attributes only accept the `{{call:fn:args}}` syntax (see §8), transformed to allowlisted `QS.*()` calls (`CallTransformer`); raw JS is rejected. The tag, URL-scheme and `on*` policies are also enforced by the node writers (`addNode` / `editNode` / `editStructure`), so unsafe values are refused on write, not just dropped at render. |
 | File upload | MIME sniffed from content (not extension); per-category size cap; JS uploads disallowed. |
 | AuthN / AuthZ | Bearer token + role check on every Management call; logged. |
 | CSRF on admin | Admin panel uses the same Bearer token via `fetch`; no cookie-only auth. |
@@ -401,7 +401,7 @@ Behaviour is declared **inline in the JSON structure** rather than injected as r
 
 The renderer turns `{{call:fn:arg1,arg2}}` into a namespaced call to a registered function. Only registered functions can be called; arbitrary inline JS is rejected. The keyword `event` passes through unquoted so handlers like `oninput="QS.filter(event, '.card')"` work.
 
-A single argument can contain literal commas by escaping them with `\,`. For example, `{{call:filter:event,.cmd-card,.cmd-name\, .cmd-description,hidden}}` passes `.cmd-name, .cmd-description` as a single `matchAttr` value (a comma-separated child-selector list, see `QS.filter`), not two separate args. Both the JSON-side parser (`interactionHelpers.parseCallSyntax`) and the renderer (`JsonToHtmlRenderer.transformCallSyntax`) honour the escape and unescape it before quoting.
+A single argument can contain literal commas by escaping them with `\,`. For example, `{{call:filter:event,.cmd-card,.cmd-name\, .cmd-description,hidden}}` passes `.cmd-name, .cmd-description` as a single `matchAttr` value (a comma-separated child-selector list, see `QS.filter`), not two separate args. Both the JSON-side parser (`interactionHelpers.parseCallSyntax`) and the shared transform (`CallTransformer::transform`) honour the escape and unescape it before quoting.
 
 **Reserved class names.** `qs.js` self-injects `<style id="qs-hidden-style">.hidden{display:none!important}</style>` into the document head at script-load time so projects without a `.hidden` rule still get a working hide. This makes `.hidden` a **reserved QuickSite class**: do not redefine it in your CSS — the `!important` will win regardless and the override won't apply. To get animated/custom hide behaviour, define your own class (e.g. `.fade-out`) and pass it as the `hideClass` arg to `QS.show`/`QS.hide`/`QS.toggleHide`/`QS.filter` instead.
 
@@ -428,7 +428,7 @@ Custom logic is expressed by composing the core functions or, for richer client 
 
 #### 8.0.1 Chain execution & ordering
 
-Calls in a handler attribute (`{{call:a}};{{call:b}};…`) are compiled by `JsonToHtmlRenderer::transformCallSyntax` with three rules:
+Calls in a handler attribute (`{{call:a}};{{call:b}};…`) are compiled by `CallTransformer::transform` (shared by the renderer and the compiler) with three rules:
 
 1. **Sync prelude** — verbs in `CHAIN_SYNC_PRELUDE` (`validate`) emit first as plain `QS.foo(...)` statements. They run inside the event tick and can still call `event.preventDefault()` or `throw` to abort the rest.
 2. **Async wrap** — if the remaining body contains at least one verb from `CHAIN_AWAITABLE` (`fetch`, plus the Tier 3 magic-link verbs `exchangeMagicLink` / `requestMagicLink` / `logoutServer`) AND there is more than one call, the body is wrapped in `(async()=>{await A;await B;…})().catch(e=>console.warn('[QS] chain aborted:',e))`. Every call gets `await`'d, so "fetch then hide" — or "exchangeMagicLink then saveToken then redirect" — actually waits for the response.
@@ -442,7 +442,7 @@ Side channel: `QS.fetch` also dispatches `qs:fetch:loaded` / `qs:fetch:error` DO
 
 The renderer resolves translation keys at compile time so the rendered HTML carries the per-language **string**, never the key — `qs.js` at runtime has no access to translation files.
 
-Two parallel resolution paths in `JsonToHtmlRenderer::buildQsCallJs`:
+Two parallel resolution paths in `CallTransformer` (`buildCallJs`):
 
 1. **Keyword-arg path** (the original) — a `TRANSLATABLE_KEYWORD_ARGS` const lists per-verb kwarg names. The first consumer was `fetch`'s `toastSuccessKey` / `toastErrorKey`. Pattern: `{{call:fetch:@api/ep,toastSuccessKey=form.contact.success}}` → resolved kwarg value substituted in the rendered call.
 
@@ -450,7 +450,7 @@ Two parallel resolution paths in `JsonToHtmlRenderer::buildQsCallJs`:
 
 Today's positional users: `toast.message` (with `allowFreeText: true`). Future verbs declaring `inputType: 'translationKey'` on a positional arg are picked up automatically — no renderer code change required.
 
-Mirrored in `JsonToPhpCompiler::transformCallSyntax` for the build path. Multi-language sites work natively: source JSON is identical across languages; each per-request render produces a per-language compiled chain.
+The build path (`JsonToPhpCompiler`) calls the same `CallTransformer::transform`, so render and compile stay in lockstep. Multi-language sites work natively: source JSON is identical across languages; each per-request render produces a per-language compiled chain.
 
 See [ADMIN_PANEL.md §9.9](ADMIN_PANEL.md) for the authoring UX (translationKey picker + Custom Text sentinel in §9.9.7) and the full inputType taxonomy (§9.9.4).
 

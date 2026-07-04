@@ -1155,10 +1155,10 @@ query-string args). Otherwise free-text — typically `#form-id`.
 
 Two textKey pickers (success / error) + per-side silent checkbox.
 Translation happens at compile time via the
-`TRANSLATABLE_KEYWORD_ARGS` table in `JsonToHtmlRenderer` (see
+`TRANSLATABLE_KEYWORD_ARGS` table in `CallTransformer` (see
 `docs/ARCHITECTURE.md` for the metadata pattern). The compiled chain
 ships translated **strings**, not keys. Multi-language works for
-free — each page render runs `transformCallSyntax` in the request's
+free — each page render runs `CallTransformer::transform` in the request's
 language.
 
 `silent` opts out of BOTH success and error toasts (matches the
@@ -1171,8 +1171,8 @@ emitted.
 
 Authors chain steps that fire AFTER the fetch resolves. The list is
 NOT stored alongside the main interaction — each row is persisted as
-a **sibling interaction** on the same event. The renderer's
-`transformCallSyntax` then compiles the chain in storage order with
+a **sibling interaction** on the same event. The shared
+`CallTransformer::transform` then compiles the chain in storage order with
 `await` between awaitable steps (see
 `docs/ARCHITECTURE.md §8.0.1`).
 
@@ -1213,7 +1213,7 @@ private const TRANSLATABLE_KEYWORD_ARGS = [
 ```
 
 Future verbs that introduce translatable **kwargs** (e.g. `confirm`,
-`prompt`) add one line. `JsonToHtmlRenderer::buildQsCallJs` walks
+`prompt`) add one line. `CallTransformer::buildCallJs` walks
 each call's args and translates the value whenever the key is in
 the list.
 
@@ -1520,7 +1520,7 @@ Any additional languages your project ships need the same shape.
 |---|---|
 | Runtime verbs | `public/scripts/qs.js` (search for `QS.exchangeMagicLink`, `QS.requestMagicLink`, `QS.logoutServer`) |
 | Catalog metadata | `secure/src/functions/qsVerbCatalog.php` |
-| Async-chain wrapping | `secure/src/classes/JsonToHtmlRenderer.php` `CHAIN_AWAITABLE` |
+| Async-chain wrapping | `secure/src/classes/CallTransformer.php` `CHAIN_AWAITABLE` |
 | Lifecycle events | `qs:auth:exchange-started` / `qs:auth:exchange-failed` on `document`; cleared by `qs:auth:saved` / `qs:auth:cleared` |
 
 #### Tier 4 — OAuth
@@ -2376,7 +2376,7 @@ catalog. Defense in depth for direct API callers and batch imports.
 When a verb arg declares `inputType: 'translationKey'`, the saved
 value is stored as a translation key (e.g.
 `{{call:toast:hello.world,info,4000}}`). At render time,
-`JsonToHtmlRenderer::buildQsCallJs` reads the catalog, sees that the
+`CallTransformer::buildCallJs` reads the catalog, sees that the
 `message` arg of `toast` carries the translationKey hint, and
 substitutes the per-language string before the chain is compiled into
 the JS attribute:
@@ -2402,7 +2402,7 @@ through unchanged: a raw string like `"Hello world!"` triggers
 `Translator::translate`'s missing-marker, which the resolver falls
 back from to the raw value.
 
-Mirrored in `JsonToPhpCompiler::transformCallSyntax` for the build
+Uses the shared `CallTransformer::transform` on the build
 path. Future verbs gain compile-time translation by declaring the
 inputType in the catalog — zero renderer code changes.
 

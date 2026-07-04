@@ -7,6 +7,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 /**
  * addNode - Adds a new HTML tag node to a structure
@@ -115,7 +116,17 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
     
     // SECURITY: Strip sandbox attribute on embed tags — system enforces its own at render time
     IframeSandbox::sanitizeNodeParams($tag, $nodeParams);
-    
+
+    // SECURITY (beta.10): reject raw on* handlers + dangerous URL schemes on
+    // write — the renderer enforces the same at render; this is the reject-
+    // on-store companion so stored JSON stays clean.
+    $unsafeParam = firstUnsafeParam($nodeParams);
+    if ($unsafeParam !== null) {
+        return ApiResponse::create(400, 'validation.unsafe_param')
+            ->withMessage($unsafeParam)
+            ->withErrors([['field' => 'params', 'reason' => 'unsafe_value']]);
+    }
+
     // Validate structure type
     $allowed_types = ['menu', 'footer', 'page', 'component'];
     if (!in_array($type, $allowed_types, true)) {

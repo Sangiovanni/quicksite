@@ -6,6 +6,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/IframeSandbox.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 // SECURITY: Blocked tags are defined in TagRegistry::BLOCKED_TAGS
 
@@ -112,13 +113,27 @@ function validateStructureTags($node): ?string {
         return null;
     }
     
-    // Check if this node has a blocked tag
+    // Enforce the SAME gate the renderer + compiler use — TagRegistry::
+    // isRenderable = well-formed name + NOT blocked + on the allowlist.
+    // Previously only isBlocked was checked, so non-allowed tags (raw SVG
+    // <rect>/<text>/<set>, <foreignObject>, …) could be STORED even though the
+    // render/compile layers drop them (beta.10 F-g). Reject on write too, so
+    // stored JSON stays clean and the author gets an immediate error.
     if (isset($node['tag']) && is_string($node['tag'])) {
-        if (TagRegistry::isBlocked($node['tag'])) {
-            return "Blocked tag '{$node['tag']}' not allowed (security restriction)";
+        if (!TagRegistry::isRenderable($node['tag'])) {
+            return "Tag '{$node['tag']}' is not allowed (security restriction)";
         }
     }
-    
+
+    // Param safety: reject raw on* handlers + dangerous URL schemes on write
+    // (mirrors the renderer). Same shared helper the single-node writers use.
+    if (isset($node['params']) && is_array($node['params'])) {
+        $paramError = firstUnsafeParam($node['params']);
+        if ($paramError !== null) {
+            return $paramError;
+        }
+    }
+
     // Recursively check children
     if (isset($node['children']) && is_array($node['children'])) {
         foreach ($node['children'] as $child) {
