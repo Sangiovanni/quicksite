@@ -53,7 +53,11 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     }
     
     // Optional parameters
-    $siteName = trim($params['site_name'] ?? ucfirst($projectName));
+    $siteName = mb_substr(trim($params['site_name'] ?? ucfirst($projectName)), 0, 200);
+    // Cap length + strip control bytes (\x00-\x1F, \x7F). Byte-wise strip is
+    // UTF-8-safe: control bytes never occur inside a multibyte sequence. Display
+    // titles keep spaces / punctuation / accents — no strict format enforced.
+    $siteName = preg_replace('/[\x00-\x1F\x7F]/', '', $siteName);
     $defaultLang = trim($params['language'] ?? 'en');
     $switchTo = filter_var($params['switch_to'] ?? false, FILTER_VALIDATE_BOOLEAN);
     
@@ -119,7 +123,7 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     }
     
     // Create routes.php with home route (associative array format)
-    $routesContent = "<?php\n/**\n * Route definitions for $siteName\n * Created: " . date('Y-m-d H:i:s') . "\n */\n\nreturn [\n    'home' => [],\n];\n";
+    $routesContent = "<?php\n/**\n * Route definitions (auto-generated)\n * Created: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . varExportNested(['home' => []]) . ";\n";
     if (file_put_contents($projectPath . '/routes.php', $routesContent, LOCK_EX) === false) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage('Failed to create routes.php');

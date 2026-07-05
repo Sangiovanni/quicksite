@@ -108,7 +108,7 @@ function __command_switchProject(array $params = [], array $urlParams = []): Api
     }
     
     // Write new target.php with explicit sync to ensure file is fully written before response
-    $targetContent = "<?php\n/**\n * Active Project Target Configuration\n * \n * Updated: " . date('Y-m-d H:i:s') . "\n * Previous: " . ($previousProject ?? 'none') . "\n */\n\nreturn [\n    'project' => '" . addslashes($projectName) . "'\n];\n";
+    $targetContent = "<?php\n/**\n * Active Project Target Configuration\n * \n * Updated: " . date('Y-m-d H:i:s') . "\n */\n\nreturn [\n    'project' => '" . addslashes($projectName) . "'\n];\n";
     
     // Use fopen/fwrite/fflush for explicit sync instead of file_put_contents
     $handle = fopen($targetFile, 'w');

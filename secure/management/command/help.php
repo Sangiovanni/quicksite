@@ -3216,7 +3216,8 @@ $GLOBALS['__help_commands'] = [
                 'required' => false,
                 'type' => 'string',
                 'description' => 'Display name for the site',
-                'default' => 'Capitalized project name'
+                'default' => 'Capitalized project name',
+                'validation' => 'Max 200 chars; control characters stripped'
             ],
             'language' => [
                 'required' => false,

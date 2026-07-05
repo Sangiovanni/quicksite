@@ -106,7 +106,7 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
         $config = include $configPath;
         if (is_array($config)) {
             $config['SITE_NAME'] = ucfirst(str_replace(['-', '_'], ' ', $newName));
-            $configContent = "<?php\n/**\n * Site Configuration\n * Cloned from '$sourceProject' on " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($config, true) . ";\n";
+            $configContent = "<?php\n/**\n * Site Configuration\n * Cloned on " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($config, true) . ";\n";
             file_put_contents($configPath, $configContent, LOCK_EX);
         }
     }
