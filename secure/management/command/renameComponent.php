@@ -149,10 +149,14 @@ function __command_renameComponent(array $params = [], array $urlParams = []): A
             ->withData(['missing' => 'newName']);
     }
     
-    // Validate names don't contain slashes
-    if (strpos($oldName, '/') !== false || strpos($newName, '/') !== false) {
+    // Validate names don't contain path characters (/, \, or ..). On Windows a
+    // backslash is a separator, so a /-only check let `oldName=..\..\x` traverse
+    // out of the components/ dir (beta.10 C3 F1-n).
+    if (strpos($oldName, '/') !== false || strpos($newName, '/') !== false ||
+        strpos($oldName, '\\') !== false || strpos($newName, '\\') !== false ||
+        strpos($oldName, '..') !== false || strpos($newName, '..') !== false) {
         return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('Component names cannot contain slashes');
+            ->withMessage('Component names cannot contain path separators');
     }
     
     // Validate new name format (alphanumeric with hyphens)

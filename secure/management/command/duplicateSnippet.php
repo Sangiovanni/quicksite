@@ -18,6 +18,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -31,7 +32,15 @@ function __command_duplicateSnippet(array $params = [], array $urlParams = []): 
     $newId = $params['newId'] ?? null;
     $newName = $params['newName'] ?? null;
     $projectName = $params['project'] ?? null;
-    
+
+    // Reject a traversal payload in the project name before it reaches the
+    // snippets path (beta.10 C3 F1-k). null = active-project (trusted).
+    if ($projectName !== null && !is_valid_project_name((string)$projectName)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Invalid project name')
+            ->withErrors([['field' => 'project', 'reason' => 'invalid_format']]);
+    }
+
     if (!$sourceId) {
         return ApiResponse::create(400, 'snippets.id_required')
             ->withMessage('Source snippet ID is required');

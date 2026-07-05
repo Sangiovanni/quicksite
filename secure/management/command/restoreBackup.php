@@ -16,6 +16,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 
 /**
  * Recursively copy a directory
@@ -117,6 +118,19 @@ function __command_restoreBackup(array $params = [], array $urlParams = []): Api
     if (!$projectName) {
         return ApiResponse::create(400, 'project.not_specified')
             ->withMessage('No project specified and no active project found');
+    }
+
+    // Reject traversal payloads before the backup source + project dest paths are
+    // built (beta.10 C3 F1-d). The active-project fallback is trusted.
+    if (!is_valid_backup_name((string)$backupName)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Invalid backup name')
+            ->withErrors([['field' => 'backup', 'reason' => 'invalid_format']]);
+    }
+    if (!is_valid_project_name((string)$projectName)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Invalid project name')
+            ->withErrors([['field' => 'name', 'reason' => 'invalid_format']]);
     }
 
     // Validate project exists

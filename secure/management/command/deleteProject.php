@@ -19,6 +19,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -36,7 +37,14 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
             ->withMessage('Project name is required')
             ->withErrors(['name' => 'Required field']);
     }
-    
+
+    // Reject a traversal payload before it reaches the delete sink (beta.10 C3 F1-a).
+    if (!is_valid_project_name($projectName)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Invalid project name')
+            ->withErrors(['name' => 'Only letters, numbers, dash, underscore; must start with a letter']);
+    }
+
     // Safety confirmation
     $confirm = filter_var($params['confirm'] ?? false, FILTER_VALIDATE_BOOLEAN);
     

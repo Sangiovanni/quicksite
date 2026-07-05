@@ -282,15 +282,28 @@ function loadJsonStructure(string $filePath): ?array {
 }
 
 /**
+ * Guard a page ROUTE path against traversal before it becomes a filesystem path
+ * (beta.10 C3 F1 cluster D). Legit page routes are lowercase alnum/hyphen segments
+ * (see addRoute) and never contain '..'; reject any '..' (incl. its Windows
+ * backslash form). Shared by the three page-path resolvers below so every caller
+ * is covered in one place — a traversal route now resolves to null (→404) instead
+ * of silently escaping the pages/ dir.
+ */
+function routePathIsSafe(string $routePath): bool {
+    return strpos(str_replace('\\', '/', $routePath), '..') === false;
+}
+
+/**
  * Resolve page JSON file path using folder structure convention
  * Convention: ALL pages use folder structure - route/route.json
  * Falls back to flat route.json for backward compatibility
- * 
+ *
  * @param string $routePath Route path (e.g., 'home', 'guides/getting-started')
  * @param string|null $projectPath Optional project path, defaults to PROJECT_PATH constant
  * @return string|null Full path to JSON file, or null if not found
  */
 function resolvePageJsonPath(string $routePath, ?string $projectPath = null): ?string {
+    if (!routePathIsSafe($routePath)) return null;
     $projectPath = $projectPath ?? PROJECT_PATH;
     $basePath = $projectPath . '/templates/model/json/pages';
 
@@ -326,6 +339,7 @@ function resolvePageJsonPath(string $routePath, ?string $projectPath = null): ?s
  * @return string|null Full path to PHP file, or null if not found
  */
 function resolvePagePhpPath(string $routePath, ?string $projectPath = null): ?string {
+    if (!routePathIsSafe($routePath)) return null;
     $projectPath = $projectPath ?? PROJECT_PATH;
     $basePath = $projectPath . '/templates/pages';
 
@@ -356,9 +370,11 @@ function resolvePagePhpPath(string $routePath, ?string $projectPath = null): ?st
  * @param string $routePath Route path (e.g., 'home', 'guides/getting-started')
  * @param string $extension File extension ('json' or 'php')
  * @param string|null $projectPath Optional project path
- * @return string Full path where file should be created
+ * @return string|null Full path where the file should be created, or null if the
+ *                     route is unsafe (contains '..').
  */
-function getNewPagePath(string $routePath, string $extension, ?string $projectPath = null): string {
+function getNewPagePath(string $routePath, string $extension, ?string $projectPath = null): ?string {
+    if (!routePathIsSafe($routePath)) return null;
     $projectPath = $projectPath ?? PROJECT_PATH;
     $basePath = ($extension === 'json') 
         ? $projectPath . '/templates/model/json/pages'

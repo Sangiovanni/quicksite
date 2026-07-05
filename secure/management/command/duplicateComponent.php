@@ -37,10 +37,14 @@ function __command_duplicateComponent(array $params = [], array $urlParams = [])
             ->withData(['missing' => 'name']);
     }
     
-    // Validate names don't contain slashes
-    if (strpos($sourceName, '/') !== false || strpos($newName, '/') !== false) {
+    // Validate names don't contain path characters (/, \, or ..). On Windows a
+    // backslash is a separator, so a /-only check let `source=..\..\x` traverse
+    // out of the components/ dir (beta.10 C3 F1-o).
+    if (strpos($sourceName, '/') !== false || strpos($newName, '/') !== false ||
+        strpos($sourceName, '\\') !== false || strpos($newName, '\\') !== false ||
+        strpos($sourceName, '..') !== false || strpos($newName, '..') !== false) {
         return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('Component names cannot contain slashes');
+            ->withMessage('Component names cannot contain path separators');
     }
     
     // Validate new name format (alphanumeric with hyphens)

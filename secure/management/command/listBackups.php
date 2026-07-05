@@ -15,6 +15,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 
 /**
  * Calculate directory size
@@ -96,6 +97,14 @@ function __command_listBackups(array $params = [], array $urlParams = []): ApiRe
     if (!$projectName) {
         return ApiResponse::create(400, 'project.not_specified')
             ->withMessage('No project specified and no active project found');
+    }
+
+    // Reject a traversal payload before the backups path is enumerated
+    // (beta.10 C3 F1 listBackups). The active-project fallback is trusted.
+    if (!is_valid_project_name((string)$projectName)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Invalid project name')
+            ->withErrors([['field' => 'name', 'reason' => 'invalid_format']]);
     }
 
     // Validate project exists

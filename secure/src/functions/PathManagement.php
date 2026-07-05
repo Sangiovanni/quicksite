@@ -67,6 +67,45 @@ function is_valid_relative_path(string $path, int $max_length = 255, int $max_de
 }
 
 
+/**
+ * Validate a PROJECT name — a single directory segment under secure/projects/.
+ *
+ * Mirrors the createProject / switchProject format that is already treated as
+ * correct: must start with a letter, then alphanumerics / dash / underscore,
+ * max 50 chars. This rejects '', '.', '..', '/', '\', ':' (NTFS ADS), and any
+ * other separator or device-name character, so the value can never traverse out
+ * of the projects/ jail when concatenated into a path.
+ *
+ * Use this for every request-supplied project name/source before it is used to
+ * build a filesystem path (deleteProject, cloneProject source, backupProject,
+ * restoreBackup, exportProject, clearExports filter, and the snippet family's
+ * `project` param). The active-project value read from target.php is trusted and
+ * always satisfies this shape, so validating the resolved value never regresses
+ * a legitimate active-project fallback.
+ */
+function is_valid_project_name(string $name): bool
+{
+    return (bool) preg_match('/^[a-zA-Z][a-zA-Z0-9_-]{0,49}$/', $name);
+}
+
+/**
+ * Validate a BACKUP folder name — a single segment under a project's backups/.
+ *
+ * Backups are timestamp folders (Y-m-d_H-i-s), optionally 'pre-restore_'-prefixed
+ * or uniqid-suffixed, so the first character is a digit — a superset of a project
+ * name. Charset: start alphanumeric, then alphanumerics / dot / dash / underscore,
+ * max 100 chars, and an explicit '..' reject. No separators means the value can
+ * never leave the backups/ dir.
+ */
+function is_valid_backup_name(string $name): bool
+{
+    if (strpos($name, '..') !== false) {
+        return false;
+    }
+    return (bool) preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/', $name);
+}
+
+
 
 /**
  * Recursively MOVES files and folders from source to destination using a two-pass approach:

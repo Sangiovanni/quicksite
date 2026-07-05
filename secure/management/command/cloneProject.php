@@ -18,6 +18,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -43,7 +44,15 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
                 ->withErrors(['source' => 'Specify a source project or ensure an active project is set']);
         }
     }
-    
+
+    // Reject a traversal payload in the source name before the recursive copy
+    // reads from it (beta.10 C3 F1-c). The active-project fallback is trusted.
+    if (!is_valid_project_name($sourceProject)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Invalid source project name')
+            ->withErrors(['source' => 'Only letters, numbers, dash, underscore; must start with a letter']);
+    }
+
     // Validate new project name
     $newName = trim($params['name'] ?? '');
     

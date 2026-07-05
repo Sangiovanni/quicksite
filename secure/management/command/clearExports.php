@@ -15,6 +15,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -42,6 +43,13 @@ function __command_clearExports(array $params = [], array $urlParams = []): ApiR
     }
     
     $projectFilter = trim($params['project'] ?? '');
+    // Reject a traversal / glob-wildcard payload in the filter before it reaches
+    // glob() + unlink() (beta.10 C3 F1-g). Empty filter = clear all (unchanged).
+    if ($projectFilter !== '' && !is_valid_project_name($projectFilter)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Invalid project filter')
+            ->withErrors([['field' => 'project', 'reason' => 'invalid_format']]);
+    }
     $pattern = $projectFilter ? $exportDir . '/' . $projectFilter . '_export_*.zip' : $exportDir . '/*.zip';
     
     $files = glob($pattern);

@@ -26,6 +26,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 
 // Allowed keys in config.json export (security: no arbitrary PHP execution)
 const EXPORT_ALLOWED_CONFIG_KEYS = [
@@ -56,7 +57,15 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
     if (empty($projectName)) {
         $projectName = PROJECT_NAME ?? 'quicksite';
     }
-    
+
+    // Reject a traversal payload before the export source path is built
+    // (beta.10 C3 F1-f). The active-project fallback is trusted.
+    if (!is_valid_project_name($projectName)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Invalid project name')
+            ->withErrors([['field' => 'name', 'reason' => 'invalid_format']]);
+    }
+
     // Options
     $includePublic = filter_var($params['include_public'] ?? true, FILTER_VALIDATE_BOOLEAN);
     // Default: stream directly. Use save=true to store in exports folder

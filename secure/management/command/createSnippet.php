@@ -20,6 +20,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -36,7 +37,15 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
     $structure = $params['structure'] ?? null;
     $translations = $params['translations'] ?? [];
     $projectName = $params['project'] ?? null;
-    
+
+    // Reject a traversal payload in the project name before it reaches the
+    // snippets write path (beta.10 C3 F1-h). null = active-project (trusted).
+    if ($projectName !== null && !is_valid_project_name((string)$projectName)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Invalid project name')
+            ->withErrors([['field' => 'project', 'reason' => 'invalid_format']]);
+    }
+
     // Validate required fields
     if (!$snippetId) {
         return ApiResponse::create(400, 'snippets.id_required')

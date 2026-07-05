@@ -15,6 +15,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -26,7 +27,15 @@ require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
 function __command_deleteSnippet(array $params = [], array $urlParams = []): ApiResponse {
     $snippetId = $params['id'] ?? null;
     $projectName = $params['project'] ?? null;
-    
+
+    // Reject a traversal payload in the project name before it reaches the
+    // snippets delete path (beta.10 C3 F1-i). null = active-project (trusted).
+    if ($projectName !== null && !is_valid_project_name((string)$projectName)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Invalid project name')
+            ->withErrors([['field' => 'project', 'reason' => 'invalid_format']]);
+    }
+
     if (!$snippetId) {
         return ApiResponse::create(400, 'snippets.id_required')
             ->withMessage('Snippet ID is required');
