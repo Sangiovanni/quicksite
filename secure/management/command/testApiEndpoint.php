@@ -26,10 +26,11 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiEndpointManager.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/OutboundUrlPolicy.php';
 
 /**
  * Command function for internal execution
- * 
+ *
  * @param array $params Body parameters
  * @param array $urlParams URL segments (unused)
  * @return ApiResponse
@@ -95,7 +96,18 @@ function __command_testApiEndpoint(array $params = [], array $urlParams = []): A
     if (!empty($queryParams)) {
         $url .= (strpos($url, '?') !== false ? '&' : '?') . http_build_query($queryParams);
     }
-    
+
+    // SSRF guard (beta.10 C4 / F8): the endpoint baseUrl + path/query params
+    // are author-controlled, so validate the FINAL url before fetching — block
+    // non-http(s) schemes and loopback/private/metadata addresses, and pin the
+    // resolved IP so DNS can't rebind. Redirects are not followed (below).
+    $ssrf = OutboundUrlPolicy::check($url);
+    if (!$ssrf['ok']) {
+        return ApiResponse::create(400, 'api.error.blocked_url')
+            ->withMessage('Endpoint URL blocked by SSRF policy: ' . $ssrf['error'])
+            ->withData(['url' => $url]);
+    }
+
     // Build headers
     $headers = [];
     
@@ -143,12 +155,18 @@ function __command_testApiEndpoint(array $params = [], array $urlParams = []): A
         curl_setopt_array($ch, [
             CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_FOLLOWLOCATION => false, // SSRF: never chase a redirect into an internal host
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
             CURLOPT_TIMEOUT => (int)$timeout,
             CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_HEADER => true,
         ]);
-        
+
+        // Pin the validated IP so curl connects to exactly what was checked.
+        if (!empty($ssrf['resolve'])) {
+            curl_setopt($ch, CURLOPT_RESOLVE, $ssrf['resolve']);
+        }
+
         // Set headers
         if (!empty($headers)) {
             $headerLines = [];

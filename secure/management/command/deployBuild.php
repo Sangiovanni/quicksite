@@ -94,6 +94,64 @@ if (!$isAbsolute) {
         ->send();
 }
 
+// === CONFINE DEPLOY TARGET TO AN ALLOWLISTED ROOT (beta.10 C4 / F8) ===
+// The build contains generated PHP; under the CONTAIN model a leaked/low-
+// trust deploy token must not write it to an arbitrary absolute path
+// (another vhost, a startup folder, a system dir) or overwrite unrelated
+// files. Allowed roots = SERVER_ROOT (always) + any listed in
+// secure/management/config/deploy-roots.php. Absent/empty config ⇒
+// SERVER_ROOT only, so the default deploy-to-self flow is unaffected.
+$allowedRoots = [SERVER_ROOT];
+$deployRootsFile = SECURE_FOLDER_PATH . '/management/config/deploy-roots.php';
+if (is_file($deployRootsFile)) {
+    $configuredRoots = require $deployRootsFile;
+    if (is_array($configuredRoots)) {
+        foreach ($configuredRoots as $configuredRoot) {
+            if (is_string($configuredRoot) && $configuredRoot !== '') {
+                $allowedRoots[] = $configuredRoot;
+            }
+        }
+    }
+}
+
+// Canonicalise for a boundary-safe containment check: resolve symlinks/case
+// on the deepest EXISTING ancestor (the target itself may not exist yet),
+// then re-append the not-yet-created tail. '..' was already rejected above.
+$deployCanonicalise = static function (string $p): string {
+    $p = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $p), DIRECTORY_SEPARATOR);
+    $suffix = '';
+    $probe = $p;
+    while ($probe !== '' && @realpath($probe) === false) {
+        $slash = strrpos($probe, DIRECTORY_SEPARATOR);
+        if ($slash === false) break;
+        $suffix = substr($probe, $slash) . $suffix;
+        $probe = substr($probe, 0, $slash);
+    }
+    $real = ($probe !== '') ? @realpath($probe) : false;
+    $full = $real !== false ? $real . $suffix : $p;
+    return (PHP_OS_FAMILY === 'Windows') ? strtolower($full) : $full;
+};
+
+$targetCanonical = $deployCanonicalise($targetPath);
+$targetAllowed = false;
+foreach ($allowedRoots as $allowedRoot) {
+    $rootCanonical = $deployCanonicalise($allowedRoot);
+    if ($rootCanonical !== '' && ($targetCanonical === $rootCanonical
+        || str_starts_with($targetCanonical . DIRECTORY_SEPARATOR, $rootCanonical . DIRECTORY_SEPARATOR))) {
+        $targetAllowed = true;
+        break;
+    }
+}
+if (!$targetAllowed) {
+    ApiResponse::create(403, 'validation.security_violation')
+        ->withMessage('Deploy target is outside the allowed deploy root(s). Add it to secure/management/config/deploy-roots.php to permit this location.')
+        ->withErrors([
+            ['field' => 'targetPath', 'value' => $targetPath],
+            ['reason' => 'Only SERVER_ROOT and configured deploy-roots.php entries are permitted']
+        ])
+        ->send();
+}
+
 // === BUILD VALIDATION ===
 
 // Check that no build with this name is currently in progress (would mean files are incomplete)

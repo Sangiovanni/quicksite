@@ -83,6 +83,7 @@
  */
 
 require_once __DIR__ . '/../classes/ApiEndpointManager.php';
+require_once __DIR__ . '/../classes/OutboundUrlPolicy.php';
 
 /**
  * Internal — build a curl handle + bookkeeping for serverFetch /
@@ -202,6 +203,21 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
         if (!empty($nonPathInputs)) {
             $body = json_encode($nonPathInputs);
         }
+    }
+
+    // SSRF guard (beta.10 C4 / F8): baseUrl comes from the project's API
+    // registry (author-controlled), so validate the final URL before fetching
+    // — block non-http(s) schemes + loopback/private/metadata addresses and
+    // pin the resolved IP so DNS can't rebind. Checked before the cache read
+    // so an internal URL is refused outright, cached or not.
+    $ssrf = OutboundUrlPolicy::check($url);
+    if (!$ssrf['ok']) {
+        return ['state' => 'error', 'result' => [
+            'ok'     => false,
+            'status' => 0,
+            'data'   => null,
+            'error'  => "Endpoint @{$endpointRef} blocked by SSRF policy: {$ssrf['error']}",
+        ]];
     }
 
     // Build headers.
@@ -328,12 +344,16 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
     curl_setopt_array($ch, [
         CURLOPT_URL            => $url,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_FOLLOWLOCATION => false, // SSRF: no redirect-following (OutboundUrlPolicy checks one URL)
+        CURLOPT_PROTOCOLS      => CURLPROTO_HTTP | CURLPROTO_HTTPS,
         CURLOPT_TIMEOUT        => 10,
         CURLOPT_CONNECTTIMEOUT => 5,
         CURLOPT_CUSTOMREQUEST  => $method,
         CURLOPT_HTTPHEADER     => $headers,
     ]);
+    if (!empty($ssrf['resolve'])) {
+        curl_setopt($ch, CURLOPT_RESOLVE, $ssrf['resolve']); // pin the checked IP
+    }
     if ($body !== null) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
     }

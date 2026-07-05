@@ -2,6 +2,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/SvgSanitizer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/AssetMetadataManager.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/OutboundUrlPolicy.php';
 
 /**
  * Upload Asset Command
@@ -34,6 +35,8 @@ function downloadUrlToTemp(string $url, int $maxSize, string $tmpDir): array
 
         $parsed = parse_url($currentUrl);
 
+        // Asset downloads are HTTPS-only (stricter than the shared policy,
+        // which allows http+https) — keep this explicit.
         $scheme = strtolower($parsed['scheme'] ?? '');
         if ($scheme !== 'https') {
             return ['error' => 'Only HTTPS URLs are allowed'];
@@ -44,17 +47,17 @@ function downloadUrlToTemp(string $url, int $maxSize, string $tmpDir): array
             return ['error' => 'URL has no hostname'];
         }
 
-        // Resolve hostname to IP before connecting
-        $ip = gethostbyname($host);
-        if ($ip === $host) {
-            return ['error' => 'Could not resolve hostname: ' . $host];
-        }
-
-        // Block private/reserved IPs only for non-local requests
-        // Allow loopback (127.x) and private ranges for self-hosted CMS use
-        // Still block link-local (169.254.x) and other reserved ranges
-        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_RES_RANGE) === false) {
-            return ['error' => 'URL resolves to a reserved IP address'];
+        // SSRF guard (beta.10 C4 / F8): block loopback/private/metadata and
+        // pin the resolved IP so curl connects to exactly the address we
+        // validated — this closes the DNS-rebind gap the old code had (it
+        // validated gethostbyname() but then handed curl the hostname to
+        // re-resolve) and adds the private-range block it was missing
+        // (FILTER_FLAG_NO_RES_RANGE alone allowed 10./172.16./192.168.).
+        // Runs on EVERY hop, so a redirect to an internal address is refused.
+        // In 'development' the range block is lifted (see OutboundUrlPolicy).
+        $ssrf = OutboundUrlPolicy::check($currentUrl);
+        if (!$ssrf['ok']) {
+            return ['error' => $ssrf['error']];
         }
 
         $tmpFile = tempnam($tmpDir, 'asset_');
@@ -74,6 +77,7 @@ function downloadUrlToTemp(string $url, int $maxSize, string $tmpDir): array
             CURLOPT_URL            => $currentUrl,
             CURLOPT_FILE           => $fp,
             CURLOPT_FOLLOWLOCATION => false, // Handle redirects manually for SSRF safety
+            CURLOPT_PROTOCOLS      => CURLPROTO_HTTPS,
             CURLOPT_TIMEOUT        => 30,
             CURLOPT_MAXFILESIZE    => $maxSize,
             CURLOPT_USERAGENT      => 'QuickSite/1.0',
@@ -99,6 +103,9 @@ function downloadUrlToTemp(string $url, int $maxSize, string $tmpDir): array
         }
 
         curl_setopt_array($ch, $curlOpts);
+        if (!empty($ssrf['resolve'])) {
+            curl_setopt($ch, CURLOPT_RESOLVE, $ssrf['resolve']); // pin the checked IP
+        }
 
         curl_exec($ch);
         $httpCode  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);

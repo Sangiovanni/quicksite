@@ -686,6 +686,7 @@ crawlers are even more conservative about running JS).
 | Storage (per project) | `secure/projects/<project>/data/route-resolvers.json` |
 | Server-side execution | `secure/src/classes/DataResolver.php` → `resolveMany()` (handles single- and multi-resolver routes uniformly) |
 | Server-side fetch | `secure/src/functions/serverFetch.php` → `serverFetch()` (single) / `serverFetchMulti()` (parallel via `curl_multi_*`) |
+| Outbound SSRF guard | `secure/src/classes/OutboundUrlPolicy.php` — every server-side fetch is restricted to `http`/`https`, and in `production` the target is refused if it resolves to a loopback, private, or cloud-metadata address; the validated IP is pinned so DNS cannot rebind between check and connect. `development` (see `secure/management/config/environment.php`) lifts the internal-address block so a local/LAN API can be reached while building. Resolver fetches do **not** follow HTTP redirects. |
 | Storage + validation helpers | `secure/src/functions/resolverHelpers.php` |
 | File-based cache + observability | `secure/src/functions/resolverCache.php` + `X-QS-Resolver-Cache` header |
 | Commands | `setRouteResolver` (set / clear / patch / append / remove), `cleanResolverCache` |

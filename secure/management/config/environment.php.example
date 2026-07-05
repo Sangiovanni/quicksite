@@ -1,0 +1,26 @@
+<?php
+/**
+ * Runtime Environment  (beta.10 C4 / F8)
+ *
+ * Copy this file to environment.php to change the environment. If the live
+ * file is absent, QuickSite behaves as 'production' (the secure default).
+ *
+ * Values:
+ *   'production'   (default) — server-side fetches (resolvers, testApiEndpoint,
+ *                  OAuth, URL asset import) MAY NOT reach loopback / private /
+ *                  cloud-metadata addresses. This is what a public or shared
+ *                  deployment must run as.
+ *   'development'  — lifts the internal-address block so a local author can
+ *                  call http://localhost:3000 or a LAN API while building.
+ *                  The http/https scheme allowlist and DNS-pinning stay on.
+ *
+ * SECURITY: only ever run 'development' on a machine you fully trust and that
+ * is not reachable by untrusted callers. Changing this is a deliberate
+ * server-side edit — it is intentionally NOT a runtime API setting, so a
+ * leaked/low-trust token can never flip the environment to re-open SSRF.
+ * (A future setup.bat/setup.sh step will offer to write this at install time.)
+ */
+
+return [
+    'environment' => 'production',
+];

@@ -82,7 +82,7 @@ Each row enumerates the commands in that category — comma-separated, alphabeti
 | **Styles** | `getStyles`, `editStyles`, `listStyleRules`, `getStyleRule`, `setStyleRule`, `deleteStyleRule` — `style.css` blocks + scoped CSS rule management. |
 | **CSS variables** | `getRootVariables`, `setRootVariables`, `setThemeMode` — CSS custom-property registries used by the color picker and theme switcher. |
 | **Animations** | `listKeyframes`, `getKeyframes`, `setKeyframes`, `deleteKeyframes`, `getAnimatedSelectors` — named keyframes + per-element animation bindings. |
-| **Builds** | `build`, `listBuilds`, `getBuild`, `deleteBuild`, `cleanBuilds`, `deployBuild`, `downloadBuild` — compile a project to a static `public/build/<name>/` deliverable; list / deploy / clean. |
+| **Builds** | `build`, `listBuilds`, `getBuild`, `deleteBuild`, `cleanBuilds`, `deployBuild`, `downloadBuild` — compile a project to a static `public/build/<name>/` deliverable; list / deploy (to the install root, or a root listed in `secure/management/config/deploy-roots.php`) / clean. |
 | **Projects** | `listProjects`, `getActiveProject`, `switchProject`, `createProject`, `cloneProject`, `deleteProject` — per-project CRUD + active-project switching under `secure/projects/`. |
 | **Backups** | `backupProject`, `listBackups`, `restoreBackup`, `deleteBackup` — snapshot / restore (configurable scope). |
 | **Export / Import** | `exportProject`, `importProject`, `downloadExport`, `clearExports` — pack a project as ZIP for portability; import a ZIP back. |

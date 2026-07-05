@@ -60,6 +60,8 @@
  *   - Logout + session-helpers (Slice 2e — DONE)
  */
 
+require_once __DIR__ . '/OutboundUrlPolicy.php';
+
 class OAuthHandler
 {
     /**
@@ -763,15 +765,30 @@ class OAuthHandler
      */
     private static function httpRequest(string $method, string $url, ?string $body, array $headers): ?array
     {
+        // SSRF guard (beta.10 C4 / F8): provider token/userinfo/revoke URLs
+        // come from the provider preset (author/admin config). Validate the
+        // back-channel URL — block non-http(s) + loopback/private/metadata,
+        // pin the resolved IP. A block is surfaced as a transport failure
+        // (null), matching this method's contract.
+        $ssrf = OutboundUrlPolicy::check($url);
+        if (!$ssrf['ok']) {
+            error_log("OAuth back-channel URL blocked by SSRF policy ({$url}): {$ssrf['error']}");
+            return null;
+        }
+
         $ch = curl_init($url);
         if ($ch === false) {
             return null;
         }
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+        curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
         curl_setopt($ch, CURLOPT_TIMEOUT, 10);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        if (!empty($ssrf['resolve'])) {
+            curl_setopt($ch, CURLOPT_RESOLVE, $ssrf['resolve']); // pin the checked IP
+        }
         if ($method === 'POST') {
             curl_setopt($ch, CURLOPT_POST, true);
             if ($body !== null) {

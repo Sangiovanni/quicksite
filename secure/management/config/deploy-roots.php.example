@@ -1,0 +1,32 @@
+<?php
+/**
+ * Deploy Roots Allowlist  (beta.10 C4 / F8 — deploy-target containment)
+ *
+ * Copy this file to deploy-roots.php to permit `deployBuild` to write the
+ * build output to locations OUTSIDE the QuickSite install directory.
+ *
+ * WHY THIS EXISTS
+ *   `deployBuild` copies a build (which contains generated PHP) to an
+ *   operator-chosen absolute path. Without a confinement list, anyone
+ *   holding a deploy-capable token could write the site — or overwrite
+ *   files — anywhere the PHP process can reach (another vhost, a startup
+ *   folder, a system directory). This allowlist boxes that in.
+ *
+ * BEHAVIOUR
+ *   - The install root (SERVER_ROOT) is ALWAYS allowed — the default
+ *     "deploy to self" flow keeps working with no config at all.
+ *   - If this file is absent or returns an empty array, SERVER_ROOT is the
+ *     ONLY permitted target.
+ *   - Each entry below adds one more permitted root. A deploy target is
+ *     accepted only when it is that root or lives underneath it (boundary-
+ *     safe: "/var/www/site" does NOT permit "/var/www/site-evil").
+ *   - Paths are matched after symlink resolution on the deepest existing
+ *     ancestor; on Windows the comparison is case-insensitive.
+ *
+ * Return an array of ABSOLUTE paths.
+ */
+
+return [
+    // 'C:\\wamp64\\www\\my-production-site',
+    // '/var/www/mysite',
+];

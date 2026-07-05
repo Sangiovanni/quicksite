@@ -37,7 +37,9 @@ quicksite/
 │   │   ├── config/               # API configuration
 │   │   │   ├── target.php        # Active project selector (gitignored)
 │   │   │   ├── auth.php          # Tokens and CORS config (gitignored)
-│   │   │   └── roles.php         # Role definitions (gitignored)
+│   │   │   ├── roles.php         # Role definitions (gitignored)
+│   │   │   ├── environment.php   # production | development — SSRF/error gate (gitignored; default production)
+│   │   │   └── deploy-roots.php  # deployBuild allowed target roots (gitignored; default SERVER_ROOT only)
 │   │   └── routes.php            # Command whitelist
 │   ├── admin/                    # Admin panel backend
 │   │   ├── AdminRouter.php       # Admin routing and page rendering

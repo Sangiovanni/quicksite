@@ -81,6 +81,8 @@ secure/projects/quicksite/backups/
 secure/management/config/target.php
 secure/management/config/auth.php
 secure/management/config/roles.php
+secure/management/config/deploy-roots.php
+secure/management/config/environment.php
 
 # Admin config - server-side secrets for data resolver (beta.8 A2) +
 # OAuth provider credentials (beta.9 A1).

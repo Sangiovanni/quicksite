@@ -1849,6 +1849,7 @@ splits).
 | Storage (per project, keyed by route) | `secure/projects/<project>/data/route-resolvers.json` |
 | Server-side execution | `secure/src/classes/DataResolver.php` → `resolveMany()` |
 | Server-side fetch (single + parallel) | `secure/src/functions/serverFetch.php` → `serverFetch()` / `serverFetchMulti()` |
+| Outbound SSRF guard | `secure/src/classes/OutboundUrlPolicy.php` — a resolver endpoint must be a public `http`/`https` URL. In `production` a target resolving to a loopback / private / cloud-metadata address is refused (the fetch returns an error and the resolver's `onMiss` applies); set the environment to `development` (`secure/management/config/environment.php`) to reach `localhost` / a LAN API while building. |
 | Storage + validation helpers | `secure/src/functions/resolverHelpers.php` |
 | Cache layer | `secure/src/functions/resolverCache.php` + `cleanResolverCache` command |
 | Read / write commands | `setRouteResolver` (set / clear / patch / append / remove single slot) |
