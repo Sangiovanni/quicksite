@@ -36,17 +36,22 @@ function __command_listRoles(array $params = [], array $urlParams = []): ApiResp
     }
     
     // Get current user's role to determine what to show
-    $tokenInfo = null;
+    $user = null;
     $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
     if ($authHeader) {
         $result = validateBearerToken($authHeader);
         if ($result['valid']) {
-            $tokenInfo = $result['token_info'];
+            $user = $result['user'];
         }
     }
-    
-    $isSuperAdmin = ($tokenInfo['role'] ?? '') === '*';
-    
+
+    // Owner/admin of the selected project see the full command lists
+    // (superadmin tier removed — C5)
+    $role = ($user !== null && isset($user['id'], $user['selected_project']))
+        ? getUserRoleForProject($user['id'], $user['selected_project'])
+        : null;
+    $isPrivileged = in_array($role, ['owner', 'admin'], true) || !empty($user['_authDisabled']);
+
     // Build response
     $rolesList = [];
     foreach ($roles as $name => $config) {
@@ -56,21 +61,21 @@ function __command_listRoles(array $params = [], array $urlParams = []): ApiResp
             'builtin' => $config['builtin'] ?? false,
             'command_count' => count($config['commands'] ?? [])
         ];
-        
-        // Only * users can see the full command list
-        if ($isSuperAdmin) {
+
+        // Only privileged users see the full command list
+        if ($isPrivileged) {
             $roleData['commands'] = $config['commands'] ?? [];
         }
-        
+
         $rolesList[] = $roleData;
     }
-    
+
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('Roles retrieved successfully')
         ->withData([
             'roles' => $rolesList,
             'count' => count($rolesList),
-            'includes_commands' => $isSuperAdmin
+            'includes_commands' => $isPrivileged
         ]);
 }
 

@@ -28,22 +28,25 @@ function __command_listTokens(array $params = [], array $urlParams = []): ApiRes
         $currentToken = $_SESSION['admin_token'];
     }
 
-    // Build safe token list (mask token values)
+    // Build safe token list (mask token values). Tokens now resolve to a user
+    // (C5); the name comes from users.php and the role is per-project (shown for
+    // the user's selected project as a best-effort hint).
+    $users = loadUsersConfig();
     $tokens = [];
     foreach ($config['authentication']['tokens'] as $token => $info) {
         // Show only first 8 and last 4 characters
         $masked = substr($token, 0, 8) . '...' . substr($token, -4);
-        
-        // Support both old (permissions) and new (role) format
-        $role = $info['role'] ?? null;
-        if (!$role && isset($info['permissions'])) {
-            $role = migrateTokenPermissions($info);
-        }
-        
+
+        $uid  = $info['userId'] ?? null;
+        $user = ($uid !== null) ? ($users['users'][$uid] ?? null) : null;
+        $proj = $user['selected_project'] ?? null;
+        $role = ($uid !== null && $proj !== null) ? (getUserRoleForProject($uid, $proj) ?? 'none') : 'none';
+
         $tokens[] = [
             'token_preview' => $masked,
-            'name' => $info['name'] ?? 'Unnamed',
-            'role' => $role ?? 'unknown',
+            'name' => $user['name'] ?? 'Unknown',
+            'user_id' => $uid,
+            'role' => $role,
             'created' => $info['created'] ?? 'unknown',
             'is_current' => ($token === $currentToken),
         ];

@@ -167,12 +167,58 @@ HTACCESS;
     
     // Create basic style.css
     createBasicStyles($projectPath);
-    
+
+    // --- Membership (C5): the creator becomes the project's sole owner ---
+    // No project may exist without a members.json (L9). Requires AuthManagement.
+    if (!function_exists('getCurrentUser')) {
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+    }
+    $creator   = getCurrentUser();
+    $creatorId = $creator['id'] ?? null;
+
+    if (!is_dir($projectPath . '/config')) {
+        mkdir($projectPath . '/config', 0755, true);
+    }
+    $membersData = [
+        'owner'      => $creatorId,
+        'visibility' => 'private',
+        'members'    => $creatorId !== null ? [$creatorId => ['role' => 'owner']] : (object)[],
+    ];
+    file_put_contents(
+        $projectPath . '/config/members.json',
+        json_encode($membersData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n",
+        LOCK_EX
+    );
+
+    // Update the creator's derived project index (users.php) — cache only (L5)
+    if ($creatorId !== null) {
+        $usersPath = SECURE_FOLDER_PATH . '/management/config/users.php';
+        if (is_file($usersPath)) {
+            $usersCfg = require $usersPath;
+            if (isset($usersCfg['users'][$creatorId])) {
+                $usersCfg['users'][$creatorId]['projects'][$projectName] = [
+                    'name'    => $siteName,
+                    'created' => date('Y-m-d'),
+                    'role'    => 'owner',
+                ];
+                if ($switchTo) {
+                    $usersCfg['users'][$creatorId]['selected_project'] = $projectName;
+                }
+                $usersContent = "<?php\n/**\n * User Registry (C5) — stable userId => identity.\n * Engine plumbing (PHP). Atomic write (temp+rename).\n */\n\nreturn " . var_export($usersCfg, true) . ";\n";
+                $tmp = $usersPath . '.tmp' . getmypid();
+                if (file_put_contents($tmp, $usersContent, LOCK_EX) !== false) {
+                    @rename($tmp, $usersPath);
+                }
+            }
+        }
+    }
+
     $result = [
         'project' => $projectName,
         'path' => 'secure/projects/' . $projectName,
         'site_name' => $siteName,
         'default_language' => $defaultLang,
+        'owner_user_id' => $creatorId,
         'created' => true,
         'switched_to' => false
     ];

@@ -130,7 +130,7 @@ if (!$authResult['valid']) {
     );
 }
 
-$currentTokenInfo = $authResult['token_info'];
+$currentUser = $authResult['user'];
 
 // ============================================================================
 // Route Management Setup
@@ -173,7 +173,7 @@ if(in_array($trimParametersManagement->command(), ROUTES_MANAGEMENT)){
 // ============================================================================
 // Permission Check
 // ============================================================================
-if (!hasPermission($currentTokenInfo, $command)) {
+if (!hasPermission($currentUser, $command)) {
     sendForbiddenResponse($command);
 }
 
@@ -185,12 +185,12 @@ if (!hasPermission($currentTokenInfo, $command)) {
 $requestBody = json_decode(REQUEST_BODY_RAW, true) ?? [];
 
 // Set up logging callback
-ApiResponse::setBeforeSendCallback(function($status, $responseCode) use ($command, $currentTokenInfo, $commandStartTime, $requestBody) {
+ApiResponse::setBeforeSendCallback(function($status, $responseCode) use ($command, $currentUser, $commandStartTime, $requestBody) {
     logCommand(
         $command,
         $_SERVER['REQUEST_METHOD'],
         $requestBody,
-        $currentTokenInfo,
+        $currentUser,
         $status,
         $responseCode,
         $commandStartTime

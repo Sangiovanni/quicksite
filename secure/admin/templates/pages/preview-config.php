@@ -27,9 +27,12 @@ try {
         $__aiToolsAuthCfg = loadAuthConfig();
         $__aiToolsTokens = $__aiToolsAuthCfg['authentication']['tokens'] ?? [];
         if (isset($__aiToolsTokens[$__aiToolsToken])) {
-            $__aiToolsInfo = normalizeTokenInfo($__aiToolsTokens[$__aiToolsToken]);
-            $__aiToolsPerms = getTokenPermissions($__aiToolsInfo);
-            $__aiToolsAllowed = $__aiToolsPerms['commands'] ?? null;
+            // Resolve the token to a user, then its effective commands (C5)
+            $__aiToolsResolved = validateBearerToken('Bearer ' . $__aiToolsToken);
+            if ($__aiToolsResolved['valid']) {
+                $__aiToolsPerms = getTokenPermissions($__aiToolsResolved['user']);
+                $__aiToolsAllowed = $__aiToolsPerms['commands'] ?? null;
+            }
         }
     }
     $__aiToolsCategoryOrder = ['creation', 'template', 'modification', 'content', 'style', 'advanced', 'wip'];

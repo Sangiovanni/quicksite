@@ -80,6 +80,7 @@ secure/projects/quicksite/backups/
 # Management config - local/sensitive files (use .example templates for setup)
 secure/management/config/target.php
 secure/management/config/auth.php
+secure/management/config/users.php
 secure/management/config/roles.php
 secure/management/config/deploy-roots.php
 secure/management/config/environment.php
@@ -99,6 +100,12 @@ secure/admin/config/oauth-secrets.php
 # explicitly so a copy-and-rename setup in the template can't accidentally
 # leak credentials at commit time.
 secure/projects/quicksite/data/oauth-secrets.json
+
+# Per-project membership/access file (C5). Install-local — references userIds
+# generated at migration/bootstrap, meaningless without the local users.php.
+# The secure/projects/* tree is gitignored EXCEPT the quicksite starter template,
+# so re-ignore the template's members.json explicitly (like oauth-secrets above).
+secure/projects/quicksite/config/members.json
 
 # Resolver response cache (beta.8 A2 Slice 4). File-based TTL cache for
 # the server-side data resolver. Per-deployment runtime state — never

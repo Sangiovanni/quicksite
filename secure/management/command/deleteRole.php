@@ -71,7 +71,7 @@ function __command_deleteRole(array $params = [], array $urlParams = []): ApiRes
     $affectedTokens = [];
     
     foreach ($tokens as $tokenKey => $tokenInfo) {
-        $tokenRole = $tokenInfo['role'] ?? migrateTokenPermissions($tokenInfo);
+        $tokenRole = $tokenInfo['role'] ?? null; // tokens no longer carry roles (C5); per-project membership is C6
         if ($tokenRole === $name) {
             $affectedTokens[] = [
                 'name' => $tokenInfo['name'] ?? 'Unknown',
@@ -93,7 +93,7 @@ function __command_deleteRole(array $params = [], array $urlParams = []): ApiRes
     $reassignedTokens = [];
     if (!empty($affectedTokens) && $force) {
         foreach ($tokens as $tokenKey => &$tokenInfo) {
-            $tokenRole = $tokenInfo['role'] ?? migrateTokenPermissions($tokenInfo);
+            $tokenRole = $tokenInfo['role'] ?? null; // tokens no longer carry roles (C5); per-project membership is C6
             if ($tokenRole === $name) {
                 $tokenInfo['role'] = 'viewer';
                 // Remove old permissions array if it exists

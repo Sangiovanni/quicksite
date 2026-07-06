@@ -96,12 +96,8 @@ function createLogEntry(
 ): array {
     $duration = round((microtime(true) - $startTime) * 1000, 2);
     
-    // Create safe token preview (first 7 + last 3 chars)
-    $token = $tokenInfo['token'] ?? '';
-    $tokenPreview = strlen($token) > 10 
-        ? substr($token, 0, 7) . '...' . substr($token, -3)
-        : '***';
-    
+    // Publisher identity (C5): the resolved user — the token no longer carries a
+    // name, so we record the stable userId + display name.
     return [
         'id' => generateLogId(),
         'timestamp' => date('c'), // ISO 8601 format
@@ -109,7 +105,7 @@ function createLogEntry(
         'method' => $method,
         'body' => sanitizeLogBody($command, $body),
         'publisher' => [
-            'token_preview' => $tokenPreview,
+            'user_id' => $tokenInfo['id'] ?? null,
             'token_name' => $tokenInfo['name'] ?? 'Unknown'
         ],
         'result' => [

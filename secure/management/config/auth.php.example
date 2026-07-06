@@ -1,25 +1,29 @@
 <?php
 /**
  * Authentication & CORS Configuration
- * 
- * Copy this file to auth.php and customize your tokens.
- * 
- * IMPORTANT: Replace ALL default tokens before deploying to production!
- * Generate secure tokens with: bin2hex(random_bytes(32))
+ *
+ * Copy this file to auth.php and customize.
+ *
+ * The token is the credential (it "logs you in"); it resolves to a USER in
+ * users.php (copy users.php.example alongside this). Per-project roles live in
+ * each project's config/members.json — NOT here.
+ *
+ * IMPORTANT: Replace the default token before deploying to production!
+ * Generate a secure token with: php -r "echo 'tvt_' . bin2hex(random_bytes(24));"
+ * and point its userId at a real entry in users.php.
  */
 
 return [
     'authentication' => [
         'enabled' => true,
         'tokens' => [
-            // Default superadmin token - change this before deploying!
-            // You can replace it during setup (setup.bat / setup.sh)
-            // or generate a secure one with: php -r "echo bin2hex(random_bytes(32));"
+            // Default token — change this before deploying! Resolves to the
+            // 'usr_CHANGE_ME_default' user in users.php.example.
+            // (Key kept as CHANGE_ME_superadmin_token so the admin panel's
+            //  default-token security warning still detects it.)
             'CHANGE_ME_superadmin_token' => [
-                'name' => 'Default Superadmin',
-                'role' => '*',
-                'created' => date('Y-m-d'),
-                'note' => 'Replace this token before deploying to production',
+                'userId' => 'usr_CHANGE_ME_default',
+                'created' => '2026-01-01',
             ],
         ],
     ],

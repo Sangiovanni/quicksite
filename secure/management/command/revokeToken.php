@@ -77,8 +77,11 @@ if ($currentToken === $tokenToRevoke) {
         ->send();
 }
 
-// Remove token
-$revokedName = $tokenInfo['name'];
+// Remove token — resolve the owning user's name for the confirmation (the token
+// entry no longer carries a name; identity lives in users.php — C5)
+$revokedUserId = $tokenInfo['userId'] ?? null;
+$revokedUsers = loadUsersConfig();
+$revokedName = ($revokedUserId !== null ? ($revokedUsers['users'][$revokedUserId]['name'] ?? null) : null) ?? ($revokedUserId ?? 'Unknown');
 unset($config['authentication']['tokens'][$tokenToRevoke]);
 
 // Write updated config

@@ -1,0 +1,34 @@
+<?php
+/**
+ * User Registry — stable userId => identity. Engine plumbing (PHP).
+ *
+ * Copy this file to users.php. Each token in auth.php points at a userId here.
+ * There is NO global "superadmin" role: a user simply owns / is a member of
+ * projects, and their capabilities come from their per-project role
+ * (owner/admin/developer/designer/editor/viewer) recorded in each project's
+ * config/members.json. A brand-new user with no projects can still create one
+ * (createProject) and becomes its owner.
+ *
+ * Generate a real userId with: php -r "echo 'usr_' . bin2hex(random_bytes(16));"
+ *
+ * Fields:
+ *   name             display name (shown in the admin panel)
+ *   email            optional
+ *   status           'active' | 'disabled' (disabled = all tokens rejected)
+ *   externalId       optional hook for an external/SaaS user system
+ *   selected_project the project opened by default (UX only — never authorization)
+ *   projects         DERIVED CACHE of "my projects" (rebuildable; not authoritative)
+ */
+
+return [
+    'users' => [
+        'usr_CHANGE_ME_default' => [
+            'name'             => 'Default Admin',
+            'email'            => null,
+            'status'           => 'active',
+            'externalId'       => null,
+            'selected_project' => null,
+            'projects'         => [],
+        ],
+    ],
+];

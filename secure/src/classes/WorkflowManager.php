@@ -92,7 +92,7 @@ class WorkflowManager {
      * When set, fetchDataRequirements will verify each command is allowed
      * for the user's role before executing via CommandRunner.
      * 
-     * @param array $tokenInfo Token info from validateBearerToken() — must have 'role' key
+     * @param array $tokenInfo Resolved user from validateBearerToken() — must have 'id' (C5)
      */
     public function setTokenInfo(array $tokenInfo): void {
         $this->tokenInfo = $tokenInfo;

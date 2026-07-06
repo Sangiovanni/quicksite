@@ -37,7 +37,7 @@ if (!$token) {
 // Resolve token to tokenInfo for role-based permission checks
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 $tokenValidation = validateBearerToken('Bearer ' . $token);
-$tokenInfo = $tokenValidation['valid'] ? $tokenValidation['token_info'] : null;
+$tokenInfo = $tokenValidation['valid'] ? $tokenValidation['user'] : null;
 
 // Get the action from URL
 $requestUri = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
