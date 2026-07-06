@@ -162,25 +162,35 @@ class AdminRouter {
     }
 
     /**
-     * Get the role of the currently authenticated token.
-     * Returns '*' for superadmin, a role slug (e.g. 'viewer') for named roles,
-     * or null when not authenticated.
+     * Get the effective role of the currently authenticated token (C6).
+     * Resolves token -> userId -> user -> role on the user's selected project
+     * (the same source hasPermission uses transitionally). Returns a role slug
+     * (e.g. 'viewer' … 'owner') or null when not authenticated, unresolved,
+     * disabled, or not a member of the selected project. No superadmin / no '*'.
      */
     public function getTokenRole(): ?string {
         $token = $this->getToken();
         if (!$token) return null;
 
-        $authConfigPath = SECURE_FOLDER_PATH . '/management/config/auth.php';
-        if (!file_exists($authConfigPath)) return null;
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+        $authConfig = loadAuthConfig();
+        $userId = $authConfig['authentication']['tokens'][$token]['userId'] ?? null;
+        if ($userId === null) return null;
 
-        $authConfig = include $authConfigPath;
-        return $authConfig['authentication']['tokens'][$token]['role'] ?? null;
+        $users = loadUsersConfig();
+        $user = $users['users'][$userId] ?? null;
+        if ($user === null || ($user['status'] ?? 'active') === 'disabled') return null;
+
+        $selected = $user['selected_project'] ?? null;
+        if ($selected === null || $selected === '') return null;
+
+        return getUserRoleForProject($userId, (string)$selected);
     }
 
     /**
      * Pages that require at least one specific command in the token's role.
-     * Superadmin ('*') always passes. Any other role must have at least one listed command.
-     * Pages not listed here are open to all authenticated users.
+     * A role must hold at least one listed command (owner/admin do, via their
+     * expanded categories). Pages not listed here are open to all authenticated users.
      */
     private const PAGE_PERMISSIONS = [
         'assets'         => ['listAssets', 'uploadAsset'],
@@ -207,7 +217,6 @@ class AdminRouter {
 
         $role = $this->getTokenRole();
         if ($role === null) return false;
-        if ($role === '*') return true;
 
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
         $commands = getRoleCommands($role) ?? [];

@@ -182,20 +182,20 @@ Errors include a structured `errors` array with `field` / `value` / `reason`.
 
 ### Authentication & roles
 
-Tokens are stored in `secure/management/config/auth.php` and mapped to one of:
+A token in `secure/management/config/auth.php` resolves to a **user** (`users.php`); authorization is **per project**. Each project's `config/members.json` assigns its members one of six fixed roles:
 
-| Role | Reads | Mutates content | Mutates style | Build / deploy | Tokens |
-|---|---|---|---|---|---|
-| `viewer` | ✓ | | | | |
-| `editor` | ✓ | ✓ | | | |
-| `designer` | ✓ | ✓ | ✓ | | |
-| `developer` | ✓ | ✓ | ✓ | ✓ | |
-| `admin` | ✓ | ✓ | ✓ | ✓ | |
-| `*` (superadmin) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Role | rank | Adds (cumulative) |
+|---|---|---|
+| `viewer` | 1 | read structure, content, styles |
+| `editor` | 2 | edit content, translations, routes, assets, interactions, privacy copy; read integration config |
+| `designer` | 3 | styles, CSS variables, animations, theme |
+| `developer` | 4 | builds + server-side route resolvers |
+| `admin` | 5 | deploy, API / OAuth config, iframe sandbox, backup / export / import, command history |
+| `owner` | 6 | delete the project + transfer ownership; the single top of the project, cannot be removed by others |
 
 > AI is not a permissioned column: AI calls happen in the browser via `QSAiCall` against per-user credentials in `aiConnectionsV3` (localStorage). Any authenticated admin can use the AI workspace; gating happens at the connection level, not the role level.
 
-Named roles (`viewer`, `editor`, `designer`, `developer`, `admin`) and any custom role live in `secure/management/config/roles.php`. The superadmin `*` is **hardcoded** in `secure/src/functions/AuthManagement.php` (and `AdminRouter.php`) — it bypasses the roles file entirely and gets unconditional access to every command, including token and role management. It is the only role that cannot be created, edited, or deleted at runtime. Permissions are checked before the command file is included.
+Roles are **fixed** — there is no superadmin and no custom roles. A role is defined as a set of trust-coherent command **categories** in `secure/management/config/categories.php` (e.g. `content.read`, `style.write`, `deploy`, `project.delete`); `roles.php` grants each role a `rank` and its categories, which are expanded to a per-command allowlist at load time. Every command belongs to exactly one category, and its category also fixes its **scope**: *global* (a small set any authenticated user may run — `createProject`, `listProjects`, `listRoles`, `getMyPermissions`, `checkForUpdates`) or *project* (requires membership). `owner` is the top of each project; `rank` orders the roles and governs role management — a granter may only assign a role strictly below their own (the self-escalation guard). Permissions are checked before the command file is included.
 
 ### Extending one command via builders — `addComplexElement`
 
@@ -268,8 +268,9 @@ Page template
 POST /management/addRoute       Authorization: Bearer tvt_xxx
   │
 public/management/index.php
-  ├── parses bearer token → looks up role in auth.php
-  ├── checks role permits 'addRoute' (roles.php) → 401/403 if not
+  ├── parses bearer token → resolves user (auth.php → users.php)
+  ├── checks the user's project role permits 'addRoute'
+  │     (members.json role → categories.php → roles.php) → 401/403 if not
   ├── resolves command via secure/management/routes.php
   └── includes secure/management/command/addRoute.php
   │

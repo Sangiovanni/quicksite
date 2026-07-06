@@ -50,6 +50,27 @@ function loadRolesConfig(): array {
 }
 
 /**
+ * Load the command CATEGORY map (categories.php — the trust-coherent authz map). C6.
+ * category => ['scope'=>'project'|'global', 'access'?=>'any'|'owner', 'commands'=>[]].
+ *
+ * @return array
+ */
+function loadCategoriesConfig(): array {
+    $configPath = SECURE_FOLDER_PATH . '/management/config/categories.php';
+
+    if (!file_exists($configPath)) {
+        return [];
+    }
+
+    // Invalidate opcode cache if available (config changes must be seen live)
+    if (function_exists('opcache_invalidate')) {
+        opcache_invalidate($configPath, true);
+    }
+
+    return require $configPath;
+}
+
+/**
  * Load the user registry (token identities). C5.
  *
  * @return array ['users' => [ userId => record ]]
@@ -147,19 +168,81 @@ function getAllCommands(): array {
 }
 
 /**
- * Get commands for a specific role
- * 
+ * Reverse index: command name -> its category (from categories.php). C6.
+ * Unmapped command -> null (hasPermission treats that as DENY, fail-closed).
+ *
+ * @param string $command
+ * @return string|null category name, or null if unmapped
+ */
+function getCommandCategory(string $command): ?string {
+    $index = [];
+    foreach (loadCategoriesConfig() as $cat => $def) {
+        foreach (($def['commands'] ?? []) as $cmd) {
+            $index[$cmd] = $cat;
+        }
+    }
+    return $index[$command] ?? null;
+}
+
+/**
+ * Expand a role's granted CATEGORIES to its full PROJECT command list (C6).
+ * Replaces the old flat roles.php['commands'] lookup; stable interface (callers
+ * still receive a command array or null). Global commands (any-auth + the
+ * owner-interim system.admin set) are layered on by getTokenPermissions, not here.
+ *
  * @param string $roleName The role name
  * @return array|null Array of command names, or null if role doesn't exist
  */
 function getRoleCommands(string $roleName): ?array {
     $roles = loadRolesConfig();
-    
+
     if (!isset($roles[$roleName])) {
         return null;
     }
-    
-    return $roles[$roleName]['commands'] ?? [];
+
+    $categories = loadCategoriesConfig();
+    $commands = [];
+    foreach (($roles[$roleName]['categories'] ?? []) as $cat) {
+        foreach (($categories[$cat]['commands'] ?? []) as $cmd) {
+            $commands[$cmd] = true; // dedupe via keys
+        }
+    }
+    return array_keys($commands);
+}
+
+/**
+ * A role's numeric rank (viewer 1 … owner 6) from roles.php. C6.
+ * Drives the L9 manages-below hierarchy + the F6 self-escalation guard.
+ *
+ * @param string|null $roleName
+ * @return int rank, or 0 for an unknown / invalid / null role
+ */
+function roleRank(?string $roleName): int {
+    if ($roleName === null || $roleName === '') {
+        return 0;
+    }
+    $roles = loadRolesConfig();
+    return (int)($roles[$roleName]['rank'] ?? 0);
+}
+
+/**
+ * May an actor holding $actorRole grant/assign/manage a member at $targetRole?
+ * Self-escalation guard (F6, L9): the target must be STRICTLY below the actor's own
+ * rank — you can never grant or act on a role at or above your own. C6.
+ *
+ * This is the rank primitive only. The membership commands that consume it (C8)
+ * MUST ALSO require the actor to hold the relevant capability
+ * (project.members = admin/owner; project.ownership = owner) via hasPermission —
+ * so e.g. a developer (rank 4) manages no one despite rank alone allowing 1–3.
+ *
+ * @param string $actorRole
+ * @param string $targetRole
+ * @return bool
+ */
+function canManageRole(string $actorRole, string $targetRole): bool {
+    $a = roleRank($actorRole);
+    $t = roleRank($targetRole);
+    return $a > 0 && $t > 0 && $a > $t;
 }
 
 /**
@@ -169,11 +252,7 @@ function getRoleCommands(string $roleName): ?array {
  * @return bool
  */
 function isValidRole(string $roleName): bool {
-    // '*' is special - it's not a role, it's superadmin
-    if ($roleName === '*') {
-        return true;
-    }
-    
+    // No superadmin / no '*' role (C6). A role is valid iff it exists in roles.php.
     $roles = loadRolesConfig();
     return isset($roles[$roleName]);
 }
@@ -200,10 +279,10 @@ function isBuiltinRole(string $roleName): bool {
 function validateBearerToken(?string $authHeader): array {
     $config = loadAuthConfig();
 
-    // Auth disabled: synthetic full-access principal (dev/testing escape hatch)
-    if (!($config['authentication']['enabled'] ?? true)) {
-        return ['valid' => true, 'user' => ['name' => 'Auth Disabled', 'status' => 'active', '_authDisabled' => true], 'userId' => null, 'error' => null];
-    }
+    // NOTE (C6): the old `authentication.enabled == false` synthetic full-access
+    // principal (a superadmin escape hatch) was REMOVED. Auth is always enforced —
+    // a valid token still resolves to its user; a missing/invalid one still 401s.
+    // The `enabled` flag is now inert (slated for removal from the config shape).
 
     // No header provided
     if (empty($authHeader)) {
@@ -242,76 +321,110 @@ function validateBearerToken(?string $authHeader): array {
 }
 
 /**
- * Check whether a USER may run a command (C5).
+ * Check whether a USER may run a command — per-project category RBAC (C6).
  *
- * TRANSITIONAL BRIDGE — replaced in C6 by category-based per-project RBAC and in
- * C7 by the per-REQUEST project (this reads the user's selected_project). Role is
- * read from the AUTHORITATIVE members.json, never the users.php cache (L5).
+ *   command -> category (categories.php) -> scope:
+ *     global 'any'   → any authenticated user
+ *     global 'owner' → interim: effective role must be owner
+ *     project        → the user's effective role must grant that category
+ *                      (owner short-circuits — owner is the top of the project, L9)
+ *   unmapped command → DENY (fail-closed). NO superadmin, NO '*'.
+ *
+ * The effective role comes from resolveEffectiveRole (the user's selected_project
+ * with graceful fallback). That PROJECT SOURCE is transitional — C7 replaces it with
+ * the per-request URL project. The RBAC model here is not transitional. Disabled
+ * users are already rejected in validateBearerToken (L10), before this runs.
  *
  * @param array $user Resolved user (from validateBearerToken; must have 'id')
  * @param string $command Command name being accessed
  * @return bool
  */
 function hasPermission(array $user, string $command): bool {
-    // Auth-disabled escape hatch resolves to a synthetic full-access principal
-    if (!empty($user['_authDisabled'])) {
-        return true;
+    $category = getCommandCategory($command);
+    if ($category === null) {
+        return false; // unmapped command → fail-closed
     }
 
-    // Global "any authenticated user" commands (no project membership required)
-    static $anyAuth = ['help', 'getMyPermissions', 'getMyProjects', 'listProjects', 'createProject', 'listRoles'];
-    if (in_array($command, $anyAuth, true)) {
-        return true;
+    $categories = loadCategoriesConfig();
+    $def = $categories[$category] ?? [];
+    $scope = $def['scope'] ?? 'project';
+
+    if ($scope === 'global') {
+        $access = $def['access'] ?? '';
+        if ($access === 'any') {
+            return true; // any authenticated (non-disabled) user
+        }
+        if ($access === 'owner') {
+            return resolveEffectiveRole($user) === 'owner'; // interim owner-only
+        }
+        return false; // unknown global access rule → fail-closed
     }
 
-    $role = resolveEffectiveRole($user); // selected project, with graceful fallback
+    // project-scoped
+    $role = resolveEffectiveRole($user);
     if ($role === null) {
-        return false; // no membership anywhere
+        return false; // not a member of any project → 403
     }
-    if ($role === 'owner' || $role === 'admin') {
-        return true;  // top of the project
+    if ($role === 'owner') {
+        return true; // owner-top (L9)
     }
 
-    $allowedCommands = getRoleCommands($role);
-    return $allowedCommands !== null && in_array($command, $allowedCommands, true);
+    $roles = loadRolesConfig();
+    $granted = $roles[$role]['categories'] ?? [];
+    return in_array($category, $granted, true);
 }
 
 /**
- * Get a USER's effective role + command list for their selected project (C5).
- * Feeds getMyPermissions (admin JS reads {role, commands} to gate the UI).
- * TRANSITIONAL — mirrors hasPermission's bridge; C6 replaces with category RBAC.
+ * Get a USER's effective role + full command list for their current project (C6).
+ * Feeds getMyPermissions (admin JS reads {role, commands} to gate the UI). Category
+ * RBAC: any-auth globals ∪ the role's project commands (∪ the owner-interim
+ * system.admin set when the role is owner). Project source = selected_project
+ * (transitional; C7 swaps to the per-request URL project).
  *
  * @param array $user Resolved user (must have 'id')
  * @return array ['role' => string|null, 'commands' => string[]]
  */
 function getTokenPermissions(array $user): array {
-    // Global commands any authenticated user may run (project-independent)
-    $anyAuth = ['help', 'getMyPermissions', 'getMyProjects', 'listProjects', 'createProject', 'listRoles'];
+    $categories = loadCategoriesConfig();
 
-    if (!empty($user['_authDisabled'])) {
-        $all = array_values(array_unique(array_merge(getAllCommands(), $anyAuth)));
-        sort($all);
-        return ['role' => 'owner', 'commands' => $all];
+    // Commands every authenticated user may run (global, access == 'any').
+    $commands = [];
+    foreach ($categories as $def) {
+        if (($def['scope'] ?? '') === 'global' && ($def['access'] ?? '') === 'any') {
+            foreach (($def['commands'] ?? []) as $cmd) {
+                $commands[$cmd] = true;
+            }
+        }
     }
 
-    $role = resolveEffectiveRole($user); // selected project, with graceful fallback
+    $role = resolveEffectiveRole($user);
 
     if ($role === null) {
-        // No membership anywhere: only the any-auth globals
-        sort($anyAuth);
-        return ['role' => null, 'commands' => $anyAuth];
+        // No membership anywhere: only the any-auth globals.
+        $list = array_keys($commands);
+        sort($list);
+        return ['role' => null, 'commands' => $list];
     }
 
-    if ($role === 'owner' || $role === 'admin') {
-        $all = array_values(array_unique(array_merge(getAllCommands(), $anyAuth)));
-        sort($all);
-        return ['role' => $role, 'commands' => $all];
+    // Project commands granted by the role (owner grants all project categories).
+    foreach ((getRoleCommands($role) ?? []) as $cmd) {
+        $commands[$cmd] = true;
     }
 
-    $commands = getRoleCommands($role) ?? [];
-    // array_values() forces a JSON array (roles.php can have non-contiguous keys)
-    $commands = array_values(array_unique(array_merge($commands, $anyAuth)));
-    return ['role' => $role, 'commands' => $commands];
+    // Interim: an owner also holds the owner-only global system.admin set.
+    if ($role === 'owner') {
+        foreach ($categories as $def) {
+            if (($def['scope'] ?? '') === 'global' && ($def['access'] ?? '') === 'owner') {
+                foreach (($def['commands'] ?? []) as $cmd) {
+                    $commands[$cmd] = true;
+                }
+            }
+        }
+    }
+
+    $list = array_keys($commands);
+    sort($list);
+    return ['role' => $role, 'commands' => $list];
 }
 
 /**

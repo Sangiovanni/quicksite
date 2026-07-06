@@ -49,9 +49,7 @@ function __command_getMyPermissions(array $params = [], array $urlParams = []): 
             'token_name' => $user['name'] ?? 'Unknown',
             'role' => $permissions['role'],
             'commands' => $permissions['commands'],
-            'command_count' => count($permissions['commands']),
-            // superadmin tier removed (C5); the commands list is authoritative
-            'is_superadmin' => false
+            'command_count' => count($permissions['commands'])
         ]);
 }
 

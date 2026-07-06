@@ -1,175 +1,81 @@
 <?php
 /**
- * Role Definitions for Permission System
- * 
- * Copy this file to roles.php to use the default role definitions.
- * You can customize roles and their allowed commands after copying.
- * 
- * Use the 'generateToken' and 'listRoles' API commands to manage roles.
- * 
- * Available roles: viewer, editor, designer, developer, admin
- * The '*' role (superadmin) has access to all commands and cannot be modified here.
+ * Role Definitions — per-project RBAC (beta.10 C6).
+ *
+ * Copy this file to roles.php. These are the FIXED built-in roles — there are no
+ * custom roles (L8), so you should not need to edit this. Each role grants a set of
+ * trust-coherent CATEGORIES (defined in categories.php), expanded to per-command at
+ * load time by AuthManagement::getRoleCommands(). Enforcement:
+ *   command -> category (categories.php) -> role grant (here) | global access rule.
+ *
+ * `rank` (viewer 1 … owner 6) drives the L9 "manages strictly below" hierarchy and
+ * the F6 self-escalation guard (AuthManagement::canManageRole): a granter may only
+ * assign/manage a role of STRICTLY LOWER rank than their own. There is NO superadmin
+ * and NO '*' — `owner` (rank 6) is the top of each project. Per-project role
+ * assignments live in each project's config/members.json, NOT here.
+ *
+ * Categories are cumulative up the tier (each role = all lower tiers' + its own),
+ * listed explicitly for auditability (no inheritance logic). Engine config → PHP.
  */
 
 return [
     'viewer' => [
-        'description' => 'Read-only access to structure, content, and styles',
+        'rank' => 1,
         'builtin' => true,
-        'commands' => [
-            'help', 'getSizeInfo', 'getStructure', 'getRoutes', 'getSiteMap',
-            'listComponents', 'findComponentUsages', 'listPages',
-            'getTranslation', 'getTranslations', 'getTranslationKeys', 'getLangList',
-            'listAssets', 'getStyles', 'getRootVariables',
-            'listStyleRules', 'getStyleRule', 'getKeyframes', 'listKeyframes',
-            'getAnimatedSelectors', 'listAliases', 'listBuilds', 'getBuild',
-            'listRoles', 'getMyPermissions', 'listAiProviders',
-            'listJsFunctions', 'listDataBindings', 'listInteractions', 'listApiEndpoints', 'listOAuthProviders', 'listStorageItems', 'scanStorageUsage', 'getConsentStatus', 'getApiEndpoint',
-            'listSnippets', 'getSnippet',
-            'checkForUpdates',
-        ],
+        'description' => 'Read-only: rendered site + content/structure/styles in the editor. No writes.',
+        'categories' => ['content.read'],
     ],
     'editor' => [
-        'description' => 'Content editing: pages, translations, components, assets',
+        'rank' => 2,
         'builtin' => true,
-        'commands' => [
-            // All viewer commands
-            'help', 'getSizeInfo', 'getStructure', 'getRoutes', 'getSiteMap',
-            'listComponents', 'findComponentUsages', 'listPages',
-            'getTranslation', 'getTranslations', 'getTranslationKeys', 'getLangList',
-            'listAssets', 'getStyles', 'getRootVariables',
-            'listStyleRules', 'getStyleRule', 'getKeyframes', 'listKeyframes',
-            'getAnimatedSelectors', 'listAliases', 'listBuilds', 'getBuild',
-            'listRoles', 'getMyPermissions',
-            // Content editing commands
-            'editStructure', 'addRoute', 'deleteRoute', 'setRouteLayout', 'setRouteResolver',
-            'setTranslationKeys', 'deleteTranslationKeys',
-            'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations',
-            'addLang', 'deleteLang', 'cleanOrphanTranslations', 'setDefaultLang', 'setMultilingual', 'checkStructureMulti',
-            'uploadAsset', 'deleteAsset', 'editAsset',
-            'createAlias', 'deleteAlias',
-            'listAiProviders', 'detectProvider', 'testAiKey',
-            'moveNode', 'deleteNode', 'duplicateNode', 'addNode', 'editNode',
-            'addComponentToNode', 'editComponentToNode', 'renameComponent', 'duplicateComponent',
-            'listInteractions', 'addInteraction', 'editInteraction', 'deleteInteraction',
-            'getPageEvents', 'addPageEvent', 'editPageEvent', 'deletePageEvent',
-            'importStructureTranslations',
-            'listApiEndpoints', 'listOAuthProviders', 'listStorageItems', 'scanStorageUsage', 'getConsentStatus', 'getPrivacyStatus', 'addStorageItem', 'editStorageItem', 'deleteStorageItem', 'setStorageDescLang', 'setCollectedDatum', 'deleteCollectedDatum', 'setPrivacyDescLang', 'setPrivacyMapping', 'setPrivacyHost', 'generatePrivacyPolicy', 'deletePrivacyPolicy', 'setPrivacyCookieSection', 'generateConsentLayer', 'generateCookiePolicy', 'deleteCookiePolicy', 'getApiEndpoint', 'addApi', 'editApi', 'deleteApi', 'testApiEndpoint',
-            'listSnippets', 'getSnippet', 'createSnippet', 'deleteSnippet', 'duplicateSnippet', 'insertSnippet',
+        'description' => 'Content: structure, translations, routes, assets, interactions, privacy copy, config reads.',
+        'categories' => [
+            'content.read', 'config.read', 'content.write', 'translation.write',
+            'route.write', 'asset.write', 'interaction.write', 'privacy.manage',
         ],
     ],
     'designer' => [
-        'description' => 'Style editing: CSS, animations, root variables',
+        'rank' => 3,
         'builtin' => true,
-        'commands' => [
-            // All viewer commands
-            'help', 'getSizeInfo', 'getStructure', 'getRoutes', 'getSiteMap',
-            'listComponents', 'findComponentUsages', 'listPages',
-            'getTranslation', 'getTranslations', 'getTranslationKeys', 'getLangList',
-            'listAssets', 'getStyles', 'getRootVariables',
-            'listStyleRules', 'getStyleRule', 'getKeyframes', 'listKeyframes',
-            'getAnimatedSelectors', 'listAliases', 'listBuilds', 'getBuild',
-            'listRoles', 'getMyPermissions',
-            // Content editing commands (same as editor)
-            'editStructure', 'addRoute', 'deleteRoute', 'setRouteLayout', 'setRouteResolver',
-            'setTranslationKeys', 'deleteTranslationKeys',
-            'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations',
-            'addLang', 'deleteLang', 'cleanOrphanTranslations', 'setDefaultLang', 'setMultilingual', 'checkStructureMulti',
-            'uploadAsset', 'deleteAsset', 'editAsset',
-            'createAlias', 'deleteAlias',
-            // Style commands
-            'editStyles', 'setRootVariables',
-            'setStyleRule', 'deleteStyleRule',
-            'setKeyframes', 'deleteKeyframes',
-            'editFavicon', 'editTitle',
-            'listAiProviders', 'detectProvider', 'testAiKey',
-            'moveNode', 'deleteNode', 'duplicateNode', 'addNode', 'editNode',
-            'addComponentToNode', 'editComponentToNode', 'renameComponent', 'duplicateComponent',
-            'listInteractions', 'addInteraction', 'editInteraction', 'deleteInteraction',
-            'getPageEvents', 'addPageEvent', 'editPageEvent', 'deletePageEvent',
-            'importStructureTranslations',
-            'listApiEndpoints', 'listOAuthProviders', 'listStorageItems', 'scanStorageUsage', 'getConsentStatus', 'getPrivacyStatus', 'addStorageItem', 'editStorageItem', 'deleteStorageItem', 'setStorageDescLang', 'setCollectedDatum', 'deleteCollectedDatum', 'setPrivacyDescLang', 'setPrivacyMapping', 'setPrivacyHost', 'generatePrivacyPolicy', 'deletePrivacyPolicy', 'setPrivacyCookieSection', 'generateConsentLayer', 'generateCookiePolicy', 'deleteCookiePolicy', 'getApiEndpoint', 'addApi', 'editApi', 'deleteApi', 'testApiEndpoint',
-            'listSnippets', 'getSnippet', 'createSnippet', 'deleteSnippet', 'duplicateSnippet', 'insertSnippet',
+        'description' => 'Everything an editor can do + styles / CSS / animations / theme.',
+        'categories' => [
+            'content.read', 'config.read', 'content.write', 'translation.write',
+            'route.write', 'asset.write', 'interaction.write', 'privacy.manage',
+            'style.write',
         ],
     ],
     'developer' => [
-        'description' => 'Build, deploy, API management, routes',
+        'rank' => 4,
         'builtin' => true,
-        'commands' => [
-            // All viewer commands
-            'help', 'getSizeInfo', 'getStructure', 'getRoutes', 'getSiteMap',
-            'listComponents', 'findComponentUsages', 'listPages',
-            'getTranslation', 'getTranslations', 'getTranslationKeys', 'getLangList',
-            'listAssets', 'getStyles', 'getRootVariables',
-            'listStyleRules', 'getStyleRule', 'getKeyframes', 'listKeyframes',
-            'getAnimatedSelectors', 'listAliases', 'listBuilds', 'getBuild',
-            'listRoles', 'getMyPermissions',
-            // Content + style commands
-            'editStructure', 'addRoute', 'deleteRoute', 'setRouteLayout', 'setRouteResolver',
-            'setTranslationKeys', 'deleteTranslationKeys',
-            'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations',
-            'addLang', 'deleteLang', 'cleanOrphanTranslations', 'setDefaultLang', 'setMultilingual', 'checkStructureMulti',
-            'uploadAsset', 'deleteAsset', 'editAsset',
-            'createAlias', 'deleteAlias',
-            'editStyles', 'setRootVariables',
-            'setStyleRule', 'deleteStyleRule',
-            'setKeyframes', 'deleteKeyframes',
-            'editFavicon', 'editTitle',
-            // Build & deploy commands
-            'build', 'deleteBuild', 'cleanBuilds', 'cleanResolverCache', 'deployBuild', 'downloadBuild',
-            'listAiProviders', 'detectProvider', 'testAiKey', 'callAi',
-            'moveNode', 'deleteNode', 'duplicateNode', 'addNode', 'editNode',
-            'addComponentToNode', 'editComponentToNode', 'renameComponent', 'duplicateComponent',
-            'listJsFunctions',
-            'listDataBindings',
-            'listInteractions', 'addInteraction', 'editInteraction', 'deleteInteraction',
-            'getPageEvents', 'addPageEvent', 'editPageEvent', 'deletePageEvent',
-            'importStructureTranslations',
-            'listApiEndpoints', 'listOAuthProviders', 'listStorageItems', 'scanStorageUsage', 'getConsentStatus', 'getPrivacyStatus', 'addStorageItem', 'editStorageItem', 'deleteStorageItem', 'setStorageDescLang', 'setCollectedDatum', 'deleteCollectedDatum', 'setPrivacyDescLang', 'setPrivacyMapping', 'setPrivacyHost', 'generatePrivacyPolicy', 'deletePrivacyPolicy', 'setPrivacyCookieSection', 'generateConsentLayer', 'generateCookiePolicy', 'deleteCookiePolicy', 'getApiEndpoint', 'addApi', 'editApi', 'deleteApi', 'testApiEndpoint',
-            'listSnippets', 'getSnippet', 'createSnippet', 'deleteSnippet', 'duplicateSnippet', 'insertSnippet',
-            'checkForUpdates',
+        'description' => 'Everything a designer can do + builds + server-side resolvers.',
+        'categories' => [
+            'content.read', 'config.read', 'content.write', 'translation.write',
+            'route.write', 'asset.write', 'interaction.write', 'privacy.manage',
+            'style.write', 'build', 'resolver.manage',
         ],
     ],
     'admin' => [
-        'description' => 'Full access except system-level operations',
+        'rank' => 5,
         'builtin' => true,
-        'commands' => [
-            // All viewer commands
-            'help', 'getSizeInfo', 'getStructure', 'getRoutes', 'getSiteMap',
-            'listComponents', 'findComponentUsages', 'listPages',
-            'getTranslation', 'getTranslations', 'getTranslationKeys', 'getLangList',
-            'listAssets', 'getStyles', 'getRootVariables',
-            'listStyleRules', 'getStyleRule', 'getKeyframes', 'listKeyframes',
-            'getAnimatedSelectors', 'listAliases', 'listBuilds', 'getBuild',
-            'listRoles', 'getMyPermissions',
-            // Content + style commands
-            'editStructure', 'addRoute', 'deleteRoute', 'setRouteLayout', 'setRouteResolver',
-            'setTranslationKeys', 'deleteTranslationKeys',
-            'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations',
-            'addLang', 'deleteLang', 'cleanOrphanTranslations', 'setDefaultLang', 'setMultilingual', 'checkStructureMulti',
-            'uploadAsset', 'deleteAsset', 'editAsset',
-            'createAlias', 'deleteAlias',
-            'editStyles', 'setRootVariables',
-            'setStyleRule', 'deleteStyleRule',
-            'setKeyframes', 'deleteKeyframes',
-            'editFavicon', 'editTitle',
-            // Build & deploy commands
-            'build', 'deleteBuild', 'cleanBuilds', 'cleanResolverCache', 'deployBuild', 'downloadBuild',
-            // Admin-specific commands
-            'listProjects', 'getActiveProject', 'switchProject', 'createProject', 'deleteProject',
-            'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup',
-            'exportProject', 'importProject', 'downloadExport', 'clearExports',
-            'getCommandHistory', 'clearCommandHistory',
-            'listAiProviders', 'detectProvider', 'testAiKey', 'callAi',
-            'moveNode', 'deleteNode', 'duplicateNode', 'addNode', 'editNode',
-            'addComponentToNode', 'editComponentToNode', 'renameComponent', 'duplicateComponent',
-            'listJsFunctions',
-            'listDataBindings',
-            'listInteractions', 'addInteraction', 'editInteraction', 'deleteInteraction',
-            'getPageEvents', 'addPageEvent', 'editPageEvent', 'deletePageEvent',
-            'importStructureTranslations',
-            'listApiEndpoints', 'listOAuthProviders', 'listStorageItems', 'scanStorageUsage', 'getConsentStatus', 'getPrivacyStatus', 'addStorageItem', 'editStorageItem', 'deleteStorageItem', 'setStorageDescLang', 'setCollectedDatum', 'deleteCollectedDatum', 'setPrivacyDescLang', 'setPrivacyMapping', 'setPrivacyHost', 'generatePrivacyPolicy', 'deletePrivacyPolicy', 'setPrivacyCookieSection', 'generateConsentLayer', 'generateCookiePolicy', 'deleteCookiePolicy', 'addOAuthProvider', 'editOAuthProvider', 'deleteOAuthProvider', 'getApiEndpoint', 'addApi', 'editApi', 'deleteApi', 'testApiEndpoint',
-            'listSnippets', 'getSnippet', 'createSnippet', 'deleteSnippet', 'duplicateSnippet', 'insertSnippet',
-            'checkForUpdates', 'applyUpdate',
+        'description' => 'Everything on the project EXCEPT delete / transfer ownership. Manages editor/designer/developer/viewer.',
+        'categories' => [
+            'content.read', 'config.read', 'content.write', 'translation.write',
+            'route.write', 'asset.write', 'interaction.write', 'privacy.manage',
+            'style.write', 'build', 'resolver.manage', 'deploy', 'api.manage',
+            'oauth.manage', 'iframe.manage', 'project.data', 'history', 'workflow',
+            'project.settings', 'project.members',
+        ],
+    ],
+    'owner' => [
+        'rank' => 6,
+        'builtin' => true,
+        'description' => 'Top of the project: everything + delete + manage admins + transfer ownership. Cannot be removed by others.',
+        'categories' => [
+            'content.read', 'config.read', 'content.write', 'translation.write',
+            'route.write', 'asset.write', 'interaction.write', 'privacy.manage',
+            'style.write', 'build', 'resolver.manage', 'deploy', 'api.manage',
+            'oauth.manage', 'iframe.manage', 'project.data', 'history', 'workflow',
+            'project.settings', 'project.members', 'project.delete', 'project.ownership',
         ],
     ],
 ];

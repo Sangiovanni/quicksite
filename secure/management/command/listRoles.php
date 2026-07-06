@@ -3,8 +3,8 @@
  * listRoles Command
  * 
  * Lists all available roles with their metadata.
- * Non-* users see only role names and descriptions.
- * * users see the full command lists for each role.
+ * Non-privileged users see only role names and descriptions.
+ * Owner/admin of the caller's current project see the full command lists.
  * 
  * @method POST
  * @route /management/listRoles
@@ -45,26 +45,28 @@ function __command_listRoles(array $params = [], array $urlParams = []): ApiResp
         }
     }
 
-    // Owner/admin of the selected project see the full command lists
-    // (superadmin tier removed — C5)
+    // Owner/admin of the caller's current project see the full command lists
+    // (no superadmin — C6).
     $role = ($user !== null && isset($user['id'], $user['selected_project']))
         ? getUserRoleForProject($user['id'], $user['selected_project'])
         : null;
-    $isPrivileged = in_array($role, ['owner', 'admin'], true) || !empty($user['_authDisabled']);
+    $isPrivileged = in_array($role, ['owner', 'admin'], true);
 
     // Build response
     $rolesList = [];
     foreach ($roles as $name => $config) {
+        // Commands are expanded from the role's categories (C6), not a flat list.
+        $commands = getRoleCommands($name) ?? [];
         $roleData = [
             'name' => $name,
             'description' => $config['description'] ?? '',
             'builtin' => $config['builtin'] ?? false,
-            'command_count' => count($config['commands'] ?? [])
+            'command_count' => count($commands)
         ];
 
         // Only privileged users see the full command list
         if ($isPrivileged) {
-            $roleData['commands'] = $config['commands'] ?? [];
+            $roleData['commands'] = $commands;
         }
 
         $rolesList[] = $roleData;

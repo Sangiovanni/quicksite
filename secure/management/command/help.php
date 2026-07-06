@@ -3683,11 +3683,10 @@ $GLOBALS['__help_commands'] = [
                     'getRoutes', 'getStructure', 'listProjects', 'listBackups',
                     'editStructure', 'addRoute', 'deleteRoute', '...'
                 ],
-                'command_count' => 45,
-                'is_superadmin' => false
+                'command_count' => 45
             ]
         ],
-        'notes' => 'Use this to determine what commands the current token can execute. Useful for building permission-aware UIs. Superadmin (*) users have is_superadmin=true and access to all 104 commands.'
+        'notes' => 'Use this to determine what commands the current token can execute. Useful for building permission-aware UIs. The role is the caller\'s effective per-project role; owner (top of the project) sees every command. There is no superadmin.'
     ],
     
     'createRole' => [

@@ -18,10 +18,9 @@ return [
         'enabled' => true,
         'tokens' => [
             // Default token — change this before deploying! Resolves to the
-            // 'usr_CHANGE_ME_default' user in users.php.example.
-            // (Key kept as CHANGE_ME_superadmin_token so the admin panel's
-            //  default-token security warning still detects it.)
-            'CHANGE_ME_superadmin_token' => [
+            // 'usr_CHANGE_ME_default' user in users.php.example. The admin panel's
+            // default-token security warning detects any key containing 'CHANGE_ME'.
+            'CHANGE_ME_default_token' => [
                 'userId' => 'usr_CHANGE_ME_default',
                 'created' => '2026-01-01',
             ],

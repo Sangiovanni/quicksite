@@ -359,8 +359,10 @@ $langNames = [
             $authConfig = include $authConfigPath;
             $allTokens = $authConfig['authentication']['tokens'] ?? [];
             foreach ($allTokens as $tokenValue => $tokenInfo) {
-                if ($tokenValue === 'CHANGE_ME_superadmin_token' || 
-                    (is_string($tokenValue) && stripos($tokenValue, 'default_change_me') !== false)) {
+                // Detect any shipped default/placeholder token key (case-insensitive
+                // 'CHANGE_ME' also catches the legacy 'default_change_me…' form). C6:
+                // no hardcoded superadmin-token key.
+                if (is_string($tokenValue) && stripos($tokenValue, 'CHANGE_ME') !== false) {
                     $hasDefaultToken = true;
                     if ($tokenValue === $currentToken) {
                         $usingDefaultToken = true;
@@ -381,7 +383,7 @@ $langNames = [
             <span>
                 <?php if ($usingDefaultToken): ?>
                 <strong>Security:</strong> You are using a default API token.
-                <a href="<?= $router->url('command', 'generateToken') ?>" class="admin-security-warning__link">Generate a secure token</a> with the <strong>* (Superadmin)</strong> role,
+                <a href="<?= $router->url('command', 'generateToken') ?>" class="admin-security-warning__link">Generate a secure token</a>,
                 then log out and log back in with it so you can
                 <a href="<?= $router->url('command', 'revokeToken') ?>" class="admin-security-warning__link">revoke the default one</a>.
                 <?php else: ?>

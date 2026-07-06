@@ -34,8 +34,8 @@ The `help` endpoint is the only publicly accessible command and is the canonical
   ```
   Authorization: Bearer <token>
   ```
-- Tokens are defined in `secure/management/config/auth.php` (gitignored, auto-created from `.example`).
-- Tokens are scoped to **roles** defined in `secure/management/config/roles.php`. Roles grant granular, command-level permissions.
+- Tokens are defined in `secure/management/config/auth.php` (gitignored, auto-created from `.example`) and resolve to a **user** in `users.php`.
+- Authorization is **per project**: a user's role comes from the target project's `config/members.json`. The six fixed roles (`viewer` … `owner`) are defined by trust-coherent command **categories** in `categories.php`; `roles.php` grants each role a `rank` and its categories, expanded to a per-command allowlist at load time. There is no superadmin and no custom roles.
 - Default install ships with a placeholder token and prompts you on first admin login to generate a real one and revoke the placeholder before going public.
 
 ## Response shape
@@ -86,8 +86,8 @@ Each row enumerates the commands in that category — comma-separated, alphabeti
 | **Projects** | `listProjects`, `getActiveProject`, `switchProject`, `createProject`, `cloneProject`, `deleteProject` — per-project CRUD + active-project switching under `secure/projects/`. |
 | **Backups** | `backupProject`, `listBackups`, `restoreBackup`, `deleteBackup` — snapshot / restore (configurable scope). |
 | **Export / Import** | `exportProject`, `importProject`, `downloadExport`, `clearExports` — pack a project as ZIP for portability; import a ZIP back. |
-| **Tokens** | `generateToken`, `listTokens`, `revokeToken` — bearer token CRUD, with role assignment. |
-| **Roles** | `listRoles`, `getMyPermissions`, `createRole`, `editRole`, `deleteRole` — role + per-command permission management. |
+| **Tokens** | `generateToken`, `listTokens`, `revokeToken` — bearer token CRUD (owner-only, interim; being retired for account-based auth). |
+| **Roles** | `listRoles`, `getMyPermissions` — read the fixed roles and your own effective permissions. (`createRole` / `editRole` / `deleteRole` are disabled: roles are a fixed set, not customisable.) |
 | **Snippets** | `listSnippets`, `getSnippet`, `createSnippet`, `deleteSnippet`, `duplicateSnippet`, `insertSnippet`, `injectSnippetCss` — reusable in-tree snippets (nav, cards, forms…); insert / inject into a page's structure. |
 | **JS functions & data bindings** | `listJsFunctions`, `listDataBindings` — catalog read endpoints. `listJsFunctions` returns the QS.* verb catalog (consumed by the admin picker; see [ADMIN_PANEL.md §9.9](ADMIN_PANEL.md)). `listDataBindings` returns the `data-qs-*` attribute catalog. |
 | **Interactions** | `listInteractions`, `addInteraction`, `editInteraction`, `deleteInteraction` — bind triggers (click, hover, scroll…) to verb chains on a node. |
@@ -188,7 +188,7 @@ Two commands manage in-place upgrades against the GitHub repo:
 | Command | Method | Notes |
 |---|---|---|
 | `checkForUpdates` | GET | Reads the local `VERSION` file, fetches the latest GitHub release tag, compares with PHP's `version_compare`. Returns `update_available`, `current_version`, `latest_version`, `release_url`, `install_method` (`git`\|`zip`). |
-| `applyUpdate` | POST (superadmin only) | Performs `git pull` (git installs) or downloads + extracts the release ZIP. |
+| `applyUpdate` | POST (owner only, interim) | Performs `git pull` (git installs) or downloads + extracts the release ZIP. |
 
 `version_compare` natively orders pre-release tags correctly: `1.0.0-beta.5 < 1.0.0-beta.10 < 1.0.0-rc.1 < 1.0.0`. The installed version is read from the local `VERSION` file, so that file's contents are what `checkForUpdates` compares against the latest GitHub release tag.
 
