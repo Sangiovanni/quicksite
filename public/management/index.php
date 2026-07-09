@@ -1,7 +1,13 @@
 <?php
+// C7 — defer project context. A management request must NOT inherit PROJECT_PATH
+// from the global target.php: the action's project is the per-request projectId
+// peeled from the URL, resolved + validated + membership-checked below, then bound
+// via qs_load_project_context(). init.php still defines all the GLOBAL constants.
+define('QS_DEFER_PROJECT_CONTEXT', true);
 require_once '../init.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/LoggingManagement.php';
 
 // Prevent browsers from caching ANY API response (including 401/404/error responses).
@@ -96,7 +102,13 @@ $segments = array_values(array_filter(explode('/', $uriPath)));
 $earlyCommand = null;
 foreach ($segments as $i => $seg) {
     if ($seg === 'management' && isset($segments[$i + 1])) {
-        $earlyCommand = $segments[$i + 1];
+        // C7 — skip the optional project marker '/management/p/<projectId>/<command>'
+        // so a public command (help) is recognised whether or not it carries one.
+        if ($segments[$i + 1] === 'p' && isset($segments[$i + 3])) {
+            $earlyCommand = $segments[$i + 3];
+        } else {
+            $earlyCommand = $segments[$i + 1];
+        }
         break;
     }
 }
@@ -171,10 +183,47 @@ if(in_array($trimParametersManagement->command(), ROUTES_MANAGEMENT)){
 }
 
 // ============================================================================
-// Permission Check
+// Per-request project scoping + permission check (C7)
 // ============================================================================
-if (!hasPermission($currentUser, $command)) {
-    sendForbiddenResponse($command);
+// The action's project comes from the URL ('/management/p/<projectId>/<command>'),
+// NEVER from selected_project. A project-scoped command is validated as an F1 path
+// input, then authorized against the project's AUTHORITATIVE members.json (L5)
+// before the command runs. Global commands do not authorize against a project.
+$requestedProject = $trimParametersManagement->project();
+$commandCategory  = getCommandCategory($command);
+$categoriesConfig = loadCategoriesConfig();
+$commandScope     = $categoriesConfig[$commandCategory]['scope'] ?? 'project';
+
+if ($commandScope === 'project') {
+    // A project-scoped command MUST target a project.
+    if ($requestedProject === null || $requestedProject === '') {
+        ApiResponse::create(400, 'project.required')
+            ->withMessage('This command is project-scoped. Target a project with /management/p/<projectId>/' . $command)
+            ->send();
+    }
+    // F1 — the projectId is request-controlled and becomes a directory selector.
+    if (!is_valid_project_name($requestedProject)) {
+        ApiResponse::create(400, 'project.invalid')
+            ->withMessage('Invalid project identifier')
+            ->send();
+    }
+    // Membership + role, one authoritative check. A non-member, a stranger's
+    // projectId, a non-existent project, and an under-privileged member ALL yield
+    // the same 403 — no oracle for existence, membership, or role level.
+    if (!hasPermission($currentUser, $command, $requestedProject)) {
+        sendForbiddenResponse($command);
+    }
+    // Authorized member only: bind PROJECT_PATH to their project for the command.
+    qs_load_project_context($requestedProject, true);
+} else {
+    // Global command: authz is project-independent. Give it a benign working
+    // context from the caller's UX-default project (tolerant — a zero-membership
+    // user still gets a defined, empty context; never dies, never leaks). This is
+    // NOT an authz input — global access is decided by the category's access rule.
+    qs_load_project_context(resolveDefaultProject($currentUser) ?? '', false);
+    if (!hasPermission($currentUser, $command, null)) {
+        sendForbiddenResponse($command);
+    }
 }
 
 // ============================================================================

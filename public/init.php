@@ -191,15 +191,22 @@ if (file_exists($nginxSetupPending) && stripos($serverSoftware, 'nginx') !== fal
 }
 
 // ============================================================================
-// PROJECT PATH - Points to the active project in secure/projects/{name}/
+// PROJECT CONTEXT - the active project under secure/projects/{name}/
 // ============================================================================
-if (!defined('PROJECT_PATH')) {
+// Served site + admin pages resolve the single GLOBAL served project from
+// target.php (L6, unchanged). The management dispatcher (C7) defines
+// QS_DEFER_PROJECT_CONTEXT before requiring init.php and calls
+// qs_load_project_context() itself, AFTER it has validated + membership-checked
+// the per-request projectId peeled from the URL — so PROJECT_PATH is scoped to
+// the project the request actually targets, not a global mutable pointer.
+require_once SECURE_FOLDER_PATH . '/src/functions/projectContext.php';
+
+if (!defined('QS_DEFER_PROJECT_CONTEXT') && !defined('PROJECT_PATH')) {
     $targetConfigPath = SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'management' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'target.php';
     if (file_exists($targetConfigPath)) {
         $targetConfig = require $targetConfigPath;
         $projectName = $targetConfig['project'] ?? 'quicksite';
-        define('PROJECT_PATH', SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'projects' . DIRECTORY_SEPARATOR . $projectName);
-        define('PROJECT_NAME', $projectName);
+        qs_load_project_context($projectName);
     } else {
         // target.php is required for multi-project architecture
         http_response_code(500);
@@ -217,71 +224,6 @@ if (!defined('PROJECT_PATH')) {
             "</ul>"
         );
     }
-}
-
-if(!defined('CONFIG_PATH')){
-    define('CONFIG_PATH', PROJECT_PATH . DIRECTORY_SEPARATOR . 'config.php');
-}
-if (!file_exists(CONFIG_PATH)) {
-    http_response_code(500);
-    die(
-        "<h1>QuickSite Project Error</h1>" .
-        "<p><strong>Missing file:</strong> <code>" . htmlspecialchars(CONFIG_PATH) . "</code></p>" .
-        "<p><strong>Active project:</strong> <code>" . htmlspecialchars(PROJECT_NAME) . "</code></p>" .
-        "<p><strong>What this means:</strong> The project configuration file <code>config.php</code> is missing for project '<strong>" . htmlspecialchars(PROJECT_NAME) . "</strong>'.</p>" .
-        "<p><strong>Expected structure:</strong><br><code>" . htmlspecialchars(SECURE_FOLDER_PATH) . "/projects/" . htmlspecialchars(PROJECT_NAME) . "/config.php</code></p>" .
-        "<p><strong>Possible causes:</strong></p>" .
-        "<ul>" .
-        "<li>Project '<strong>" . htmlspecialchars(PROJECT_NAME) . "</strong>' does not exist in <code>" . SECURE_FOLDER_NAME . "/projects/</code></li>" .
-        "<li>Project folder exists but <code>config.php</code> was deleted</li>" .
-        "<li>Wrong project name in <code>" . SECURE_FOLDER_NAME . "/management/config/target.php</code></li>" .
-        "<li>If paths look wrong, check constants in <code>" . PUBLIC_FOLDER_NAME . "/init.php</code></li>" .
-        "</ul>"
-    );
-}
-if(!defined('CONFIG')){
-    define('CONFIG', require CONFIG_PATH);
-}
-
-if(!defined('MULTILINGUAL_SUPPORT')){
-    define('MULTILINGUAL_SUPPORT', CONFIG['MULTILINGUAL_SUPPORT']);
-}
-
-// ============================================================================
-// THEME CONFIGURATION — flags read from project config with safe fallbacks
-// ============================================================================
-if (!defined('THEME_MODE_ENABLED')) {
-    define('THEME_MODE_ENABLED', CONFIG['THEME_MODE_ENABLED'] ?? false);
-}
-if (!defined('THEME_DEFAULT')) {
-    define('THEME_DEFAULT', CONFIG['THEME_DEFAULT'] ?? 'light');
-}
-if (!defined('THEME_USER_TOGGLE_ENABLED')) {
-    define('THEME_USER_TOGGLE_ENABLED', CONFIG['THEME_USER_TOGGLE_ENABLED'] ?? false);
-}
-
-if(!defined('ROUTES_PATH')){
-    define('ROUTES_PATH', PROJECT_PATH . DIRECTORY_SEPARATOR . 'routes.php');
-}
-if (!file_exists(ROUTES_PATH)) {
-    http_response_code(500);
-    die(
-        "<h1>QuickSite Project Error</h1>" .
-        "<p><strong>Missing file:</strong> <code>" . htmlspecialchars(ROUTES_PATH) . "</code></p>" .
-        "<p><strong>Active project:</strong> <code>" . htmlspecialchars(PROJECT_NAME) . "</code></p>" .
-        "<p><strong>What this means:</strong> The routes definition file <code>routes.php</code> is missing for project '<strong>" . htmlspecialchars(PROJECT_NAME) . "</strong>'.</p>" .
-        "<p><strong>Expected structure:</strong><br><code>" . htmlspecialchars(SECURE_FOLDER_PATH) . "/projects/" . htmlspecialchars(PROJECT_NAME) . "/routes.php</code></p>" .
-        "<p><strong>Possible causes:</strong></p>" .
-        "<ul>" .
-        "<li>Project '<strong>" . htmlspecialchars(PROJECT_NAME) . "</strong>' is incomplete - missing <code>routes.php</code></li>" .
-        "<li>File was accidentally deleted</li>" .
-        "<li>Corrupted project - try recreating with <code>createProject</code> API command</li>" .
-        "<li>If paths look wrong, check constants in <code>" . PUBLIC_FOLDER_NAME . "/init.php</code></li>" .
-        "</ul>"
-    );
-}
-if(!defined('ROUTES')){
-    define('ROUTES', require ROUTES_PATH);
 }
 
 if (!defined('BASE_URL')) {

@@ -153,6 +153,33 @@ function resolveEffectiveRole(array $user): ?string {
 }
 
 /**
+ * Resolve a user's UX-DEFAULT project NAME (C7) — their selected_project when that
+ * membership is still real, else the first cached project they are genuinely a
+ * member of, else null. This is used ONLY to give GLOBAL commands a benign working
+ * PROJECT_PATH context (never authz — global authz does not depend on a project,
+ * and project-scoped authz uses the per-request URL project). Mirrors
+ * resolveEffectiveRole's selection but returns the project id instead of the role.
+ *
+ * @return string|null project id, or null if the user has no real membership
+ */
+function resolveDefaultProject(array $user): ?string {
+    $userId = $user['id'] ?? null;
+    if ($userId === null) {
+        return null;
+    }
+    $selected = $user['selected_project'] ?? null;
+    if ($selected !== null && $selected !== '' && getUserRoleForProject($userId, (string)$selected) !== null) {
+        return (string)$selected;
+    }
+    foreach (array_keys($user['projects'] ?? []) as $project) {
+        if (getUserRoleForProject($userId, (string)$project) !== null) {
+            return (string)$project;
+        }
+    }
+    return null;
+}
+
+/**
  * Get the master list of all commands from routes.php
  *
  * @return array List of all command names
@@ -321,25 +348,32 @@ function validateBearerToken(?string $authHeader): array {
 }
 
 /**
- * Check whether a USER may run a command — per-project category RBAC (C6).
+ * Check whether a USER may run a command — per-project category RBAC (C6/C7).
  *
  *   command -> category (categories.php) -> scope:
  *     global 'any'   → any authenticated user
  *     global 'owner' → interim: effective role must be owner
- *     project        → the user's effective role must grant that category
- *                      (owner short-circuits — owner is the top of the project, L9)
+ *     project        → the user's role ON THE PER-REQUEST PROJECT must grant that
+ *                      category (owner short-circuits — owner is the top, L9)
  *   unmapped command → DENY (fail-closed). NO superadmin, NO '*'.
  *
- * The effective role comes from resolveEffectiveRole (the user's selected_project
- * with graceful fallback). That PROJECT SOURCE is transitional — C7 replaces it with
- * the per-request URL project. The RBAC model here is not transitional. Disabled
+ * C7 — the PROJECT-scoped decision now keys off $requestedProject (the projectId
+ * peeled from the request URL, already validated + membership-checked by the
+ * dispatcher), NOT the user's selected_project. selected_project is a UX default
+ * ONLY and is never consulted here — that closes the "selected_project is never
+ * authz" rule for actions. The role always comes from the AUTHORITATIVE
+ * members.json (L5). GLOBAL scope is unchanged (global-'owner' remains the GAP-A
+ * interim on selected_project, relocating to operator/CLI in beta.11). Disabled
  * users are already rejected in validateBearerToken (L10), before this runs.
  *
- * @param array $user Resolved user (from validateBearerToken; must have 'id')
- * @param string $command Command name being accessed
+ * @param array       $user             Resolved user (from validateBearerToken; must have 'id')
+ * @param string      $command          Command name being accessed
+ * @param string|null $requestedProject Per-request projectId (required for a
+ *                                       project-scoped command; ignored for global).
+ *                                       Absent/empty on a project command → DENY.
  * @return bool
  */
-function hasPermission(array $user, string $command): bool {
+function hasPermission(array $user, string $command, ?string $requestedProject = null): bool {
     $category = getCommandCategory($command);
     if ($category === null) {
         return false; // unmapped command → fail-closed
@@ -355,15 +389,19 @@ function hasPermission(array $user, string $command): bool {
             return true; // any authenticated (non-disabled) user
         }
         if ($access === 'owner') {
-            return resolveEffectiveRole($user) === 'owner'; // interim owner-only
+            return resolveEffectiveRole($user) === 'owner'; // GAP-A interim owner-only
         }
         return false; // unknown global access rule → fail-closed
     }
 
-    // project-scoped
-    $role = resolveEffectiveRole($user);
+    // project-scoped — role comes from the PER-REQUEST project (C7), never
+    // selected_project. No projectId ⇒ no project to authorize against ⇒ DENY.
+    if ($requestedProject === null || $requestedProject === '') {
+        return false;
+    }
+    $role = getUserRoleForProject((string)($user['id'] ?? ''), $requestedProject);
     if ($role === null) {
-        return false; // not a member of any project → 403
+        return false; // not a member of THIS project → 403
     }
     if ($role === 'owner') {
         return true; // owner-top (L9)

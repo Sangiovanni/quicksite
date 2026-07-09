@@ -325,9 +325,12 @@ class WorkflowManager {
             $urlParams = $req['urlParams'] ?? [];
             $extract = $req['extract'] ?? null;
             
-            // Role-based permission check: if tokenInfo is set, verify the user can run this command
+            // Role-based permission check: if tokenInfo is set, verify the user can run this command.
+            // C7 — hasPermission is project-scoped for project commands; authorize against the loaded
+            // project context (PROJECT_NAME). WorkflowManager always runs inside a resolved project
+            // (admin/api or the dispatcher), so a workflow's data commands are checked against it.
             if ($this->tokenInfo !== null && function_exists('hasPermission')) {
-                if (!hasPermission($this->tokenInfo, $command)) {
+                if (!hasPermission($this->tokenInfo, $command, defined('PROJECT_NAME') ? PROJECT_NAME : null)) {
                     $data[$id] = [
                         '_error' => true,
                         '_message' => "Permission denied for command: {$command}",

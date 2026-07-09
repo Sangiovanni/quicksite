@@ -5,6 +5,7 @@ class TrimParametersManagement{
   private $command = '';
   private $additionnalCommand = [];
   private $params = [];
+  private $project = null; // C7: per-request projectId peeled from '/management/p/<id>/...'
 
   public function __construct() {
     $request_uri = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
@@ -26,6 +27,17 @@ class TrimParametersManagement{
     $parts = array_map('rawurldecode', $parts);
     //shift management folder
     array_shift($parts);
+    // C7 — peel the optional project marker: '/management/p/<projectId>/<command>'.
+    // The literal 'p' segment (mirrors surface-B '/p/<id>/') unambiguously marks a
+    // project-scoped request; without it the request is a GLOBAL command
+    // ('/management/<command>'). No projectId-vs-command ambiguity because 'p' is a
+    // reserved marker, never a command name. The projectId is a NEW F1 path input —
+    // the dispatcher validates it (is_valid_project_name) and membership-checks it
+    // before it is ever used to build a path; it is NOT trusted here.
+    if (count($parts) >= 2 && $parts[0] === 'p' && $parts[1] !== '') {
+      array_shift($parts);                   // drop the 'p' marker
+      $this->project = array_shift($parts);  // <projectId>
+    }
     if (count($parts) > 0 && $parts[0] !== '') {
       $this->command = array_shift($parts);
     }
@@ -52,6 +64,15 @@ class TrimParametersManagement{
 
   public function command() {
     return $this->command;
+  }
+
+  /**
+   * The per-request projectId peeled from '/management/p/<projectId>/...', or
+   * null for a global command ('/management/<command>'). C7. UNVALIDATED — the
+   * dispatcher runs is_valid_project_name + a membership check before use.
+   */
+  public function project() {
+    return $this->project;
   }
   
   public function params() {
