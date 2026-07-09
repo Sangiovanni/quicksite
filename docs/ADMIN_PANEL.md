@@ -197,7 +197,7 @@ Every localStorage / sessionStorage key is declared as a constant in `js/core/st
 
 | PHP file | Injects into | Notable fields |
 |---|---|---|
-| `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `defaultLang`, `multilingual`, `translations`, `token`, `apiUrl` |
+| `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `currentProject`, `globalCommands`, `defaultLang`, `multilingual`, `translations`, `token`, `apiUrl` |
 | `templates/pages/settings.php` | extends `QUICKSITE_CONFIG` | `commandUrl`, `aiSettingsUrl`, `quicksiteVersion` |
 | `templates/pages/apis.php` | inline `window.translations` | `apis` namespace |
 | `templates/pages/preview-config.php` | `window.PreviewConfig` | full preview runtime data — routes, components, settings, i18n, token (200+ fields) |

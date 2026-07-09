@@ -212,6 +212,30 @@ function getCommandCategory(string $command): ?string {
 }
 
 /**
+ * The set of GLOBAL-scoped command names (categories.php scope === 'global'). C8 (8.W).
+ *
+ * The admin client uses this to choose transport: a global command is called at
+ * '/management/<cmd>'; every OTHER (project-scoped) command must carry the
+ * '/management/p/<projectId>/<cmd>' marker (C7). Emitting the set from THIS source
+ * (categories.php) keeps client + server in agreement by construction, mirroring
+ * the server's own default — hasPermission treats an unmapped command as 'project'
+ * ('scope' ?? 'project') — so the client rule is: global IFF listed here, else project.
+ *
+ * @return string[] global command names (may contain duplicates only if categories.php does; it does not — 1:1)
+ */
+function getGlobalCommands(): array {
+    $globals = [];
+    foreach (loadCategoriesConfig() as $def) {
+        if (($def['scope'] ?? 'project') === 'global') {
+            foreach (($def['commands'] ?? []) as $cmd) {
+                $globals[] = $cmd;
+            }
+        }
+    }
+    return $globals;
+}
+
+/**
  * Expand a role's granted CATEGORIES to its full PROJECT command list (C6).
  * Replaces the old flat roles.php['commands'] lookup; stable interface (callers
  * still receive a command array or null). Global commands (any-auth + the

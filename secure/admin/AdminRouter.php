@@ -188,6 +188,34 @@ class AdminRouter {
     }
 
     /**
+     * The project the admin panel is currently working with (C8 8.W).
+     *
+     * = the SERVED/active project (config/target.php) — the SAME source the preview
+     * iframe, the dashboard project-manager (getActiveProject), and the form-helpers
+     * already use. The client seeds `currentProject` from this so the editor's C7
+     * marker, the preview, the header badge, and the dashboard all agree on ONE
+     * project, and switchProject (which rewrites target.php + reloads) propagates
+     * everywhere.
+     *
+     * Deliberately NOT the per-user selected_project: until per-project preview
+     * serving lands (C9), the preview + form-helpers still resolve via target.php, so
+     * seeding the client off selected_project would edit one project while previewing
+     * another (the exact hazard C7's findings log warned about). selected_project
+     * becomes the per-user editing driver in C9. A UX default only — the dispatcher
+     * re-validates membership on every request (C7), so this is never an authz input.
+     *
+     * @return string|null the served project id, or null if target.php is missing/empty
+     */
+    public function getCurrentProject(): ?string {
+        $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
+        if (!is_file($targetFile)) return null;
+        $target = @include $targetFile;
+        if (is_array($target)) return $target['project'] ?? null;
+        if (is_string($target) && $target !== '') return $target; // legacy scalar form
+        return null;
+    }
+
+    /**
      * Pages that require at least one specific command in the token's role.
      * A role must hold at least one listed command (owner/admin do, via their
      * expanded categories). Pages not listed here are open to all authenticated users.

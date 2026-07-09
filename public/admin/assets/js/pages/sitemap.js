@@ -712,7 +712,10 @@
         nameInput.placeholder = isRoot
             ? t('routeNameNested', 'route-name or parent/child')
             : t('routeName', 'route-name');
-        nameInput.setAttribute('pattern', '[a-z0-9\\-/]+');
+        // Escape the '/' inside the class — an unescaped '/' is invalid in a character
+        // class under the RegExp 'v' flag that modern browsers use to compile the
+        // pattern attribute (throws "invalid character in class" while typing).
+        nameInput.setAttribute('pattern', '[a-z0-9\\-\\/]+');
         nameInput.autofocus = true;
         form.appendChild(nameInput);
 

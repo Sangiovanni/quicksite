@@ -103,6 +103,17 @@ if (!empty($__previewRouteResolvers)) {
         $__previewResolverDefaults[$__routePath] = getResolverDefaultsForRoute($__resolverCfg, $__previewApiManager);
     }
 }
+
+// C8 (8.W) — the served project this panel works with (getCurrentProject = target.php,
+// same as the editor marker + the preview iframe, so edit and preview never diverge).
+// The visual-editor STYLE panels (preview-style-*/transition) hand-build
+// fetch(managementUrl + cmd) for project-scoped commands, so the C7 '/management/p/<id>/'
+// marker is baked into managementUrl here (every command reached this way is
+// project-scoped). Empty marker → falls back to '/management/' when target.php is
+// missing. (Cleanup chip tracks routing those calls through QuickSiteAdmin.apiRequest.)
+$__previewProject = $router->getCurrentProject();
+$__previewMgmtBase = rtrim(BASE_URL, '/') . '/management/'
+    . ($__previewProject !== null && $__previewProject !== '' ? 'p/' . rawurlencode($__previewProject) . '/' : '');
 ?>
 <!-- Preview Configuration (needed before preview.js) -->
 <script>
@@ -110,7 +121,8 @@ window.PreviewConfig = {
     // URLs and settings
     baseUrl: <?= json_encode(rtrim(BASE_URL, '/')) ?>,
     adminUrl: <?= json_encode($router->url('')) ?>,
-    managementUrl: <?= json_encode(rtrim(BASE_URL, '/') . '/management/') ?>,
+    managementUrl: <?= json_encode($__previewMgmtBase) ?>,
+    currentProject: <?= json_encode($__previewProject) ?>,
 
     // Beta.8 A2 — per-route resolver sidecar (only routes with a resolver).
     // Used by the editor's emulation panel to know which variables exist

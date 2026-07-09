@@ -30,6 +30,18 @@ $isLoginPage = $router->getPage() === 'login';
 $isPreviewPage = $router->getPage() === 'preview';
 $currentPage = $router->getPage();
 
+// C8 (8.W) — client transport wiring. The admin client must (a) know which
+// commands are project-scoped (to prepend the C7 '/management/p/<id>/' marker) and
+// (b) know which project it is working with. Both come from the authoritative
+// server source: the scope set from categories.php, and the SERVED project
+// (target.php, via getCurrentProject) — the same project the preview iframe + the
+// dashboard already use, so editor/preview/badge/dashboard all agree (selected_project
+// as the per-user editing driver is C9). Emitted into QUICKSITE_CONFIG below + used
+// for the badge. currentProject is a UX default only — the server re-authorizes every call.
+require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+$globalCommands = getGlobalCommands();
+$currentProject = $isLoginPage ? null : $router->getCurrentProject();
+
 // Get page title from translations or fallback to capitalized page name
 $pageTitle = $lang->has('nav.' . $currentPage) 
     ? __admin('nav.' . $currentPage) 
@@ -289,15 +301,12 @@ $langNames = [
         
         <div class="admin-header__actions">
             <?php
-            // Active project badge — always show which project is being edited
-            // (you switch a lot during testing). Reads config/target.php, the
-            // same source getActiveProjectName() uses.
-            $activeProjectName = null;
-            $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-            if (file_exists($targetFile)) {
-                $target = @include $targetFile;
-                $activeProjectName = is_array($target) ? ($target['project'] ?? null) : (is_string($target) ? $target : null);
-            }
+            // Active project badge — the project THIS panel is working with (C8 8.W):
+            // currentProject = the served target.php project (via getCurrentProject),
+            // the same one the client's C7 marker, the preview, and the dashboard use,
+            // so the badge can never disagree with what the editor edits. Null (badge
+            // hidden) when target.php is missing/empty.
+            $activeProjectName = $currentProject;
             ?>
             <?php if ($activeProjectName): ?>
             <a href="<?= $router->url('dashboard') ?>" class="admin-btn admin-btn--ghost admin-project-badge" title="<?= __admin('common.activeProject', 'Active project') ?>">
@@ -429,6 +438,13 @@ $langNames = [
             adminBase: '<?= $router->getBaseUrl() ?>',
             baseUrl: '<?= rtrim(BASE_URL, '/') ?>',
             publicSpace: '<?= defined('PUBLIC_FOLDER_SPACE') ? PUBLIC_FOLDER_SPACE : '' ?>',
+            // C8 (8.W) — project transport. currentProject = the SERVED project
+            // (target.php), the same one preview + the dashboard use; globalCommands =
+            // the categories.php scope==='global' set. The client prepends the
+            // '/management/p/<currentProject>/' marker for any command NOT in
+            // globalCommands. Both are UX/plumbing — the server re-authorizes each call.
+            currentProject: <?= json_encode($currentProject) ?>,
+            globalCommands: <?= json_encode($globalCommands) ?>,
             defaultLang: '<?= CONFIG['LANGUAGE_DEFAULT'] ?? 'en' ?>',
             multilingual: <?= (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) ? 'true' : 'false' ?>,
             translations: {

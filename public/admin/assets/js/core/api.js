@@ -91,6 +91,104 @@ window.QuickSiteAPI = (function() {
     }
 
     // ============================================
+    // Project scope transport (C8 8.W)
+    // ============================================
+    // C7 requires the '/management/p/<projectId>/<cmd>' marker for project-scoped
+    // commands; global commands stay '/management/<cmd>'. This module decides which
+    // is which and builds the path accordingly. The authoritative scope set and the
+    // default project both come from the server (QUICKSITE_CONFIG, emitted from
+    // categories.php + the user's selected_project) so client + server agree.
+
+    // The project the client targets by default. Seeded from the server; a future
+    // project picker can override it via setCurrentProject(). UX DEFAULT ONLY — the
+    // server re-validates membership on every request, so this is never authz.
+    let currentProject = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.currentProject) || null;
+
+    function getCurrentProject() {
+        return currentProject;
+    }
+
+    function setCurrentProject(projectId) {
+        currentProject = (projectId === undefined || projectId === '') ? null : projectId;
+    }
+
+    // Defensive mirror of categories.php scope==='global' — used ONLY if the page
+    // failed to emit QUICKSITE_CONFIG.globalCommands, so the panel can still
+    // authenticate + list/create projects. The emitted set is authoritative.
+    const FALLBACK_GLOBAL_COMMANDS = [
+        'help', 'getMyPermissions', 'listRoles', 'listProjects', 'getActiveProject',
+        'createProject', 'checkForUpdates'
+    ];
+
+    function globalCommandSet() {
+        const emitted = window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.globalCommands;
+        return (Array.isArray(emitted) && emitted.length > 0) ? emitted : FALLBACK_GLOBAL_COMMANDS;
+    }
+
+    // A command is project-scoped unless it is in the global set (mirrors the
+    // server's 'scope' ?? 'project' default: unmapped/unknown => project-scoped).
+    function isProjectScoped(command) {
+        return !globalCommandSet().includes(command);
+    }
+
+    // Build the management path for a command (WITHOUT the /management prefix):
+    // project-scoped commands get the 'p/<currentProject>/' marker, globals don't.
+    // Returns null when a project-scoped command has no current project — the caller
+    // surfaces a clean error rather than firing '/management/p//<cmd>' (which the
+    // dispatcher would read as command 'p' → 404).
+    function buildCommandPath(command) {
+        if (!isProjectScoped(command)) return command;
+        if (!currentProject) return null;
+        return 'p/' + encodeURIComponent(currentProject) + '/' + command;
+    }
+
+    // Shared client-side error for a project-scoped call with no project selected.
+    function noProjectError(command) {
+        return {
+            ok: false,
+            status: 0,
+            data: {
+                success: false,
+                code: 'client.project_required',
+                error: 'No project selected for project-scoped command: ' + command
+            }
+        };
+    }
+
+    // C8 deferral guard — the dashboard project-manager's project.data/project.delete
+    // commands. With currentProject = the SERVED project (8.W), the marker now aligns
+    // with the project the manager UI targets, so these WOULD act on the right project.
+    // They are still held here per the defer ruling: their deeper re-scoping
+    // (importProject should be global, the F6 marker-vs-param containment matrix,
+    // per-user targeting) lands in C8's project.data slice — better to keep the manager
+    // off during the auth rework than expose half-reworked destructive project ops.
+    // NOTE: the preview AI-tools "backup before AI change" path hand-builds its URL from
+    // PreviewConfig.managementUrl (already project-markered) and does NOT go through
+    // request(), so it stays live — it backs up the served project being edited.
+    // (Remove this guard when C8 wires the project-manager; the panel is consistent
+    // either way now that currentProject is the served project.)
+    const C8_DEFERRED_PROJECT_COMMANDS = [
+        'backupProject', 'restoreBackup', 'cloneProject', 'deleteProject',
+        'exportProject', 'importProject', 'deleteBackup', 'listBackups'
+    ];
+
+    function isDeferredToC8(command) {
+        return C8_DEFERRED_PROJECT_COMMANDS.includes(command);
+    }
+
+    function deferredC8Error(command) {
+        return {
+            ok: false,
+            status: 0,
+            data: {
+                success: false,
+                code: 'client.project_manager_c8',
+                error: 'Project management (' + command + ') is being reworked (C8) and is temporarily unavailable from the dashboard.'
+            }
+        };
+    }
+
+    // ============================================
     // Core API Methods
     // ============================================
 
@@ -136,12 +234,21 @@ window.QuickSiteAPI = (function() {
             };
         }
 
-        // Build URL
-        let url = `${config.apiBase}/${command}`;
+        // C8-deferred project-manager commands: refuse rather than mis-target (8.W).
+        if (isDeferredToC8(command)) {
+            return deferredC8Error(command);
+        }
+
+        // Build URL — project-scoped commands carry the C7 '/p/<projectId>/' marker (8.W)
+        const commandPath = buildCommandPath(command);
+        if (commandPath === null) {
+            return noProjectError(command);
+        }
+        let url = `${config.apiBase}/${commandPath}`;
         if (urlParams.length > 0) {
             url += '/' + urlParams.join('/');
         }
-        
+
         // Add query parameters
         if (Object.keys(queryParams).length > 0) {
             const searchParams = new URLSearchParams();
@@ -243,7 +350,12 @@ window.QuickSiteAPI = (function() {
             };
         }
 
-        let url = `${config.apiBase}/${command}`;
+        // Project-scoped commands (uploadAsset) carry the C7 '/p/<projectId>/' marker (8.W)
+        const commandPath = buildCommandPath(command);
+        if (commandPath === null) {
+            return noProjectError(command);
+        }
+        let url = `${config.apiBase}/${commandPath}`;
         if (urlParams.length > 0) {
             url += '/' + urlParams.join('/');
         }
@@ -342,7 +454,12 @@ window.QuickSiteAPI = (function() {
         setToken,
         clearToken,
         isAuthenticated,
-        
+
+        // Project scope (C8 8.W)
+        getCurrentProject,
+        setCurrentProject,
+        isProjectScoped,
+
         // API Methods
         request,
         upload,
