@@ -1,5 +1,18 @@
 <?php
+// C9 surface B — intercept `/p/<projectId>/` BEFORE init.php binds the GLOBAL served
+// project, so a project view is scoped to its own secure/projects/<id>/public/ folder.
+// No-op for every non-/p/ request. (secure/src/functions/surfaceB.php)
+require_once __DIR__ . '/../secure/src/functions/surfaceB.php';
+qs_surface_b_maybe_handle();
+
 require_once 'init.php';
+
+// C9 surface B — with the project context deferred above, bind it to the /p/ project
+// now, then finish (gate visibility, serve a static asset, or set up the HTML render).
+if (defined('QS_SURFACE_B_PROJECT')) {
+    qs_load_project_context(QS_SURFACE_B_PROJECT, true);
+    qs_surface_b_finish();
+}
 
 // --- Component Preview Mode (for Visual Editor) ---
 // If ?_component={name}&_editor=1 is present, render just the component in isolation

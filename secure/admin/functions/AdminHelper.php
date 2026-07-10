@@ -138,7 +138,7 @@ function getCommandCategories(): array {
         'project_management' => [
             'label' => 'Project Management',
             'icon' => 'folder-tree',
-            'commands' => ['listProjects', 'getActiveProject', 'switchProject', 'createProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'clearExports', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
+            'commands' => ['listProjects', 'getActiveProject', 'setSelectedProject', 'switchProject', 'createProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'clearExports', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
         ],
         'storage_monitoring' => [
             'label' => 'Storage',

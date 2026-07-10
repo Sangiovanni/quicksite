@@ -87,8 +87,8 @@ function policyCreateRoute(array $segments): void {
     if ($changed && defined('ROUTES_PATH')) {
         file_put_contents(ROUTES_PATH, '<?php return ' . varExportNested($newRoutes) . '; ?>', LOCK_EX);
         if (function_exists('opcache_invalidate')) opcache_invalidate(ROUTES_PATH, true);
-        $schemaPath = PUBLIC_CONTENT_PATH . '/scripts/qs-route-schema.js';
-        if (function_exists('writeRoutesMetaFile')) writeRoutesMetaFile($newRoutes, $schemaPath);
+        require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
+        qs_emit_route_schema($newRoutes);
     }
 }
 
@@ -115,9 +115,8 @@ function policyDeleteRoute(array $segments): void {
         file_put_contents(ROUTES_PATH, '<?php return ' . varExportNested($newRoutes) . '; ?>', LOCK_EX);
         if (function_exists('opcache_invalidate')) opcache_invalidate(ROUTES_PATH, true);
     }
-    if (function_exists('writeRoutesMetaFile')) {
-        writeRoutesMetaFile($newRoutes, PUBLIC_CONTENT_PATH . '/scripts/qs-route-schema.js');
-    }
+    require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
+    qs_emit_route_schema($newRoutes);
     $name = end($segments);
     $jsonDir = PROJECT_PATH . '/templates/model/json/pages/' . implode('/', $segments);
     $phpDir  = PROJECT_PATH . '/templates/pages/' . implode('/', $segments);

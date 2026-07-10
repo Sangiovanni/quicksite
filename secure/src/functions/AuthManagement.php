@@ -180,6 +180,34 @@ function resolveDefaultProject(array $user): ?string {
 }
 
 /**
+ * The project ids the user is genuinely a member of (authoritative members.json — L5):
+ * their users.php `projects` cache VERIFIED against members.json (a stale cache entry
+ * never lists a project they can't access), plus selected_project. For the "my projects"
+ * editing picker (C9). Sorted, deduped. Informational only — never an authz decision.
+ *
+ * @return string[] project ids
+ */
+function getUserProjectIds(array $user): array {
+    $userId = $user['id'] ?? null;
+    if ($userId === null) {
+        return [];
+    }
+    $ids = [];
+    foreach (array_keys($user['projects'] ?? []) as $project) {
+        if (getUserRoleForProject($userId, (string)$project) !== null) {
+            $ids[(string)$project] = true;
+        }
+    }
+    $selected = $user['selected_project'] ?? null;
+    if ($selected !== null && $selected !== '' && getUserRoleForProject($userId, (string)$selected) !== null) {
+        $ids[(string)$selected] = true;
+    }
+    $out = array_keys($ids);
+    sort($out);
+    return $out;
+}
+
+/**
  * Get the master list of all commands from routes.php
  *
  * @return array List of all command names

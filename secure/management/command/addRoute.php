@@ -266,8 +266,8 @@ try {
     // schema so qs.js (Slice 2) sees the new route immediately
     // without a full rebuild. Mirrors editApi's qs-api-config.js
     // regen pattern. File is project-scoped public/scripts/qs-route-schema.js.
-    $routesMetaPath = PUBLIC_CONTENT_PATH . '/scripts/qs-route-schema.js';
-    writeRoutesMetaFile($newRoutes, $routesMetaPath);
+    require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
+    qs_emit_route_schema($newRoutes);
 
 } catch (Exception $e) {
     // Cleanup on failure

@@ -18,13 +18,27 @@ $isMultilingual = CONFIG['MULTILINGUAL_SUPPORT'] ?? false;
 $defaultLang = CONFIG['LANGUAGE_DEFAULT'] ?? 'en';
 $languages = $isMultilingual ? (CONFIG['LANGUAGES_SUPPORTED'] ?? [$defaultLang]) : [$defaultLang];
 
-// Get site URL for iframe (start with default language)
-// Add ?_editor=1 to enable editor mode data attributes
+// Get site URL for iframe (start with default language) + ?_editor=1 for editor mode.
+// C9 — the project you EDIT is getCurrentProject() (per-user selected_project). If it is
+// the SERVED project (target.php), preview at the site root (its base materialization);
+// otherwise preview via surface B (/p/<id>/) from that project's own folder. The
+// qs_preview cookie (emitted below, before the iframe) carries the admin's token so a
+// PRIVATE project's iframe — a plain browser navigation with no Authorization header —
+// authenticates against surface B (D3 seam; HttpOnly hardening → C5b).
+$previewProject = $router->getCurrentProject();          // what you EDIT (selected_project)
+$previewServed  = $router->getServedProject();           // what the site serves (target.php)
+$previewAtRoot  = ($previewProject === null || $previewProject === '' || $previewProject === $previewServed);
 $siteUrl = rtrim(BASE_URL, '/') . '/';
+if (!$previewAtRoot) {
+    $siteUrl .= 'p/' . rawurlencode($previewProject) . '/';
+}
 if ($isMultilingual) {
     $siteUrl .= $defaultLang . '/';
 }
-$siteUrl .= '?_editor=1';
+// `_t` = a per-page-load cache-buster so the preview iframe always loads FRESH content for
+// the current project — never a stale/bfcached page from a previous project (which would
+// desync the iframe DOM from the editor's marker and mis-target edits). C9.
+$siteUrl .= '?_editor=1&_t=' . time();
 
 // Get available routes for navigation
 $routes = [];

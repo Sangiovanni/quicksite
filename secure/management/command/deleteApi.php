@@ -42,9 +42,10 @@ function __command_deleteApi(array $params = [], array $urlParams = []): ApiResp
             ->withMessage($result['error']);
     }
     
-    // Regenerate qs-api-config.js for live development
-    $apiConfigPath = PUBLIC_CONTENT_PATH . '/scripts/qs-api-config.js';
-    $manager->writeCompiledJs($apiConfigPath);
+    // Regenerate qs-api-config.js into the project's OWN public/ (+ base mirror when
+    // editing the reserved base) so /p/<id>/ serves it. C9 D2 — projectPublicArtifacts.php.
+    require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
+    qs_emit_api_config($manager);
     
     // Cascade cleanup: remove orphaned references to this API
     $pageEventsCleanup = cleanPageEventsForApiEndpoint($apiId);

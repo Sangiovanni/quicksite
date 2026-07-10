@@ -204,13 +204,19 @@ Every localStorage / sessionStorage key is declared as a constant in `js/core/st
 | `templates/pages/ai/*.php` | `data-precomputed` on `.admin-ai-page` | precomputed components/routes snapshot |
 | `templates/pages/optimize.php` | inline readiness flag | `window.__cssRefinerLibReady` |
 
-There is no schema or runtime validation on injected objects, and page-level extensions of `QUICKSITE_CONFIG` can silently overwrite global fields. Treat the injected globals as read-only by convention.
+`currentProject` is the user's **edited** project (their `selected_project`, §8.0) — the client prepends a `p/<currentProject>/` marker to project-scoped Management calls so the server acts on it; `globalCommands` is the set of commands called without that marker. There is no schema or runtime validation on injected objects, and page-level extensions of `QUICKSITE_CONFIG` can silently overwrite global fields. Treat the injected globals as read-only by convention.
 
 ---
 
 ## 8. Visual editor (preview subsystem)
 
 The visual editor is the panel's flagship feature. It runs as a sidebar UI in the admin shell driving a preview iframe loaded with `?_editor=1`. The renderer (server side) emits `data-qs-node` and `data-qs-struct` attributes so the iframe can map clicks back to JSON paths.
+
+### 8.0 Which project the editor edits
+
+The panel edits one project at a time — the user's **selected project** (a per-user preference; ARCHITECTURE §6). The header carries a **project picker** listing the projects the user is a member of; changing it calls `setSelectedProject` and does a cache-busted reload, so the header badge, the editor's command target, and the preview iframe all follow together. The dashboard's project switch calls the same command. Switching what you edit **never** changes the **main project** served at the site root — that is a separate deploy-level action (`switchProject`).
+
+The preview iframe loads the edited project in editor mode: the **main project** at the site root (`/?_editor=1`), any **other** project through its per-project live view (`/p/<id>/?_editor=1`). Private projects authenticate via a short-lived HttpOnly `qs_preview` cookie the panel sets from the caller's token. The iframe URL carries a per-load cache-buster so a switch always loads the new project fresh — the editor's command target and the iframe DOM can never drift onto different projects.
 
 ### 8.1 Modes
 

@@ -188,30 +188,47 @@ class AdminRouter {
     }
 
     /**
-     * The project the admin panel is currently working with (C8 8.W).
+     * The project THIS user is EDITING = their per-user `selected_project`
+     * (resolveDefaultProject: selected_project when the membership is real, else first
+     * real membership, else the served project as a 0-membership fallback).
      *
-     * = the SERVED/active project (config/target.php) — the SAME source the preview
-     * iframe, the dashboard project-manager (getActiveProject), and the form-helpers
-     * already use. The client seeds `currentProject` from this so the editor's C7
-     * marker, the preview, the header badge, and the dashboard all agree on ONE
-     * project, and switchProject (which rewrites target.php + reloads) propagates
-     * everywhere.
+     * C9 model (2026-07-10, after Sangio's browser tests): `quicksite` is the FIXED main
+     * project, always served at the site root (/); it does NOT change when you switch.
+     * "Switching project" (header picker AND the dashboard) means switching which project
+     * you EDIT — this value — via `setSelectedProject`; it does NOT touch the served main.
+     * The editor marker, badge, and preview follow it: editing the main → the site root;
+     * editing any other project → surface B (/p/<id>/) from its own folder. A UX pointer
+     * only — the dispatcher re-authorizes every request against members.json (C7).
      *
-     * Deliberately NOT the per-user selected_project: until per-project preview
-     * serving lands (C9), the preview + form-helpers still resolve via target.php, so
-     * seeding the client off selected_project would edit one project while previewing
-     * another (the exact hazard C7's findings log warned about). selected_project
-     * becomes the per-user editing driver in C9. A UX default only — the dispatcher
-     * re-validates membership on every request (C7), so this is never an authz input.
-     *
-     * @return string|null the served project id, or null if target.php is missing/empty
+     * @return string|null the edited project id, or null if none resolvable
      */
     public function getCurrentProject(): ?string {
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+        $token = $this->getToken();
+        if ($token) {
+            $auth = validateBearerToken('Bearer ' . $token);
+            if (!empty($auth['valid'])) {
+                $proj = resolveDefaultProject($auth['user']);
+                if ($proj !== null && $proj !== '') return $proj;
+            }
+        }
+        return $this->getServedProject(); // 0-membership fallback: the main project
+    }
+
+    /**
+     * The globally SERVED project (target.php). In the C9 UNIFIED model this is also the
+     * ACTIVE project, so getCurrentProject() delegates here — one project served + edited +
+     * previewed. Kept as its own method because the preview/back-to-site code (and future
+     * per-user editing) branch on "is the project I'm looking at the served one?".
+     *
+     * @return string|null served project id, or null if target.php is missing/empty
+     */
+    public function getServedProject(): ?string {
         $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
         if (!is_file($targetFile)) return null;
         $target = @include $targetFile;
         if (is_array($target)) return $target['project'] ?? null;
-        if (is_string($target) && $target !== '') return $target; // legacy scalar form
+        if (is_string($target) && $target !== '') return $target;
         return null;
     }
 

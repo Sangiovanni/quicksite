@@ -101,9 +101,10 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
             ->withMessage($result['error']);
     }
     
-    // Regenerate qs-api-config.js for live development
-    $apiConfigPath = PUBLIC_CONTENT_PATH . '/scripts/qs-api-config.js';
-    $manager->writeCompiledJs($apiConfigPath);
+    // Regenerate qs-api-config.js into the project's OWN public/ (+ base mirror when
+    // editing the reserved base) so /p/<id>/ serves it. C9 D2 — projectPublicArtifacts.php.
+    require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
+    qs_emit_api_config($manager);
 
     // Keep qs-enums.js in sync with the new endpoint shape — bindings on
     // a freshly-edited endpoint might reference enums that weren't in
@@ -111,7 +112,7 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
     // their unreferenced entries. The sync is forgiving: missing
     // references become warnings (QS.enum falls back gracefully) so a
     // bad binding doesn't block the save.
-    $enumSync = EnumSyncHelper::sync();
+    $enumSync = qs_emit_enums();
 
     // Beta.8 A2 Slice 4 — auto-clear the resolver response cache for
     // this API (locked Q1 of BETA8_DATA_RESOLVER.md). Any cached

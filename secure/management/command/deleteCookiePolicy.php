@@ -41,9 +41,8 @@ if (consentRouteExists($routeTrim)) {
             opcache_invalidate(ROUTES_PATH, true);
         }
     }
-    if (function_exists('writeRoutesMetaFile')) {
-        writeRoutesMetaFile($newRoutes, PUBLIC_CONTENT_PATH . '/scripts/qs-route-schema.js');
-    }
+    require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
+    qs_emit_route_schema($newRoutes);
     // Delete the leaf page files, then prune now-empty folders.
     $name = end($segments);
     $jsonDir = PROJECT_PATH . '/templates/model/json/pages/' . implode('/', $segments);

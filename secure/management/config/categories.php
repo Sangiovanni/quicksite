@@ -225,6 +225,15 @@ return [
         'commands' => ['createProject'],
     ],
 
+    // Per-user EDITING target (selected_project) — a benign self-write: sets which
+    // project THIS user's panel edits (C9). UX only, never an authz input; the command
+    // still refuses selecting a project you are not a member of. any-auth.
+    'projects.select' => [
+        'scope' => 'global',
+        'access' => 'any',
+        'commands' => ['setSelectedProject'],
+    ],
+
     // Read-only update check (hardcoded GitHub URL, no request input — C2 PASS).
     'system.read' => [
         'scope' => 'global',

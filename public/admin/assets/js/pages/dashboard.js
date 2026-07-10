@@ -407,7 +407,9 @@
             ]);
             
             if (activeResult.ok && activeResult.data?.data?.project) {
-                currentProject = activeResult.data.data.project;
+                // C9 — the dashboard reflects the project you are EDITING (selected_project),
+                // not the served main. window.QUICKSITE_CONFIG.currentProject = getCurrentProject().
+                currentProject = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.currentProject) || activeResult.data.data.project;
                 const created = activeResult.data.data.created_at;
                 
                 infoContainer.innerHTML = `
@@ -756,7 +758,10 @@
             this.disabled = true;
             this.innerHTML = QuickSiteUtils.htmlSpinner() + ' ' + (common.loading || 'Switching...');
             try {
-                const result = await QuickSiteAdmin.apiRequest('switchProject', 'POST', { project: newProject });
+                // C9 — the dashboard's project switch changes which project you EDIT
+                // (setSelectedProject), the SAME as the header picker; it does NOT change the
+                // served main (quicksite stays at the site root).
+                const result = await QuickSiteAdmin.apiRequest('setSelectedProject', 'POST', { project: newProject });
                 if (result.ok) {
                     QuickSiteAdmin.showToast((proj.switched || 'Switched to project') + ': ' + newProject, 'success');
                     window.location.href = window.location.pathname + '?t=' + Date.now();

@@ -20,7 +20,7 @@ The API documents itself. Once installed:
 GET /management/help
 ```
 
-returns full documentation for **all 152 commands** — parameters, examples, validation rules, and error codes. For a specific command:
+returns full documentation for **all 153 commands** — parameters, examples, validation rules, and error codes. For a specific command:
 
 ```
 GET /management/help/addRoute
@@ -63,7 +63,7 @@ There is **no separate error envelope**. A failed call uses the same four fields
 
 ## Command catalogue
 
-The 152 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
+The 153 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
 
 > **AI is browser-direct (BYOK).** There is no `callAi` / `testAiKey` / `detectProvider` / `listAiProviders` server command — the admin panel calls AI providers directly from the browser using credentials stored in `aiConnectionsV3` (localStorage). The Management API only handles workflow specs and command execution.
 
@@ -83,7 +83,7 @@ Each row enumerates the commands in that category — comma-separated, alphabeti
 | **CSS variables** | `getRootVariables`, `setRootVariables`, `setThemeMode` — CSS custom-property registries used by the color picker and theme switcher. |
 | **Animations** | `listKeyframes`, `getKeyframes`, `setKeyframes`, `deleteKeyframes`, `getAnimatedSelectors` — named keyframes + per-element animation bindings. |
 | **Builds** | `build`, `listBuilds`, `getBuild`, `deleteBuild`, `cleanBuilds`, `deployBuild`, `downloadBuild` — compile a project to a static `public/build/<name>/` deliverable; list / deploy (to the install root, or a root listed in `secure/management/config/deploy-roots.php`) / clean. |
-| **Projects** | `listProjects`, `getActiveProject`, `switchProject`, `createProject`, `cloneProject`, `deleteProject` — per-project CRUD + active-project switching under `secure/projects/`. |
+| **Projects** | `listProjects`, `getActiveProject`, `setSelectedProject`, `switchProject`, `createProject`, `cloneProject`, `deleteProject` — per-project CRUD under `secure/projects/`, plus two distinct project pointers: `setSelectedProject` sets the caller's **edited** project (per-user, member-only — drives the admin panel + preview), while `switchProject` sets the globally **served** main project (deploy-level). See [ARCHITECTURE.md §6](ARCHITECTURE.md). |
 | **Backups** | `backupProject`, `listBackups`, `restoreBackup`, `deleteBackup` — snapshot / restore (configurable scope). |
 | **Export / Import** | `exportProject`, `importProject`, `downloadExport`, `clearExports` — pack a project as ZIP for portability; import a ZIP back. |
 | **Tokens** | `generateToken`, `listTokens`, `revokeToken` — bearer token CRUD (owner-only, interim; being retired for account-based auth). |
@@ -176,7 +176,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 ## Internals
 
 - Command handlers live in `secure/management/command/<command>.php`, one file per command.
-- The whitelist of valid commands is `secure/management/routes.php` (152 entries — this file is the single source of truth for which commands exist).
+- The whitelist of valid commands is `secure/management/routes.php` (153 entries — this file is the single source of truth for which commands exist).
 - Shared helpers live in `secure/src/functions/utilsManagement.php` (e.g., `varExportNested()`, `SPECIAL_PAGES`, role helpers).
 - Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `secure/src/classes/CommandRunner.php`. CommandRunner currently carries a **hardcoded read-only allowlist** of ~50 `get*` / `list*` commands it will execute internally.
 - Workflow execution adds its own role check via `WorkflowManager::setTokenInfo()` so steps respect the calling token's permissions.

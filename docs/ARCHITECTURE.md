@@ -13,7 +13,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
 | Layer | Folder | Audience | Purpose |
 |---|---|---|---|
 | **Project** | `secure/projects/{name}/` | Site owner | The actual website data: routes, page structures (JSON), translations, components, interactions, styles, assets. |
-| **Management** | `secure/management/` | API client (admin panel, scripts) | The 152 commands that read or mutate project data. Single entry point: `public/management/index.php`. Token + role enforced. AI calls bypass this layer entirely (browser-direct). |
+| **Management** | `secure/management/` | API client (admin panel, scripts) | The 153 commands that read or mutate project data. Single entry point: `public/management/index.php`. Token + role enforced. AI calls bypass this layer entirely (browser-direct). |
 | **Admin** | `public/admin/` + `secure/admin/` | Human operator | The browser UI that calls Management commands. Includes the visual editor, sitemap, theme editor, AI workspace, workflow runner. |
 
 ```
@@ -165,7 +165,7 @@ ApiResponse::create(201, 'route.created')
     ->send();
 ```
 
-The full list of 152 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
+The full list of 153 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
 
 ### Response shape
 
@@ -195,7 +195,7 @@ A token in `secure/management/config/auth.php` resolves to a **user** (`users.ph
 
 > AI is not a permissioned column: AI calls happen in the browser via `QSAiCall` against per-user credentials in `aiConnectionsV3` (localStorage). Any authenticated admin can use the AI workspace; gating happens at the connection level, not the role level.
 
-Roles are **fixed** — there is no superadmin and no custom roles. A role is defined as a set of trust-coherent command **categories** in `secure/management/config/categories.php` (e.g. `content.read`, `style.write`, `deploy`, `project.delete`); `roles.php` grants each role a `rank` and its categories, which are expanded to a per-command allowlist at load time. Every command belongs to exactly one category, and its category also fixes its **scope**: *global* (a small set any authenticated user may run — `createProject`, `listProjects`, `listRoles`, `getMyPermissions`, `checkForUpdates`) or *project* (requires membership). `owner` is the top of each project; `rank` orders the roles and governs role management — a granter may only assign a role strictly below their own (the self-escalation guard). Permissions are checked before the command file is included.
+Roles are **fixed** — there is no superadmin and no custom roles. A role is defined as a set of trust-coherent command **categories** in `secure/management/config/categories.php` (e.g. `content.read`, `style.write`, `deploy`, `project.delete`); `roles.php` grants each role a `rank` and its categories, which are expanded to a per-command allowlist at load time. Every command belongs to exactly one category, and its category also fixes its **scope**: *global* (a small set any authenticated user may run — `createProject`, `listProjects`, `setSelectedProject`, `listRoles`, `getMyPermissions`, `checkForUpdates`) or *project* (requires membership). `owner` is the top of each project; `rank` orders the roles and governs role management — a granter may only assign a role strictly below their own (the self-escalation guard). Permissions are checked before the command file is included.
 
 ### Extending one command via builders — `addComplexElement`
 
@@ -262,6 +262,8 @@ Page template
   └── Page::render() emits <!doctype>, <head>, menu, body, footer
 ```
 
+A request under `/p/<projectId>/` (the per-project live view, §6) is intercepted at the top of `public/index.php` — before `init.php` binds the main project — and scoped to that project's own folder: it gates access by visibility + membership, then either live-renders the page through the same pipeline above or serves a static sub-resource through the prefix-checked passthrough (§7). The main project keeps rendering exactly as shown.
+
 ### 5.2 Management API request
 
 ```
@@ -282,7 +284,7 @@ addRoute.php
   └── ApiResponse::create(201, 'route.created')->send()
 ```
 
-The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 152 commands.
+The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 153 commands.
 
 ### 5.3 Routing — exact and parameterised routes
 
@@ -345,7 +347,7 @@ The response carries a `warnings` array of `{ type, message }` entries. The site
 
 ## 6. Multi-project model
 
-One QuickSite installation can host any number of projects:
+One QuickSite installation hosts any number of projects, each with its own config, routes, templates, translations, interactions, assets, and backups:
 
 ```
 secure/projects/
@@ -354,13 +356,22 @@ secure/projects/
 └── documentation/
 ```
 
-`secure/management/config/target.php` is a single line that names the active project. Switching projects is one command:
+A project is reachable three ways — the **three surfaces**:
 
-```
-POST /management/switchProject  { "project": "client-website" }
-```
+- **Main site (root).** `secure/management/config/target.php` names one **main project**, served at the site root (`/`, or under a configured URL space). Its `assets/` and compiled `style.css` are materialised into the live `public/` folder so the root site matches. Setting the main project is a deploy-level action (`switchProject`).
+- **Per-project live view — `/p/<projectId>/`.** Every *other* project is live-rendered from its own `secure/projects/<id>/public/` folder under `/p/<projectId>/`, with no materialisation. The HTML runs through the same renderer as the main site; static sub-resources (style, scripts, images, fonts) are served through a canonicalised, prefix-checked passthrough that exposes **only** that project's `public/` subtree (§7). `/p/<mainProject>/` redirects to the root. The `/p/` prefix keeps a project view from ever shadowing a main-site route.
+- **Visual editor.** The admin panel edits one project at a time — the main project at the root, any other via its `/p/<id>/` view in editor mode.
 
-On switch, QuickSite syncs the project's `assets/` and compiled `style.css` into the live `public/` folder so the served site matches. Each project carries its own config, routes, templates, translations, interactions, and backups. Tokens, role definitions, command code, interaction schemas, and the admin panel are shared across all projects.
+**Project visibility.** Each project's `config/members.json` carries a `visibility` flag:
+
+- `public` — the `/p/<id>/` view is open to anonymous visitors (a shareable site).
+- `private` — the `/p/<id>/` view requires membership (owner / member / viewer). Membership is presented by a short-lived, HttpOnly `qs_preview` cookie the admin panel sets from the caller's token.
+
+**Per-user editing.** A user's `selected_project` (in `users.php`, set via `setSelectedProject`) names the project their admin panel edits. It is a per-user preference, **never an authorization input** — every request is re-authorized against the target project's `members.json`. Because each project is served *and* edited from its own folder, two users can edit two different projects at once without colliding, and the main project (`target.php`) is independent of any user's `selected_project`.
+
+**Generated client artifacts are per-project.** The compiled `qs-api-config.js` / `qs-enums.js` / `qs-route-schema.js` are written into each project's own `public/scripts/` when its API / enums / routes change, plus a mirror into the live `public/` when the edited project is the main one (so the root site stays in sync). Serving `/p/<id>/` regenerates any missing artifact on demand.
+
+Tokens, role/category definitions, command code, interaction schemas, and the admin panel are shared across all projects.
 
 ---
 
@@ -383,6 +394,7 @@ Other layered protections:
 | AuthN / AuthZ | Bearer token + role check on every Management call; logged. |
 | CSRF on admin | Admin panel uses the same Bearer token via `fetch`; no cookie-only auth. |
 | CORS | Configurable per deployment. |
+| Per-project serving (`/p/<id>/`) | Static sub-resources are served **only** from the project's own `public/` subtree via a `realpath` canonicalisation + prefix check (a jail): any path resolving outside `…/public/` is refused, so `config/` (members.json), `data/` (api-endpoints.json), `routes.php`, `config.php`, `templates/`, `translate/` are unreachable, and encoded / backslash / absolute traversals are rejected. HTML is always live-rendered, never served as raw project files; the view runs the same render/compile sanitisation as the built site, plus a Content-Security-Policy. Private projects require membership. |
 
 ---
 

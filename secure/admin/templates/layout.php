@@ -40,7 +40,35 @@ $currentPage = $router->getPage();
 // for the badge. currentProject is a UX default only — the server re-authorizes every call.
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 $globalCommands = getGlobalCommands();
-$currentProject = $isLoginPage ? null : $router->getCurrentProject();
+$currentProject = $isLoginPage ? null : $router->getCurrentProject();   // the project you EDIT (selected_project)
+
+// C9 — the SERVED project (target.php) drives "back to site" + the preview's root-vs-/p/
+// decision; the header picker lists the caller's memberships so they can switch what they edit.
+$servedProject = $isLoginPage ? null : $router->getServedProject();
+$myProjectIds = [];
+if (!$isLoginPage) {
+    $__pkTok = $router->getToken();
+    if ($__pkTok) {
+        $__pkAuth = validateBearerToken('Bearer ' . $__pkTok);
+        if (!empty($__pkAuth['valid'])) {
+            $myProjectIds = getUserProjectIds($__pkAuth['user']);
+        }
+    }
+    // C9 — set the qs_preview cookie SERVER-SIDE (before any output) so a PRIVATE
+    // /p/<id>/ preview iframe — a plain browser navigation with no Authorization header —
+    // authenticates on the FIRST load, not only after a footer script runs (which the
+    // iframe would race). HttpOnly: JS can't read it, the browser still sends it → the D3
+    // seam, hardened. surfaceB validates $_COOKIE['qs_preview'].
+    if (!empty($__pkTok) && !headers_sent()) {
+        setcookie('qs_preview', $__pkTok, [
+            'expires'  => 0,
+            'path'     => '/',
+            'secure'   => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+            'httponly' => true,
+            'samesite' => 'Strict',
+        ]);
+    }
+}
 
 // Get page title from translations or fallback to capitalized page name
 $pageTitle = $lang->has('nav.' . $currentPage) 
@@ -301,25 +329,40 @@ $langNames = [
         
         <div class="admin-header__actions">
             <?php
-            // Active project badge — the project THIS panel is working with (C8 8.W):
-            // currentProject = the served target.php project (via getCurrentProject),
-            // the same one the client's C7 marker, the preview, and the dashboard use,
-            // so the badge can never disagree with what the editor edits. Null (badge
-            // hidden) when target.php is missing/empty.
-            $activeProjectName = $currentProject;
+            // C9 UNIFIED — ACTIVE-project picker: the ONE project served + edited + previewed
+            // (= getCurrentProject = target.php). Changing it calls switchProject (the SAME
+            // command the dashboard uses) so the whole panel + the served site move together.
+            // Single-project users see a plain badge; multi-project users get the dropdown.
+            $editingProject = $currentProject;
             ?>
-            <?php if ($activeProjectName): ?>
+            <?php if (!empty($myProjectIds) && count($myProjectIds) > 1): ?>
+            <label class="admin-btn admin-btn--ghost admin-project-badge admin-project-picker" title="<?= __admin('common.activeProject', 'Active project') ?>">
+                <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+                <select id="admin-project-picker" aria-label="<?= __admin('common.activeProject', 'Active project') ?>" style="background:transparent;border:none;color:inherit;font:inherit;cursor:pointer;outline:none;padding:0 2px;max-width:12rem;">
+                    <?php foreach ($myProjectIds as $pid): ?>
+                    <option value="<?= adminEscape($pid) ?>"<?= $pid === $editingProject ? ' selected' : '' ?>><?= adminEscape($pid) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <?php elseif ($editingProject): ?>
             <a href="<?= $router->url('dashboard') ?>" class="admin-btn admin-btn--ghost admin-project-badge" title="<?= __admin('common.activeProject', 'Active project') ?>">
                 <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
-                <span><?= adminEscape($activeProjectName) ?></span>
+                <span><?= adminEscape($editingProject) ?></span>
             </a>
             <?php endif; ?>
             <?php
-            // Build the correct site URL - include default language if multilingual
+            // C9 — "back to site" shows the project you're EDITING: the site root when that
+            // is the SERVED project (target.php), else surface B (/p/<id>/) from its own
+            // folder. (Lang prefix only when it's the served project — surface B resolves the
+            // edited project's own default language itself.)
             $siteUrl = rtrim($baseUrl, '/') . '/';
-            if (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) {
+            if ($editingProject && $editingProject !== $servedProject) {
+                $siteUrl .= 'p/' . rawurlencode($editingProject) . '/';
+            } elseif (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) {
                 $siteUrl .= (CONFIG['LANGUAGE_DEFAULT'] ?? 'en') . '/';
             }
             ?>
@@ -539,7 +582,46 @@ $langNames = [
         window.QUICKSITE_CONFIG.token = '<?= adminEscape($router->getToken()) ?>';
         window.QUICKSITE_CONFIG.apiUrl = '<?= $router->getApiUrl() ?>';
     </script>
-    
+
+    <script>
+    (function () {
+        // (The qs_preview cookie is set SERVER-SIDE in this layout's PHP head, HttpOnly,
+        // before any output — so a private /p/ preview iframe authenticates on first load.)
+
+        // C9 — the header project picker switches which project you EDIT (setSelectedProject).
+        // It does NOT change the main/served project (quicksite stays at the site root). The
+        // dashboard's project switch calls the same command. Editing the main → the site root;
+        // editing any other project → surface B (/p/<id>/). apiRequest RESOLVES with a
+        // {status, code, message} object (it does NOT reject on non-2xx) — branch on status.
+        var picker = document.getElementById('admin-project-picker');
+        if (picker) {
+            picker.addEventListener('change', function () {
+                var project = picker.value;
+                if (!project) { return; }
+                picker.disabled = true;
+                QuickSiteAdmin.apiRequest('setSelectedProject', 'POST', { project: project })
+                    .then(function (res) {
+                        if (res && res.ok) {
+                            // Cache-busted navigation (NOT reload()) — Firefox can restore the
+                            // preview iframe from bfcache on reload(), leaving the badge on the
+                            // new project but the iframe (and thus the editor's DOM) on the OLD
+                            // one → edits target the wrong project. A fresh URL forces a clean
+                            // load of the whole page + iframe. Matches the dashboard switch.
+                            window.location.href = window.location.pathname + '?t=' + Date.now();
+                        } else {
+                            picker.disabled = false;
+                            alert('Could not switch project: ' + ((res && res.data && res.data.message) || 'unknown error'));
+                        }
+                    })
+                    .catch(function (err) {
+                        picker.disabled = false;
+                        alert('Could not switch project: ' + ((err && err.message) || err));
+                    });
+            });
+        }
+    })();
+    </script>
+
     <!-- Global Miniplayer (not on preview page, it has its own) -->
     <?php if ($currentPage !== 'preview'): ?>
         <?php require __DIR__ . '/partials/_miniplayer.php'; ?>

@@ -4634,7 +4634,7 @@
     // ==================== Event Handlers ====================
     
     function initIframeAndControls() {
-        iframe.addEventListener('load', function() {
+        function handleIframeLoad() {
             clearTimeout(loadingTimeout);
             hideLoading();
             // A new document loaded — previous overlay is gone regardless of flag
@@ -4643,7 +4643,20 @@
             // Retry injection in case document wasn't fully ready
             setTimeout(function() { if (!overlayInjected) injectOverlay(); }, 50);
             setTimeout(function() { if (!overlayInjected) injectOverlay(); }, 200);
-        });
+        }
+        iframe.addEventListener('load', handleIframeLoad);
+        // First (uncached) page load: this big script parses slower than the iframe's
+        // page, so the iframe's 'load' event may have ALREADY fired before the listener
+        // above was attached — leaving hideLoading()/injectOverlay() un-run and the
+        // loading overlay stuck over a "blank" iframe until a manual refresh. If the
+        // iframe document is already complete, run the handler now. (Same-origin; a
+        // cross-origin access throws and we fall back to waiting for the event.)
+        try {
+            var _idoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+            if (_idoc && _idoc.readyState === 'complete') {
+                handleIframeLoad();
+            }
+        } catch (e) { /* cross-origin or not ready — the load event will handle it */ }
         
         targetSelect.addEventListener('change', function() {
             // Parse unified dropdown value: "type:name" (e.g., "page:home" or "component:feature-item")

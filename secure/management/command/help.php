@@ -3159,7 +3159,33 @@ $GLOBALS['__help_commands'] = [
         ],
         'notes' => 'Shows which project is currently being served by the website.'
     ],
-    
+
+    'setSelectedProject' => [
+        'description' => 'Sets the CALLER\'s per-user editing target (selected_project) — the project their admin panel edits (header picker/badge, visual editor, preview). Distinct from switchProject, which repoints the globally SERVED project (target.php). Global-scoped (no /management/p/<id>/ marker).',
+        'method' => 'POST',
+        'parameters' => [
+            'project' => 'string (required) — project id to edit; the caller MUST be a member of it',
+        ],
+        'example_post' => 'POST /management/setSelectedProject  {"project":"my-site"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => "Now editing project 'my-site'",
+            'data' => [
+                'selected_project' => 'my-site',
+                'role' => 'owner',
+            ],
+        ],
+        'error_responses' => [
+            '400.validation.missing_field' => 'project is required',
+            '400.project.invalid' => 'project id fails the path-safety format',
+            '401.auth.required' => 'not authenticated',
+            '403.authz.not_a_member' => 'caller is not a member of the target project',
+            '500.server.file_write_failed' => 'failed to persist selected_project',
+        ],
+        'notes' => 'selected_project is a UX default, never an authz input — the dispatcher re-authorizes every request against the URL project + members.json. Refuses non-member projects so the panel never opens a project it cannot edit.'
+    ],
+
     'switchProject' => [
         'description' => 'Switches the active project. Syncs live edits back to previous project before switching, then copies new project files to live folder.',
         'method' => 'PATCH',
