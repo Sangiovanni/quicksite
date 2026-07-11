@@ -155,10 +155,14 @@ function getCommandCategories(): array {
             'icon' => 'shield',
             'commands' => ['listRoles', 'getMyPermissions', 'createRole', 'editRole', 'deleteRole']
         ],
-        'authentication' => [
-            'label' => 'Authentication',
+        // C5b session lifecycle. (This slot previously held the removed
+        // generateToken/listTokens/revokeToken trio under a duplicate
+        // 'authentication' key that the OAuth block below silently clobbered —
+        // the trio never actually rendered. Unique keys now.)
+        'auth_session' => [
+            'label' => 'Authentication / Session',
             'icon' => 'key',
-            'commands' => ['generateToken', 'listTokens', 'revokeToken']
+            'commands' => ['login', 'refreshSession', 'logoutSession']
         ],
         'js_functions' => [
             'label' => 'JavaScript Functions / Interactions',
@@ -170,8 +174,8 @@ function getCommandCategories(): array {
             'icon' => 'globe',
             'commands' => ['listApiEndpoints', 'getApiEndpoint', 'addApi', 'editApi', 'deleteApi', 'testApiEndpoint']
         ],
-        'authentication' => [
-            'label' => 'Authentication',
+        'oauth_providers' => [
+            'label' => 'OAuth Providers',
             'icon' => 'shield',
             'commands' => ['listOAuthProviders', 'addOAuthProvider', 'editOAuthProvider', 'deleteOAuthProvider']
         ],

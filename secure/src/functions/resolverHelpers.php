@@ -41,17 +41,21 @@
 
 require_once __DIR__ . '/../classes/ApiEndpointManager.php';
 
-function getResolverSidecarPath(): string {
-    return PROJECT_PATH . '/data/route-resolvers.json';
+function getResolverSidecarPath(?string $projectPath = null): string {
+    return ($projectPath ?? PROJECT_PATH) . '/data/route-resolvers.json';
 }
 
 /**
  * Load all resolvers for the active project. Empty array when the
  * sidecar file doesn't exist or is unreadable (route-resolvers are
  * fully optional — most routes don't have one).
+ *
+ * $projectPath (optional) targets another project's sidecar — used by the
+ * admin preview page, whose EDITED project can differ from the served one
+ * that the global PROJECT_PATH constant is bound to. Default = active project.
  */
-function loadResolversSidecar(): array {
-    $path = getResolverSidecarPath();
+function loadResolversSidecar(?string $projectPath = null): array {
+    $path = getResolverSidecarPath($projectPath);
     if (!file_exists($path)) {
         return [];
     }

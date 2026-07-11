@@ -33,10 +33,12 @@ quicksite/
 │
 ├── secure/                       # Backend (outside web root, not publicly accessible)
 │   ├── management/               # API engine (shared across all projects)
-│   │   ├── command/              # 118 command handler files (one per command)
+│   │   ├── command/              # Command handler files (one per command; see COMMAND_API.md)
 │   │   ├── config/               # API configuration
 │   │   │   ├── target.php        # Active project selector (gitignored)
-│   │   │   ├── auth.php          # Tokens and CORS config (gitignored)
+│   │   │   ├── auth.php          # Session TTLs, self-registration gate, CORS (gitignored)
+│   │   │   ├── users.php         # User registry: email + password_hash per user (gitignored)
+│   │   │   ├── sessions.json     # Runtime sessions — access/refresh tokens, hashed (machine-written, gitignored)
 │   │   │   ├── roles.php         # Role definitions (gitignored)
 │   │   │   ├── environment.php   # production | development — SSRF/error gate (gitignored; default production)
 │   │   │   └── deploy-roots.php  # deployBuild allowed target roots (gitignored; default SERVER_ROOT only)

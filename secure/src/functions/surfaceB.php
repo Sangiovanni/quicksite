@@ -39,6 +39,43 @@ function qs_sb_valid_id(string $id): bool {
 }
 
 /**
+ * The surface-B visibility + membership gate (§8.4). PRE-INIT-safe: only needs
+ * SECURE_FOLDER_PATH (defined here from the computed secure root when init.php
+ * has not run yet) + members.json + the C5b session store.
+ *
+ * @return int|null null = allowed (public project, or authenticated member);
+ *                  401 = private + no valid identity; 403 = valid identity,
+ *                  not a member (same refusal for a nonexistent project).
+ */
+function qs_surface_b_gate(string $id, string $secure): ?int {
+    if (!defined('SECURE_FOLDER_PATH')) {
+        define('SECURE_FOLDER_PATH', $secure); // init.php's own define is if(!defined())-guarded
+    }
+    require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+
+    $members    = loadProjectMembers($id);
+    $visibility = $members['visibility'] ?? 'private';   // secure default: private
+    if ($visibility === 'public') {
+        return null;
+    }
+    // Private → require identity. The author's own preview iframe carries a
+    // short-lived `qs_preview` cookie (D3); a bearer header is also accepted.
+    $token      = $_COOKIE['qs_preview'] ?? null;
+    $authHeader = ($token !== null && $token !== '')
+        ? 'Bearer ' . $token
+        : ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null);
+    $auth = validateBearerToken($authHeader);
+    if (empty($auth['valid'])) {
+        return 401;
+    }
+    $userId = $auth['user']['id'] ?? '';
+    if ($userId === '' || getUserRoleForProject($userId, $id) === null) {
+        return 403; // same for non-member / stranger project — no membership oracle
+    }
+    return null;
+}
+
+/**
  * PRE-INIT: detect a `/p/<id>/` request and set up the surface-B constant overrides.
  * No-op (returns) for every non-surface-B request. Call FIRST in public/index.php,
  * before require 'init.php'.
@@ -85,6 +122,27 @@ function qs_surface_b_maybe_handle(): void {
         exit;
     }
 
+    // ---- visibility + membership gate (§8.4) — PRE-INIT deliberately ------------
+    // Denying BEFORE the constant overrides means a refused request falls through
+    // to the NORMAL pipeline: init.php binds the MAIN served project and the
+    // request renders ITS error page (styled, correct BASE_URL/assets) with the
+    // real 401/403 status — instead of a bare refusal. Same page for a private
+    // project and a nonexistent one (loadProjectMembers defaults to private) —
+    // no existence oracle. The gate only needs members.json + the session store,
+    // none of the init constants.
+    $denyStatus = qs_surface_b_gate($id, $secure);
+    if ($denyStatus !== null) {
+        if (!defined('QS_SB_DENY_STATUS')) {
+            define('QS_SB_DENY_STATUS', $denyStatus);
+        }
+        // Rewrite to a never-matching route on the MAIN site (space prefix kept)
+        // → TrimParameters not-found → public/index.php's 404 branch, which
+        // honours QS_SB_DENY_STATUS (status + 401/403 special page preference).
+        $spaceSegs = array_slice($segs, 0, $idIndex);
+        $_SERVER['REQUEST_URI'] = '/' . implode('/', array_merge($spaceSegs, ['__qs_denied__']));
+        return; // NO overrides, NO $GLOBALS['__qs_sb'] — normal main-site boot
+    }
+
     $prefixSegs = array_slice($segs, 0, $idIndex + 2);       // [optional space] + p + id
     $subSegs    = array_slice($segs, $idIndex + 2);          // the rest (route or asset)
     $subpath    = implode('/', $subSegs);                    // RAW (kept encoded for the resolver)
@@ -123,27 +181,9 @@ function qs_surface_b_finish(): void {
     $projectDir = $sb['projectDir'];
     $subpath    = $sb['subpath'];
 
-    // ---- visibility + membership gate (§8.4) -------------------------------------
-    require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
-    $members    = loadProjectMembers($id);
-    $visibility = $members['visibility'] ?? 'private';   // secure default: private
-    if ($visibility !== 'public') {
-        // Private → require identity. The author's own preview iframe carries a
-        // short-lived `qs_preview` cookie (D3); a bearer header is also accepted.
-        $token      = $_COOKIE['qs_preview'] ?? null;
-        $authHeader = ($token !== null && $token !== '')
-            ? 'Bearer ' . $token
-            : ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null);
-        $auth = validateBearerToken($authHeader);
-        if (empty($auth['valid'])) {
-            qs_sb_deny(401, 'This project is private. Sign in to view it.');
-        }
-        $userId = $auth['user']['id'] ?? '';
-        if ($userId === '' || getUserRoleForProject($userId, $id) === null) {
-            // Same 403 for non-member / wrong project — no membership oracle.
-            qs_sb_deny(403, 'You do not have access to this project.');
-        }
-    }
+    // (The visibility + membership gate ran PRE-INIT in qs_surface_b_maybe_handle —
+    // a denied request never reaches this function: it boots the MAIN site and
+    // renders its error page instead. Reaching here = public project or member.)
 
     // ---- static passthrough (L11) ------------------------------------------------
     if ($subpath !== '') {

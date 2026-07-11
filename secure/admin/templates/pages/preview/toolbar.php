@@ -50,7 +50,7 @@
         <?php endif; ?>
 
         <!-- Theme Preview Toggle (always rendered; visibility managed by JS/config) -->
-        <div class="preview-toolbar__group" id="preview-theme-toggle-group" style="display: <?= (CONFIG['THEME_MODE_ENABLED'] ?? false) ? '' : 'none' ?>;">
+        <div class="preview-toolbar__group" id="preview-theme-toggle-group" style="display: <?= ($editConfig['THEME_MODE_ENABLED'] ?? false) ? '' : 'none' ?>;">
             <label class="preview-toolbar__label"><?= __admin('preview.themePreview') ?? 'Theme' ?>:</label>
             <div class="preview-toolbar__segmented" id="preview-theme-mode-switcher">
                 <button type="button" class="preview-toolbar__seg-btn preview-toolbar__seg-btn--active" data-theme-preview="light" title="<?= __admin('preview.themeLight') ?? 'Preview light mode' ?>">

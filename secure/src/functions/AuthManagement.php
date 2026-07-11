@@ -1,22 +1,29 @@
 <?php
 /**
  * Authentication & CORS Management Functions
- * 
+ *
  * Handles API token validation, role-based permissions, and CORS header management.
+ * C5b: credentials are email + password (users.php `password_hash`); per-request
+ * auth is a short-lived ACCESS token from the session store (SessionManagement.php).
  */
+
+require_once __DIR__ . '/SessionManagement.php';
 
 /**
  * Load authentication configuration
- * 
+ *
  * @return array Auth configuration
  */
 function loadAuthConfig(): array {
     $configPath = SECURE_FOLDER_PATH . '/management/config/auth.php';
-    
+
     if (!file_exists($configPath)) {
         // Return default restrictive config if file missing
         return [
-            'authentication' => ['enabled' => true, 'tokens' => []],
+            'authentication' => [
+                'session'      => [],
+                'registration' => ['allow_self_registration' => false],
+            ],
             'cors' => ['enabled' => false]
         ];
     }
@@ -348,55 +355,129 @@ function isBuiltinRole(string $roleName): bool {
 }
 
 /**
- * Validate Bearer token and resolve it to a USER (C5).
- * token -> userId (auth.php) -> user (users.php). Disabled users are rejected
- * before any command runs (L10). The returned user has its 'id' attached.
+ * Validate a Bearer ACCESS token and resolve it to a USER (C5/C5b).
+ * access token -> session family (sessions.json) -> userId -> user (users.php).
+ * Disabled users are rejected before any command runs (L10). The returned user
+ * has its 'id' attached.
+ *
+ * The 'code' key distinguishes an EXPIRED access token ('auth.token_expired' —
+ * the client should refresh and retry) from every other refusal
+ * ('auth.unauthorized' — the client should re-authenticate).
  *
  * @param string|null $authHeader The Authorization header value
- * @return array ['valid'=>bool, 'user'=>array|null, 'userId'=>string|null, 'error'=>string|null]
+ * @return array ['valid'=>bool, 'user'=>array|null, 'userId'=>string|null, 'error'=>string|null, 'code'=>string|null]
  */
 function validateBearerToken(?string $authHeader): array {
-    $config = loadAuthConfig();
-
-    // NOTE (C6): the old `authentication.enabled == false` synthetic full-access
-    // principal (a superadmin escape hatch) was REMOVED. Auth is always enforced —
-    // a valid token still resolves to its user; a missing/invalid one still 401s.
-    // The `enabled` flag is now inert (slated for removal from the config shape).
+    $refuse = static function (string $error, ?string $userId = null, string $code = 'auth.unauthorized'): array {
+        return ['valid' => false, 'user' => null, 'userId' => $userId, 'error' => $error, 'code' => $code];
+    };
 
     // No header provided
     if (empty($authHeader)) {
-        return ['valid' => false, 'user' => null, 'userId' => null, 'error' => 'Authorization header required'];
+        return $refuse('Authorization header required');
     }
 
     // Check Bearer format
     if (!preg_match('/^Bearer\s+(.+)$/i', $authHeader, $matches)) {
-        return ['valid' => false, 'user' => null, 'userId' => null, 'error' => 'Invalid Authorization header format. Use: Bearer <token>'];
+        return $refuse('Invalid Authorization header format. Use: Bearer <token>');
     }
 
     $token = trim($matches[1]);
 
-    // token -> userId
-    $tokens = $config['authentication']['tokens'] ?? [];
-    $tokenEntry = $tokens[$token] ?? null;
-    if ($tokenEntry === null) {
-        return ['valid' => false, 'user' => null, 'userId' => null, 'error' => 'Invalid or expired token'];
+    // access token -> session family -> userId (C5b)
+    $session = qs_session_validate_access($token);
+    if (!$session['valid']) {
+        if ($session['error'] === 'expired') {
+            return $refuse('Access token expired', null, 'auth.token_expired');
+        }
+        return $refuse('Invalid or expired token');
     }
 
     // userId -> user
-    $userId = $tokenEntry['userId'] ?? null;
+    $userId = $session['userId'];
     $users = loadUsersConfig();
     $user = ($userId !== null) ? ($users['users'][$userId] ?? null) : null;
     if ($user === null) {
-        return ['valid' => false, 'user' => null, 'userId' => null, 'error' => 'Token does not resolve to a user'];
+        return $refuse('Token does not resolve to a user');
     }
 
-    // L10: disabled user — ALL their tokens die everywhere; short-circuit here
+    // L10: disabled user — ALL their sessions die everywhere; short-circuit here
     if (($user['status'] ?? 'active') === 'disabled') {
-        return ['valid' => false, 'user' => null, 'userId' => $userId, 'error' => 'User account is disabled'];
+        return $refuse('User account is disabled', $userId);
     }
 
     $user['id'] = $userId; // attach resolved id for downstream (authz, logging, ownership)
-    return ['valid' => true, 'user' => $user, 'userId' => $userId, 'error' => null];
+    return ['valid' => true, 'user' => $user, 'userId' => $userId, 'error' => null, 'code' => null];
+}
+
+/**
+ * Find a user by email (the login identifier — C5b). Case-insensitive; users
+ * without an email (or externally managed ones) are simply never matched.
+ * The returned record has its 'id' attached.
+ *
+ * @return array|null
+ */
+function findUserByEmail(string $email): ?array {
+    $needle = strtolower(trim($email));
+    if ($needle === '') {
+        return null;
+    }
+    foreach (loadUsersConfig()['users'] ?? [] as $userId => $user) {
+        $candidate = $user['email'] ?? null;
+        if (is_string($candidate) && strtolower(trim($candidate)) === $needle) {
+            $user['id'] = (string)$userId;
+            return $user;
+        }
+    }
+    return null;
+}
+
+/**
+ * THE login gate (C5b) — shared by the `login` command and the admin panel's
+ * form so there is exactly ONE credential-check + issuance path (C8's
+ * register/createUser flows mint through qs_session_issue the same way).
+ *
+ * Refusals are deliberately uniform ('invalid_credentials' for unknown email,
+ * wrong password, passwordless/externally-managed account, disabled user) —
+ * no account-existence oracle. Verification is timing-equalized with a dummy
+ * hash when the user has no usable password.
+ *
+ * @return array {ok:true, user:array, session:array}   (session = qs_session_issue result)
+ *             | {ok:false, error:'invalid_credentials'|'throttled'|'server', retry_after?:int}
+ */
+function qs_auth_attempt_login(string $email, string $password): array {
+    $email = trim($email);
+    if ($email === '' || $password === '') {
+        return ['ok' => false, 'error' => 'invalid_credentials'];
+    }
+
+    $wait = qs_login_throttle_check($email);
+    if ($wait > 0) {
+        return ['ok' => false, 'error' => 'throttled', 'retry_after' => $wait];
+    }
+
+    $user = findUserByEmail($email);
+    $hash = is_array($user) ? ($user['password_hash'] ?? null) : null;
+
+    if (is_string($hash) && $hash !== '') {
+        $verified = password_verify($password, $hash);
+    } else {
+        // No such user / no local password: burn the same time as a real check.
+        password_verify($password, '$2y$10$abcdefghijklmnopqrstuvC5bDummyTimingEqualizerHashXX2u');
+        $verified = false;
+    }
+
+    if (!$verified || ($user['status'] ?? 'active') === 'disabled') {
+        qs_login_throttle_fail($email);
+        return ['ok' => false, 'error' => 'invalid_credentials'];
+    }
+
+    qs_login_throttle_clear($email);
+    $session = qs_session_issue($user['id']);
+    if ($session === false) {
+        return ['ok' => false, 'error' => 'server'];
+    }
+    return ['ok' => true, 'user' => $user, 'session' => $session];
 }
 
 /**
@@ -602,35 +683,6 @@ function handlePreflightRequest(): void {
 }
 
 /**
- * Generate a new API token
- * 
- * @param int $length Length of random bytes (default 24 = 48 char hex string)
- * @return string Generated token with prefix
- */
-function generateApiToken(int $length = 24): string {
-    return 'tvt_' . bin2hex(random_bytes($length));
-}
-
-/**
- * Get the current token from the Authorization header
- * 
- * @return string|null The token, or null if not present/invalid format
- */
-function getTokenFromRequest(): ?string {
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
-    
-    if (empty($authHeader)) {
-        return null;
-    }
-    
-    if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $matches)) {
-        return trim($matches[1]);
-    }
-
-    return null;
-}
-
-/**
  * Resolve the current request's USER from the Authorization header (C5).
  * For commands that need the caller's identity (e.g. createProject owner).
  * Returns null if unauthenticated / unresolved / disabled.
@@ -649,18 +701,20 @@ function getCurrentUser(): ?array {
 
 /**
  * Send 401 Unauthorized response
- * 
+ *
  * @param string $message Error message
  * @param string|null $hint Optional hint for fixing the error
+ * @param string $code Response code — 'auth.token_expired' tells the client to
+ *                     refresh + retry; anything else means re-authenticate (C5b)
  */
-function sendUnauthorizedResponse(string $message, ?string $hint = null): void {
+function sendUnauthorizedResponse(string $message, ?string $hint = null, string $code = 'auth.unauthorized'): void {
     http_response_code(401);
     header('Content-Type: application/json');
     header('WWW-Authenticate: Bearer realm="Template Vitrine Management API"');
-    
+
     $response = [
         'status' => 401,
-        'code' => 'auth.unauthorized',
+        'code' => $code,
         'message' => $message
     ];
     

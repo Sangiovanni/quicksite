@@ -518,7 +518,7 @@ $GLOBALS['__help_commands'] = [
                         'command' => 'editStructure',
                         'method' => 'POST',
                         'body' => ['type' => 'page', 'name' => 'home'],
-                        'publisher' => ['token_preview' => 'tvt_dev...tion', 'token_name' => 'Dev Token'],
+                        'publisher' => ['user_id' => 'usr_a1b2c3...', 'token_name' => 'Your Name'],
                         'result' => ['status' => 'success', 'code' => 'operation.success'],
                         'duration_ms' => 45.2
                     ]
@@ -529,7 +529,7 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.invalid_date' => 'Invalid date format (expected YYYY-MM-DD)'
         ],
-        'notes' => 'Logs are stored in daily files. By default returns last 7 days. The getCommandHistory command itself is not logged to prevent recursion. Request bodies are sanitized (uploadAsset files, generateToken tokens are redacted).'
+        'notes' => 'Logs are stored in daily files. By default returns last 7 days. The getCommandHistory command itself is not logged to prevent recursion. Request bodies are sanitized (uploadAsset files redacted; the public session commands - login/refreshSession/logoutSession - are not logged at all).'
     ],
     
     'clearCommandHistory' => [
@@ -2134,124 +2134,111 @@ $GLOBALS['__help_commands'] = [
         ]
     ],
     
-    'generateToken' => [
-        'description' => 'Creates a new API authentication token with specified role. Requires superadmin (*) permission.',
+    'login' => [
+        'description' => 'Exchanges email + password for a session: a short-lived access token (sent as Authorization: Bearer on every request) + a longer-lived refresh token (used only with refreshSession). PUBLIC + self-authenticating - no bearer header needed.',
         'method' => 'POST',
         'parameters' => [
-            'name' => [
+            'email' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Descriptive name for the token (1-100 characters)',
-                'example' => 'Collaborator Token'
+                'description' => 'Login identifier (the user email in users.php)',
+                'example' => 'you@example.com'
             ],
-            'role' => [
+            'password' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Role to assign to the token',
-                'valid_values' => [
-                    '*' => 'Superadmin - full access to all 104 commands including token/role management',
-                    'viewer' => 'Read-only access (31 commands)',
-                    'editor' => 'Content editing - structure, translations, assets, APIs (66 commands)',
-                    'designer' => 'Style editing - CSS, animations, visual elements, APIs (73 commands)',
-                    'developer' => 'Build and deploy access (80 commands)',
-                    'admin' => 'Full access except token/role management (98 commands)',
-                    '<custom>' => 'Any custom role name created via createRole'
-                ],
-                'example' => 'editor or designer or admin'
-            ],
-            'note' => [
-                'required' => false,
-                'type' => 'string',
-                'description' => 'Optional note about the token purpose',
-                'example' => 'For the design team'
+                'description' => 'Plain password, verified against the password_hash of the user',
+                'example' => '********'
             ]
         ],
-        'example_post' => 'POST /management/generateToken with body: {"name": "Design Team", "role": "designer", "note": "For external designers"}',
+        'example_post' => 'POST /management/login with body: {"email": "you@example.com", "password": "********"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => 'Token generated successfully',
+            'message' => 'Logged in',
             'data' => [
-                'token' => 'tvt_a1b2c3d4e5f6... (52 characters)',
-                'name' => 'Design Team',
-                'role' => 'designer',
-                'command_count' => 54,
-                'created' => '2026-01-03 10:30:00',
-                'warning' => 'Save this token securely - it cannot be retrieved later!'
+                'token_type' => 'Bearer',
+                'access_token' => 'qsa_a1b2c3... (52 characters, short-lived)',
+                'expires_in' => 900,
+                'refresh_token' => 'qsr_d4e5f6... (52 characters, rotate via refreshSession)',
+                'refresh_expires_in' => 2592000,
+                'user' => [
+                    'id' => 'usr_...',
+                    'name' => 'Your Name',
+                    'email' => 'you@example.com',
+                    'selected_project' => 'quicksite'
+                ]
             ]
         ],
         'error_responses' => [
-            '400.validation.required' => 'name and role parameters are required',
-            '400.validation.invalid_type' => 'name must be string',
-            '400.validation.invalid_length' => 'name must be between 1 and 100 characters',
-            '400.validation.invalid_role' => 'Role does not exist',
-            '403.auth.forbidden' => 'Insufficient permissions (requires * superadmin)',
-            '500.server.file_write_failed' => 'Failed to save new token'
+            '400.validation.required' => 'email and password are required',
+            '401.auth.invalid_credentials' => 'Invalid email or password (uniform for unknown email, wrong password, externally managed or disabled account - no account oracle)',
+            '429.auth.throttled' => 'Too many failed attempts - retry_after gives the wait in seconds',
+            '500.server.session_store_failed' => 'Could not create the session'
         ],
-        'notes' => 'Token format: tvt_ prefix + 48 hex characters. Store the token immediately as it cannot be retrieved again. Use listTokens to see masked previews of existing tokens. Use listRoles to see available roles.'
+        'notes' => 'Session TTLs are configured in auth.php (authentication.session: access_ttl / refresh_ttl / reuse_grace). When the access token expires, requests return 401 with code auth.token_expired - call refreshSession with the refresh token and retry. Users with password_hash null are externally managed and cannot log in here.'
     ],
-    
-    'listTokens' => [
-        'description' => 'Lists all API tokens with masked values. Requires admin permission.',
-        'method' => 'GET',
-        'parameters' => [],
-        'example_get' => 'GET /management/listTokens',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Tokens retrieved successfully',
-            'data' => [
-                'total_tokens' => 2,
-                'tokens' => [
-                    [
-                        'token_preview' => 'tvt_dev_...tion',
-                        'name' => 'Default Development Token',
-                        'permissions' => ['*'],
-                        'created' => '2025-12-11'
-                    ]
-                ],
-                'auth_enabled' => true,
-                'development_mode' => true
-            ]
-        ],
-        'error_responses' => [
-            '403.auth.forbidden' => 'Insufficient permissions (requires admin)'
-        ],
-        'notes' => 'Token values are masked (first 8 + last 4 characters visible). Use the token_preview value with revokeToken to delete tokens. Full token values are never exposed after creation.'
-    ],
-    
-    'revokeToken' => [
-        'description' => 'Revokes (permanently deletes) an API token. Requires admin permission.',
-        'method' => 'DELETE',
+
+    'refreshSession' => [
+        'description' => 'Exchanges a refresh token for a NEW access + refresh pair (rotation). Reusing an already-rotated refresh token after a short grace window is treated as theft and revokes the whole session family. PUBLIC + self-authenticating.',
+        'method' => 'POST',
         'parameters' => [
-            'token_preview' => [
+            'refresh_token' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'The token preview from listTokens (e.g., "tvt_dev_...tion") or the full token value',
-                'example' => 'tvt_abc1...xyz9'
+                'description' => 'The refresh token issued by login or by a previous refreshSession',
+                'example' => 'qsr_d4e5f6...'
             ]
         ],
-        'example_delete' => 'DELETE /management/revokeToken with body: {"token_preview": "tvt_abc1...xyz9"}',
+        'example_post' => 'POST /management/refreshSession with body: {"refresh_token": "qsr_d4e5f6..."}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => 'Token revoked successfully',
+            'message' => 'Session refreshed',
             'data' => [
-                'revoked_token' => 'tvt_abc1...xyz9',
-                'name' => 'Old Token Name',
-                'remaining_tokens' => 1
+                'token_type' => 'Bearer',
+                'access_token' => 'qsa_... (new)',
+                'expires_in' => 900,
+                'refresh_token' => 'qsr_... (new - the presented one is now rotated)',
+                'refresh_expires_in' => 2592000
             ]
         ],
         'error_responses' => [
-            '400.validation.required' => 'token_preview parameter is required',
-            '400.operation.denied' => 'Cannot revoke the last remaining token or currently used token',
-            '403.auth.forbidden' => 'Insufficient permissions (requires admin)',
-            '404.resource.not_found' => 'Token not found',
-            '500.server.file_write_failed' => 'Failed to save config after revoking'
+            '400.validation.required' => 'refresh_token parameter is required',
+            '401.auth.refresh_invalid' => 'Invalid or expired refresh token',
+            '401.auth.refresh_reuse_revoked' => 'Rotated-token reuse detected - the session family was revoked; log in again',
+            '401.auth.unauthorized' => 'User account is disabled (the family is revoked)',
+            '500.server.session_store_failed' => 'Could not rotate the session'
         ],
-        'notes' => 'Cannot revoke: 1) the last remaining token (create a new one first), 2) the token currently being used for this request. Use a different admin token to revoke another.'
+        'notes' => 'Always store BOTH returned tokens - the presented refresh token is retired on success. A re-presentation within the reuse_grace window (default 60s, e.g. two browser tabs racing) yields a sibling pair without punishment; after the window it revokes the family (theft signal).'
     ],
-    
+
+    'logoutSession' => [
+        'description' => 'Revokes the session family the given refresh token belongs to (its access + refresh tokens all die together). Idempotent. PUBLIC + self-authenticating.',
+        'method' => 'POST',
+        'parameters' => [
+            'refresh_token' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'The refresh token of the session to revoke',
+                'example' => 'qsr_d4e5f6...'
+            ]
+        ],
+        'example_post' => 'POST /management/logoutSession with body: {"refresh_token": "qsr_d4e5f6..."}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Session revoked',
+            'data' => [
+                'revoked' => true
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'refresh_token parameter is required'
+        ],
+        'notes' => 'Unknown or already-revoked tokens return 200 with revoked=false (idempotent, no token oracle). The admin panel logout revokes the same way in-process.'
+    ],
+
     'listComponents' => [
         'description' => 'Lists all reusable JSON components with metadata. Shows available slots (placeholders), typed variables, and component dependencies.',
         'method' => 'GET',
@@ -3758,7 +3745,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.role_exists' => 'A role with this name already exists',
             '403.auth.forbidden' => 'Requires superadmin (*) permission'
         ],
-        'notes' => 'Custom roles are stored in secure/config/roles.php. Commands must be valid existing commands. Use listRoles to see all available roles. Restricted commands (generateToken, revokeToken, listTokens, createRole, editRole, deleteRole) can only be assigned to custom roles by superadmin users with * permission.'
+        'notes' => 'Custom roles are stored in secure/config/roles.php. Commands must be valid existing commands. Use listRoles to see all available roles. The createRole/editRole/deleteRole commands are disabled (denied to every role) in the fixed-role model.'
     ],
     
     'editRole' => [
@@ -5737,7 +5724,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'export_import' => ['exportProject', 'importProject', 'downloadExport', 'clearExports'],
                 'storage_monitoring' => ['getSizeInfo'],
                 'command_history' => ['getCommandHistory', 'clearCommandHistory'],
-                'authentication' => ['generateToken', 'listTokens', 'revokeToken'],
+                'authentication' => ['login', 'refreshSession', 'logoutSession'],
                 'role_management' => ['listRoles', 'getMyPermissions', 'createRole', 'editRole', 'deleteRole'],
                 'snippet_management' => ['listSnippets', 'getSnippet', 'createSnippet', 'deleteSnippet', 'duplicateSnippet', 'insertSnippet'],
                 'system_updates' => ['checkForUpdates', 'applyUpdate'],
@@ -5746,33 +5733,34 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
             ],
             'authentication' => [
                 'required' => true,
-                'header' => 'Authorization: Bearer <your-token>',
-                'token_format' => 'tvt_<48 hex characters>',
-                'default_token' => 'tvt_dev_default_change_me_in_production (CHANGE IN PRODUCTION!)',
+                'login' => 'POST /management/login with {email, password} (users.php credentials) returns an access + refresh token pair',
+                'header' => 'Authorization: Bearer <access_token>',
+                'access_token_format' => 'qsa_<48 hex characters> (short-lived; on 401 auth.token_expired call refreshSession and retry)',
+                'refresh_token_format' => 'qsr_<48 hex characters> (rotates on every refreshSession - always keep the newest pair; reusing a rotated token revokes the whole session family)',
+                'public_commands' => ['help', 'login', 'refreshSession', 'logoutSession'],
                 'role_system' => [
-                    '*' => 'Superadmin - full access to all 111 commands including token/role management',
-                    'viewer' => 'Read-only access - get*, list*, validate*, analyze*, help, listJsFunctions, listInteractions, listApiEndpoints, listSnippets, getSnippet',
-                    'editor' => 'Content editing (72 commands) - viewer + structure, translations, assets, interactions, APIs, snippets',
-                    'designer' => 'Style editing (79 commands) - editor + CSS, animations, visual elements',
-                    'developer' => 'Build access (86 commands) - designer + build, deploy, projects, AI, listJsFunctions',
-                    'admin' => 'Full except tokens (105 commands) - developer + all except token/role management + JS functions'
+                    'note' => 'Roles are PER PROJECT (config/members.json), fixed set, no superadmin. Rank order: viewer < editor < designer < developer < admin < owner.',
+                    'viewer' => 'Read-only access to content, structure, styles',
+                    'editor' => 'Content editing - structure, translations, routes, assets, interactions',
+                    'designer' => 'Style editing - CSS, animations, visual elements',
+                    'developer' => 'Build and integration access - builds, APIs, storage, snippets',
+                    'admin' => 'Project administration - backups, export/import, policies',
+                    'owner' => 'Everything on the project, including membership (top of the project)'
                 ],
                 'endpoints' => [
-                    'listRoles' => 'View available roles (* sees commands, others see names only)',
-                    'getMyPermissions' => 'See your role and accessible commands',
-                    'createRole' => 'Create custom role (* only)',
-                    'editRole' => 'Edit role (* only, builtin description only)',
-                    'deleteRole' => 'Delete custom role (* only)'
+                    'listRoles' => 'View the fixed roles',
+                    'getMyPermissions' => 'See your role and accessible commands'
                 ],
-                'config_file' => 'secure/management/config/auth.php',
-                'roles_config' => 'secure/config/roles.php'
+                'config_file' => 'secure/management/config/auth.php (session TTLs, self-registration gate, CORS)',
+                'users_file' => 'secure/management/config/users.php (email + password_hash per user)',
+                'roles_config' => 'secure/management/config/roles.php'
             ],
             'cors' => [
                 'development_mode' => 'Allows localhost:* origins automatically',
                 'config_file' => 'secure/management/config/auth.php',
                 'allowed_methods' => ['GET', 'POST', 'OPTIONS']
             ],
-            'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getSiteMap, analyzeReachability, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listTokens, listComponents, getComponent, listPages, listAliases. POST commands: all others.',
+            'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getSiteMap, analyzeReachability, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listComponents, getComponent, listPages, listAliases. POST commands: all others.',
             'note' => 'For GET commands with URL parameters, use URL segments (e.g., /getStructure/menu, /validateTranslations/en, /getStyleRule/.btn-primary, /getSiteMap/text). For POST commands, send parameters as JSON in request body. For file uploads, use multipart/form-data encoding.',
             'workflows' => [
                 'translation_workflow' => '1) analyzeTranslations for full health check, OR 2) validateTranslations to find missing, 3) getUnusedTranslationKeys to find orphans, 4) setTranslationKeys to add/update, 5) deleteTranslationKeys to clean up.',
@@ -5780,7 +5768,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'style_workflow' => '1) getStyles to retrieve current CSS, 2) editStyles to update (response includes backup for rollback).',
                 'css_granular_workflow' => '1) getRootVariables to see all CSS variables, 2) setRootVariables to update colors/spacing/etc, 3) listStyleRules to see all selectors, 4) getStyleRule to inspect specific rules, 5) setStyleRule to add/update rules, 6) deleteStyleRule to remove rules.',
                 'animation_workflow' => '1) getKeyframes to list all animations, 2) setKeyframes to add/update animations, 3) deleteKeyframes to remove animations.',
-                'token_workflow' => '1) listTokens to see existing tokens, 2) generateToken to create new ones with role, 3) revokeToken to delete old tokens.',
+                'token_workflow' => '1) login with email+password to get an access + refresh pair, 2) send the access token as Authorization: Bearer, 3) on 401 auth.token_expired call refreshSession with the refresh token (it rotates - keep the new pair), 4) logoutSession to end the session.',
                 'role_workflow' => '1) listRoles to see available roles and commands, 2) getMyPermissions to check current access, 3) createRole to add custom roles, 4) editRole to modify roles, 5) deleteRole to remove custom roles.',
                 'alias_workflow' => '1) listAliases to see existing redirects, 2) createAlias to add URL redirects, 3) deleteAlias to remove redirects.',
                 'component_workflow' => '1) listComponents to see available reusable components, 2) getComponent?name=... to view full details with preview, 3) editStructure with type="component" to create/update/delete.',

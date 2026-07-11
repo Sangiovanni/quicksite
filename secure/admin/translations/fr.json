@@ -46,18 +46,24 @@
     },
     "login": {
         "title": "Connexion Admin",
-        "subtitle": "Entrez votre jeton API pour accéder au panneau d'administration",
-        "tokenLabel": "Jeton API",
-        "tokenPlaceholder": "tvt_xxxxxxxxxxxxxxxx...",
-        "rememberToken": "Se souvenir du jeton sur cet appareil",
-        "rememberHint": "Votre jeton sera stocké en toute sécurité dans votre navigateur",
-        "submit": "Connexion",
-        "invalidToken": "Jeton invalide ou expiré",
+        "subtitle": "Connectez-vous avec votre email et votre mot de passe",
+        "emailLabel": "Email",
+        "emailPlaceholder": "vous@exemple.com",
+        "passwordLabel": "Mot de passe",
+        "rememberSession": "Rester connecté sur cet appareil",
+        "rememberHint": "Votre session reste active sur cet appareil (cookie sécurisé) ; rien n'est stocké dans les scripts du navigateur.",
+        "submit": "Se connecter",
+        "invalidCredentials": "Email ou mot de passe invalide",
+        "missingFields": "Le formulaire est arrivé sans email ou mot de passe — rechargez la page (Ctrl+F5) et réessayez",
+        "throttled": "Trop de tentatives échouées — réessayez dans :seconds secondes",
+        "serverError": "Impossible de créer la session — réessayez",
+        "showPassword": "Afficher le mot de passe",
+        "hidePassword": "Masquer le mot de passe",
         "connectionError": "Impossible de se connecter à l'API",
-        "privacyNote": "En cochant 'Se souvenir du jeton', vous consentez au stockage local des données d'authentification.",
+        "privacyNote": "En cochant 'Rester connecté', vous consentez à un cookie d'authentification persistant sur cet appareil.",
         "help": {
-            "title": "Besoin d'un jeton ?",
-            "text": "Utilisez la commande generateToken via l'API, ou consultez votre fichier auth.php pour le jeton par défaut."
+            "title": "Pas de compte ?",
+            "text": "Les comptes sont créés par un administrateur (ou par la plateforme qui héberge ce site). Mot de passe perdu ? Demandez à votre administrateur de le réinitialiser."
         }
     },
     "logout": {

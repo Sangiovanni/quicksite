@@ -32,9 +32,9 @@ public/admin/assets/js/lib/css-refiner/      → CSS analysis library
 
 `layout.php` emits `<script>` tags in this exact order:
 
-1. Inline `<script>` defines `window.QUICKSITE_CONFIG` (apiBase, adminBase, baseUrl, publicSpace, defaultLang, multilingual, translations, token, …).
+1. Inline `<script>` defines `window.QUICKSITE_CONFIG` (apiBase, adminBase, baseUrl, publicSpace, defaultLang, multilingual, translations, token, tokenExpiresIn, …). The `token` is the **short-lived access token** of the panel's session (the rotating refresh token stays server-side in the PHP session) and MUST be in this first block — `api.js` seeds from it and `admin.js` loads permissions at parse time.
 2. `core/storage-keys.js` → defines `window.QuickSiteStorageKeys` (single source of truth for localStorage / sessionStorage key strings).
-3. `core/api.js` → defines `window.QuickSiteAPI` (`request()`, `upload()`; emits `quicksite:command-executed` after every successful write).
+3. `core/api.js` → defines `window.QuickSiteAPI` (`request()`, `upload()`; emits `quicksite:command-executed` after every successful write). Holds the access token in memory, refreshes it through `POST /admin/session-refresh` (single-flight, plus a keepalive at ~80% of the token's lifetime), transparently retries a request once on `401 auth.token_expired`, and exposes `setTokenSource(fn)` so an embedding platform can plug its own token provider.
 4. `core/utils.js` → defines `window.QuickSiteUtils` (toasts, confirms, escaping, prefs, pending messages).
 5. `admin.js` → defines `window.QuickSiteAdmin` (singleton: permissions load, user badge, nav, page utility delegation).
 6. The page template loads its page-specific module(s). For preview pages, `preview-config.php` runs first and exposes `window.PreviewConfig`.
@@ -85,7 +85,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 
 | File | Purpose |
 |---|---|
-| `js/core/api.js` | `QuickSiteAPI.request` + `upload`; token storage; emits `quicksite:command-executed`. |
+| `js/core/api.js` | `QuickSiteAPI.request` + `upload`; in-memory access token + session refresh (`/admin/session-refresh`, keepalive, retry-once on expiry, `setTokenSource` seam); emits `quicksite:command-executed`. |
 | `js/core/utils.js` | `QuickSiteUtils`: toasts, confirms, escaping, prefs storage, pending messages. |
 | `js/core/storage-keys.js` | Constants for every localStorage / sessionStorage key (`window.QuickSiteStorageKeys`). |
 | `admin.js` | Singleton `QuickSiteAdmin`: permissions, user badge, nav, delegation. |
@@ -176,10 +176,10 @@ Public API: `QSEasingPicker.open({ anchor, value, onConfirm, onCancel })` → on
 
 Every localStorage / sessionStorage key is declared as a constant in `js/core/storage-keys.js`.
 
+Authentication uses **no browser storage**: the short-lived access token is page-embedded + held in memory (`api.js`), and the refresh token stays server-side in the PHP session. (`api.js` still clears the retired pre-session `quicksite_admin_token` / `quicksite_admin_remember` keys on logout as one-time upgrade hygiene.)
+
 | Constant | Storage | Used by |
 |---|---|---|
-| `TOKEN` | localStorage + sessionStorage | `api.js`, `admin.js` |
-| `REMEMBER` | localStorage | `api.js` |
 | `PREFS` | localStorage | `utils.js`, `admin.js`, `settings.js`, `preview-sidebar-resize.js` |
 | `PENDING_MESSAGE` | sessionStorage | `utils.js`, `admin.js` |
 | `API_AUTH_TOKENS` | localStorage | `apis.js` |
@@ -197,7 +197,7 @@ Every localStorage / sessionStorage key is declared as a constant in `js/core/st
 
 | PHP file | Injects into | Notable fields |
 |---|---|---|
-| `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `currentProject`, `globalCommands`, `defaultLang`, `multilingual`, `translations`, `token`, `apiUrl` |
+| `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `currentProject`, `globalCommands`, `defaultLang`, `multilingual`, `translations`, `token` (short-lived access token), `tokenExpiresIn`, `apiUrl` |
 | `templates/pages/settings.php` | extends `QUICKSITE_CONFIG` | `commandUrl`, `aiSettingsUrl`, `quicksiteVersion` |
 | `templates/pages/apis.php` | inline `window.translations` | `apis` namespace |
 | `templates/pages/preview-config.php` | `window.PreviewConfig` | full preview runtime data — routes, components, settings, i18n, token (200+ fields) |

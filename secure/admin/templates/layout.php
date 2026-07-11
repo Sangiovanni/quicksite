@@ -399,32 +399,29 @@ $langNames = [
     
     <?php
     // ================================================================
-    // Security warning: detect default/insecure tokens in auth config
-    // Shows as long as ANY default token exists, not just the current one
+    // Security warning: detect the shipped default/placeholder ACCOUNT
+    // (C5b — credentials are users.php email+password now; the example
+    // registry ships a 'usr_CHANGE_ME…' user with a documented default
+    // password). Shows as long as any such account exists.
     // ================================================================
-    $hasDefaultToken = false;
-    $usingDefaultToken = false;
+    $hasDefaultAccount = false;
+    $usingDefaultAccount = false;
     if (!$isLoginPage) {
-        $currentToken = $router->getToken();
-        $authConfigPath = SECURE_FOLDER_PATH . '/management/config/auth.php';
-        if (file_exists($authConfigPath)) {
-            $authConfig = include $authConfigPath;
-            $allTokens = $authConfig['authentication']['tokens'] ?? [];
-            foreach ($allTokens as $tokenValue => $tokenInfo) {
-                // Detect any shipped default/placeholder token key (case-insensitive
-                // 'CHANGE_ME' also catches the legacy 'default_change_me…' form). C6:
-                // no hardcoded superadmin-token key.
-                if (is_string($tokenValue) && stripos($tokenValue, 'CHANGE_ME') !== false) {
-                    $hasDefaultToken = true;
-                    if ($tokenValue === $currentToken) {
-                        $usingDefaultToken = true;
-                    }
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+        $__warnTok = $router->getToken();
+        $__warnAuth = $__warnTok ? validateBearerToken('Bearer ' . $__warnTok) : ['valid' => false];
+        $__warnUserId = !empty($__warnAuth['valid']) ? ($__warnAuth['userId'] ?? null) : null;
+        foreach (loadUsersConfig()['users'] ?? [] as $__uid => $__u) {
+            if (is_string($__uid) && stripos($__uid, 'CHANGE_ME') !== false) {
+                $hasDefaultAccount = true;
+                if ($__uid === $__warnUserId) {
+                    $usingDefaultAccount = true;
                 }
             }
         }
     }
     ?>
-    <?php if (!$isLoginPage && $hasDefaultToken): ?>
+    <?php if (!$isLoginPage && $hasDefaultAccount): ?>
     <div class="admin-security-warning" id="security-warning">
         <div class="admin-security-warning__content">
             <svg class="admin-security-warning__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -433,14 +430,14 @@ $langNames = [
                 <line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
             <span>
-                <?php if ($usingDefaultToken): ?>
-                <strong>Security:</strong> You are using a default API token.
-                <a href="<?= $router->url('command', 'generateToken') ?>" class="admin-security-warning__link">Generate a secure token</a>,
-                then log out and log back in with it so you can
-                <a href="<?= $router->url('command', 'revokeToken') ?>" class="admin-security-warning__link">revoke the default one</a>.
+                <?php if ($usingDefaultAccount): ?>
+                <strong>Security:</strong> You are signed in as the shipped default account
+                (its password is public). Edit <code>secure/management/config/users.php</code>:
+                set a fresh <code>password_hash</code> (<code>php -r "echo password_hash('new-password', PASSWORD_DEFAULT);"</code>)
+                and replace the <code>usr_CHANGE_ME…</code> id before deploying.
                 <?php else: ?>
-                <strong>Security:</strong> A default API token still exists in your configuration.
-                <a href="<?= $router->url('command', 'revokeToken') ?>" class="admin-security-warning__link">Revoke it</a>
+                <strong>Security:</strong> The shipped default account (<code>usr_CHANGE_ME…</code>)
+                still exists in <code>users.php</code>. Remove it or change its password
                 before deploying to production.
                 <?php endif; ?>
             </span>
@@ -481,6 +478,12 @@ $langNames = [
             adminBase: '<?= $router->getBaseUrl() ?>',
             baseUrl: '<?= rtrim(BASE_URL, '/') ?>',
             publicSpace: '<?= defined('PUBLIC_FOLDER_SPACE') ? PUBLIC_FOLDER_SPACE : '' ?>',
+            // C5b — the SHORT-LIVED access token + its remaining lifetime MUST be
+            // in the config from creation: api.js seeds its in-memory token and
+            // admin.js fires loadPermissions() at parse time, both BEFORE any
+            // later script block runs (the refresh token never reaches the page).
+            token: '<?= adminEscape((string)$router->getToken()) ?>',
+            tokenExpiresIn: <?= (int)$router->getTokenExpiresIn() ?>,
             // C8 (8.W) — project transport. currentProject = the SERVED project
             // (target.php), the same one preview + the dashboard use; globalCommands =
             // the categories.php scope==='global' set. The client prepends the
@@ -579,7 +582,6 @@ $langNames = [
     
     <?php if (!$isLoginPage): ?>
     <script>
-        window.QUICKSITE_CONFIG.token = '<?= adminEscape($router->getToken()) ?>';
         window.QUICKSITE_CONFIG.apiUrl = '<?= $router->getApiUrl() ?>';
     </script>
 

@@ -12,7 +12,11 @@
     // Get config from PHP
     const config = window.QUICKSITE_CONFIG || {};
     const apiBaseUrl = config.apiBaseUrl || '';
-    const token = config.token || '';
+    // C5b: the access token is short-lived and renewed in place — read it at
+    // call time (never capture it in a const; a long-open editor would go stale).
+    function getAuthToken() {
+        return (window.QuickSiteAPI && window.QuickSiteAPI.getToken()) || config.token || '';
+    }
     const isNew = config.isNew || false;
     const originalSpecId = config.originalSpecId || '';
     const translations = config.translations || {};
@@ -174,7 +178,7 @@
             const response = await fetch(`${apiBaseUrl}/api/ai-spec-preview`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${getAuthToken()}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
@@ -228,7 +232,7 @@
             const response = await fetch(`${apiBaseUrl}/api/ai-spec-save`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${getAuthToken()}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({

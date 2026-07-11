@@ -13,10 +13,21 @@
 // Get auth token for API calls
 $token = $router->getToken();
 
-// Get multilingual config
-$isMultilingual = CONFIG['MULTILINGUAL_SUPPORT'] ?? false;
-$defaultLang = CONFIG['LANGUAGE_DEFAULT'] ?? 'en';
-$languages = $isMultilingual ? (CONFIG['LANGUAGES_SUPPORTED'] ?? [$defaultLang]) : [$defaultLang];
+// C9/C5b — the editor edits getCurrentProject() (the per-user selected_project),
+// which can DIFFER from the served project that init.php bound the global
+// PROJECT_PATH / CONFIG constants to. Every server-side read on this page (and
+// in the partials + preview-config.php it includes) must come from the EDITED
+// project's own path + config, or the sidebar/toolbar shows the wrong
+// project's routes, components, languages and theme flags.
+$editProject     = $router->getCurrentProject() ?: (defined('PROJECT_NAME') ? PROJECT_NAME : '');
+$editProjectPath = SECURE_FOLDER_PATH . '/projects/' . $editProject;
+$editConfigFile  = $editProjectPath . '/config.php';
+$editConfig      = is_file($editConfigFile) ? (require $editConfigFile) : (defined('CONFIG') ? CONFIG : []);
+
+// Get multilingual config (of the EDITED project)
+$isMultilingual = $editConfig['MULTILINGUAL_SUPPORT'] ?? false;
+$defaultLang = $editConfig['LANGUAGE_DEFAULT'] ?? 'en';
+$languages = $isMultilingual ? ($editConfig['LANGUAGES_SUPPORTED'] ?? [$defaultLang]) : [$defaultLang];
 
 // Get site URL for iframe (start with default language) + ?_editor=1 for editor mode.
 // C9 — the project you EDIT is getCurrentProject() (per-user selected_project). If it is
@@ -40,9 +51,9 @@ if ($isMultilingual) {
 // desync the iframe DOM from the editor's marker and mis-target edits). C9.
 $siteUrl .= '?_editor=1&_t=' . time();
 
-// Get available routes for navigation
+// Get available routes for navigation (from the EDITED project)
 $routes = [];
-$routesFile = PROJECT_PATH . '/routes.php';
+$routesFile = $editProjectPath . '/routes.php';
 if (file_exists($routesFile)) {
     $routesData = require $routesFile;
     // Flatten routes
@@ -64,16 +75,16 @@ if (file_exists($routesFile)) {
 // Add special pages that exist as structure files but are not in routes (e.g. 404)
 $specialPages = ['404'];
 foreach ($specialPages as $sp) {
-    $spFolder = PROJECT_PATH . '/templates/model/json/pages/' . $sp . '/' . $sp . '.json';
-    $spFlat = PROJECT_PATH . '/templates/model/json/pages/' . $sp . '.json';
+    $spFolder = $editProjectPath . '/templates/model/json/pages/' . $sp . '/' . $sp . '.json';
+    $spFlat = $editProjectPath . '/templates/model/json/pages/' . $sp . '.json';
     if (file_exists($spFolder) || file_exists($spFlat)) {
         $routes[] = $sp;
     }
 }
 
-// Get available components
+// Get available components (from the EDITED project)
 $components = [];
-$componentsDir = PROJECT_PATH . '/templates/model/json/components';
+$componentsDir = $editProjectPath . '/templates/model/json/components';
 if (is_dir($componentsDir)) {
     foreach (glob($componentsDir . '/*.json') as $file) {
         $components[] = basename($file, '.json');

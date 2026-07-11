@@ -159,18 +159,32 @@ $route = $trimParameters->route();         // e.g., ['guides', 'installation']
 $routePath = $trimParameters->routePath(); // e.g., 'guides/installation'
 $routeFound = $trimParameters->routeFound();
 
-// Handle 404
+// Handle 404 — also the landing spot for a surface-B DENY (C9/C5b): a refused
+// /p/<id>/ request boots the MAIN site with QS_SB_DENY_STATUS (401|403) and a
+// never-matching route, so the visitor gets THIS project's styled error page
+// with the real status. A dedicated 401/403 special page wins when the author
+// created one (SPECIAL_PAGES reserves them); the 404 page is the fallback.
 if (!$routeFound || $routePath === '404') {
-    http_response_code(404);
-    $templateFile = PROJECT_PATH . '/templates/pages/404/404.php';
-    if (!file_exists($templateFile)) {
-        // Fallback to flat structure during migration
-        $templateFile = PROJECT_PATH . '/templates/pages/404.php';
+    $errorStatus = defined('QS_SB_DENY_STATUS') ? (int) QS_SB_DENY_STATUS : 404;
+    http_response_code($errorStatus);
+    $candidates = [];
+    if ($errorStatus !== 404) {
+        $candidates[] = PROJECT_PATH . "/templates/pages/{$errorStatus}/{$errorStatus}.php";
+        $candidates[] = PROJECT_PATH . "/templates/pages/{$errorStatus}.php";
     }
-    if (file_exists($templateFile)) {
+    $candidates[] = PROJECT_PATH . '/templates/pages/404/404.php';
+    $candidates[] = PROJECT_PATH . '/templates/pages/404.php'; // flat fallback (migration)
+    $templateFile = null;
+    foreach ($candidates as $candidate) {
+        if (file_exists($candidate)) {
+            $templateFile = $candidate;
+            break;
+        }
+    }
+    if ($templateFile !== null) {
         require_once $templateFile;
     } else {
-        echo '<h1>404 - Page Not Found</h1>';
+        echo '<h1>' . $errorStatus . ' - ' . ($errorStatus === 404 ? 'Page Not Found' : 'Access Denied') . '</h1>';
     }
     exit;
 }

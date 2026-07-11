@@ -118,7 +118,10 @@ if ($origin) {
 // ============================================================================
 // Public Routes (no authentication required)
 // ============================================================================
-$PUBLIC_COMMANDS = ['help'];
+// C5b: the session endpoints are public because they are SELF-authenticating —
+// login checks email+password, refreshSession/logoutSession check the refresh
+// token itself. They never act on behalf of a bearer header.
+$PUBLIC_COMMANDS = ['help', 'login', 'refreshSession', 'logoutSession'];
 
 // Parse the command early to check if it's public
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';
@@ -162,9 +165,12 @@ if (!$authHeader && function_exists('apache_request_headers')) {
 $authResult = validateBearerToken($authHeader);
 
 if (!$authResult['valid']) {
+    // C5b: 'auth.token_expired' tells the client to refresh + retry; any other
+    // code means re-authenticate (login).
     sendUnauthorizedResponse(
         $authResult['error'],
-        'Include header: Authorization: Bearer <your-token>'
+        'Include header: Authorization: Bearer <your-token>',
+        $authResult['code'] ?? 'auth.unauthorized'
     );
 }
 

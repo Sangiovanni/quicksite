@@ -203,6 +203,16 @@ return [
         'commands' => ['help'],
     ],
 
+    // Session lifecycle (C5b). Served pre-auth (index.php PUBLIC_COMMANDS) —
+    // each command is SELF-authenticating (email+password / the refresh token
+    // itself), so hasPermission never actually gates them; mapped here so the
+    // command↔category coverage stays 1:1.
+    'auth.session' => [
+        'scope' => 'global',
+        'access' => 'any',
+        'commands' => ['login', 'refreshSession', 'logoutSession'],
+    ],
+
     // Self / role catalog reads.
     'roles.read' => [
         'scope' => 'global',
@@ -241,18 +251,15 @@ return [
         'commands' => ['checkForUpdates'],
     ],
 
-    // INTERIM owner-only home for the god/operator commands pending relocation.
-    //   token trio → REMOVED in C8 (login-page signup replaces them). NOTE:
-    //     generateToken is already broken on the C5 token shape (writes a legacy
-    //     {name,role} token with no userId → fails closed / unusable) — kept
-    //     owner-gated per the C6 task; C8 deletes it.
+    // INTERIM owner-only home for the operator commands pending relocation:
     //   applyUpdate + switchProject (set served project) → operator/deploy in beta.11
     //   (AUTH_REWORK §2.3 GAP A). Until then, only a project owner may run these.
+    //   (The generateToken/listTokens/revokeToken trio was REMOVED in C5b —
+    //   sessions via login/refreshSession replace lifetime tokens.)
     'system.admin' => [
         'scope' => 'global',
         'access' => 'owner',
         'commands' => [
-            'generateToken', 'listTokens', 'revokeToken',
             'applyUpdate', 'switchProject',
         ],
     ],

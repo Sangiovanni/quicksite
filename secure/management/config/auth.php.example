@@ -4,26 +4,29 @@
  *
  * Copy this file to auth.php and customize.
  *
- * The token is the credential (it "logs you in"); it resolves to a USER in
- * users.php (copy users.php.example alongside this). Per-project roles live in
- * each project's config/members.json — NOT here.
- *
- * IMPORTANT: Replace the default token before deploying to production!
- * Generate a secure token with: php -r "echo 'tvt_' . bin2hex(random_bytes(24));"
- * and point its userId at a real entry in users.php.
+ * C5b: credentials are EMAIL + PASSWORD — see users.php(.example)
+ * `password_hash`. Runtime sessions (short-lived access token + rotating
+ * refresh token) live in sessions.json next to this file (machine-written,
+ * auto-created — never edit or commit it). This file holds the session TTL
+ * knobs, the self-registration gate, and CORS.
  */
 
 return [
     'authentication' => [
-        'enabled' => true,
-        'tokens' => [
-            // Default token — change this before deploying! Resolves to the
-            // 'usr_CHANGE_ME_default' user in users.php.example. The admin panel's
-            // default-token security warning detects any key containing 'CHANGE_ME'.
-            'CHANGE_ME_default_token' => [
-                'userId' => 'usr_CHANGE_ME_default',
-                'created' => '2026-01-01',
-            ],
+        // Session lifecycle knobs (seconds).
+        'session' => [
+            'access_ttl'  => 900,       // access-token lifetime (15 min)
+            'refresh_ttl' => 2592000,   // refresh-token lifetime, sliding (30 days)
+            'reuse_grace' => 60,        // window in which a rotated refresh token's
+                                        // reuse is treated as a legit race (two tabs),
+                                        // not theft
+        ],
+        // Self-registration gate. false (secure default) = nobody can register
+        // from the login page; accounts are created by an administrator or by
+        // an embedding platform through the management API. The register
+        // page + command that consume this flag ship with C8.
+        'registration' => [
+            'allow_self_registration' => false,
         ],
     ],
     'cors' => [

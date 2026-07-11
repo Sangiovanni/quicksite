@@ -334,46 +334,24 @@ const QuickSiteAdmin = {
     },
 
     /**
-     * Get stored token - delegates to QuickSiteAPI
+     * Get the current access token - delegates to QuickSiteAPI (C5b: tokens
+     * never live in browser storage; the page-embedded config is the fallback)
      */
     getToken() {
         if (window.QuickSiteAPI) {
             return window.QuickSiteAPI.getToken();
         }
-        // Fallback for when core module isn't loaded
-        return localStorage.getItem(this.config.tokenStorageKey) || 
-               sessionStorage.getItem(this.config.tokenStorageKey);
+        return (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.token) || null;
     },
 
     /**
-     * Store token - delegates to QuickSiteAPI
-     */
-    setToken(token, remember = false) {
-        if (window.QuickSiteAPI) {
-            return window.QuickSiteAPI.setToken(token, remember);
-        }
-        // Fallback
-        if (remember) {
-            localStorage.setItem(this.config.tokenStorageKey, token);
-            localStorage.setItem(this.config.rememberStorageKey, 'true');
-        } else {
-            sessionStorage.setItem(this.config.tokenStorageKey, token);
-            localStorage.removeItem(this.config.tokenStorageKey);
-            localStorage.removeItem(this.config.rememberStorageKey);
-        }
-    },
-
-    /**
-     * Clear stored token - delegates to QuickSiteAPI
+     * Clear the access token - delegates to QuickSiteAPI
      */
     clearToken() {
         if (window.QuickSiteAPI) {
             return window.QuickSiteAPI.clearToken();
         }
-        // Fallback
-        localStorage.removeItem(this.config.tokenStorageKey);
-        sessionStorage.removeItem(this.config.tokenStorageKey);
-        localStorage.removeItem(this.config.rememberStorageKey);
+        if (window.QUICKSITE_CONFIG) window.QUICKSITE_CONFIG.token = '';
     },
 
     /**
@@ -515,63 +493,13 @@ const QuickSiteAdmin = {
      * Initialize form handling
      */
     initForms() {
-        // Login form
-        const loginForm = document.getElementById('admin-login-form');
-        if (loginForm) {
-            loginForm.addEventListener('submit', (e) => this.handleLogin(e));
-        }
+        // Login form: plain server-side POST (C5b email+password — the router
+        // verifies credentials and holds the session; no JS pre-validation).
 
         // Command execution forms
         document.querySelectorAll('.admin-command-form').forEach(form => {
             form.addEventListener('submit', (e) => this.handleCommandSubmit(e));
         });
-    },
-
-    /**
-     * Handle login form submission
-     */
-    async handleLogin(e) {
-        e.preventDefault();
-        
-        const form = e.target;
-        const token = form.querySelector('[name="token"]').value.trim();
-        const remember = form.querySelector('[name="remember"]')?.checked || false;
-        const submitBtn = form.querySelector('[type="submit"]');
-        const errorDiv = form.querySelector('.admin-alert--error');
-        
-        // Validate token format
-        if (!token) {
-            this.showFormError(errorDiv, 'Please enter your API token');
-            return;
-        }
-
-        // Disable button and show loading
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="admin-spinner"></span> Verifying...';
-        
-        // Hide previous error
-        if (errorDiv) errorDiv.style.display = 'none';
-
-        try {
-            // Test the token by making a simple API call (help command is always available)
-            this.setToken(token, remember);
-            const result = await this.apiRequest('help');
-            
-            if (result.ok) {
-                // Token is valid, submit the form to set server-side session
-                form.submit();
-            } else {
-                this.clearToken();
-                this.showFormError(errorDiv, result.data?.message || 'Invalid token');
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = 'Login';
-            }
-        } catch (error) {
-            this.clearToken();
-            this.showFormError(errorDiv, 'Could not connect to API');
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = 'Login';
-        }
     },
 
     /**

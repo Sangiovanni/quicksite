@@ -59,22 +59,22 @@
                         <div class="preview-theme-config-row">
                             <span class="preview-theme-config-label"><?= __admin('preview.themeModeEnabled') ?? 'Dark mode support' ?></span>
                             <label class="preview-toggle">
-                                <input type="checkbox" id="theme-config-enabled" <?= (CONFIG['THEME_MODE_ENABLED'] ?? false) ? 'checked' : '' ?>>
+                                <input type="checkbox" id="theme-config-enabled" <?= ($editConfig['THEME_MODE_ENABLED'] ?? false) ? 'checked' : '' ?>>
                                 <span class="preview-toggle__track"></span>
                             </label>
                         </div>
                         <div class="preview-theme-config-row">
                             <span class="preview-theme-config-label"><?= __admin('preview.themeDefault') ?? 'Default mode' ?></span>
                             <select id="theme-config-default" class="preview-toolbar__select preview-toolbar__select--sm">
-                                <option value="light" <?= (CONFIG['THEME_DEFAULT'] ?? 'light') === 'light' ? 'selected' : '' ?>>☀ <?= __admin('preview.light') ?? 'Light' ?></option>
-                                <option value="dark"  <?= (CONFIG['THEME_DEFAULT'] ?? 'light') === 'dark'  ? 'selected' : '' ?>>🌙 <?= __admin('preview.dark') ?? 'Dark' ?></option>
-                                <option value="system"<?= (CONFIG['THEME_DEFAULT'] ?? 'light') === 'system'? 'selected' : '' ?>>⚙ <?= __admin('preview.system') ?? 'System' ?></option>
+                                <option value="light" <?= ($editConfig['THEME_DEFAULT'] ?? 'light') === 'light' ? 'selected' : '' ?>>☀ <?= __admin('preview.light') ?? 'Light' ?></option>
+                                <option value="dark"  <?= ($editConfig['THEME_DEFAULT'] ?? 'light') === 'dark'  ? 'selected' : '' ?>>🌙 <?= __admin('preview.dark') ?? 'Dark' ?></option>
+                                <option value="system"<?= ($editConfig['THEME_DEFAULT'] ?? 'light') === 'system'? 'selected' : '' ?>>⚙ <?= __admin('preview.system') ?? 'System' ?></option>
                             </select>
                         </div>
                         <div class="preview-theme-config-row">
                             <span class="preview-theme-config-label"><?= __admin('preview.themeUserToggle') ?? 'Visitor can switch' ?></span>
                             <label class="preview-toggle">
-                                <input type="checkbox" id="theme-config-usertoggle" <?= (CONFIG['THEME_USER_TOGGLE_ENABLED'] ?? false) ? 'checked' : '' ?>>
+                                <input type="checkbox" id="theme-config-usertoggle" <?= ($editConfig['THEME_USER_TOGGLE_ENABLED'] ?? false) ? 'checked' : '' ?>>
                                 <span class="preview-toggle__track"></span>
                             </label>
                         </div>
@@ -85,7 +85,7 @@
                 </div>
 
                 <!-- Light / Dark scope switcher (always rendered; visibility managed by JS/config) -->
-                <div class="preview-theme-scope" id="theme-scope-switcher" style="display: <?= (CONFIG['THEME_MODE_ENABLED'] ?? false) ? '' : 'none' ?>;">
+                <div class="preview-theme-scope" id="theme-scope-switcher" style="display: <?= ($editConfig['THEME_MODE_ENABLED'] ?? false) ? '' : 'none' ?>;">
                     <button type="button" class="preview-theme-scope__btn preview-theme-scope__btn--active" data-scope="light">
                         <span aria-hidden="true">☀</span> <?= __admin('preview.light') ?? 'Light' ?>
                     </button>
@@ -113,7 +113,7 @@
                         </button>
                         <div class="preview-theme-add__form" data-form hidden>
                             <div class="preview-theme-add__scope-banner" data-scope-banner></div>
-                            <label class="preview-theme-add__also-other" data-also-other-row<?= (CONFIG['THEME_MODE_ENABLED'] ?? false) ? '' : ' hidden' ?>>
+                            <label class="preview-theme-add__also-other" data-also-other-row<?= ($editConfig['THEME_MODE_ENABLED'] ?? false) ? '' : ' hidden' ?>>
                                 <input type="checkbox" data-also-other>
                                 <span><?= __admin('preview.themeAddVariableAlsoOtherScope', 'Also add to the other scope') ?></span>
                             </label>
@@ -162,7 +162,7 @@
                         </button>
                         <div class="preview-theme-add__form" data-form hidden>
                             <div class="preview-theme-add__scope-banner" data-scope-banner></div>
-                            <label class="preview-theme-add__also-other" data-also-other-row<?= (CONFIG['THEME_MODE_ENABLED'] ?? false) ? '' : ' hidden' ?>>
+                            <label class="preview-theme-add__also-other" data-also-other-row<?= ($editConfig['THEME_MODE_ENABLED'] ?? false) ? '' : ' hidden' ?>>
                                 <input type="checkbox" data-also-other>
                                 <span><?= __admin('preview.themeAddVariableAlsoOtherScope', 'Also add to the other scope') ?></span>
                             </label>
@@ -211,7 +211,7 @@
                         </button>
                         <div class="preview-theme-add__form" data-form hidden>
                             <div class="preview-theme-add__scope-banner" data-scope-banner></div>
-                            <label class="preview-theme-add__also-other" data-also-other-row<?= (CONFIG['THEME_MODE_ENABLED'] ?? false) ? '' : ' hidden' ?>>
+                            <label class="preview-theme-add__also-other" data-also-other-row<?= ($editConfig['THEME_MODE_ENABLED'] ?? false) ? '' : ' hidden' ?>>
                                 <input type="checkbox" data-also-other>
                                 <span><?= __admin('preview.themeAddVariableAlsoOtherScope', 'Also add to the other scope') ?></span>
                             </label>

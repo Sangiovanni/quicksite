@@ -11,9 +11,11 @@
  * @version 1.0.0
  */
 window.QuickSiteStorageKeys = Object.freeze({
-    // Auth / session
-    adminToken:          'quicksite_admin_token',
-    adminRemember:       'quicksite_admin_remember',
+    // Auth / session — C5b: tokens no longer touch browser storage (the access
+    // token is in-memory + page-embedded; the refresh token stays server-side
+    // in the PHP session). The old 'quicksite_admin_token' /
+    // 'quicksite_admin_remember' keys survive only as literals inside
+    // api.js clearToken() for one-time legacy cleanup.
     adminPrefs:          'quicksite_admin_prefs',
     pendingMessage:      'quicksite_pending_message',
 

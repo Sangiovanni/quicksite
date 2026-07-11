@@ -10,8 +10,14 @@
 // editor knows which routes have a resolver (and what variables they
 // expose) when building the emulation panel. Small payload — only
 // routes WITH a resolver are present.
+// C9/C5b — read from the EDITED project ($editProjectPath, computed by
+// preview.php which includes this file), not the served one PROJECT_PATH
+// is bound to. Defensive fallbacks in case of a different inclusion context.
 require_once SECURE_FOLDER_PATH . '/src/functions/resolverHelpers.php';
-$__previewRouteResolvers = loadResolversSidecar();
+$__previewRouteResolvers = loadResolversSidecar($editProjectPath ?? null);
+if (!isset($editConfig)) {
+    $editConfig = defined('CONFIG') ? CONFIG : [];
+}
 
 // AI tools mode workflow metadata. Loaded server-side (mirrors
 // /admin/workflows pattern) with the same role-based filter applied.
@@ -24,15 +30,12 @@ try {
     $__aiToolsAllowed = null;
     $__aiToolsToken = $router->getToken();
     if ($__aiToolsToken) {
-        $__aiToolsAuthCfg = loadAuthConfig();
-        $__aiToolsTokens = $__aiToolsAuthCfg['authentication']['tokens'] ?? [];
-        if (isset($__aiToolsTokens[$__aiToolsToken])) {
-            // Resolve the token to a user, then its effective commands (C5)
-            $__aiToolsResolved = validateBearerToken('Bearer ' . $__aiToolsToken);
-            if ($__aiToolsResolved['valid']) {
-                $__aiToolsPerms = getTokenPermissions($__aiToolsResolved['user']);
-                $__aiToolsAllowed = $__aiToolsPerms['commands'] ?? null;
-            }
+        // Resolve the session access token to a user, then its effective
+        // commands (C5/C5b — validateBearerToken checks the session store).
+        $__aiToolsResolved = validateBearerToken('Bearer ' . $__aiToolsToken);
+        if ($__aiToolsResolved['valid']) {
+            $__aiToolsPerms = getTokenPermissions($__aiToolsResolved['user']);
+            $__aiToolsAllowed = $__aiToolsPerms['commands'] ?? null;
         }
     }
     $__aiToolsCategoryOrder = ['creation', 'template', 'modification', 'content', 'style', 'advanced', 'wip'];
@@ -120,6 +123,15 @@ $__previewMgmtBase = rtrim(BASE_URL, '/') . '/management/'
 window.PreviewConfig = {
     // URLs and settings
     baseUrl: <?= json_encode(rtrim(BASE_URL, '/')) ?>,
+    // C9/C5b — the base the preview IFRAME navigates under: the site root when
+    // editing the SERVED project, the surface-B '/p/<id>' view otherwise.
+    // buildUrl() must use THIS (not baseUrl) or picking a page in the toolbar
+    // silently navigates the iframe back to the main project.
+    previewBase: <?= json_encode(
+        (isset($previewAtRoot) && !$previewAtRoot && isset($previewProject))
+            ? rtrim(BASE_URL, '/') . '/p/' . rawurlencode($previewProject)
+            : rtrim(BASE_URL, '/')
+    ) ?>,
     adminUrl: <?= json_encode($router->url('')) ?>,
     managementUrl: <?= json_encode($__previewMgmtBase) ?>,
     currentProject: <?= json_encode($__previewProject) ?>,
@@ -142,13 +154,13 @@ window.PreviewConfig = {
     projectStyleUrl: <?= json_encode(rtrim(BASE_URL, '/') . '/style/style.css') ?>,
     authToken: <?= json_encode($router->getToken()) ?>,
     structureUrl: <?= json_encode($router->url('structure')) ?>,
-    multilingual: <?= json_encode(CONFIG['MULTILINGUAL_SUPPORT'] ?? false) ?>,
-    defaultLang: <?= json_encode(CONFIG['LANGUAGE_DEFAULT'] ?? 'en') ?>,
+    multilingual: <?= json_encode($editConfig['MULTILINGUAL_SUPPORT'] ?? false) ?>,
+    defaultLang: <?= json_encode($editConfig['LANGUAGE_DEFAULT'] ?? 'en') ?>,
     
     // Theme mode
-    themeModeEnabled: <?= json_encode(CONFIG['THEME_MODE_ENABLED'] ?? false) ?>,
-    themeDefault: <?= json_encode(CONFIG['THEME_DEFAULT'] ?? 'light') ?>,
-    themeUserToggle: <?= json_encode(CONFIG['THEME_USER_TOGGLE_ENABLED'] ?? false) ?>,
+    themeModeEnabled: <?= json_encode($editConfig['THEME_MODE_ENABLED'] ?? false) ?>,
+    themeDefault: <?= json_encode($editConfig['THEME_DEFAULT'] ?? 'light') ?>,
+    themeUserToggle: <?= json_encode($editConfig['THEME_USER_TOGGLE_ENABLED'] ?? false) ?>,
     
     // Translations — always-needed keys (used by preview.js core and always-active panels).
     // Panel-specific keys are in i18nPanels below and merged on first tab activation.

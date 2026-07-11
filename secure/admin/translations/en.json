@@ -46,18 +46,24 @@
     },
     "login": {
         "title": "Admin Login",
-        "subtitle": "Enter your API token to access the admin panel",
-        "tokenLabel": "API Token",
-        "tokenPlaceholder": "tvt_xxxxxxxxxxxxxxxx...",
-        "rememberToken": "Remember token on this device",
-        "rememberHint": "Your token will be stored securely in your browser",
-        "submit": "Login",
-        "invalidToken": "Invalid or expired token",
+        "subtitle": "Sign in with your email and password",
+        "emailLabel": "Email",
+        "emailPlaceholder": "you@example.com",
+        "passwordLabel": "Password",
+        "rememberSession": "Keep me signed in on this device",
+        "rememberHint": "Your session stays active on this device (secure cookie); nothing is stored in browser scripts.",
+        "submit": "Sign in",
+        "invalidCredentials": "Invalid email or password",
+        "missingFields": "The form arrived without an email or password — hard-refresh this page (Ctrl+F5) and try again",
+        "throttled": "Too many failed attempts — try again in :seconds seconds",
+        "serverError": "Could not create the session — try again",
+        "showPassword": "Show password",
+        "hidePassword": "Hide password",
         "connectionError": "Could not connect to API",
-        "privacyNote": "By checking 'Remember token', you consent to storing authentication data locally.",
+        "privacyNote": "By checking 'Keep me signed in', you consent to a persistent authentication cookie on this device.",
         "help": {
-            "title": "Need a token?",
-            "text": "Use the generateToken command via API, or check your auth.php config file for the default token."
+            "title": "No account?",
+            "text": "Accounts are created by an administrator (or the platform hosting this site). If you lost your password, ask your administrator to reset it."
         }
     },
     "logout": {

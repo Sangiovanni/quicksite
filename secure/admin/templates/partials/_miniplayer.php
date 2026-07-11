@@ -8,9 +8,17 @@
  * @version 1.0.0
  */
 
-// Get site URL for iframe
+// Get site URL for iframe — the project the user EDITS (same rule as the main
+// editor preview): the site root when it is the SERVED project, else its
+// surface-B view (/p/<id>/, which resolves its own default language). The
+// miniplayer auto-reloads after every command, so it must show the project the
+// commands actually target, not the served one.
+$mpEditing = $router->getCurrentProject();
+$mpServed  = $router->getServedProject();
 $miniplayerSiteUrl = rtrim(BASE_URL, '/') . '/';
-if (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) {
+if ($mpEditing !== null && $mpEditing !== '' && $mpEditing !== $mpServed) {
+    $miniplayerSiteUrl .= 'p/' . rawurlencode($mpEditing) . '/';
+} elseif (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) {
     $miniplayerDefaultLang = CONFIG['LANGUAGE_DEFAULT'] ?? 'en';
     $miniplayerSiteUrl .= $miniplayerDefaultLang . '/';
 }

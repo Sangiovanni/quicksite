@@ -85,6 +85,14 @@ secure/management/config/roles.php
 secure/management/config/deploy-roots.php
 secure/management/config/environment.php
 
+# Session + login-throttle runtime state (C5b) - machine-written JSON
+# (auto-created; holds sha256-hashed session tokens + per-email backoff
+# counters) plus their flock sidecars and atomic-write temp files.
+secure/management/config/sessions.json
+secure/management/config/login-throttle.json
+secure/management/config/*.json.lock
+secure/management/config/*.tmp*
+
 # Admin config - server-side secrets for data resolver (beta.8 A2) +
 # OAuth provider credentials (beta.9 A1).
 # Gitignored by design — anyone with filesystem access to secure/ can

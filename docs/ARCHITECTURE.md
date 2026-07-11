@@ -135,7 +135,7 @@ Every operation in QuickSite runs through one HTTP endpoint:
 
 ```
 {POST|GET} /management/{command}
-Authorization: Bearer tvt_xxx
+Authorization: Bearer qsa_xxx        ← short-lived access token from /management/login
 Content-Type: application/json
 ```
 
@@ -182,7 +182,9 @@ Errors include a structured `errors` array with `field` / `value` / `reason`.
 
 ### Authentication & roles
 
-A token in `secure/management/config/auth.php` resolves to a **user** (`users.php`); authorization is **per project**. Each project's `config/members.json` assigns its members one of six fixed roles:
+Credentials are **email + password**: `users.php` holds each user's `password_hash` (a `null` hash marks an externally-managed account — its sessions are minted by an embedding platform, never by password login). The public `login` command exchanges them for a **session** — a short-lived access token (sent as `Authorization: Bearer` on every call) plus a rotating refresh token (`refreshSession`; reusing a rotated refresh token after a short grace window revokes the whole session family — a theft becomes visible instead of silent). Runtime sessions live hashed in `secure/management/config/sessions.json`; the TTL knobs and the self-registration gate live in `auth.php` alongside CORS. The admin panel holds its session server-side in the PHP session and only ever exposes the short-lived access token to the browser.
+
+Authorization is **per project**. Each project's `config/members.json` assigns its members one of six fixed roles:
 
 | Role | rank | Adds (cumulative) |
 |---|---|---|
@@ -267,10 +269,11 @@ A request under `/p/<projectId>/` (the per-project live view, §6) is intercepte
 ### 5.2 Management API request
 
 ```
-POST /management/addRoute       Authorization: Bearer tvt_xxx
+POST /management/addRoute       Authorization: Bearer qsa_xxx
   │
 public/management/index.php
-  ├── parses bearer token → resolves user (auth.php → users.php)
+  ├── validates the access token → resolves user (sessions.json → users.php)
+  │     (expired → 401 auth.token_expired; the client refreshes + retries)
   ├── checks the user's project role permits 'addRoute'
   │     (members.json role → categories.php → roles.php) → 401/403 if not
   ├── resolves command via secure/management/routes.php
@@ -365,7 +368,9 @@ A project is reachable three ways — the **three surfaces**:
 **Project visibility.** Each project's `config/members.json` carries a `visibility` flag:
 
 - `public` — the `/p/<id>/` view is open to anonymous visitors (a shareable site).
-- `private` — the `/p/<id>/` view requires membership (owner / member / viewer). Membership is presented by a short-lived, HttpOnly `qs_preview` cookie the admin panel sets from the caller's token.
+- `private` — the `/p/<id>/` view requires membership (owner / member / viewer). Membership is presented by a short-lived, HttpOnly `qs_preview` cookie the admin panel sets from the caller's access token (a bearer header is accepted too).
+
+A refused `/p/<id>/` request (no identity → `401`, identity but not a member → `403`) renders the **main project's** error page with that status: a dedicated `401` / `403` page when the main project has one (the special-pages set is `404`, `500`, `403`, `401` — create `templates/model/json/pages/401/…` like any page), else its `404` page. The refusal page never names the project.
 
 **Per-user editing.** A user's `selected_project` (in `users.php`, set via `setSelectedProject`) names the project their admin panel edits. It is a per-user preference, **never an authorization input** — every request is re-authorized against the target project's `members.json`. Because each project is served *and* edited from its own folder, two users can edit two different projects at once without colliding, and the main project (`target.php`) is independent of any user's `selected_project`.
 
@@ -391,8 +396,8 @@ Other layered protections:
 | XSS in JSON content | Only allowlisted tags render: a tag must be on `TagRegistry::ALLOWED_TAGS` and off the blacklist (`script`, `noscript`, `style`, `template`, `slot`, `object`, `embed`, `applet`) — anything else is dropped. URL attributes (`href`, `src`, `xlink:href`, `ping`, `srcset`, …) accept only `http` / `https` / `mailto` / `tel` schemes plus relative / anchor / protocol-relative values; everything else becomes `#`. All attribute values are HTML-escaped. The renderer and the compiler enforce this identically (`TagRegistry::isRenderable`, `UrlPolicy`), so preview and built output agree. |
 | Inline JS injection | `on*` attributes only accept the `{{call:fn:args}}` syntax (see §8), transformed to allowlisted `QS.*()` calls (`CallTransformer`); raw JS is rejected. The tag, URL-scheme and `on*` policies are also enforced by the node writers (`addNode` / `editNode` / `editStructure`), so unsafe values are refused on write, not just dropped at render. |
 | File upload | MIME sniffed from content (not extension); per-category size cap; JS uploads disallowed. |
-| AuthN / AuthZ | Bearer token + role check on every Management call; logged. |
-| CSRF on admin | Admin panel uses the same Bearer token via `fetch`; no cookie-only auth. |
+| AuthN / AuthZ | Email+password login → short-lived access token (Bearer) + rotating refresh token with reuse-detection (family revoke); role check on every Management call; logged. Session tokens are stored hashed; failed logins are throttled per email. |
+| CSRF on admin | Admin panel sends the Bearer access token via `fetch`; the refresh token never reaches the browser (held server-side in the PHP session). |
 | CORS | Configurable per deployment. |
 | Per-project serving (`/p/<id>/`) | Static sub-resources are served **only** from the project's own `public/` subtree via a `realpath` canonicalisation + prefix check (a jail): any path resolving outside `…/public/` is refused, so `config/` (members.json), `data/` (api-endpoints.json), `routes.php`, `config.php`, `templates/`, `translate/` are unreachable, and encoded / backslash / absolute traversals are rejected. HTML is always live-rendered, never served as raw project files; the view runs the same render/compile sanitisation as the built site, plus a Content-Security-Policy. Private projects require membership. |
 

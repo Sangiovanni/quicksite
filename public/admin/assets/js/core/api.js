@@ -13,6 +13,8 @@ window.QuickSiteAPI = (function() {
     // Configuration
     // ============================================
 
+    // Legacy pre-C5b storage keys — referenced ONLY to clean up entries left
+    // by older versions (tokens no longer touch browser storage).
     const TOKEN_KEY = 'quicksite_admin_token';
     const REMEMBER_KEY = 'quicksite_admin_remember';
 
@@ -44,42 +46,125 @@ window.QuickSiteAPI = (function() {
     };
 
     // ============================================
-    // Token Management
+    // Token Management (C5b)
     // ============================================
+    // The panel's session (access + refresh pair) is held SERVER-SIDE in the
+    // PHP session; the page only ever sees the short-lived ACCESS token,
+    // embedded at render time (QUICKSITE_CONFIG.token) and renewed via the
+    // /admin/session-refresh endpoint. Nothing auth-related touches
+    // localStorage/sessionStorage anymore — an XSS can at worst steal a token
+    // that dies within its TTL.
+
+    // In-memory access token, seeded from the server-rendered page config.
+    let currentToken = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.token) || null;
+
+    // C5b token-SOURCE seam: a deployment embedding QuickSite (e.g. a SaaS
+    // platform) can plug its own async token provider here; the default source
+    // is the built-in session flow above. See setTokenSource().
+    let customTokenSource = null;
 
     /**
-     * Get stored authentication token
-     * Checks localStorage first (remembered), then sessionStorage
-     * @returns {string|null} The stored token or null
+     * Get the current (short-lived) access token
+     * @returns {string|null}
      */
     function getToken() {
-        return localStorage.getItem(TOKEN_KEY) || 
-               sessionStorage.getItem(TOKEN_KEY);
+        return currentToken ||
+               (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.token) || null;
     }
 
     /**
-     * Store authentication token
-     * @param {string} token - The token to store
-     * @param {boolean} [remember=false] - Whether to persist across sessions
+     * Adopt a fresh access token: update this module + the page-embedded
+     * globals so the hand-built fetch sites (PreviewConfig.authToken readers,
+     * QUICKSITE_CONFIG.token readers) stay valid, then schedule the keepalive.
+     * @param {string} token
+     * @param {number} [expiresIn=0] - seconds of validity (0 = unknown)
      */
-    function setToken(token, remember = false) {
-        if (remember) {
-            localStorage.setItem(TOKEN_KEY, token);
-            localStorage.setItem(REMEMBER_KEY, 'true');
-        } else {
-            sessionStorage.setItem(TOKEN_KEY, token);
-            localStorage.removeItem(TOKEN_KEY);
-            localStorage.removeItem(REMEMBER_KEY);
-        }
+    function applyToken(token, expiresIn = 0) {
+        currentToken = token;
+        if (window.QUICKSITE_CONFIG) window.QUICKSITE_CONFIG.token = token;
+        if (window.PreviewConfig) window.PreviewConfig.authToken = token;
+        scheduleKeepalive(expiresIn);
     }
 
     /**
-     * Clear stored authentication token
+     * C5b seam — plug a custom access-token source (async function resolving to
+     * a token string). Used by deployments whose auth lives outside QuickSite;
+     * the built-in PHP-session refresh flow is skipped while a source is set.
+     * @param {(() => Promise<string|null>)|null} fn
+     */
+    function setTokenSource(fn) {
+        customTokenSource = (typeof fn === 'function') ? fn : null;
+    }
+
+    // Single-flight refresh: a burst of concurrent 401s collapses into ONE
+    // /admin/session-refresh POST (mirrors the qs.js Tier-2 refresh pattern).
+    let refreshInFlight = null;
+
+    /**
+     * Obtain a fresh access token (custom source if set, else the PHP-session
+     * refresh endpoint). Resolves to the new token, or null when the session
+     * is dead (caller falls back to the login redirect).
+     * @returns {Promise<string|null>}
+     */
+    function refreshAccessToken() {
+        if (refreshInFlight) return refreshInFlight;
+        refreshInFlight = (async () => {
+            try {
+                if (customTokenSource) {
+                    const token = await customTokenSource();
+                    if (token) { applyToken(token, 0); return token; }
+                    return null;
+                }
+                const response = await fetch(`${config.adminBase}/session-refresh`, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) return null;
+                const data = await response.json();
+                if (data && data.token) {
+                    applyToken(data.token, data.expires_in | 0);
+                    return data.token;
+                }
+                return null;
+            } catch {
+                return null;
+            } finally {
+                refreshInFlight = null;
+            }
+        })();
+        return refreshInFlight;
+    }
+
+    // Proactive keepalive at ~80% of the token's remaining lifetime, so
+    // long-open pages (visual editor) and the hand-built fetch sites that
+    // never retry always find a live token. The login page (no token) never
+    // schedules one.
+    let keepaliveTimer = null;
+
+    function scheduleKeepalive(expiresIn) {
+        const remaining = (expiresIn | 0) > 0
+            ? (expiresIn | 0)
+            : ((window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.tokenExpiresIn) | 0);
+        if (remaining <= 0 || !getToken()) return;
+        clearTimeout(keepaliveTimer);
+        keepaliveTimer = setTimeout(() => { refreshAccessToken(); }, Math.max(30, Math.floor(remaining * 0.8)) * 1000);
+    }
+
+    scheduleKeepalive(0); // boot from the server-emitted tokenExpiresIn
+
+    /**
+     * Clear the in-memory token (and any legacy pre-C5b storage entries left
+     * from older versions — one-time upgrade hygiene).
      */
     function clearToken() {
-        localStorage.removeItem(TOKEN_KEY);
-        sessionStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(REMEMBER_KEY);
+        currentToken = null;
+        clearTimeout(keepaliveTimer);
+        if (window.QUICKSITE_CONFIG) window.QUICKSITE_CONFIG.token = '';
+        try {
+            localStorage.removeItem(TOKEN_KEY);
+            sessionStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(REMEMBER_KEY);
+        } catch { /* storage may be unavailable; nothing to clean */ }
     }
 
     /**
@@ -224,7 +309,7 @@ window.QuickSiteAPI = (function() {
      * // GET with query params: /management/getCommandHistory?limit=50&offset=0
      * const result = await QuickSiteAPI.request('getCommandHistory', 'GET', null, [], { limit: 50, offset: 0 });
      */
-    async function request(command, method = 'GET', data = null, urlParams = [], queryParams = {}) {
+    async function request(command, method = 'GET', data = null, urlParams = [], queryParams = {}, _isRetry = false) {
         const token = getToken();
         if (!token) {
             return {
@@ -304,11 +389,21 @@ window.QuickSiteAPI = (function() {
                 }));
             }
 
-            // Auto-logout on 401 — token is invalid or expired
-            if (response.status === 401 && !redirectingToLogin) {
-                redirectingToLogin = true;
-                clearToken();
-                window.location.href = config.adminBase + '/login';
+            // C5b: an EXPIRED access token is refreshable — do it transparently
+            // and retry the original request exactly once. Any other 401 means
+            // the session is dead → login.
+            if (response.status === 401) {
+                if (!_isRetry && result && result.code === 'auth.token_expired') {
+                    const fresh = await refreshAccessToken();
+                    if (fresh) {
+                        return request(command, method, data, urlParams, queryParams, true);
+                    }
+                }
+                if (!redirectingToLogin) {
+                    redirectingToLogin = true;
+                    clearToken();
+                    window.location.href = config.adminBase + '/login';
+                }
                 return { ok: false, status: 401, data: result };
             }
 
@@ -340,7 +435,7 @@ window.QuickSiteAPI = (function() {
      * formData.append('file', fileInput.files[0]);
      * const result = await QuickSiteAPI.upload('uploadAsset', formData);
      */
-    async function upload(command, formData, urlParams = []) {
+    async function upload(command, formData, urlParams = [], _isRetry = false) {
         const token = getToken();
         if (!token) {
             return {
@@ -371,12 +466,20 @@ window.QuickSiteAPI = (function() {
             });
 
             const result = await response.json();
-            
-            // Auto-logout on 401
-            if (response.status === 401 && !redirectingToLogin) {
-                redirectingToLogin = true;
-                clearToken();
-                window.location.href = config.adminBase + '/login';
+
+            // C5b: refresh + retry once on an expired access token (see request()).
+            if (response.status === 401) {
+                if (!_isRetry && result && result.code === 'auth.token_expired') {
+                    const fresh = await refreshAccessToken();
+                    if (fresh) {
+                        return upload(command, formData, urlParams, true);
+                    }
+                }
+                if (!redirectingToLogin) {
+                    redirectingToLogin = true;
+                    clearToken();
+                    window.location.href = config.adminBase + '/login';
+                }
                 return { ok: false, status: 401, data: result };
             }
 
@@ -448,12 +551,13 @@ window.QuickSiteAPI = (function() {
     return {
         // Configuration
         config,
-        
-        // Token Management
+
+        // Token Management (C5b: short-lived access token; refresh lives server-side)
         getToken,
-        setToken,
         clearToken,
         isAuthenticated,
+        refreshAccessToken,
+        setTokenSource,
 
         // Project scope (C8 8.W)
         getCurrentProject,

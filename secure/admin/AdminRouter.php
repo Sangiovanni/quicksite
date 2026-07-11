@@ -30,7 +30,8 @@ class AdminRouter {
         'assets',      // Asset Management page
         'sitemap',     // Visual Sitemap & Route Management
         'optimize',    // Optimization Tools
-        'logout'       // Logout action
+        'logout',      // Logout action
+        'session-refresh' // C5b: JSON endpoint — rotates the PHP-held session, returns a fresh access token
     ];
 
     public function __construct() {
@@ -117,55 +118,199 @@ class AdminRouter {
     }
 
     /**
-     * Check if user is authenticated (has valid token in session/cookie)
+     * The panel's session model (C5b): PHP $_SESSION is the SINGLE holder of the
+     * access + refresh pair — the refresh token never reaches the browser's JS
+     * (only the short-lived access token is page-embedded). One holder = one
+     * rotation actor = no false theft signals; PHP's per-session file locking
+     * serializes concurrent tabs by construction. "Remember me" persists the
+     * CURRENT refresh token in an HttpOnly `qs_refresh` cookie (re-set on every
+     * rotation) so a fresh PHP session can re-establish itself.
+     */
+
+    /**
+     * Check if user is authenticated (valid, store-backed access token in the
+     * PHP session — rotating in-process when it is about to expire).
      */
     public function isAuthenticated(): bool {
-        // Start session if not started
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-        
-        // Check if token exists in session
-        if (empty($_SESSION['admin_token'])) {
+        $this->ensureFreshSession();
+        $access = $_SESSION['admin_token'] ?? null;
+        if (!is_string($access) || $access === '') {
             return false;
         }
-        
-        // Validate token against auth.php
-        $token = $_SESSION['admin_token'];
-        $authConfigPath = SECURE_FOLDER_PATH . '/management/config/auth.php';
-        
-        if (!file_exists($authConfigPath)) {
+        // Store-backed check (catches a family revoked elsewhere, e.g. reuse
+        // detection or a management-API logout of the same session).
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+        if (!qs_session_validate_access($access)['valid']) {
+            $this->clearSessionAuth();
             return false;
         }
-        
-        $authConfig = include $authConfigPath;
-        
-        // Check if token exists in config
-        if (!isset($authConfig['authentication']['tokens'][$token])) {
-            // Invalid token - clear session
-            unset($_SESSION['admin_token']);
-            return false;
-        }
-        
         return true;
     }
 
     /**
-     * Get stored token
+     * Make sure the session's access token has at least $margin seconds left,
+     * rotating in-process (via the session's refresh token, then the qs_refresh
+     * remember-me cookie) when it does not. Clears dead state on failure.
+     */
+    private function ensureFreshSession(int $margin = 120): void {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+
+        $access  = $_SESSION['admin_token'] ?? null;
+        $expires = (int)($_SESSION['admin_token_expires'] ?? 0);
+        if (is_string($access) && $access !== '' && time() < $expires - $margin) {
+            return; // still fresh
+        }
+
+        // Stale/expired: rotate with the session's own refresh token first.
+        $refresh = $_SESSION['admin_refresh'] ?? null;
+        if (is_string($refresh) && $refresh !== '') {
+            $rotated = qs_session_rotate($refresh);
+            if ($rotated['ok'] ?? false) {
+                $this->storeSessionPair($rotated);
+                return;
+            }
+        }
+
+        // Fall back to the remember-me cookie (fresh PHP session after browser
+        // restart / session GC). A dead cookie is cleared so we stop retrying it.
+        $cookie = $_COOKIE['qs_refresh'] ?? null;
+        if (is_string($cookie) && $cookie !== '') {
+            $rotated = qs_session_rotate($cookie);
+            if ($rotated['ok'] ?? false) {
+                $_SESSION['admin_remember'] = true;
+                $this->storeSessionPair($rotated);
+                return;
+            }
+            $this->clearRefreshCookie();
+        }
+
+        $this->clearSessionAuth();
+    }
+
+    /**
+     * Persist a freshly issued/rotated pair into the PHP session (and, when the
+     * user chose "remember me", roll the qs_refresh cookie forward — rotation
+     * retires the token the cookie previously held).
+     */
+    private function storeSessionPair(array $pair): void {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $_SESSION['admin_token']           = $pair['access_token'];
+        $_SESSION['admin_token_expires']   = (int)$pair['access_expires'];
+        $_SESSION['admin_refresh']         = $pair['refresh_token'];
+        $_SESSION['admin_refresh_expires'] = (int)$pair['refresh_expires'];
+
+        if (!empty($_SESSION['admin_remember'])) {
+            setcookie('qs_refresh', $pair['refresh_token'], [
+                'expires'  => (int)$pair['refresh_expires'],
+                'path'     => rtrim(parse_url($this->getBaseUrl(), PHP_URL_PATH) ?: '/admin', '/') ?: '/admin',
+                'secure'   => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+                'httponly' => true,
+                'samesite' => 'Strict'
+            ]);
+        }
+    }
+
+    /**
+     * Drop the panel's auth state from the PHP session (tokens only — the rest
+     * of the session, e.g. admin language, survives).
+     */
+    private function clearSessionAuth(): void {
+        unset(
+            $_SESSION['admin_token'],
+            $_SESSION['admin_token_expires'],
+            $_SESSION['admin_refresh'],
+            $_SESSION['admin_refresh_expires'],
+            $_SESSION['admin_remember']
+        );
+    }
+
+    private function clearRefreshCookie(): void {
+        setcookie('qs_refresh', '', [
+            'expires'  => time() - 3600,
+            'path'     => rtrim(parse_url($this->getBaseUrl(), PHP_URL_PATH) ?: '/admin', '/') ?: '/admin',
+            'httponly' => true,
+            'samesite' => 'Strict'
+        ]);
+    }
+
+    /**
+     * Attempt an email + password login (C5b) — the panel form's entry into the
+     * ONE shared credential-check + issuance path (qs_auth_attempt_login).
+     * On success the pair lands in the PHP session; with $remember the refresh
+     * token also lands in the HttpOnly qs_refresh cookie.
+     *
+     * @return string|null null on success, else an error key:
+     *                     'invalid_credentials' | 'throttled:<seconds>' | 'server'
+     */
+    public function attemptLogin(string $email, string $password, bool $remember = false): ?string {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+
+        // Distinguish an empty submission (stale cached form, autofill mishap)
+        // from wrong credentials — a real diagnostic for the user, and empty
+        // probes are not brute force. The management `login` command 400s the
+        // same case with validation.required.
+        if (trim($email) === '' || $password === '') {
+            return 'missing_fields';
+        }
+
+        $attempt = qs_auth_attempt_login($email, $password);
+        if (!$attempt['ok']) {
+            if ($attempt['error'] === 'throttled') {
+                return 'throttled:' . (int)($attempt['retry_after'] ?? 60);
+            }
+            return $attempt['error'];
+        }
+
+        session_regenerate_id(true); // fresh session id on privilege change
+        $_SESSION['admin_remember'] = $remember;
+        $this->storeSessionPair($attempt['session']);
+        if (!$remember) {
+            $this->clearRefreshCookie();
+        }
+        // Expire the pre-C5b raw-token cookie if a stale one is still around.
+        if (!empty($_COOKIE['admin_token'])) {
+            setcookie('admin_token', '', ['expires' => time() - 3600, 'path' => '/admin', 'httponly' => true, 'samesite' => 'Strict']);
+        }
+        return null;
+    }
+
+    /**
+     * Get the current ACCESS token (short-lived). This is what layout.php embeds
+     * for the admin JS and what the qs_preview cookie carries — never the
+     * refresh token.
      */
     public function getToken(): ?string {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
-        
+
         return $_SESSION['admin_token'] ?? null;
     }
 
     /**
-     * Get the effective role of the currently authenticated token (C6).
-     * Resolves token -> userId -> user -> role on the user's selected project
-     * (the same source hasPermission uses transitionally). Returns a role slug
-     * (e.g. 'viewer' … 'owner') or null when not authenticated, unresolved,
+     * Seconds until the current access token expires (0 when unauthenticated).
+     * Emitted to the admin JS so its keepalive can schedule the next refresh.
+     */
+    public function getTokenExpiresIn(): int {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        return max(0, (int)($_SESSION['admin_token_expires'] ?? 0) - time());
+    }
+
+    /**
+     * Get the effective role of the currently authenticated user (C6).
+     * Resolves the session's access token -> user -> role on the user's selected
+     * project (the same source hasPermission uses transitionally). Returns a role
+     * slug (e.g. 'viewer' … 'owner') or null when not authenticated, unresolved,
      * disabled, or not a member of the selected project. No superadmin / no '*'.
      */
     public function getTokenRole(): ?string {
@@ -173,13 +318,10 @@ class AdminRouter {
         if (!$token) return null;
 
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
-        $authConfig = loadAuthConfig();
-        $userId = $authConfig['authentication']['tokens'][$token]['userId'] ?? null;
-        if ($userId === null) return null;
-
-        $users = loadUsersConfig();
-        $user = $users['users'][$userId] ?? null;
-        if ($user === null || ($user['status'] ?? 'active') === 'disabled') return null;
+        $auth = validateBearerToken('Bearer ' . $token);
+        if (empty($auth['valid'])) return null;
+        $user = $auth['user'];
+        $userId = $auth['userId'];
 
         $selected = $user['selected_project'] ?? null;
         if ($selected === null || $selected === '') return null;
@@ -272,56 +414,67 @@ class AdminRouter {
     }
 
     /**
-     * Store authentication token
-     */
-    public function setToken(string $token, bool $remember = false): void {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-        
-        $_SESSION['admin_token'] = $token;
-        
-        // If remember is checked, set a longer-lived cookie
-        if ($remember) {
-            setcookie('admin_token', $token, [
-                'expires' => time() + (30 * 24 * 60 * 60), // 30 days
-                'path' => '/admin',
-                'httponly' => true,
-                'samesite' => 'Strict'
-            ]);
-        }
-    }
-
-    /**
-     * Clear authentication
+     * Log the panel out: revoke the whole session FAMILY server-side (the pair
+     * dies everywhere, not just in this browser), then drop every client trace
+     * (session auth keys, qs_refresh remember-me cookie, qs_preview cookie, and
+     * any stale pre-C5b admin_token cookie).
      */
     public function clearToken(): void {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
-        
-        unset($_SESSION['admin_token']);
-        
-        // Also clear cookie
-        setcookie('admin_token', '', [
-            'expires' => time() - 3600,
-            'path' => '/admin',
-            'httponly' => true,
-            'samesite' => 'Strict'
-        ]);
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+
+        $refresh = $_SESSION['admin_refresh'] ?? ($_COOKIE['qs_refresh'] ?? null);
+        if (is_string($refresh) && $refresh !== '') {
+            qs_session_revoke_by_refresh($refresh);
+        }
+
+        $this->clearSessionAuth();
+        $this->clearRefreshCookie();
+        setcookie('qs_preview', '', ['expires' => time() - 3600, 'path' => '/', 'httponly' => true, 'samesite' => 'Strict']);
+        setcookie('admin_token', '', ['expires' => time() - 3600, 'path' => '/admin', 'httponly' => true, 'samesite' => 'Strict']);
     }
 
     /**
-     * Restore token from cookie if session is empty
+     * C5b: JSON endpoint for the admin JS (POST /admin/session-refresh).
+     * Rotates the PHP-held session when needed and returns the CURRENT access
+     * token + its remaining lifetime; also re-emits the qs_preview cookie so a
+     * long-open editor's private /p/<id>/ preview keeps authenticating. The
+     * refresh token itself never leaves the server.
      */
-    private function restoreTokenFromCookie(): void {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+    private function handleSessionRefresh(): void {
+        header('Content-Type: application/json');
+        header('Cache-Control: no-store'); // the response body IS a token
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'method_not_allowed']);
+            exit;
         }
-        
-        if (empty($_SESSION['admin_token']) && !empty($_COOKIE['admin_token'])) {
-            $_SESSION['admin_token'] = $_COOKIE['admin_token'];
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+
+        // Rotate proactively at half the access TTL so the returned token is
+        // never about to die under the caller.
+        $this->ensureFreshSession((int)floor(qs_session_config()['access_ttl'] / 2));
+
+        if (!$this->isAuthenticated()) {
+            http_response_code(401);
+            echo json_encode(['error' => 'unauthenticated']);
+            exit;
         }
+
+        setcookie('qs_preview', (string)$_SESSION['admin_token'], [
+            'expires'  => 0,
+            'path'     => '/',
+            'secure'   => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+            'httponly' => true,
+            'samesite' => 'Strict'
+        ]);
+        echo json_encode([
+            'token'      => $_SESSION['admin_token'],
+            'expires_in' => $this->getTokenExpiresIn(),
+        ]);
+        exit;
     }
 
     /**
@@ -367,9 +520,11 @@ class AdminRouter {
      * Dispatch the request to the appropriate handler
      */
     public function dispatch(): void {
-        // Restore token from cookie if available
-        $this->restoreTokenFromCookie();
-        
+        // C5b: JSON session-refresh endpoint for the admin JS (exits).
+        if ($this->page === 'session-refresh') {
+            $this->handleSessionRefresh();
+        }
+
         // Handle logout
         if ($this->page === 'logout') {
             $this->clearToken();
@@ -404,6 +559,14 @@ class AdminRouter {
      * Render the current page
      */
     private function render(): void {
+        // C5b: admin pages embed the short-lived access token (and the login
+        // page is a credential form) — they must never come out of a cache.
+        // Also prevents a stale pre-C5b login form (old token field) being
+        // resurrected by the browser and posting empty email/password.
+        if (!headers_sent()) {
+            header('Cache-Control: no-store');
+        }
+
         // Load admin functions
         require_once SECURE_FOLDER_PATH . '/admin/functions/AdminHelper.php';
         require_once SECURE_FOLDER_PATH . '/admin/functions/AdminTranslation.php';

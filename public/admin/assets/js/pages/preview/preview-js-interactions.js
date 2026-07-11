@@ -744,7 +744,7 @@
         }
         
         try {
-            const response = await fetch('/management/deleteInteraction', {
+            const response = await fetch(PreviewConfig.managementUrl + 'deleteInteraction', {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${PreviewConfig.authToken}`,
@@ -1752,7 +1752,7 @@
             var delBody = { structType: structType, nodeId: nodeId, event: eventName, index: j };
             if (pageName) delBody.pageName = pageName;
             try {
-                await fetch('/management/deleteInteraction', {
+                await fetch(PreviewConfig.managementUrl + 'deleteInteraction', {
                     method: 'DELETE',
                     headers: {
                         'Authorization': 'Bearer ' + PreviewConfig.authToken,
@@ -1786,7 +1786,7 @@
             if (pageName) addBody.pageName = pageName;
 
             try {
-                await fetch('/management/addInteraction', {
+                await fetch(PreviewConfig.managementUrl + 'addInteraction', {
                     method: 'POST',
                     headers: {
                         'Authorization': 'Bearer ' + PreviewConfig.authToken,
@@ -2784,7 +2784,7 @@
      */
     async function fetchJsFunctions() {
         try {
-            const response = await fetch('/management/listJsFunctions', {
+            const response = await fetch(PreviewConfig.managementUrl + 'listJsFunctions', {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${PreviewConfig.authToken}`
@@ -2810,7 +2810,7 @@
      */
     async function fetchApiEndpoints() {
         try {
-            const response = await fetch('/management/listApiEndpoints', {
+            const response = await fetch(PreviewConfig.managementUrl + 'listApiEndpoints', {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${PreviewConfig.authToken}`
@@ -2858,7 +2858,7 @@
      */
     async function fetchRoutes() {
         try {
-            const response = await fetch('/management/getRoutes', {
+            const response = await fetch(PreviewConfig.managementUrl + 'getRoutes', {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${PreviewConfig.authToken}`
@@ -2888,7 +2888,7 @@
      */
     async function fetchStorageItems() {
         try {
-            const response = await fetch('/management/listStorageItems', {
+            const response = await fetch(PreviewConfig.managementUrl + 'listStorageItems', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${PreviewConfig.authToken}`,
@@ -3072,7 +3072,7 @@
                 skBody.description[skLang] = skDesc;
             }
             try {
-                var response = await fetch('/management/addStorageItem', {
+                var response = await fetch(PreviewConfig.managementUrl + 'addStorageItem', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${PreviewConfig.authToken}`,
@@ -4268,7 +4268,7 @@
                 jsFormSave.textContent = PreviewConfig.i18n?.saving || 'Saving...';
             }
             
-            const endpoint = isEdit ? '/management/editInteraction' : '/management/addInteraction';
+            const endpoint = isEdit ? PreviewConfig.managementUrl + 'editInteraction' : PreviewConfig.managementUrl + 'addInteraction';
             const method = isEdit ? 'PUT' : 'POST';
             
             const response = await fetch(endpoint, {
@@ -4372,7 +4372,7 @@
             // Split nested routes (e.g. "documentation/commands") so each segment
             // is encoded individually — encoding the whole string would turn "/" into
             // "%2F", collapsing the path into a single segment the router can't match.
-            var url = '/management/getPageEvents/' + currentPageName.split('/').map(encodeURIComponent).join('/');
+            var url = PreviewConfig.managementUrl + 'getPageEvents/' + currentPageName.split('/').map(encodeURIComponent).join('/');
             var response = await fetch(url, {
                 method: 'GET',
                 headers: { 'Authorization': 'Bearer ' + PreviewConfig.authToken }
@@ -4455,7 +4455,7 @@
         if (!confirm(PreviewConfig.i18n?.confirmDeleteInteraction || 'Delete this interaction?')) return;
         
         try {
-            var response = await fetch('/management/deletePageEvent', {
+            var response = await fetch(PreviewConfig.managementUrl + 'deletePageEvent', {
                 method: 'DELETE',
                 headers: {
                     'Authorization': 'Bearer ' + PreviewConfig.authToken,
@@ -4857,7 +4857,7 @@
                 peFormSave.textContent = PreviewConfig.i18n?.saving || 'Saving...';
             }
 
-            var endpoint = isEdit ? '/management/editPageEvent' : '/management/addPageEvent';
+            var endpoint = isEdit ? PreviewConfig.managementUrl + 'editPageEvent' : PreviewConfig.managementUrl + 'addPageEvent';
             var method = isEdit ? 'PUT' : 'POST';
             var body = {
                 pageName: currentPageName,
@@ -4997,7 +4997,7 @@
     async function loadStateStores() {
         if (!currentPageName) return;
         try {
-            var response = await fetch('/management/getStateStores', {
+            var response = await fetch(PreviewConfig.managementUrl + 'getStateStores', {
                 method: 'POST',
                 headers: {
                     'Authorization': 'Bearer ' + PreviewConfig.authToken,
@@ -5083,7 +5083,7 @@
         var stores = Object.assign({}, ssCurrentStores);
         delete stores[id];
         try {
-            var response = await fetch('/management/setStateStores', {
+            var response = await fetch(PreviewConfig.managementUrl + 'setStateStores', {
                 method: 'POST',
                 headers: {
                     'Authorization': 'Bearer ' + PreviewConfig.authToken,
@@ -5537,7 +5537,7 @@
 
         var allStores = {};
         try {
-            var response = await fetch('/management/getStateStores', {
+            var response = await fetch(PreviewConfig.managementUrl + 'getStateStores', {
                 method: 'POST',
                 headers: {
                     'Authorization': 'Bearer ' + PreviewConfig.authToken,
@@ -5687,7 +5687,7 @@
 
         try {
             if (ssImportConfirm) ssImportConfirm.disabled = true;
-            var response = await fetch('/management/setStateStores', {
+            var response = await fetch(PreviewConfig.managementUrl + 'setStateStores', {
                 method: 'POST',
                 headers: {
                     'Authorization': 'Bearer ' + PreviewConfig.authToken,
@@ -5764,7 +5764,7 @@
 
         try {
             if (ssFormSave) { ssFormSave.disabled = true; ssFormSave.textContent = PreviewConfig.i18n?.saving || 'Saving...'; }
-            var response = await fetch('/management/setStateStores', {
+            var response = await fetch(PreviewConfig.managementUrl + 'setStateStores', {
                 method: 'POST',
                 headers: {
                     'Authorization': 'Bearer ' + PreviewConfig.authToken,
@@ -5864,7 +5864,7 @@
 
     function _loadComponentListOnce() {
         if (_componentListCache) return _componentListCache;
-        _componentListCache = fetch('/management/listComponents', {
+        _componentListCache = fetch(PreviewConfig.managementUrl + 'listComponents', {
             headers: { 'Authorization': 'Bearer ' + PreviewConfig.authToken }
         })
         .then(function(r) { return r.json(); })
@@ -6952,7 +6952,7 @@
      */
     async function saveResponseBindings(apiName, endpointId, bindings) {
         try {
-            var response = await fetch('/management/editApi', {
+            var response = await fetch(PreviewConfig.managementUrl + 'editApi', {
                 method: 'POST',
                 headers: {
                     'Authorization': 'Bearer ' + PreviewConfig.authToken,

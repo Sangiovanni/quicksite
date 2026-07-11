@@ -26,17 +26,25 @@ returns full documentation for **all 153 commands** — parameters, examples, va
 GET /management/help/addRoute
 ```
 
-The `help` endpoint is the only publicly accessible command and is the canonical source of truth for the API surface. This document is a high-level map; `help` is the contract.
+The `help` endpoint is publicly accessible and is the canonical source of truth for the API surface. This document is a high-level map; `help` is the contract.
 
 ## Authentication
 
-- All endpoints except `help` require a bearer token:
+- Credentials are **email + password** (`users.php` stores a `password_hash`; a `null` hash marks an externally-managed account that cannot use password login). `POST /management/login` exchanges them for a **session**:
+  ```json
+  { "email": "you@example.com", "password": "…" }
+  → { "access_token": "qsa_…", "expires_in": 900,
+      "refresh_token": "qsr_…", "refresh_expires_in": 2592000, … }
   ```
-  Authorization: Bearer <token>
+- Every other endpoint requires the short-lived **access token**:
   ```
-- Tokens are defined in `secure/management/config/auth.php` (gitignored, auto-created from `.example`) and resolve to a **user** in `users.php`.
+  Authorization: Bearer <access_token>
+  ```
+  When it expires, requests return `401` with code `auth.token_expired` — call `refreshSession` with the refresh token and retry. Each refresh **rotates** the refresh token (always store both returned tokens); presenting an already-rotated refresh token after a short grace window is treated as theft and revokes the whole session family. `logoutSession` ends a session explicitly.
+- Four commands are public and self-authenticating: `help`, `login`, `refreshSession`, `logoutSession`. Failed logins are throttled per email (doubling cooldown after 5 attempts).
+- Session TTLs (`access_ttl`, `refresh_ttl`, `reuse_grace`) and the self-registration gate live in `secure/management/config/auth.php` (gitignored, auto-created from `.example`); runtime session state lives in `sessions.json` next to it (machine-written, hashed at rest — never edit).
 - Authorization is **per project**: a user's role comes from the target project's `config/members.json`. The six fixed roles (`viewer` … `owner`) are defined by trust-coherent command **categories** in `categories.php`; `roles.php` grants each role a `rank` and its categories, expanded to a per-command allowlist at load time. There is no superadmin and no custom roles.
-- Default install ships with a placeholder token and prompts you on first admin login to generate a real one and revoke the placeholder before going public.
+- Default install ships with a placeholder account whose default password is documented in `users.php.example`; the admin panel warns until you change its password and id.
 
 ## Response shape
 
@@ -71,7 +79,8 @@ Each row enumerates the commands in that category — comma-separated, alphabeti
 
 | Category | Commands & detail |
 |---|---|
-| **Meta** | `help` — single self-documenting endpoint; the only command callable without a bearer token. |
+| **Meta** | `help` — self-documenting endpoint, callable without authentication. |
+| **Session** | `login`, `refreshSession`, `logoutSession` — email+password login → access + refresh pair; refresh rotation with reuse-detection (family revoke); explicit logout. Public + self-authenticating (see *Authentication* above). |
 | **Pages** | `listPages`, `createAlias`, `deleteAlias`, `listAliases`, `editFavicon`, `editTitle` — page metadata, title, favicon, alias routes. |
 | **Routes & sitemap** | `addRoute`, `deleteRoute`, `getRoutes`, `getSiteMap`, `setRouteLayout`, `analyzeReachability` — URL routing tree CRUD, sitemap export, dead-route audit. `setRouteResolver` is under "Server-side data resolvers" below since the route layer just hosts the resolver config. |
 | **Structure** | `getStructure`, `editStructure`, `addNode`, `addComplexElement`, `addComponentToNode`, `editComponentToNode`, `editNode`, `moveNode`, `deleteNode`, `duplicateNode` — edit nodes inside a page tree. |
@@ -86,7 +95,6 @@ Each row enumerates the commands in that category — comma-separated, alphabeti
 | **Projects** | `listProjects`, `getActiveProject`, `setSelectedProject`, `switchProject`, `createProject`, `cloneProject`, `deleteProject` — per-project CRUD under `secure/projects/`, plus two distinct project pointers: `setSelectedProject` sets the caller's **edited** project (per-user, member-only — drives the admin panel + preview), while `switchProject` sets the globally **served** main project (deploy-level). See [ARCHITECTURE.md §6](ARCHITECTURE.md). |
 | **Backups** | `backupProject`, `listBackups`, `restoreBackup`, `deleteBackup` — snapshot / restore (configurable scope). |
 | **Export / Import** | `exportProject`, `importProject`, `downloadExport`, `clearExports` — pack a project as ZIP for portability; import a ZIP back. |
-| **Tokens** | `generateToken`, `listTokens`, `revokeToken` — bearer token CRUD (owner-only, interim; being retired for account-based auth). |
 | **Roles** | `listRoles`, `getMyPermissions` — read the fixed roles and your own effective permissions. (`createRole` / `editRole` / `deleteRole` are disabled: roles are a fixed set, not customisable.) |
 | **Snippets** | `listSnippets`, `getSnippet`, `createSnippet`, `deleteSnippet`, `duplicateSnippet`, `insertSnippet`, `injectSnippetCss` — reusable in-tree snippets (nav, cards, forms…); insert / inject into a page's structure. |
 | **JS functions & data bindings** | `listJsFunctions`, `listDataBindings` — catalog read endpoints. `listJsFunctions` returns the QS.* verb catalog (consumed by the admin picker; see [ADMIN_PANEL.md §9.9](ADMIN_PANEL.md)). `listDataBindings` returns the `data-qs-*` attribute catalog. |

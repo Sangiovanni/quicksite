@@ -403,9 +403,13 @@
     
     // Configuration
     const baseUrl = PreviewConfig.baseUrl;
+    // C9/C5b — the base the preview iframe navigates under: site root for the
+    // SERVED project, '/p/<id>' (surface B) for any other edited project.
+    // (No parse-time authToken capture here: the access token is short-lived
+    // and renewed in place — modules read PreviewConfig.authToken at call time.)
+    const previewBase = PreviewConfig.previewBase || PreviewConfig.baseUrl;
     const adminUrl = PreviewConfig.adminUrl;
     const managementUrl = PreviewConfig.managementUrl;
-    const authToken = PreviewConfig.authToken;
     const structureUrl = PreviewConfig.structureUrl;
     const multilingual = PreviewConfig.multilingual;
     const defaultLang = PreviewConfig.defaultLang;
@@ -2214,7 +2218,10 @@
     }
     
     function buildUrl(editType, editName) {
-        let url = baseUrl + '/';
+        // previewBase, not baseUrl — editing a non-served project must stay
+        // inside its /p/<id>/ view (picking a page used to jump the iframe
+        // back to the main project).
+        let url = previewBase + '/';
         
         if (editType === 'component') {
             // Component preview - standalone component render
@@ -6101,7 +6108,7 @@
                 item.className = 'preview-asset-picker__item';
                 const path = asset.path || `/assets/${asset.category}/${asset.filename}`;
                 const isImage = asset.mime_type?.startsWith('image/');
-                const displayPath = baseUrl + path;
+                const displayPath = previewBase + path; // project assets live under /p/<id>/ for a non-served project
                 
                 item.innerHTML = `
                     ${isImage ? `<img class="preview-asset-picker__thumb" src="${displayPath}" alt="" loading="lazy">` : `<span class="preview-asset-picker__icon">📄</span>`}
@@ -6156,7 +6163,7 @@
         const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
         const videoExts = ['mp4', 'webm', 'ogv'];
         const audioExts = ['mp3', 'wav', 'ogg'];
-        const displayPath = baseUrl + path;
+        const displayPath = previewBase + path; // project assets live under /p/<id>/ for a non-served project
         
         const mime = (mimeType || '').split('/')[0];
         
@@ -6422,7 +6429,7 @@
             if (previewTitle) previewTitle.textContent = componentName;
             
             // Reuse the server-side component renderer (same as main editor preview)
-            previewFrame.src = PreviewConfig.baseUrl + '/?_component=' + encodeURIComponent(componentName) + '&_editor=1';
+            previewFrame.src = (PreviewConfig.previewBase || PreviewConfig.baseUrl) + '/?_component=' + encodeURIComponent(componentName) + '&_editor=1';
         }
         
         function renderComponentVars(comp) {
