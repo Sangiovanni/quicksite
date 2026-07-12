@@ -15,6 +15,7 @@ class AdminRouter {
     private ?string $workflowId = null;  // For workflow routing
     private array $validPages = [
         'login',       // Authentication page
+        'register',    // Self-registration page (C8; renders only when auth.php allows it)
         'dashboard',   // Main admin panel after login
         'command',     // Individual command pages
         'settings',    // Settings and configuration
@@ -283,6 +284,53 @@ class AdminRouter {
     }
 
     /**
+     * Is self-registration currently allowed (auth.php
+     * registration.allow_self_registration)? Drives the register page's
+     * existence and the login page's register link (C8).
+     */
+    public function isRegistrationOpen(): bool {
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+        return qs_registration_config()['allow_self_registration'];
+    }
+
+    /**
+     * Attempt a self-registration (C8) — the register page's entry into the
+     * ONE shared gate (qs_auth_attempt_register, also behind the public
+     * `register` command). On success a one-shot session flash is set for the
+     * login page's "account created" banner. A duplicate email reports
+     * success exactly like the command (no account oracle).
+     *
+     * @return string|null null on success, else an error key:
+     *                     'registration_disabled' | 'registration_closed' |
+     *                     'missing_fields' | 'invalid_email' |
+     *                     'password_too_short:<min>' | 'throttled:<seconds>' |
+     *                     'server'
+     */
+    public function attemptRegister(string $name, string $email, string $password): ?string {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+
+        if (trim($name) === '' || trim($email) === '' || $password === '') {
+            return 'missing_fields';
+        }
+
+        $attempt = qs_auth_attempt_register($name, $email, $password);
+        if ($attempt['ok']) {
+            $_SESSION['qs_register_flash'] = true;
+            return null;
+        }
+        if ($attempt['error'] === 'throttled') {
+            return 'throttled:' . (int)($attempt['retry_after'] ?? 60);
+        }
+        if ($attempt['error'] === 'password_too_short') {
+            return 'password_too_short:' . (int)($attempt['min_length'] ?? 12);
+        }
+        return $attempt['error'];
+    }
+
+    /**
      * Get the current ACCESS token (short-lived). This is what layout.php embeds
      * for the admin JS and what the qs_preview cookie carries — never the
      * refresh token.
@@ -537,13 +585,19 @@ class AdminRouter {
         }
         
         // Check authentication for protected pages
-        if (!in_array($this->page, ['login']) && !$this->isAuthenticated()) {
+        if (!in_array($this->page, ['login', 'register']) && !$this->isAuthenticated()) {
             $this->redirect('login');
         }
-        
-        // If already authenticated and trying to access login, go to dashboard
-        if ($this->page === 'login' && $this->isAuthenticated()) {
+
+        // If already authenticated and trying to access login/register, go to dashboard
+        if (in_array($this->page, ['login', 'register']) && $this->isAuthenticated()) {
             $this->redirect('dashboard');
+        }
+
+        // C8: the register page exists ONLY while self-registration is allowed
+        // (server-side gate — the command enforces the same flag independently).
+        if ($this->page === 'register' && !$this->isRegistrationOpen()) {
+            $this->redirect('login');
         }
 
         // Check page-level permissions (role-based access control)

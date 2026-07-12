@@ -36,9 +36,10 @@ quicksite/
 │   │   ├── command/              # Command handler files (one per command; see COMMAND_API.md)
 │   │   ├── config/               # API configuration
 │   │   │   ├── target.php        # Active project selector (gitignored)
-│   │   │   ├── auth.php          # Session TTLs, self-registration gate, CORS (gitignored)
+│   │   │   ├── auth.php          # Session TTLs, registration policy (self-registration + flood controls), CORS (gitignored)
 │   │   │   ├── users.php         # User registry: email + password_hash per user (gitignored)
 │   │   │   ├── sessions.json     # Runtime sessions — access/refresh tokens, hashed (machine-written, gitignored)
+│   │   │   ├── *-throttle.json   # Login + registration backoff counters, hashed keys (machine-written, gitignored)
 │   │   │   ├── roles.php         # Role definitions (gitignored)
 │   │   │   ├── environment.php   # production | development — SSRF/error gate (gitignored; default production)
 │   │   │   └── deploy-roots.php  # deployBuild allowed target roots (gitignored; default SERVER_ROOT only)

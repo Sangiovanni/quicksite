@@ -61,10 +61,32 @@
         "hidePassword": "Hide password",
         "connectionError": "Could not connect to API",
         "privacyNote": "By checking 'Keep me signed in', you consent to a persistent authentication cookie on this device.",
+        "registerLink": "No account yet? Create one",
+        "registerSuccess": "Account created — sign in with your email and password",
         "help": {
             "title": "No account?",
-            "text": "Accounts are created by an administrator (or the platform hosting this site). If you lost your password, ask your administrator to reset it."
+            "text": "Accounts are created by an administrator (or the platform hosting this site). If you lost your password, ask your administrator to reset it.",
+            "textRegisterOpen": "Use the link above to create your account. If you lost your password, ask your administrator to reset it."
         }
+    },
+    "register": {
+        "title": "Create your account",
+        "subtitle": "Register with your email and a password",
+        "nameLabel": "Name",
+        "namePlaceholder": "Your name",
+        "emailLabel": "Email",
+        "emailPlaceholder": "you@example.com",
+        "passwordLabel": "Password",
+        "passwordHint": "At least :min characters — length matters more than symbols.",
+        "submit": "Create account",
+        "backToLogin": "Already have an account? Sign in",
+        "invalidEmail": "This email address is not valid",
+        "passwordTooShort": "Password is too short — at least :min characters",
+        "missingFields": "The form arrived incomplete — hard-refresh this page (Ctrl+F5) and try again",
+        "throttled": "Too many attempts — try again in :seconds seconds",
+        "closed": "Registration is closed on this installation (account limit reached)",
+        "disabled": "Self-registration is disabled on this installation",
+        "serverError": "Could not create the account — try again"
     },
     "logout": {
         "title": "Logout",

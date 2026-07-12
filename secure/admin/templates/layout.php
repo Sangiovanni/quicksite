@@ -26,7 +26,12 @@ $versionedAsset = function($path) use ($baseUrl, $assetVersion) {
     return $baseUrl . '/admin/assets' . $path . '?v=' . $version;
 };
 
-$isLoginPage = $router->getPage() === 'login';
+// login + register are the unauthenticated AUTH pages: minimal centered chrome,
+// no nav/config/JS boot. Register MUST be here — the full chrome flushes output
+// before the page template runs, which would break its POST-success redirect
+// (headers already sent); the slim auth chrome stays inside the output buffer,
+// same as login's own POST redirect relies on.
+$isLoginPage = in_array($router->getPage(), ['login', 'register'], true);
 $isPreviewPage = $router->getPage() === 'preview';
 $currentPage = $router->getPage();
 

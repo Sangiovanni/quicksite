@@ -20,7 +20,7 @@ The API documents itself. Once installed:
 GET /management/help
 ```
 
-returns full documentation for **all 153 commands** — parameters, examples, validation rules, and error codes. For a specific command:
+returns full documentation for **all 155 commands** — parameters, examples, validation rules, and error codes. For a specific command:
 
 ```
 GET /management/help/addRoute
@@ -41,8 +41,9 @@ The `help` endpoint is publicly accessible and is the canonical source of truth 
   Authorization: Bearer <access_token>
   ```
   When it expires, requests return `401` with code `auth.token_expired` — call `refreshSession` with the refresh token and retry. Each refresh **rotates** the refresh token (always store both returned tokens); presenting an already-rotated refresh token after a short grace window is treated as theft and revokes the whole session family. `logoutSession` ends a session explicitly.
-- Four commands are public and self-authenticating: `help`, `login`, `refreshSession`, `logoutSession`. Failed logins are throttled per email (doubling cooldown after 5 attempts).
-- Session TTLs (`access_ttl`, `refresh_ttl`, `reuse_grace`) and the self-registration gate live in `secure/management/config/auth.php` (gitignored, auto-created from `.example`); runtime session state lives in `sessions.json` next to it (machine-written, hashed at rest — never edit).
+- Five commands are public: `help`, `login`, `refreshSession`, `logoutSession`, `register`. The session commands are self-authenticating; `register` is self-gating — it enforces the `registration.allow_self_registration` flag server-side (default: **disabled**) plus flood controls (attempts per IP per minute, successful registrations per hour install-wide, and an optional absolute account cap). Failed logins are throttled per email (doubling cooldown after 5 attempts). A duplicate email at `register` returns the same success response as a real creation — no account-existence oracle.
+- `changePassword` (authenticated) changes the caller's own password: it requires the current password, shares the login throttle, and revokes every **other** session of the user on success (the session performing the change survives).
+- Session TTLs (`access_ttl`, `refresh_ttl`, `reuse_grace`) and the registration policy (`allow_self_registration`, `min_password_length`, `max_users`, `throttle.per_ip_per_minute`, `throttle.global_per_hour` — 0 disables a limit) live in `secure/management/config/auth.php` (gitignored, auto-created from `.example`); runtime session state lives in `sessions.json` next to it (machine-written, hashed at rest — never edit).
 - Authorization is **per project**: a user's role comes from the target project's `config/members.json`. The six fixed roles (`viewer` … `owner`) are defined by trust-coherent command **categories** in `categories.php`; `roles.php` grants each role a `rank` and its categories, expanded to a per-command allowlist at load time. There is no superadmin and no custom roles.
 - Default install ships with a placeholder account whose default password is documented in `users.php.example`; the admin panel warns until you change its password and id.
 
@@ -71,7 +72,7 @@ There is **no separate error envelope**. A failed call uses the same four fields
 
 ## Command catalogue
 
-The 153 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
+The 155 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
 
 > **AI is browser-direct (BYOK).** There is no `callAi` / `testAiKey` / `detectProvider` / `listAiProviders` server command — the admin panel calls AI providers directly from the browser using credentials stored in `aiConnectionsV3` (localStorage). The Management API only handles workflow specs and command execution.
 
@@ -80,7 +81,7 @@ Each row enumerates the commands in that category — comma-separated, alphabeti
 | Category | Commands & detail |
 |---|---|
 | **Meta** | `help` — self-documenting endpoint, callable without authentication. |
-| **Session** | `login`, `refreshSession`, `logoutSession` — email+password login → access + refresh pair; refresh rotation with reuse-detection (family revoke); explicit logout. Public + self-authenticating (see *Authentication* above). |
+| **Session & account** | `login`, `refreshSession`, `logoutSession`, `register`, `changePassword` — email+password login → access + refresh pair; refresh rotation with reuse-detection (family revoke); explicit logout; flag-gated flood-controlled self-registration (public); self-service password change (authenticated — requires the current password, revokes the user's other sessions). See *Authentication* above. |
 | **Pages** | `listPages`, `createAlias`, `deleteAlias`, `listAliases`, `editFavicon`, `editTitle` — page metadata, title, favicon, alias routes. |
 | **Routes & sitemap** | `addRoute`, `deleteRoute`, `getRoutes`, `getSiteMap`, `setRouteLayout`, `analyzeReachability` — URL routing tree CRUD, sitemap export, dead-route audit. `setRouteResolver` is under "Server-side data resolvers" below since the route layer just hosts the resolver config. |
 | **Structure** | `getStructure`, `editStructure`, `addNode`, `addComplexElement`, `addComponentToNode`, `editComponentToNode`, `editNode`, `moveNode`, `deleteNode`, `duplicateNode` — edit nodes inside a page tree. |
@@ -92,7 +93,7 @@ Each row enumerates the commands in that category — comma-separated, alphabeti
 | **CSS variables** | `getRootVariables`, `setRootVariables`, `setThemeMode` — CSS custom-property registries used by the color picker and theme switcher. |
 | **Animations** | `listKeyframes`, `getKeyframes`, `setKeyframes`, `deleteKeyframes`, `getAnimatedSelectors` — named keyframes + per-element animation bindings. |
 | **Builds** | `build`, `listBuilds`, `getBuild`, `deleteBuild`, `cleanBuilds`, `deployBuild`, `downloadBuild` — compile a project to a static `public/build/<name>/` deliverable; list / deploy (to the install root, or a root listed in `secure/management/config/deploy-roots.php`) / clean. |
-| **Projects** | `listProjects`, `getActiveProject`, `setSelectedProject`, `switchProject`, `createProject`, `cloneProject`, `deleteProject` — per-project CRUD under `secure/projects/`, plus two distinct project pointers: `setSelectedProject` sets the caller's **edited** project (per-user, member-only — drives the admin panel + preview), while `switchProject` sets the globally **served** main project (deploy-level). See [ARCHITECTURE.md §6](ARCHITECTURE.md). |
+| **Projects** | `listProjects`, `getActiveProject`, `setSelectedProject`, `switchProject`, `createProject`, `cloneProject`, `deleteProject` — per-project CRUD under `secure/projects/`. `listProjects` is membership-filtered: it returns only the caller's projects, each with `my_role` (no all-projects view). Two distinct project pointers: `setSelectedProject` sets the caller's **edited** project (per-user, member-only — drives the admin panel + preview), while `switchProject` sets the globally **served** main project (deploy-level). `createProject`'s `switch_to` sets only the creator's edited project — it never changes the served main. See [ARCHITECTURE.md §6](ARCHITECTURE.md). |
 | **Backups** | `backupProject`, `listBackups`, `restoreBackup`, `deleteBackup` — snapshot / restore (configurable scope). |
 | **Export / Import** | `exportProject`, `importProject`, `downloadExport`, `clearExports` — pack a project as ZIP for portability; import a ZIP back. |
 | **Roles** | `listRoles`, `getMyPermissions` — read the fixed roles and your own effective permissions. (`createRole` / `editRole` / `deleteRole` are disabled: roles are a fixed set, not customisable.) |
@@ -184,7 +185,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 ## Internals
 
 - Command handlers live in `secure/management/command/<command>.php`, one file per command.
-- The whitelist of valid commands is `secure/management/routes.php` (153 entries — this file is the single source of truth for which commands exist).
+- The whitelist of valid commands is `secure/management/routes.php` (155 entries — this file is the single source of truth for which commands exist).
 - Shared helpers live in `secure/src/functions/utilsManagement.php` (e.g., `varExportNested()`, `SPECIAL_PAGES`, role helpers).
 - Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `secure/src/classes/CommandRunner.php`. CommandRunner currently carries a **hardcoded read-only allowlist** of ~50 `get*` / `list*` commands it will execute internally.
 - Workflow execution adds its own role check via `WorkflowManager::setTokenInfo()` so steps respect the calling token's permissions.

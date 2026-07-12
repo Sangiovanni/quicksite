@@ -61,10 +61,32 @@
         "hidePassword": "Masquer le mot de passe",
         "connectionError": "Impossible de se connecter à l'API",
         "privacyNote": "En cochant 'Rester connecté', vous consentez à un cookie d'authentification persistant sur cet appareil.",
+        "registerLink": "Pas encore de compte ? Créez-en un",
+        "registerSuccess": "Compte créé — connectez-vous avec votre email et votre mot de passe",
         "help": {
             "title": "Pas de compte ?",
-            "text": "Les comptes sont créés par un administrateur (ou par la plateforme qui héberge ce site). Mot de passe perdu ? Demandez à votre administrateur de le réinitialiser."
+            "text": "Les comptes sont créés par un administrateur (ou par la plateforme qui héberge ce site). Mot de passe perdu ? Demandez à votre administrateur de le réinitialiser.",
+            "textRegisterOpen": "Utilisez le lien ci-dessus pour créer votre compte. Mot de passe perdu ? Demandez à votre administrateur de le réinitialiser."
         }
+    },
+    "register": {
+        "title": "Créer votre compte",
+        "subtitle": "Inscrivez-vous avec votre email et un mot de passe",
+        "nameLabel": "Nom",
+        "namePlaceholder": "Votre nom",
+        "emailLabel": "Email",
+        "emailPlaceholder": "vous@exemple.com",
+        "passwordLabel": "Mot de passe",
+        "passwordHint": "Au moins :min caractères — la longueur compte plus que les symboles.",
+        "submit": "Créer le compte",
+        "backToLogin": "Déjà un compte ? Connectez-vous",
+        "invalidEmail": "Cette adresse email n'est pas valide",
+        "passwordTooShort": "Mot de passe trop court — au moins :min caractères",
+        "missingFields": "Le formulaire est arrivé incomplet — rechargez la page (Ctrl+F5) et réessayez",
+        "throttled": "Trop de tentatives — réessayez dans :seconds secondes",
+        "closed": "Les inscriptions sont fermées sur cette installation (limite de comptes atteinte)",
+        "disabled": "L'auto-inscription est désactivée sur cette installation",
+        "serverError": "Impossible de créer le compte — réessayez"
     },
     "logout": {
         "title": "Déconnexion",

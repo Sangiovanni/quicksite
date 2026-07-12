@@ -1,18 +1,22 @@
 <?php
 /**
  * listProjects Command
- * 
- * Lists all projects in secure/projects/ folder with metadata.
- * Can be called via API or internally from admin panel.
- * 
+ *
+ * Lists the CALLER's projects — the scan of secure/projects/ is filtered to
+ * the projects the authenticated user is a member of (authoritative
+ * members.json), each annotated with the caller's role. There is no
+ * all-projects API view (C8 / GAP A ruling): a project you are not a member
+ * of simply isn't listed.
+ *
  * @method GET
  * @route /management/listProjects
  * @auth required
- * 
- * @return ApiResponse List of projects with metadata
+ *
+ * @return ApiResponse List of the caller's projects with metadata
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 
 /**
  * Count routes recursively in a nested routes structure
@@ -68,14 +72,24 @@ function __command_listProjects(array $params = [], array $urlParams = []): ApiR
         $activeProject = $targetConfig['project'] ?? null;
     }
     
-    // Scan projects directory
+    // Scan projects directory — MEMBERSHIP-FILTERED (C8/GAP A): only projects
+    // the caller is a member of are listed, role from the authoritative
+    // members.json. No resolvable caller (e.g. an in-process run without a
+    // request context) → empty list, fail-closed.
+    $user = getCurrentUser();
+    $userId = $user['id'] ?? null;
     $projects = [];
     $dirs = glob($projectsDir . '/*', GLOB_ONLYDIR);
-    
+
     foreach ($dirs as $dir) {
         $projectName = basename($dir);
+        $role = $userId !== null ? getUserRoleForProject($userId, $projectName) : null;
+        if ($role === null) {
+            continue; // not a member → not listed
+        }
         $projectInfo = getProjectInfo($dir, $projectName);
         $projectInfo['is_active'] = ($projectName === $activeProject);
+        $projectInfo['my_role'] = $role;
         $projects[] = $projectInfo;
     }
     

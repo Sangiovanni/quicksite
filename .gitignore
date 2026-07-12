@@ -85,13 +85,16 @@ secure/management/config/roles.php
 secure/management/config/deploy-roots.php
 secure/management/config/environment.php
 
-# Session + login-throttle runtime state (C5b) - machine-written JSON
-# (auto-created; holds sha256-hashed session tokens + per-email backoff
-# counters) plus their flock sidecars and atomic-write temp files.
+# Session + login/registration-throttle runtime state (C5b/C8) -
+# machine-written JSON (auto-created; holds sha256-hashed session tokens +
+# hashed-key backoff counters) plus flock sidecars and atomic-write temp
+# files (users.php.lock = the C8 centralized users-writer's sidecar).
 secure/management/config/sessions.json
 secure/management/config/login-throttle.json
+secure/management/config/registration-throttle.json
 secure/management/config/*.json.lock
 secure/management/config/*.tmp*
+secure/management/config/users.php.lock
 
 # Admin config - server-side secrets for data resolver (beta.8 A2) +
 # OAuth provider credentials (beta.9 A1).

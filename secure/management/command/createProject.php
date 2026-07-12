@@ -12,8 +12,11 @@
  * @param string $name Project name (required)
  * @param string $site_name Display name for the site (optional)
  * @param string $language Default language code (optional, default: en)
- * @param bool $switch_to Switch to this project after creation (optional, default: false)
- * 
+ * @param bool $switch_to Make the new project the CREATOR's editing target
+ *                        (their per-user selected_project) after creation
+ *                        (optional, default: false). Never changes the served
+ *                        main project (target.php) — C9 fixed-main model.
+ *
  * @return ApiResponse Creation result
  */
 
@@ -190,27 +193,28 @@ HTACCESS;
         LOCK_EX
     );
 
-    // Update the creator's derived project index (users.php) — cache only (L5)
+    // Update the creator's derived project index (users.php) — cache only, NO
+    // role key (role is authoritative in members.json — L5/C5). With switch_to,
+    // ONLY the creator's selected_project (their per-user EDITING target) moves
+    // to the new project — a command never repoints the served main (target.php);
+    // the site root keeps serving the fixed main and the new project is edited
+    // at /p/<id>/ (C9 fixed-main model).
+    $selectedProjectSet = false;
     if ($creatorId !== null) {
-        $usersPath = SECURE_FOLDER_PATH . '/management/config/users.php';
-        if (is_file($usersPath)) {
-            $usersCfg = require $usersPath;
-            if (isset($usersCfg['users'][$creatorId])) {
-                $usersCfg['users'][$creatorId]['projects'][$projectName] = [
-                    'name'    => $siteName,
-                    'created' => date('Y-m-d'),
-                    'role'    => 'owner',
-                ];
-                if ($switchTo) {
-                    $usersCfg['users'][$creatorId]['selected_project'] = $projectName;
-                }
-                $usersContent = "<?php\n/**\n * User Registry (C5) — stable userId => identity.\n * Engine plumbing (PHP). Atomic write (temp+rename).\n */\n\nreturn " . var_export($usersCfg, true) . ";\n";
-                $tmp = $usersPath . '.tmp' . getmypid();
-                if (file_put_contents($tmp, $usersContent, LOCK_EX) !== false) {
-                    @rename($tmp, $usersPath);
-                }
+        $written = qs_users_mutate(function (array &$cfg) use ($creatorId, $projectName, $siteName, $switchTo) {
+            if (!isset($cfg['users'][$creatorId])) {
+                return false;
             }
-        }
+            $cfg['users'][$creatorId]['projects'][$projectName] = [
+                'name'    => $siteName,
+                'created' => date('Y-m-d'),
+            ];
+            if ($switchTo) {
+                $cfg['users'][$creatorId]['selected_project'] = $projectName;
+            }
+            return true;
+        });
+        $selectedProjectSet = ($written === true && $switchTo);
     }
 
     $result = [
@@ -220,77 +224,9 @@ HTACCESS;
         'default_language' => $defaultLang,
         'owner_user_id' => $creatorId,
         'created' => true,
-        'switched_to' => false
+        'switched_to' => $selectedProjectSet
     ];
-    
-    // Switch to project if requested
-    if ($switchTo) {
-        // Sync live public files back to the previous project before switching
-        // This prevents CSS/asset loss when creating multiple projects in sequence
-        $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-        if (file_exists($targetFile)) {
-            $prevTarget = include $targetFile;
-            $prevName = is_array($prevTarget) ? ($prevTarget['project'] ?? null) : $prevTarget;
-            if ($prevName && $prevName !== $projectName) {
-                $prevProjectPath = SECURE_FOLDER_PATH . '/projects/' . $prevName;
-                if (is_dir($prevProjectPath)) {
-                    $prevPublicPath = $prevProjectPath . '/public';
-                    if (!is_dir($prevPublicPath)) {
-                        mkdir($prevPublicPath, 0755, true);
-                    }
-                    foreach (['style', 'assets'] as $folder) {
-                        $liveSrc = PUBLIC_CONTENT_PATH . '/' . $folder;
-                        $projDst = $prevPublicPath . '/' . $folder;
-                        if (is_dir($liveSrc)) {
-                            // Remove old and copy fresh from live
-                            if (is_dir($projDst)) {
-                                $di = new RecursiveDirectoryIterator($projDst, FilesystemIterator::SKIP_DOTS);
-                                $ri = new RecursiveIteratorIterator($di, RecursiveIteratorIterator::CHILD_FIRST);
-                                foreach ($ri as $file) {
-                                    $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
-                                }
-                                rmdir($projDst);
-                            }
-                            // Copy live folder to project
-                            $si = new RecursiveIteratorIterator(
-                                new RecursiveDirectoryIterator($liveSrc, RecursiveDirectoryIterator::SKIP_DOTS),
-                                RecursiveIteratorIterator::SELF_FIRST
-                            );
-                            mkdir($projDst, 0755, true);
-                            foreach ($si as $item) {
-                                $dest = $projDst . '/' . $si->getSubPathname();
-                                $item->isDir() ? (is_dir($dest) || mkdir($dest, 0755, true)) : copy($item->getPathname(), $dest);
-                            }
-                        }
-                    }
-                    $result['previous_project_synced'] = $prevName;
-                }
-            }
-        }
 
-        $targetContent = "<?php\n/**\n * Active Project Target Configuration\n * Updated: " . date('Y-m-d H:i:s') . "\n */\n\nreturn [\n    'project' => '" . addslashes($projectName) . "'\n];\n";
-        
-        // Use fopen/fwrite/fflush for explicit sync
-        $handle = fopen($targetFile, 'w');
-        if ($handle !== false) {
-            if (flock($handle, LOCK_EX)) {
-                $bytesWritten = fwrite($handle, $targetContent);
-                fflush($handle);
-                flock($handle, LOCK_UN);
-                if ($bytesWritten === strlen($targetContent)) {
-                    $result['switched_to'] = true;
-                }
-            }
-            fclose($handle);
-            
-            // Clear all caches to ensure next request sees new file
-            clearstatcache(true, $targetFile);
-            if (function_exists('opcache_invalidate')) {
-                opcache_invalidate($targetFile, true);
-            }
-        }
-    }
-    
     return ApiResponse::create(201, 'resource.created')
         ->withMessage("Project '$projectName' created successfully")
         ->withData($result);

@@ -50,28 +50,24 @@ function __command_setSelectedProject(array $params = [], array $urlParams = [])
             ->withMessage('You are not a member of this project');
     }
 
-    // Atomic update of the caller's selected_project in users.php (temp + rename), mirroring
-    // createProject's writer. Only this one field changes.
-    $usersPath = SECURE_FOLDER_PATH . '/management/config/users.php';
-    if (!is_file($usersPath)) {
-        return ApiResponse::create(500, 'server.config_missing')
-            ->withMessage('User registry not found');
-    }
-    $usersCfg = require $usersPath;
-    if (!isset($usersCfg['users'][$userId])) {
+    // Update the caller's selected_project through THE users.php writer
+    // (qs_users_mutate — flock + temp/rename + opcache invalidate, C8).
+    $userMissing = false;
+    $written = qs_users_mutate(function (array &$cfg) use ($userId, $project, &$userMissing) {
+        if (!isset($cfg['users'][$userId])) {
+            $userMissing = true;
+            return false;
+        }
+        $cfg['users'][$userId]['selected_project'] = $project;
+        return true;
+    });
+    if ($userMissing) {
         return ApiResponse::create(404, 'resource.not_found')
             ->withMessage('User record not found');
     }
-    $usersCfg['users'][$userId]['selected_project'] = $project;
-    $usersContent = "<?php\n/**\n * User Registry (C5) — stable userId => identity.\n * Engine plumbing (PHP). Atomic write (temp+rename).\n */\n\nreturn " . var_export($usersCfg, true) . ";\n";
-    $tmp = $usersPath . '.tmp' . getmypid();
-    if (file_put_contents($tmp, $usersContent, LOCK_EX) === false || !@rename($tmp, $usersPath)) {
-        @unlink($tmp);
+    if ($written !== true) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage('Failed to persist selected project');
-    }
-    if (function_exists('opcache_invalidate')) {
-        opcache_invalidate($usersPath, true);
     }
 
     return ApiResponse::create(200, 'operation.success')

@@ -217,14 +217,18 @@ window.QuickSiteAPI = (function() {
     }
 
     // Build the management path for a command (WITHOUT the /management prefix):
-    // project-scoped commands get the 'p/<currentProject>/' marker, globals don't.
-    // Returns null when a project-scoped command has no current project — the caller
-    // surfaces a clean error rather than firing '/management/p//<cmd>' (which the
-    // dispatcher would read as command 'p' → 404).
-    function buildCommandPath(command) {
+    // project-scoped commands get the 'p/<project>/' marker, globals don't.
+    // `projectOverride` (optional) targets a SPECIFIC project for this one call
+    // instead of the panel default — used by the dashboard project-manager, where
+    // the acted-on project is chosen in the modal, not the edited project. The
+    // server still re-authorizes the marker project on every request. Returns null
+    // when a project-scoped command has no project — the caller surfaces a clean
+    // error rather than firing '/management/p//<cmd>' (dispatcher reads command 'p' → 404).
+    function buildCommandPath(command, projectOverride) {
         if (!isProjectScoped(command)) return command;
-        if (!currentProject) return null;
-        return 'p/' + encodeURIComponent(currentProject) + '/' + command;
+        const project = projectOverride || currentProject;
+        if (!project) return null;
+        return 'p/' + encodeURIComponent(project) + '/' + command;
     }
 
     // Shared client-side error for a project-scoped call with no project selected.
@@ -252,8 +256,12 @@ window.QuickSiteAPI = (function() {
     // request(), so it stays live — it backs up the served project being edited.
     // (Remove this guard when C8 wires the project-manager; the panel is consistent
     // either way now that currentProject is the served project.)
+    // C8: `deleteProject` LIFTED — it is wired with an explicit project override
+    // (the dashboard sends the marker = the project being deleted) and the command
+    // enforces marker==target server-side (confused-deputy fix). The rest of the
+    // family stays fenced pending the full 8.4 project.data re-scope.
     const C8_DEFERRED_PROJECT_COMMANDS = [
-        'backupProject', 'restoreBackup', 'cloneProject', 'deleteProject',
+        'backupProject', 'restoreBackup', 'cloneProject',
         'exportProject', 'importProject', 'deleteBackup', 'listBackups'
     ];
 
@@ -308,8 +316,13 @@ window.QuickSiteAPI = (function() {
      * 
      * // GET with query params: /management/getCommandHistory?limit=50&offset=0
      * const result = await QuickSiteAPI.request('getCommandHistory', 'GET', null, [], { limit: 50, offset: 0 });
+     *
+     * // Target a SPECIFIC project (dashboard project-manager): opts.project sets the marker
+     * const result = await QuickSiteAPI.request('deleteProject', 'POST', { confirm: true }, [], {}, { project: 'prj_x' });
+     *
+     * @param {Object} [opts] - { project?: string } marker override for this call
      */
-    async function request(command, method = 'GET', data = null, urlParams = [], queryParams = {}, _isRetry = false) {
+    async function request(command, method = 'GET', data = null, urlParams = [], queryParams = {}, _isRetry = false, opts = {}) {
         const token = getToken();
         if (!token) {
             return {
@@ -324,8 +337,9 @@ window.QuickSiteAPI = (function() {
             return deferredC8Error(command);
         }
 
-        // Build URL — project-scoped commands carry the C7 '/p/<projectId>/' marker (8.W)
-        const commandPath = buildCommandPath(command);
+        // Build URL — project-scoped commands carry the C7 '/p/<projectId>/' marker;
+        // opts.project targets a specific project for this call (else the panel default).
+        const commandPath = buildCommandPath(command, opts.project);
         if (commandPath === null) {
             return noProjectError(command);
         }
@@ -390,14 +404,20 @@ window.QuickSiteAPI = (function() {
             }
 
             // C5b: an EXPIRED access token is refreshable — do it transparently
-            // and retry the original request exactly once. Any other 401 means
-            // the session is dead → login.
+            // and retry the original request exactly once. A 401 with
+            // auth.invalid_credentials is a COMMAND-level credential check
+            // (e.g. changePassword's current password) — the session itself is
+            // alive, so surface it to the caller (C8). Any other 401 means the
+            // session is dead → login.
             if (response.status === 401) {
                 if (!_isRetry && result && result.code === 'auth.token_expired') {
                     const fresh = await refreshAccessToken();
                     if (fresh) {
-                        return request(command, method, data, urlParams, queryParams, true);
+                        return request(command, method, data, urlParams, queryParams, true, opts);
                     }
+                }
+                if (result && result.code === 'auth.invalid_credentials') {
+                    return { ok: false, status: 401, data: result };
                 }
                 if (!redirectingToLogin) {
                     redirectingToLogin = true;
@@ -467,13 +487,17 @@ window.QuickSiteAPI = (function() {
 
             const result = await response.json();
 
-            // C5b: refresh + retry once on an expired access token (see request()).
+            // C5b: refresh + retry once on an expired access token (see request()
+            // — incl. the auth.invalid_credentials carve-out, kept symmetric).
             if (response.status === 401) {
                 if (!_isRetry && result && result.code === 'auth.token_expired') {
                     const fresh = await refreshAccessToken();
                     if (fresh) {
                         return upload(command, formData, urlParams, true);
                     }
+                }
+                if (result && result.code === 'auth.invalid_credentials') {
+                    return { ok: false, status: 401, data: result };
                 }
                 if (!redirectingToLogin) {
                     redirectingToLogin = true;

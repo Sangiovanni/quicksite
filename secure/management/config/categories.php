@@ -203,14 +203,23 @@ return [
         'commands' => ['help'],
     ],
 
-    // Session lifecycle (C5b). Served pre-auth (index.php PUBLIC_COMMANDS) —
-    // each command is SELF-authenticating (email+password / the refresh token
-    // itself), so hasPermission never actually gates them; mapped here so the
-    // command↔category coverage stays 1:1.
+    // Session lifecycle (C5b) + self-registration (C8). Served pre-auth
+    // (index.php PUBLIC_COMMANDS) — each command is SELF-authenticating /
+    // self-gating (email+password / the refresh token itself / the
+    // registration flag + flood controls), so hasPermission never actually
+    // gates them; mapped here so the command↔category coverage stays 1:1.
     'auth.session' => [
         'scope' => 'global',
         'access' => 'any',
-        'commands' => ['login', 'refreshSession', 'logoutSession'],
+        'commands' => ['login', 'refreshSession', 'logoutSession', 'register'],
+    ],
+
+    // Authenticated self-service on the caller's OWN account (C8). Unlike
+    // auth.session these DO require a bearer; any authenticated user.
+    'account.self' => [
+        'scope' => 'global',
+        'access' => 'any',
+        'commands' => ['changePassword'],
     ],
 
     // Self / role catalog reads.

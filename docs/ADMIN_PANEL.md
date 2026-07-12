@@ -26,6 +26,8 @@ public/admin/assets/js/lib/css-refiner/      → CSS analysis library
                                                (consumed by optimize.js)
 ```
 
+Two pages sit outside the authenticated shell: `/admin/login` (email + password form; POSTs to itself, verified through the shared server-side login gate) and `/admin/register` (self-registration form — exists **only** while `auth.php` `registration.allow_self_registration` is true, otherwise it redirects to login; the login page shows a "create one" link under the same condition). A successful registration redirects to the login page with a one-shot "account created" banner — registering never logs you in by itself. Both are plain server-rendered forms with no admin JS beyond a password-visibility toggle, and are served with `Cache-Control: no-store`.
+
 ---
 
 ## 2. Boot flow

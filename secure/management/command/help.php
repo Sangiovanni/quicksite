@@ -2147,6 +2147,7 @@ $GLOBALS['__help_commands'] = [
             'password' => [
                 'required' => true,
                 'type' => 'string',
+                'ui_type' => 'password',
                 'description' => 'Plain password, verified against the password_hash of the user',
                 'example' => '********'
             ]
@@ -2237,6 +2238,89 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'refresh_token parameter is required'
         ],
         'notes' => 'Unknown or already-revoked tokens return 200 with revoked=false (idempotent, no token oracle). The admin panel logout revokes the same way in-process.'
+    ],
+
+    'register' => [
+        'description' => 'Self-registration: creates a user account from name + email + password. PUBLIC + self-gating - the command enforces the auth.php registration.allow_self_registration flag server-side (default: DISABLED) plus flood controls (per-IP rate, install-wide hourly cap, absolute account cap). A duplicate email returns the SAME success response as a real creation (no account-existence oracle); sign in afterwards with the login command.',
+        'method' => 'POST',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Display name (max 200 characters)',
+                'example' => 'Your Name'
+            ],
+            'email' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Login identifier - must be a valid, unused email address',
+                'example' => 'you@example.com'
+            ],
+            'password' => [
+                'required' => true,
+                'type' => 'string',
+                'ui_type' => 'password',
+                'description' => 'Plain password (minimum length from auth.php registration.min_password_length, default 12)',
+                'example' => '************'
+            ]
+        ],
+        'example_post' => 'POST /management/register with body: {"name": "Your Name", "email": "you@example.com", "password": "************"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Account registered - you can now sign in',
+            'data' => [
+                'registered' => true
+            ]
+        ],
+        'error_responses' => [
+            '403.auth.registration_disabled' => 'Self-registration is disabled on this installation (auth.php registration.allow_self_registration)',
+            '403.auth.registration_closed' => 'Registration is closed - the account limit (registration.max_users) is reached',
+            '429.auth.throttled' => 'Too many registration attempts - retry_after gives the wait in seconds (per-IP rate or install-wide hourly cap)',
+            '400.validation.required' => 'name, email and password are required',
+            '400.validation.invalid_format' => 'Invalid email address, or password shorter than the configured minimum (data.min_length)',
+            '500.server.registration_failed' => 'Could not register the account'
+        ],
+        'notes' => 'No session and no user id are returned - the new account signs in through the login command. The success response is identical whether the account was created or the email already existed; if the email belonged to someone else, the subsequent login simply fails. Flood-control knobs live in auth.php authentication.registration (throttle.per_ip_per_minute, throttle.global_per_hour, max_users; 0 disables a limit).'
+    ],
+
+    'changePassword' => [
+        'description' => 'Self-service password change for the AUTHENTICATED caller. Requires the current password (a stolen access token alone cannot take over the account) and is throttled with the login backoff. On success every OTHER session of the user is revoked (containment) - the session performing the change survives.',
+        'method' => 'POST',
+        'parameters' => [
+            'current_password' => [
+                'required' => true,
+                'type' => 'string',
+                'ui_type' => 'password',
+                'description' => 'The account\'s current password',
+                'example' => '************'
+            ],
+            'new_password' => [
+                'required' => true,
+                'type' => 'string',
+                'ui_type' => 'password',
+                'description' => 'Replacement password (minimum length from auth.php registration.min_password_length, default 12)',
+                'example' => '************'
+            ]
+        ],
+        'example_post' => 'POST /management/changePassword with body: {"current_password": "************", "new_password": "************"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Password changed',
+            'data' => [
+                'other_sessions_revoked' => 1
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'current_password and new_password are required',
+            '400.auth.externally_managed' => 'This account has no local password (password_hash is null - managed by an embedding platform)',
+            '400.validation.invalid_format' => 'New password shorter than the configured minimum (data.min_length)',
+            '401.auth.invalid_credentials' => 'Current password is incorrect (counts toward the login throttle)',
+            '429.auth.throttled' => 'Too many failed attempts - retry_after gives the wait in seconds',
+            '500.server.file_write_failed' => 'Could not persist the new password'
+        ],
+        'notes' => 'Global-scoped (no project marker) - acts only on the caller\'s own account. Wrong current-password attempts share the login throttle for the same email, so a stolen access token cannot brute-force the password. After a successful change, other devices/sessions must log in again with the new password.'
     ],
 
     'listComponents' => [
@@ -3095,7 +3179,7 @@ $GLOBALS['__help_commands'] = [
     // ==========================================
     
     'listProjects' => [
-        'description' => 'Lists all available projects with metadata (name, site name, routes, languages, size)',
+        'description' => 'Lists the CALLER\'s projects with metadata (name, site name, routes, languages, size). The list is filtered to the projects the authenticated user is a member of (from each project\'s members.json) - there is no all-projects view.',
         'method' => 'GET',
         'parameters' => [],
         'example_get' => 'GET /management/listProjects',
@@ -3114,7 +3198,8 @@ $GLOBALS['__help_commands'] = [
                         'languages' => ['en', 'fr'],
                         'size' => '2.5 MB',
                         'size_bytes' => 2621440,
-                        'is_active' => true
+                        'is_active' => true,
+                        'my_role' => 'owner'
                     ]
                 ],
                 'count' => 1,
@@ -3122,7 +3207,7 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [],
-        'notes' => 'Use to get overview of all managed projects. The is_active flag shows which project is currently being served.'
+        'notes' => 'Projects you are not a member of are simply absent from the list. my_role is your role on that project (members.json). The is_active flag shows which project is currently being served; a user with no memberships gets an empty list.'
     ],
     
     'getActiveProject' => [
@@ -3270,13 +3355,13 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'deleteProject' => [
-        'description' => 'Permanently deletes a project and all its files',
+        'description' => 'Permanently deletes a project and all its files. Project-scoped and OWNER-ONLY: authorized against the URL marker project (/management/p/<projectId>/deleteProject) via that project\'s members.json. The deleted project is always the marker project; a body "name" that disagrees is refused.',
         'method' => 'DELETE',
         'parameters' => [
             'name' => [
-                'required' => true,
+                'required' => false,
                 'type' => 'string',
-                'description' => 'Project name to delete'
+                'description' => 'Optional. If provided, MUST equal the project in the URL marker (defense-in-depth); the marker project is what gets deleted.'
             ],
             'confirm' => [
                 'required' => true,
@@ -3305,12 +3390,14 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '400.validation.missing_field' => 'Missing name parameter',
+            '400.project.mismatch' => 'The body name does not match the targeted (URL marker) project',
+            '400.validation.missing_field' => 'No project targeted',
             '400.validation.confirmation_required' => 'Must set confirm=true',
-            '400.validation.active_project' => 'Cannot delete active project (use force=true)',
+            '400.validation.active_project' => 'Cannot delete the served main project (use force=true)',
+            '403.auth.forbidden' => 'Not the owner of this project (owner-only)',
             '404.resource.not_found' => 'Project not found'
         ],
-        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. If deleting active project, system will auto-switch to another available project.'
+        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Deleting a project leaves each member\'s users.php projects cache pointing at it until reconcileMemberships runs, but those pointers are re-verified against members.json on every read, so a member simply falls back to another project (or the no-project state).'
     ],
     
     'exportProject' => [
@@ -5724,7 +5811,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'export_import' => ['exportProject', 'importProject', 'downloadExport', 'clearExports'],
                 'storage_monitoring' => ['getSizeInfo'],
                 'command_history' => ['getCommandHistory', 'clearCommandHistory'],
-                'authentication' => ['login', 'refreshSession', 'logoutSession'],
+                'authentication' => ['login', 'refreshSession', 'logoutSession', 'register', 'changePassword'],
                 'role_management' => ['listRoles', 'getMyPermissions', 'createRole', 'editRole', 'deleteRole'],
                 'snippet_management' => ['listSnippets', 'getSnippet', 'createSnippet', 'deleteSnippet', 'duplicateSnippet', 'insertSnippet'],
                 'system_updates' => ['checkForUpdates', 'applyUpdate'],
@@ -5737,7 +5824,8 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'header' => 'Authorization: Bearer <access_token>',
                 'access_token_format' => 'qsa_<48 hex characters> (short-lived; on 401 auth.token_expired call refreshSession and retry)',
                 'refresh_token_format' => 'qsr_<48 hex characters> (rotates on every refreshSession - always keep the newest pair; reusing a rotated token revokes the whole session family)',
-                'public_commands' => ['help', 'login', 'refreshSession', 'logoutSession'],
+                'public_commands' => ['help', 'login', 'refreshSession', 'logoutSession', 'register'],
+                'registration' => 'POST /management/register (public) creates an account when auth.php registration.allow_self_registration is true (default: false); flood-controlled; sign in afterwards via login',
                 'role_system' => [
                     'note' => 'Roles are PER PROJECT (config/members.json), fixed set, no superadmin. Rank order: viewer < editor < designer < developer < admin < owner.',
                     'viewer' => 'Read-only access to content, structure, styles',

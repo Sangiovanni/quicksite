@@ -105,22 +105,30 @@ const QuickSiteAdmin = {
         
         if (!nameEl || !roleEl) return;
         
-        if (!this.permissions.loaded || !this.permissions.role) {
+        // "Not logged in" ONLY when there is genuinely no session (no token /
+        // failed load). An authenticated user with role null is simply a
+        // member of no project (C8 — e.g. freshly registered): show who they
+        // are with a "no project" chip instead.
+        if (!this.permissions.loaded || (!this.permissions.role && !this.permissions.tokenName)) {
             nameEl.textContent = 'Not logged in';
             roleEl.textContent = '';
             roleEl.removeAttribute('data-role');
             return;
         }
-        
+
         // Display token name (shortened if too long)
         const name = this.permissions.tokenName || 'Unknown';
         nameEl.textContent = name.length > 20 ? name.substring(0, 20) + '...' : name;
         nameEl.title = name;
-        
-        // Display role with special formatting for superadmin
+
         const role = this.permissions.role;
-        roleEl.textContent = role === '*' ? 'Superadmin' : role;
-        roleEl.setAttribute('data-role', role);
+        if (role) {
+            roleEl.textContent = role;
+            roleEl.setAttribute('data-role', role);
+        } else {
+            roleEl.textContent = 'no project';
+            roleEl.removeAttribute('data-role');
+        }
     },
 
     /**
@@ -357,9 +365,9 @@ const QuickSiteAdmin = {
     /**
      * Make an API request - delegates to QuickSiteAPI
      */
-    async apiRequest(command, method = 'GET', data = null, urlParams = [], queryParams = {}) {
+    async apiRequest(command, method = 'GET', data = null, urlParams = [], queryParams = {}, opts = {}) {
         if (window.QuickSiteAPI) {
-            return window.QuickSiteAPI.request(command, method, data, urlParams, queryParams);
+            return window.QuickSiteAPI.request(command, method, data, urlParams, queryParams, false, opts);
         }
         
         // Fallback implementation

@@ -3260,9 +3260,33 @@ function renderFormField(rawName, param, required) {
         `;
     } else if (uiType === 'text') {
         inputHtml = `
-            <input type="text" name="${name}" id="${inputId}" class="admin-input" 
-                placeholder="${QuickSiteAdmin.escapeHtml(example || '')}" 
+            <input type="text" name="${name}" id="${inputId}" class="admin-input"
+                placeholder="${QuickSiteAdmin.escapeHtml(example || '')}"
                 ${required ? 'required' : ''} ${urlParamAttr}>
+        `;
+    } else if (uiType === 'password') {
+        // Masked input + visibility toggle (C8: login/register/changePassword
+        // params declare ui_type 'password' in help.php).
+        inputHtml = `
+            <div style="position: relative;">
+                <input type="password" name="${name}" id="${inputId}" class="admin-input"
+                    style="padding-right: 2.75rem;" autocomplete="new-password"
+                    ${required ? 'required' : ''} ${urlParamAttr}>
+                <button type="button" aria-label="Show password" title="Show password"
+                    data-password-toggle="${inputId}"
+                    style="position: absolute; top: 50%; right: 0.5rem; transform: translateY(-50%); background: none; border: none; padding: 0.25rem; cursor: pointer; color: inherit; opacity: 0.65; line-height: 0;">
+                    <svg data-eye viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    <svg data-eye-off viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                        <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/>
+                        <line x1="1" y1="1" x2="23" y2="23"/>
+                    </svg>
+                </button>
+            </div>
         `;
     } else if (uiType === 'checkbox') {
         inputHtml = `
@@ -3353,6 +3377,30 @@ function renderFormField(rawName, param, required) {
         </div>
     `;
 }
+
+/**
+ * ui_type 'password' visibility toggle (C8) — DELEGATED click handler.
+ * Delegation, not inline onclick: this whole file is IIFE-scoped, so inline
+ * handlers cannot reach its functions (the datetime picker's onclick
+ * applyDateTimeToField has that exact latent bug), and the fields are
+ * innerHTML-rendered after load.
+ */
+document.addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-password-toggle]');
+    if (!btn) return;
+    const input = document.getElementById(btn.getAttribute('data-password-toggle'));
+    if (!input) return;
+    const reveal = input.type === 'password';
+    input.type = reveal ? 'text' : 'password';
+    const eye = btn.querySelector('[data-eye]');
+    const eyeOff = btn.querySelector('[data-eye-off]');
+    if (eye) eye.style.display = reveal ? 'none' : '';
+    if (eyeOff) eyeOff.style.display = reveal ? '' : 'none';
+    const label = reveal ? 'Hide password' : 'Show password';
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('title', label);
+    input.focus();
+});
 
 function renderCommandDocs(doc) {
     const container = document.getElementById('command-docs');

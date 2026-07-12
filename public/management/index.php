@@ -121,7 +121,9 @@ if ($origin) {
 // C5b: the session endpoints are public because they are SELF-authenticating —
 // login checks email+password, refreshSession/logoutSession check the refresh
 // token itself. They never act on behalf of a bearer header.
-$PUBLIC_COMMANDS = ['help', 'login', 'refreshSession', 'logoutSession'];
+// C8: register is public too — SELF-gating (the registration flag + flood
+// controls are enforced inside the command; default = disabled).
+$PUBLIC_COMMANDS = ['help', 'login', 'refreshSession', 'logoutSession', 'register'];
 
 // Parse the command early to check if it's public
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';

@@ -412,3 +412,166 @@ function qs_login_throttle_clear(string $email): void {
         return true;
     });
 }
+
+/**
+ * Revoke EVERY session family belonging to a user except (optionally) one (C8).
+ * Password change: the new password invalidates every other device/session
+ * (theft containment) while the session that performed the change survives.
+ * Also serves a future admin force-logout.
+ *
+ * @return int number of families revoked
+ */
+function qs_session_revoke_user_families(string $userId, ?string $exceptFamily = null, string $reason = 'password_change'): int {
+    $result = qs_sessions_mutate(function (array &$data) use ($userId, $exceptFamily, $reason) {
+        $count = 0;
+        foreach ($data['families'] as $famId => $fam) {
+            if (($fam['userId'] ?? '') !== $userId || !empty($fam['revoked']) || $famId === $exceptFamily) {
+                continue;
+            }
+            qs_session_mark_family_revoked($data, (string)$famId, $reason);
+            $count++;
+        }
+        return $count;
+    });
+    return is_int($result) ? $result : 0;
+}
+
+// ============================================================================
+// Registration policy + flood control (C8) — the knobs live in auth.php
+// `authentication.registration`; the counters in registration-throttle.json
+// (same flock + temp/rename discipline, hashed IP keys — the raw address never
+// sits in the state file).
+// ============================================================================
+
+/**
+ * Registration policy knobs from auth.php (all optional, secure defaults —
+ * flag OFF, min password 12, no user cap, 3 attempts/IP/minute, 30 successful
+ * registrations/hour install-wide; 0 disables a limit).
+ *
+ * @return array{allow_self_registration:bool, min_password_length:int,
+ *               max_users:int, per_ip_per_minute:int, global_per_hour:int}
+ */
+function qs_registration_config(): array {
+    $cfg = loadAuthConfig()['authentication']['registration'] ?? [];
+    $throttle = is_array($cfg['throttle'] ?? null) ? $cfg['throttle'] : [];
+    return [
+        'allow_self_registration' => (bool)($cfg['allow_self_registration'] ?? false),
+        'min_password_length'     => max(1, (int)($cfg['min_password_length'] ?? 12)),
+        'max_users'               => max(0, (int)($cfg['max_users'] ?? 0)),
+        'per_ip_per_minute'       => max(0, (int)($throttle['per_ip_per_minute'] ?? 3)),
+        'global_per_hour'         => max(0, (int)($throttle['global_per_hour'] ?? 30)),
+    ];
+}
+
+/**
+ * The caller's network address for rate limiting. Deliberately REMOTE_ADDR
+ * only — X-Forwarded-For is caller-controlled (spoofable) and QuickSite does
+ * not know which proxies to trust; behind a reverse proxy this rate-limits
+ * the proxy address (deploy-time concern, beta.11 checklist).
+ */
+function qs_client_ip(): string {
+    return (string)($_SERVER['REMOTE_ADDR'] ?? '');
+}
+
+function qs_registration_throttle_path(): string {
+    return SECURE_FOLDER_PATH . '/management/config/registration-throttle.json';
+}
+
+/**
+ * Shared mutate for the registration-throttle file. $fn(array &$data): mixed.
+ * Shape: ['ips' => [sha256(ip) => {minute, count, last}], 'global' => {hour, count}]
+ */
+function qs_registration_throttle_mutate(callable $fn) {
+    $path = qs_registration_throttle_path();
+    $lock = @fopen($path . '.lock', 'c');
+    if ($lock === false) {
+        return false;
+    }
+    flock($lock, LOCK_EX);
+    try {
+        $data = is_file($path) ? json_decode((string)@file_get_contents($path), true) : [];
+        if (!is_array($data)) {
+            $data = [];
+        }
+        $data['ips'] = is_array($data['ips'] ?? null) ? $data['ips'] : [];
+        $data['global'] = is_array($data['global'] ?? null) ? $data['global'] : [];
+        $result = $fn($data);
+        // prune IP entries idle for an hour (their minute window is long over)
+        $cutoff = time() - 3600;
+        foreach ($data['ips'] as $key => $entry) {
+            if ((int)($entry['last'] ?? 0) < $cutoff) {
+                unset($data['ips'][$key]);
+            }
+        }
+        $tmp = $path . '.tmp' . getmypid();
+        if (file_put_contents($tmp, json_encode($data, JSON_PRETTY_PRINT)) === false || !@rename($tmp, $path)) {
+            @unlink($tmp);
+            return false;
+        }
+        return $result;
+    } finally {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+    }
+}
+
+/**
+ * Seconds the caller must wait before another registration attempt
+ * (0 = go ahead). Read-only. Checks the per-IP minute window, then the
+ * install-wide hourly cap of SUCCESSFUL registrations.
+ */
+function qs_registration_throttle_check(array $cfg): int {
+    $path = qs_registration_throttle_path();
+    $data = is_file($path) ? json_decode((string)@file_get_contents($path), true) : null;
+    if (!is_array($data)) {
+        return 0;
+    }
+    $now = time();
+    if ($cfg['per_ip_per_minute'] > 0) {
+        $entry = $data['ips'][qs_session_hash(qs_client_ip())] ?? null;
+        if (is_array($entry)
+            && (int)($entry['minute'] ?? -1) === intdiv($now, 60)
+            && (int)($entry['count'] ?? 0) >= $cfg['per_ip_per_minute']) {
+            return 60 - ($now % 60);
+        }
+    }
+    if ($cfg['global_per_hour'] > 0) {
+        $global = $data['global'] ?? null;
+        if (is_array($global)
+            && (int)($global['hour'] ?? -1) === intdiv($now, 3600)
+            && (int)($global['count'] ?? 0) >= $cfg['global_per_hour']) {
+            return 3600 - ($now % 3600);
+        }
+    }
+    return 0;
+}
+
+/**
+ * Record a registration ATTEMPT against the caller's IP (fixed minute window).
+ * Every attempt counts — failed, duplicate, or successful.
+ */
+function qs_registration_throttle_attempt(): void {
+    $key = qs_session_hash(qs_client_ip());
+    qs_registration_throttle_mutate(function (array &$data) use ($key) {
+        $now = time();
+        $minute = intdiv($now, 60);
+        $entry = $data['ips'][$key] ?? null;
+        $count = (is_array($entry) && (int)($entry['minute'] ?? -1) === $minute) ? (int)($entry['count'] ?? 0) : 0;
+        $data['ips'][$key] = ['minute' => $minute, 'count' => $count + 1, 'last' => $now];
+        return true;
+    });
+}
+
+/**
+ * Record a SUCCESSFUL registration against the install-wide hourly cap.
+ * Only real creations count — a duplicate-email attempt must not let an
+ * attacker fill the global window and lock legitimate users out.
+ */
+function qs_registration_record_success(): void {
+    qs_registration_throttle_mutate(function (array &$data) {
+        $hour = intdiv(time(), 3600);
+        $count = ((int)($data['global']['hour'] ?? -1) === $hour) ? (int)($data['global']['count'] ?? 0) : 0;
+        $data['global'] = ['hour' => $hour, 'count' => $count + 1];
+        return true;
+    });
+}

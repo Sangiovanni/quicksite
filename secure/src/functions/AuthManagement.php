@@ -365,11 +365,13 @@ function isBuiltinRole(string $roleName): bool {
  * ('auth.unauthorized' — the client should re-authenticate).
  *
  * @param string|null $authHeader The Authorization header value
- * @return array ['valid'=>bool, 'user'=>array|null, 'userId'=>string|null, 'error'=>string|null, 'code'=>string|null]
+ * @return array ['valid'=>bool, 'user'=>array|null, 'userId'=>string|null, 'family'=>string|null, 'error'=>string|null, 'code'=>string|null]
+ *               'family' = the presenting access token's session family (C8:
+ *               lets changePassword spare the caller's own session when revoking)
  */
 function validateBearerToken(?string $authHeader): array {
     $refuse = static function (string $error, ?string $userId = null, string $code = 'auth.unauthorized'): array {
-        return ['valid' => false, 'user' => null, 'userId' => $userId, 'error' => $error, 'code' => $code];
+        return ['valid' => false, 'user' => null, 'userId' => $userId, 'family' => null, 'error' => $error, 'code' => $code];
     };
 
     // No header provided
@@ -407,7 +409,7 @@ function validateBearerToken(?string $authHeader): array {
     }
 
     $user['id'] = $userId; // attach resolved id for downstream (authz, logging, ownership)
-    return ['valid' => true, 'user' => $user, 'userId' => $userId, 'error' => null, 'code' => null];
+    return ['valid' => true, 'user' => $user, 'userId' => $userId, 'family' => $session['family'], 'error' => null, 'code' => null];
 }
 
 /**
@@ -478,6 +480,171 @@ function qs_auth_attempt_login(string $email, string $password): array {
         return ['ok' => false, 'error' => 'server'];
     }
     return ['ok' => true, 'user' => $user, 'session' => $session];
+}
+
+/**
+ * Serialized read-modify-write on users.php — THE single users-registry writer
+ * (C8): createProject, setSelectedProject, register and changePassword all
+ * come through here. flock sidecar (the pre-C8 inline writers were temp+rename
+ * only, so two simultaneous writers could lose an update) + temp + rename
+ * (atomic swap for lock-free readers) + opcache_invalidate (readers must see
+ * the new file immediately).
+ *
+ * @param callable $fn function(array &$cfg): mixed — receives the full
+ *                     users.php array by reference. Return false to abort
+ *                     WITHOUT writing; any other value is passed through
+ *                     after a successful write.
+ * @return mixed the callback's return value, or false on abort/lock/write failure
+ */
+function qs_users_mutate(callable $fn) {
+    $path = SECURE_FOLDER_PATH . '/management/config/users.php';
+    $lock = @fopen($path . '.lock', 'c');
+    if ($lock === false) {
+        return false;
+    }
+    flock($lock, LOCK_EX);
+    try {
+        $cfg = loadUsersConfig(); // opcache-invalidated fresh read
+        $result = $fn($cfg);
+        if ($result === false) {
+            return false;
+        }
+        $content = "<?php\n/**\n * User Registry (C5) — stable userId => identity.\n * Engine plumbing (PHP). Atomic write (temp+rename).\n */\n\nreturn " . var_export($cfg, true) . ";\n";
+        $tmp = $path . '.tmp' . getmypid();
+        if (file_put_contents($tmp, $content, LOCK_EX) === false) {
+            @unlink($tmp);
+            return false;
+        }
+        if (!@rename($tmp, $path)) {
+            // Windows: a transient sharing violation (AV scan) can fail the swap once.
+            usleep(50000);
+            if (!@rename($tmp, $path)) {
+                @unlink($tmp);
+                return false;
+            }
+        }
+        if (function_exists('opcache_invalidate')) {
+            opcache_invalidate($path, true);
+        }
+        return $result;
+    } finally {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+    }
+}
+
+/**
+ * Mint a NEW user account — THE single identity-creation path (C8; the
+ * identity mirror of qs_session_issue): the public `register` command and the
+ * admin register page both come through here. Email uniqueness and the
+ * account cap are checked INSIDE the users.php write lock (no TOCTOU).
+ *
+ * The bcrypt hash is computed BEFORE the lock (it costs ~100ms — must not
+ * hold the write lock) and UNCONDITIONALLY — so the duplicate-email path
+ * burns the same time as a real creation (anti-enumeration timing, the same
+ * discipline as qs_auth_attempt_login's dummy verify).
+ *
+ * @param string|null $password null/'' = externally managed (password_hash null)
+ * @param int         $maxUsers 0 = unlimited; refused as 'full' under the lock
+ * @return array {ok:true, userId:string}
+ *             | {ok:false, error:'invalid_email'|'duplicate'|'full'|'store'}
+ */
+function qs_user_create(string $name, string $email, ?string $password, int $maxUsers = 0): array {
+    $email = trim($email);
+    if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        return ['ok' => false, 'error' => 'invalid_email'];
+    }
+    // Display name: cap + control-strip (same rule as createProject site_name).
+    $name = preg_replace('/[\x00-\x1F\x7F]/', '', mb_substr(trim($name), 0, 200));
+    $hash = ($password !== null && $password !== '') ? password_hash($password, PASSWORD_DEFAULT) : null;
+    $userId = 'usr_' . bin2hex(random_bytes(16));
+
+    $error = null;
+    $result = qs_users_mutate(function (array &$cfg) use ($name, $email, $hash, $userId, $maxUsers, &$error) {
+        if ($maxUsers > 0 && count($cfg['users'] ?? []) >= $maxUsers) {
+            $error = 'full';
+            return false;
+        }
+        $needle = strtolower($email);
+        foreach (($cfg['users'] ?? []) as $existing) {
+            $candidate = $existing['email'] ?? null;
+            if (is_string($candidate) && strtolower(trim($candidate)) === $needle) {
+                $error = 'duplicate';
+                return false;
+            }
+        }
+        $cfg['users'][$userId] = [
+            'name'             => $name,
+            'email'            => $email,
+            'status'           => 'active',
+            'password_hash'    => $hash,
+            'selected_project' => null,
+            'projects'         => [],
+        ];
+        return true;
+    });
+
+    if ($result === true) {
+        return ['ok' => true, 'userId' => $userId];
+    }
+    return ['ok' => false, 'error' => $error ?? 'store'];
+}
+
+/**
+ * THE registration gate (C8) — shared by the public `register` command and
+ * the admin register page (the qs_auth_attempt_login pattern): ONE
+ * flag-check + flood-control + creation path.
+ *
+ * Enumeration safety: a duplicate email reports ok:true EXACTLY like a real
+ * creation ('created' is for the caller's own logic only and must never
+ * reach the HTTP response or the page), and the bcrypt cost is burned on
+ * both paths (qs_user_create). Every other refusal (disabled / closed /
+ * throttled / validation) is independent of whether the email exists.
+ *
+ * @return array {ok:true, created:bool, userId:?string}
+ *             | {ok:false, error:'registration_disabled'|'registration_closed'
+ *                |'missing_fields'|'invalid_email'|'password_too_short'
+ *                |'throttled'|'server', retry_after?:int, min_length?:int}
+ */
+function qs_auth_attempt_register(string $name, string $email, string $password): array {
+    $cfg = qs_registration_config();
+    if (!$cfg['allow_self_registration']) {
+        return ['ok' => false, 'error' => 'registration_disabled'];
+    }
+    $name = trim($name);
+    $email = trim($email);
+    if ($name === '' || $email === '' || $password === '') {
+        return ['ok' => false, 'error' => 'missing_fields'];
+    }
+    if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        return ['ok' => false, 'error' => 'invalid_email'];
+    }
+    if (mb_strlen($password) < $cfg['min_password_length']) {
+        return ['ok' => false, 'error' => 'password_too_short', 'min_length' => $cfg['min_password_length']];
+    }
+
+    $wait = qs_registration_throttle_check($cfg);
+    if ($wait > 0) {
+        return ['ok' => false, 'error' => 'throttled', 'retry_after' => $wait];
+    }
+    qs_registration_throttle_attempt(); // every attempt counts against the IP
+
+    $created = qs_user_create($name, $email, $password, $cfg['max_users']);
+    if ($created['ok']) {
+        qs_registration_record_success(); // only real creations fill the global cap
+        return ['ok' => true, 'created' => true, 'userId' => $created['userId']];
+    }
+    if ($created['error'] === 'duplicate') {
+        // Uniform success — no account-existence oracle.
+        return ['ok' => true, 'created' => false, 'userId' => null];
+    }
+    if ($created['error'] === 'full') {
+        return ['ok' => false, 'error' => 'registration_closed'];
+    }
+    if ($created['error'] === 'invalid_email') {
+        return ['ok' => false, 'error' => 'invalid_email'];
+    }
+    return ['ok' => false, 'error' => 'server'];
 }
 
 /**
@@ -683,6 +850,24 @@ function handlePreflightRequest(): void {
 }
 
 /**
+ * Resolve the current request's full auth context from the Authorization
+ * header: the user AND the presenting session family (C8 — changePassword
+ * spares the caller's own family when revoking the rest).
+ *
+ * @return array|null the full validateBearerToken success shape
+ *                    (user / userId / family), or null when unauthenticated
+ */
+function getCurrentAuth(): ?array {
+    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
+    if (empty($authHeader) && function_exists('apache_request_headers')) {
+        $headers = apache_request_headers();
+        $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? null;
+    }
+    $result = validateBearerToken($authHeader);
+    return $result['valid'] ? $result : null;
+}
+
+/**
  * Resolve the current request's USER from the Authorization header (C5).
  * For commands that need the caller's identity (e.g. createProject owner).
  * Returns null if unauthenticated / unresolved / disabled.
@@ -690,13 +875,8 @@ function handlePreflightRequest(): void {
  * @return array|null Resolved user (with 'id') or null
  */
 function getCurrentUser(): ?array {
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
-    if (empty($authHeader) && function_exists('apache_request_headers')) {
-        $headers = apache_request_headers();
-        $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? null;
-    }
-    $result = validateBearerToken($authHeader);
-    return $result['valid'] ? $result['user'] : null;
+    $auth = getCurrentAuth();
+    return $auth !== null ? $auth['user'] : null;
 }
 
 /**

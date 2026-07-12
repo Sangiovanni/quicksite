@@ -1015,10 +1015,13 @@
             
             this.disabled = true;
             try {
+                // Target the project being deleted via the URL marker (opts.project);
+                // the server authorizes THAT project (owner-only) and refuses if the
+                // body name disagrees (confused-deputy fix, C8).
                 const result = await QuickSiteAdmin.apiRequest('deleteProject', 'POST', {
                     name: projectToDelete,
                     confirm: true
-                });
+                }, [], {}, { project: projectToDelete });
                 
                 if (result.ok) {
                     QuickSiteAdmin.showToast(proj.deleted || 'Project deleted', 'success');

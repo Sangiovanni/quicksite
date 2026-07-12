@@ -31,7 +31,24 @@ require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 function __command_deleteProject(array $params = [], array $urlParams = []): ApiResponse {
     // Validate project name
     $projectName = trim($params['name'] ?? '');
-    
+
+    // C8 CONTAINMENT (confused-deputy / F6): a project-scoped command is
+    // AUTHORIZED against the URL marker project (PROJECT_NAME, bound by the
+    // dispatcher after the owner-only members.json check). The destructive
+    // target MUST be that same project — never a different one named only in
+    // the request body. Bind the target to the authorized marker; a body
+    // `name` that disagrees is refused outright (you cannot delete a project
+    // you did not target/authorize).
+    $markerProject = defined('PROJECT_NAME') ? (string)PROJECT_NAME : '';
+    if ($markerProject !== '') {
+        if ($projectName !== '' && $projectName !== $markerProject) {
+            return ApiResponse::create(400, 'project.mismatch')
+                ->withMessage('The targeted project does not match the project in the request body')
+                ->withErrors(['name' => 'Must match the project in the URL']);
+        }
+        $projectName = $markerProject;
+    }
+
     if (empty($projectName)) {
         return ApiResponse::create(400, 'validation.missing_field')
             ->withMessage('Project name is required')

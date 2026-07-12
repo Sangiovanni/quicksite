@@ -1,37 +1,45 @@
 <?php
 /**
- * Admin Login Page
+ * Admin Self-Registration Page (C8)
  *
- * Email + password authentication (C5b). The form POSTs to this page; the
- * router verifies the credentials through the shared login gate and holds the
- * resulting session (access + refresh pair) server-side in the PHP session.
- * "Remember me" persists the rotating refresh token in an HttpOnly cookie —
- * no credential or token is ever stored in browser JS storage.
+ * Renders ONLY while auth.php `registration.allow_self_registration` is true
+ * (the router redirects to login otherwise; the underlying gate also enforces
+ * the flag + flood controls on every POST). The form POSTs to this page and
+ * goes through the SAME shared registration gate as the public `register`
+ * command. On success the user is sent to the login page with a one-shot
+ * "account created" banner — no auto-login (the login page is the single
+ * session-establishing point).
  *
- * @version 1.6.0
+ * A duplicate email shows the same success path as a real creation (no
+ * account-existence oracle) — the person simply discovers at sign-in.
  */
 
-$loginError = null;
-$loginRetryAfter = 0;
+require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 
-// One-shot "account created" banner set by the register page (C8).
-$registerFlash = !empty($_SESSION['qs_register_flash']);
-unset($_SESSION['qs_register_flash']);
+$registerError = null;
+$registerRetryAfter = 0;
+$registerMinLength = 0;
+$passwordMinLength = qs_registration_config()['min_password_length'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $name = (string)($_POST['name'] ?? '');
     $email = (string)($_POST['email'] ?? '');
     $password = (string)($_POST['password'] ?? '');
-    $remember = isset($_POST['remember']);
 
-    $result = $router->attemptLogin($email, $password, $remember);
+    $result = $router->attemptRegister($name, $email, $password);
     if ($result === null) {
-        $router->redirect('dashboard');
+        $router->redirect('login');
     }
     if (strpos($result, 'throttled:') === 0) {
-        $loginError = 'throttled';
-        $loginRetryAfter = (int)substr($result, strlen('throttled:'));
+        $registerError = 'throttled';
+        $registerRetryAfter = (int)substr($result, strlen('throttled:'));
+    } elseif (strpos($result, 'password_too_short:') === 0) {
+        $registerError = 'password_too_short';
+        $registerMinLength = (int)substr($result, strlen('password_too_short:'));
     } else {
-        $loginError = $result; // 'invalid_credentials' | 'server'
+        // 'registration_disabled' | 'registration_closed' | 'missing_fields'
+        // | 'invalid_email' | 'server'
+        $registerError = $result;
     }
 }
 ?>
@@ -43,37 +51,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <path d="M2 17l10 5 10-5"/>
             <path d="M2 12l10 5 10-5"/>
         </svg>
-        <h1 class="admin-login__title"><?= __admin('login.title') ?></h1>
-        <p class="admin-login__subtitle"><?= __admin('login.subtitle') ?></p>
+        <h1 class="admin-login__title"><?= __admin('register.title') ?></h1>
+        <p class="admin-login__subtitle"><?= __admin('register.subtitle') ?></p>
     </div>
 
     <div class="admin-card">
         <div class="admin-card__body">
-            <?php if ($registerFlash): ?>
-            <div class="admin-alert admin-alert--success"><?= __admin('login.registerSuccess') ?></div>
+            <?php if ($registerError === 'throttled'): ?>
+            <div class="admin-alert admin-alert--error"><?= __admin('register.throttled', ['seconds' => $registerRetryAfter]) ?></div>
+            <?php elseif ($registerError === 'password_too_short'): ?>
+            <div class="admin-alert admin-alert--error"><?= __admin('register.passwordTooShort', ['min' => $registerMinLength]) ?></div>
+            <?php elseif ($registerError === 'invalid_email'): ?>
+            <div class="admin-alert admin-alert--error"><?= __admin('register.invalidEmail') ?></div>
+            <?php elseif ($registerError === 'registration_closed'): ?>
+            <div class="admin-alert admin-alert--error"><?= __admin('register.closed') ?></div>
+            <?php elseif ($registerError === 'registration_disabled'): ?>
+            <div class="admin-alert admin-alert--error"><?= __admin('register.disabled') ?></div>
+            <?php elseif ($registerError === 'missing_fields'): ?>
+            <div class="admin-alert admin-alert--error"><?= __admin('register.missingFields') ?></div>
+            <?php elseif ($registerError !== null): ?>
+            <div class="admin-alert admin-alert--error"><?= __admin('register.serverError') ?></div>
             <?php endif; ?>
 
-            <?php if ($loginError === 'throttled'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('login.throttled', ['seconds' => $loginRetryAfter]) ?></div>
-            <?php elseif ($loginError === 'server'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('login.serverError') ?></div>
-            <?php elseif ($loginError === 'missing_fields'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('login.missingFields') ?></div>
-            <?php elseif ($loginError !== null): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('login.invalidCredentials') ?></div>
-            <?php endif; ?>
+            <form id="admin-register-form" method="POST" action="">
+                <div class="admin-form-group">
+                    <label class="admin-label admin-label--required" for="name">
+                        <?= __admin('register.nameLabel') ?>
+                    </label>
+                    <input
+                        type="text"
+                        id="name"
+                        name="name"
+                        class="admin-input"
+                        placeholder="<?= adminAttr(__admin('register.namePlaceholder')) ?>"
+                        value="<?= adminAttr((string)($_POST['name'] ?? '')) ?>"
+                        maxlength="200"
+                        autocomplete="name"
+                        required
+                    >
+                </div>
 
-            <form id="admin-login-form" method="POST" action="">
                 <div class="admin-form-group">
                     <label class="admin-label admin-label--required" for="email">
-                        <?= __admin('login.emailLabel') ?>
+                        <?= __admin('register.emailLabel') ?>
                     </label>
                     <input
                         type="email"
                         id="email"
                         name="email"
                         class="admin-input"
-                        placeholder="<?= adminAttr(__admin('login.emailPlaceholder')) ?>"
+                        placeholder="<?= adminAttr(__admin('register.emailPlaceholder')) ?>"
                         value="<?= adminAttr((string)($_POST['email'] ?? '')) ?>"
                         autocomplete="username"
                         required
@@ -82,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <div class="admin-form-group">
                     <label class="admin-label admin-label--required" for="password">
-                        <?= __admin('login.passwordLabel') ?>
+                        <?= __admin('register.passwordLabel') ?>
                     </label>
                     <div style="position: relative;">
                         <input
@@ -91,7 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             name="password"
                             class="admin-input"
                             style="padding-right: 2.75rem;"
-                            autocomplete="current-password"
+                            autocomplete="new-password"
                             required
                         >
                         <button
@@ -113,49 +140,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </svg>
                         </button>
                     </div>
-                </div>
-
-                <div class="admin-form-group">
-                    <div class="admin-checkbox-group">
-                        <input
-                            type="checkbox"
-                            id="remember"
-                            name="remember"
-                            class="admin-checkbox"
-                            <?= isset($_POST['remember']) ? 'checked' : '' ?>
-                        >
-                        <label for="remember" class="admin-checkbox-label">
-                            <?= __admin('login.rememberSession') ?>
-                        </label>
-                    </div>
-                    <p class="admin-hint"><?= __admin('login.rememberHint') ?></p>
+                    <p class="admin-hint"><?= __admin('register.passwordHint', ['min' => $passwordMinLength]) ?></p>
                 </div>
 
                 <button type="submit" class="admin-btn admin-btn--primary admin-btn--lg admin-btn--block">
-                    <?= __admin('login.submit') ?>
+                    <?= __admin('register.submit') ?>
                 </button>
 
                 <p class="admin-hint" style="margin-top: var(--space-md); text-align: center;">
-                    <?= __admin('login.privacyNote') ?>
+                    <a href="<?= adminAttr($router->url('login')) ?>"><?= __admin('register.backToLogin') ?></a>
                 </p>
-
-                <?php if ($router->isRegistrationOpen()): ?>
-                <p class="admin-hint" style="margin-top: var(--space-md); text-align: center;">
-                    <a href="<?= adminAttr($router->url('register')) ?>"><?= __admin('login.registerLink') ?></a>
-                </p>
-                <?php endif; ?>
             </form>
         </div>
-    </div>
-
-    <div class="admin-login__help">
-        <div class="admin-login__help-title"><?= __admin('login.help.title') ?></div>
-        <p class="admin-login__help-text"><?= $router->isRegistrationOpen() ? __admin('login.help.textRegisterOpen') : __admin('login.help.text') ?></p>
     </div>
 </div>
 
 <script>
-// Password visibility toggle — lets the user verify a pasted password.
+// Password visibility toggle — same behaviour as the login page.
 (function () {
     var input = document.getElementById('password');
     var btn = document.getElementById('password-toggle');

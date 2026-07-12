@@ -13,7 +13,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
 | Layer | Folder | Audience | Purpose |
 |---|---|---|---|
 | **Project** | `secure/projects/{name}/` | Site owner | The actual website data: routes, page structures (JSON), translations, components, interactions, styles, assets. |
-| **Management** | `secure/management/` | API client (admin panel, scripts) | The 153 commands that read or mutate project data. Single entry point: `public/management/index.php`. Token + role enforced. AI calls bypass this layer entirely (browser-direct). |
+| **Management** | `secure/management/` | API client (admin panel, scripts) | The 155 commands that read or mutate project data. Single entry point: `public/management/index.php`. Token + role enforced. AI calls bypass this layer entirely (browser-direct). |
 | **Admin** | `public/admin/` + `secure/admin/` | Human operator | The browser UI that calls Management commands. Includes the visual editor, sitemap, theme editor, AI workspace, workflow runner. |
 
 ```
@@ -165,7 +165,7 @@ ApiResponse::create(201, 'route.created')
     ->send();
 ```
 
-The full list of 153 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
+The full list of 155 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
 
 ### Response shape
 
@@ -182,7 +182,9 @@ Errors include a structured `errors` array with `field` / `value` / `reason`.
 
 ### Authentication & roles
 
-Credentials are **email + password**: `users.php` holds each user's `password_hash` (a `null` hash marks an externally-managed account — its sessions are minted by an embedding platform, never by password login). The public `login` command exchanges them for a **session** — a short-lived access token (sent as `Authorization: Bearer` on every call) plus a rotating refresh token (`refreshSession`; reusing a rotated refresh token after a short grace window revokes the whole session family — a theft becomes visible instead of silent). Runtime sessions live hashed in `secure/management/config/sessions.json`; the TTL knobs and the self-registration gate live in `auth.php` alongside CORS. The admin panel holds its session server-side in the PHP session and only ever exposes the short-lived access token to the browser.
+Credentials are **email + password**: `users.php` holds each user's `password_hash` (a `null` hash marks an externally-managed account — its sessions are minted by an embedding platform, never by password login). The public `login` command exchanges them for a **session** — a short-lived access token (sent as `Authorization: Bearer` on every call) plus a rotating refresh token (`refreshSession`; reusing a rotated refresh token after a short grace window revokes the whole session family — a theft becomes visible instead of silent). Runtime sessions live hashed in `secure/management/config/sessions.json`; the TTL knobs and the registration policy live in `auth.php` alongside CORS. The admin panel holds its session server-side in the PHP session and only ever exposes the short-lived access token to the browser.
+
+Accounts are **self-created only**: the public `register` command (and the matching `/admin/register` page, linked from the login page) creates an account when `auth.php` `registration.allow_self_registration` is true — the default is **false**, meaning a fresh install accepts no registrations and accounts exist from setup only. Registration is flood-controlled (per-IP rate, install-wide hourly cap, optional absolute account cap) and enumeration-safe (a duplicate email is indistinguishable from a success). `changePassword` lets an authenticated user rotate their own password — it requires the current password, shares the login throttle, and revokes the user's other sessions on success. No command creates an account **for someone else**; server-to-server provisioning is deliberately deferred to the platform-integration design.
 
 Authorization is **per project**. Each project's `config/members.json` assigns its members one of six fixed roles:
 
@@ -197,7 +199,7 @@ Authorization is **per project**. Each project's `config/members.json` assigns i
 
 > AI is not a permissioned column: AI calls happen in the browser via `QSAiCall` against per-user credentials in `aiConnectionsV3` (localStorage). Any authenticated admin can use the AI workspace; gating happens at the connection level, not the role level.
 
-Roles are **fixed** — there is no superadmin and no custom roles. A role is defined as a set of trust-coherent command **categories** in `secure/management/config/categories.php` (e.g. `content.read`, `style.write`, `deploy`, `project.delete`); `roles.php` grants each role a `rank` and its categories, which are expanded to a per-command allowlist at load time. Every command belongs to exactly one category, and its category also fixes its **scope**: *global* (a small set any authenticated user may run — `createProject`, `listProjects`, `setSelectedProject`, `listRoles`, `getMyPermissions`, `checkForUpdates`) or *project* (requires membership). `owner` is the top of each project; `rank` orders the roles and governs role management — a granter may only assign a role strictly below their own (the self-escalation guard). Permissions are checked before the command file is included.
+Roles are **fixed** — there is no superadmin and no custom roles. A role is defined as a set of trust-coherent command **categories** in `secure/management/config/categories.php` (e.g. `content.read`, `style.write`, `deploy`, `project.delete`); `roles.php` grants each role a `rank` and its categories, which are expanded to a per-command allowlist at load time. Every command belongs to exactly one category, and its category also fixes its **scope**: *global* (a small set any authenticated user may run — `createProject`, `listProjects`, `setSelectedProject`, `changePassword`, `listRoles`, `getMyPermissions`, `checkForUpdates`) or *project* (requires membership). Global reads are still caller-relative: `listProjects` returns only the projects the caller is a member of (with their role on each) — there is no all-projects API view. `owner` is the top of each project; `rank` orders the roles and governs role management — a granter may only assign a role strictly below their own (the self-escalation guard). Permissions are checked before the command file is included.
 
 ### Extending one command via builders — `addComplexElement`
 
@@ -287,7 +289,7 @@ addRoute.php
   └── ApiResponse::create(201, 'route.created')->send()
 ```
 
-The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 153 commands.
+The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 155 commands.
 
 ### 5.3 Routing — exact and parameterised routes
 
