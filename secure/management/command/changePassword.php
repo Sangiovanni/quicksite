@@ -55,7 +55,7 @@ function __command_changePassword(array $params = [], array $urlParams = []): Ap
     }
 
     // Same brute-force backoff as login, keyed on the same credential target.
-    $throttleKey = is_string($user['email'] ?? null) && $user['email'] !== '' ? $user['email'] : $userId;
+    $throttleKey = is_string($user['username'] ?? null) && $user['username'] !== '' ? $user['username'] : $userId;
     $wait = qs_login_throttle_check($throttleKey);
     if ($wait > 0) {
         return ApiResponse::create(429, 'auth.throttled')

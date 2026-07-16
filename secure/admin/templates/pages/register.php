@@ -10,8 +10,9 @@
  * "account created" banner — no auto-login (the login page is the single
  * session-establishing point).
  *
- * A duplicate email shows the same success path as a real creation (no
- * account-existence oracle) — the person simply discovers at sign-in.
+ * A duplicate USERNAME shows the same success path as a real creation (the
+ * username is the private login identifier — no account-existence oracle);
+ * the person simply discovers at sign-in.
  */
 
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
@@ -23,10 +24,10 @@ $passwordMinLength = qs_registration_config()['min_password_length'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = (string)($_POST['name'] ?? '');
-    $email = (string)($_POST['email'] ?? '');
+    $username = (string)($_POST['username'] ?? '');
     $password = (string)($_POST['password'] ?? '');
 
-    $result = $router->attemptRegister($name, $email, $password);
+    $result = $router->attemptRegister($name, $username, $password);
     if ($result === null) {
         $router->redirect('login');
     }
@@ -38,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $registerMinLength = (int)substr($result, strlen('password_too_short:'));
     } else {
         // 'registration_disabled' | 'registration_closed' | 'missing_fields'
-        // | 'invalid_email' | 'server'
+        // | 'invalid_username' | 'name_equals_username' | 'server'
         $registerError = $result;
     }
 }
@@ -61,8 +62,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="admin-alert admin-alert--error"><?= __admin('register.throttled', ['seconds' => $registerRetryAfter]) ?></div>
             <?php elseif ($registerError === 'password_too_short'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('register.passwordTooShort', ['min' => $registerMinLength]) ?></div>
-            <?php elseif ($registerError === 'invalid_email'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('register.invalidEmail') ?></div>
+            <?php elseif ($registerError === 'invalid_username'): ?>
+            <div class="admin-alert admin-alert--error"><?= __admin('register.invalidUsername') ?></div>
+            <?php elseif ($registerError === 'name_equals_username'): ?>
+            <div class="admin-alert admin-alert--error"><?= __admin('register.nameEqualsUsername') ?></div>
             <?php elseif ($registerError === 'registration_closed'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('register.closed') ?></div>
             <?php elseif ($registerError === 'registration_disabled'): ?>
@@ -89,22 +92,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         autocomplete="name"
                         required
                     >
+                    <p class="admin-hint"><?= __admin('register.nameHint') ?></p>
                 </div>
 
                 <div class="admin-form-group">
-                    <label class="admin-label admin-label--required" for="email">
-                        <?= __admin('register.emailLabel') ?>
+                    <label class="admin-label admin-label--required" for="username">
+                        <?= __admin('register.usernameLabel') ?>
                     </label>
                     <input
-                        type="email"
-                        id="email"
-                        name="email"
+                        type="text"
+                        id="username"
+                        name="username"
                         class="admin-input"
-                        placeholder="<?= adminAttr(__admin('register.emailPlaceholder')) ?>"
-                        value="<?= adminAttr((string)($_POST['email'] ?? '')) ?>"
+                        placeholder="<?= adminAttr(__admin('register.usernamePlaceholder')) ?>"
+                        value="<?= adminAttr((string)($_POST['username'] ?? '')) ?>"
+                        maxlength="32"
+                        pattern="[a-z0-9_-]{3,32}"
                         autocomplete="username"
+                        autocapitalize="none"
+                        spellcheck="false"
                         required
                     >
+                    <p class="admin-hint"><?= __admin('register.usernameHint') ?></p>
                 </div>
 
                 <div class="admin-form-group">

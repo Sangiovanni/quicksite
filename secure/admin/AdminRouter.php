@@ -240,15 +240,16 @@ class AdminRouter {
     }
 
     /**
-     * Attempt an email + password login (C5b) — the panel form's entry into the
-     * ONE shared credential-check + issuance path (qs_auth_attempt_login).
-     * On success the pair lands in the PHP session; with $remember the refresh
-     * token also lands in the HttpOnly qs_refresh cookie.
+     * Attempt a username + password login (C5b; username identity C8 8.0b) —
+     * the panel form's entry into the ONE shared credential-check + issuance
+     * path (qs_auth_attempt_login). On success the pair lands in the PHP
+     * session; with $remember the refresh token also lands in the HttpOnly
+     * qs_refresh cookie.
      *
      * @return string|null null on success, else an error key:
      *                     'invalid_credentials' | 'throttled:<seconds>' | 'server'
      */
-    public function attemptLogin(string $email, string $password, bool $remember = false): ?string {
+    public function attemptLogin(string $username, string $password, bool $remember = false): ?string {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
@@ -258,11 +259,11 @@ class AdminRouter {
         // from wrong credentials — a real diagnostic for the user, and empty
         // probes are not brute force. The management `login` command 400s the
         // same case with validation.required.
-        if (trim($email) === '' || $password === '') {
+        if (trim($username) === '' || $password === '') {
             return 'missing_fields';
         }
 
-        $attempt = qs_auth_attempt_login($email, $password);
+        $attempt = qs_auth_attempt_login($username, $password);
         if (!$attempt['ok']) {
             if ($attempt['error'] === 'throttled') {
                 return 'throttled:' . (int)($attempt['retry_after'] ?? 60);
@@ -297,26 +298,27 @@ class AdminRouter {
      * Attempt a self-registration (C8) — the register page's entry into the
      * ONE shared gate (qs_auth_attempt_register, also behind the public
      * `register` command). On success a one-shot session flash is set for the
-     * login page's "account created" banner. A duplicate email reports
-     * success exactly like the command (no account oracle).
+     * login page's "account created" banner. A duplicate username reports
+     * success exactly like the command (login identifiers are private — no
+     * account oracle).
      *
      * @return string|null null on success, else an error key:
      *                     'registration_disabled' | 'registration_closed' |
-     *                     'missing_fields' | 'invalid_email' |
-     *                     'password_too_short:<min>' | 'throttled:<seconds>' |
-     *                     'server'
+     *                     'missing_fields' | 'invalid_username' |
+     *                     'name_equals_username' | 'password_too_short:<min>' |
+     *                     'throttled:<seconds>' | 'server'
      */
-    public function attemptRegister(string $name, string $email, string $password): ?string {
+    public function attemptRegister(string $name, string $username, string $password): ?string {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 
-        if (trim($name) === '' || trim($email) === '' || $password === '') {
+        if (trim($name) === '' || trim($username) === '' || $password === '') {
             return 'missing_fields';
         }
 
-        $attempt = qs_auth_attempt_register($name, $email, $password);
+        $attempt = qs_auth_attempt_register($name, $username, $password);
         if ($attempt['ok']) {
             $_SESSION['qs_register_flash'] = true;
             return null;
@@ -616,7 +618,7 @@ class AdminRouter {
         // C5b: admin pages embed the short-lived access token (and the login
         // page is a credential form) — they must never come out of a cache.
         // Also prevents a stale pre-C5b login form (old token field) being
-        // resurrected by the browser and posting empty email/password.
+        // resurrected by the browser and posting empty username/password.
         if (!headers_sent()) {
             header('Cache-Control: no-store');
         }

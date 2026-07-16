@@ -3,8 +3,10 @@
  * Authentication & CORS Management Functions
  *
  * Handles API token validation, role-based permissions, and CORS header management.
- * C5b: credentials are email + password (users.php `password_hash`); per-request
- * auth is a short-lived ACCESS token from the session store (SessionManagement.php).
+ * C5b/C8 8.0b: credentials are username + password (users.php `password_hash`);
+ * per-request auth is a short-lived ACCESS token from the session store
+ * (SessionManagement.php). The username is PRIVATE (login-only); public identity
+ * is the display `name` + the opaque user id — there is no email field.
  */
 
 require_once __DIR__ . '/SessionManagement.php';
@@ -413,19 +415,29 @@ function validateBearerToken(?string $authHeader): array {
 }
 
 /**
- * Find a user by email (the login identifier — C5b). Case-insensitive; users
- * without an email (or externally managed ones) are simply never matched.
- * The returned record has its 'id' attached.
+ * Username shape rule (C8 8.0b): 3–32 chars, lowercase a-z / 0-9 / '_' / '-'.
+ * The username is the PRIVATE login identifier (the email field was dropped —
+ * a mailer-less system cannot verify or use one): it is never shown to other
+ * users. Public identity = the display `name` + the opaque user id.
+ */
+function qs_valid_username(string $username): bool {
+    return preg_match('/^[a-z0-9_-]{3,32}$/', $username) === 1;
+}
+
+/**
+ * Find a user by USERNAME (the private login identifier — C8 8.0b).
+ * Case-insensitive; users without a username (externally managed ones) are
+ * simply never matched. The returned record has its 'id' attached.
  *
  * @return array|null
  */
-function findUserByEmail(string $email): ?array {
-    $needle = strtolower(trim($email));
+function findUserByUsername(string $username): ?array {
+    $needle = strtolower(trim($username));
     if ($needle === '') {
         return null;
     }
     foreach (loadUsersConfig()['users'] ?? [] as $userId => $user) {
-        $candidate = $user['email'] ?? null;
+        $candidate = $user['username'] ?? null;
         if (is_string($candidate) && strtolower(trim($candidate)) === $needle) {
             $user['id'] = (string)$userId;
             return $user;
@@ -439,26 +451,26 @@ function findUserByEmail(string $email): ?array {
  * form so there is exactly ONE credential-check + issuance path (C8's
  * register/createUser flows mint through qs_session_issue the same way).
  *
- * Refusals are deliberately uniform ('invalid_credentials' for unknown email,
- * wrong password, passwordless/externally-managed account, disabled user) —
- * no account-existence oracle. Verification is timing-equalized with a dummy
- * hash when the user has no usable password.
+ * Refusals are deliberately uniform ('invalid_credentials' for unknown
+ * username, wrong password, passwordless/externally-managed account, disabled
+ * user) — no account-existence oracle. Verification is timing-equalized with
+ * a dummy hash when the user has no usable password.
  *
  * @return array {ok:true, user:array, session:array}   (session = qs_session_issue result)
  *             | {ok:false, error:'invalid_credentials'|'throttled'|'server', retry_after?:int}
  */
-function qs_auth_attempt_login(string $email, string $password): array {
-    $email = trim($email);
-    if ($email === '' || $password === '') {
+function qs_auth_attempt_login(string $username, string $password): array {
+    $username = trim($username);
+    if ($username === '' || $password === '') {
         return ['ok' => false, 'error' => 'invalid_credentials'];
     }
 
-    $wait = qs_login_throttle_check($email);
+    $wait = qs_login_throttle_check($username);
     if ($wait > 0) {
         return ['ok' => false, 'error' => 'throttled', 'retry_after' => $wait];
     }
 
-    $user = findUserByEmail($email);
+    $user = findUserByUsername($username);
     $hash = is_array($user) ? ($user['password_hash'] ?? null) : null;
 
     if (is_string($hash) && $hash !== '') {
@@ -470,11 +482,11 @@ function qs_auth_attempt_login(string $email, string $password): array {
     }
 
     if (!$verified || ($user['status'] ?? 'active') === 'disabled') {
-        qs_login_throttle_fail($email);
+        qs_login_throttle_fail($username);
         return ['ok' => false, 'error' => 'invalid_credentials'];
     }
 
-    qs_login_throttle_clear($email);
+    qs_login_throttle_clear($username);
     $session = qs_session_issue($user['id']);
     if ($session === false) {
         return ['ok' => false, 'error' => 'server'];
@@ -536,46 +548,56 @@ function qs_users_mutate(callable $fn) {
 /**
  * Mint a NEW user account — THE single identity-creation path (C8; the
  * identity mirror of qs_session_issue): the public `register` command and the
- * admin register page both come through here. Email uniqueness and the
+ * admin register page both come through here. Username uniqueness and the
  * account cap are checked INSIDE the users.php write lock (no TOCTOU).
  *
  * The bcrypt hash is computed BEFORE the lock (it costs ~100ms — must not
- * hold the write lock) and UNCONDITIONALLY — so the duplicate-email path
+ * hold the write lock) and UNCONDITIONALLY — so the duplicate-username path
  * burns the same time as a real creation (anti-enumeration timing, the same
  * discipline as qs_auth_attempt_login's dummy verify).
  *
  * @param string|null $password null/'' = externally managed (password_hash null)
  * @param int         $maxUsers 0 = unlimited; refused as 'full' under the lock
  * @return array {ok:true, userId:string}
- *             | {ok:false, error:'invalid_email'|'duplicate'|'full'|'store'}
+ *             | {ok:false, error:'invalid_username'|'name_equals_username'
+ *                |'duplicate'|'full'|'store'}
  */
-function qs_user_create(string $name, string $email, ?string $password, int $maxUsers = 0): array {
-    $email = trim($email);
-    if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-        return ['ok' => false, 'error' => 'invalid_email'];
+function qs_user_create(string $name, string $username, ?string $password, int $maxUsers = 0): array {
+    $username = strtolower(trim($username));
+    if (!qs_valid_username($username)) {
+        return ['ok' => false, 'error' => 'invalid_username'];
     }
     // Display name: cap + control-strip (same rule as createProject site_name).
     $name = preg_replace('/[\x00-\x1F\x7F]/', '', mb_substr(trim($name), 0, 200));
+    // Privacy: the username is the PRIVATE login identifier; the public display
+    // name is shown to other users. Forbid them being equal (case-insensitive)
+    // so the public surface can never directly reveal a valid login identifier.
+    // Enforced HERE at the single mint path so every creation route inherits it
+    // (this also backstops the register gate against a control-char evasion:
+    // the name is compared AFTER control-strip). Broader "username never appears
+    // in any output visible to others" is a C10 audit item.
+    if (strtolower($name) === $username) {
+        return ['ok' => false, 'error' => 'name_equals_username'];
+    }
     $hash = ($password !== null && $password !== '') ? password_hash($password, PASSWORD_DEFAULT) : null;
     $userId = 'usr_' . bin2hex(random_bytes(16));
 
     $error = null;
-    $result = qs_users_mutate(function (array &$cfg) use ($name, $email, $hash, $userId, $maxUsers, &$error) {
+    $result = qs_users_mutate(function (array &$cfg) use ($name, $username, $hash, $userId, $maxUsers, &$error) {
         if ($maxUsers > 0 && count($cfg['users'] ?? []) >= $maxUsers) {
             $error = 'full';
             return false;
         }
-        $needle = strtolower($email);
         foreach (($cfg['users'] ?? []) as $existing) {
-            $candidate = $existing['email'] ?? null;
-            if (is_string($candidate) && strtolower(trim($candidate)) === $needle) {
+            $candidate = $existing['username'] ?? null;
+            if (is_string($candidate) && strtolower(trim($candidate)) === $username) {
                 $error = 'duplicate';
                 return false;
             }
         }
         $cfg['users'][$userId] = [
             'name'             => $name,
-            'email'            => $email,
+            'username'         => $username,
             'status'           => 'active',
             'password_hash'    => $hash,
             'selected_project' => null,
@@ -595,29 +617,38 @@ function qs_user_create(string $name, string $email, ?string $password, int $max
  * the admin register page (the qs_auth_attempt_login pattern): ONE
  * flag-check + flood-control + creation path.
  *
- * Enumeration safety: a duplicate email reports ok:true EXACTLY like a real
- * creation ('created' is for the caller's own logic only and must never
+ * Enumeration safety: a duplicate USERNAME reports ok:true EXACTLY like a
+ * real creation ('created' is for the caller's own logic only and must never
  * reach the HTTP response or the page), and the bcrypt cost is burned on
- * both paths (qs_user_create). Every other refusal (disabled / closed /
- * throttled / validation) is independent of whether the email exists.
+ * both paths (qs_user_create). The username is the PRIVATE login identifier
+ * (C8 8.0b) — it must not be enumerable pre-auth. Every other refusal
+ * (disabled / closed / throttled / validation) is independent of whether the
+ * username exists.
  *
  * @return array {ok:true, created:bool, userId:?string}
  *             | {ok:false, error:'registration_disabled'|'registration_closed'
- *                |'missing_fields'|'invalid_email'|'password_too_short'
- *                |'throttled'|'server', retry_after?:int, min_length?:int}
+ *                |'missing_fields'|'invalid_username'|'name_equals_username'
+ *                |'password_too_short'|'throttled'|'server',
+ *                retry_after?:int, min_length?:int}
  */
-function qs_auth_attempt_register(string $name, string $email, string $password): array {
+function qs_auth_attempt_register(string $name, string $username, string $password): array {
     $cfg = qs_registration_config();
     if (!$cfg['allow_self_registration']) {
         return ['ok' => false, 'error' => 'registration_disabled'];
     }
     $name = trim($name);
-    $email = trim($email);
-    if ($name === '' || $email === '' || $password === '') {
+    $username = strtolower(trim($username));
+    if ($name === '' || $username === '' || $password === '') {
         return ['ok' => false, 'error' => 'missing_fields'];
     }
-    if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-        return ['ok' => false, 'error' => 'invalid_email'];
+    if (!qs_valid_username($username)) {
+        return ['ok' => false, 'error' => 'invalid_username'];
+    }
+    // The public name must differ from the private username (see qs_user_create).
+    // Checked here BEFORE the throttle so a bad submission costs no budget; the
+    // mint path re-checks after control-strip as the authoritative backstop.
+    if (strtolower($name) === $username) {
+        return ['ok' => false, 'error' => 'name_equals_username'];
     }
     if (mb_strlen($password) < $cfg['min_password_length']) {
         return ['ok' => false, 'error' => 'password_too_short', 'min_length' => $cfg['min_password_length']];
@@ -629,7 +660,7 @@ function qs_auth_attempt_register(string $name, string $email, string $password)
     }
     qs_registration_throttle_attempt(); // every attempt counts against the IP
 
-    $created = qs_user_create($name, $email, $password, $cfg['max_users']);
+    $created = qs_user_create($name, $username, $password, $cfg['max_users']);
     if ($created['ok']) {
         qs_registration_record_success(); // only real creations fill the global cap
         return ['ok' => true, 'created' => true, 'userId' => $created['userId']];
@@ -641,8 +672,11 @@ function qs_auth_attempt_register(string $name, string $email, string $password)
     if ($created['error'] === 'full') {
         return ['ok' => false, 'error' => 'registration_closed'];
     }
-    if ($created['error'] === 'invalid_email') {
-        return ['ok' => false, 'error' => 'invalid_email'];
+    if ($created['error'] === 'invalid_username') {
+        return ['ok' => false, 'error' => 'invalid_username'];
+    }
+    if ($created['error'] === 'name_equals_username') {
+        return ['ok' => false, 'error' => 'name_equals_username'];
     }
     return ['ok' => false, 'error' => 'server'];
 }

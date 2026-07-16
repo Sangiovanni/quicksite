@@ -2,7 +2,8 @@
 /**
  * Admin Login Page
  *
- * Email + password authentication (C5b). The form POSTs to this page; the
+ * Username + password authentication (C5b; username identity C8 8.0b). The
+ * form POSTs to this page; the
  * router verifies the credentials through the shared login gate and holds the
  * resulting session (access + refresh pair) server-side in the PHP session.
  * "Remember me" persists the rotating refresh token in an HttpOnly cookie —
@@ -19,11 +20,11 @@ $registerFlash = !empty($_SESSION['qs_register_flash']);
 unset($_SESSION['qs_register_flash']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = (string)($_POST['email'] ?? '');
+    $username = (string)($_POST['username'] ?? '');
     $password = (string)($_POST['password'] ?? '');
     $remember = isset($_POST['remember']);
 
-    $result = $router->attemptLogin($email, $password, $remember);
+    $result = $router->attemptLogin($username, $password, $remember);
     if ($result === null) {
         $router->redirect('dashboard');
     }
@@ -65,17 +66,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <form id="admin-login-form" method="POST" action="">
                 <div class="admin-form-group">
-                    <label class="admin-label admin-label--required" for="email">
-                        <?= __admin('login.emailLabel') ?>
+                    <label class="admin-label admin-label--required" for="username">
+                        <?= __admin('login.usernameLabel') ?>
                     </label>
                     <input
-                        type="email"
-                        id="email"
-                        name="email"
+                        type="text"
+                        id="username"
+                        name="username"
                         class="admin-input"
-                        placeholder="<?= adminAttr(__admin('login.emailPlaceholder')) ?>"
-                        value="<?= adminAttr((string)($_POST['email'] ?? '')) ?>"
+                        placeholder="<?= adminAttr(__admin('login.usernamePlaceholder')) ?>"
+                        value="<?= adminAttr((string)($_POST['username'] ?? '')) ?>"
                         autocomplete="username"
+                        autocapitalize="none"
+                        spellcheck="false"
                         required
                     >
                 </div>

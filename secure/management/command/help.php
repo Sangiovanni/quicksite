@@ -2135,14 +2135,14 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'login' => [
-        'description' => 'Exchanges email + password for a session: a short-lived access token (sent as Authorization: Bearer on every request) + a longer-lived refresh token (used only with refreshSession). PUBLIC + self-authenticating - no bearer header needed.',
+        'description' => 'Exchanges username + password for a session: a short-lived access token (sent as Authorization: Bearer on every request) + a longer-lived refresh token (used only with refreshSession). PUBLIC + self-authenticating - no bearer header needed.',
         'method' => 'POST',
         'parameters' => [
-            'email' => [
+            'username' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Login identifier (the user email in users.php)',
-                'example' => 'you@example.com'
+                'description' => 'Login identifier (the private username in users.php - never shown to other users)',
+                'example' => 'your-username'
             ],
             'password' => [
                 'required' => true,
@@ -2152,7 +2152,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => '********'
             ]
         ],
-        'example_post' => 'POST /management/login with body: {"email": "you@example.com", "password": "********"}',
+        'example_post' => 'POST /management/login with body: {"username": "your-username", "password": "********"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -2166,14 +2166,14 @@ $GLOBALS['__help_commands'] = [
                 'user' => [
                     'id' => 'usr_...',
                     'name' => 'Your Name',
-                    'email' => 'you@example.com',
+                    'username' => 'your-username',
                     'selected_project' => 'quicksite'
                 ]
             ]
         ],
         'error_responses' => [
-            '400.validation.required' => 'email and password are required',
-            '401.auth.invalid_credentials' => 'Invalid email or password (uniform for unknown email, wrong password, externally managed or disabled account - no account oracle)',
+            '400.validation.required' => 'username and password are required',
+            '401.auth.invalid_credentials' => 'Invalid username or password (uniform for unknown username, wrong password, externally managed or disabled account - no account oracle)',
             '429.auth.throttled' => 'Too many failed attempts - retry_after gives the wait in seconds',
             '500.server.session_store_failed' => 'Could not create the session'
         ],
@@ -2241,20 +2241,20 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'register' => [
-        'description' => 'Self-registration: creates a user account from name + email + password. PUBLIC + self-gating - the command enforces the auth.php registration.allow_self_registration flag server-side (default: DISABLED) plus flood controls (per-IP rate, install-wide hourly cap, absolute account cap). A duplicate email returns the SAME success response as a real creation (no account-existence oracle); sign in afterwards with the login command.',
+        'description' => 'Self-registration: creates a user account from a public name + a private username + password. PUBLIC + self-gating - the command enforces the auth.php registration.allow_self_registration flag server-side (default: DISABLED) plus flood controls (per-IP rate, install-wide hourly cap, absolute account cap). A duplicate username returns the SAME success response as a real creation (login identifiers are private - no account-existence oracle); sign in afterwards with the login command.',
         'method' => 'POST',
         'parameters' => [
             'name' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Display name (max 200 characters)',
+                'description' => 'Public display name (max 200 characters - how other users identify you; must differ from the private username)',
                 'example' => 'Your Name'
             ],
-            'email' => [
+            'username' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Login identifier - must be a valid, unused email address',
-                'example' => 'you@example.com'
+                'description' => 'Private login identifier - unique; 3-32 characters, lowercase letters/digits/dash/underscore',
+                'example' => 'your-username'
             ],
             'password' => [
                 'required' => true,
@@ -2264,7 +2264,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => '************'
             ]
         ],
-        'example_post' => 'POST /management/register with body: {"name": "Your Name", "email": "you@example.com", "password": "************"}',
+        'example_post' => 'POST /management/register with body: {"name": "Your Name", "username": "your-username", "password": "************"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -2277,11 +2277,11 @@ $GLOBALS['__help_commands'] = [
             '403.auth.registration_disabled' => 'Self-registration is disabled on this installation (auth.php registration.allow_self_registration)',
             '403.auth.registration_closed' => 'Registration is closed - the account limit (registration.max_users) is reached',
             '429.auth.throttled' => 'Too many registration attempts - retry_after gives the wait in seconds (per-IP rate or install-wide hourly cap)',
-            '400.validation.required' => 'name, email and password are required',
-            '400.validation.invalid_format' => 'Invalid email address, or password shorter than the configured minimum (data.min_length)',
+            '400.validation.required' => 'name, username and password are required',
+            '400.validation.invalid_format' => 'Invalid username (3-32 chars: lowercase letters, digits, dash, underscore); OR the public name equals the username (they must differ - the username is private); OR password shorter than the configured minimum (data.min_length)',
             '500.server.registration_failed' => 'Could not register the account'
         ],
-        'notes' => 'No session and no user id are returned - the new account signs in through the login command. The success response is identical whether the account was created or the email already existed; if the email belonged to someone else, the subsequent login simply fails. Flood-control knobs live in auth.php authentication.registration (throttle.per_ip_per_minute, throttle.global_per_hour, max_users; 0 disables a limit).'
+        'notes' => 'No session and no user id are returned - the new account signs in through the login command. The success response is identical whether the account was created or the username already existed; if the username belonged to someone else, the subsequent login simply fails - pick another username and register again. Flood-control knobs live in auth.php authentication.registration (throttle.per_ip_per_minute, throttle.global_per_hour, max_users; 0 disables a limit).'
     ],
 
     'changePassword' => [
@@ -2320,7 +2320,7 @@ $GLOBALS['__help_commands'] = [
             '429.auth.throttled' => 'Too many failed attempts - retry_after gives the wait in seconds',
             '500.server.file_write_failed' => 'Could not persist the new password'
         ],
-        'notes' => 'Global-scoped (no project marker) - acts only on the caller\'s own account. Wrong current-password attempts share the login throttle for the same email, so a stolen access token cannot brute-force the password. After a successful change, other devices/sessions must log in again with the new password.'
+        'notes' => 'Global-scoped (no project marker) - acts only on the caller\'s own account. Wrong current-password attempts share the login throttle for the same account (keyed on its username), so a stolen access token cannot brute-force the password. After a successful change, other devices/sessions must log in again with the new password.'
     ],
 
     'listComponents' => [

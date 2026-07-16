@@ -324,8 +324,9 @@ function qs_session_revoke_by_refresh(string $rawRefresh): bool {
 
 // ============================================================================
 // Login throttle (brute-force backoff) — separate small state file, same
-// flock + temp/rename discipline. Keyed by sha256 of the lowercased email
-// (the raw identifier never sits in the state file).
+// flock + temp/rename discipline. Keyed by sha256 of the lowercased login
+// identifier (the USERNAME since C8 8.0b; the raw identifier never sits in
+// the state file).
 // ============================================================================
 
 function qs_login_throttle_path(): string {
@@ -333,16 +334,16 @@ function qs_login_throttle_path(): string {
 }
 
 /**
- * Seconds the caller must still wait before another attempt for this email
- * (0 = go ahead). Read-only.
+ * Seconds the caller must still wait before another attempt for this login
+ * identifier (0 = go ahead). Read-only.
  */
-function qs_login_throttle_check(string $email): int {
+function qs_login_throttle_check(string $identifier): int {
     $path = qs_login_throttle_path();
     $data = is_file($path) ? json_decode((string)@file_get_contents($path), true) : null;
     if (!is_array($data)) {
         return 0;
     }
-    $entry = $data[qs_session_hash(strtolower($email))] ?? null;
+    $entry = $data[qs_session_hash(strtolower($identifier))] ?? null;
     if (!is_array($entry)) {
         return 0;
     }
@@ -388,8 +389,8 @@ function qs_login_throttle_mutate(callable $fn) {
  * Record a failed attempt: 5 free tries, then a doubling cooldown
  * (30s, 60s, 120s, … capped at 1h).
  */
-function qs_login_throttle_fail(string $email): void {
-    $key = qs_session_hash(strtolower($email));
+function qs_login_throttle_fail(string $identifier): void {
+    $key = qs_session_hash(strtolower($identifier));
     qs_login_throttle_mutate(function (array &$data) use ($key) {
         $now = time();
         $fails = (int)(($data[$key]['fails'] ?? 0)) + 1;
@@ -403,10 +404,10 @@ function qs_login_throttle_fail(string $email): void {
 }
 
 /**
- * Successful login clears the email's counter.
+ * Successful login clears the identifier's counter.
  */
-function qs_login_throttle_clear(string $email): void {
-    $key = qs_session_hash(strtolower($email));
+function qs_login_throttle_clear(string $identifier): void {
+    $key = qs_session_hash(strtolower($identifier));
     qs_login_throttle_mutate(function (array &$data) use ($key) {
         unset($data[$key]);
         return true;
@@ -564,7 +565,7 @@ function qs_registration_throttle_attempt(): void {
 
 /**
  * Record a SUCCESSFUL registration against the install-wide hourly cap.
- * Only real creations count — a duplicate-email attempt must not let an
+ * Only real creations count — a duplicate-username attempt must not let an
  * attacker fill the global window and lock legitimate users out.
  */
 function qs_registration_record_success(): void {

@@ -30,9 +30,9 @@ The `help` endpoint is publicly accessible and is the canonical source of truth 
 
 ## Authentication
 
-- Credentials are **email + password** (`users.php` stores a `password_hash`; a `null` hash marks an externally-managed account that cannot use password login). `POST /management/login` exchanges them for a **session**:
+- Credentials are **username + password** (`users.php` stores a `password_hash`; a `null` hash marks an externally-managed account that cannot use password login). The username is the **private** login identifier — never shown to other users; public identity is the display name + the user id (there is no email field). `POST /management/login` exchanges the credentials for a **session**:
   ```json
-  { "email": "you@example.com", "password": "…" }
+  { "username": "your-username", "password": "…" }
   → { "access_token": "qsa_…", "expires_in": 900,
       "refresh_token": "qsr_…", "refresh_expires_in": 2592000, … }
   ```
@@ -41,7 +41,7 @@ The `help` endpoint is publicly accessible and is the canonical source of truth 
   Authorization: Bearer <access_token>
   ```
   When it expires, requests return `401` with code `auth.token_expired` — call `refreshSession` with the refresh token and retry. Each refresh **rotates** the refresh token (always store both returned tokens); presenting an already-rotated refresh token after a short grace window is treated as theft and revokes the whole session family. `logoutSession` ends a session explicitly.
-- Five commands are public: `help`, `login`, `refreshSession`, `logoutSession`, `register`. The session commands are self-authenticating; `register` is self-gating — it enforces the `registration.allow_self_registration` flag server-side (default: **disabled**) plus flood controls (attempts per IP per minute, successful registrations per hour install-wide, and an optional absolute account cap). Failed logins are throttled per email (doubling cooldown after 5 attempts). A duplicate email at `register` returns the same success response as a real creation — no account-existence oracle.
+- Five commands are public: `help`, `login`, `refreshSession`, `logoutSession`, `register`. The session commands are self-authenticating; `register` is self-gating — it enforces the `registration.allow_self_registration` flag server-side (default: **disabled**) plus flood controls (attempts per IP per minute, successful registrations per hour install-wide, and an optional absolute account cap). Failed logins are throttled per username (doubling cooldown after 5 attempts). A duplicate username at `register` returns the same success response as a real creation — login identifiers are private, so no account-existence oracle.
 - `changePassword` (authenticated) changes the caller's own password: it requires the current password, shares the login throttle, and revokes every **other** session of the user on success (the session performing the change survives).
 - Session TTLs (`access_ttl`, `refresh_ttl`, `reuse_grace`) and the registration policy (`allow_self_registration`, `min_password_length`, `max_users`, `throttle.per_ip_per_minute`, `throttle.global_per_hour` — 0 disables a limit) live in `secure/management/config/auth.php` (gitignored, auto-created from `.example`); runtime session state lives in `sessions.json` next to it (machine-written, hashed at rest — never edit).
 - Authorization is **per project**: a user's role comes from the target project's `config/members.json`. The six fixed roles (`viewer` … `owner`) are defined by trust-coherent command **categories** in `categories.php`; `roles.php` grants each role a `rank` and its categories, expanded to a per-command allowlist at load time. There is no superadmin and no custom roles.
@@ -81,7 +81,7 @@ Each row enumerates the commands in that category — comma-separated, alphabeti
 | Category | Commands & detail |
 |---|---|
 | **Meta** | `help` — self-documenting endpoint, callable without authentication. |
-| **Session & account** | `login`, `refreshSession`, `logoutSession`, `register`, `changePassword` — email+password login → access + refresh pair; refresh rotation with reuse-detection (family revoke); explicit logout; flag-gated flood-controlled self-registration (public); self-service password change (authenticated — requires the current password, revokes the user's other sessions). See *Authentication* above. |
+| **Session & account** | `login`, `refreshSession`, `logoutSession`, `register`, `changePassword` — username+password login → access + refresh pair; refresh rotation with reuse-detection (family revoke); explicit logout; flag-gated flood-controlled self-registration (public); self-service password change (authenticated — requires the current password, revokes the user's other sessions). See *Authentication* above. |
 | **Pages** | `listPages`, `createAlias`, `deleteAlias`, `listAliases`, `editFavicon`, `editTitle` — page metadata, title, favicon, alias routes. |
 | **Routes & sitemap** | `addRoute`, `deleteRoute`, `getRoutes`, `getSiteMap`, `setRouteLayout`, `analyzeReachability` — URL routing tree CRUD, sitemap export, dead-route audit. `setRouteResolver` is under "Server-side data resolvers" below since the route layer just hosts the resolver config. |
 | **Structure** | `getStructure`, `editStructure`, `addNode`, `addComplexElement`, `addComponentToNode`, `editComponentToNode`, `editNode`, `moveNode`, `deleteNode`, `duplicateNode` — edit nodes inside a page tree. |

@@ -2,9 +2,12 @@
 /**
  * User Registry — stable userId => identity. Engine plumbing (PHP).
  *
- * Copy this file to users.php. Login is EMAIL + PASSWORD (C5b): the login
- * command / admin login page verify the password against `password_hash` and
- * issue a short-lived session (see auth.php `session` knobs). There is NO
+ * Copy this file to users.php. Login is USERNAME + PASSWORD (C5b; username
+ * identity C8 8.0b): the login command / admin login page verify the password
+ * against `password_hash` and issue a short-lived session (see auth.php
+ * `session` knobs). The username is PRIVATE (login-only — never shown to
+ * other users); public identity is the display `name` + the user id. There
+ * is NO email field (a mailer-less system cannot verify or use one) and NO
  * global "superadmin" role: a user simply owns / is a member of projects, and
  * their capabilities come from their per-project role
  * (owner/admin/developer/designer/editor/viewer) recorded in each project's
@@ -15,8 +18,11 @@
  * Generate a password hash with: php -r "echo password_hash('your-password', PASSWORD_DEFAULT);"
  *
  * Fields:
- *   name             display name (shown in the admin panel)
- *   email            login identifier (unique; null = cannot log in by password)
+ *   name             public display name (shown in the admin panel and to
+ *                    other users)
+ *   username         PRIVATE login identifier (unique; 3-32 characters,
+ *                    lowercase letters/digits/dash/underscore; null = cannot
+ *                    log in by password)
  *   status           'active' | 'disabled' (disabled = every session rejected)
  *   password_hash    password_hash() output; null = externally managed account
  *                    (its sessions are minted by an embedding platform, never
@@ -32,7 +38,7 @@ return [
         // panel shows a security warning as long as this account exists.
         'usr_CHANGE_ME_default' => [
             'name'             => 'Default Admin',
-            'email'            => 'admin@example.com',
+            'username'         => 'admin',
             'status'           => 'active',
             'password_hash'    => '$2y$10$v8pm2uxDZ.qdwA5LgF.Yt.96LYs9svgaAsJ2c//X4P0X4BTVig4QO',
             'selected_project' => null,

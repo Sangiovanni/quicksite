@@ -501,7 +501,7 @@ const QuickSiteAdmin = {
      * Initialize form handling
      */
     initForms() {
-        // Login form: plain server-side POST (C5b email+password — the router
+        // Login form: plain server-side POST (C5b username+password — the router
         // verifies credentials and holds the session; no JS pre-validation).
 
         // Command execution forms
