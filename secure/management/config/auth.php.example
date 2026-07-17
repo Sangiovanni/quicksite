@@ -4,7 +4,7 @@
  *
  * Copy this file to auth.php and customize.
  *
- * C5b: credentials are EMAIL + PASSWORD — see users.php(.example)
+ * C5b/C8 8.0b: credentials are USERNAME + PASSWORD — see users.php(.example)
  * `password_hash`. Runtime sessions (short-lived access token + rotating
  * refresh token) live in sessions.json next to this file (machine-written,
  * auto-created — never edit or commit it). This file holds the session TTL

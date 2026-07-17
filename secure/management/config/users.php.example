@@ -28,7 +28,16 @@
  *                    (its sessions are minted by an embedding platform, never
  *                    by the login page)
  *   selected_project the project opened by default (UX only — never authorization)
- *   projects         DERIVED CACHE of "my projects" (rebuildable; not authoritative)
+ *   projects         status MIRROR of "my projects" (never authoritative —
+ *                    access always re-checks the project's members.json).
+ *                    Each entry carries a `status`: 'member' (missing =
+ *                    member, pre-8.3a entries), 'pending_invite' /
+ *                    'pending_request' (awaiting consent — never grants
+ *                    access), or a terminal notice 'refused' / 'removed' /
+ *                    'deleted' (dismissable via dismissProjectNotice).
+ *                    'member' entries are rebuildable from members.json;
+ *                    pending/terminal statuses are NOT — a cache repair
+ *                    (reconcileMemberships) must merge-preserve them.
  */
 
 return [

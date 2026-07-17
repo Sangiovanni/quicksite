@@ -37,7 +37,7 @@ quicksite/
 │   │   ├── config/               # API configuration
 │   │   │   ├── target.php        # Active project selector (gitignored)
 │   │   │   ├── auth.php          # Session TTLs, registration policy (self-registration + flood controls), CORS (gitignored)
-│   │   │   ├── users.php         # User registry: email + password_hash per user (gitignored)
+│   │   │   ├── users.php         # User registry: name + username + password_hash + per-user project list (gitignored)
 │   │   │   ├── sessions.json     # Runtime sessions — access/refresh tokens, hashed (machine-written, gitignored)
 │   │   │   ├── *-throttle.json   # Login + registration backoff counters, hashed keys (machine-written, gitignored)
 │   │   │   ├── roles.php         # Role definitions (gitignored)
@@ -58,6 +58,8 @@ quicksite/
 │   ├── projects/                 # Project data (one folder per project)
 │   │   └── quicksite/            # Default project
 │   │       ├── config.php        # Project config (languages, settings)
+│   │       ├── config/           # Access control — members.json: owner, visibility,
+│   │       │                     #   members {userId → role} + pending invitations (gitignored)
 │   │       ├── routes.php        # Public route definitions
 │   │       ├── templates/        # Page and component JSON structures
 │   │       ├── translate/        # Translation files (en.json, fr.json, etc.)

@@ -116,7 +116,9 @@ secure/projects/quicksite/data/oauth-secrets.json
 # generated at migration/bootstrap, meaningless without the local users.php.
 # The secure/projects/* tree is gitignored EXCEPT the quicksite starter template,
 # so re-ignore the template's members.json explicitly (like oauth-secrets above).
+# The .lock sibling is qs_members_mutate's flock sidecar (C8 8.3a).
 secure/projects/quicksite/config/members.json
+secure/projects/quicksite/config/members.json.lock
 
 # Resolver response cache (beta.8 A2 Slice 4). File-based TTL cache for
 # the server-side data resolver. Per-deployment runtime state — never

@@ -20,6 +20,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -104,7 +105,22 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
     
     // Count what we're about to delete
     $stats = countProjectFiles($projectPath);
-    
+
+    // C8 8.3a membership cascade — capture BEFORE the directory (and the
+    // members.json inside it) is destroyed: who must be notified, and the
+    // project's display name for the notices.
+    $cascadeMembers = null;
+    $membersPath = $projectPath . '/config/members.json';
+    if (is_file($membersPath)) {
+        $cascadeMembers = json_decode((string)@file_get_contents($membersPath), true);
+        if (!is_array($cascadeMembers)) {
+            $cascadeMembers = null;
+            error_log("deleteProject: members.json for '{$projectName}' is unreadable — no membership cascade possible");
+        }
+    }
+    $cascadeSiteName = qs_project_site_name($projectName);
+    $callerId = getCurrentUser()['id'] ?? null;
+
     // Delete the project directory recursively
     $deleted = deleteDirectory($projectPath);
     
@@ -134,13 +150,59 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
         }
     }
     
+    // C8 8.3a membership cascade — the project is gone; update every affected
+    // user's status-mirror cache in ONE users.php write. The DELETING owner's
+    // own entry is plainly removed (self-initiated exits leave no tombstone);
+    // every other member AND every pending invitee gets a dismissable
+    // 'deleted' notice (Sangio R3: they must know the project died — they
+    // were not refused). Cache failure is silent by ruling (error_log only):
+    // access is already correct — the authority died with the folder.
+    $cascade = ['members_notified' => 0, 'invitees_notified' => 0, 'self_removed' => false];
+    if ($cascadeMembers !== null) {
+        $affected = array_merge(
+            array_keys($cascadeMembers['members'] ?? []),
+            array_keys($cascadeMembers['invitations'] ?? [])
+        );
+        $memberIds = $cascadeMembers['members'] ?? [];
+        $today = date('Y-m-d');
+        $written = qs_users_mutate(function (array &$cfg) use ($affected, $memberIds, $projectName, $cascadeSiteName, $callerId, $today, &$cascade) {
+            foreach (array_unique($affected) as $uid) {
+                $uid = (string)$uid;
+                if (!isset($cfg['users'][$uid])) {
+                    continue; // account gone — nothing to notify
+                }
+                if ($uid === $callerId) {
+                    unset($cfg['users'][$uid]['projects'][$projectName]);
+                    $cascade['self_removed'] = true;
+                    continue;
+                }
+                $existingName = $cfg['users'][$uid]['projects'][$projectName]['name'] ?? null;
+                $cfg['users'][$uid]['projects'][$projectName] = [
+                    'name'   => is_string($existingName) && $existingName !== '' ? $existingName : $cascadeSiteName,
+                    'status' => 'deleted',
+                    'at'     => $today,
+                ];
+                if (isset($memberIds[$uid])) {
+                    $cascade['members_notified']++;
+                } else {
+                    $cascade['invitees_notified']++;
+                }
+            }
+            return true;
+        });
+        if ($written !== true) {
+            error_log("deleteProject: membership-cascade cache write failed for '{$projectName}'");
+        }
+    }
+
     $result = [
         'project' => $projectName,
         'deleted' => true,
         'files_deleted' => $stats['files'],
         'directories_deleted' => $stats['directories'],
         'size_freed' => formatBytes($stats['size']),
-        'size_bytes' => $stats['size']
+        'size_bytes' => $stats['size'],
+        'membership_cascade' => $cascade
     ];
     
     if ($switchedTo !== null) {

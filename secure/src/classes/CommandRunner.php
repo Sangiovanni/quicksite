@@ -57,7 +57,6 @@ class CommandRunner {
         // Read-only: system info
         'help',
         'getCommandHistory',
-        'listTokens',
         'listAliases',
         // Read-only: project info (no mutations)
         'listProjects',

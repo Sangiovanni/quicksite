@@ -129,6 +129,253 @@ function getUserRoleForProject(string $userId, string $project): ?string {
 }
 
 /**
+ * Does this users.php `projects` cache entry describe a REAL membership?
+ * C8 8.3a status mirror: entries carry `status` (pending_invite | pending_request
+ * | member | refused | removed | deleted). Only 'member' entries may feed the
+ * membership iterators below; a missing status means a pre-8.3a entry, which is
+ * by definition a membership (readers default missing keys). This is a cheap
+ * pre-filter only — the AUTHORITATIVE members.json check stays the real gate.
+ */
+function qs_cache_entry_is_member($entry): bool {
+    return !is_array($entry) || (($entry['status'] ?? 'member') === 'member');
+}
+
+/**
+ * A project's public display name (config.php SITE_NAME), read directly so it
+ * works in every context (dispatcher, internal, harness) — falls back to the
+ * project id. F1-guarded like loadProjectMembers. C8 8.3a (cache mirror labels).
+ */
+function qs_project_site_name(string $project): string {
+    if ($project === '' || strpbrk($project, "/\\") !== false || strpos($project, '..') !== false) {
+        return $project;
+    }
+    $path = SECURE_FOLDER_PATH . '/projects/' . $project . '/config.php';
+    if (!is_file($path)) {
+        return $project;
+    }
+    $cfg = @include $path;
+    return (is_array($cfg) && !empty($cfg['SITE_NAME'])) ? (string)$cfg['SITE_NAME'] : $project;
+}
+
+/**
+ * The PUBLIC reference for a user in shared output: `{user_id, name}` — and
+ * NOTHING else. Every membership response that names a user builds the
+ * reference through here, so the PRIVATE username structurally cannot leak
+ * into output visible to other users (C8 8.0b privacy rule; C10 audit point).
+ * Unresolvable id (deleted account) → name null.
+ *
+ * @param array|null $usersCfg optional preloaded loadUsersConfig() (loop callers)
+ */
+function qs_public_user_ref(?string $userId, ?array $usersCfg = null): array {
+    $ref = ['user_id' => $userId, 'name' => null];
+    if ($userId === null || $userId === '') {
+        return $ref;
+    }
+    $users = $usersCfg ?? loadUsersConfig();
+    $name = $users['users'][$userId]['name'] ?? null;
+    if (is_string($name) && $name !== '') {
+        $ref['name'] = $name;
+    }
+    return $ref;
+}
+
+/**
+ * Membership notes (invitation note, removal reason, …): trim, strip control
+ * bytes (same rule as display names — byte-wise strip is UTF-8-safe), cap at
+ * 500 chars. Empty → null (callers omit the key entirely). C8 8.3a.
+ */
+function qs_clean_note($note): ?string {
+    if (!is_string($note)) {
+        return null;
+    }
+    $note = preg_replace('/[\x00-\x1F\x7F]/', '', mb_substr(trim($note), 0, 500));
+    return ($note === '' || $note === null) ? null : $note;
+}
+
+/**
+ * The members.json INVARIANT BACKSTOP (C8 8.3a) — the conditions that must hold
+ * before qs_members_mutate is allowed to write. members.json IS access control;
+ * a buggy caller must abort loudly rather than corrupt it.
+ *
+ * @return string|null a human-readable violation, or null when the data is sound
+ */
+function qs_members_invariant_violation(array $data): ?string {
+    $owner = $data['owner'] ?? null;
+    if (!is_string($owner) || $owner === '') {
+        return 'owner must be a non-empty string';
+    }
+    $members = $data['members'] ?? null;
+    if (!is_array($members)) {
+        return 'members must be a map';
+    }
+    if (($members[$owner]['role'] ?? null) !== 'owner') {
+        return "the owner field must reference a member holding role 'owner'";
+    }
+    $ownerCount = 0;
+    foreach ($members as $uid => $entry) {
+        $role = is_array($entry) ? ($entry['role'] ?? null) : null;
+        if (!is_string($role) || !isValidRole($role)) {
+            return "member '{$uid}' has an invalid role";
+        }
+        if ($role === 'owner') {
+            $ownerCount++;
+        }
+    }
+    if ($ownerCount !== 1) {
+        return "exactly one member must hold role 'owner' (found {$ownerCount})";
+    }
+    $visibility = $data['visibility'] ?? 'private';
+    if (!in_array($visibility, ['private', 'public'], true)) {
+        return 'visibility must be private|public';
+    }
+    $invitations = $data['invitations'] ?? [];
+    if (!is_array($invitations)) {
+        return 'invitations must be a map';
+    }
+    foreach ($invitations as $uid => $inv) {
+        if (isset($members[$uid])) {
+            return "invitation for '{$uid}' collides with an existing member (pending must never grant)";
+        }
+        $role = is_array($inv) ? ($inv['role'] ?? null) : null;
+        if (!is_string($role) || !isValidRole($role) || roleRank($role) >= 6) {
+            return "invitation for '{$uid}' has an invalid role";
+        }
+        if (!in_array($inv['direction'] ?? null, ['invite', 'request'], true)) {
+            return "invitation for '{$uid}' has an invalid direction";
+        }
+        $by = $inv['by'] ?? null;
+        if (!is_string($by) || $by === '') {
+            return "invitation for '{$uid}' lacks its sponsor";
+        }
+    }
+    return null;
+}
+
+/**
+ * Serialized read-modify-write on a project's members.json — THE members.json
+ * writer (C8 8.3a; the membership mirror of qs_users_mutate). createProject's
+ * birth-write stays inline (file CREATION in a just-minted dir — different
+ * contract); every LATER mutation comes through here.
+ *
+ * Contract:
+ *  - F1 single-segment guard on $project (self-defending primitive).
+ *  - Per-project flock sidecar `members.json.lock`, fresh in-lock read.
+ *  - ABORTS on missing/corrupt file — never conjures or clobbers the authority
+ *    file (a broken members.json surfaces as an error, not a silent rebuild).
+ *  - Callback returns false → abort, nothing written ($failure stays null so
+ *    the caller can tell its own abort from an infrastructure failure).
+ *  - INVARIANT BACKSTOP before write (qs_members_invariant_violation) —
+ *    violation = abort + error_log, never a silent repair.
+ *  - temp + rename atomic swap; byte format identical to createProject's
+ *    birth-write (JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES + trailing \n).
+ *
+ * @param callable    $fn      function(array &$data): mixed — full decoded
+ *                             members.json by reference; false aborts.
+ * @param string|null $failure OUT: null | 'invalid_project' | 'missing' |
+ *                             'lock' | 'corrupt' | 'invariant' | 'write'
+ * @return mixed the callback's return value, or false on abort/failure
+ */
+function qs_members_mutate(string $project, callable $fn, ?string &$failure = null) {
+    $failure = null;
+    if ($project === '' || strpbrk($project, "/\\") !== false || strpos($project, '..') !== false) {
+        $failure = 'invalid_project';
+        return false;
+    }
+    $path = SECURE_FOLDER_PATH . '/projects/' . $project . '/config/members.json';
+    if (!is_file($path)) {
+        $failure = 'missing';
+        return false;
+    }
+    $lock = @fopen($path . '.lock', 'c');
+    if ($lock === false) {
+        $failure = 'lock';
+        return false;
+    }
+    flock($lock, LOCK_EX);
+    try {
+        $raw = @file_get_contents($path); // fresh in-lock read
+        $data = is_string($raw) ? json_decode($raw, true) : null;
+        if (!is_array($data) || !is_array($data['members'] ?? null)) {
+            $failure = 'corrupt';
+            return false;
+        }
+        $result = $fn($data);
+        if ($result === false) {
+            return false;
+        }
+        $violation = qs_members_invariant_violation($data);
+        if ($violation !== null) {
+            error_log("qs_members_mutate: refusing to write members.json for '{$project}' — {$violation}");
+            $failure = 'invariant';
+            return false;
+        }
+        $content = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";
+        $tmp = $path . '.tmp' . getmypid();
+        if (file_put_contents($tmp, $content, LOCK_EX) === false) {
+            @unlink($tmp);
+            $failure = 'write';
+            return false;
+        }
+        if (!@rename($tmp, $path)) {
+            // Windows: a transient sharing violation (AV scan) can fail the swap once.
+            usleep(50000);
+            if (!@rename($tmp, $path)) {
+                @unlink($tmp);
+                $failure = 'write';
+                return false;
+            }
+        }
+        return $result;
+    } finally {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+    }
+}
+
+/**
+ * Map a qs_members_mutate infrastructure $failure to an HTTP triple
+ * [status, code, message] (C8 8.3a). Marker-scoped commands use it directly
+ * (the dispatcher already proved the project exists — a missing/corrupt file
+ * there is an integrity fault). Self-service commands must translate
+ * 'missing' to their UNIFORM not-found response BEFORE calling this (a
+ * nonexistent project must be indistinguishable from "no invitation").
+ */
+function qs_members_failure_http(?string $failure): array {
+    if ($failure === 'invalid_project') {
+        return [400, 'project.invalid', 'Invalid project identifier'];
+    }
+    if ($failure === 'missing' || $failure === 'corrupt' || $failure === 'invariant') {
+        return [500, 'members.integrity', 'The project membership file is missing or unsound; refusing to operate on it'];
+    }
+    return [500, 'server.file_write_failed', 'Failed to persist the membership change'];
+}
+
+/**
+ * Write ONE entry of a user's `projects` cache (the status mirror) through the
+ * users.php writer — the single mirror-write path for the membership commands
+ * (C8 8.3a). $entry null = remove the entry. Mirror writes are SECONDARY: the
+ * ruled failure mode is silent success + error_log at the caller (access stays
+ * correct by construction — members.json already committed; 8.4
+ * reconcileMemberships heals).
+ *
+ * @return bool true when the cache write committed
+ */
+function qs_membership_cache_set(string $userId, string $project, ?array $entry): bool {
+    $result = qs_users_mutate(function (array &$cfg) use ($userId, $project, $entry) {
+        if (!isset($cfg['users'][$userId])) {
+            return false;
+        }
+        if ($entry === null) {
+            unset($cfg['users'][$userId]['projects'][$project]);
+        } else {
+            $cfg['users'][$userId]['projects'][$project] = $entry;
+        }
+        return true;
+    });
+    return $result === true;
+}
+
+/**
  * Resolve a user's EFFECTIVE role for the transitional bridge (C5): their role on
  * the selected project, or — if that pointer is stale (project deleted / no longer
  * a member) — a graceful fallback to any project they are genuinely a member of.
@@ -152,7 +399,10 @@ function resolveEffectiveRole(array $user): ?string {
         }
     }
     // Fallback: first cached project where the membership actually exists
-    foreach (array_keys($user['projects'] ?? []) as $project) {
+    foreach (($user['projects'] ?? []) as $project => $entry) {
+        if (!qs_cache_entry_is_member($entry)) {
+            continue; // status mirror (8.3a): pending/terminal entries are not memberships
+        }
         $role = getUserRoleForProject($userId, (string)$project);
         if ($role !== null) {
             return $role;
@@ -180,7 +430,10 @@ function resolveDefaultProject(array $user): ?string {
     if ($selected !== null && $selected !== '' && getUserRoleForProject($userId, (string)$selected) !== null) {
         return (string)$selected;
     }
-    foreach (array_keys($user['projects'] ?? []) as $project) {
+    foreach (($user['projects'] ?? []) as $project => $entry) {
+        if (!qs_cache_entry_is_member($entry)) {
+            continue; // status mirror (8.3a): pending/terminal entries are not memberships
+        }
         if (getUserRoleForProject($userId, (string)$project) !== null) {
             return (string)$project;
         }
@@ -202,7 +455,10 @@ function getUserProjectIds(array $user): array {
         return [];
     }
     $ids = [];
-    foreach (array_keys($user['projects'] ?? []) as $project) {
+    foreach (($user['projects'] ?? []) as $project => $entry) {
+        if (!qs_cache_entry_is_member($entry)) {
+            continue; // status mirror (8.3a): pending/terminal entries are not memberships
+        }
         if (getUserRoleForProject($userId, (string)$project) !== null) {
             $ids[(string)$project] = true;
         }

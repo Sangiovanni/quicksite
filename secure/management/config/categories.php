@@ -181,15 +181,21 @@ return [
     // Forward-declared (C8 populates) — kept so role grants + the rank guard resolve.
     'project.settings' => [
         'scope' => 'project',
-        'commands' => [], // C8: setProjectVisibility, …
+        'commands' => [], // C8 8.3b/8.4: setJoinPolicy, setProjectVisibility, …
     ],
+
+    // Membership management (C8 8.3a) — consent model: invitations, not direct
+    // adds. Rank rules (canManageRole strictly-below) enforced in-command,
+    // in-lock. Targeting is by user_id only. admin+.
     'project.members' => [
         'scope' => 'project',
-        'commands' => [], // C8: addMember, removeMember, changeMemberRole, listMembers
+        'commands' => ['listMembers', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember'],
     ],
+
+    // Ownership rotation — owner only.
     'project.ownership' => [
         'scope' => 'project',
-        'commands' => [], // C8: transferOwnership
+        'commands' => ['transferOwnership'],
     ],
 
     // ====================================================================
@@ -220,6 +226,26 @@ return [
         'scope' => 'global',
         'access' => 'any',
         'commands' => ['changePassword'],
+    ],
+
+    // Exact PUBLIC-name lookup (C8 8.3a) — the "invite someone" primitive:
+    // response is {user_id, name} pairs ONLY. The PRIVATE username is never
+    // searchable and never returned (C8 8.0b privacy rule).
+    'users.lookup' => [
+        'scope' => 'global',
+        'access' => 'any',
+        'commands' => ['findUser'],
+    ],
+
+    // Membership self-service (C8 8.3a): the caller's OWN invitations,
+    // memberships and notices. GLOBAL on purpose — an invitee is not a member,
+    // so the '/p/<id>/' marker gate would 403 them before the command runs;
+    // `project` is an F1-validated DATA parameter and every command acts only
+    // on the caller's own entries.
+    'membership.self' => [
+        'scope' => 'global',
+        'access' => 'any',
+        'commands' => ['listMyInvitations', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice'],
     ],
 
     // Self / role catalog reads.

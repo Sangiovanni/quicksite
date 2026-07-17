@@ -3397,9 +3397,416 @@ $GLOBALS['__help_commands'] = [
             '403.auth.forbidden' => 'Not the owner of this project (owner-only)',
             '404.resource.not_found' => 'Project not found'
         ],
-        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Deleting a project leaves each member\'s users.php projects cache pointing at it until reconcileMemberships runs, but those pointers are re-verified against members.json on every read, so a member simply falls back to another project (or the no-project state).'
+        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Membership cascade: every OTHER member and every pending invitee gets a dismissable status "deleted" notice in their own cache (listMyInvitations shows it; dismissProjectNotice clears it) so the deletion is never mistaken for a refusal or removal; the deleting owner\'s own entry is simply removed. The response reports the cascade under data.membership_cascade.'
     ],
-    
+
+    'listMembers' => [
+        'description' => 'Roster of the TARGET project: active members (rank-descending) plus the pending-invitations block. Users are referenced as {user_id, name} - the public display name and the opaque public id. The PRIVATE username never appears in membership output.',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/p/<projectId>/listMembers',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Members listed successfully',
+            'data' => [
+                'project' => 'prj_a1b2c3',
+                'owner_user_id' => 'usr_...',
+                'visibility' => 'private',
+                'members' => [
+                    ['user_id' => 'usr_...', 'name' => 'Sangio', 'role' => 'owner', 'rank' => 6, 'is_owner' => true],
+                    ['user_id' => 'usr_...', 'name' => 'Alice', 'role' => 'editor', 'rank' => 2, 'is_owner' => false]
+                ],
+                'invitations' => [
+                    ['user_id' => 'usr_...', 'name' => 'Bob', 'role' => 'developer', 'direction' => 'invite',
+                     'invited_by' => ['user_id' => 'usr_...', 'name' => 'Sangio'], 'at' => '2026-07-16', 'note' => 'welcome']
+                ],
+                'member_count' => 2,
+                'invitation_count' => 1
+            ]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'No project targeted - use /management/p/<projectId>/listMembers',
+            '403.auth.forbidden' => 'Caller is not an admin/owner of this project (project.members category)'
+        ],
+        'notes' => 'Project-scoped on the URL marker; the body carries no project parameter. A pending invitation grants NO access - it lives in a separate block that no permission check reads. Names resolve live from the user registry (null if the account no longer exists).'
+    ],
+
+    'inviteMember' => [
+        'description' => 'Offers project membership to an existing account (consent model): writes a pending invitation that only materializes when the invitee runs acceptInvitation - where the inviter\'s authority is re-validated. Targeting is by user_id ONLY (the unique public identifier, discovered via findUser); the private username is never a membership target.',
+        'method' => 'POST',
+        'parameters' => [
+            'user_id' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Target account\'s user id (from findUser or a shared id)',
+                'example' => 'usr_a1b2c3d4e5f6...'
+            ],
+            'role' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Offered role - any built-in role below owner that the actor outranks (admin offers up to developer; owner offers up to admin)',
+                'example' => 'editor'
+            ],
+            'note' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Optional message shown to the invitee (control characters stripped, 500 chars max)'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/inviteMember with body: {"user_id": "usr_...", "role": "editor", "note": "Come help with the docs"}',
+        'success_response' => [
+            'status' => 201,
+            'code' => 'resource.created',
+            'message' => 'Invitation sent',
+            'data' => [
+                'project' => 'prj_a1b2c3',
+                'user_id' => 'usr_...',
+                'name' => 'Bob',
+                'role' => 'editor',
+                'at' => '2026-07-16'
+            ]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'No project targeted',
+            '400.validation.missing_field' => 'user_id and role are required',
+            '400.validation.invalid_format' => 'Unknown role',
+            '400.member.role_not_assignable' => 'The owner role cannot be offered - use transferOwnership',
+            '403.authz.insufficient_rank' => 'Offered role is not strictly below the actor\'s own rank (checked in-lock against the current members.json)',
+            '404.user.not_found' => 'No account with this user id',
+            '409.member.already_exists' => 'Target is already a member',
+            '409.invitation.already_pending' => 'Target already has a pending invitation - cancel it first to change the offer',
+            '500.members.integrity' => 'members.json missing/unsound - refused',
+            '500.server.file_write_failed' => 'Could not persist the invitation'
+        ],
+        'notes' => 'The invitee sees the invitation via listMyInvitations and answers with acceptInvitation / declineInvitation. The rank check runs inside the members.json write lock, so a concurrent demotion of the actor cannot be outrun. The invitee\'s cache gains a pending_invite mirror entry (display only - never an access input).'
+    ],
+
+    'cancelInvitation' => [
+        'description' => 'Withdraws a pending invitation before the invitee answers. Plain removal on both sides - a withdrawn offer leaves no notice in the invitee\'s cache (it is not a decision against them).',
+        'method' => 'POST',
+        'parameters' => [
+            'user_id' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Invitee\'s user id'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/cancelInvitation with body: {"user_id": "usr_..."}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Invitation cancelled',
+            'data' => ['project' => 'prj_a1b2c3', 'user_id' => 'usr_...', 'cancelled' => true]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'No project targeted',
+            '400.validation.missing_field' => 'user_id is required',
+            '403.authz.insufficient_rank' => 'The offered role is not strictly below the actor\'s rank (cancelling an offer = managing that role; no inviter carve-out)',
+            '404.invitation.not_found' => 'No pending invitation for this user',
+            '500.members.integrity' => 'members.json missing/unsound - refused',
+            '500.server.file_write_failed' => 'Could not persist the cancellation'
+        ],
+        'notes' => 'Any admin/owner outranking the offered role may cancel - not just the original inviter (an owner can always clean up an admin\'s invitations; an admin cannot touch an owner-sent admin offer).'
+    ],
+
+    'changeMemberRole' => [
+        'description' => 'Changes an existing member\'s role. The actor must outrank BOTH the member\'s current role AND the new role (an admin can neither touch another admin nor promote anyone to admin; the owner manages everything below owner). The owner\'s role is immutable here - transferOwnership is the only door.',
+        'method' => 'POST',
+        'parameters' => [
+            'user_id' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Target member\'s user id'
+            ],
+            'role' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'New role (below owner, below the actor)',
+                'example' => 'designer'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/changeMemberRole with body: {"user_id": "usr_...", "role": "designer"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Member role updated',
+            'data' => [
+                'project' => 'prj_a1b2c3',
+                'user_id' => 'usr_...',
+                'role' => 'designer',
+                'previous_role' => 'editor',
+                'role_changed' => true
+            ]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'No project targeted',
+            '400.validation.missing_field' => 'user_id and role are required',
+            '400.validation.invalid_format' => 'Unknown role',
+            '400.member.role_not_assignable' => 'The owner role cannot be assigned - use transferOwnership',
+            '400.member.owner_immutable' => 'The owner\'s role only changes through transferOwnership',
+            '400.member.cannot_target_self' => 'You cannot change your own role',
+            '403.authz.insufficient_rank' => 'Current or new role is not strictly below the actor\'s rank',
+            '404.member.not_found' => 'This user is not a member',
+            '500.members.integrity' => 'members.json missing/unsound - refused',
+            '500.server.file_write_failed' => 'Could not persist the change'
+        ],
+        'notes' => 'Same-role no-op returns 200 with role_changed=false and writes nothing. No cache touch: the users.php mirror is roleless (the role is authoritative in members.json only).'
+    ],
+
+    'removeMember' => [
+        'description' => 'Removes a member from the project (rank rule: strictly below the actor). The removed user keeps a dismissable "removed" notice in their own cache - with the optional note as the reason - so the removal is visible to them (other-initiated terminations leave a notice; self-initiated exits do not).',
+        'method' => 'POST',
+        'parameters' => [
+            'user_id' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Target member\'s user id'
+            ],
+            'note' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Optional reason shown to the removed user (control characters stripped, 500 chars max)'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/removeMember with body: {"user_id": "usr_...", "note": "project wrapped up"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Member removed',
+            'data' => ['project' => 'prj_a1b2c3', 'user_id' => 'usr_...', 'removed' => true]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'No project targeted',
+            '400.validation.missing_field' => 'user_id is required',
+            '400.member.owner_immutable' => 'The owner cannot be removed - transfer ownership first',
+            '400.member.cannot_target_self' => 'Use leaveProject to remove yourself',
+            '403.authz.insufficient_rank' => 'Target\'s role is not strictly below the actor\'s rank',
+            '404.member.not_found' => 'This user is not a member',
+            '500.members.integrity' => 'members.json missing/unsound - refused',
+            '500.server.file_write_failed' => 'Could not persist the removal'
+        ],
+        'notes' => 'Removal is effective immediately (the next request re-reads members.json). The removed user\'s sessions stay valid for their OTHER projects - membership, not authentication, is what was revoked.'
+    ],
+
+    'transferOwnership' => [
+        'description' => 'Rotates project ownership to an EXISTING member (owner-only). One atomic members.json write: owner field -> new owner, new owner\'s role -> owner, old owner -> old_owner_role (default admin). Transfer is a role rotation, never an implicit add - invite + accept first.',
+        'method' => 'POST',
+        'parameters' => [
+            'user_id' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'New owner\'s user id - must already be a member AND still resolve in the user registry at transfer time'
+            ],
+            'confirm' => [
+                'required' => true,
+                'type' => 'boolean',
+                'description' => 'Safety confirmation (must be true)',
+                'validation' => 'Must be true to proceed'
+            ],
+            'old_owner_role' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Role the departing owner keeps (any built-in role below owner)',
+                'default' => 'admin'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/transferOwnership with body: {"user_id": "usr_...", "confirm": true, "old_owner_role": "developer"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Ownership transferred',
+            'data' => [
+                'project' => 'prj_a1b2c3',
+                'new_owner' => ['user_id' => 'usr_...', 'name' => 'Alice'],
+                'old_owner' => ['user_id' => 'usr_...', 'name' => 'Sangio'],
+                'old_owner_role' => 'developer',
+                'transferred' => true
+            ]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'No project targeted',
+            '400.validation.missing_field' => 'user_id is required',
+            '400.validation.confirmation_required' => 'Must set confirm=true',
+            '400.validation.invalid_format' => 'Unknown old_owner_role',
+            '400.member.role_not_assignable' => 'old_owner_role must be below owner',
+            '400.member.not_a_member' => 'The new owner must already be a member - invite them first',
+            '400.member.cannot_target_self' => 'You already own this project',
+            '403.auth.forbidden' => 'Caller is not the owner (project.ownership category)',
+            '404.user.not_found' => 'The target no longer resolves in the user registry',
+            '500.members.integrity' => 'The owner field and the owner role disagree - surfaced, never silently repaired',
+            '500.server.file_write_failed' => 'Could not persist the rotation'
+        ],
+        'notes' => 'The rotation happens inside one write lock with a fresh read and an invariant backstop (exactly one owner; owner field matches the owner role) - there is no read-back-reverse pass; the atomic temp+rename swap IS the integrity guarantee. No cache touch (both parties remain members).'
+    ],
+
+    'findUser' => [
+        'description' => 'EXACT public-name lookup - the "invite someone" primitive: look a person up by the display name they gave you, confirm the {user_id, name} pair, then invite by id. Names are NOT unique, so several matches may return; the opaque user id is the unique public identifier that disambiguates. The PRIVATE username is never searchable and never returned.',
+        'method' => 'POST',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Public display name to match (exact, case-insensitive; no substring search)',
+                'example' => 'Alice'
+            ]
+        ],
+        'example_post' => 'POST /management/findUser with body: {"name": "Alice"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => '1 user found',
+            'data' => [
+                'query' => 'Alice',
+                'matches' => [
+                    ['user_id' => 'usr_...', 'name' => 'Alice']
+                ],
+                'count' => 1
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.missing_field' => 'name is required'
+        ],
+        'notes' => 'Global-scoped (no project marker), any authenticated user. Zero matches is a 200 with an empty list - display names are public data and a search with no results is a success, not an error. Exact match only in beta.10 (no roster harvesting by prefix).'
+    ],
+
+    'listMyInvitations' => [
+        'description' => 'The caller\'s membership inbox: pending invitations (project, offered role, inviter, note) plus terminal project notices (refused / removed / deleted) awaiting dismissal. Reads the caller\'s own cache, then verifies each pending invitation against that project\'s authoritative members.json - a withdrawn offer whose mirror survived a failed cache write is silently pruned here.',
+        'method' => 'GET',
+        'parameters' => [],
+        'example_get' => 'GET /management/listMyInvitations',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Invitations listed successfully',
+            'data' => [
+                'invitations' => [
+                    ['project' => 'prj_a1b2c3', 'project_name' => 'Portfolio', 'role' => 'editor',
+                     'invited_by' => ['user_id' => 'usr_...', 'name' => 'Sangio'], 'at' => '2026-07-16', 'note' => 'welcome']
+                ],
+                'notices' => [
+                    ['project' => 'prj_d4e5f6', 'project_name' => 'Old Shop', 'status' => 'deleted', 'at' => '2026-07-15']
+                ],
+                'invitation_count' => 1,
+                'notice_count' => 1
+            ]
+        ],
+        'error_responses' => [
+            '401.auth.unauthorized' => 'Missing/invalid bearer token'
+        ],
+        'notes' => 'Global-scoped self-service (an invitee is not yet a member, so a project-marker route would refuse them). Answer with acceptInvitation / declineInvitation; clear notices with dismissProjectNotice. The inviter identity is the public {user_id, name} reference - never the private username.'
+    ],
+
+    'acceptInvitation' => [
+        'description' => 'Accepts the caller\'s OWN pending invitation - the consent step where membership actually materializes. The inviter\'s authority is RE-VALIDATED at accept time: they must still be a member whose rank outranks the offered role, otherwise the invitation is void (removed) and refused - a grant never materializes on dead authority.',
+        'method' => 'POST',
+        'parameters' => [
+            'project' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Project id the invitation belongs to (from listMyInvitations)'
+            ]
+        ],
+        'example_post' => 'POST /management/acceptInvitation with body: {"project": "prj_a1b2c3"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Invitation accepted - welcome aboard',
+            'data' => ['project' => 'prj_a1b2c3', 'role' => 'editor', 'joined' => true]
+        ],
+        'error_responses' => [
+            '400.validation.missing_field' => 'project is required',
+            '400.project.invalid' => 'Malformed project identifier',
+            '404.invitation.not_found' => 'No pending invitation for you on this project (identical for a nonexistent project - no existence oracle)',
+            '409.invitation.void' => 'The inviter no longer holds the authority that offered this role; the invitation was removed',
+            '500.members.integrity' => 'members.json unsound - refused',
+            '500.server.file_write_failed' => 'Could not persist the join'
+        ],
+        'notes' => 'Acts only on the caller\'s own invitation. On success the caller is a full member (role from the offer) and their cache entry flips to status member. A voided invitation disappears from listMyInvitations - ask the project\'s admins to re-invite.'
+    ],
+
+    'declineInvitation' => [
+        'description' => 'Declines the caller\'s OWN pending invitation. Self-initiated - the invitation is removed everywhere with no notice kept (the inviter simply sees it gone from listMembers).',
+        'method' => 'POST',
+        'parameters' => [
+            'project' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Project id the invitation belongs to'
+            ]
+        ],
+        'example_post' => 'POST /management/declineInvitation with body: {"project": "prj_a1b2c3"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Invitation declined',
+            'data' => ['project' => 'prj_a1b2c3', 'declined' => true]
+        ],
+        'error_responses' => [
+            '400.validation.missing_field' => 'project is required',
+            '400.project.invalid' => 'Malformed project identifier',
+            '404.invitation.not_found' => 'No pending invitation for you on this project (identical for a nonexistent project)',
+            '500.members.integrity' => 'members.json unsound - refused',
+            '500.server.file_write_failed' => 'Could not persist the decline'
+        ],
+        'notes' => 'Global-scoped self-service; acts only on the caller\'s own invitation.'
+    ],
+
+    'leaveProject' => [
+        'description' => 'Removes the CALLER\'s own membership (self-service exit). Self-initiated - no notice is kept. The owner cannot leave (a project must never go ownerless): transfer ownership first, or delete the project.',
+        'method' => 'POST',
+        'parameters' => [
+            'project' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Project id to leave'
+            ]
+        ],
+        'example_post' => 'POST /management/leaveProject with body: {"project": "prj_a1b2c3"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'You left the project',
+            'data' => ['project' => 'prj_a1b2c3', 'left' => true]
+        ],
+        'error_responses' => [
+            '400.validation.missing_field' => 'project is required',
+            '400.project.invalid' => 'Malformed project identifier',
+            '400.member.owner_immutable' => 'The owner cannot leave - transferOwnership first (or deleteProject)',
+            '404.member.not_found' => 'You are not a member of this project (identical for a nonexistent project)',
+            '500.members.integrity' => 'members.json unsound - refused',
+            '500.server.file_write_failed' => 'Could not persist the exit'
+        ],
+        'notes' => 'Effective immediately - the panel falls back to another project you are a member of (or the no-project state). Rejoining takes a fresh invitation.'
+    ],
+
+    'dismissProjectNotice' => [
+        'description' => 'Clears ONE terminal notice (refused / removed / deleted) from the caller\'s own cache - the "OK, seen it" for the notices listMyInvitations shows. Live states are never dismissable: end a membership with leaveProject, answer an invitation with accept/declineInvitation.',
+        'method' => 'POST',
+        'parameters' => [
+            'project' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Project id the notice refers to (the project may no longer exist - that is the point)'
+            ]
+        ],
+        'example_post' => 'POST /management/dismissProjectNotice with body: {"project": "prj_d4e5f6"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Notice dismissed',
+            'data' => ['project' => 'prj_d4e5f6', 'dismissed' => true]
+        ],
+        'error_responses' => [
+            '400.validation.missing_field' => 'project is required',
+            '400.project.invalid' => 'Malformed project identifier',
+            '400.notice.not_dismissable' => 'The entry is a live membership/invitation, not a terminal notice (data.status says which)',
+            '404.notice.not_found' => 'No cache entry for this project',
+            '500.server.file_write_failed' => 'Could not persist the dismissal'
+        ],
+        'notes' => 'Pure cache operation on the caller\'s own users.php entry - no members.json involved. The project id is shape-checked only, never existence-checked (a deleted project\'s notice must stay dismissable).'
+    ],
+
     'exportProject' => [
         'description' => 'Exports a project as a downloadable ZIP file',
         'method' => 'GET',
@@ -5807,6 +6214,8 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'site_customization' => ['editFavicon', 'editTitle'],
                 'build_deployment' => ['build', 'listBuilds', 'getBuild', 'deleteBuild', 'cleanBuilds', 'deployBuild', 'downloadBuild'],
                 'project_management' => ['listProjects', 'getActiveProject', 'switchProject', 'createProject', 'deleteProject'],
+                'member_management' => ['listMembers', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership'],
+                'my_memberships' => ['findUser', 'listMyInvitations', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice'],
                 'backup_restore' => ['backupProject', 'listBackups', 'restoreBackup', 'deleteBackup'],
                 'export_import' => ['exportProject', 'importProject', 'downloadExport', 'clearExports'],
                 'storage_monitoring' => ['getSizeInfo'],
@@ -5820,7 +6229,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
             ],
             'authentication' => [
                 'required' => true,
-                'login' => 'POST /management/login with {email, password} (users.php credentials) returns an access + refresh token pair',
+                'login' => 'POST /management/login with {username, password} (users.php credentials) returns an access + refresh token pair',
                 'header' => 'Authorization: Bearer <access_token>',
                 'access_token_format' => 'qsa_<48 hex characters> (short-lived; on 401 auth.token_expired call refreshSession and retry)',
                 'refresh_token_format' => 'qsr_<48 hex characters> (rotates on every refreshSession - always keep the newest pair; reusing a rotated token revokes the whole session family)',
@@ -5840,7 +6249,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                     'getMyPermissions' => 'See your role and accessible commands'
                 ],
                 'config_file' => 'secure/management/config/auth.php (session TTLs, self-registration gate, CORS)',
-                'users_file' => 'secure/management/config/users.php (email + password_hash per user)',
+                'users_file' => 'secure/management/config/users.php (username + password_hash per user)',
                 'roles_config' => 'secure/management/config/roles.php'
             ],
             'cors' => [
@@ -5848,7 +6257,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'config_file' => 'secure/management/config/auth.php',
                 'allowed_methods' => ['GET', 'POST', 'OPTIONS']
             ],
-            'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getSiteMap, analyzeReachability, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listComponents, getComponent, listPages, listAliases. POST commands: all others.',
+            'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getSiteMap, analyzeReachability, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listComponents, getComponent, listPages, listAliases, listMembers, listMyInvitations. POST commands: all others.',
             'note' => 'For GET commands with URL parameters, use URL segments (e.g., /getStructure/menu, /validateTranslations/en, /getStyleRule/.btn-primary, /getSiteMap/text). For POST commands, send parameters as JSON in request body. For file uploads, use multipart/form-data encoding.',
             'workflows' => [
                 'translation_workflow' => '1) analyzeTranslations for full health check, OR 2) validateTranslations to find missing, 3) getUnusedTranslationKeys to find orphans, 4) setTranslationKeys to add/update, 5) deleteTranslationKeys to clean up.',
@@ -5862,6 +6271,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'component_workflow' => '1) listComponents to see available reusable components, 2) getComponent?name=... to view full details with preview, 3) editStructure with type="component" to create/update/delete.',
                 'sitemap_workflow' => '1) getSiteMap for JSON data with route details and coverage, 2) getSiteMap/text to generate plain text sitemap.txt for SEO crawlers.',
                 'project_workflow' => '1) listProjects to see all available projects, 2) getActiveProject to check current project, 3) createProject to start a new project, 4) switchProject to change active project, 5) deleteProject to remove (requires confirm=true).',
+                'membership_workflow' => '1) findUser to confirm the {user_id, name} pair by public display name, 2) inviteMember (admin/owner, by user_id) to offer a role, 3) the invitee sees it in listMyInvitations and answers with acceptInvitation or declineInvitation, 4) manage the roster with listMembers / changeMemberRole / removeMember (cancelInvitation to withdraw an offer), 5) transferOwnership (owner-only, member target, confirm=true) to rotate the top role, 6) leaveProject to exit yourself, dismissProjectNotice to clear a refused/removed/deleted notice.',
                 'backup_workflow' => '1) backupProject to create instant backup, 2) listBackups to see available backups with size/age info, 3) restoreBackup to restore from backup (optional pre-restore backup), 4) deleteBackup to free disk space.',
                 'export_workflow' => '1) exportProject to create shareable ZIP (JSON-only, secure), 2) downloadExport to download the ZIP, 3) importProject to import from ZIP (rebuilds PHP from JSON), 4) clearExports to clean up old exports.'
             ]

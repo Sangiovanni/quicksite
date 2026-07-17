@@ -140,6 +140,18 @@ function getCommandCategories(): array {
             'icon' => 'folder-tree',
             'commands' => ['listProjects', 'getActiveProject', 'setSelectedProject', 'switchProject', 'createProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'clearExports', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
         ],
+        // C8 8.3a — membership consent model. Marker-scoped roster management…
+        'member_management' => [
+            'label' => 'Project Members',
+            'icon' => 'users',
+            'commands' => ['listMembers', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership']
+        ],
+        // …and the caller's own membership surface (global self-service).
+        'my_memberships' => [
+            'label' => 'My Memberships',
+            'icon' => 'user',
+            'commands' => ['findUser', 'listMyInvitations', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice']
+        ],
         'storage_monitoring' => [
             'label' => 'Storage',
             'icon' => 'database',
