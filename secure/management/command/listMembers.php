@@ -73,6 +73,11 @@ function __command_listMembers(array $params = [], array $urlParams = []): ApiRe
             'invited_by' => isset($inv['by']) ? qs_public_user_ref((string)$inv['by'], $usersCfg) : null,
             'at'         => $inv['at'] ?? null,
         ];
+        // 8.3b: an approved proposal keeps its sponsor for attribution
+        // ("invited by <approver>, proposed by <sponsor>").
+        if (isset($inv['sponsor']) && is_string($inv['sponsor'])) {
+            $row['sponsored_by'] = qs_public_user_ref($inv['sponsor'], $usersCfg);
+        }
         if (isset($inv['note']) && is_string($inv['note']) && $inv['note'] !== '') {
             $row['note'] = $inv['note'];
         }

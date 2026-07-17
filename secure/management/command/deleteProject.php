@@ -153,15 +153,26 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
     // C8 8.3a membership cascade — the project is gone; update every affected
     // user's status-mirror cache in ONE users.php write. The DELETING owner's
     // own entry is plainly removed (self-initiated exits leave no tombstone);
-    // every other member AND every pending invitee gets a dismissable
+    // every other member AND every ENGAGED pending party gets a dismissable
     // 'deleted' notice (Sangio R3: they must know the project died — they
-    // were not refused). Cache failure is silent by ruling (error_log only):
+    // were not refused). Engaged = an invitee (direction 'invite') or a
+    // self-requester (direction 'request', by == themselves). A SPONSORED,
+    // not-yet-validated proposal target (8.3b) was never engaged — never told
+    // anything — so the cascade must not conjure a notice for a project they
+    // never knew existed. Cache failure is silent by ruling (error_log only):
     // access is already correct — the authority died with the folder.
     $cascade = ['members_notified' => 0, 'invitees_notified' => 0, 'self_removed' => false];
     if ($cascadeMembers !== null) {
+        $engaged = [];
+        foreach (($cascadeMembers['invitations'] ?? []) as $iuid => $inv) {
+            $direction = is_array($inv) ? ($inv['direction'] ?? 'invite') : 'invite';
+            if ($direction === 'invite' || (is_array($inv) && ($inv['by'] ?? null) === (string)$iuid)) {
+                $engaged[] = (string)$iuid;
+            }
+        }
         $affected = array_merge(
             array_keys($cascadeMembers['members'] ?? []),
-            array_keys($cascadeMembers['invitations'] ?? [])
+            $engaged
         );
         $memberIds = $cascadeMembers['members'] ?? [];
         $today = date('Y-m-d');

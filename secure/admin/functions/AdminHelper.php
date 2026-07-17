@@ -140,17 +140,19 @@ function getCommandCategories(): array {
             'icon' => 'folder-tree',
             'commands' => ['listProjects', 'getActiveProject', 'setSelectedProject', 'switchProject', 'createProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'clearExports', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
         ],
-        // C8 8.3a — membership consent model. Marker-scoped roster management…
+        // C8 8.3a/8.3b — membership consent model. Marker-scoped roster
+        // management, request adjudication + the join-policy knob + the
+        // any-member sponsor lane…
         'member_management' => [
             'label' => 'Project Members',
             'icon' => 'users',
-            'commands' => ['listMembers', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership']
+            'commands' => ['listMembers', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership', 'approveJoinRequest', 'denyJoinRequest', 'proposeMember', 'setJoinPolicy']
         ],
         // …and the caller's own membership surface (global self-service).
         'my_memberships' => [
             'label' => 'My Memberships',
             'icon' => 'user',
-            'commands' => ['findUser', 'listMyInvitations', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice']
+            'commands' => ['findUser', 'listMyInvitations', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice', 'requestToJoin', 'withdrawJoinRequest']
         ],
         'storage_monitoring' => [
             'label' => 'Storage',

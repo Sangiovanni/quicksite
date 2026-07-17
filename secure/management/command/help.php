@@ -3397,7 +3397,7 @@ $GLOBALS['__help_commands'] = [
             '403.auth.forbidden' => 'Not the owner of this project (owner-only)',
             '404.resource.not_found' => 'Project not found'
         ],
-        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Membership cascade: every OTHER member and every pending invitee gets a dismissable status "deleted" notice in their own cache (listMyInvitations shows it; dismissProjectNotice clears it) so the deletion is never mistaken for a refusal or removal; the deleting owner\'s own entry is simply removed. The response reports the cascade under data.membership_cascade.'
+        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Membership cascade: every OTHER member and every ENGAGED pending party (invitees, self-requesters) gets a dismissable status "deleted" notice in their own cache (listMyInvitations shows it; dismissProjectNotice clears it) so the deletion is never mistaken for a refusal or removal; the deleting owner\'s own entry is simply removed, and a sponsored not-yet-validated proposal target gets NOTHING (they were never told the project existed). The response reports the cascade under data.membership_cascade.'
     ],
 
     'listMembers' => [
@@ -3429,7 +3429,7 @@ $GLOBALS['__help_commands'] = [
             '400.project.required' => 'No project targeted - use /management/p/<projectId>/listMembers',
             '403.auth.forbidden' => 'Caller is not an admin/owner of this project (project.members category)'
         ],
-        'notes' => 'Project-scoped on the URL marker; the body carries no project parameter. A pending invitation grants NO access - it lives in a separate block that no permission check reads. Names resolve live from the user registry (null if the account no longer exists).'
+        'notes' => 'Project-scoped on the URL marker; the body carries no project parameter. A pending entry grants NO access - it lives in a separate block that no permission check reads. Each invitations[] row carries direction: "invite" (offer awaiting the person\'s consent) or "request" (join request/proposal awaiting approveJoinRequest / denyJoinRequest; invited_by is then the asker - themselves for a self-request, the sponsoring member for a proposal). A converted proposal additionally carries sponsored_by. Names resolve live from the user registry (null if the account no longer exists).'
     ],
 
     'inviteMember' => [
@@ -3475,7 +3475,7 @@ $GLOBALS['__help_commands'] = [
             '403.authz.insufficient_rank' => 'Offered role is not strictly below the actor\'s own rank (checked in-lock against the current members.json)',
             '404.user.not_found' => 'No account with this user id',
             '409.member.already_exists' => 'Target is already a member',
-            '409.invitation.already_pending' => 'Target already has a pending invitation - cancel it first to change the offer',
+            '409.invitation.already_pending' => 'Target already has a pending invitation (cancel it first to change the offer) or a pending join request/proposal (approve or deny it instead)',
             '500.members.integrity' => 'members.json missing/unsound - refused',
             '500.server.file_write_failed' => 'Could not persist the invitation'
         ],
@@ -3483,7 +3483,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'cancelInvitation' => [
-        'description' => 'Withdraws a pending invitation before the invitee answers. Plain removal on both sides - a withdrawn offer leaves no notice in the invitee\'s cache (it is not a decision against them).',
+        'description' => 'Withdraws a pending INVITATION (direction "invite") before the invitee answers. Plain removal on both sides - a withdrawn offer leaves no notice in the invitee\'s cache (it is not a decision against them). Join requests/proposals are NOT cancellable here: answer them with approveJoinRequest / denyJoinRequest (a cancel would be a silent deny dodging the mandatory refusal note).',
         'method' => 'POST',
         'parameters' => [
             'user_id' => [
@@ -3503,11 +3503,11 @@ $GLOBALS['__help_commands'] = [
             '400.project.required' => 'No project targeted',
             '400.validation.missing_field' => 'user_id is required',
             '403.authz.insufficient_rank' => 'The offered role is not strictly below the actor\'s rank (cancelling an offer = managing that role; no inviter carve-out)',
-            '404.invitation.not_found' => 'No pending invitation for this user',
+            '404.invitation.not_found' => 'No pending INVITATION for this user (a direction "request" entry answers here too - use approve/denyJoinRequest for those)',
             '500.members.integrity' => 'members.json missing/unsound - refused',
             '500.server.file_write_failed' => 'Could not persist the cancellation'
         ],
-        'notes' => 'Any admin/owner outranking the offered role may cancel - not just the original inviter (an owner can always clean up an admin\'s invitations; an admin cannot touch an owner-sent admin offer).'
+        'notes' => 'Any admin/owner outranking the offered role may cancel - not just the original inviter (an owner can always clean up an admin\'s invitations; an admin cannot touch an owner-sent admin offer). Invites only: requests and proposals go through the adjudication lane.'
     ],
 
     'changeMemberRole' => [
@@ -3671,7 +3671,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'listMyInvitations' => [
-        'description' => 'The caller\'s membership inbox: pending invitations (project, offered role, inviter, note) plus terminal project notices (refused / removed / deleted) awaiting dismissal. Reads the caller\'s own cache, then verifies each pending invitation against that project\'s authoritative members.json - a withdrawn offer whose mirror survived a failed cache write is silently pruned here.',
+        'description' => 'The caller\'s membership inbox: pending invitations (project, offered role, inviter, note), the caller\'s own pending join requests, and terminal project notices (refused / removed / deleted) awaiting dismissal. Reads the caller\'s own cache, then verifies each pending entry against that project\'s authoritative members.json - drift heals toward authority (a withdrawn offer is pruned; a lost approve/accept mirror upgrades to member; a pending kind that disagrees with the authority\'s direction is corrected).',
         'method' => 'GET',
         'parameters' => [],
         'example_get' => 'GET /management/listMyInvitations',
@@ -3684,17 +3684,21 @@ $GLOBALS['__help_commands'] = [
                     ['project' => 'prj_a1b2c3', 'project_name' => 'Portfolio', 'role' => 'editor',
                      'invited_by' => ['user_id' => 'usr_...', 'name' => 'Sangio'], 'at' => '2026-07-16', 'note' => 'welcome']
                 ],
+                'requests' => [
+                    ['project' => 'prj_g7h8i9', 'project_name' => 'prj_g7h8i9', 'role' => 'viewer', 'at' => '2026-07-17', 'note' => 'I run the docs team']
+                ],
                 'notices' => [
                     ['project' => 'prj_d4e5f6', 'project_name' => 'Old Shop', 'status' => 'deleted', 'at' => '2026-07-15']
                 ],
                 'invitation_count' => 1,
+                'request_count' => 1,
                 'notice_count' => 1
             ]
         ],
         'error_responses' => [
             '401.auth.unauthorized' => 'Missing/invalid bearer token'
         ],
-        'notes' => 'Global-scoped self-service (an invitee is not yet a member, so a project-marker route would refuse them). Answer with acceptInvitation / declineInvitation; clear notices with dismissProjectNotice. The inviter identity is the public {user_id, name} reference - never the private username.'
+        'notes' => 'Global-scoped self-service (an invitee is not yet a member, so a project-marker route would refuse them). Answer invitations with acceptInvitation / declineInvitation; withdraw your own requests with withdrawJoinRequest; clear notices with dismissProjectNotice. An invitation born from an approved proposal also carries sponsored_by. requests[] lists only asks YOU authored - a sponsor\'s proposal about you is invisible until validated, and a request on a private project shows the project id as its name (the site name is not yours to see yet). Identities are public {user_id, name} references - never the private username.'
     ],
 
     'acceptInvitation' => [
@@ -3805,6 +3809,211 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'Could not persist the dismissal'
         ],
         'notes' => 'Pure cache operation on the caller\'s own users.php entry - no members.json involved. The project id is shape-checked only, never existence-checked (a deleted project\'s notice must stay dismissable).'
+    ],
+
+    'requestToJoin' => [
+        'description' => 'Self-service "knock": an authenticated non-member asks to join a project. The ask lands as a pending direction:"request" entry (grants nothing until approved via approveJoinRequest). The note is MANDATORY - a request always carries its reason. The requested role is fixed at viewer: the note says what you want, approval materializes viewer, changeMemberRole handles upgrades.',
+        'method' => 'POST',
+        'parameters' => [
+            'project' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Project id to knock on'
+            ],
+            'note' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Why you want to join (control characters stripped, 500 chars max)'
+            ]
+        ],
+        'example_post' => 'POST /management/requestToJoin with body: {"project": "prj_a1b2c3", "note": "I run the docs team"}',
+        'success_response' => [
+            'status' => 201,
+            'code' => 'resource.created',
+            'message' => 'Join request sent - a project admin or the owner will answer it',
+            'data' => ['project' => 'prj_a1b2c3', 'role' => 'viewer', 'requested' => true, 'at' => '2026-07-17']
+        ],
+        'error_responses' => [
+            '400.validation.missing_field' => 'project and note are required',
+            '400.project.invalid' => 'Malformed project identifier',
+            '403.join.requests_closed' => 'The project is public but its join policy is closed',
+            '404.join.unavailable' => 'The project does not accept join requests - identical for a nonexistent project and a private project with a closed policy (no existence oracle)',
+            '409.member.already_exists' => 'You are already a member',
+            '409.invitation.already_pending' => 'You already have a pending invitation here - accept or decline it instead',
+            '409.request.already_pending' => 'You already asked - withdraw first to re-ask',
+            '409.request.notice_pending' => 'A refused/removed notice for this project is still in your inbox - dismiss it first',
+            '500.members.integrity' => 'members.json unsound - refused',
+            '500.server.file_write_failed' => 'Could not persist the request'
+        ],
+        'notes' => 'Only projects whose join_policy is "open" (setJoinPolicy) accept requests. On a PRIVATE open project, a successful request confirms the project exists - an explicit owner choice; your own cache/inbox shows the project ID as its name, never the site name, until you are a member. Withdraw anytime with withdrawJoinRequest (no notice); a denial leaves a dismissable refused notice with the reason.'
+    ],
+
+    'withdrawJoinRequest' => [
+        'description' => 'Withdraws a pending join ask the CALLER AUTHORED: their own join request (no user_id), or a proposal they sponsored via proposeMember (user_id = the proposed person). Self-initiated - plain removal everywhere, no notice kept.',
+        'method' => 'POST',
+        'parameters' => [
+            'project' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Project id the request/proposal sits on'
+            ],
+            'user_id' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Proposal target\'s user id - omit to withdraw your own join request'
+            ]
+        ],
+        'example_post' => 'POST /management/withdrawJoinRequest with body: {"project": "prj_a1b2c3"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Join request withdrawn',
+            'data' => ['project' => 'prj_a1b2c3', 'user_id' => 'usr_...', 'withdrawn' => true]
+        ],
+        'error_responses' => [
+            '400.validation.missing_field' => 'project is required',
+            '400.project.invalid' => 'Malformed project identifier',
+            '404.request.not_found' => 'No join request of yours on this project (identical for a nonexistent project, an entry you did not author, or nothing pending)',
+            '500.members.integrity' => 'members.json unsound - refused',
+            '500.server.file_write_failed' => 'Could not persist the withdrawal'
+        ],
+        'notes' => 'Only the AUTHOR may withdraw (by == caller): a requester cannot remove a sponsor\'s proposal about them this way, and probing for one gets the same uniform 404. Admin-side removal is denyJoinRequest (which requires a reason).'
+    ],
+
+    'proposeMember' => [
+        'description' => 'The sponsor lane: ANY member (viewer included) vouches an outsider for membership. The proposal is a pending direction:"request" entry with a MANDATORY note (the vouch) and needs admin/owner validation (approveJoinRequest) - the proposed person is NOT told anything until then (no inbox row, no cache entry), and nothing is granted.',
+        'method' => 'POST',
+        'parameters' => [
+            'user_id' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Proposed account\'s user id (from findUser)'
+            ],
+            'role' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Suggested role (any built-in role below owner) - the VALIDATOR must outrank it at approval time',
+                'example' => 'editor'
+            ],
+            'note' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'The vouch - why this person (control characters stripped, 500 chars max)'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/proposeMember with body: {"user_id": "usr_...", "role": "editor", "note": "My colleague, she runs our content"}',
+        'success_response' => [
+            'status' => 201,
+            'code' => 'resource.created',
+            'message' => 'Proposal recorded - a project admin or the owner must validate it before the person is invited',
+            'data' => ['project' => 'prj_a1b2c3', 'user_id' => 'usr_...', 'name' => 'Carol', 'role' => 'editor', 'at' => '2026-07-17', 'proposed' => true]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'No project targeted',
+            '400.validation.missing_field' => 'user_id, role and note are required',
+            '400.validation.invalid_format' => 'Unknown role',
+            '400.member.role_not_assignable' => 'The owner role cannot be proposed',
+            '403.auth.forbidden' => 'Caller is not a member of this project (project.propose category)',
+            '403.authz.insufficient_rank' => 'Caller left/lost membership between dispatch and the write (re-checked in-lock)',
+            '404.user.not_found' => 'No account with this user id',
+            '409.member.already_exists' => 'Already a member',
+            '409.invitation.already_pending' => 'Something already pends for this user on this project',
+            '500.members.integrity' => 'members.json unsound - refused',
+            '500.server.file_write_failed' => 'Could not persist the proposal'
+        ],
+        'notes' => 'Rank-free on the sponsor side: a viewer may propose a developer - authority is the validator\'s problem (approveJoinRequest re-checks canManageRole). join_policy does NOT gate proposals (it gates only the self-service requestToJoin door). On approval the proposal converts into a real invitation carried by the approver\'s rank, with you kept as sponsored_by; the person then accepts or declines like any invitee. Withdraw your own proposal with withdrawJoinRequest {project, user_id}.'
+    ],
+
+    'approveJoinRequest' => [
+        'description' => 'Authority\'s "yes" on a pending join request or proposal. Consent rule: membership materializes exactly when BOTH consents exist. A SELF-REQUEST (the person asked) joins immediately at the stored role. A SPONSORED PROPOSAL converts into a normal invitation (by = the approver, sponsor kept, note kept) - the person is engaged for the first time and still answers via acceptInvitation.',
+        'method' => 'POST',
+        'parameters' => [
+            'user_id' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Requester/proposed account\'s user id (see listMembers invitations with direction "request")'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/approveJoinRequest with body: {"user_id": "usr_..."}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Request approved - the requester is now a member',
+            'data' => ['project' => 'prj_a1b2c3', 'user_id' => 'usr_...', 'name' => 'Carol', 'role' => 'viewer', 'approved' => true, 'joined' => true]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'No project targeted',
+            '400.validation.missing_field' => 'user_id is required',
+            '403.authz.insufficient_rank' => 'The stored role is not strictly below the approver\'s CURRENT rank (re-checked in-lock)',
+            '404.request.not_found' => 'No pending join request/proposal for this user (invites are answered by the invitee, not here)',
+            '409.request.void' => 'The requester\'s account or the proposal\'s sponsor is gone - the entry was pruned, nothing granted',
+            '500.members.integrity' => 'members.json unsound - refused',
+            '500.server.file_write_failed' => 'Could not persist the approval'
+        ],
+        'notes' => 'Approve-time re-validation mirrors acceptInvitation: approver rank in-lock; target account must still exist; a sponsored entry\'s sponsor must still be a MEMBER (any rank - a demoted sponsor stays valid, a removed one voids the proposal). No role override at approve - approval never edits the terms; want different terms: denyJoinRequest + inviteMember. For a converted proposal the response carries converted_to_invitation=true and joined=false.'
+    ],
+
+    'denyJoinRequest' => [
+        'description' => 'Authority\'s "no" on a pending join request or proposal. The note is MANDATORY - a refusal always carries its reason. A denied SELF-REQUEST leaves a dismissable "refused" notice (with the reason) in the requester\'s inbox and blocks re-requesting until dismissed. A denied SPONSORED proposal is simply removed - the proposed person was never engaged and is told nothing.',
+        'method' => 'POST',
+        'parameters' => [
+            'user_id' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Requester/proposed account\'s user id'
+            ],
+            'note' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Why the request is refused (control characters stripped, 500 chars max)'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/denyJoinRequest with body: {"user_id": "usr_...", "note": "Team is full this quarter"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Join request denied',
+            'data' => ['project' => 'prj_a1b2c3', 'user_id' => 'usr_...', 'denied' => true]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'No project targeted',
+            '400.validation.missing_field' => 'user_id and note are required',
+            '403.authz.insufficient_rank' => 'The stored role is not strictly below the denier\'s rank - nobody may veto what they could not grant (an admin cannot kill a proposal-for-admin before the owner sees it)',
+            '404.request.not_found' => 'No pending join request/proposal for this user',
+            '500.members.integrity' => 'members.json unsound - refused',
+            '500.server.file_write_failed' => 'Could not persist the denial'
+        ],
+        'notes' => 'The refused notice inherits the privacy-correct display name (a private project\'s notice shows the project id, not the site name). The sponsor of a denied proposal gets no automatic notice (structural: their cache slot holds their membership) - the reason lives in this response and the command history.'
+    ],
+
+    'setJoinPolicy' => [
+        'description' => 'Opens or closes the SELF-SERVICE join-request lane (requestToJoin) for the target project by setting join_policy in members.json. Default is closed. Gates ONLY the front door: member proposals (proposeMember) always reach the admin queue, and closing never purges requests already pending - they stay adjudicable.',
+        'method' => 'POST',
+        'parameters' => [
+            'policy' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => "'open' or 'closed'",
+                'example' => 'open'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/setJoinPolicy with body: {"policy": "open"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => "Join policy set to 'open'",
+            'data' => ['project' => 'prj_a1b2c3', 'join_policy' => 'open', 'previous' => 'closed', 'changed' => true]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'No project targeted',
+            '400.validation.missing_field' => 'policy is required',
+            '400.validation.invalid_format' => "policy must be 'open' or 'closed'",
+            '403.auth.forbidden' => 'Caller is not an admin/owner of this project (project.settings category)',
+            '403.authz.insufficient_rank' => 'Caller lost the authority between dispatch and the write (re-checked in-lock)',
+            '500.members.integrity' => 'members.json unsound - refused',
+            '500.server.file_write_failed' => 'Could not persist the policy'
+        ],
+        'notes' => 'Same-value calls are a no-op (200, changed=false). PRIVACY TRADE, stated plainly: a PRIVATE project with an open policy is knockable-by-id - any authenticated account that guesses/knows the id can send a request and thereby confirm the project exists (the response carries an advisory note when this combination becomes active). Closed private projects stay indistinguishable from nonexistent ones on the request lane.'
     ],
 
     'exportProject' => [
@@ -6214,8 +6423,8 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'site_customization' => ['editFavicon', 'editTitle'],
                 'build_deployment' => ['build', 'listBuilds', 'getBuild', 'deleteBuild', 'cleanBuilds', 'deployBuild', 'downloadBuild'],
                 'project_management' => ['listProjects', 'getActiveProject', 'switchProject', 'createProject', 'deleteProject'],
-                'member_management' => ['listMembers', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership'],
-                'my_memberships' => ['findUser', 'listMyInvitations', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice'],
+                'member_management' => ['listMembers', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership', 'approveJoinRequest', 'denyJoinRequest', 'proposeMember', 'setJoinPolicy'],
+                'my_memberships' => ['findUser', 'listMyInvitations', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice', 'requestToJoin', 'withdrawJoinRequest'],
                 'backup_restore' => ['backupProject', 'listBackups', 'restoreBackup', 'deleteBackup'],
                 'export_import' => ['exportProject', 'importProject', 'downloadExport', 'clearExports'],
                 'storage_monitoring' => ['getSizeInfo'],
@@ -6272,6 +6481,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'sitemap_workflow' => '1) getSiteMap for JSON data with route details and coverage, 2) getSiteMap/text to generate plain text sitemap.txt for SEO crawlers.',
                 'project_workflow' => '1) listProjects to see all available projects, 2) getActiveProject to check current project, 3) createProject to start a new project, 4) switchProject to change active project, 5) deleteProject to remove (requires confirm=true).',
                 'membership_workflow' => '1) findUser to confirm the {user_id, name} pair by public display name, 2) inviteMember (admin/owner, by user_id) to offer a role, 3) the invitee sees it in listMyInvitations and answers with acceptInvitation or declineInvitation, 4) manage the roster with listMembers / changeMemberRole / removeMember (cancelInvitation to withdraw an offer), 5) transferOwnership (owner-only, member target, confirm=true) to rotate the top role, 6) leaveProject to exit yourself, dismissProjectNotice to clear a refused/removed/deleted notice.',
+                'join_request_workflow' => 'Front door (setJoinPolicy open): an outsider runs requestToJoin {project, note} (mandatory note, fixed viewer ask) and tracks it in listMyInvitations requests[]; admins/owner see it in listMembers (direction "request") and answer with approveJoinRequest (member immediately) or denyJoinRequest {note} (dismissable refused notice; re-request blocked until dismissed); withdrawJoinRequest retracts your own ask silently. Sponsor lane (any member, policy-independent): proposeMember {user_id, role, note} - the person learns NOTHING until approveJoinRequest converts it into a real invitation (by = approver, sponsored_by = you), which they accept/decline as usual; denyJoinRequest removes it silently on their side.',
                 'backup_workflow' => '1) backupProject to create instant backup, 2) listBackups to see available backups with size/age info, 3) restoreBackup to restore from backup (optional pre-restore backup), 4) deleteBackup to free disk space.',
                 'export_workflow' => '1) exportProject to create shareable ZIP (JSON-only, secure), 2) downloadExport to download the ZIP, 3) importProject to import from ZIP (rebuilds PHP from JSON), 4) clearExports to clean up old exports.'
             ]

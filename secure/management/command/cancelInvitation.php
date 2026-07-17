@@ -9,6 +9,11 @@
  * Rank rule: cancelling an offer is managing that role — the actor must
  * outrank the OFFERED role (canManageRole, in-lock, no inviter carve-out).
  *
+ * Direction gate (C8 8.3b): this command withdraws INVITES only. A
+ * `direction:'request'` entry (join request / proposal) is answered through
+ * approveJoinRequest / denyJoinRequest — cancelling one here would be a
+ * silent deny that dodges the mandatory refusal note.
+ *
  * @method POST
  * @route /management/p/<projectId>/cancelInvitation
  * @auth required (project.members — admin, owner)
@@ -54,7 +59,9 @@ function __command_cancelInvitation(array $params = [], array $urlParams = []): 
     $failure = null;
     $written = qs_members_mutate($project, function (array &$m) use ($actorId, $targetId, &$error) {
         $inv = $m['invitations'][$targetId] ?? null;
-        if (!is_array($inv)) {
+        if (!is_array($inv) || (($inv['direction'] ?? 'invite') !== 'invite')) {
+            // Requests/proposals are not cancellable offers — approve or deny
+            // them (the mandatory-note refusal lane). Uniform not-found.
             $error = 'invitation.not_found';
             return false;
         }

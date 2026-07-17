@@ -23,7 +23,7 @@ return [
         'rank' => 1,
         'builtin' => true,
         'description' => 'Read-only: rendered site + content/structure/styles in the editor. No writes.',
-        'categories' => ['content.read'],
+        'categories' => ['content.read', 'project.propose'],
     ],
     'editor' => [
         'rank' => 2,
@@ -32,6 +32,7 @@ return [
         'categories' => [
             'content.read', 'config.read', 'content.write', 'translation.write',
             'route.write', 'asset.write', 'interaction.write', 'privacy.manage',
+            'project.propose',
         ],
     ],
     'designer' => [
@@ -41,7 +42,7 @@ return [
         'categories' => [
             'content.read', 'config.read', 'content.write', 'translation.write',
             'route.write', 'asset.write', 'interaction.write', 'privacy.manage',
-            'style.write',
+            'style.write', 'project.propose',
         ],
     ],
     'developer' => [
@@ -51,7 +52,7 @@ return [
         'categories' => [
             'content.read', 'config.read', 'content.write', 'translation.write',
             'route.write', 'asset.write', 'interaction.write', 'privacy.manage',
-            'style.write', 'build', 'resolver.manage',
+            'style.write', 'build', 'resolver.manage', 'project.propose',
         ],
     ],
     'admin' => [
@@ -63,7 +64,7 @@ return [
             'route.write', 'asset.write', 'interaction.write', 'privacy.manage',
             'style.write', 'build', 'resolver.manage', 'deploy', 'api.manage',
             'oauth.manage', 'iframe.manage', 'project.data', 'history', 'workflow',
-            'project.settings', 'project.members',
+            'project.settings', 'project.members', 'project.propose',
         ],
     ],
     'owner' => [
@@ -76,6 +77,7 @@ return [
             'style.write', 'build', 'resolver.manage', 'deploy', 'api.manage',
             'oauth.manage', 'iframe.manage', 'project.data', 'history', 'workflow',
             'project.settings', 'project.members', 'project.delete', 'project.ownership',
+            'project.propose',
         ],
     ],
 ];

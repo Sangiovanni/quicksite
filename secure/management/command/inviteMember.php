@@ -96,7 +96,8 @@ function __command_inviteMember(array $params = [], array $urlParams = []): ApiR
     // outrun), and member/pending conflicts can't race.
     $error = null;
     $failure = null;
-    $written = qs_members_mutate($project, function (array &$m) use ($actorId, $targetId, $role, $invitation, &$error) {
+    $pendingDirection = null;
+    $written = qs_members_mutate($project, function (array &$m) use ($actorId, $targetId, $role, $invitation, &$error, &$pendingDirection) {
         $actorRole = $m['members'][$actorId]['role'] ?? null;
         if ($actorRole === null || !canManageRole($actorRole, $role)) {
             $error = 'authz.insufficient_rank';
@@ -108,6 +109,7 @@ function __command_inviteMember(array $params = [], array $urlParams = []): ApiR
         }
         if (isset($m['invitations'][$targetId])) {
             $error = 'invitation.already_pending';
+            $pendingDirection = $m['invitations'][$targetId]['direction'] ?? 'invite';
             return false;
         }
         if (!isset($m['invitations']) || !is_array($m['invitations'])) {
@@ -126,8 +128,12 @@ function __command_inviteMember(array $params = [], array $urlParams = []): ApiR
             ->withMessage('This user is already a member of the project');
     }
     if ($error === 'invitation.already_pending') {
+        // 8.3b: the blocker may be a join request/proposal — those are
+        // adjudicated, not cancelled.
         return ApiResponse::create(409, 'invitation.already_pending')
-            ->withMessage('This user already has a pending invitation — cancel it first to change the offer');
+            ->withMessage($pendingDirection === 'request'
+                ? 'This user already has a pending join request or proposal — approve or deny it first'
+                : 'This user already has a pending invitation — cancel it first to change the offer');
     }
     if ($written !== true) {
         [$status, $code, $message] = qs_members_failure_http($failure);

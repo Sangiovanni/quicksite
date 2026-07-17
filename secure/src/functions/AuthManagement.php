@@ -228,6 +228,12 @@ function qs_members_invariant_violation(array $data): ?string {
     if (!in_array($visibility, ['private', 'public'], true)) {
         return 'visibility must be private|public';
     }
+    // C8 8.3b: join_policy gates the self-service request lane. Absent = closed
+    // (readers default); when present it must be a valid enum value.
+    $joinPolicy = $data['join_policy'] ?? 'closed';
+    if (!in_array($joinPolicy, ['closed', 'open'], true)) {
+        return 'join_policy must be closed|open';
+    }
     $invitations = $data['invitations'] ?? [];
     if (!is_array($invitations)) {
         return 'invitations must be a map';
@@ -246,6 +252,15 @@ function qs_members_invariant_violation(array $data): ?string {
         $by = $inv['by'] ?? null;
         if (!is_string($by) || $by === '') {
             return "invitation for '{$uid}' lacks its sponsor";
+        }
+        // C8 8.3b: the mandatory-note rule is STRUCTURAL for the request
+        // direction — a join-request or member proposal always carries its
+        // reason/vouch (locked R3: mandatory note on join-request).
+        if (($inv['direction'] ?? null) === 'request') {
+            $note = $inv['note'] ?? null;
+            if (!is_string($note) || $note === '') {
+                return "request entry for '{$uid}' lacks its mandatory note";
+            }
         }
     }
     return null;

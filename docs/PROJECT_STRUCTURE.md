@@ -58,8 +58,8 @@ quicksite/
 │   ├── projects/                 # Project data (one folder per project)
 │   │   └── quicksite/            # Default project
 │   │       ├── config.php        # Project config (languages, settings)
-│   │       ├── config/           # Access control — members.json: owner, visibility,
-│   │       │                     #   members {userId → role} + pending invitations (gitignored)
+│   │       ├── config/           # Access control — members.json: owner, visibility, join_policy,
+│   │       │                     #   members {userId → role} + pending invitations/requests (gitignored)
 │   │       ├── routes.php        # Public route definitions
 │   │       ├── templates/        # Page and component JSON structures
 │   │       ├── translate/        # Translation files (en.json, fr.json, etc.)

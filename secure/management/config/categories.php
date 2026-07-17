@@ -178,18 +178,29 @@ return [
         'commands' => ['deleteProject'],
     ],
 
-    // Forward-declared (C8 populates) — kept so role grants + the rank guard resolve.
+    // Project-level settings knobs (C8 8.3b; 8.4 adds setProjectVisibility, …).
+    // setJoinPolicy opens/closes the self-service request lane. admin+.
     'project.settings' => [
         'scope' => 'project',
-        'commands' => [], // C8 8.3b/8.4: setJoinPolicy, setProjectVisibility, …
+        'commands' => ['setJoinPolicy'],
     ],
 
-    // Membership management (C8 8.3a) — consent model: invitations, not direct
-    // adds. Rank rules (canManageRole strictly-below) enforced in-command,
-    // in-lock. Targeting is by user_id only. admin+.
+    // Membership management (C8 8.3a/8.3b) — consent model: invitations +
+    // join-request adjudication, never direct adds. Rank rules (canManageRole
+    // strictly-below) enforced in-command, in-lock. Targeting is by user_id
+    // only. admin+.
     'project.members' => [
         'scope' => 'project',
-        'commands' => ['listMembers', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember'],
+        'commands' => ['listMembers', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'approveJoinRequest', 'denyJoinRequest'],
+    ],
+
+    // The sponsor lane (C8 8.3b, model A): ANY member — viewer included — may
+    // VOUCH an outsider (direction:'request' entry, mandatory note, no
+    // engagement of the target). Authority stays with approveJoinRequest:
+    // a proposal grants nothing and notifies nobody until validated.
+    'project.propose' => [
+        'scope' => 'project',
+        'commands' => ['proposeMember'],
     ],
 
     // Ownership rotation — owner only.
@@ -237,15 +248,16 @@ return [
         'commands' => ['findUser'],
     ],
 
-    // Membership self-service (C8 8.3a): the caller's OWN invitations,
-    // memberships and notices. GLOBAL on purpose — an invitee is not a member,
-    // so the '/p/<id>/' marker gate would 403 them before the command runs;
-    // `project` is an F1-validated DATA parameter and every command acts only
-    // on the caller's own entries.
+    // Membership self-service (C8 8.3a/8.3b): the caller's OWN invitations,
+    // join requests, memberships and notices. GLOBAL on purpose — an invitee/
+    // requester is not a member, so the '/p/<id>/' marker gate would 403 them
+    // before the command runs; `project` is an F1-validated DATA parameter and
+    // every command acts only on entries the caller owns or authored
+    // (withdrawJoinRequest's `by == caller` rule covers sponsored proposals).
     'membership.self' => [
         'scope' => 'global',
         'access' => 'any',
-        'commands' => ['listMyInvitations', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice'],
+        'commands' => ['listMyInvitations', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice', 'requestToJoin', 'withdrawJoinRequest'],
     ],
 
     // Self / role catalog reads.
