@@ -158,6 +158,47 @@ function qs_project_site_name(string $project): string {
 }
 
 /**
+ * THE canonical members.json birth-write (C8 8.4) — mint a fresh trust file for a
+ * just-created project directory with $ownerId as the SOLE owner: no other
+ * members, no pending invitations, visibility 'private', join_policy closed (via
+ * reader default). This is the SINGLE birth-write path shared by createProject,
+ * cloneProject and importProject, so a cloned/imported project can NEVER inherit
+ * or accept a foreign members.json (the C10 clone-hijack flaw): whatever roster
+ * an archive or source folder carried is discarded — the CALLER owns the copy.
+ *
+ * Distinct from qs_members_mutate: this CREATES the file (mutate aborts on a
+ * missing file). Byte format is identical to mutate's swap (JSON_PRETTY_PRINT |
+ * JSON_UNESCAPED_SLASHES + trailing \n) so the invariant backstop accepts every
+ * later mutation. A null/empty owner cannot satisfy the single-owner invariant —
+ * the write is refused (the caller surfaces a 500 rather than mint an ownerless,
+ * inaccessible project).
+ *
+ * @param string      $projectPath absolute path to the project dir (…/projects/<id>)
+ * @param string|null $ownerId     the caller's user id — the sole owner
+ * @return bool true on write, false on empty owner / mkdir / write failure
+ */
+function qs_project_birth_write_members(string $projectPath, ?string $ownerId): bool {
+    if ($ownerId === null || $ownerId === '') {
+        return false;
+    }
+    $configDir = $projectPath . '/config';
+    if (!is_dir($configDir) && !mkdir($configDir, 0755, true) && !is_dir($configDir)) {
+        return false;
+    }
+    $membersData = [
+        'owner'      => $ownerId,
+        'visibility' => 'private',
+        'members'    => [$ownerId => ['role' => 'owner']],
+    ];
+    $bytes = file_put_contents(
+        $configDir . '/members.json',
+        json_encode($membersData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n",
+        LOCK_EX
+    );
+    return $bytes !== false;
+}
+
+/**
  * The PUBLIC reference for a user in shared output: `{user_id, name}` — and
  * NOTHING else. Every membership response that names a user builds the
  * reference through here, so the PRIVATE username structurally cannot leak

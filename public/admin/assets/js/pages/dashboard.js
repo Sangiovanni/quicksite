@@ -17,6 +17,7 @@
     let currentProject = null;
     let allProjects = [];
     let pendingRestoreBackup = null;
+    let restoreTargetProject = null; // the project whose backups the restore modal is showing
     let manageSpaceLoaded = false;
     let dashStructureLoaded = null; // Stores { type, name, structure }
 
@@ -394,62 +395,102 @@
     // Project Manager
     // ========================================================================
 
+    // The project the manager ACTS ON = the one chosen in the selector (falls back
+    // to the edited project). Every project-manager command sends this as the URL
+    // marker (opts.project); the server binds + re-authorizes it (C8 8.4).
+    function getTargetProject() {
+        const sel = document.getElementById('project-selector');
+        return (sel && sel.value) ? sel.value : currentProject;
+    }
+
+    // Folder icon as an ELEMENT (QuickSiteUtils.icon* return HTML strings, which
+    // can't be QSDom children without re-introducing innerHTML).
+    function _folderIcon(size) {
+        return QSDom.svgIcon('M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', size || 18);
+    }
+
     async function loadProjectManager() {
         const infoContainer = document.getElementById('current-project-info');
         const selector = document.getElementById('project-selector');
         const switchBtn = document.getElementById('btn-switch-project');
         const proj = t('dashboard.projects', {});
-        
+
+        // C9 — the dashboard reflects the project you are EDITING (selected_project),
+        // NOT the served main. listProjects is membership-filtered (my_role); the
+        // is_active flag marks the SERVED project and must not drive the chip.
+        currentProject = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.currentProject) || null;
+
+        let listResult;
         try {
-            const [activeResult, listResult] = await Promise.all([
-                QuickSiteAdmin.apiRequest('getActiveProject'),
-                QuickSiteAdmin.apiRequest('listProjects')
-            ]);
-            
-            if (activeResult.ok && activeResult.data?.data?.project) {
-                // C9 — the dashboard reflects the project you are EDITING (selected_project),
-                // not the served main. window.QUICKSITE_CONFIG.currentProject = getCurrentProject().
-                currentProject = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.currentProject) || activeResult.data.data.project;
-                const created = activeResult.data.data.created_at;
-                
-                infoContainer.innerHTML = `
-                    <div class="project-manager__info">
-                        <div class="project-manager__name">
-                            ${QuickSiteUtils.iconFolder(20)}
-                            <span>${QuickSiteAdmin.escapeHtml(currentProject)}</span>
-                            <span class="badge badge--primary">${proj.active || 'Active'}</span>
-                        </div>
-                        ${created ? `<div class="project-manager__meta">${proj.created || 'Created'}: ${new Date(created).toLocaleDateString()}</div>` : ''}
-                    </div>
-                `;
-            } else {
-                currentProject = null;
-                const errorMsg = activeResult.data?.message || proj.error || 'Failed to load active project';
-                infoContainer.innerHTML = `<p class="admin-error">${QuickSiteAdmin.escapeHtml(errorMsg)}</p>`;
-            }
-            
-            if (listResult.ok && listResult.data?.data?.projects) {
-                allProjects = listResult.data.data.projects || [];
-                
-                selector.innerHTML = '';
-                allProjects.forEach(p => {
-                    const opt = document.createElement('option');
-                    opt.value = p.name;
-                    opt.textContent = p.name + (p.is_active ? ` (${proj.active || 'active'})` : '');
-                    opt.selected = p.is_active;
-                    selector.appendChild(opt);
-                });
-                
-                selector.disabled = false;
-                switchBtn.disabled = false;
-                
-                updateDeleteSelector();
-            }
-            
+            listResult = await QuickSiteAdmin.apiRequest('listProjects');
         } catch (error) {
             console.error('Failed to load project manager:', error);
-            infoContainer.innerHTML = `<p class="admin-error">${proj.error || 'Failed to load project info'}</p>`;
+            listResult = { ok: false };
         }
+        allProjects = (listResult.ok && listResult.data?.data?.projects) ? listResult.data.data.projects : [];
+
+        QSDom.clear(infoContainer);
+
+        // 0-membership empty state — no doomed project-scoped calls (they'd 400/403).
+        if (allProjects.length === 0) {
+            infoContainer.appendChild(_renderProjectManagerEmpty(proj));
+            selector.disabled = true;
+            switchBtn.disabled = true;
+            _setProjectActionsEnabled(false);
+            return;
+        }
+
+        // Default the edited project when the client emitted none / a stale one.
+        if (!currentProject || !allProjects.some(p => p.name === currentProject)) {
+            currentProject = allProjects[0].name;
+        }
+        const edited = allProjects.find(p => p.name === currentProject) || allProjects[0];
+        infoContainer.appendChild(_renderProjectChip(edited, proj));
+
+        QSDom.clear(selector);
+        allProjects.forEach(p => {
+            const label = p.name + (p.my_role ? ' — ' + p.my_role : '');
+            const opt = QSDom.el('option', { value: p.name, text: label });
+            if (p.name === currentProject) opt.selected = true;
+            selector.appendChild(opt);
+        });
+        selector.disabled = false;
+        switchBtn.disabled = false;
+        _setProjectActionsEnabled(true);
+
+        updateDeleteSelector();
+    }
+
+    function _renderProjectChip(edited, proj) {
+        return QSDom.el('div', { class: 'project-manager__info' }, [
+            QSDom.el('div', { class: 'project-manager__name' }, [
+                _folderIcon(20),
+                QSDom.el('span', { text: edited.name }),
+                QSDom.el('span', { class: 'badge badge--primary', text: proj.editing || 'Editing' }),
+                edited.my_role ? QSDom.el('span', { class: 'badge', text: edited.my_role }) : null,
+            ]),
+            edited.site_name ? QSDom.el('div', { class: 'project-manager__meta', text: edited.site_name }) : null,
+        ]);
+    }
+
+    function _renderProjectManagerEmpty(proj) {
+        return QSDom.el('div', { class: 'project-manager__info' }, [
+            QSDom.el('div', { class: 'project-manager__name' }, [
+                QSDom.el('span', { text: proj.noProjects || 'You are not a member of any project yet.' }),
+            ]),
+            QSDom.el('div', { class: 'project-manager__meta', text: proj.noProjectsHint || 'Create a project to get started.' }),
+        ]);
+    }
+
+    // Only the project-SCOPED actions depend on having a project. `btn-create-project`
+    // and `btn-import-project` are GLOBAL (create / create-from-archive) — a member of
+    // nothing must still be able to make or import their first project (C8 8.4).
+    function _setProjectActionsEnabled(enabled) {
+        ['btn-clone-project', 'btn-backup-project', 'btn-restore-backup',
+         'btn-export-project', 'btn-delete-project'].forEach(id => {
+            const b = document.getElementById(id);
+            if (b) b.disabled = !enabled;
+        });
     }
 
     // ========================================================================
@@ -654,63 +695,65 @@
             tip.textContent = t('dashboard.storage.backupsTip', 'Switch project to manage other projects\u2019 backups.');
         }
 
-        list.innerHTML = '<div class="manage-space__loading">' + t('common.loading', 'Loading...') + '</div>';
+        QSDom.clear(list);
+        list.appendChild(QSDom.el('div', { class: 'manage-space__loading', text: t('common.loading', 'Loading...') }));
+
+        // The manage-space backups list is scoped to the EDITED project.
+        const managed = currentProject;
+        const emptyRow = () => QSDom.el('div', { class: 'manage-space__empty', text: t('dashboard.storage.noItems', 'No items') });
 
         try {
-            const result = await QuickSiteAdmin.apiRequest('listBackups');
+            const result = await QuickSiteAdmin.apiRequest('listBackups', 'GET', null, [], {}, { project: managed });
             const backups = result.data?.data?.backups || [];
             count.textContent = backups.length;
 
-            if (backups.length === 0) {
-                list.innerHTML = '<div class="manage-space__empty">' + t('dashboard.storage.noItems', 'No items') + '</div>';
-                return;
-            }
+            QSDom.clear(list);
+            if (backups.length === 0) { list.appendChild(emptyRow()); return; }
 
-            list.innerHTML = backups.map(b => {
-                const date = b.created_relative || b.created_formatted || '--';
-                const size = b.size_formatted || '--';
-                const typeLabel = b.type !== 'manual' ? ` <span class="manage-space__item-badge">${QuickSiteAdmin.escapeHtml(b.type)}</span>` : '';
-                return `<div class="manage-space__item" data-backup="${QuickSiteAdmin.escapeHtml(b.name)}">
-                    <div class="manage-space__item-info">
-                        <span class="manage-space__item-name">${QuickSiteAdmin.escapeHtml(b.name)}${typeLabel}</span>
-                        <span class="manage-space__item-meta">${date} · ${size}</span>
-                    </div>
-                    <button type="button" class="manage-space__delete-btn" title="${t('common.delete', 'Delete')}">
-                        ${QuickSiteUtils.iconTrash()}
-                    </button>
-                </div>`;
-            }).join('');
-
-            list.querySelectorAll('.manage-space__delete-btn').forEach(btn => {
-                btn.addEventListener('click', async function() {
-                    const item = this.closest('.manage-space__item');
-                    const name = item.dataset.backup;
-                    if (!confirm(t('dashboard.storage.confirmDelete', 'Delete this item?') + '\n' + name)) return;
-                    this.disabled = true;
-                    try {
-                        const res = await QuickSiteAdmin.apiRequest('deleteBackup', 'DELETE', { backup: name });
-                        if (res.ok) {
-                            item.remove();
-                            const remaining = list.querySelectorAll('.manage-space__item').length;
-                            count.textContent = remaining;
-                            if (remaining === 0) {
-                                list.innerHTML = '<div class="manage-space__empty">' + t('dashboard.storage.noItems', 'No items') + '</div>';
-                            }
-                            loadStorageOverview();
-                            QuickSiteAdmin.showToast(t('dashboard.storage.deleted', 'Deleted') + ': ' + name, 'success');
-                        } else {
-                            QuickSiteAdmin.showToast(res.data?.message || 'Delete failed', 'error');
-                            this.disabled = false;
-                        }
-                    } catch (e) {
-                        QuickSiteAdmin.showToast('Delete failed', 'error');
-                        this.disabled = false;
-                    }
-                });
-            });
+            backups.forEach(b => list.appendChild(_renderManageSpaceItem(b, managed, list, count, emptyRow)));
         } catch (error) {
-            list.innerHTML = '<div class="manage-space__empty">' + t('common.error', 'Error loading data') + '</div>';
+            QSDom.clear(list);
+            list.appendChild(QSDom.el('div', { class: 'manage-space__empty', text: t('common.error', 'Error loading data') }));
         }
+    }
+
+    function _renderManageSpaceItem(b, managed, list, count, emptyRow) {
+        const date = b.created_relative || b.created_formatted || '--';
+        const size = b.size_formatted || '--';
+        const nameChildren = [b.name];
+        if (b.type !== 'manual') nameChildren.push(QSDom.el('span', { class: 'manage-space__item-badge', text: b.type }));
+
+        const delBtn = QSDom.el('button', { type: 'button', class: 'manage-space__delete-btn', title: t('common.delete', 'Delete') },
+            [QSDom.svgIcon('M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6', 14)]);
+        const item = QSDom.el('div', { class: 'manage-space__item', dataset: { backup: b.name } }, [
+            QSDom.el('div', { class: 'manage-space__item-info' }, [
+                QSDom.el('span', { class: 'manage-space__item-name' }, nameChildren),
+                QSDom.el('span', { class: 'manage-space__item-meta', text: date + ' · ' + size }),
+            ]),
+            delBtn,
+        ]);
+        delBtn.addEventListener('click', async function () {
+            if (!confirm(t('dashboard.storage.confirmDelete', 'Delete this item?') + '\n' + b.name)) return;
+            this.disabled = true;
+            try {
+                const res = await QuickSiteAdmin.apiRequest('deleteBackup', 'DELETE', { backup: b.name }, [], {}, { project: managed });
+                if (res.ok) {
+                    item.remove();
+                    const remaining = list.querySelectorAll('.manage-space__item').length;
+                    count.textContent = remaining;
+                    if (remaining === 0) list.appendChild(emptyRow());
+                    loadStorageOverview();
+                    QuickSiteAdmin.showToast(t('dashboard.storage.deleted', 'Deleted') + ': ' + b.name, 'success');
+                } else {
+                    QuickSiteAdmin.showToast(res.data?.message || 'Delete failed', 'error');
+                    this.disabled = false;
+                }
+            } catch (e) {
+                QuickSiteAdmin.showToast('Delete failed', 'error');
+                this.disabled = false;
+            }
+        });
+        return item;
     }
 
     // ========================================================================
@@ -720,21 +763,18 @@
     function updateDeleteSelector() {
         const deleteSelector = document.getElementById('delete-project-selector');
         const proj = t('dashboard.projects', {});
-        
-        deleteSelector.innerHTML = `<option value="">${proj.selectProject || 'Select a project...'}</option>`;
-        
+
+        QSDom.clear(deleteSelector);
+        deleteSelector.appendChild(QSDom.el('option', { value: '', text: proj.selectProject || 'Select a project...' }));
+
+        // The SERVED project (is_active) can't be deleted without force — omit it.
         const deletable = allProjects.filter(p => !p.is_active);
         deletable.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p.name;
-            opt.textContent = p.name;
-            deleteSelector.appendChild(opt);
+            deleteSelector.appendChild(QSDom.el('option', { value: p.name, text: p.name }));
         });
-        
+
         if (deletable.length === 0 && allProjects.length > 0) {
-            const opt = document.createElement('option');
-            opt.value = '';
-            opt.textContent = proj.cannotDeleteActive || 'Cannot delete active project';
+            const opt = QSDom.el('option', { value: '', text: proj.cannotDeleteActive || 'Cannot delete active project' });
             opt.disabled = true;
             deleteSelector.appendChild(opt);
         }
@@ -785,8 +825,9 @@
         
         // Clone project modal
         document.getElementById('btn-clone-project').addEventListener('click', function() {
-            document.getElementById('clone-source-name').textContent = currentProject;
-            document.getElementById('clone-project-name').value = currentProject + '-copy';
+            const target = getTargetProject();
+            document.getElementById('clone-source-name').textContent = target;
+            document.getElementById('clone-project-name').value = target + '-copy';
             document.getElementById('modal-clone-project').style.display = 'flex';
             document.getElementById('clone-project-name').focus();
             document.getElementById('clone-project-name').select();
@@ -806,11 +847,13 @@
             this.disabled = true;
             this.innerHTML = QuickSiteUtils.htmlSpinner() + ' ' + (proj.cloning || 'Cloning...');
             try {
+                // Source = the selected target project (bound to the URL marker
+                // server-side); body carries only the new name + switch_to.
+                const target = getTargetProject();
                 const result = await QuickSiteAdmin.apiRequest('cloneProject', 'POST', {
-                    source: currentProject,
                     name: name,
                     switch_to: activateCheckbox.checked
-                });
+                }, [], {}, { project: target });
                 
                 if (result.ok) {
                     const filesCopied = result.data?.data?.files_copied || '';
@@ -882,18 +925,23 @@
             this.disabled = true;
             const originalText = this.textContent;
             this.innerHTML = '<span class="spinner"></span> ' + (proj.exporting || 'Exporting...');
-            
+
             try {
-                const response = await fetch(window.QUICKSITE_CONFIG.apiBase + '/exportProject?name=' + encodeURIComponent(currentProject), {
+                // exportProject streams a binary ZIP (can't go through request()), but
+                // it is project-scoped: it MUST carry the C7 '/p/<id>/' marker or the
+                // dispatcher answers 400 project.required. The command binds the marker
+                // as the target (C8 8.4 containment), so no ?name is needed.
+                const target = getTargetProject();
+                const response = await fetch(window.QUICKSITE_CONFIG.apiBase + '/p/' + encodeURIComponent(target) + '/exportProject', {
                     method: 'GET',
                     headers: {
                         'Authorization': 'Bearer ' + QuickSiteAdmin.getToken()
                     }
                 });
-                
+
                 if (response.ok) {
                     const contentDisposition = response.headers.get('Content-Disposition');
-                    let filename = currentProject + '_export.zip';
+                    let filename = target + '_export.zip';
                     if (contentDisposition) {
                         const match = contentDisposition.match(/filename="?([^";\n]+)"?/);
                         if (match) filename = match[1];
@@ -934,11 +982,11 @@
             const file = this.files[0];
             const formData = new FormData();
             formData.append('file', file);
-            formData.append('activate', 'false');
-            
+
             try {
                 QuickSiteAdmin.showToast(proj.importing || 'Importing project...', 'info');
-                
+
+                // importProject is GLOBAL (create-from-archive) — no project marker.
                 const response = await fetch(window.QUICKSITE_CONFIG.apiBase + '/importProject', {
                     method: 'POST',
                     headers: {
@@ -946,19 +994,22 @@
                     },
                     body: formData
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (response.ok) {
                     QuickSiteAdmin.showToast(result.message || proj.imported || 'Project imported successfully', 'success');
-                    loadProjectManager();
-                } else {
-                    QuickSiteAdmin.showToast(result.message || 'Failed to import project', 'error');
+                    // Full reload: a new project changes the header picker, the nav
+                    // permission set and the storage totals — not just this card.
+                    this.value = '';
+                    window.location.href = window.location.pathname + '?t=' + Date.now();
+                    return;
                 }
+                QuickSiteAdmin.showToast(result.message || 'Failed to import project', 'error');
             } catch (error) {
                 QuickSiteAdmin.showToast('Failed to import project', 'error');
             }
-            
+
             this.value = '';
         });
         
@@ -969,8 +1020,8 @@
             this.innerHTML = '<span class="spinner"></span> ' + (proj.backing_up || 'Creating backup...');
             
             try {
-                const result = await QuickSiteAdmin.apiRequest('backupProject', 'GET');
-                
+                const result = await QuickSiteAdmin.apiRequest('backupProject', 'GET', null, [], {}, { project: getTargetProject() });
+
                 if (result.ok && result.data?.data?.backup) {
                     const data = result.data.data;
                     QuickSiteAdmin.showToast(
@@ -989,8 +1040,9 @@
             this.innerHTML = originalText;
         });
         
-        // Restore backup modal
+        // Restore backup modal — pin the target project the modal operates on.
         document.getElementById('btn-restore-backup').addEventListener('click', async function() {
+            restoreTargetProject = getTargetProject();
             document.getElementById('modal-restore-backup').style.display = 'flex';
             await loadBackupList();
         });
@@ -1026,6 +1078,15 @@
                 if (result.ok) {
                     QuickSiteAdmin.showToast(proj.deleted || 'Project deleted', 'success');
                     closeAllModals();
+                    // If we just deleted the project we were EDITING, currentProject now
+                    // points at a dead project — any further project-scoped call (e.g.
+                    // getSizeInfo behind loadStorageOverview) would fire with that stale
+                    // marker and 403. Reload so the server re-resolves the effective
+                    // project instead of refreshing in place.
+                    if (projectToDelete === currentProject) {
+                        window.location.href = window.location.pathname + '?t=' + Date.now();
+                        return;
+                    }
                     loadProjectManager();
                     loadStorageOverview();
                 } else {
@@ -1084,121 +1145,97 @@
         const container = document.getElementById('backup-list-container');
         const proj = t('dashboard.projects', {});
         const common = t('common', {});
-        
+        const target = restoreTargetProject || currentProject;
+
         container.innerHTML = QuickSiteUtils.htmlLoading(common.loading || 'Loading...');
-        
+
+        let result;
         try {
-            const result = await QuickSiteAdmin.apiRequest('listBackups', 'GET');
-            
-            if (!result.ok) {
-                container.innerHTML = `<p class="admin-error">${result.data?.message || 'Failed to load backups'}</p>`;
-                return;
-            }
-            
-            const data = result.data.data;
-            const backups = data.backups || [];
-            
-            if (backups.length === 0) {
-                container.innerHTML = `
-                    <div class="backup-empty">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48" style="opacity: 0.4; margin-bottom: 1rem;">
-                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                            <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
-                        </svg>
-                        <p style="color: var(--admin-text-muted); margin: 0;">${proj.no_backups || 'No backups yet'}</p>
-                        <p style="color: var(--admin-text-muted); font-size: 0.875rem; margin: 0.5rem 0 0 0;">${proj.backup_hint || 'Click "Backup" to create your first backup'}</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            let html = `
-                <div class="backup-summary">
-                    <span>${data.count} ${proj.backups_count || 'backup(s)'}</span>
-                    <span class="backup-summary__divider">•</span>
-                    <span>${data.total_size_formatted} ${proj.total_size || 'total'}</span>
-                </div>
-                <div class="backup-list">
-            `;
-            
-            backups.forEach(backup => {
-                const typeLabel = backup.type === 'pre-restore' 
-                    ? `<span class="badge badge--warning">${proj.pre_restore || 'Pre-restore'}</span>` 
-                    : backup.type === 'auto' 
-                        ? `<span class="badge badge--info">${proj.auto_backup || 'Auto'}</span>`
-                        : '';
-                
-                html += `
-                    <div class="backup-item" data-backup="${QuickSiteAdmin.escapeHtml(backup.name)}">
-                        <div class="backup-item__info">
-                            <div class="backup-item__name">
-                                ${QuickSiteUtils.iconSave(16)}
-                                <span>${QuickSiteAdmin.escapeHtml(backup.name)}</span>
-                                ${typeLabel}
-                            </div>
-                            <div class="backup-item__meta">
-                                <span>${backup.size_formatted}</span>
-                                <span class="backup-item__divider">•</span>
-                                <span>${backup.files} ${proj.files || 'files'}</span>
-                                <span class="backup-item__divider">•</span>
-                                <span>${backup.created_relative}</span>
-                            </div>
-                        </div>
-                        <div class="backup-item__actions">
-                            <button type="button" class="admin-btn admin-btn--sm admin-btn--primary btn-restore-this" data-backup="${QuickSiteAdmin.escapeHtml(backup.name)}">
-                                ${QuickSiteUtils.iconRefresh()}
-                                ${proj.restore_btn || 'Restore'}
-                            </button>
-                            <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost admin-btn--danger btn-delete-backup" data-backup="${QuickSiteAdmin.escapeHtml(backup.name)}">
-                                ${QuickSiteUtils.iconTrash()}
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            html += '</div>';
-            container.innerHTML = html;
-            
-            // Add restore handlers
-            container.querySelectorAll('.btn-restore-this').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const backupName = this.dataset.backup;
-                    openRestoreConfirmModal(backupName);
-                });
-            });
-            
-            // Add delete handlers
-            container.querySelectorAll('.btn-delete-backup').forEach(btn => {
-                btn.addEventListener('click', async function() {
-                    const backupName = this.dataset.backup;
-                    if (!confirm((proj.confirm_delete_backup || 'Delete backup') + ': ' + backupName + '?')) {
-                        return;
-                    }
-                    
-                    this.disabled = true;
-                    
-                    try {
-                        const result = await QuickSiteAdmin.apiRequest('deleteBackup', 'DELETE', { backup: backupName });
-                        
-                        if (result.ok) {
-                            QuickSiteAdmin.showToast(proj.backup_deleted || 'Backup deleted', 'success');
-                            await loadBackupList();
-                        } else {
-                            QuickSiteAdmin.showToast(result.data?.message || 'Failed to delete backup', 'error');
-                            this.disabled = false;
-                        }
-                    } catch (error) {
-                        QuickSiteAdmin.showToast('Failed to delete backup', 'error');
-                        this.disabled = false;
-                    }
-                });
-            });
-            
+            result = await QuickSiteAdmin.apiRequest('listBackups', 'GET', null, [], {}, { project: target });
         } catch (error) {
             console.error('Failed to load backups:', error);
-            container.innerHTML = `<p class="admin-error">Failed to load backups</p>`;
+            QSDom.clear(container);
+            container.appendChild(QSDom.el('p', { class: 'admin-error', text: 'Failed to load backups' }));
+            return;
         }
+        if (!result.ok) {
+            QSDom.clear(container);
+            container.appendChild(QSDom.el('p', { class: 'admin-error', text: result.data?.message || 'Failed to load backups' }));
+            return;
+        }
+
+        const data = result.data.data;
+        const backups = data.backups || [];
+
+        QSDom.clear(container);
+        if (backups.length === 0) {
+            container.appendChild(QSDom.el('div', { class: 'backup-empty' }, [
+                QSDom.svgIcon('M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z', 48),
+                QSDom.el('p', { class: 'backup-empty__title', text: proj.no_backups || 'No backups yet' }),
+                QSDom.el('p', { class: 'backup-empty__hint', text: proj.backup_hint || 'Click "Backup" to create your first backup' }),
+            ]));
+            return;
+        }
+
+        container.appendChild(QSDom.el('div', { class: 'backup-summary' }, [
+            QSDom.el('span', { text: data.count + ' ' + (proj.backups_count || 'backup(s)') }),
+            QSDom.el('span', { class: 'backup-summary__divider', text: '•' }),
+            QSDom.el('span', { text: data.total_size_formatted + ' ' + (proj.total_size || 'total') }),
+        ]));
+        const listEl = QSDom.el('div', { class: 'backup-list' });
+        backups.forEach(b => listEl.appendChild(_renderBackupItem(b, proj, target)));
+        container.appendChild(listEl);
+    }
+
+    function _renderBackupItem(backup, proj, target) {
+        let typeBadge = null;
+        if (backup.type === 'pre-restore') typeBadge = QSDom.el('span', { class: 'badge badge--warning', text: proj.pre_restore || 'Pre-restore' });
+        else if (backup.type === 'auto') typeBadge = QSDom.el('span', { class: 'badge badge--info', text: proj.auto_backup || 'Auto' });
+
+        const restoreBtn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--sm admin-btn--primary btn-restore-this' }, [
+            QSDom.svgIcon('M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15', 14),
+            ' ' + (proj.restore_btn || 'Restore'),
+        ]);
+        const delBtn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--sm admin-btn--ghost admin-btn--danger btn-delete-backup' }, [
+            QSDom.svgIcon('M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6', 14),
+        ]);
+
+        restoreBtn.addEventListener('click', () => openRestoreConfirmModal(backup.name));
+        delBtn.addEventListener('click', async function () {
+            if (!confirm((proj.confirm_delete_backup || 'Delete backup') + ': ' + backup.name + '?')) return;
+            this.disabled = true;
+            try {
+                const res = await QuickSiteAdmin.apiRequest('deleteBackup', 'DELETE', { backup: backup.name }, [], {}, { project: target });
+                if (res.ok) {
+                    QuickSiteAdmin.showToast(proj.backup_deleted || 'Backup deleted', 'success');
+                    await loadBackupList();
+                } else {
+                    QuickSiteAdmin.showToast(res.data?.message || 'Failed to delete backup', 'error');
+                    this.disabled = false;
+                }
+            } catch (error) {
+                QuickSiteAdmin.showToast('Failed to delete backup', 'error');
+                this.disabled = false;
+            }
+        });
+
+        return QSDom.el('div', { class: 'backup-item', dataset: { backup: backup.name } }, [
+            QSDom.el('div', { class: 'backup-item__info' }, [
+                QSDom.el('div', { class: 'backup-item__name' }, [
+                    QSDom.svgIcon('M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z', 16),
+                    QSDom.el('span', { text: backup.name }),
+                    typeBadge,
+                ]),
+                QSDom.el('div', { class: 'backup-item__meta' }, [
+                    QSDom.el('span', { text: backup.size_formatted }),
+                    QSDom.el('span', { class: 'backup-item__divider', text: '•' }),
+                    QSDom.el('span', { text: backup.files + ' ' + (proj.files || 'files') }),
+                    QSDom.el('span', { class: 'backup-item__divider', text: '•' }),
+                    QSDom.el('span', { text: backup.created_relative }),
+                ]),
+            ]),
+            QSDom.el('div', { class: 'backup-item__actions' }, [restoreBtn, delBtn]),
+        ]);
     }
 
     // ========================================================================
@@ -1443,11 +1480,11 @@
             this.innerHTML = QuickSiteUtils.htmlSpinner(16) + ' ' + (proj.restoring || 'Restoring...');
             
             try {
-                const result = await QuickSiteAdmin.apiRequest('restoreBackup', 'POST', { 
+                const result = await QuickSiteAdmin.apiRequest('restoreBackup', 'POST', {
                     backup: pendingRestoreBackup,
                     create_backup: createBackup
-                });
-                
+                }, [], {}, { project: restoreTargetProject || currentProject });
+
                 if (result.ok) {
                     QuickSiteAdmin.showToast(proj.restore_success || 'Backup restored successfully', 'success');
                     closeAllModals();

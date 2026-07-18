@@ -146,7 +146,7 @@ function getCommandCategories(): array {
         'member_management' => [
             'label' => 'Project Members',
             'icon' => 'users',
-            'commands' => ['listMembers', 'getProjectRoster', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership', 'approveJoinRequest', 'denyJoinRequest', 'proposeMember', 'setJoinPolicy']
+            'commands' => ['listMembers', 'getProjectRoster', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership', 'approveJoinRequest', 'denyJoinRequest', 'proposeMember', 'setJoinPolicy', 'setProjectVisibility', 'reconcileMemberships']
         ],
         // …and the caller's own membership surface (global self-service).
         'my_memberships' => [

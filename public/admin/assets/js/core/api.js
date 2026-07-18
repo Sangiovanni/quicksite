@@ -244,42 +244,13 @@ window.QuickSiteAPI = (function() {
         };
     }
 
-    // C8 deferral guard — the dashboard project-manager's project.data/project.delete
-    // commands. With currentProject = the SERVED project (8.W), the marker now aligns
-    // with the project the manager UI targets, so these WOULD act on the right project.
-    // They are still held here per the defer ruling: their deeper re-scoping
-    // (importProject should be global, the F6 marker-vs-param containment matrix,
-    // per-user targeting) lands in C8's project.data slice — better to keep the manager
-    // off during the auth rework than expose half-reworked destructive project ops.
-    // NOTE: the preview AI-tools "backup before AI change" path hand-builds its URL from
-    // PreviewConfig.managementUrl (already project-markered) and does NOT go through
-    // request(), so it stays live — it backs up the served project being edited.
-    // (Remove this guard when C8 wires the project-manager; the panel is consistent
-    // either way now that currentProject is the served project.)
-    // C8: `deleteProject` LIFTED — it is wired with an explicit project override
-    // (the dashboard sends the marker = the project being deleted) and the command
-    // enforces marker==target server-side (confused-deputy fix). The rest of the
-    // family stays fenced pending the full 8.4 project.data re-scope.
-    const C8_DEFERRED_PROJECT_COMMANDS = [
-        'backupProject', 'restoreBackup', 'cloneProject',
-        'exportProject', 'importProject', 'deleteBackup', 'listBackups'
-    ];
-
-    function isDeferredToC8(command) {
-        return C8_DEFERRED_PROJECT_COMMANDS.includes(command);
-    }
-
-    function deferredC8Error(command) {
-        return {
-            ok: false,
-            status: 0,
-            data: {
-                success: false,
-                code: 'client.project_manager_c8',
-                error: 'Project management (' + command + ') is being reworked (C8) and is temporarily unavailable from the dashboard.'
-            }
-        };
-    }
+    // C8 8.4: the project-manager fence is LIFTED. Every project.data command
+    // (backup/restore/clone/export/deleteBackup/listBackups) is now marker-contained
+    // server-side (target bound to PROJECT_NAME, body mismatch → 400 project.mismatch)
+    // and the dashboard targets each call with an explicit opts.project = the selected
+    // project (marker == target). importProject became GLOBAL (create-from-archive,
+    // caller = owner) so it needs no marker at all. deleteProject was lifted earlier
+    // (8.0 round 5) on the same pattern.
 
     // ============================================
     // Core API Methods
@@ -330,11 +301,6 @@ window.QuickSiteAPI = (function() {
                 data: { success: false, error: 'No authentication token' },
                 status: 401
             };
-        }
-
-        // C8-deferred project-manager commands: refuse rather than mis-target (8.W).
-        if (isDeferredToC8(command)) {
-            return deferredC8Error(command);
         }
 
         // Build URL — project-scoped commands carry the C7 '/p/<projectId>/' marker;

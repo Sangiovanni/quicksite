@@ -188,7 +188,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
     }
     
     // Extract files (secure: skip PHP, track warnings)
-    $stats = ['files' => 0, 'directories' => 0, 'total_size' => 0, 'skipped_php' => []];
+    $stats = ['files' => 0, 'directories' => 0, 'total_size' => 0, 'skipped_php' => [], 'skipped_unsafe' => []];
     $extractResult = extractProjectFromZipSecure($zip, $projectFolder['prefix'], $projectPath, $stats);
     
     $zip->close();
@@ -220,9 +220,31 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
             ->withErrors($validation['errors']);
     }
     
+    // C8 8.4 BIRTH-WRITE: an imported archive's config/members.json is UNTRUSTED
+    // input — it could name any owner and any roster (a membership-hijack plant),
+    // or be absent entirely (an ownerless, inaccessible project). Discard whatever
+    // the ZIP carried (log it for audit) and mint a fresh trust file: the IMPORTER
+    // is the sole owner. (Export now excludes members.json, but old archives and
+    // hand-built ZIPs may still contain one — never trust it.)
+    require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+    $importerId = getCurrentUser()['id'] ?? null;
+    $discarded = @json_decode((string)@file_get_contents($projectPath . '/config/members.json'), true);
+    if (is_array($discarded)) {
+        $dOwner   = $discarded['owner'] ?? '(none)';
+        $dMembers = is_array($discarded['members'] ?? null) ? count($discarded['members']) : 0;
+        $dInv     = is_array($discarded['invitations'] ?? null) ? count($discarded['invitations']) : 0;
+        error_log("importProject: discarded archive members.json for '{$projectName}' (owner='{$dOwner}', members={$dMembers}, invitations={$dInv}) — importer '{$importerId}' set as sole owner (C8 8.4 containment)");
+    }
+    if (!qs_project_birth_write_members($projectPath, $importerId)) {
+        deleteImportDirectory($projectPath);
+        return ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Failed to initialise imported project membership');
+    }
+    @unlink($projectPath . '/config/members.json.lock');
+
     // Load project info
     $projectInfo = getImportedProjectInfo($projectPath);
-    
+
     $result = [
         'project' => $projectName,
         'path' => 'secure/projects/' . $projectName,
@@ -239,21 +261,38 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
             'format' => 'v2.0-secure',
             'php_rebuilt_from_json' => true,
             'skipped_php_files' => count($stats['skipped_php']),
-            'skipped_files' => $stats['skipped_php']
+            'skipped_files' => $stats['skipped_php'],
+            // Entries refused by the zip-slip containment guard (path escape attempts).
+            'skipped_unsafe_paths' => count($stats['skipped_unsafe']),
+            'skipped_unsafe' => $stats['skipped_unsafe'],
+            'membership' => 'archive members.json discarded; importer set as sole owner'
         ],
         'rebuild_stats' => $rebuildResult['stats'] ?? []
     ];
     
-    // Switch to project if requested
-    if ($switchTo) {
-        $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-        $targetContent = "<?php\n/**\n * Active Project Target Configuration\n * Updated: " . date('Y-m-d H:i:s') . "\n */\n\nreturn [\n    'project' => '" . addslashes($projectName) . "'\n];\n";
-        
-        if (file_put_contents($targetFile, $targetContent, LOCK_EX) !== false) {
-            $result['switched_to'] = true;
-        }
+    // Register the import in the importer's project index + move ONLY their
+    // per-user editing target with switch_to (C9 fixed-main — a command NEVER
+    // repoints the served main / target.php; the old tail here did, the same
+    // pre-C9 leftover createProject dropped in 8.0). Edited at /p/<id>/.
+    if ($importerId !== null) {
+        $siteName = $projectInfo['site_name'] ?? $projectName;
+        $written = qs_users_mutate(function (array &$cfg) use ($importerId, $projectName, $siteName, $switchTo) {
+            if (!isset($cfg['users'][$importerId])) {
+                return false;
+            }
+            $cfg['users'][$importerId]['projects'][$projectName] = [
+                'name'    => $siteName,
+                'created' => date('Y-m-d'),
+            ];
+            if ($switchTo) {
+                $cfg['users'][$importerId]['selected_project'] = $projectName;
+            }
+            return true;
+        });
+        $result['switched_to'] = ($written === true && $switchTo);
     }
-    
+    $result['owner_user_id'] = $importerId;
+
     return ApiResponse::create(201, 'resource.imported')
         ->withMessage("Project '$projectName' imported successfully (secure rebuild)")
         ->withData($result);
@@ -331,7 +370,24 @@ function extractProjectFromZipSecure(ZipArchive $zip, string $prefix, string $de
         if ($relativePath === 'export_info.json') {
             continue;
         }
-        
+
+        // SECURITY (C8 8.4) — ZIP-SLIP containment. The entry name is fully
+        // attacker-controlled: an entry like 'proj/../../../evil.json' would resolve
+        // OUTSIDE the new project directory and let an archive plant or overwrite a
+        // file anywhere the process can write (another project's data, a config
+        // file...). The extension filter below does NOT stop this — a .json or .css
+        // written to the wrong place is still an escape. Reject anything that is not
+        // a clean, relative, non-escaping path BEFORE it is used to build a path.
+        $relativePath = str_replace('\\', '/', $relativePath);
+        if (strpos($relativePath, "\0") !== false                 // null-byte truncation
+            || $relativePath[0] === '/'                            // absolute (posix)
+            || preg_match('#^[a-zA-Z]:#', $relativePath)           // absolute (windows drive)
+            || preg_match('#(^|/)\.\.(/|$)#', $relativePath)       // any '..' segment
+        ) {
+            $stats['skipped_unsafe'][] = $relativePath;
+            continue;
+        }
+
         // Get file extension
         $ext = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
         

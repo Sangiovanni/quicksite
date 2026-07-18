@@ -194,12 +194,23 @@ window.QS_MEMBERS_I18N = <?= json_encode([
 </section>
 <?php endif; ?>
 
-<!-- Propose — every member rank (the sponsor lane) -->
+<!-- Propose — the sponsor lane, for every rank EXCEPT the owner.
+     The owner is the top validator: a proposal of theirs would only ever be
+     approved by themselves, so the lane is pure ceremony for them (they can
+     inviteMember every role they could propose). An ADMIN still needs it —
+     proposeMember caps at the sponsor's OWN rank (<=) while inviteMember
+     requires strictly-below, so proposing a fellow ADMIN is how an admin asks
+     the owner to sign off on a peer-rank member. -->
+<?php if (!$__isOwner): ?>
 <section class="admin-section" id="members-propose-section" data-requires-command="proposeMember">
     <h2 class="admin-section__title"><?= __admin('members.propose.title', 'Propose a member') ?></h2>
     <div class="admin-card">
         <div class="admin-card__body">
+            <?php if ($__isAdmin): ?>
+            <p class="admin-hint"><?= __admin('members.propose.hintAdmin', 'You can invite anyone below your own rank directly (above). Use a proposal only to ask the OWNER to sign off on someone you cannot invite yourself — another admin. Your note IS the vouch.') ?></p>
+            <?php else: ?>
             <p class="admin-hint"><?= __admin('members.propose.hint', 'Vouch for someone: an admin or the owner validates your proposal before the person is even told. Your note IS the vouch — make it count.') ?></p>
+            <?php endif; ?>
             <div class="members-find-row">
                 <div class="admin-form-group members-find-row__name">
                     <label class="admin-label" for="propose-find-name"><?= __admin('members.invite.nameLabel', 'Their public name') ?> <span class="admin-text-danger">*</span></label>
@@ -222,6 +233,7 @@ window.QS_MEMBERS_I18N = <?= json_encode([
         </div>
     </div>
 </section>
+<?php endif; ?>
 
 <?php if ($__isAdmin): ?>
 <!-- Join policy — admin/owner -->

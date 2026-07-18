@@ -179,19 +179,13 @@ HTACCESS;
     $creator   = getCurrentUser();
     $creatorId = $creator['id'] ?? null;
 
-    if (!is_dir($projectPath . '/config')) {
-        mkdir($projectPath . '/config', 0755, true);
+    // Birth-write the trust file via the single canonical path (C8 8.4) — creator
+    // as sole owner. A create with no resolvable owner is invalid (an ownerless,
+    // inaccessible project); fail loudly rather than mint one.
+    if (!qs_project_birth_write_members($projectPath, $creatorId)) {
+        return ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Failed to initialise project membership');
     }
-    $membersData = [
-        'owner'      => $creatorId,
-        'visibility' => 'private',
-        'members'    => $creatorId !== null ? [$creatorId => ['role' => 'owner']] : (object)[],
-    ];
-    file_put_contents(
-        $projectPath . '/config/members.json',
-        json_encode($membersData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n",
-        LOCK_EX
-    );
 
     // Update the creator's derived project index (users.php) — cache only, NO
     // role key (role is authoritative in members.json — L5/C5). With switch_to,

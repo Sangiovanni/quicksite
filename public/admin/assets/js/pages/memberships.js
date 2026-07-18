@@ -199,8 +199,12 @@
                     close();
                     if (res && res.ok) {
                         toast(T.leftMsg || 'You left the project', 'success');
-                        refreshAll();
-                        notifyMembershipChange();
+                        // Leaving changes the caller's SERVER-computed permission set
+                        // (nav links, PAGE_PERMISSIONS, the project picker) — a soft
+                        // refreshAll() leaves stale tabs that only correct themselves on
+                        // the next click. Reload instead; no notifyMembershipChange first
+                        // (its fetches would be cancelled by the reload — 8.3c round 2).
+                        window.location.href = window.location.pathname + '?t=' + Date.now();
                     } else {
                         toast(serverMessage(res), 'error');
                     }

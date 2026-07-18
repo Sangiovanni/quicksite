@@ -28,25 +28,28 @@ require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
  * @return ApiResponse
  */
 function __command_cloneProject(array $params = [], array $urlParams = []): ApiResponse {
-    // Determine source project
-    $sourceProject = trim($params['source'] ?? '');
-    
-    if (empty($sourceProject)) {
-        // Use active project as source
-        $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-        if (file_exists($targetFile)) {
-            $target = include $targetFile;
-            $sourceProject = is_array($target) ? ($target['project'] ?? '') : (string)$target;
+    // C8 8.4 CONTAINMENT (confused-deputy / F6): the clone SOURCE is BOUND to the
+    // URL marker (PROJECT_NAME, authorized by the dispatcher — project.data, admin+
+    // on the source — before this runs). A body `source` that disagrees is refused;
+    // it is optional. You cannot clone FROM a project you did not target/authorize.
+    $sourceProject = trim((string)($params['source'] ?? ''));
+    $markerProject = defined('PROJECT_NAME') ? (string)PROJECT_NAME : '';
+    if ($markerProject !== '') {
+        if ($sourceProject !== '' && $sourceProject !== $markerProject) {
+            return ApiResponse::create(400, 'project.mismatch')
+                ->withMessage('The clone source does not match the project in the request body')
+                ->withErrors(['source' => 'Must match the project in the URL']);
         }
-        if (empty($sourceProject)) {
-            return ApiResponse::create(400, 'validation.missing_field')
-                ->withMessage('No source project specified and no active project found')
-                ->withErrors(['source' => 'Specify a source project or ensure an active project is set']);
-        }
+        $sourceProject = $markerProject;
+    }
+    if ($sourceProject === '') {
+        return ApiResponse::create(400, 'validation.missing_field')
+            ->withMessage('No source project specified')
+            ->withErrors(['source' => 'Specify a source project']);
     }
 
     // Reject a traversal payload in the source name before the recursive copy
-    // reads from it (beta.10 C3 F1-c). The active-project fallback is trusted.
+    // reads from it (beta.10 C3 F1-c).
     if (!is_valid_project_name($sourceProject)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid source project name')
@@ -133,9 +136,27 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
         }
     }
     
+    // C8 8.4 BIRTH-WRITE: never inherit the source's members.json (the C10
+    // clone-hijack — the copy carried the source's old owner, every member at
+    // their role, and every pending invitation). Overwrite it with a fresh trust
+    // file: the CLONER is the sole owner, no members, no invitations, private,
+    // closed. The source roster is intentionally discarded (a clone is a new,
+    // independent project — re-invite collaborators explicitly).
+    require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+    $clonerId = getCurrentUser()['id'] ?? null;
+    if (!qs_project_birth_write_members($targetPath, $clonerId)) {
+        // Files exist but the trust file could not be minted — an ownerless
+        // project is inaccessible; roll back rather than orphan it.
+        deleteDirectoryRecursive($targetPath);
+        return ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Failed to initialise cloned project membership');
+    }
+    @unlink($targetPath . '/config/members.json.lock'); // stale sidecar if it was copied
+    error_log("cloneProject: '{$newName}' birth-written to owner '{$clonerId}'; source '{$sourceProject}' roster NOT carried over (C8 8.4 containment)");
+
     // Count cloned files for the response
     $fileCount = countFilesRecursive($targetPath);
-    
+
     $result = [
         'project' => $newName,
         'source' => $sourceProject,
@@ -143,58 +164,33 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
         'site_name' => $newSiteName,
         'files_copied' => $fileCount,
         'cloned' => true,
+        'owner_user_id' => $clonerId,
         'switched_to' => false
     ];
     
-    // Switch to new project if requested
-    if ($switchTo) {
-        // Sync live public files back to the previous project before switching
-        $targetConfFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-        if (file_exists($targetConfFile)) {
-            $prevTarget = include $targetConfFile;
-            $prevName = is_array($prevTarget) ? ($prevTarget['project'] ?? null) : $prevTarget;
-            if ($prevName && $prevName !== $newName) {
-                $prevProjectPath = SECURE_FOLDER_PATH . '/projects/' . $prevName;
-                if (is_dir($prevProjectPath)) {
-                    $prevPublicPath = $prevProjectPath . '/public';
-                    if (!is_dir($prevPublicPath)) {
-                        mkdir($prevPublicPath, 0755, true);
-                    }
-                    foreach (['style', 'assets'] as $folder) {
-                        $liveSrc = PUBLIC_CONTENT_PATH . '/' . $folder;
-                        $projDst = $prevPublicPath . '/' . $folder;
-                        if (is_dir($liveSrc)) {
-                            if (is_dir($projDst)) {
-                                deleteDirectoryRecursive($projDst);
-                            }
-                            cloneProjectDirectory($liveSrc, $projDst, []);
-                        }
-                    }
-                }
+    // Register the clone in the cloner's own project index (users.php cache) —
+    // like createProject. With switch_to, ONLY the cloner's per-user editing
+    // target (selected_project) moves to the new project; a command NEVER repoints
+    // the served main (target.php) — the C9 fixed-main model (the old switch_to
+    // tail here wrote target.php + synced live public: the same pre-C9 leftover
+    // that createProject dropped in 8.0). The new project is edited at /p/<id>/.
+    if ($clonerId !== null) {
+        $written = qs_users_mutate(function (array &$cfg) use ($clonerId, $newName, $newSiteName, $switchTo) {
+            if (!isset($cfg['users'][$clonerId])) {
+                return false;
             }
-        }
-
-        $targetContent = "<?php\n/**\n * Active Project Target Configuration\n * Updated: " . date('Y-m-d H:i:s') . "\n */\n\nreturn [\n    'project' => '" . addslashes($newName) . "'\n];\n";
-        
-        $handle = fopen($targetConfFile, 'w');
-        if ($handle !== false) {
-            if (flock($handle, LOCK_EX)) {
-                $bytesWritten = fwrite($handle, $targetContent);
-                fflush($handle);
-                flock($handle, LOCK_UN);
-                if ($bytesWritten === strlen($targetContent)) {
-                    $result['switched_to'] = true;
-                }
+            $cfg['users'][$clonerId]['projects'][$newName] = [
+                'name'    => $newSiteName,
+                'created' => date('Y-m-d'),
+            ];
+            if ($switchTo) {
+                $cfg['users'][$clonerId]['selected_project'] = $newName;
             }
-            fclose($handle);
-            
-            clearstatcache(true, $targetConfFile);
-            if (function_exists('opcache_invalidate')) {
-                opcache_invalidate($targetConfFile, true);
-            }
-        }
+            return true;
+        });
+        $result['switched_to'] = ($written === true && $switchTo);
     }
-    
+
     return ApiResponse::create(201, 'resource.created')
         ->withMessage("Project '$sourceProject' cloned to '$newName' successfully")
         ->withData($result);

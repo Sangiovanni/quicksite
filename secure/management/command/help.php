@@ -4024,6 +4024,62 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Same-value calls are a no-op (200, changed=false). PRIVACY TRADE, stated plainly: a PRIVATE project with an open policy is knockable-by-id - any authenticated account that guesses/knows the id can send a request and thereby confirm the project exists (the response carries an advisory note when this combination becomes active). Closed private projects stay indistinguishable from nonexistent ones on the request lane.'
     ],
 
+    'setProjectVisibility' => [
+        'description' => 'Sets the TARGET project visibility (private|public) in members.json - the knob surface-B reads to decide whether the site is served to the PUBLIC internet or only to authenticated members. Default is private. OWNER-ONLY (project.visibility category): public exposure is the gravest decision a project carries, held at the delete/transfer tier, not the admin-tier project.settings that setJoinPolicy uses.',
+        'method' => 'POST',
+        'parameters' => [
+            'visibility' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => "'private' or 'public'",
+                'example' => 'public'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/setProjectVisibility with body: {"visibility": "public"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => "Visibility set to 'public'",
+            'data' => ['project' => 'prj_a1b2c3', 'visibility' => 'public', 'previous' => 'private', 'changed' => true]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'No project targeted',
+            '400.validation.missing_field' => 'visibility is required',
+            '400.validation.invalid_format' => "visibility must be 'private' or 'public'",
+            '403.auth.forbidden' => 'Caller is not the owner of this project (project.visibility category)',
+            '403.authz.insufficient_rank' => 'Caller is no longer the owner between dispatch and the write (re-checked in-lock)',
+            '500.members.integrity' => 'members.json unsound - refused',
+            '500.server.file_write_failed' => 'Could not persist the visibility'
+        ],
+        'notes' => 'Same-value calls are a no-op (200, changed=false). Owner-only. Making a project PRIVATE while its join_policy is open re-creates the knockable-by-id state (the response carries the same advisory note setJoinPolicy uses). Flipping to public dissolves that concern (existence is public by design). A visibility change never purges the pending request queue.'
+    ],
+
+    'reconcileMemberships' => [
+        'description' => 'Heals every user\'s users.php membership cache for the TARGET project against its AUTHORITATIVE members.json. The cache is only a mirror (members.json is the sole grant authority); drift comes from a members.json hand-edit, a failed cascade cache-write, or pre-8.3a legacy entries. admin/owner (project.members).',
+        'method' => 'POST',
+        'parameters' => [],
+        'example_post' => 'POST /management/p/<projectId>/reconcileMemberships',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => "Reconciled membership cache for 'prj_a1b2c3' against members.json",
+            'data' => [
+                'project' => 'prj_a1b2c3',
+                'counts' => [
+                    'members' => 2, 'pending_invites' => 1, 'pending_requests' => 0,
+                    'added' => 0, 'healed' => 1, 'pruned_stale' => 1, 'preserved_tombstones' => 3, 'total_changes' => 2
+                ]
+            ]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'No project targeted',
+            '403.auth.forbidden' => 'Caller is not an admin/owner of this project (project.members category)',
+            '500.members.unreadable' => 'members.json missing/corrupt - reconcile aborted (never prunes off a failed read)',
+            '500.server.file_write_failed' => 'Could not persist the reconciled cache'
+        ],
+        'notes' => 'MERGE-PRESERVE rule (the point of the command): member/pending_invite/pending_request are DERIVABLE from members.json and rebuilt from it; but refused/removed/deleted are TOMBSTONES that live ONLY in the user cache (members.json keeps no record of a refusal, kick, or dead project). Reconcile PRESERVES any tombstone for a user the authority no longer lists, and prunes only STALE POSITIVES (a cache claiming member/pending the authority contradicts). Aborts on an unreadable authority rather than wipe real memberships.'
+    ],
+
     'getProjectRoster' => [
         'description' => 'Reduced roster of the TARGET project for EVERY member rank: active members only, rank-descending - {user_id, name, role, rank, is_owner}. The pending invitations/requests block is deliberately absent (adjudication data stays admin/owner via listMembers). Exists so any member - viewer included - can see who is on the project with them.',
         'method' => 'GET',
@@ -6479,7 +6535,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'site_customization' => ['editFavicon', 'editTitle'],
                 'build_deployment' => ['build', 'listBuilds', 'getBuild', 'deleteBuild', 'cleanBuilds', 'deployBuild', 'downloadBuild'],
                 'project_management' => ['listProjects', 'getActiveProject', 'switchProject', 'createProject', 'deleteProject'],
-                'member_management' => ['listMembers', 'getProjectRoster', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership', 'approveJoinRequest', 'denyJoinRequest', 'proposeMember', 'setJoinPolicy'],
+                'member_management' => ['listMembers', 'getProjectRoster', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership', 'approveJoinRequest', 'denyJoinRequest', 'proposeMember', 'setJoinPolicy', 'setProjectVisibility', 'reconcileMemberships'],
                 'my_memberships' => ['findUser', 'listMyInvitations', 'listMyProposals', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice', 'requestToJoin', 'withdrawJoinRequest'],
                 'backup_restore' => ['backupProject', 'listBackups', 'restoreBackup', 'deleteBackup'],
                 'export_import' => ['exportProject', 'importProject', 'downloadExport', 'clearExports'],

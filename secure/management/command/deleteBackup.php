@@ -64,25 +64,30 @@ if (!function_exists('delbackup_formatSize')) {
 function __command_deleteBackup(array $params = [], array $urlParams = []): ApiResponse {
     // Get parameters
     $backupName = $params['backup'] ?? null;
-    $projectName = $params['name'] ?? null;
 
     if (!$backupName) {
         return ApiResponse::create(400, 'backup.name_required')
             ->withMessage('Backup name is required');
     }
 
-    // If no project name, use active project
-    if (!$projectName) {
-        $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-        if (file_exists($targetFile)) {
-            $target = include $targetFile;
-            $projectName = is_array($target) ? ($target['project'] ?? null) : $target;
+    // C8 8.4 CONTAINMENT (confused-deputy / F6): the target is BOUND to the URL
+    // marker (PROJECT_NAME, authorized by the dispatcher — project.data, admin+).
+    // A body `name` that disagrees is refused; body is optional. You cannot delete
+    // a backup of a project you did not target/authorize.
+    $projectName = trim((string)($params['name'] ?? ''));
+    $markerProject = defined('PROJECT_NAME') ? (string)PROJECT_NAME : '';
+    if ($markerProject !== '') {
+        if ($projectName !== '' && $projectName !== $markerProject) {
+            return ApiResponse::create(400, 'project.mismatch')
+                ->withMessage('The targeted project does not match the project in the request body')
+                ->withErrors(['name' => 'Must match the project in the URL']);
         }
+        $projectName = $markerProject;
     }
 
-    if (!$projectName) {
+    if ($projectName === '') {
         return ApiResponse::create(400, 'project.not_specified')
-            ->withMessage('No project specified and no active project found');
+            ->withMessage('No project specified');
     }
 
     // Reject traversal payloads before the backup path is built + deleted

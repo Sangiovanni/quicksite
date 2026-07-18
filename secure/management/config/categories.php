@@ -156,7 +156,7 @@ return [
         'scope' => 'project',
         'commands' => [
             'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup', 'exportProject',
-            'importProject', 'downloadExport', 'clearExports', 'cloneProject',
+            'downloadExport', 'clearExports', 'cloneProject',
         ],
     ],
 
@@ -191,7 +191,16 @@ return [
     // only. admin+.
     'project.members' => [
         'scope' => 'project',
-        'commands' => ['listMembers', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'approveJoinRequest', 'denyJoinRequest'],
+        'commands' => ['listMembers', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'approveJoinRequest', 'denyJoinRequest', 'reconcileMemberships'],
+    ],
+
+    // Owner-only project exposure (C8 8.4). setProjectVisibility flips surface-B
+    // public/private serving — the gravest exposure a project carries (public =
+    // anyone on the internet reads the site), so it sits at the delete/transfer
+    // tier, NOT the admin-tier project.settings that setJoinPolicy uses.
+    'project.visibility' => [
+        'scope' => 'project',
+        'commands' => ['setProjectVisibility'],
     ],
 
     // Reduced roster for EVERY member rank (C8 8.3c): active members only —
@@ -285,10 +294,15 @@ return [
     ],
 
     // Any authenticated user may create a project (and becomes its sole owner).
+    // importProject is create-from-archive: it mints a NEW project (no marker can
+    // exist for a project that does not exist yet), birth-writes the importer as
+    // sole owner, and discards any archived roster — so it is GLOBAL like
+    // createProject, not the project-scoped admin-tier project.data it used to sit
+    // in (C8 8.4). The deep ZIP-internal path/zip-slip sweep stays C11.
     'projects.create' => [
         'scope' => 'global',
         'access' => 'any',
-        'commands' => ['createProject'],
+        'commands' => ['createProject', 'importProject'],
     ],
 
     // Per-user EDITING target (selected_project) — a benign self-write: sets which

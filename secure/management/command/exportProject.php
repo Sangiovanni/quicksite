@@ -49,17 +49,30 @@ const EXPORT_ALLOWED_CONFIG_KEYS = [
 function __command_exportProject(array $params = [], array $urlParams = []): ApiResponse {
     // Merge query parameters for GET requests
     $params = array_merge($_GET, $params);
-    
-    // Get project name - default to active project if not specified
-    $projectName = trim($params['name'] ?? $params['project'] ?? '');
-    
-    // If no project specified, use active project
-    if (empty($projectName)) {
-        $projectName = PROJECT_NAME ?? 'quicksite';
+
+    // C8 8.4 CONTAINMENT (confused-deputy / F6): the exported project is BOUND to
+    // the URL marker (PROJECT_NAME, authorized by the dispatcher — project.data,
+    // admin+ — before this runs). A query `name`/`project` that disagrees is
+    // refused; it is optional. You cannot export a project you did not
+    // target/authorize.
+    $projectName = trim((string)($params['name'] ?? $params['project'] ?? ''));
+    $markerProject = defined('PROJECT_NAME') ? (string)PROJECT_NAME : '';
+    if ($markerProject !== '') {
+        if ($projectName !== '' && $projectName !== $markerProject) {
+            return ApiResponse::create(400, 'project.mismatch')
+                ->withMessage('The targeted project does not match the project in the request')
+                ->withErrors(['name' => 'Must match the project in the URL']);
+        }
+        $projectName = $markerProject;
+    }
+
+    if ($projectName === '') {
+        return ApiResponse::create(400, 'project.not_specified')
+            ->withMessage('No project specified');
     }
 
     // Reject a traversal payload before the export source path is built
-    // (beta.10 C3 F1-f). The active-project fallback is trusted.
+    // (beta.10 C3 F1-f).
     if (!is_valid_project_name($projectName)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid project name')
@@ -87,9 +100,19 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
             ->withData(['hint' => 'Install php-zip extension']);
     }
     
-    // If exporting the active project, sync live public files to project folder first
-    // This ensures CSS/asset edits made via editStyles/AI workflows are captured
-    $isActiveProject = (defined('PROJECT_NAME') && PROJECT_NAME === $projectName);
+    // Sync live public files into the project folder first, ONLY when exporting the
+    // SERVED main (target.php). PUBLIC_CONTENT_PATH is the served main's live dir
+    // (NOT rebound per-marker), so under the C8 8.4 marker bind — where PROJECT_NAME
+    // always equals $projectName — the old `PROJECT_NAME === $projectName` gate was
+    // always true and would contaminate any OTHER project's export with the served
+    // project's assets. Compare against the served main instead.
+    $servedMain = null;
+    $servedTargetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
+    if (file_exists($servedTargetFile)) {
+        $servedTarget = include $servedTargetFile;
+        $servedMain = is_array($servedTarget) ? ($servedTarget['project'] ?? null) : $servedTarget;
+    }
+    $isActiveProject = ($servedMain !== null && $servedMain === $projectName);
     if ($isActiveProject && defined('PUBLIC_CONTENT_PATH')) {
         $projectPublicPath = $projectPath . '/public';
         if (!is_dir($projectPublicPath)) {
@@ -133,10 +156,14 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
         // 2. Export routes.php as routes.json
         exportRoutesAsJson($zip, $projectPath, $projectName, $stats);
         
-        // 3. Export config/*.json (project settings)
+        // 3. Export config/*.json (project settings) — but NEVER members.json
+        // (C8 8.4 privacy): it holds the membership graph + owner id + private
+        // invitation notes. Import discards any archived members.json and
+        // birth-writes the importer as sole owner, so shipping it would be a pure
+        // leak. (The members.json.lock sidecar is not .json — already skipped.)
         $configDir = $projectPath . '/config';
         if (is_dir($configDir)) {
-            addJsonFilesOnly($zip, $configDir, $projectName . '/config', $stats);
+            addJsonFilesOnly($zip, $configDir, $projectName . '/config', $stats, ['members.json']);
         }
         
         // 4. Export templates/model/json/ (JSON structures only - no PHP!)
@@ -281,19 +308,23 @@ function exportRoutesAsJson(ZipArchive $zip, string $projectPath, string $projec
 }
 
 /**
- * Add only JSON files from a directory (no PHP)
+ * Add only JSON files from a directory (no PHP). $excludeNames = basenames to
+ * skip at THIS level (C8 8.4: members.json is excluded from the config export).
  */
-function addJsonFilesOnly(ZipArchive $zip, string $dir, string $zipBase, array &$stats): void {
+function addJsonFilesOnly(ZipArchive $zip, string $dir, string $zipBase, array &$stats, array $excludeNames = []): void {
     $items = scandir($dir);
-    
+
     foreach ($items as $item) {
         if ($item === '.' || $item === '..') {
             continue;
         }
-        
+        if (in_array($item, $excludeNames, true)) {
+            continue;
+        }
+
         $path = $dir . '/' . $item;
         $zipPath = $zipBase . '/' . $item;
-        
+
         if (is_dir($path)) {
             $zip->addEmptyDir($zipPath);
             $stats['directories']++;
