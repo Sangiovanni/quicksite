@@ -141,9 +141,19 @@ class AdminRouter {
             return false;
         }
         // Store-backed check (catches a family revoked elsewhere, e.g. reuse
-        // detection or a management-API logout of the same session).
+        // detection or a management-API logout of the same session) AND the
+        // user-level check (L10 disabled, vanished account).
+        //
+        // C8 8.2 / F-C8-8.2-1: this used to call qs_session_validate_access,
+        // which only inspects token/family/expiry and never resolves the user —
+        // so a DISABLED account kept rendering every page absent from
+        // PAGE_PERMISSIONS (dashboard, command, memberships) until its access
+        // token expired, even though the management API, the login gate and the
+        // refresh boundary all refused it. validateBearerToken is the single
+        // path that already does both checks (it is what getTokenRole uses), so
+        // routing through it keeps ONE status-check implementation.
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
-        if (!qs_session_validate_access($access)['valid']) {
+        if (!validateBearerToken('Bearer ' . $access)['valid']) {
             $this->clearSessionAuth();
             return false;
         }

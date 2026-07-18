@@ -263,11 +263,13 @@ return [
     ],
 
     // Authenticated self-service on the caller's OWN account (C8). Unlike
-    // auth.session these DO require a bearer; any authenticated user.
+    // auth.session these DO require a bearer; any authenticated user. Both
+    // commands re-verify the current password before acting — 'any' authorizes
+    // WHOSE account may be touched (only your own), not how cheaply (C8 8.2).
     'account.self' => [
         'scope' => 'global',
         'access' => 'any',
-        'commands' => ['changePassword'],
+        'commands' => ['changePassword', 'deleteMyAccount'],
     ],
 
     // Exact PUBLIC-name lookup (C8 8.3a) — the "invite someone" primitive:

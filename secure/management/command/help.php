@@ -2323,6 +2323,49 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Global-scoped (no project marker) - acts only on the caller\'s own account. Wrong current-password attempts share the login throttle for the same account (keyed on its username), so a stolen access token cannot brute-force the password. After a successful change, other devices/sessions must log in again with the new password.'
     ],
 
+    'deleteMyAccount' => [
+        'description' => 'Permanently deletes the AUTHENTICATED caller\'s own account. There is no admin lane: QuickSite has no global tier (every authority is per-project), so no principal can delete someone else\'s account - per-project eviction is removeMember, and operator-level removal is a users.php edit. Requires the current password plus an explicit confirm. REFUSED while the caller solely owns any project.',
+        'method' => 'POST',
+        'parameters' => [
+            'current_password' => [
+                'required' => true,
+                'type' => 'string',
+                'ui_type' => 'password',
+                'description' => 'The account\'s current password (a stolen access token alone must not be able to erase an account)',
+                'example' => '************'
+            ],
+            'confirm' => [
+                'required' => true,
+                'type' => 'boolean',
+                'description' => 'Must be true - this is irreversible',
+                'example' => true
+            ]
+        ],
+        'example_post' => 'POST /management/deleteMyAccount with body: {"current_password": "************", "confirm": true}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'resource.deleted',
+            'message' => 'Your account has been permanently deleted',
+            'data' => [
+                'deleted' => true,
+                'memberships_removed' => 2,
+                'invitations_removed' => 1,
+                'sessions_revoked' => 3
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'current_password is required',
+            '400.validation.confirmation_required' => 'Set confirm=true to proceed (data.warning describes the consequences)',
+            '400.auth.externally_managed' => 'This account has no local password (password_hash is null - its embedding platform owns its lifecycle)',
+            '401.auth.invalid_credentials' => 'Current password is incorrect (counts toward the login throttle)',
+            '409.account.sole_owner' => 'You still solely own one or more projects - data.owned_projects lists them; transfer or delete each first',
+            '429.auth.throttled' => 'Too many failed attempts - retry_after gives the wait in seconds',
+            '500.members.integrity' => 'A project membership file could not be updated - the account was NOT deleted and nothing changed',
+            '500.server.file_write_failed' => 'Memberships were removed but the account record could not be deleted - retry'
+        ],
+        'notes' => 'Global-scoped (no project marker). Sole ownership is refused rather than cascaded: deleting a project\'s only owner leaves it unownable AND undeletable (transferOwnership requires the caller to be the owner, and project.delete is owner-only), and cascading would hide N site deletions behind one call. What is removed: the users.php record (with its status-mirror cache), every members.json entry keyed by the caller\'s user id (membership, invitation received, own join request, proposal filed about them), and every session family. What is KEPT: `by`/`sponsor` references to the caller inside entries about OTHER people (removing those would destroy a third party\'s pending invitation) - they render as {user_id, name:null}, and the shipped accept/approve-time re-validation voids anything that depended on the caller\'s standing. Command history keeps its publisher record (immutable audit; the display name was already snapshotted at write time).'
+    ],
+
     'listComponents' => [
         'description' => 'Lists all reusable JSON components with metadata. Shows available slots (placeholders), typed variables, and component dependencies.',
         'method' => 'GET',

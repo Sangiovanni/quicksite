@@ -176,7 +176,7 @@ function getCommandCategories(): array {
         'auth_session' => [
             'label' => 'Authentication / Session',
             'icon' => 'key',
-            'commands' => ['login', 'refreshSession', 'logoutSession', 'register', 'changePassword']
+            'commands' => ['login', 'refreshSession', 'logoutSession', 'register', 'changePassword', 'deleteMyAccount']
         ],
         'js_functions' => [
             'label' => 'JavaScript Functions / Interactions',
