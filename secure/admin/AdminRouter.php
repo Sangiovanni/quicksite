@@ -430,6 +430,32 @@ class AdminRouter {
     }
 
     /**
+     * The URL base at which the EDITED project's own `public/` is served (C8 8.1).
+     *
+     * The site ROOT when the edited project IS the served main (its public/ is the base
+     * live public/), otherwise its surface-B view `/p/<id>` — every non-served project
+     * is served live from its own folder and its assets are NOT at the root. Returned
+     * WITHOUT a trailing slash so callers append '/assets/...' like they do with baseUrl.
+     *
+     * This is the one place that answers "where do this project's public files live, as
+     * a URL?". The preview page computed the same thing as `previewBase`, but only
+     * there — which is why /admin/assets rendered every thumbnail against the root and
+     * showed the SERVED project's assets (or a broken image) while editing another
+     * project. Exposed to every admin page as QUICKSITE_CONFIG.projectContentBase.
+     *
+     * @return string e.g. 'http://host' or 'http://host/p/test'
+     */
+    public function getProjectContentBase(): string {
+        $base    = rtrim(BASE_URL, '/');
+        $project = $this->getCurrentProject();
+        $served  = $this->getServedProject();
+        if ($project === null || $project === '' || $project === $served) {
+            return $base;
+        }
+        return $base . '/p/' . rawurlencode($project);
+    }
+
+    /**
      * Pages that require at least one specific command in the token's role.
      * A role must hold at least one listed command (owner/admin do, via their
      * expanded categories). Pages not listed here are open to all authenticated users.

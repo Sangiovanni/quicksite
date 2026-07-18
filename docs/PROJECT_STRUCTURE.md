@@ -87,7 +87,7 @@ quicksite/
 - **`public/management/`** is the API gateway. Any client (admin panel, curl, Flutter app, custom UI) talks to QuickSite through this endpoint.
 - **`public/scripts/`** contains the core JS runtime. `qs.js` handles front-end features like show/hide triggers, sorting, and dynamic behavior.
 - **`secure/management/config/`** holds sensitive files (tokens, auth) that are gitignored. They are auto-created from `.example` templates on first load.
-- **Projects** are fully isolated in `secure/projects/`. Each has its own pages, translations, routes, and assets. Switch between them with `switchProject`.
+- **Projects** are fully isolated in `secure/projects/`. Each has its own pages, translations, routes, and assets. Change which one you are *editing* with `setSelectedProject` (the admin header picker); change which one is *served at the site root* with `switchProject` (owner-only).
 
 ## Folder customization
 

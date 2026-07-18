@@ -1,56 +1,81 @@
 <?php
 /**
  * switchProject Command
- * 
- * Changes the active project by updating target.php.
- * Also copies the project's public files to the live public/ directory.
- * Can be called via API or internally from admin panel.
- * 
+ *
+ * Sets the globally SERVED main project — the one deployment served at the site
+ * ROOT (BASE_URL/). It writes `secure/management/config/target.php`, the served-main
+ * pointer, and materializes that project's static surface into the base live
+ * public/ so the root deployment serves the right assets.
+ *
+ * NOT the per-user editing target: that is `setSelectedProject` (which is what the
+ * admin header picker and the dashboard call). Under the C9 fixed-main model every
+ * NON-served project is edited + previewed live at `/p/<id>/` from its own folder,
+ * with no copy anywhere; only the ROOT deployment needs materialized files, because
+ * the webserver serves `/assets/…`, `/style/…`, `/build/…` and `sitemap.txt`
+ * straight from the webroot while pages live-render from PROJECT_PATH.
+ *
+ * C8 8.1 — AUTHORIZATION (fixes a proven privilege escalation). This command used to
+ * sit in the GLOBAL `system.admin` category with access 'owner', which hasPermission
+ * resolves as "owns AT LEAST ONE project ANYWHERE" — never "owns the project you are
+ * promoting". Since createProject is access 'any', ANY authenticated account could
+ * mint that ownership in one call and then repoint the world-facing root at a project
+ * it had no membership on — publishing a private project and bypassing the owner-only
+ * setProjectVisibility. It is now PROJECT-SCOPED (`project.serve`, owner-only): the
+ * target is the URL marker the dispatcher already authorized, so only an OWNER of
+ * project X may make X the served main.
+ *
  * @method POST
- * @route /management/switchProject
- * @auth required (admin permission)
- * 
- * @param string $project Project name to switch to (required)
- * @param bool $copy_public Whether to copy project's public files to live public/ (default: true)
- * 
+ * @route /management/p/<projectId>/switchProject
+ * @auth required (project.serve — owner)
+ *
+ * @param string $project Optional advisory echo of the target; if present it MUST
+ *                        match the URL marker (else 400 project.mismatch).
+ *
  * @return ApiResponse Switch result
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
- * 
+ *
  * @param array $params Body parameters
  * @param array $urlParams URL segments (unused)
  * @return ApiResponse
  */
 function __command_switchProject(array $params = [], array $urlParams = []): ApiResponse {
-    // Validate project parameter
-    $projectName = trim($params['project'] ?? '');
-    
-    if (empty($projectName)) {
-        return ApiResponse::create(400, 'validation.missing_field')
-            ->withMessage('Project name is required')
-            ->withErrors(['project' => 'Required field']);
+    // C8 8.1 CONTAINMENT (confused-deputy / F6), the deleteProject idiom: the served
+    // main is BOUND to the URL marker (PROJECT_NAME, authorized by the dispatcher —
+    // project.serve, OWNER-only — before this runs). A body `project` that disagrees
+    // is refused; body is optional (advisory). You cannot promote a project you did
+    // not target/authorize.
+    $markerProject = defined('PROJECT_NAME') ? (string)PROJECT_NAME : '';
+    if ($markerProject === '') {
+        return ApiResponse::create(400, 'project.required')
+            ->withMessage('This command is project-scoped. Target a project with /management/p/<projectId>/switchProject');
     }
-    
-    // Validate project name format (alphanumeric, dashes, underscores)
-    if (!preg_match('/^[a-zA-Z0-9_-]+$/', $projectName)) {
+    $bodyProject = trim((string)($params['project'] ?? ''));
+    if ($bodyProject !== '' && $bodyProject !== $markerProject) {
+        return ApiResponse::create(400, 'project.mismatch')
+            ->withMessage('The body project does not match the targeted project')
+            ->withErrors([
+                'project' => "Targeted '{$markerProject}' but body named '{$bodyProject}'",
+            ]);
+    }
+    $projectName = $markerProject;
+
+    // F1 — the shared validator (was a looser local regex that allowed a leading
+    // digit/dash and unbounded length). Runs BEFORE any path is built from the name.
+    if (!is_valid_project_name($projectName)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid project name format')
-            ->withErrors(['project' => 'Only alphanumeric characters, dashes, and underscores allowed']);
+            ->withErrors(['project' => 'Must start with a letter, contain only alphanumeric/dash/underscore, max 50 chars']);
     }
-    
-    $copyPublic = $params['copy_public'] ?? true;
-    if (is_string($copyPublic)) {
-        $copyPublic = filter_var($copyPublic, FILTER_VALIDATE_BOOLEAN);
-    }
-    
-    // Check project exists
+
     $projectPath = SECURE_FOLDER_PATH . '/projects/' . $projectName;
-    
+
     if (!is_dir($projectPath)) {
         return ApiResponse::create(404, 'resource.not_found')
             ->withMessage("Project '$projectName' not found")
@@ -59,64 +84,49 @@ function __command_switchProject(array $params = [], array $urlParams = []): Api
                 'expected_path' => 'secure/projects/' . $projectName
             ]);
     }
-    
-    // Check project has required files
+
+    // A project missing its engine files would break the ROOT site for everyone.
     $requiredFiles = [
         'config.php' => $projectPath . '/config.php',
         'routes.php' => $projectPath . '/routes.php'
     ];
-    
+
     $missingFiles = [];
     foreach ($requiredFiles as $name => $path) {
         if (!file_exists($path)) {
             $missingFiles[] = $name;
         }
     }
-    
+
     if (!empty($missingFiles)) {
         return ApiResponse::create(400, 'validation.incomplete_project')
             ->withMessage("Project '$projectName' is missing required files")
             ->withErrors(['missing_files' => $missingFiles]);
     }
-    
-    // Get current project before switch
+
+    // Current served main (target.php)
     $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-    $previousProject = null;
-    if (file_exists($targetFile)) {
-        $currentConfig = include $targetFile;
-        $previousProject = $currentConfig['project'] ?? null;
-    }
-    
-    // Check if already active
+    $previousProject = qs_served_project();
+
     if ($previousProject === $projectName) {
         return ApiResponse::create(200, 'operation.no_change')
-            ->withMessage("Project '$projectName' is already active")
+            ->withMessage("Project '$projectName' is already the served main")
             ->withData([
                 'project' => $projectName,
                 'was_already_active' => true
             ]);
     }
-    
-    // CRITICAL: Sync live public files BACK to previous project before switching
-    // This preserves any CSS/asset edits made while that project was active
-    $previousProjectSynced = false;
-    if ($previousProject !== null) {
-        $previousProjectPath = SECURE_FOLDER_PATH . '/projects/' . $previousProject;
-        if (is_dir($previousProjectPath)) {
-            $previousProjectSynced = syncLiveToProject($previousProjectPath);
-        }
-    }
-    
-    // Write new target.php with explicit sync to ensure file is fully written before response
+
+    // Write the served-main pointer with explicit sync so the file is fully written
+    // before the response (a half-written target.php would break the root site).
     $targetContent = "<?php\n/**\n * Active Project Target Configuration\n * \n * Updated: " . date('Y-m-d H:i:s') . "\n */\n\nreturn [\n    'project' => '" . addslashes($projectName) . "'\n];\n";
-    
-    // Use fopen/fwrite/fflush for explicit sync instead of file_put_contents
+
     $handle = fopen($targetFile, 'w');
     if ($handle === false) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage('Failed to open target configuration for writing');
     }
-    
+
     if (flock($handle, LOCK_EX)) {
         $bytesWritten = fwrite($handle, $targetContent);
         fflush($handle);  // Flush PHP buffers to OS
@@ -127,99 +137,90 @@ function __command_switchProject(array $params = [], array $urlParams = []): Api
             ->withMessage('Failed to acquire lock on target configuration');
     }
     fclose($handle);
-    
-    // Verify write succeeded by checking bytes written
+
     if ($bytesWritten !== strlen($targetContent)) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage('Target configuration write incomplete');
     }
-    
+
     // Clear caches to ensure fresh read on next request
     clearstatcache(true, $targetFile);
     if (function_exists('opcache_invalidate')) {
         opcache_invalidate($targetFile, true);
     }
-    
+
     $result = [
         'project' => $projectName,
         'previous_project' => $previousProject,
-        'previous_project_synced' => $previousProjectSynced,
         'target_updated' => true,
-        'public_files_copied' => false,
-        'custom_js_regenerated' => false
     ];
-    
-    // Copy public files if requested
-    if ($copyPublic) {
-        $projectPublicPath = $projectPath . '/public';
-        
-        if (is_dir($projectPublicPath)) {
-            $copyResult = copyProjectPublicFiles($projectPublicPath, PUBLIC_CONTENT_PATH);
-            $result['public_files_copied'] = $copyResult['success'];
-            $result['public_copy_details'] = $copyResult;
-        } else {
-            $result['public_files_copied'] = false;
-            $result['public_copy_details'] = [
-                'success' => false,
-                'reason' => 'Project has no public/ folder'
-            ];
-        }
-    }
-    
-    // Regenerate qs-api-config.js with project's API configurations
-    require_once SECURE_FOLDER_PATH . '/src/classes/ApiEndpointManager.php';
-    $apiManager = new ApiEndpointManager($projectPath);
-    $apiConfigPath = PUBLIC_CONTENT_PATH . '/scripts/qs-api-config.js';
-    $apiConfigWritten = $apiManager->writeCompiledJs($apiConfigPath);
-    $result['api_config_regenerated'] = $apiConfigWritten;
 
-    // Regenerate qs-enums.js for the NEW project's components +
-    // bindings. The previous project's registry would be stale (it
-    // referenced components that may not exist here, or values that
-    // changed). Sync rebuilds from scratch against the now-active
-    // project's files.
-    require_once SECURE_FOLDER_PATH . '/src/classes/EnumSyncHelper.php';
-    $enumSync = EnumSyncHelper::sync($projectPath);
-    $result['enum_registry_regenerated'] = $enumSync['written'] ?? false;
-    $result['enum_registry_count']       = $enumSync['count']   ?? 0;
-    if (!empty($enumSync['warnings'])) {
-        $result['enum_registry_warnings'] = $enumSync['warnings'];
-    }
+    // ---- materialize the new main's static surface into the BASE live public/ ----
+    // The base is derived from PUBLIC_FOLDER_ROOT, NOT from PUBLIC_CONTENT_PATH: the
+    // management dispatcher pre-points PUBLIC_CONTENT_PATH at the TARGETED project's
+    // own public/ (it was not the served main when the request arrived), so using it
+    // here would copy the project onto itself and leave the root untouched.
+    $baseLivePublic = PUBLIC_FOLDER_SPACE !== ''
+        ? PUBLIC_FOLDER_ROOT . '/' . PUBLIC_FOLDER_SPACE
+        : PUBLIC_FOLDER_ROOT;
 
-    // Regenerate qs-route-schema.js with the new project's routes
-    // structure (beta.8 A1 Build Slice 1). Without this, qs.js's
-    // client-side path matcher would route URLs against the previous
-    // project's routes — same staleness class as qs-api-config.js
-    // and qs-enums.js. Loads the new project's routes.php directly
-    // (the ROUTES constant in scope here still points at the
-    // previous project's load).
-    require_once SECURE_FOLDER_PATH . '/src/functions/routeHelpers.php';
-    $projectRoutesFile = $projectPath . '/routes.php';
-    if (file_exists($projectRoutesFile)) {
-        $projectRoutes = require $projectRoutesFile;
-        if (is_array($projectRoutes)) {
-            $routesMetaPath = PUBLIC_CONTENT_PATH . '/scripts/qs-route-schema.js';
-            $result['routes_meta_regenerated'] = writeRoutesMetaFile($projectRoutes, $routesMetaPath);
-            $result['routes_meta_count']       = count($projectRoutes);
-        } else {
-            $result['routes_meta_regenerated'] = false;
-            $result['routes_meta_warning']     = 'routes.php returned a non-array';
-        }
+    $projectPublicPath = $projectPath . '/public';
+    if (is_dir($projectPublicPath)) {
+        $copyResult = copyProjectPublicFiles($projectPublicPath, $baseLivePublic);
+        $result['public_files_copied'] = $copyResult['success'];
+        $result['public_copy_details'] = $copyResult;
     } else {
-        $result['routes_meta_regenerated'] = false;
-        $result['routes_meta_warning']     = 'routes.php missing in project';
+        $result['public_files_copied'] = false;
+        $result['public_copy_details'] = [
+            'success' => false,
+            'reason' => 'Project has no public/ folder'
+        ];
     }
+
+    // Regenerate the three generated client artifacts for the NEW main. The previous
+    // project's registry/config/route-schema would be stale (they describe components,
+    // endpoints and routes that may not exist here). Built via the C9 helper into the
+    // project's OWN public/scripts (idempotent, the single generation path), then
+    // copied into the base — the base scripts/ dir also holds the shipped engine
+    // (qs.js), so it is never folder-synced, only these three files are placed.
+    $regen = qs_regenerate_project_scripts($projectPath, $projectName);
+    $result['scripts_regenerated'] = [
+        'api_config'   => $regen['api'],
+        'enums'        => $regen['enums'],
+        'route_schema' => $regen['routes'],
+    ];
+
+    $baseScriptsDir = $baseLivePublic . '/scripts';
+    if (!is_dir($baseScriptsDir)) {
+        @mkdir($baseScriptsDir, 0755, true);
+    }
+    $placed = [];
+    foreach (['qs-api-config.js', 'qs-enums.js', 'qs-route-schema.js'] as $generated) {
+        $src = $regen['scriptsDir'] . '/' . $generated;
+        if (is_file($src) && @copy($src, $baseScriptsDir . '/' . $generated)) {
+            $placed[] = $generated;
+        }
+    }
+    $result['scripts_placed_in_base'] = $placed;
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage("Switched to project '$projectName'")
+        ->withMessage("Served main switched to project '$projectName'")
         ->withData($result);
 }
 
 /**
- * Copy project's public files to live public directory
- * 
+ * Copy a project's public files to the BASE live public directory (the root
+ * deployment's served surface).
+ *
+ * Note: this only ever writes INTO the base live public/. C8 8.1 removed the former
+ * reverse "sync live → previous project" step, which recursively DELETED and rebuilt
+ * folders inside another project's directory on every switch. Each project's own
+ * public/ is authoritative (C9), and the write-time mirrors in uploadAsset /
+ * deleteAsset / editStyles keep it that way, so nothing has to be rescued at switch
+ * time any more.
+ *
  * @param string $source Project's public folder
- * @param string $destination Live public folder
+ * @param string $destination Base live public folder
  * @return array Result with success status and details
  */
 function copyProjectPublicFiles(string $source, string $destination): array {
@@ -228,26 +229,26 @@ function copyProjectPublicFiles(string $source, string $destination): array {
         'copied' => [],
         'errors' => []
     ];
-    
+
     // Folders to replace (clean destination first, then copy fresh from project)
     $foldersToSync = ['assets', 'style', 'build'];
-    
+
     foreach ($foldersToSync as $folder) {
         $srcFolder = $source . '/' . $folder;
         $destFolder = $destination . '/' . $folder;
-        
+
         if (!is_dir($srcFolder)) {
             continue;
         }
-        
+
         // Clean destination first to avoid stale files from previous project
         if (is_dir($destFolder)) {
             deleteDirectoryRecursive($destFolder);
         }
-        
+
         // Copy folder contents recursively
         $copySuccess = copyDirectoryContents($srcFolder, $destFolder);
-        
+
         if ($copySuccess) {
             $result['copied'][] = $folder;
         } else {
@@ -255,7 +256,7 @@ function copyProjectPublicFiles(string $source, string $destination): array {
             $result['success'] = false;
         }
     }
-    
+
     // Copy individual files (sitemap.txt)
     $filesToCopy = ['sitemap.txt'];
     foreach ($filesToCopy as $file) {
@@ -273,7 +274,13 @@ function copyProjectPublicFiles(string $source, string $destination): array {
         }
     }
 
-    // Copy .htaccess if exists
+    // Copy .htaccess if exists.
+    // NOTE (C8 8.1, deliberately KEPT): this installs a project-authored .htaccess at
+    // the webroot, while importProject refuses .htaccess entries as dangerous — an
+    // inconsistency. Removing it was proposed and DEFERRED by Sangio: QuickSite must
+    // stay deployable on Apache AND nginx (nginx never reads .htaccess), so the root
+    // rewrite story needs a deliberate server-agnostic design pass rather than a
+    // drive-by cut here. Tracked as an open question for the deploy concern.
     $htaccessSrc = $source . '/.htaccess';
     if (file_exists($htaccessSrc)) {
         $destHtaccess = $destination . '/.htaccess';
@@ -298,7 +305,7 @@ function copyProjectPublicFiles(string $source, string $destination): array {
             }
         }
     }
-    
+
     return $result;
 }
 
@@ -309,15 +316,15 @@ function copyDirectoryContents(string $source, string $destination): bool {
     if (!is_dir($destination)) {
         mkdir($destination, 0755, true);
     }
-    
+
     $iterator = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($source, RecursiveDirectoryIterator::SKIP_DOTS),
         RecursiveIteratorIterator::SELF_FIRST
     );
-    
+
     foreach ($iterator as $item) {
         $destPath = $destination . '/' . $iterator->getSubPathname();
-        
+
         if ($item->isDir()) {
             if (!is_dir($destPath)) {
                 mkdir($destPath, 0755, true);
@@ -332,58 +339,8 @@ function copyDirectoryContents(string $source, string $destination): bool {
             }
         }
     }
-    
+
     return true;
-}
-
-/**
- * Sync live public files back to project folder
- * Preserves CSS/asset edits made while project was active
- * 
- * @param string $projectPath Project folder path
- * @return bool Success status
- */
-function syncLiveToProject(string $projectPath): bool {
-    $livePublicPath = PUBLIC_CONTENT_PATH;
-    $projectPublicPath = $projectPath . '/public';
-    
-    // Ensure project public folder exists
-    if (!is_dir($projectPublicPath)) {
-        mkdir($projectPublicPath, 0755, true);
-    }
-    
-    // Folders to sync from live → project
-    $foldersToSync = ['assets', 'style'];
-    $success = true;
-    
-    foreach ($foldersToSync as $folder) {
-        $src = $livePublicPath . '/' . $folder;
-        $dst = $projectPublicPath . '/' . $folder;
-        
-        if (!is_dir($src)) {
-            continue;
-        }
-        
-        // Delete existing destination and copy fresh from live
-        if (is_dir($dst)) {
-            deleteDirectoryRecursive($dst);
-        }
-        
-        if (!copyDirectoryContents($src, $dst)) {
-            $success = false;
-        }
-    }
-
-    // Sync individual files (sitemap.txt)
-    $filesToSync = ['sitemap.txt'];
-    foreach ($filesToSync as $file) {
-        $src = $livePublicPath . '/' . $file;
-        if (file_exists($src)) {
-            copy($src, $projectPublicPath . '/' . $file);
-        }
-    }
-    
-    return $success;
 }
 
 /**
@@ -393,12 +350,12 @@ function deleteDirectoryRecursive(string $dir): bool {
     if (!is_dir($dir)) {
         return true;
     }
-    
+
     $iterator = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
         RecursiveIteratorIterator::CHILD_FIRST
     );
-    
+
     foreach ($iterator as $file) {
         if ($file->isDir()) {
             rmdir($file->getRealPath());
@@ -406,7 +363,7 @@ function deleteDirectoryRecursive(string $dir): bool {
             unlink($file->getRealPath());
         }
     }
-    
+
     return rmdir($dir);
 }
 

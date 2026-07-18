@@ -206,7 +206,44 @@ if (!defined('QS_DEFER_PROJECT_CONTEXT') && !defined('PROJECT_PATH')) {
     if (file_exists($targetConfigPath)) {
         $targetConfig = require $targetConfigPath;
         $projectName = $targetConfig['project'] ?? 'quicksite';
-        qs_load_project_context($projectName);
+
+        // C8 8.1 — "no served main" is a LEGITIMATE, RECOVERABLE state, not a broken
+        // install. deleteProject clears the pointer when the served project is removed
+        // (it never auto-promotes a project the operator did not choose), and a
+        // hand-edited target.php can name a project that no longer exists. Dying here
+        // used to take down the site AND the admin panel with a 500 that also printed
+        // an absolute server path — leaving recovery possible only by hand-crafted API
+        // call. Degrade instead:
+        //   - the ADMIN PANEL boots on an empty project context (it declares
+        //     QS_TOLERATE_NO_SERVED_PROJECT), so an owner can log in and choose a new
+        //     main with switchProject;
+        //   - the PUBLIC root answers a clean 503 that leaks no filesystem detail.
+        // A MISSING target.php is still a hard installation error (see below) — that
+        // one really is a broken install.
+        $servedProjectUsable = $projectName !== ''
+            && file_exists(SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'projects'
+                . DIRECTORY_SEPARATOR . $projectName . DIRECTORY_SEPARATOR . 'config.php');
+
+        if ($servedProjectUsable) {
+            qs_load_project_context($projectName);
+        } elseif (defined('QS_TOLERATE_NO_SERVED_PROJECT')) {
+            qs_load_project_context($projectName, false); // empty context — panel boots
+        } else {
+            http_response_code(503);
+            header('Retry-After: 3600');
+            die(
+                "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">"
+                . "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+                . "<title>No site published</title>"
+                . "<style>body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;"
+                . "max-width:34rem;margin:15vh auto;padding:0 1.5rem;line-height:1.6;color:#333}"
+                . "h1{font-size:1.5rem;margin:0 0 .5rem}p{margin:.5rem 0;color:#555}</style>"
+                . "</head><body><h1>No site is published yet</h1>"
+                . "<p>This installation does not currently serve a main project.</p>"
+                . "<p>An administrator can publish one from the admin panel.</p>"
+                . "</body></html>"
+            );
+        }
     } else {
         // target.php is required for multi-project architecture
         http_response_code(500);

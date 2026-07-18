@@ -380,9 +380,11 @@ $langNames = [
         
         <div class="admin-header__actions">
             <?php
-            // C9 UNIFIED — ACTIVE-project picker: the ONE project served + edited + previewed
-            // (= getCurrentProject = target.php). Changing it calls switchProject (the SAME
-            // command the dashboard uses) so the whole panel + the served site move together.
+            // EDITED-project picker: which project this user is authoring right now
+            // (= getCurrentProject = their per-user selected_project). Changing it calls
+            // setSelectedProject — see the handler at the bottom of this file — NOT
+            // switchProject, which is the owner-only, project-scoped command that repoints
+            // the globally SERVED main (target.php) and is not wired to any panel control.
             // Single-project users see a plain badge; multi-project users get the dropdown.
             $editingProject = $currentProject;
             ?>
@@ -528,6 +530,12 @@ $langNames = [
             apiBase: '<?= $router->getApiUrl() ?>',
             adminBase: '<?= $router->getBaseUrl() ?>',
             baseUrl: '<?= rtrim(BASE_URL, '/') ?>',
+            // C8 8.1 — where the EDITED project's own public/ is served: the site root
+            // when it IS the served main, else its surface-B view '/p/<id>'. Any panel
+            // code that links to PROJECT content (assets, style, uploads) must build on
+            // THIS, not baseUrl — baseUrl always points at the served main, so it shows
+            // the wrong project's files (or a broken image) while editing another one.
+            projectContentBase: '<?= adminEscape($router->getProjectContentBase()) ?>',
             publicSpace: '<?= defined('PUBLIC_FOLDER_SPACE') ? PUBLIC_FOLDER_SPACE : '' ?>',
             // C5b — the SHORT-LIVED access token + its remaining lifetime MUST be
             // in the config from creation: api.js seeds its in-memory token and

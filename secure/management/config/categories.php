@@ -203,6 +203,19 @@ return [
         'commands' => ['setProjectVisibility'],
     ],
 
+    // Owner-only "make THIS project the served main" (C8 8.1). switchProject rewrites
+    // target.php, the served-main pointer, publishing the project at the site ROOT.
+    // It used to live in the GLOBAL system.admin category, whose access 'owner' means
+    // "owns any project anywhere" — so any account could createProject (access 'any')
+    // and then promote a project it had NO membership on, publishing a private project
+    // and bypassing owner-only project.visibility (proven escalation, C8 §8 F-C8-8.1-1).
+    // Project-scoped + owner-only makes the gate "owner of the project you promote",
+    // enforced by the dispatcher against the URL marker.
+    'project.serve' => [
+        'scope' => 'project',
+        'commands' => ['switchProject'],
+    ],
+
     // Reduced roster for EVERY member rank (C8 8.3c): active members only —
     // {user_id, name, role} rows, NO pending queue (adjudication data stays
     // admin+ via project.members/listMembers). Exists so any member can see
@@ -322,15 +335,18 @@ return [
     ],
 
     // INTERIM owner-only home for the operator commands pending relocation:
-    //   applyUpdate + switchProject (set served project) → operator/deploy in beta.11
-    //   (AUTH_REWORK §2.3 GAP A). Until then, only a project owner may run these.
+    //   applyUpdate → operator/deploy in beta.11 (AUTH_REWORK §2.3 GAP A). Until then,
+    //   only a project owner may run it.
     //   (The generateToken/listTokens/revokeToken trio was REMOVED in C5b —
     //   sessions via login/refreshSession replace lifetime tokens.)
+    //   switchProject LEFT this category in C8 8.1 — "owns any project anywhere" is
+    //   the wrong gate for repointing the served main; it is now project-scoped
+    //   owner-only under project.serve.
     'system.admin' => [
         'scope' => 'global',
         'access' => 'owner',
         'commands' => [
-            'applyUpdate', 'switchProject',
+            'applyUpdate',
         ],
     ],
 

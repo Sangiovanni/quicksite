@@ -91,17 +91,48 @@ function qs_write_public_artifact(string $relPath, string $content): bool {
 
 /**
  * Copy a source file to every artifact target for $relPath (binary-safe; assets/favicon).
+ *
+ * A target identical to the source is SKIPPED, not copied onto itself: the common
+ * caller writes the file to PUBLIC_CONTENT_PATH first and then mirrors it, and for a
+ * NON-served project PUBLIC_CONTENT_PATH already IS the project's own public/ — so
+ * source and target coincide. copy() onto itself is a truncation risk, never useful.
  */
 function qs_copy_public_artifact(string $sourceFile, string $relPath): bool {
     if (!is_file($sourceFile)) return false;
+    $sourceReal = realpath($sourceFile);
     $ok = true;
     foreach (qs_public_artifact_targets($relPath) as $target) {
+        $targetReal = realpath($target);
+        if ($targetReal !== false && $sourceReal !== false && $targetReal === $sourceReal) {
+            continue; // already the file we were asked to mirror
+        }
         $dir = dirname($target);
         if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
             $ok = false;
             continue;
         }
         if (!@copy($sourceFile, $target)) {
+            $ok = false;
+        }
+    }
+    return $ok;
+}
+
+/**
+ * Delete an artifact from every target for $relPath — the mirror-aware counterpart of
+ * qs_copy_public_artifact (C8 8.1). Without this, deleting an asset while editing the
+ * SERVED project removes it from the base live public/ but leaves the copy in the
+ * project's own folder, which then resurrects on the next serve/switch.
+ *
+ * Tolerant by design: a target that does not exist is not a failure (the mirror may
+ * never have been written for a pre-8.1 asset).
+ *
+ * @return bool false only if a target exists and could not be unlinked.
+ */
+function qs_delete_public_artifact(string $relPath): bool {
+    $ok = true;
+    foreach (qs_public_artifact_targets($relPath) as $target) {
+        if (is_file($target) && !@unlink($target)) {
             $ok = false;
         }
     }

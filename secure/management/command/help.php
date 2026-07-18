@@ -3259,44 +3259,45 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'switchProject' => [
-        'description' => 'Switches the active project. Syncs live edits back to previous project before switching, then copies new project files to live folder.',
-        'method' => 'PATCH',
+        'description' => 'Makes the TARGETED project the globally served main — the one deployment served at the site root. Rewrites target.php (the served-main pointer) and materializes that project\'s static surface (assets, style, build, sitemap.txt) into the base live public folder, then regenerates the three client artifacts (qs-api-config.js, qs-enums.js, qs-route-schema.js) for it. Project-scoped and OWNER-ONLY: only an owner of project X may make X the served main. Distinct from setSelectedProject, which sets the CALLER\'s per-user editing target and is what the admin panel pickers use.',
+        'method' => 'POST',
+        'route' => '/management/p/<projectId>/switchProject',
         'parameters' => [
             'project' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Project name to switch to',
-                'example' => 'quicksite'
-            ],
-            'copy_public' => [
                 'required' => false,
-                'type' => 'boolean',
-                'description' => 'Copy project public files (assets, styles, build) to live public folder',
-                'default' => true
+                'type' => 'string',
+                'description' => 'Advisory echo of the target. The project promoted is ALWAYS the URL marker; if this is present it must match the marker, otherwise the request is refused with 400 project.mismatch.',
+                'example' => 'mysite'
             ]
         ],
-        'example_patch' => 'PATCH /management/switchProject with body: {"project": "mysite", "copy_public": true}',
+        'example_post' => 'POST /management/p/mysite/switchProject (no body needed)',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => "Switched to project 'mysite'",
+            'message' => "Served main switched to project 'mysite'",
             'data' => [
                 'project' => 'mysite',
                 'previous_project' => 'quicksite',
-                'previous_project_synced' => true,
                 'target_updated' => true,
                 'public_files_copied' => true,
-                'custom_js_regenerated' => true,
-                'custom_functions_count' => 0
+                'scripts_regenerated' => [
+                    'api_config' => true,
+                    'enums' => true,
+                    'route_schema' => true
+                ],
+                'scripts_placed_in_base' => ['qs-api-config.js', 'qs-enums.js', 'qs-route-schema.js']
             ]
         ],
         'error_responses' => [
-            '400.validation.missing_field' => 'Missing project parameter',
-            '400.validation.incomplete_project' => 'Project missing required files',
-            '200.operation.no_change' => 'Already on this project (returns success with was_already_active=true)',
+            '400.project.required' => 'No project marker — target one with /management/p/<projectId>/switchProject',
+            '400.project.mismatch' => 'The body project does not match the targeted (URL marker) project',
+            '400.validation.invalid_format' => 'Invalid project identifier',
+            '400.validation.incomplete_project' => 'Project missing required files (config.php / routes.php)',
+            '403.authz.insufficient_rank' => 'Not an owner of the targeted project',
+            '200.operation.no_change' => 'Already the served main (returns success with was_already_active=true)',
             '404.resource.not_found' => 'Project not found'
         ],
-        'notes' => 'IMPORTANT: Before switching, live CSS/assets are synced BACK to the previous project to prevent data loss. The website will immediately start serving the new project. Custom JS functions are regenerated for the new project.'
+        'notes' => 'The site root immediately starts serving the new project. Every OTHER project is served live from its own folder at /p/<projectId>/ and needs no switch. Switching no longer syncs the live public folder back into the previous project: each project\'s own public folder is authoritative, and asset/style writes mirror into it at write time.'
     ],
     
     'createProject' => [
@@ -6534,7 +6535,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'css_animations' => ['getKeyframes', 'setKeyframes', 'deleteKeyframes'],
                 'site_customization' => ['editFavicon', 'editTitle'],
                 'build_deployment' => ['build', 'listBuilds', 'getBuild', 'deleteBuild', 'cleanBuilds', 'deployBuild', 'downloadBuild'],
-                'project_management' => ['listProjects', 'getActiveProject', 'switchProject', 'createProject', 'deleteProject'],
+                'project_management' => ['listProjects', 'getActiveProject', 'setSelectedProject', 'switchProject', 'createProject', 'deleteProject'],
                 'member_management' => ['listMembers', 'getProjectRoster', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership', 'approveJoinRequest', 'denyJoinRequest', 'proposeMember', 'setJoinPolicy', 'setProjectVisibility', 'reconcileMemberships'],
                 'my_memberships' => ['findUser', 'listMyInvitations', 'listMyProposals', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice', 'requestToJoin', 'withdrawJoinRequest'],
                 'backup_restore' => ['backupProject', 'listBackups', 'restoreBackup', 'deleteBackup'],
@@ -6591,7 +6592,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'alias_workflow' => '1) listAliases to see existing redirects, 2) createAlias to add URL redirects, 3) deleteAlias to remove redirects.',
                 'component_workflow' => '1) listComponents to see available reusable components, 2) getComponent?name=... to view full details with preview, 3) editStructure with type="component" to create/update/delete.',
                 'sitemap_workflow' => '1) getSiteMap for JSON data with route details and coverage, 2) getSiteMap/text to generate plain text sitemap.txt for SEO crawlers.',
-                'project_workflow' => '1) listProjects to see all available projects, 2) getActiveProject to check current project, 3) createProject to start a new project, 4) switchProject to change active project, 5) deleteProject to remove (requires confirm=true).',
+                'project_workflow' => '1) listProjects to see the projects you are a member of, 2) setSelectedProject to change which one you EDIT (your per-user target; every non-served project is edited and previewed at /p/<projectId>/), 3) getActiveProject to check which project is served at the site root, 4) createProject to start a new one, 5) switchProject (project-scoped, OWNER-only) to make a project the globally served main, 6) deleteProject to remove (requires confirm=true).',
                 'membership_workflow' => '1) findUser to confirm the {user_id, name} pair by public display name, 2) inviteMember (admin/owner, by user_id) to offer a role, 3) the invitee sees it in listMyInvitations and answers with acceptInvitation or declineInvitation, 4) manage the roster with listMembers / changeMemberRole / removeMember (cancelInvitation to withdraw an offer), 5) transferOwnership (owner-only, member target, confirm=true) to rotate the top role, 6) leaveProject to exit yourself, dismissProjectNotice to clear a refused/removed/deleted notice.',
                 'join_request_workflow' => 'Front door (setJoinPolicy open): an outsider runs requestToJoin {project, note} (mandatory note, fixed viewer ask) and tracks it in listMyInvitations requests[]; admins/owner see it in listMembers (direction "request") and answer with approveJoinRequest (member immediately) or denyJoinRequest {note} (dismissable refused notice; re-request blocked until dismissed); withdrawJoinRequest retracts your own ask silently. Sponsor lane (any member, policy-independent): proposeMember {user_id, role, note} - the person learns NOTHING until approveJoinRequest converts it into a real invitation (by = approver, sponsored_by = you), which they accept/decline as usual; denyJoinRequest removes it silently on their side.',
                 'backup_workflow' => '1) backupProject to create instant backup, 2) listBackups to see available backups with size/age info, 3) restoreBackup to restore from backup (optional pre-restore backup), 4) deleteBackup to free disk space.',

@@ -563,6 +563,21 @@ if ($mimeType === 'image/svg+xml') {
 }
 
 // ============================================================
+// C9 D2 mirror (wired C8 8.1) — write the project folder too
+// ============================================================
+// The write above targets PUBLIC_CONTENT_PATH. For a NON-served project the
+// dispatcher already points that at the project's own public/ (no-op mirror,
+// skipped as self-copy); for the SERVED project it is the BASE live public/, and
+// without this the asset would exist ONLY there — the project's own folder, which
+// C9 made authoritative, would never receive it. That gap is what switchProject's
+// live→project back-sync used to paper over; 8.1 deletes the back-sync, so the
+// mirror has to happen at write time. Runs AFTER SVG sanitization so the mirrored
+// bytes are the sanitized ones. Advisory: a failed mirror does not fail the upload
+// (the authoritative copy is already written + verified).
+require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
+qs_copy_public_artifact($targetFile, 'assets/' . $category . '/' . $finalFilename);
+
+// ============================================================
 // Store Asset Metadata (via AssetMetadataManager)
 // ============================================================
 

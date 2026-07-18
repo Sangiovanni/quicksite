@@ -8,6 +8,10 @@
  * @version 1.6.0
  */
 
+// C8 8.1 — same tolerance as the panel entry: this AJAX helper backs admin pages, so
+// it must not 503 when no main project is served (see public/admin/index.php).
+define('QS_TOLERATE_NO_SERVED_PROJECT', true);
+
 require_once __DIR__ . '/../../init.php';
 require_once SECURE_FOLDER_PATH . '/admin/AdminRouter.php';
 require_once SECURE_FOLDER_PATH . '/admin/functions/AdminHelper.php';

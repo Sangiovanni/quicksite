@@ -118,8 +118,13 @@
     }
 
     function getAssetUrl(asset) {
-        // Build URL from category + filename
-        const base = window.QUICKSITE_CONFIG?.baseUrl?.replace(/\/management$/, '') || '';
+        // Build URL from category + filename against the EDITED project's own serving
+        // base (C8 8.1). baseUrl is the site ROOT, which serves the SERVED main — using
+        // it here showed the wrong project's asset, or nothing at all, whenever you were
+        // editing any other project. projectContentBase is the root for the served
+        // project and '/p/<id>' for every other one.
+        const cfg = window.QUICKSITE_CONFIG || {};
+        const base = (cfg.projectContentBase || cfg.baseUrl || '').replace(/\/management$/, '');
         return base + '/assets/' + asset.category + '/' + encodeURIComponent(asset.filename);
     }
 

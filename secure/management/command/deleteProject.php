@@ -130,23 +130,22 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
             ->withData(['path' => $projectPath]);
     }
     
-    // If this was the active project, we need to update target.php
-    $switchedTo = null;
+    // If this was the SERVED main, clear the pointer — never auto-promote.
+    //
+    // C8 8.1: this used to promote `reset($projects)` — the first project in scandir
+    // order — to the world-facing root, regardless of the deleter's membership on it
+    // and regardless of its `visibility`. That silently published a stranger's PRIVATE
+    // project, the same exposure class as the switchProject escalation fixed in this
+    // slice (and it bypassed setProjectVisibility just as thoroughly). Promotion is a
+    // deliberate, owner-authorized act: it belongs to switchProject
+    // (project.serve, owner-only) and nowhere else. Leaving the root unserved is the
+    // safe, honest state — the deployer picks the next main explicitly.
     if ($activeProject === $projectName) {
-        // Find another project to switch to
-        $projectsDir = SECURE_FOLDER_PATH . '/projects';
-        $projects = array_diff(scandir($projectsDir), ['.', '..']);
-        $projects = array_filter($projects, fn($p) => is_dir($projectsDir . '/' . $p));
-        
-        if (!empty($projects)) {
-            $newActive = reset($projects);
-            $targetContent = "<?php\n/**\n * Active Project Target Configuration\n * Updated: " . date('Y-m-d H:i:s') . "\n */\n\nreturn [\n    'project' => '" . addslashes($newActive) . "'\n];\n";
-            file_put_contents($targetFile, $targetContent, LOCK_EX);
-            $switchedTo = $newActive;
-        } else {
-            // No projects left - write empty/placeholder
-            $targetContent = "<?php\n/**\n * Active Project Target Configuration\n * Updated: " . date('Y-m-d H:i:s') . "\n * WARNING: No projects available\n */\n\nreturn [\n    'project' => ''\n];\n";
-            file_put_contents($targetFile, $targetContent, LOCK_EX);
+        $targetContent = "<?php\n/**\n * Active Project Target Configuration\n * Updated: " . date('Y-m-d H:i:s') . "\n * WARNING: the served project was deleted — no main is served.\n * Set one with POST /management/p/<projectId>/switchProject (owner only).\n */\n\nreturn [\n    'project' => ''\n];\n";
+        file_put_contents($targetFile, $targetContent, LOCK_EX);
+        clearstatcache(true, $targetFile);
+        if (function_exists('opcache_invalidate')) {
+            opcache_invalidate($targetFile, true);
         }
     }
     
@@ -216,11 +215,9 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
         'membership_cascade' => $cascade
     ];
     
-    if ($switchedTo !== null) {
-        $result['switched_to'] = $switchedTo;
-        $result['note'] = "Active project was deleted, switched to '$switchedTo'";
-    } elseif ($activeProject === $projectName) {
-        $result['warning'] = 'No remaining projects. Please create a new project.';
+    if ($activeProject === $projectName) {
+        $result['served_main_cleared'] = true;
+        $result['warning'] = 'The deleted project was the served main. No project is served at the site root until an owner sets one with switchProject.';
     }
     
     return ApiResponse::create(200, 'resource.deleted')
