@@ -1,0 +1,285 @@
+/**
+ * Members / My Memberships pages + nav badge + dashboard card (C8 8.3c).
+ * Leans on admin.css primitives (admin-card, admin-btn, admin-modal,
+ * admin-stat…); this file only adds the membership-specific pieces.
+ */
+
+/* ---- Nav count badge (Members group toggle) ---- */
+.admin-nav__count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--admin-accent);
+    color: var(--admin-text);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+}
+/* An explicit `display` defeats the UA `[hidden] { display:none }` (equal
+   specificity, author wins) — so the hidden attribute must be re-asserted, the
+   same guard the preview modals use. Without it, a badge set hidden after a
+   count drops to 0 keeps showing its stale number. */
+.admin-nav__count-badge[hidden] { display: none; }
+
+/* ---- R4 banner: which project is being worked on ---- */
+.members-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 20px 0;
+    padding: 12px 16px;
+    border: 1px solid var(--admin-border);
+    border-left: 4px solid var(--admin-accent);
+    border-radius: 6px;
+    background: var(--admin-bg-secondary);
+    color: var(--admin-text-muted);
+}
+.members-banner__project {
+    color: var(--admin-text);
+    font-size: 1.05em;
+}
+.members-banner__role-label {
+    margin-left: 12px;
+}
+
+/* ---- Role + status chips ---- */
+.members-role-chip {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.5;
+    text-transform: lowercase;
+    background: var(--admin-surface);
+    color: var(--admin-text-muted);
+    border: 1px solid var(--admin-border);
+}
+.members-role-chip--owner  { background: var(--admin-warning-bg); color: var(--admin-warning); border-color: var(--admin-warning); }
+.members-role-chip--admin  { background: var(--admin-error-bg); color: var(--admin-error); border-color: var(--admin-error); }
+.members-role-chip--developer { background: var(--admin-info-bg); color: var(--admin-info); }
+.members-role-chip--designer  { background: var(--admin-accent-muted); color: var(--admin-accent-hover); }
+.members-role-chip--editor    { background: var(--admin-success-bg); color: var(--admin-success); }
+
+.members-chip {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.5;
+    background: var(--admin-surface);
+    color: var(--admin-text-muted);
+}
+.members-chip--owned   { background: var(--admin-warning-bg); color: var(--admin-warning); }
+.members-chip--editing { background: var(--admin-accent-muted); color: var(--admin-accent-hover); }
+.members-chip--you     { background: var(--admin-accent-muted); color: var(--admin-accent-hover); }
+.members-chip--invite   { background: var(--admin-info-bg); color: var(--admin-info); }
+.members-chip--request  { background: var(--admin-warning-bg); color: var(--admin-warning); }
+.members-chip--proposal { background: var(--admin-accent-muted); color: var(--admin-accent-hover); }
+.members-chip--refused  { background: var(--admin-error-bg); color: var(--admin-error); }
+.members-chip--removed  { background: var(--admin-error-bg); color: var(--admin-error); }
+.members-chip--deleted  { background: var(--admin-surface); color: var(--admin-text-light); }
+.members-chip--picked   { background: var(--admin-success-bg); color: var(--admin-success); margin-left: 0; margin-right: 8px; }
+.members-chip--status   { background: var(--admin-surface); color: var(--admin-text-muted); }
+
+/* ---- Section count chips ---- */
+.members-count-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    margin-left: 8px;
+    border-radius: 10px;
+    background: var(--admin-accent-muted);
+    color: var(--admin-accent-hover);
+    font-size: 12px;
+    font-weight: 700;
+    vertical-align: middle;
+}
+/* Same [hidden] re-assertion as the nav badge (see above). */
+.members-count-chip[hidden] { display: none; }
+
+/* ---- Rows (roster / queue / inbox / …) ---- */
+.members-list {
+    padding: 0;
+}
+.members-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--admin-border);
+}
+.members-row:last-child {
+    border-bottom: none;
+}
+.members-row__main {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+.members-row__title {
+    color: var(--admin-text);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.members-row__subtle {
+    color: var(--admin-text-muted);
+    font-size: 0.9em;
+}
+.members-row__chips {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.members-row__chips .members-chip {
+    margin-left: 0;
+}
+.members-row__meta {
+    color: var(--admin-text-light);
+    font-size: 0.85em;
+}
+.members-row__id {
+    color: var(--admin-text-light);
+    font-size: 0.78em;
+    word-break: break-all;
+}
+.members-row__notice-name {
+    margin-left: 8px;
+}
+.members-row__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+.members-note {
+    margin: 4px 0 0 0;
+    padding: 6px 10px;
+    border-left: 3px solid var(--admin-border);
+    background: var(--admin-bg-tertiary);
+    color: var(--admin-text-muted);
+    font-size: 0.9em;
+    font-style: italic;
+    border-radius: 0 4px 4px 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.members-empty {
+    padding: 20px 16px;
+    color: var(--admin-text-light);
+}
+
+/* ---- findUser picker ---- */
+.members-find-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+}
+.members-find-row__name {
+    flex: 1;
+    margin-bottom: 0;
+}
+.members-find-row .admin-btn {
+    margin-bottom: 2px;
+}
+.members-find-results {
+    margin: 10px 0;
+}
+.members-match-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border: 1px solid var(--admin-border);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    background: var(--admin-bg-tertiary);
+}
+.members-match-row--picked {
+    border-color: var(--admin-success);
+    background: var(--admin-success-bg);
+}
+.members-match-row .members-row__id {
+    flex: 1;
+}
+
+/* ---- Invite / propose form rows ---- */
+.members-form-row {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+}
+.members-form-row__note {
+    flex: 1;
+}
+
+/* ---- Join policy ---- */
+.members-policy-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 8px 0;
+}
+.members-policy-value {
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.9em;
+}
+.members-policy-value--open {
+    color: var(--admin-warning);
+}
+.members-policy-value--closed {
+    color: var(--admin-success);
+}
+.members-policy-advisory {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-top: 12px;
+    padding: 12px;
+    border: 1px solid var(--admin-warning);
+    border-radius: 6px;
+    background: var(--admin-warning-bg);
+    color: var(--admin-warning);
+}
+
+/* ---- Transfer (danger zone) ---- */
+.members-danger-zone {
+    border: 1px solid var(--admin-error);
+}
+.members-danger-zone .admin-warning {
+    color: var(--admin-error);
+    margin-bottom: 12px;
+}
+.members-transfer-confirm {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 0;
+    cursor: pointer;
+}
+
+/* ---- Dashboard card ---- */
+.dashboard-memberships__links {
+    display: flex;
+    gap: 8px;
+}
+.dashboard-memberships__stat--attention .admin-stat__value {
+    color: var(--admin-accent);
+}

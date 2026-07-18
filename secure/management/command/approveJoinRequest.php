@@ -16,21 +16,27 @@
  *     zero new accept logic.
  *
  * Approve-time re-validation (in-lock, fresh state): the approver's CURRENT
- * rank must outrank the stored role (canManageRole — a concurrent demotion
- * cannot be outrun); the target account must still resolve in users.php and a
- * sponsored entry's sponsor must STILL be a member (any rank — rank never
- * powered a proposal; a removed/left sponsor voids it, a demoted one does
- * not). Dead entries are pruned + refused (409 request.void) — grants never
- * materialize on dead parties.
+ * rank must outrank the role being GRANTED (canManageRole — a concurrent
+ * demotion cannot be outrun); the target account must still resolve in
+ * users.php and a sponsored entry's sponsor must STILL be a member (any rank —
+ * rank never powered a proposal; a removed/left sponsor voids it, a demoted
+ * one does not). Dead entries are pruned + refused (409 request.void) — grants
+ * never materialize on dead parties.
  *
- * No role override at approve: approval never edits the terms. Different
- * terms → denyJoinRequest + inviteMember.
+ * Optional role at approve (C8 8.3c — supersedes the 8.3b "no role override"
+ * rule): the approver MAY name the `role` to grant, defaulting to the stored
+ * role (viewer for a self-request, the sponsor's suggestion for a proposal).
+ * The rank check runs against whatever role is granted, so an approver can
+ * never mint a role at/above their own — the same authority `changeMemberRole`
+ * already carries, folded into one atomic step. A self-request materializes
+ * directly at that role; a proposal converts to an invitation for it.
  *
  * @method POST
  * @route /management/p/<projectId>/approveJoinRequest
  * @auth required (project.members — admin, owner)
  *
  * @param string $user_id Requester/proposed account's user id (required)
+ * @param string $role    Role to grant (optional; defaults to the stored role)
  *
  * @return ApiResponse Approval result
  */
@@ -67,6 +73,24 @@ function __command_approveJoinRequest(array $params = [], array $urlParams = [])
             ->withErrors(['user_id' => 'Required field']);
     }
 
+    // Optional role override (C8 8.3c). Validated up front like inviteMember /
+    // changeMemberRole; null = keep the stored role. The in-lock rank check
+    // (below) is what actually gates it against the approver's current rank.
+    $roleOverride = null;
+    $requestedRole = trim((string)($params['role'] ?? ''));
+    if ($requestedRole !== '') {
+        if ($requestedRole === 'owner') {
+            return ApiResponse::create(400, 'member.role_not_assignable')
+                ->withMessage('The owner role cannot be granted here — use transferOwnership');
+        }
+        if (!isValidRole($requestedRole)) {
+            return ApiResponse::create(400, 'validation.invalid_format')
+                ->withMessage('Unknown role')
+                ->withErrors(['role' => 'Unknown role']);
+        }
+        $roleOverride = $requestedRole;
+    }
+
     // Cross-file existence read (the inviteMember pattern): resolved before
     // the lock, consumed inside it — a vanished account voids the entry.
     $usersCfg = loadUsersConfig();
@@ -77,7 +101,7 @@ function __command_approveJoinRequest(array $params = [], array $urlParams = [])
     $failure = null;
     $grantedRole = null;
     $converted = false;
-    $written = qs_members_mutate($project, function (array &$m) use ($actorId, $targetId, $targetExists, $today, &$error, &$grantedRole, &$converted) {
+    $written = qs_members_mutate($project, function (array &$m) use ($actorId, $targetId, $targetExists, $today, $roleOverride, &$error, &$grantedRole, &$converted) {
         $inv = $m['invitations'][$targetId] ?? null;
         if (!is_array($inv) || (($inv['direction'] ?? 'invite') !== 'request')) {
             $error = 'request.not_found';
@@ -85,9 +109,14 @@ function __command_approveJoinRequest(array $params = [], array $urlParams = [])
         }
 
         // APPROVE-TIME RE-VALIDATION — all against the fresh in-lock state.
+        // The role GRANTED = the approver's override, else the stored role
+        // (viewer for a self-request, the sponsor's suggestion for a proposal).
+        // The rank check is against that role, so an approver can never grant
+        // at/above their own rank.
         $storedRole = (string)($inv['role'] ?? '');
+        $grantRole  = $roleOverride ?? $storedRole;
         $actorRole  = $m['members'][$actorId]['role'] ?? null;
-        if ($actorRole === null || !canManageRole($actorRole, $storedRole)) {
+        if ($actorRole === null || !canManageRole($actorRole, $grantRole)) {
             $error = 'authz.insufficient_rank';
             return false;
         }
@@ -102,17 +131,17 @@ function __command_approveJoinRequest(array $params = [], array $urlParams = [])
         }
 
         if ($isSelf) {
-            // Both consents present → membership materializes.
+            // Both consents present → membership materializes at the granted role.
             unset($m['invitations'][$targetId]);
-            $m['members'][$targetId] = ['role' => $storedRole];
-            $grantedRole = $storedRole;
+            $m['members'][$targetId] = ['role' => $grantRole];
+            $grantedRole = $grantRole;
             return true;
         }
 
         // Sponsored: authority consents, target's consent still missing →
         // convert to a normal invitation carried by the APPROVER's rank.
         $entry = [
-            'role'      => $storedRole,
+            'role'      => $grantRole,
             'direction' => 'invite',
             'by'        => $actorId,
             'sponsor'   => $sponsor,
@@ -122,7 +151,7 @@ function __command_approveJoinRequest(array $params = [], array $urlParams = [])
             $entry['note'] = $inv['note'];
         }
         $m['invitations'][$targetId] = $entry;
-        $grantedRole = $storedRole;
+        $grantedRole = $grantRole;
         $converted = true;
         return true;
     }, $failure);

@@ -146,13 +146,13 @@ function getCommandCategories(): array {
         'member_management' => [
             'label' => 'Project Members',
             'icon' => 'users',
-            'commands' => ['listMembers', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership', 'approveJoinRequest', 'denyJoinRequest', 'proposeMember', 'setJoinPolicy']
+            'commands' => ['listMembers', 'getProjectRoster', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership', 'approveJoinRequest', 'denyJoinRequest', 'proposeMember', 'setJoinPolicy']
         ],
         // …and the caller's own membership surface (global self-service).
         'my_memberships' => [
             'label' => 'My Memberships',
             'icon' => 'user',
-            'commands' => ['findUser', 'listMyInvitations', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice', 'requestToJoin', 'withdrawJoinRequest']
+            'commands' => ['findUser', 'listMyInvitations', 'listMyProposals', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice', 'requestToJoin', 'withdrawJoinRequest']
         ],
         'storage_monitoring' => [
             'label' => 'Storage',

@@ -130,10 +130,13 @@ $langNames = [
     <link rel="stylesheet" href="<?= $versionedAsset('/css/oauth-admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/storage-admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/privacy-admin.css') ?>">
+    <link rel="stylesheet" href="<?= $versionedAsset('/css/members-admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/searchable-select.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/preview-ai-tools.css') ?>">
     <!-- Storage key registry — must load before any page script that references QuickSiteStorageKeys -->
     <script src="<?= $versionedAsset('/js/core/storage-keys.js') ?>"></script>
+    <!-- Shared DOM factory (C8 8.3c) — must load before any page script that references QSDom -->
+    <script src="<?= $versionedAsset('/js/core/dom.js') ?>"></script>
     <!-- Reusable searchable combobox (beta.9 A2 Slice 2). Wraps a native <select> — page scripts construct QSSearchableSelect after locating their select element. -->
     <script src="<?= $versionedAsset('/js/core/searchable-select.js') ?>"></script>
 </head>
@@ -161,10 +164,12 @@ $langNames = [
             $buildPages = ['workflows', 'command', 'preview', 'apis'];
             $settingsPages = ['settings', 'ai-settings', 'ai-connections', 'embed-security'];
             $compliancePages = ['storage', 'privacy'];
+            $membersPages = ['memberships', 'members'];
             $isBuildActive = in_array($currentPage, $buildPages);
             $isSettingsActive = in_array($currentPage, $settingsPages);
             $isAssetsActive = ($currentPage === 'assets');
             $isComplianceActive = in_array($currentPage, $compliancePages);
+            $isMembersActive = in_array($currentPage, $membersPages);
         ?>
         <nav class="admin-nav">
             <a href="<?= $router->url('dashboard') ?>" 
@@ -249,6 +254,47 @@ $langNames = [
                 </svg>
                 <span>Authentication</span>
             </a>
+
+            <!-- Members Group (C8 8.3c) — My Memberships (any authenticated user) + Project Members
+                 (any member rank of the EDITED project; link hidden without proposeMember).
+                 The group toggle deliberately targets the ALWAYS-accessible memberships page.
+                 No data-requires-command on the group: a 0-membership user still has an inbox. -->
+            <div class="admin-nav__group<?= $isMembersActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="members">
+                <a href="<?= $router->url('memberships') ?>" class="admin-nav__group-toggle">
+                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    <span><?= __admin('nav.members', 'Members') ?></span>
+                    <span class="admin-nav__count-badge" id="members-nav-badge" hidden>0</span>
+                    <svg class="admin-nav__group-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </a>
+                <div class="admin-nav__group-dropdown">
+                    <a href="<?= $router->url('memberships') ?>"
+                       class="admin-nav__link<?= $currentPage === 'memberships' ? ' admin-nav__link--active' : '' ?>">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                        <span><?= __admin('nav.myMemberships', 'My memberships') ?></span>
+                    </a>
+                    <a href="<?= $router->url('members') ?>"
+                       class="admin-nav__link<?= $currentPage === 'members' ? ' admin-nav__link--active' : '' ?>"
+                       data-requires-command="proposeMember">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                            <circle cx="9" cy="7" r="4"/>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        </svg>
+                        <span><?= __admin('nav.projectMembers', 'Project members') ?></span>
+                    </a>
+                </div>
+            </div>
 
             <!-- Compliance Group - Storage + Privacy (beta.9 — data layer + data sharing) -->
             <div class="admin-nav__group<?= $isComplianceActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="compliance" data-requires-command="listStorageItems">
@@ -581,6 +627,10 @@ $langNames = [
     <!-- Core JavaScript Modules -->
     <script src="<?= $versionedAsset('/js/core/api.js') ?>"></script>
     <script src="<?= $versionedAsset('/js/core/utils.js') ?>"></script>
+    <?php if (!$isLoginPage): ?>
+    <!-- Membership counts + nav badge (C8 8.3c) — async, derived from existing reads -->
+    <script src="<?= $versionedAsset('/js/core/members-badge.js') ?>"></script>
+    <?php endif; ?>
     
     <!-- Admin JavaScript -->
     <script src="<?= $versionedAsset('/admin.js') ?>"></script>

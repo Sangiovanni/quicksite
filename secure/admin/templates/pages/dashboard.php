@@ -12,6 +12,7 @@ $baseUrl = rtrim(BASE_URL, '/');
 ?>
 
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/dashboard.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/dashboard.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/dashboard-memberships.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/dashboard-memberships.js') ?>"></script>
 
 <div class="admin-page-header">
     <h1 class="admin-page-header__title"><?= __admin('dashboard.title') ?></h1>
@@ -228,6 +229,45 @@ $baseUrl = rtrim(BASE_URL, '/');
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+</section>
+
+<!-- Memberships summary (C8 8.3c) — numbers filled by dashboard-memberships.js
+     from the shared QSMembershipCounts promise (members-badge.js). Visible to
+     every authenticated user; a 0-membership account sees zeros + the links. -->
+<section class="admin-section" id="dashboard-memberships">
+    <div class="admin-section__header">
+        <h2 class="admin-section__title"><?= __admin('dashboard.memberships.title', 'Memberships') ?></h2>
+        <div class="dashboard-memberships__links">
+            <a href="<?= $router->url('memberships') ?>" class="admin-btn admin-btn--ghost"><?= __admin('nav.myMemberships', 'My memberships') ?></a>
+            <a href="<?= $router->url('members') ?>" class="admin-btn admin-btn--ghost" data-requires-command="proposeMember"><?= __admin('nav.projectMembers', 'Project members') ?></a>
+        </div>
+    </div>
+    <div class="admin-grid admin-grid--cols-3">
+        <div class="admin-stat">
+            <div class="admin-stat__value" id="dash-mem-projects">-</div>
+            <div class="admin-stat__label"><?= __admin('dashboard.memberships.projects', 'My projects') ?></div>
+        </div>
+        <div class="admin-stat">
+            <div class="admin-stat__value" id="dash-mem-owned">-</div>
+            <div class="admin-stat__label"><?= __admin('dashboard.memberships.owned', 'Owned') ?></div>
+        </div>
+        <div class="admin-stat" id="dash-mem-invitations-stat">
+            <div class="admin-stat__value" id="dash-mem-invitations">-</div>
+            <div class="admin-stat__label"><?= __admin('dashboard.memberships.invitations', 'Invitations awaiting you') ?></div>
+        </div>
+        <div class="admin-stat">
+            <div class="admin-stat__value" id="dash-mem-requests">-</div>
+            <div class="admin-stat__label"><?= __admin('dashboard.memberships.requests', 'Join requests you sent') ?></div>
+        </div>
+        <div class="admin-stat" id="dash-mem-notices-stat">
+            <div class="admin-stat__value" id="dash-mem-notices">-</div>
+            <div class="admin-stat__label"><?= __admin('dashboard.memberships.notices', 'Notices to dismiss') ?></div>
+        </div>
+        <div class="admin-stat" id="dash-mem-queue-stat">
+            <div class="admin-stat__value" id="dash-mem-queue">-</div>
+            <div class="admin-stat__label"><?= __admin('dashboard.memberships.queue', 'Awaiting your validation') ?></div>
         </div>
     </div>
 </section>

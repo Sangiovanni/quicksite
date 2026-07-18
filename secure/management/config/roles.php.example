@@ -23,7 +23,7 @@ return [
         'rank' => 1,
         'builtin' => true,
         'description' => 'Read-only: rendered site + content/structure/styles in the editor. No writes.',
-        'categories' => ['content.read', 'project.propose'],
+        'categories' => ['content.read', 'project.propose', 'project.roster'],
     ],
     'editor' => [
         'rank' => 2,
@@ -32,7 +32,7 @@ return [
         'categories' => [
             'content.read', 'config.read', 'content.write', 'translation.write',
             'route.write', 'asset.write', 'interaction.write', 'privacy.manage',
-            'project.propose',
+            'project.propose', 'project.roster',
         ],
     ],
     'designer' => [
@@ -42,7 +42,7 @@ return [
         'categories' => [
             'content.read', 'config.read', 'content.write', 'translation.write',
             'route.write', 'asset.write', 'interaction.write', 'privacy.manage',
-            'style.write', 'project.propose',
+            'style.write', 'project.propose', 'project.roster',
         ],
     ],
     'developer' => [
@@ -52,7 +52,7 @@ return [
         'categories' => [
             'content.read', 'config.read', 'content.write', 'translation.write',
             'route.write', 'asset.write', 'interaction.write', 'privacy.manage',
-            'style.write', 'build', 'resolver.manage', 'project.propose',
+            'style.write', 'build', 'resolver.manage', 'project.propose', 'project.roster',
         ],
     ],
     'admin' => [
@@ -64,7 +64,7 @@ return [
             'route.write', 'asset.write', 'interaction.write', 'privacy.manage',
             'style.write', 'build', 'resolver.manage', 'deploy', 'api.manage',
             'oauth.manage', 'iframe.manage', 'project.data', 'history', 'workflow',
-            'project.settings', 'project.members', 'project.propose',
+            'project.settings', 'project.members', 'project.propose', 'project.roster',
         ],
     ],
     'owner' => [
@@ -77,7 +77,7 @@ return [
             'style.write', 'build', 'resolver.manage', 'deploy', 'api.manage',
             'oauth.manage', 'iframe.manage', 'project.data', 'history', 'workflow',
             'project.settings', 'project.members', 'project.delete', 'project.ownership',
-            'project.propose',
+            'project.propose', 'project.roster',
         ],
     ],
 ];

@@ -28,6 +28,8 @@ class AdminRouter {
         'oauth-providers', // OAuth Provider catalogue + per-project overrides (beta.9 A1 Slice 8)
         'storage',     // Storage registry — GDPR / cookie-consent data layer (beta.9)
         'privacy',     // Privacy helper — data-sharing / API surface (beta.9)
+        'memberships', // My Memberships — inbox / requests / proposals / notices (C8 8.3c; any authenticated user)
+        'members',     // Project Members — roster / queue / invite / policy for the EDITED project (C8 8.3c)
         'assets',      // Asset Management page
         'sitemap',     // Visual Sitemap & Route Management
         'optimize',    // Optimization Tools
@@ -358,10 +360,18 @@ class AdminRouter {
 
     /**
      * Get the effective role of the currently authenticated user (C6).
-     * Resolves the session's access token -> user -> role on the user's selected
-     * project (the same source hasPermission uses transitionally). Returns a role
-     * slug (e.g. 'viewer' … 'owner') or null when not authenticated, unresolved,
-     * disabled, or not a member of the selected project. No superadmin / no '*'.
+     * Resolves the session's access token -> user -> role on the project the
+     * panel actually acts as: `resolveEffectiveRole` = the selected project when
+     * that membership is real, ELSE the first project the user is genuinely a
+     * member of. This is the SAME resolution `getMyPermissions` /
+     * `getTokenPermissions` (the client-side permission filter) and
+     * `getCurrentProject` (resolveDefaultProject) use — so the server-side page
+     * gate agrees with the nav links the client shows and with the project the
+     * page operates on. A freshly-joined user who never called setSelectedProject
+     * (empty selected_project) still resolves their role instead of being locked
+     * out of every role-gated page. Returns a role slug ('viewer' … 'owner') or
+     * null when not authenticated, unresolved, disabled, or a member of nothing.
+     * No superadmin / no '*'.
      */
     public function getTokenRole(): ?string {
         $token = $this->getToken();
@@ -370,13 +380,8 @@ class AdminRouter {
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
         $auth = validateBearerToken('Bearer ' . $token);
         if (empty($auth['valid'])) return null;
-        $user = $auth['user'];
-        $userId = $auth['userId'];
 
-        $selected = $user['selected_project'] ?? null;
-        if ($selected === null || $selected === '') return null;
-
-        return getUserRoleForProject($userId, (string)$selected);
+        return resolveEffectiveRole($auth['user']);
     }
 
     /**
@@ -441,6 +446,12 @@ class AdminRouter {
         'storage'        => ['listStorageItems'],
         'privacy'        => ['getPrivacyStatus'],
         'embed-security' => ['getIframeSandbox'],
+        // C8 8.3c — Project Members page: any member rank passes (all roles hold
+        // getProjectRoster/proposeMember); non-members of the edited project
+        // (incl. the 0-membership served-project fallback) bounce to dashboard.
+        // 'memberships' is deliberately ABSENT: the self-service inbox must work
+        // for every authenticated account, 0-membership included.
+        'members'        => ['listMembers', 'getProjectRoster', 'proposeMember'],
         // 'workflows' is no longer gated by callAi: AI calls now happen in
         // the browser via QSAiCall (no PHP proxy). Any admin user can open
         // the workflows UI.

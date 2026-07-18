@@ -13,7 +13,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
 | Layer | Folder | Audience | Purpose |
 |---|---|---|---|
 | **Project** | `secure/projects/{name}/` | Site owner | The actual website data: routes, page structures (JSON), translations, components, interactions, styles, assets. |
-| **Management** | `secure/management/` | API client (admin panel, scripts) | The 173 commands that read or mutate project data. Single entry point: `public/management/index.php`. Token + role enforced. AI calls bypass this layer entirely (browser-direct). |
+| **Management** | `secure/management/` | API client (admin panel, scripts) | The 175 commands that read or mutate project data. Single entry point: `public/management/index.php`. Token + role enforced. AI calls bypass this layer entirely (browser-direct). |
 | **Admin** | `public/admin/` + `secure/admin/` | Human operator | The browser UI that calls Management commands. Includes the visual editor, sitemap, theme editor, AI workspace, workflow runner. |
 
 ```
@@ -165,7 +165,7 @@ ApiResponse::create(201, 'route.created')
     ->send();
 ```
 
-The full list of 173 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
+The full list of 175 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
 
 ### Response shape
 
@@ -190,7 +190,7 @@ Authorization is **per project**. Each project's `config/members.json` assigns i
 
 | Role | rank | Adds (cumulative) |
 |---|---|---|
-| `viewer` | 1 | read structure, content, styles; propose new members (every member may vouch an outsider — validation stays admin+) |
+| `viewer` | 1 | read structure, content, styles; see the project roster (members only — every rank can see who is on the project); propose new members (every member may vouch an outsider — validation stays admin+) |
 | `editor` | 2 | edit content, translations, routes, assets, interactions, privacy copy; read integration config |
 | `designer` | 3 | styles, CSS variables, animations, theme |
 | `developer` | 4 | builds + server-side route resolvers |
@@ -203,7 +203,7 @@ Roles are **fixed** — there is no superadmin and no custom roles. A role is de
 
 Membership itself changes on a **consent model**: an admin or owner *invites* an existing account to a role (rank-checked at send), the invitee sees the offer in their own invitation inbox, and the grant materializes only on `acceptInvitation` — where the inviter's authority is **re-validated** (a demoted or removed inviter's offer is void). Pending invitations live in a separate `invitations` block of `members.json`, so a pending entry is structurally unable to grant access — every permission check reads `members` only. Users are targeted by their opaque `user_id` (discovered by exact public-name lookup, `findUser`); membership output references people as `{user_id, name}` and never exposes the private login username. Ownership rotates atomically via `transferOwnership` (owner-only, member-only target, confirmation required); removals and project deletions leave a dismissable notice in the affected user's own project list, while self-initiated exits (leave, decline, withdraw) leave none.
 
-Membership can also start from the **other side**. With the project's `join_policy` set to `open` (`setJoinPolicy`, default `closed`), an authenticated outsider may `requestToJoin` — a mandatory-note ask, fixed at the `viewer` role, that an admin/owner answers with `approveJoinRequest` (joins immediately: both consents now exist) or `denyJoinRequest` (mandatory reason, dismissable `refused` notice; re-asking is blocked until the notice is dismissed). Separately, ANY member may `proposeMember` — vouch an outsider with a mandatory note; the proposal grants nothing, the person is told nothing, and on validation it *converts into a normal invitation* carried by the approver's rank (`sponsored_by` preserved), which the person accepts or declines like any invite — membership always materializes on exactly two consents: the person's and a ranking authority's. Enumeration posture: a private project with a closed policy answers `requestToJoin` identically to a nonexistent one; opening the policy on a *private* project deliberately makes it knockable-by-id (flagged by the command); on public projects existence is already public via `/p/<id>/`, so a closed lane answers honestly. A requester's own inbox shows a private project's *id*, never its site name, until they are a member.
+Membership can also start from the **other side**. With the project's `join_policy` set to `open` (`setJoinPolicy`, default `closed`), an authenticated outsider may `requestToJoin` — a mandatory-note ask, fixed at the `viewer` role, that an admin/owner answers with `approveJoinRequest` (joins immediately: both consents now exist) or `denyJoinRequest` (mandatory reason, dismissable `refused` notice; re-asking is blocked until the notice is dismissed). Separately, ANY member may `proposeMember` — vouch an outsider with a mandatory note, at a role no higher than the sponsor's own rank (a viewer proposes viewers, an editor up to editors); the proposal grants nothing, the person is told nothing, and on validation it *converts into a normal invitation* carried by the approver's rank (`sponsored_by` preserved), which the person accepts or declines like any invite — membership always materializes on exactly two consents: the person's and a ranking authority's. Enumeration posture: a private project with a closed policy answers `requestToJoin` identically to a nonexistent one; opening the policy on a *private* project deliberately makes it knockable-by-id (flagged by the command); on public projects existence is already public via `/p/<id>/`, so a closed lane answers honestly. A requester's own inbox shows a private project's *id*, never its site name, until they are a member. Two read surfaces complete the picture: `getProjectRoster` gives every member rank the active-members roster (no pending queue — adjudication data stays admin/owner via `listMembers`), and `listMyProposals` gives a sponsor their own outgoing proposals (pending validation, or approved and awaiting the person's answer).
 
 ### Extending one command via builders — `addComplexElement`
 
@@ -293,7 +293,7 @@ addRoute.php
   └── ApiResponse::create(201, 'route.created')->send()
 ```
 
-The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 173 commands.
+The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 175 commands.
 
 ### 5.3 Routing — exact and parameterised routes
 

@@ -96,7 +96,176 @@
         "message": "You have been logged out successfully",
         "redirect": "Redirecting to login..."
     },
+    "memberships": {
+        "title": "My Memberships",
+        "subtitle": "Your projects, invitations, join requests, proposals and notices — everything about where you belong.",
+        "myProjects": {
+            "title": "My projects",
+            "empty": "You are not a member of any project yet. Accept an invitation or send a join request below.",
+            "roleChip": "role",
+            "ownedChip": "OWNED",
+            "editingChip": "editing",
+            "editBtn": "Edit this project",
+            "leaveBtn": "Leave",
+            "leaveTitle": "Leave project",
+            "leaveConfirm": "You are about to leave {project}. You will need a fresh invitation to rejoin.",
+            "leftMsg": "You left the project"
+        },
+        "inbox": {
+            "title": "Invitation inbox",
+            "empty": "No pending invitations.",
+            "invitedBy": "Invited by",
+            "proposedBy": "proposed by",
+            "offeredRole": "offered role",
+            "accept": "Accept",
+            "decline": "Decline",
+            "acceptedMsg": "Invitation accepted — welcome aboard",
+            "declinedMsg": "Invitation declined"
+        },
+        "requests": {
+            "title": "My join requests",
+            "empty": "No pending join requests.",
+            "withdraw": "Withdraw",
+            "withdrawnMsg": "Request withdrawn"
+        },
+        "proposals": {
+            "title": "My proposals",
+            "hint": "People you vouched for on your projects. A proposal that disappears without joining was either denied or answered by the person.",
+            "empty": "No outgoing proposals.",
+            "for": "for",
+            "pendingValidation": "awaiting validation",
+            "awaitingAnswer": "invitation sent — awaiting their answer",
+            "withdrawnMsg": "Proposal withdrawn"
+        },
+        "notices": {
+            "title": "Notices",
+            "empty": "No notices.",
+            "dismiss": "Dismiss",
+            "dismissedMsg": "Notice dismissed",
+            "statusRefused": "Join request refused",
+            "statusRemoved": "Removed from project",
+            "statusDeleted": "Project deleted",
+            "reason": "Reason"
+        },
+        "request": {
+            "title": "Request to join a project",
+            "hint": "Ask to join a project by its id. The project must have an open join policy; your note is shown to its admins.",
+            "projectLabel": "Project id",
+            "noteLabel": "Why do you want to join?",
+            "submit": "Send request",
+            "sentMsg": "Join request sent",
+            "noteRequired": "The note is required — say why you want to join.",
+            "errUnavailable": "This project does not accept join requests (or does not exist).",
+            "errClosed": "This project's join requests are closed.",
+            "errAlreadyMember": "You are already a member of this project.",
+            "errAlreadyInvited": "You already have a pending invitation here — accept or decline it above.",
+            "errAlreadyRequested": "You already asked — withdraw the request above to re-ask.",
+            "errNoticePending": "A notice for this project is still in your inbox — dismiss it first."
+        }
+    },
+    "members": {
+        "title": "Project Members",
+        "subtitle": "Roster, invitations and join requests of the project you are editing.",
+        "banner": {
+            "managing": "Managing members of",
+            "yourRole": "your role"
+        },
+        "roster": {
+            "title": "Roster",
+            "empty": "No members (this should not happen — a project always has its owner).",
+            "you": "you",
+            "changeRole": "Change role",
+            "changeRoleTitle": "Change role",
+            "newRoleLabel": "New role",
+            "apply": "Apply",
+            "roleChangedMsg": "Role updated",
+            "remove": "Remove",
+            "removeTitle": "Remove member",
+            "removeNoteLabel": "Reason (optional — shown to them)",
+            "removedMsg": "Member removed"
+        },
+        "queue": {
+            "title": "Pending — invitations, requests & proposals",
+            "empty": "Nothing pending.",
+            "chipInvite": "invitation",
+            "chipRequest": "join request",
+            "chipProposal": "proposal",
+            "invitedBy": "invited by",
+            "askedBy": "asked by",
+            "proposedBy": "proposed by",
+            "approve": "Approve",
+            "deny": "Deny",
+            "cancelInvite": "Cancel",
+            "approveTitle": "Approve this request?",
+            "approveRoleLabel": "Role to grant",
+            "approvedMsg": "Approved — they are now a member",
+            "convertedMsg": "Proposal approved — invitation sent, awaiting their answer",
+            "denyTitle": "Deny this request",
+            "denyNoteLabel": "Reason (required — shown to the requester)",
+            "denyNoteRequired": "The refusal reason is required.",
+            "deniedMsg": "Request denied",
+            "cancelTitle": "Cancel this invitation?",
+            "cancelledMsg": "Invitation cancelled"
+        },
+        "invite": {
+            "title": "Invite someone",
+            "hint": "Look the person up by their EXACT public name, confirm the right account by its id, pick a role below yours, and send. They join only when they accept.",
+            "nameLabel": "Their public name",
+            "search": "Search",
+            "noMatches": "No account with this exact public name.",
+            "select": "Select",
+            "selected": "Selected",
+            "roleLabel": "Role to offer",
+            "noteLabel": "Note (optional)",
+            "send": "Send invitation",
+            "sentMsg": "Invitation sent",
+            "nameRequired": "Type the exact public name first.",
+            "pickRequired": "Search and select a person first."
+        },
+        "propose": {
+            "title": "Propose a member",
+            "hint": "Vouch for someone: an admin or the owner validates your proposal before the person is even told. Your note IS the vouch — make it count.",
+            "roleLabel": "Suggested role",
+            "noteLabel": "Why this person?",
+            "send": "Propose",
+            "sentMsg": "Proposal recorded — an admin or the owner must validate it",
+            "vouchRequired": "The vouch note is required."
+        },
+        "policy": {
+            "title": "Join policy",
+            "hint": "Open = anyone authenticated may send a join request (the self-service front door). Closed = requests bounce; invitations and member proposals always work. Closing never discards requests already pending.",
+            "label": "Self-service join requests",
+            "toggle": "Toggle",
+            "open": "open",
+            "closed": "closed",
+            "savedMsg": "Join policy updated",
+            "advisory": "Privacy note: this project is PRIVATE with an OPEN join policy — any authenticated account that knows or guesses its id can send a request and thereby learn the project exists.",
+            "confirmOpenPrivate": "This project is PRIVATE. Opening the join policy makes it knockable by id: anyone authenticated who knows or guesses the id can send a request and learn the project exists. Open anyway?"
+        },
+        "transfer": {
+            "title": "Transfer ownership",
+            "warn": "Hands the project to another MEMBER. You keep the role chosen below. There is no undo from your side — only the new owner could transfer it back.",
+            "memberLabel": "New owner (must be a member)",
+            "oldRoleLabel": "Your role after the transfer",
+            "confirmLabel": "I understand the project is handed over and my owner rights end.",
+            "submit": "Transfer ownership",
+            "modalTitle": "Transfer ownership — final confirmation",
+            "modalBody": "The project is handed to {name}. Your role becomes {role}. This cannot be undone from your side.",
+            "doneMsg": "Ownership transferred",
+            "confirmRequired": "Tick the confirmation checkbox first.",
+            "memberRequired": "Pick the member who becomes the new owner."
+        }
+    },
     "dashboard": {
+        "memberships": {
+            "title": "Memberships",
+            "projects": "My projects",
+            "owned": "Owned",
+            "invitations": "Invitations awaiting you",
+            "requests": "Join requests you sent",
+            "notices": "Notices to dismiss",
+            "queue": "Awaiting your validation"
+        },
         "title": "Dashboard",
         "welcome": "Welcome to QuickSite Admin",
         "subtitle": "Manage your site through a friendly interface",
@@ -335,6 +504,9 @@
         }
     },
     "nav": {
+        "members": "Members",
+        "myMemberships": "My memberships",
+        "projectMembers": "Project members",
         "login": "Login",
         "dashboard": "Dashboard",
         "apis": "APIs",

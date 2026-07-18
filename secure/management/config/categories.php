@@ -194,6 +194,15 @@ return [
         'commands' => ['listMembers', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'approveJoinRequest', 'denyJoinRequest'],
     ],
 
+    // Reduced roster for EVERY member rank (C8 8.3c): active members only —
+    // {user_id, name, role} rows, NO pending queue (adjudication data stays
+    // admin+ via project.members/listMembers). Exists so any member can see
+    // "who is on this project with me" (the R4 page requirement).
+    'project.roster' => [
+        'scope' => 'project',
+        'commands' => ['getProjectRoster'],
+    ],
+
     // The sponsor lane (C8 8.3b, model A): ANY member — viewer included — may
     // VOUCH an outsider (direction:'request' entry, mandatory note, no
     // engagement of the target). Authority stays with approveJoinRequest:
@@ -257,7 +266,7 @@ return [
     'membership.self' => [
         'scope' => 'global',
         'access' => 'any',
-        'commands' => ['listMyInvitations', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice', 'requestToJoin', 'withdrawJoinRequest'],
+        'commands' => ['listMyInvitations', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice', 'requestToJoin', 'withdrawJoinRequest', 'listMyProposals'],
     ],
 
     // Self / role catalog reads.

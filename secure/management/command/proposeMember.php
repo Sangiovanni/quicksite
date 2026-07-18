@@ -8,8 +8,12 @@
  * MANDATORY note (the vouch), and needs admin/owner validation
  * (approveJoinRequest) before the outsider is even ENGAGED: no mirror entry,
  * no inbox row, nothing on the target until authority converts it into a
- * real invitation. The sponsor names the role — rank is the VALIDATOR's
- * problem (canManageRole at approve), not the sponsor's.
+ * real invitation. The sponsor names the role, but MAY NOT propose a role
+ * higher than their OWN rank (C8 8.3c — supersedes the 8.3b "sponsor names any
+ * role" rule): a viewer vouches for viewers, an editor up to editors. `<=` (not
+ * strictly-below) is also the only workable bound — a viewer must be able to
+ * propose SOMEONE, which strictly-below would forbid. The validator's rank
+ * still gates the role again at approve (canManageRole).
  *
  * join_policy does NOT gate proposals: the knob closes the self-service
  * front door (requestToJoin); member-vouched proposals always reach the
@@ -20,7 +24,8 @@
  * @auth required (project.propose — every role, viewer+)
  *
  * @param string $user_id Proposed account's user id (required)
- * @param string $role    Suggested role (required; any role below owner)
+ * @param string $role    Suggested role (required; below owner AND no higher
+ *                        than the sponsor's own rank)
  * @param string $note    The vouch — why this person (required, 500 chars)
  *
  * @return ApiResponse Proposal summary
@@ -89,8 +94,16 @@ function __command_proposeMember(array $params = [], array $urlParams = []): Api
     $written = qs_members_mutate($project, function (array &$m) use ($actorId, $targetId, $role, $note, $today, &$error) {
         // The sponsor must STILL be a member (any rank) on the fresh in-lock
         // state — a concurrently-removed member cannot plant proposals.
-        if (($m['members'][$actorId]['role'] ?? null) === null) {
-            $error = 'authz.insufficient_rank';
+        $sponsorRole = $m['members'][$actorId]['role'] ?? null;
+        if ($sponsorRole === null) {
+            $error = 'not_member';
+            return false;
+        }
+        // A member may vouch for a role AT MOST their own rank — never above it
+        // (checked against the fresh in-lock rank, so a concurrent demotion
+        // cannot be outrun). The validator re-gates it at approve.
+        if (roleRank($role) > roleRank($sponsorRole)) {
+            $error = 'role_above_sponsor';
             return false;
         }
         if (isset($m['members'][$targetId])) {
@@ -114,9 +127,13 @@ function __command_proposeMember(array $params = [], array $urlParams = []): Api
         return true;
     }, $failure);
 
-    if ($error === 'authz.insufficient_rank') {
+    if ($error === 'not_member') {
         return ApiResponse::create(403, 'authz.insufficient_rank')
             ->withMessage('You must be a member of this project to propose someone');
+    }
+    if ($error === 'role_above_sponsor') {
+        return ApiResponse::create(403, 'authz.insufficient_rank')
+            ->withMessage('You cannot propose a role higher than your own');
     }
     if ($error === 'member.already_exists') {
         return ApiResponse::create(409, 'member.already_exists')

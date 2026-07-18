@@ -96,7 +96,176 @@
         "message": "Vous avez été déconnecté avec succès",
         "redirect": "Redirection vers la page de connexion..."
     },
+    "memberships": {
+        "title": "Mes adhésions",
+        "subtitle": "Vos projets, invitations, demandes, propositions et avis — tout ce qui concerne votre place.",
+        "myProjects": {
+            "title": "Mes projets",
+            "empty": "Vous n'êtes membre d'aucun projet pour l'instant. Acceptez une invitation ou envoyez une demande ci-dessous.",
+            "roleChip": "rôle",
+            "ownedChip": "PROPRIÉTAIRE",
+            "editingChip": "en édition",
+            "editBtn": "Éditer ce projet",
+            "leaveBtn": "Quitter",
+            "leaveTitle": "Quitter le projet",
+            "leaveConfirm": "Vous êtes sur le point de quitter {project}. Il faudra une nouvelle invitation pour revenir.",
+            "leftMsg": "Vous avez quitté le projet"
+        },
+        "inbox": {
+            "title": "Invitations reçues",
+            "empty": "Aucune invitation en attente.",
+            "invitedBy": "Invité par",
+            "proposedBy": "proposé par",
+            "offeredRole": "rôle proposé",
+            "accept": "Accepter",
+            "decline": "Refuser",
+            "acceptedMsg": "Invitation acceptée — bienvenue à bord",
+            "declinedMsg": "Invitation refusée"
+        },
+        "requests": {
+            "title": "Mes demandes d'adhésion",
+            "empty": "Aucune demande en attente.",
+            "withdraw": "Retirer",
+            "withdrawnMsg": "Demande retirée"
+        },
+        "proposals": {
+            "title": "Mes propositions",
+            "hint": "Les personnes pour qui vous vous êtes porté garant sur vos projets. Une proposition qui disparaît sans adhésion a été refusée, ou la personne a répondu.",
+            "empty": "Aucune proposition en cours.",
+            "for": "pour",
+            "pendingValidation": "en attente de validation",
+            "awaitingAnswer": "invitation envoyée — en attente de réponse",
+            "withdrawnMsg": "Proposition retirée"
+        },
+        "notices": {
+            "title": "Avis",
+            "empty": "Aucun avis.",
+            "dismiss": "J'ai compris",
+            "dismissedMsg": "Avis effacé",
+            "statusRefused": "Demande refusée",
+            "statusRemoved": "Retiré du projet",
+            "statusDeleted": "Projet supprimé",
+            "reason": "Motif"
+        },
+        "request": {
+            "title": "Demander à rejoindre un projet",
+            "hint": "Demandez à rejoindre un projet par son identifiant. Le projet doit accepter les demandes ; votre note est montrée à ses admins.",
+            "projectLabel": "Identifiant du projet",
+            "noteLabel": "Pourquoi voulez-vous rejoindre ?",
+            "submit": "Envoyer la demande",
+            "sentMsg": "Demande envoyée",
+            "noteRequired": "La note est obligatoire — dites pourquoi vous voulez rejoindre.",
+            "errUnavailable": "Ce projet n'accepte pas les demandes d'adhésion (ou n'existe pas).",
+            "errClosed": "Les demandes d'adhésion de ce projet sont fermées.",
+            "errAlreadyMember": "Vous êtes déjà membre de ce projet.",
+            "errAlreadyInvited": "Vous avez déjà une invitation en attente ici — acceptez-la ou refusez-la ci-dessus.",
+            "errAlreadyRequested": "Vous avez déjà demandé — retirez la demande ci-dessus pour redemander.",
+            "errNoticePending": "Un avis pour ce projet est encore dans votre boîte — effacez-le d'abord."
+        }
+    },
+    "members": {
+        "title": "Membres du projet",
+        "subtitle": "Effectif, invitations et demandes d'adhésion du projet que vous éditez.",
+        "banner": {
+            "managing": "Gestion des membres de",
+            "yourRole": "votre rôle"
+        },
+        "roster": {
+            "title": "Effectif",
+            "empty": "Aucun membre (anormal — un projet a toujours son propriétaire).",
+            "you": "vous",
+            "changeRole": "Changer le rôle",
+            "changeRoleTitle": "Changer le rôle",
+            "newRoleLabel": "Nouveau rôle",
+            "apply": "Appliquer",
+            "roleChangedMsg": "Rôle mis à jour",
+            "remove": "Retirer",
+            "removeTitle": "Retirer le membre",
+            "removeNoteLabel": "Motif (facultatif — il leur sera montré)",
+            "removedMsg": "Membre retiré"
+        },
+        "queue": {
+            "title": "En attente — invitations, demandes et propositions",
+            "empty": "Rien en attente.",
+            "chipInvite": "invitation",
+            "chipRequest": "demande",
+            "chipProposal": "proposition",
+            "invitedBy": "invité par",
+            "askedBy": "demandé par",
+            "proposedBy": "proposé par",
+            "approve": "Approuver",
+            "deny": "Refuser",
+            "cancelInvite": "Annuler",
+            "approveTitle": "Approuver cette demande ?",
+            "approveRoleLabel": "Rôle à accorder",
+            "approvedMsg": "Approuvé — la personne est maintenant membre",
+            "convertedMsg": "Proposition approuvée — invitation envoyée, en attente de réponse",
+            "denyTitle": "Refuser cette demande",
+            "denyNoteLabel": "Motif (obligatoire — montré au demandeur)",
+            "denyNoteRequired": "Le motif du refus est obligatoire.",
+            "deniedMsg": "Demande refusée",
+            "cancelTitle": "Annuler cette invitation ?",
+            "cancelledMsg": "Invitation annulée"
+        },
+        "invite": {
+            "title": "Inviter quelqu'un",
+            "hint": "Cherchez la personne par son nom public EXACT, confirmez le bon compte par son identifiant, choisissez un rôle sous le vôtre, puis envoyez. Elle ne rejoint que si elle accepte.",
+            "nameLabel": "Son nom public",
+            "search": "Chercher",
+            "noMatches": "Aucun compte avec ce nom public exact.",
+            "select": "Choisir",
+            "selected": "Choisi",
+            "roleLabel": "Rôle proposé",
+            "noteLabel": "Note (facultative)",
+            "send": "Envoyer l'invitation",
+            "sentMsg": "Invitation envoyée",
+            "nameRequired": "Tapez d'abord le nom public exact.",
+            "pickRequired": "Cherchez et sélectionnez d'abord une personne."
+        },
+        "propose": {
+            "title": "Proposer un membre",
+            "hint": "Portez-vous garant : un admin ou le propriétaire valide votre proposition avant même que la personne soit prévenue. Votre note EST la recommandation — soignez-la.",
+            "roleLabel": "Rôle suggéré",
+            "noteLabel": "Pourquoi cette personne ?",
+            "send": "Proposer",
+            "sentMsg": "Proposition enregistrée — un admin ou le propriétaire doit la valider",
+            "vouchRequired": "La note de recommandation est obligatoire."
+        },
+        "policy": {
+            "title": "Politique d'adhésion",
+            "hint": "Ouverte = toute personne authentifiée peut envoyer une demande (la porte d'entrée libre-service). Fermée = les demandes sont refusées ; invitations et propositions de membres fonctionnent toujours. Fermer ne supprime jamais les demandes déjà en attente.",
+            "label": "Demandes d'adhésion libre-service",
+            "toggle": "Basculer",
+            "open": "ouverte",
+            "closed": "fermée",
+            "savedMsg": "Politique d'adhésion mise à jour",
+            "advisory": "Note de confidentialité : ce projet est PRIVÉ avec une politique d'adhésion OUVERTE — tout compte authentifié qui connaît ou devine son identifiant peut envoyer une demande et apprendre ainsi que le projet existe.",
+            "confirmOpenPrivate": "Ce projet est PRIVÉ. Ouvrir la politique d'adhésion le rend accessible par identifiant : toute personne authentifiée qui connaît ou devine l'identifiant peut envoyer une demande et apprendre que le projet existe. Ouvrir quand même ?"
+        },
+        "transfer": {
+            "title": "Transférer la propriété",
+            "warn": "Confie le projet à un autre MEMBRE. Vous gardez le rôle choisi ci-dessous. Aucun retour en arrière de votre côté — seul le nouveau propriétaire pourrait vous le retransférer.",
+            "memberLabel": "Nouveau propriétaire (doit être membre)",
+            "oldRoleLabel": "Votre rôle après le transfert",
+            "confirmLabel": "Je comprends que le projet change de mains et que mes droits de propriétaire prennent fin.",
+            "submit": "Transférer la propriété",
+            "modalTitle": "Transfert de propriété — confirmation finale",
+            "modalBody": "Le projet est confié à {name}. Votre rôle devient {role}. Irréversible de votre côté.",
+            "doneMsg": "Propriété transférée",
+            "confirmRequired": "Cochez d'abord la case de confirmation.",
+            "memberRequired": "Choisissez le membre qui devient propriétaire."
+        }
+    },
     "dashboard": {
+        "memberships": {
+            "title": "Adhésions",
+            "projects": "Mes projets",
+            "owned": "Possédés",
+            "invitations": "Invitations qui vous attendent",
+            "requests": "Demandes envoyées",
+            "notices": "Avis à effacer",
+            "queue": "En attente de votre validation"
+        },
         "title": "Tableau de bord",
         "welcome": "Bienvenue sur QuickSite Admin",
         "subtitle": "Gérez votre site via une interface conviviale",
@@ -349,6 +518,9 @@
         }
     },
     "nav": {
+        "members": "Membres",
+        "myMemberships": "Mes adhésions",
+        "projectMembers": "Membres du projet",
         "login": "Connexion",
         "dashboard": "Tableau de bord",
         "apis": "APIs",

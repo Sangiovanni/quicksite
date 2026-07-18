@@ -90,6 +90,8 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `js/core/api.js` | `QuickSiteAPI.request` + `upload`; in-memory access token + session refresh (`/admin/session-refresh`, keepalive, retry-once on expiry, `setTokenSource` seam); emits `quicksite:command-executed`. |
 | `js/core/utils.js` | `QuickSiteUtils`: toasts, confirms, escaping, prefs storage, pending messages. |
 | `js/core/storage-keys.js` | Constants for every localStorage / sessionStorage key (`window.QuickSiteStorageKeys`). |
+| `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `clear()` — the createElement/textContent idiom for dynamic DOM. Loaded in `<head>` so page scripts can use it at parse time. |
+| `js/core/members-badge.js` | Membership counts (inbox awaiting me + queue awaiting my adjudication) → the Members nav badge; publishes `window.QSMembershipCounts` + the `quicksite:membership-counts-updated` event; recomputes on `quicksite:memberships-changed`. |
 | `admin.js` | Singleton `QuickSiteAdmin`: permissions, user badge, nav, delegation. |
 
 ### 5.2 Shared components
@@ -104,6 +106,9 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | File | Purpose |
 |---|---|
 | `pages/dashboard.js` | Stats cards, command activity, recent history. |
+| `pages/dashboard-memberships.js` | Fills the dashboard memberships card from the `quicksite:membership-counts-updated` event (computed by `core/members-badge.js`). |
+| `pages/memberships.js` | My Memberships page: my projects / invitation inbox / my join requests / my proposals / notices / request-to-join. Global self-service commands only. |
+| `pages/members.js` | Project Members page: roster, pending queue, invite + propose (findUser flows), join-policy toggle, ownership transfer for the edited project. |
 | `pages/command.js` | Command index list, permission-aware filter. |
 | `pages/command-form.js` | Dynamic per-command form, helper widgets, execution. |
 | `pages/history.js` | Command history listing + detail modal. |
@@ -205,6 +210,8 @@ Authentication uses **no browser storage**: the short-lived access token is page
 | `templates/pages/preview-config.php` | `window.PreviewConfig` | full preview runtime data — routes, components, settings, i18n, token (200+ fields) |
 | `templates/pages/ai/*.php` | `data-precomputed` on `.admin-ai-page` | precomputed components/routes snapshot |
 | `templates/pages/optimize.php` | inline readiness flag | `window.__cssRefinerLibReady` |
+| `templates/pages/memberships.php` | `window.QS_MEMBERSHIPS_CONFIG` + `window.QS_MEMBERSHIPS_I18N` | `myUserId` (the caller's own public id — no API response carries it), `editedProject`; JS-facing strings for dynamic rows |
+| `templates/pages/members.php` | `window.QS_MEMBERS_CONFIG` + `window.QS_MEMBERS_I18N` | `project`, `myUserId`, `myRole`, `myRank`, `roleRanks` (from `roles.php` — drives the strictly-below-my-rank pickers), `joinPolicy` + `visibility` (admin/owner only, read server-side from `members.json`); JS-facing strings |
 
 `currentProject` is the user's **edited** project (their `selected_project`, §8.0) — the client prepends a `p/<currentProject>/` marker to project-scoped Management calls so the server acts on it; `globalCommands` is the set of commands called without that marker. There is no schema or runtime validation on injected objects, and page-level extensions of `QUICKSITE_CONFIG` can silently overwrite global fields. Treat the injected globals as read-only by convention.
 
@@ -2590,6 +2597,53 @@ re-classification).
 (deduped across APIs); an endpoint field referencing a label the API didn't declare
 is flagged in the import preview and skipped. Native format only — OpenAPI / Swagger
 imports classify and map afterward in the UI.
+
+### 9.12 Memberships (/admin/memberships) & Project members (/admin/members)
+
+Two pages cover the consent-model membership surface (see COMMAND_API.md — *Project
+members* / *My memberships*), reached from the **Members** nav group. The group
+toggle carries a count badge: pending invitations + undismissed notices awaiting
+**me**, plus queue entries awaiting **my** adjudication on projects where I am
+admin/owner — computed asynchronously from existing reads by `core/members-badge.js`
+(no storage, no polling) and recomputed whenever a page dispatches
+`quicksite:memberships-changed`. The dashboard shows the same numbers as a
+six-stat **Memberships** card with links to both pages.
+
+**My Memberships** (`/admin/memberships`) is the caller's own surface and works for
+every authenticated account — a freshly-registered, 0-membership user lands here to
+accept their first invitation, and the page fires only global self-service
+commands (zero 403 noise). Sections: **My projects** (`listProjects` — role chip,
+OWNED badge, *editing* chip on the current edit target, per-row *Edit this
+project* = `setSelectedProject` + reload, *Leave* with confirm — hidden on owned
+rows), **Invitation inbox** (accept / decline, inviter + note + `sponsored_by`
+shown; a voided invitation surfaces the server's 409 message), **My join
+requests** (withdraw), **My proposals** (`listMyProposals` — pending validation
+vs. awaiting the person's answer; withdraw while pending), **Notices**
+(refused / removed / deleted with the recorded reason → dismiss, which also
+unblocks re-requesting), and a **Request to join** form (project id + mandatory
+note; every error code mapped to a human message).
+
+**Project members** (`/admin/members`) manages the **edited** project — a banner
+re-states the project id + the caller's role, and the page follows the header
+picker. Access requires membership of the edited project (`PAGE_PERMISSIONS`);
+sections render by role server-side: every rank sees the **Roster**
+(`getProjectRoster` — rank-ordered, "you" marker, `user_id` shown; change-role /
+remove actions only on rows the caller strictly outranks) and the **Propose**
+form (findUser by exact public name → pick the `{user_id, name}` match → suggested
+role + mandatory vouch). Admin/owner additionally get the **Pending queue**
+(`listMembers` — invitation / join request / proposal chips with notes and
+attribution; cancel for invites, approve / deny with mandatory reason for
+requests — approve of a proposal reports the conversion to an invitation), the
+**Invite** form (role picker limited to strictly below the caller's rank), and
+the **Join policy** toggle (open/closed; flipping a *private* project to open
+first shows the knockable-by-id privacy advisory, and the warning stays visible
+while the combination is active). The owner alone gets **Transfer ownership**
+(member picker + departing-owner role + checkbox + final confirm modal; the page
+reloads after transfer since the caller's role changed).
+
+Both pages render all dynamic rows via `QSDom` helpers (createElement +
+textContent); static structure and all labels live in the PHP templates
+(en/fr translated), with JS-facing strings injected per page (§7).
 
 ---
 
