@@ -59,8 +59,27 @@ function loadRolesConfig(): array {
 }
 
 /**
+ * The ONLY global `access` values that GRANT. A global category declaring anything
+ * else is denied by hasPermission — deliberately, so no future category can opt
+ * into a target-independent global grant. ('none' is the explicit deny used by the
+ * `disabled` category; it is a legal declaration but never grants.)
+ *
+ * RETIRED — 'owner' (C8 8.5). It resolved as resolveEffectiveRole($user) === 'owner',
+ * which returns the role on the user's selected project or else the first cached
+ * project where their membership is real — i.e. "owns ANY project anywhere",
+ * TARGET-INDEPENDENT. Since `projects.create` is access 'any', any account minted
+ * that ownership in a single call, which is the mechanism behind the F-C8-8.1-1
+ * privilege escalation. Authority in this model is per-project only (AUTH_REWORK
+ * L4/§2.2 — no superadmin, no global tier), so a global category can only sanely be
+ * "any authenticated user" or "nobody"; anything installation-wide (applyUpdate,
+ * the served-project pointer) is operator/CLI-side per GAP A. Do not reintroduce a
+ * value here without a global authority PRINCIPAL to gate on — there isn't one.
+ */
+const QS_GLOBAL_ACCESS_GRANTING = ['any'];
+
+/**
  * Load the command CATEGORY map (categories.php — the trust-coherent authz map). C6.
- * category => ['scope'=>'project'|'global', 'access'?=>'any'|'owner', 'commands'=>[]].
+ * category => ['scope'=>'project'|'global', 'access'?=>'any'|'none', 'commands'=>[]].
  *
  * @return array
  */
@@ -997,8 +1016,9 @@ function qs_auth_attempt_register(string $name, string $username, string $passwo
  * Check whether a USER may run a command — per-project category RBAC (C6/C7).
  *
  *   command -> category (categories.php) -> scope:
- *     global 'any'   → any authenticated user
- *     global 'owner' → interim: effective role must be owner
+ *     global         → granted iff the category's access rule is in
+ *                      QS_GLOBAL_ACCESS_GRANTING (today: 'any' = any
+ *                      authenticated user). Every other value DENIES.
  *     project        → the user's role ON THE PER-REQUEST PROJECT must grant that
  *                      category (owner short-circuits — owner is the top, L9)
  *   unmapped command → DENY (fail-closed). NO superadmin, NO '*'.
@@ -1008,9 +1028,10 @@ function qs_auth_attempt_register(string $name, string $username, string $passwo
  * dispatcher), NOT the user's selected_project. selected_project is a UX default
  * ONLY and is never consulted here — that closes the "selected_project is never
  * authz" rule for actions. The role always comes from the AUTHORITATIVE
- * members.json (L5). GLOBAL scope is unchanged (global-'owner' remains the GAP-A
- * interim on selected_project, relocating to operator/CLI in beta.11). Disabled
- * users are already rejected in validateBearerToken (L10), before this runs.
+ * members.json (L5). GLOBAL scope no longer has any owner-gated rule: C8 8.5
+ * retired global access:'owner' because it resolved target-independently as
+ * "owns ANY project anywhere" (see QS_GLOBAL_ACCESS_GRANTING). Disabled users are
+ * already rejected in validateBearerToken (L10), before this runs.
  *
  * @param array       $user             Resolved user (from validateBearerToken; must have 'id')
  * @param string      $command          Command name being accessed
@@ -1030,14 +1051,11 @@ function hasPermission(array $user, string $command, ?string $requestedProject =
     $scope = $def['scope'] ?? 'project';
 
     if ($scope === 'global') {
-        $access = $def['access'] ?? '';
-        if ($access === 'any') {
-            return true; // any authenticated (non-disabled) user
-        }
-        if ($access === 'owner') {
-            return resolveEffectiveRole($user) === 'owner'; // GAP-A interim owner-only
-        }
-        return false; // unknown global access rule → fail-closed
+        // Global authz is project-INDEPENDENT, so the only sound grant is "any
+        // authenticated (non-disabled) user". Every other declared value —
+        // 'none', a typo, or a reintroduced 'owner' — falls through to deny.
+        // See QS_GLOBAL_ACCESS_GRANTING for why 'owner' was retired (C8 8.5).
+        return in_array($def['access'] ?? '', QS_GLOBAL_ACCESS_GRANTING, true);
     }
 
     // project-scoped — role comes from the PER-REQUEST project (C7), never
@@ -1061,9 +1079,9 @@ function hasPermission(array $user, string $command, ?string $requestedProject =
 /**
  * Get a USER's effective role + full command list for their current project (C6).
  * Feeds getMyPermissions (admin JS reads {role, commands} to gate the UI). Category
- * RBAC: any-auth globals ∪ the role's project commands (∪ the owner-interim
- * system.admin set when the role is owner). Project source = selected_project
- * (transitional; C7 swaps to the per-request URL project).
+ * RBAC: any-auth globals ∪ the role's project commands. There is NO owner-only
+ * global set to add — global access:'owner' was retired in C8 8.5. Project source
+ * = selected_project (transitional; C7 swaps to the per-request URL project).
  *
  * @param array $user Resolved user (must have 'id')
  * @return array ['role' => string|null, 'commands' => string[]]
@@ -1071,10 +1089,11 @@ function hasPermission(array $user, string $command, ?string $requestedProject =
 function getTokenPermissions(array $user): array {
     $categories = loadCategoriesConfig();
 
-    // Commands every authenticated user may run (global, access == 'any').
+    // Commands every authenticated user may run (global, a GRANTING access rule).
     $commands = [];
     foreach ($categories as $def) {
-        if (($def['scope'] ?? '') === 'global' && ($def['access'] ?? '') === 'any') {
+        if (($def['scope'] ?? '') === 'global'
+            && in_array($def['access'] ?? '', QS_GLOBAL_ACCESS_GRANTING, true)) {
             foreach (($def['commands'] ?? []) as $cmd) {
                 $commands[$cmd] = true;
             }
@@ -1091,19 +1110,13 @@ function getTokenPermissions(array $user): array {
     }
 
     // Project commands granted by the role (owner grants all project categories).
+    // NOTE: there is deliberately no owner-only GLOBAL set to union in — the
+    // global access:'owner' rule was retired in C8 8.5 (see
+    // QS_GLOBAL_ACCESS_GRANTING). Being an owner of some project confers nothing
+    // installation-wide, so an owner's command list is exactly
+    // "any-auth globals ∪ their role's project commands".
     foreach ((getRoleCommands($role) ?? []) as $cmd) {
         $commands[$cmd] = true;
-    }
-
-    // Interim: an owner also holds the owner-only global system.admin set.
-    if ($role === 'owner') {
-        foreach ($categories as $def) {
-            if (($def['scope'] ?? '') === 'global' && ($def['access'] ?? '') === 'owner') {
-                foreach (($def['commands'] ?? []) as $cmd) {
-                    $commands[$cmd] = true;
-                }
-            }
-        }
     }
 
     $list = array_keys($commands);

@@ -497,6 +497,111 @@
     // Storage Overview
     // ========================================================================
 
+    /**
+     * One row in the owner-space project list. Returns ONE element.
+     * Built with createElement + textContent: project names are user-authored.
+     */
+    function _renderOwnerSpaceRow(project, grandTotal) {
+        const row = document.createElement('div');
+        row.className = 'owner-space__project';
+
+        const name = document.createElement('span');
+        name.className = 'owner-space__project-name';
+        name.textContent = project.name;
+        row.appendChild(name);
+
+        const bar = document.createElement('span');
+        bar.className = 'owner-space__project-bar';
+        const fill = document.createElement('span');
+        fill.className = 'owner-space__project-fill';
+        const pct = grandTotal > 0 ? (project.total / grandTotal) * 100 : 0;
+        fill.style.width = pct > 0 ? Math.max(pct, 1) + '%' : '0%';
+        bar.appendChild(fill);
+        row.appendChild(bar);
+
+        const size = document.createElement('span');
+        size.className = 'owner-space__project-size';
+        size.textContent = project.total_formatted || formatSize(project.total || 0);
+        row.appendChild(size);
+
+        // Backup/export counts only when there is something to say.
+        const extras = [];
+        if (project.backups?.count) {
+            extras.push(project.backups.count + ' ' + t('dashboard.storage.backups', 'Backups').toLowerCase());
+        }
+        if (project.exports?.count) {
+            extras.push(project.exports.count + ' ' + t('dashboard.storage.exports', 'Exports').toLowerCase());
+        }
+        if (extras.length) {
+            const meta = document.createElement('span');
+            meta.className = 'owner-space__project-meta';
+            meta.textContent = extras.join(' · ');
+            row.appendChild(meta);
+        }
+
+        return row;
+    }
+
+    /**
+     * Owner-wide space usage — every project the caller OWNS, above the
+     * per-project overview. Loaded independently so a slow disk walk never
+     * blocks the rest of the dashboard.
+     */
+    async function loadOwnerSpaceUsage(refresh) {
+        const section = document.getElementById('owner-space-section');
+        if (!section) return;
+
+        try {
+            const result = await QuickSiteAdmin.apiRequest(
+                'getMySpaceUsage', 'POST', refresh ? { refresh: true } : {}
+            );
+            const data = result.ok ? result.data?.data : null;
+
+            // Owning nothing is a normal state, not an error: stay hidden.
+            if (!data || !data.project_count) {
+                section.style.display = 'none';
+                return;
+            }
+            section.style.display = '';
+
+            const total = data.total?.size || 0;
+            document.getElementById('owner-space-total').textContent =
+                data.total?.size_formatted || formatSize(total);
+
+            const count = document.getElementById('owner-space-count');
+            count.textContent = data.project_count === 1
+                ? t('dashboard.storage.ownerOneProject', '1 project')
+                : t('dashboard.storage.ownerProjects', '{n} projects').replace('{n}', data.project_count);
+
+            const cats = data.by_category || {};
+            ['content', 'backups', 'builds', 'exports'].forEach(cat => {
+                const bytes = cats[cat]?.size || 0;
+                const seg = document.getElementById('owner-space-seg-' + cat);
+                const val = document.getElementById('owner-space-val-' + cat);
+                if (seg) {
+                    const pct = total > 0 ? (bytes / total) * 100 : 0;
+                    seg.style.width = pct > 0 ? Math.max(pct, 1) + '%' : '0%';
+                }
+                if (val) val.textContent = cats[cat]?.size_formatted || formatSize(bytes);
+            });
+
+            const list = document.getElementById('owner-space-projects');
+            list.replaceChildren(
+                ...(data.projects || []).map(p => _renderOwnerSpaceRow(p, total))
+            );
+
+            const hint = document.getElementById('owner-space-hint');
+            if (hint) {
+                hint.textContent = data.cache?.from_cache
+                    ? t('dashboard.storage.cachedHint', 'Cached — refresh to recalculate')
+                    : '';
+            }
+        } catch (error) {
+            console.error('Failed to load owner space usage:', error);
+            section.style.display = 'none';
+        }
+    }
+
     async function loadStorageOverview() {
         try {
             const result = await QuickSiteAdmin.apiRequest('getSizeInfo');
@@ -637,7 +742,10 @@
 
         try {
             const result = await QuickSiteAdmin.apiRequest('getSizeInfo');
-            const exports = result.data?.data?.secure_folders?.exports || {};
+            // getSizeInfo returns { summary, public, secure } — the folder map is
+            // secure.folders. The old `secure_folders` path never existed, so this
+            // panel always reported 0 files.
+            const exports = result.data?.data?.secure?.folders?.exports || {};
             const totalBytes = exports.size || 0;
             const fileCount = exports.files || 0;
             count.textContent = fileCount;
@@ -1520,8 +1628,24 @@
             hp('getSiteMap')         ? loadSiteMap()         : Promise.resolve(),
             hp('getCommandHistory')  ? loadRecentCommands()  : Promise.resolve(),
             hp('listProjects')       ? loadProjectManager()  : Promise.resolve(),
-            loadStorageOverview()
+            loadStorageOverview(),
+            // Owner-wide usage walks every owned project, so it loads alongside
+            // rather than gating anything; it hides itself when you own nothing.
+            hp('getMySpaceUsage')    ? loadOwnerSpaceUsage(false) : Promise.resolve()
         ]);
+
+        // Refresh control — the escape hatch for the measurement cache TTL.
+        const ownerRefresh = document.getElementById('owner-space-refresh');
+        if (ownerRefresh) {
+            ownerRefresh.addEventListener('click', async function () {
+                this.disabled = true;
+                try {
+                    await loadOwnerSpaceUsage(true);
+                } finally {
+                    this.disabled = false;
+                }
+            });
+        }
         
         // Setup project manager event listeners
         setupProjectManagerEvents();

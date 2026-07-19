@@ -19,6 +19,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -30,15 +31,16 @@ require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 function __command_injectSnippetCss(array $params = [], array $urlParams = []): ApiResponse {
     $snippetId = $params['id'] ?? null;
     $mode = $params['mode'] ?? null;
-    $projectName = $params['project'] ?? null;
-
-    // Reject a traversal payload in the project name before it reaches the
-    // stylesheet write path (beta.10 C3 F1-j). null = active-project (trusted).
-    if ($projectName !== null && !is_valid_project_name((string)$projectName)) {
-        return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('Invalid project name')
-            ->withErrors([['field' => 'project', 'reason' => 'invalid_format']]);
+    // C8 8.5 CONTAINMENT: this command REWRITES a project's live stylesheet, so
+    // the target is BOUND to the URL marker the dispatcher authorized; a body
+    // `project` is an optional echo that must match. (F-C8-8.5-1: it used to select
+    // the target freely and fall back to the SERVED main from target.php, so an
+    // editor authorized on one project could overwrite another project's style.css.)
+    $bound = qs_bind_marker_project($params, 'injectSnippetCss');
+    if ($bound['refusal'] !== null) {
+        return $bound['refusal'];
     }
+    $projectName = $bound['project'];
 
     // Validate required fields
     if (!$snippetId) {
@@ -49,20 +51,6 @@ function __command_injectSnippetCss(array $params = [], array $urlParams = []): 
     if (!$mode || !in_array($mode, ['missing', 'replace'], true)) {
         return ApiResponse::create(400, 'snippets.invalid_mode')
             ->withMessage('Mode must be "missing" or "replace"');
-    }
-
-    // Get project name if not provided
-    if (!$projectName) {
-        $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-        if (file_exists($targetFile)) {
-            $target = include $targetFile;
-            $projectName = is_array($target) ? ($target['project'] ?? null) : $target;
-        }
-    }
-
-    if (!$projectName) {
-        return ApiResponse::create(400, 'snippets.project_required')
-            ->withMessage('No project specified and no active project found');
     }
 
     // Load snippet

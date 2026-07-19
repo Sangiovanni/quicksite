@@ -17,6 +17,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 
 /**
  * Expand component references in a snippet structure for preview rendering.
@@ -175,30 +176,22 @@ function structureHasComponent(array $node): bool {
  */
 function __command_getSnippet(array $params = [], array $urlParams = []): ApiResponse {
     $snippetId = $params['id'] ?? null;
-    $projectName = $params['project'] ?? null;
 
-    // Reject a traversal payload in the project name before it reaches the
-    // snippets read path (beta.10 C3 F1-l). null = active-project (trusted).
-    if ($projectName !== null && !is_valid_project_name((string)$projectName)) {
-        return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('Invalid project name')
-            ->withErrors([['field' => 'project', 'reason' => 'invalid_format']]);
+    // C8 8.5 CONTAINMENT: the project read is BOUND to the URL marker the
+    // dispatcher authorized; a body `project` is an optional echo that must match
+    // (F-C8-8.5-1 — it used to select the target freely, falling back to the
+    // SERVED main from target.php).
+    $bound = qs_bind_marker_project($params, 'getSnippet');
+    if ($bound['refusal'] !== null) {
+        return $bound['refusal'];
     }
+    $projectName = $bound['project'];
 
     if (!$snippetId) {
         return ApiResponse::create(400, 'snippets.id_required')
             ->withMessage('Snippet ID is required');
     }
-    
-    // Get project name if not provided
-    if (!$projectName) {
-        $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-        if (file_exists($targetFile)) {
-            $target = include $targetFile;
-            $projectName = is_array($target) ? ($target['project'] ?? null) : $target;
-        }
-    }
-    
+
     // Get snippet by ID
     $snippet = getSnippetById($snippetId, $projectName);
     

@@ -565,6 +565,15 @@ $langNames = [
                         status: '<?= __adminJs('dashboard.history.columns.status') ?>',
                         duration: '<?= __adminJs('dashboard.history.columns.duration') ?>',
                         time: '<?= __adminJs('dashboard.history.columns.time') ?>'
+                    },
+                    // Strings the owner-space panel builds in JS (the panel's
+                    // static labels are rendered server-side by __admin()).
+                    storage: {
+                        ownerProjects: '<?= __adminJs('dashboard.storage.ownerProjects') ?>',
+                        ownerOneProject: '<?= __adminJs('dashboard.storage.ownerOneProject') ?>',
+                        cachedHint: '<?= __adminJs('dashboard.storage.cachedHint') ?>',
+                        backups: '<?= __adminJs('dashboard.storage.backups') ?>',
+                        exports: '<?= __adminJs('dashboard.storage.exports') ?>'
                     }
                 },
                 history: {

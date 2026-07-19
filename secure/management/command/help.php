@@ -3275,6 +3275,50 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Shows which project is currently being served by the website.'
     ],
 
+    'getMySpaceUsage' => [
+        'description' => 'Disk footprint of the projects the CALLER OWNS — an owner-wide total plus a per-project breakdown. Global-scoped (no /management/p/<id>/ marker) and takes no project parameter: ownership is resolved per project from members.json, so the response describes only projects you own. Owning nothing returns an empty, zeroed report.',
+        'method' => 'POST',
+        'parameters' => [
+            'refresh' => [
+                'type' => 'boolean',
+                'required' => false,
+                'description' => 'Bypass the measurement cache and re-walk the disk',
+                'example' => true
+            ]
+        ],
+        'example_post' => 'POST /management/getMySpaceUsage {"refresh": true}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Owner space usage retrieved successfully',
+            'data' => [
+                'total' => ['size' => 20971520, 'size_formatted' => '20.00 MB'],
+                'by_category' => [
+                    'content' => ['size' => 12582912, 'size_formatted' => '12.00 MB'],
+                    'backups' => ['size' => 6291456, 'size_formatted' => '6.00 MB'],
+                    'builds' => ['size' => 1048576, 'size_formatted' => '1.00 MB'],
+                    'exports' => ['size' => 1048576, 'size_formatted' => '1.00 MB']
+                ],
+                'projects' => [
+                    [
+                        'name' => 'quicksite',
+                        'total' => 14680064,
+                        'total_formatted' => '14.00 MB',
+                        'content' => 10485760,
+                        'backups' => ['size' => 4194304, 'size_formatted' => '4.00 MB', 'count' => 2],
+                        'exports' => ['size' => 0, 'size_formatted' => '0 B', 'count' => 0],
+                        'builds' => ['size' => 0, 'size_formatted' => '0 B'],
+                        'measured_at' => 1768800000
+                    ]
+                ],
+                'project_count' => 1,
+                'cache' => ['ttl' => 300, 'from_cache' => true, 'refreshed' => false]
+            ]
+        ],
+        'error_responses' => [],
+        'notes' => 'Projects are ordered largest-first. Sizes come from a short-lived shared cache (default TTL 300s); the project SET is never cached, so gaining, losing, creating or deleting a project is reflected immediately and only byte counts can age — use refresh=true to force a re-walk. Names of backups or exports are never returned, only sizes and counts. For the currently-edited project alone (including its backup list), use getSizeInfo, which is project-scoped.'
+    ],
+
     'setSelectedProject' => [
         'description' => 'Sets the CALLER\'s per-user editing target (selected_project) — the project their admin panel edits (header picker/badge, visual editor, preview). Distinct from switchProject, which repoints the globally SERVED project (target.php). Global-scoped (no /management/p/<id>/ marker).',
         'method' => 'POST',
@@ -4203,16 +4247,17 @@ $GLOBALS['__help_commands'] = [
                 'project' => 'quicksite',
                 'filename' => 'quicksite_export_20250120_143022.zip',
                 'size' => '2.1 MB',
-                'download_url' => '/management/downloadExport?file=quicksite_export_20250120_143022.zip',
+                'download_url' => '/management/p/quicksite/downloadExport?file=quicksite_export_20250120_143022.zip',
                 'expires' => '2025-01-21 14:30:22'
             ]
         ],
         'error_responses' => [
             '400.validation.missing_field' => 'Missing name parameter',
+            '400.project.mismatch' => 'A name/project in the request disagreed with the project in the URL',
             '404.resource.not_found' => 'Project not found',
             '500.server.missing_extension' => 'PHP ZIP extension not available'
         ],
-        'notes' => 'Exports are stored in secure/exports/ and auto-cleaned (keeps last 5). Use download=true to stream directly.'
+        'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Saved exports live in that project\'s own folder (secure/projects/<id>/exports/) and are auto-cleaned (keeps last 5). Use download=true to stream directly.'
     ],
     
     'importProject' => [
@@ -4279,7 +4324,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'quicksite_export_20250120_143022.zip'
             ]
         ],
-        'example_get' => 'GET /management/downloadExport?file=quicksite_export_20250120_143022.zip',
+        'example_get' => 'GET /management/p/quicksite/downloadExport?file=quicksite_export_20250120_143022.zip',
         'success_response' => [
             'description' => 'Streams ZIP file with appropriate headers'
         ],
@@ -4471,7 +4516,7 @@ $GLOBALS['__help_commands'] = [
                         'management' => ['size' => 500000, 'size_formatted' => '500 KB', 'description' => 'API and command system'],
                         'core' => ['size' => 300000, 'size_formatted' => '300 KB', 'description' => 'Core system files (src, config, logs)']
                     ],
-                    'active_project' => [
+                    'project' => [
                         'name' => 'quicksite',
                         'size' => 20200000,
                         'size_formatted' => '19.28 MB',
@@ -4482,14 +4527,14 @@ $GLOBALS['__help_commands'] = [
                 'secure' => ['total' => '...', 'folders' => '...', 'projects_detail' => '...']
             ]
         ],
-        'notes' => 'Categories combine related folders: projects (assets+style+build+secure/projects), backups (all project backups), admin (public/admin+secure/admin), management (API system), core (src+config+logs). Used by dashboard storage overview widget.'
+        'notes' => 'Project-scoped: the report covers ONLY the project in the URL marker. secure.projects_detail holds that single project (name, size, file count, its backups); it does not enumerate other projects on the installation, and folder entries carry no absolute filesystem path. summary.project names the reported project (it is NOT the globally served main). Categories combine related folders: projects, backups, admin (public/admin+secure/admin), management (API system), core (src+config+logs). Used by dashboard storage overview widget.'
     ],
     
     'clearExports' => [
-        'description' => 'Clears all exported project ZIP files from the exports folder. Useful to free up disk space after exports have been downloaded.',
+        'description' => 'Clears the exported project ZIP files belonging to the targeted project. Useful to free up disk space after exports have been downloaded.',
         'method' => 'DELETE',
         'parameters' => [],
-        'example_delete' => 'DELETE /management/clearExports',
+        'example_delete' => 'DELETE /management/p/quicksite/clearExports',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -4502,7 +4547,7 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '500.server.delete_failed' => 'Failed to delete some export files'
         ],
-        'notes' => 'Deletes all .zip files in secure/exports/ folder. Does not affect project data or backups.'
+        'notes' => 'Project-scoped: deletes .zip files only in the targeted project\'s own exports folder (secure/projects/<id>/exports/). It cannot reach another project\'s archives. Does not affect project data or backups.'
     ],
 
     // ==========================================
@@ -6343,36 +6388,6 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Read-only check — does not modify anything. Uses GitHub REST API (no auth required for public repos). Auto-detects install method (git clone vs ZIP download). When GitHub is unreachable, returns checked=false with current version info.'
     ],
 
-    'applyUpdate' => [
-        'description' => 'Updates QuickSite to the latest version. Uses git pull for git installs or downloads and extracts a ZIP for manual installs. Superadmin only.',
-        'method' => 'POST',
-        'parameters' => [],
-        'success_response' => [
-            'status' => 200,
-            'code' => 'update.success',
-            'message' => 'Updated successfully from 1.0.0-beta.1 to 1.1.0-beta.1',
-            'data' => [
-                'previous_version' => '1.0.0-beta.1',
-                'current_version' => '1.1.0-beta.1',
-                'latest_version' => '1.1.0-beta.1',
-                'method' => 'git',
-                'branch' => 'main',
-                'commit_before' => 'abc1234',
-                'commit_after' => 'def5678',
-                'pull_output' => 'Updating abc1234..def5678\nFast-forward\n ...',
-                'updated' => true
-            ]
-        ],
-        'error_responses' => [
-            '200.update.already_up_to_date' => 'Already at the latest version',
-            '409.update.git_dirty' => 'Uncommitted changes in working directory (git installs only)',
-            '500.update.git_pull_failed' => 'git pull encountered an error (merge conflict, etc.)',
-            '500.update.zip_failed' => 'ZIP download or extraction failed',
-            '502.update.github_unreachable' => 'Cannot reach GitHub API'
-        ],
-        'notes' => 'Superadmin only. For git installs: requires clean working directory (no uncommitted changes), runs git fetch + git pull. For ZIP installs: downloads source archive, extracts and copies files while preserving user config files (target.php, auth.php, roles.php) and project data (secure/projects/). Always re-reads VERSION after update to confirm success.'
-    ],
-    
     'getIframeSandbox' => [
         'description' => 'Returns the embed sandbox configuration for the active project. Shows tag-based rules (tag → domain → sandbox permissions) and the default sandbox policy.',
         'method' => 'GET',
@@ -6588,7 +6603,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'authentication' => ['login', 'refreshSession', 'logoutSession', 'register', 'changePassword'],
                 'role_management' => ['listRoles', 'getMyPermissions', 'createRole', 'editRole', 'deleteRole'],
                 'snippet_management' => ['listSnippets', 'getSnippet', 'createSnippet', 'deleteSnippet', 'duplicateSnippet', 'insertSnippet'],
-                'system_updates' => ['checkForUpdates', 'applyUpdate'],
+                'system_updates' => ['checkForUpdates'],
                 'embed_security' => ['getIframeSandbox', 'setIframeSandbox', 'removeIframeSandbox'],
                 'documentation' => ['help']
             ],

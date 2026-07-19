@@ -375,7 +375,13 @@
             "clearAll": "Clear All",
             "confirmClearExports": "Clear all export files?",
             "exportsCleared": "Exports cleared",
-            "backupsTip": "Switch project to manage other projects\u2019 backups."
+            "backupsTip": "Switch project to manage other projects\u2019 backups.",
+            "ownerTitle": "My total space",
+            "ownerProjects": "{n} projects",
+            "ownerOneProject": "1 project",
+            "content": "Content",
+            "refresh": "Refresh",
+            "cachedHint": "Cached \u2014 refresh to recalculate"
         },
         "structure": {
             "title": "Structure Overview",

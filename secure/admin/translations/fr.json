@@ -310,7 +310,13 @@
             "clearAll": "Tout supprimer",
             "confirmClearExports": "Supprimer tous les fichiers d'export ?",
             "exportsCleared": "Exports supprimés",
-            "backupsTip": "Changez de projet pour gérer les sauvegardes d\u2019autres projets."
+            "backupsTip": "Changez de projet pour gérer les sauvegardes d\u2019autres projets.",
+            "ownerTitle": "Mon espace total",
+            "ownerProjects": "{n} projets",
+            "ownerOneProject": "1 projet",
+            "content": "Contenu",
+            "refresh": "Actualiser",
+            "cachedHint": "En cache \u2014 actualiser pour recalculer"
         },
         "structure": {
             "title": "Aperçu de la Structure",

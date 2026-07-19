@@ -19,6 +19,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -31,35 +32,21 @@ function __command_duplicateSnippet(array $params = [], array $urlParams = []): 
     $sourceId = $params['id'] ?? null;
     $newId = $params['newId'] ?? null;
     $newName = $params['newName'] ?? null;
-    $projectName = $params['project'] ?? null;
-
-    // Reject a traversal payload in the project name before it reaches the
-    // snippets path (beta.10 C3 F1-k). null = active-project (trusted).
-    if ($projectName !== null && !is_valid_project_name((string)$projectName)) {
-        return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('Invalid project name')
-            ->withErrors([['field' => 'project', 'reason' => 'invalid_format']]);
+    // C8 8.5 CONTAINMENT: both the source read and the duplicate WRITE are BOUND
+    // to the URL marker the dispatcher authorized; a body `project` is an optional
+    // echo that must match (F-C8-8.5-1 — it used to select the target freely,
+    // falling back to the SERVED main from target.php).
+    $bound = qs_bind_marker_project($params, 'duplicateSnippet');
+    if ($bound['refusal'] !== null) {
+        return $bound['refusal'];
     }
+    $projectName = $bound['project'];
 
     if (!$sourceId) {
         return ApiResponse::create(400, 'snippets.id_required')
             ->withMessage('Source snippet ID is required');
     }
-    
-    // Get project name if not provided
-    if (!$projectName) {
-        $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-        if (file_exists($targetFile)) {
-            $target = include $targetFile;
-            $projectName = is_array($target) ? ($target['project'] ?? null) : $target;
-        }
-    }
-    
-    if (!$projectName) {
-        return ApiResponse::create(400, 'snippets.project_required')
-            ->withMessage('No project specified and no active project found');
-    }
-    
+
     // Get source snippet
     $sourceSnippet = getSnippetById($sourceId, $projectName);
     

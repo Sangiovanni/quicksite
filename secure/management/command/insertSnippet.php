@@ -25,6 +25,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 
 /**
  * Generate a unique text key prefix based on structure type and name
@@ -450,15 +451,18 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
             ->withMessage('Snippet ID is required');
     }
     
-    // Get target info from target.php
-    $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-    if (!file_exists($targetFile)) {
-        return ApiResponse::create(500, 'config.no_target')
-            ->withMessage('No project target configured');
+    // C8 8.5 CONTAINMENT (F-C8-8.5-5): source the snippet from the project this
+    // request is authorized for — the URL marker — NOT from the globally SERVED
+    // main in target.php. The insert itself already writes into the marker
+    // (PROJECT_PATH), so reading the source from a different project made one
+    // operation straddle two: every editor on every project read the served main's
+    // snippet library, and the command silently misbehaved for non-served projects.
+    $bound = qs_bind_marker_project($params, 'insertSnippet');
+    if ($bound['refusal'] !== null) {
+        return $bound['refusal'];
     }
-    $target = include $targetFile;
-    $projectName = is_array($target) ? ($target['project'] ?? null) : $target;
-    
+    $projectName = $bound['project'];
+
     // Load snippet
     $snippet = getSnippetById($snippetId, $projectName);
     if (!$snippet) {

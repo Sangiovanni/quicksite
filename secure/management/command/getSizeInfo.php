@@ -14,6 +14,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 
 /**
  * Calculate directory size recursively
@@ -128,9 +129,10 @@ if (!function_exists('sizeinfo_formatSize')) {
 if (!function_exists('sizeinfo_getFolderInfo')) {
     function sizeinfo_getFolderInfo($path, $name = null) {
         $size = sizeinfo_getDirectorySize($path);
+        // NOTE: the absolute filesystem `path` is deliberately NOT returned (C8 8.5)
+        // — it disclosed the install layout to every authenticated caller.
         return [
             'name' => $name ?? basename($path),
-            'path' => $path,
             'exists' => is_dir($path),
             'size' => $size,
             'size_formatted' => sizeinfo_formatSize($size),
@@ -147,6 +149,13 @@ if (!function_exists('sizeinfo_getFolderInfo')) {
  * @return ApiResponse
  */
 function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiResponse {
+    // C8 8.5: the report is scoped to the project this request was authorized for.
+    $bound = qs_bind_marker_project($params, 'getSizeInfo');
+    if ($bound['refusal'] !== null) {
+        return $bound['refusal'];
+    }
+    $markerProject = $bound['project'];
+
     // Normalize paths using realpath for proper resolution
     $publicRoot = realpath(PUBLIC_CONTENT_PATH) ?: PUBLIC_CONTENT_PATH;
     $secureRoot = realpath(SECURE_FOLDER_PATH) ?: SECURE_FOLDER_PATH;
@@ -190,82 +199,79 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
     $secureFolders = [
         'admin' => sizeinfo_getFolderInfo($secureRoot . '/admin', 'admin'),
         'config' => sizeinfo_getFolderInfo($secureRoot . '/config', 'config'),
-        'exports' => sizeinfo_getFolderInfo($secureRoot . '/exports', 'exports'),
+        // Exports moved under each project in C8 8.5, so this reports THIS
+        // project's archives rather than an installation-wide shared folder.
+        'exports' => sizeinfo_getFolderInfo($secureRoot . '/projects/' . $markerProject . '/exports', 'exports'),
         'logs' => sizeinfo_getFolderInfo($secureRoot . '/logs', 'logs'),
         'management' => sizeinfo_getFolderInfo($secureRoot . '/management', 'management'),
         'src' => sizeinfo_getFolderInfo($secureRoot . '/src', 'src'),
     ];
     
     // ========================================
-    // PROJECTS BREAKDOWN (most important!)
+    // PROJECT BREAKDOWN — THE MARKER PROJECT ONLY
     // ========================================
-    $projectsRoot = $secureRoot . '/projects';
+    // C8 8.5 CONTAINMENT (F-C8-8.5-4): this used to glob secure/projects/* and
+    // report EVERY project on the installation — name, size, file count, the
+    // served-main flag and each project's BACKUP NAMES — to any caller holding
+    // content.read, which is `viewer`, the lowest role in the model. That is an
+    // enumeration surface across tenants, and it contradicted both the listProjects
+    // membership filter and the decision to drop listUsers for the same reason.
+    // The report is now scoped to the single project this request was authorized
+    // for, and the served-main flag is gone (it named a project the caller may have
+    // no relationship with).
+    $projectDir   = $secureRoot . '/projects/' . $markerProject;
+    $projectSize  = sizeinfo_getDirectorySize($projectDir);
     $projectsData = [
-        'total' => sizeinfo_getFolderInfo($projectsRoot, 'projects'),
-        'projects' => []
+        'total'    => [
+            'name'           => 'project',
+            'exists'         => is_dir($projectDir),
+            'size'           => $projectSize,
+            'size_formatted' => sizeinfo_formatSize($projectSize),
+            'files'          => sizeinfo_countFiles($projectDir),
+        ],
+        'projects' => [],
     ];
-    
-    // Get active project
-    $targetFile = $secureRoot . '/management/config/target.php';
-    $activeProject = null;
-    if (file_exists($targetFile)) {
-        $target = include $targetFile;
-        $activeProject = is_array($target) ? ($target['project'] ?? null) : $target;
-    }
-    
-    // Iterate through each project
-    if (is_dir($projectsRoot)) {
-        $projectDirs = glob($projectsRoot . '/*', GLOB_ONLYDIR);
-        
-        foreach ($projectDirs as $projectDir) {
-            $projectName = basename($projectDir);
-            $projectSize = sizeinfo_getDirectorySize($projectDir);
-            
-            // Get backup sizes for this project
-            $backupsDir = $projectDir . '/backups';
-            $backupsInfo = [
-                'total' => sizeinfo_getFolderInfo($backupsDir, 'backups'),
-                'items' => []
-            ];
-            
-            if (is_dir($backupsDir)) {
-                $backupDirs = glob($backupsDir . '/*', GLOB_ONLYDIR);
-                foreach ($backupDirs as $backupDir) {
-                    $backupName = basename($backupDir);
-                    $backupSize = sizeinfo_getDirectorySize($backupDir);
-                    $backupsInfo['items'][] = [
-                        'name' => $backupName,
-                        'size' => $backupSize,
-                        'size_formatted' => sizeinfo_formatSize($backupSize),
-                        'is_pre_restore' => strpos($backupName, 'pre-restore') === 0
-                    ];
-                }
-                // Sort by size descending
-                usort($backupsInfo['items'], function($a, $b) {
-                    return $b['size'] - $a['size'];
-                });
-            }
-            
-            // Calculate project size without backups
-            $projectSizeWithoutBackups = $projectSize - $backupsInfo['total']['size'];
-            
-            $projectsData['projects'][$projectName] = [
-                'name' => $projectName,
-                'is_active' => $projectName === $activeProject,
-                'total' => [
-                    'size' => $projectSize,
-                    'size_formatted' => sizeinfo_formatSize($projectSize),
-                    'files' => sizeinfo_countFiles($projectDir)
-                ],
-                'without_backups' => [
-                    'size' => $projectSizeWithoutBackups,
-                    'size_formatted' => sizeinfo_formatSize($projectSizeWithoutBackups)
-                ],
-                'backups' => $backupsInfo
+
+    $backupsDir  = $projectDir . '/backups';
+    $backupsInfo = [
+        'total' => sizeinfo_getFolderInfo($backupsDir, 'backups'),
+        'items' => []
+    ];
+
+    if (is_dir($backupsDir)) {
+        $backupDirs = glob($backupsDir . '/*', GLOB_ONLYDIR);
+        foreach ($backupDirs as $backupDir) {
+            $backupName = basename($backupDir);
+            $backupSize = sizeinfo_getDirectorySize($backupDir);
+            $backupsInfo['items'][] = [
+                'name' => $backupName,
+                'size' => $backupSize,
+                'size_formatted' => sizeinfo_formatSize($backupSize),
+                'is_pre_restore' => strpos($backupName, 'pre-restore') === 0
             ];
         }
+        // Sort by size descending
+        usort($backupsInfo['items'], function($a, $b) {
+            return $b['size'] - $a['size'];
+        });
     }
-    
+
+    $projectSizeWithoutBackups = $projectSize - $backupsInfo['total']['size'];
+
+    $projectsData['projects'][$markerProject] = [
+        'name' => $markerProject,
+        'total' => [
+            'size' => $projectSize,
+            'size_formatted' => sizeinfo_formatSize($projectSize),
+            'files' => sizeinfo_countFiles($projectDir)
+        ],
+        'without_backups' => [
+            'size' => $projectSizeWithoutBackups,
+            'size_formatted' => sizeinfo_formatSize($projectSizeWithoutBackups)
+        ],
+        'backups' => $backupsInfo
+    ];
+
     // Add projects to secure folders
     $secureFolders['projects'] = $projectsData['total'];
     
@@ -315,16 +321,16 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
                + $publicRootFilesSize
                + $secureRootFilesSize;
     
-    // Exports: secure/exports (zip archives)
+    // Exports: this project's exports folder (zip archives)
     $exportsSpace = $secureFolders['exports']['size'];
-    
-    // Total backups across all projects
+
+    // Backups for THIS project (the report is single-project since C8 8.5)
     $totalBackupsSize = 0;
     foreach ($projectsData['projects'] as $project) {
         $totalBackupsSize += $project['backups']['total']['size'];
     }
-    
-    // Total project content (without backups)
+
+    // This project's content (without backups)
     $totalProjectContentSize = 0;
     foreach ($projectsData['projects'] as $project) {
         $totalProjectContentSize += $project['without_backups']['size'];
@@ -372,14 +378,17 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
                 'description' => 'Core system files (src, config, logs)'
             ]
         ],
-        'active_project' => $activeProject ? [
-            'name' => $activeProject,
-            'size' => $projectsData['projects'][$activeProject]['total']['size'] ?? 0,
-            'size_formatted' => $projectsData['projects'][$activeProject]['total']['size_formatted'] ?? '0 B',
-            'backups_size' => $projectsData['projects'][$activeProject]['backups']['total']['size'] ?? 0,
-            'backups_size_formatted' => $projectsData['projects'][$activeProject]['backups']['total']['size_formatted'] ?? '0 B',
-            'backups_count' => count($projectsData['projects'][$activeProject]['backups']['items'] ?? [])
-        ] : null
+        // Was 'active_project' — the globally SERVED main, which named a project the
+        // caller may have no relationship with. It is now simply the project this
+        // report covers: the authorized marker (C8 8.5).
+        'project' => [
+            'name' => $markerProject,
+            'size' => $projectsData['projects'][$markerProject]['total']['size'] ?? 0,
+            'size_formatted' => $projectsData['projects'][$markerProject]['total']['size_formatted'] ?? '0 B',
+            'backups_size' => $projectsData['projects'][$markerProject]['backups']['total']['size'] ?? 0,
+            'backups_size_formatted' => $projectsData['projects'][$markerProject]['backups']['total']['size_formatted'] ?? '0 B',
+            'backups_count' => count($projectsData['projects'][$markerProject]['backups']['items'] ?? [])
+        ]
     ];
     
     return ApiResponse::create(200, 'size_info.success')

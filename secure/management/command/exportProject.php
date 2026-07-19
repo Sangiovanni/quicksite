@@ -27,6 +27,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 
 // Allowed keys in config.json export (security: no arbitrary PHP execution)
 const EXPORT_ALLOWED_CONFIG_KEYS = [
@@ -211,13 +212,20 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
     // Get final ZIP size
     $zipSize = filesize($zipPath);
     
-    // If save=true, store in exports folder for later download
+    // If save=true, store in the PROJECT'S OWN exports folder for later download.
+    // C8 8.5 (F-C8-8.5-2/3): exports used to share one installation-wide
+    // secure/exports directory, which made every archive addressable from ANY
+    // authorized marker — downloadExport could stream another project's archive and
+    // clearExports could delete it. Per-project storage removes the shared namespace
+    // instead of filtering it, so the containment is structural.
     if ($save) {
-        $exportDir = SECURE_FOLDER_PATH . '/exports';
-        if (!is_dir($exportDir)) {
-            mkdir($exportDir, 0755, true);
+        $exportDir = qs_ensure_project_exports_dir($projectName);
+        if ($exportDir === null) {
+            unlink($zipPath);
+            return ApiResponse::create(500, 'server.move_failed')
+                ->withMessage('Failed to create the export directory');
         }
-        
+
         $finalPath = $exportDir . '/' . $zipFileName;
         
         // Move ZIP to exports folder
@@ -239,13 +247,14 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
             ->withData([
                 'project' => $projectName,
                 'filename' => $zipFileName,
-                'path' => 'secure/exports/' . $zipFileName,
+                'path' => 'secure/projects/' . $projectName . '/exports/' . $zipFileName,
                 'size' => formatExportBytes($zipSize),
                 'size_bytes' => $zipSize,
                 'files_count' => $stats['files'],
                 'directories_count' => $stats['directories'],
                 'original_size' => formatExportBytes($stats['total_size']),
-                'download_url' => '/management/downloadExport?file=' . urlencode($zipFileName),
+                // downloadExport is project-scoped, so the URL carries the marker.
+                'download_url' => '/management/p/' . rawurlencode($projectName) . '/downloadExport?file=' . urlencode($zipFileName),
                 'expires' => date('Y-m-d H:i:s', time() + 86400), // 24 hours
                 'format' => 'v2.0-secure',
                 'note' => 'Secure format: PHP files excluded, will be rebuilt on import'

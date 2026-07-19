@@ -3126,6 +3126,104 @@ kbd {
     color: var(--admin-text);
 }
 
+/* Owner Space Usage — aggregate across every project the caller owns.
+   Reuses the .storage-overview shell; only the per-project list is new. */
+.owner-space__count {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-normal);
+    color: var(--admin-text-muted);
+    margin-left: var(--space-sm);
+}
+
+.owner-space__projects {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--admin-border);
+}
+
+.owner-space__project {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 3fr auto;
+    align-items: center;
+    gap: var(--space-sm) var(--space-md);
+    font-size: var(--font-size-sm);
+}
+
+.owner-space__project-name {
+    color: var(--admin-text);
+    font-weight: var(--font-weight-medium);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.owner-space__project-bar {
+    display: block;
+    height: 8px;
+    background: var(--admin-bg-tertiary);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.owner-space__project-fill {
+    display: block;
+    height: 100%;
+    background: var(--admin-accent, var(--admin-text-muted));
+    border-radius: var(--radius-sm);
+}
+
+.owner-space__project-size {
+    color: var(--admin-text);
+    font-weight: var(--font-weight-semibold);
+    white-space: nowrap;
+}
+
+/* Counts sit under the name, spanning the row so they never squeeze the bar. */
+.owner-space__project-meta {
+    grid-column: 1 / -1;
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+}
+
+.owner-space__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
+}
+
+.owner-space__hint {
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+}
+
+.owner-space__refresh {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+    background: none;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+}
+
+.owner-space__refresh:hover:not(:disabled) {
+    color: var(--admin-text);
+    background: var(--admin-bg-tertiary);
+}
+
+.owner-space__refresh:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
 /* Manage Space */
 .manage-space {
     margin-top: var(--space-lg);

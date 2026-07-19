@@ -14,6 +14,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -25,9 +26,21 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 function __command_downloadExport(array $params = [], array $urlParams = []): ApiResponse {
     // Merge query parameters for GET requests
     $params = array_merge($_GET, $params);
-    
+
+    // C8 8.5 CONTAINMENT (F-C8-8.5-2): the archive is read from the PROJECT'S OWN
+    // exports directory, bound to the URL marker the dispatcher authorized. This
+    // used to read a shared installation-wide secure/exports, where the traversal
+    // guard below still held but the directory was not partitioned by project — so
+    // an admin on any project could name and stream another project's full archive
+    // (which carries its data/ tree, api-endpoints.json included).
+    $bound = qs_bind_marker_project($params, 'downloadExport');
+    if ($bound['refusal'] !== null) {
+        return $bound['refusal'];
+    }
+    $projectName = $bound['project'];
+
     $filename = trim($params['file'] ?? '');
-    
+
     if (empty($filename)) {
         return ApiResponse::create(400, 'validation.missing_field')
             ->withMessage('Export filename is required')
@@ -48,8 +61,8 @@ function __command_downloadExport(array $params = [], array $urlParams = []): Ap
             ->withErrors(['file' => 'Must be a .zip file']);
     }
     
-    // Check exports directory
-    $exportDir = SECURE_FOLDER_PATH . '/exports';
+    // Check the project's own exports directory
+    $exportDir = qs_project_exports_dir($projectName);
     $filePath = $exportDir . '/' . $filename;
     
     if (!file_exists($filePath)) {

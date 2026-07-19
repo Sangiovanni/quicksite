@@ -16,6 +16,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -34,24 +35,36 @@ function __command_clearExports(array $params = [], array $urlParams = []): ApiR
             ->withErrors(['confirm' => 'Set confirm=true to proceed']);
     }
     
-    $exportDir = SECURE_FOLDER_PATH . '/exports';
-    
+    // C8 8.5 CONTAINMENT (F-C8-8.5-3): clearing is confined to the PROJECT'S OWN
+    // exports directory, bound to the URL marker the dispatcher authorized. This
+    // used to glob a shared installation-wide secure/exports — with no filter it
+    // deleted EVERY project's archives from any authorized marker, and the response
+    // then enumerated the filenames it had destroyed (a cross-project oracle).
+    $bound = qs_bind_marker_project($params, 'clearExports');
+    if ($bound['refusal'] !== null) {
+        return $bound['refusal'];
+    }
+    $exportDir = qs_project_exports_dir($bound['project']);
+
     if (!is_dir($exportDir)) {
         return ApiResponse::create(200, 'operation.success')
             ->withMessage('Exports folder does not exist (nothing to clear)')
             ->withData(['deleted_count' => 0]);
     }
     
+    // `project` survives only as a redundant echo of the marker: qs_bind_marker_project
+    // above already refused any value that disagreed, so it can no longer widen or
+    // redirect the glob. Both branches now stay inside this project's own directory.
+    // (The C3 F1-g traversal/glob-wildcard guard is kept — defence in depth, since
+    // this value still reaches glob() + unlink().)
     $projectFilter = trim($params['project'] ?? '');
-    // Reject a traversal / glob-wildcard payload in the filter before it reaches
-    // glob() + unlink() (beta.10 C3 F1-g). Empty filter = clear all (unchanged).
     if ($projectFilter !== '' && !is_valid_project_name($projectFilter)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid project filter')
             ->withErrors([['field' => 'project', 'reason' => 'invalid_format']]);
     }
     $pattern = $projectFilter ? $exportDir . '/' . $projectFilter . '_export_*.zip' : $exportDir . '/*.zip';
-    
+
     $files = glob($pattern);
     
     if ($files === false || count($files) === 0) {

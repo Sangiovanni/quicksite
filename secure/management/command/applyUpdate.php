@@ -1,16 +1,36 @@
 <?php
 /**
- * Apply Update Command
- * 
+ * Apply Update Command — OPERATOR / CLI ONLY. NOT a routed HTTP command.
+ *
  * Updates QuickSite to the latest version using git pull (for git installs)
  * or ZIP download + extraction (for manual installs).
  * Creates a backup before updating and validates the result.
- * 
- * @method POST
- * @route /management/applyUpdate
- * @auth required (superadmin only)
- * @return ApiResponse Update result
- * 
+ *
+ * ── Why this is unrouted (C8 8.5, executing AUTH_REWORK §2.3 GAP A) ──────────
+ * This command replaces the CODE that runs every project on the installation, and
+ * it does so with no confirmation step — it pulls as soon as a newer tag exists.
+ * The authorization model has no principal to gate that on: authority is
+ * per-project only (no superadmin, no global tier — AUTH_REWORK L4/§2.2), and a
+ * per-project role cannot sanely imply "you may rewrite the shared substrate".
+ * It previously sat in the GLOBAL `system.admin` category with access 'owner',
+ * which hasPermission resolved as "owns ANY project anywhere" — target-independent
+ * — while projects.create is access 'any', so any account minted that ownership in
+ * a single call. That is the F-C8-8.1-1 escalation mechanism, pointed at an
+ * arbitrary-code-execution primitive.
+ *
+ * It is therefore ABSENT from routes.php: the dispatcher 404s /management/applyUpdate
+ * and no token can reach it. Invoke it from the deploy/CLI side instead.
+ * `checkForUpdates` remains routed (system.read, any authenticated user), so the
+ * admin panel still reports that an update is available — it just cannot apply it.
+ *
+ * The command function is kept intact and callable in-process (define
+ * COMMAND_INTERNAL_CALL and call __command_applyUpdate()). A first-class CLI/deploy
+ * entry point is beta.11 build/deploy-phase work per GAP A.
+ *
+ * @method  (not routed)
+ * @auth    operator / filesystem-level — no token grants this
+ * @return  ApiResponse Update result
+ *
  * @version 1.0.0
  */
 

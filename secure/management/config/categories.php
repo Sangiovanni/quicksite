@@ -166,12 +166,6 @@ return [
         'commands' => ['getCommandHistory', 'clearCommandHistory'],
     ],
 
-    // Workflow-editor tooling (reads global admin workflow templates). admin+.
-    'workflow' => [
-        'scope' => 'project',
-        'commands' => ['listWorkflowBlocks', 'lintWorkflows'],
-    ],
-
     // Owner-only project operations.
     'project.delete' => [
         'scope' => 'project',
@@ -300,12 +294,30 @@ return [
         'commands' => ['listRoles', 'getMyPermissions'],
     ],
 
+    // Workflow-editor tooling. These read ONLY the workflow block/lint templates
+    // shipped under secure/admin/workflows — QuickSite's own catalogue, not any
+    // project's data — so they were re-tagged GLOBAL in C8 8.5. As project-scoped
+    // admin+ they demanded a marker and an admin membership for a read that touches
+    // no project at all: the error direction was fail-SAFE, but the tag misdescribed
+    // the command and forced the editor to carry a marker it did not need.
+    'workflow' => [
+        'scope' => 'global',
+        'access' => 'any',
+        'commands' => ['listWorkflowBlocks', 'lintWorkflows'],
+    ],
+
     // "My projects" surface (OUTPUT filtered to memberships by C7/C8; the command
     // itself is any-auth). getActiveProject = "my current/last project".
+    // getMySpaceUsage aggregates disk usage across the projects the caller OWNS —
+    // global because an owner-wide total is not a fact about any one project and so
+    // cannot carry a marker. It takes no project parameter (nothing to retarget)
+    // and resolves ownership per project from members.json, so it reports only what
+    // the caller owns; it is NOT a return of the installation-wide enumeration
+    // removed from getSizeInfo in C8 8.5.
     'projects.list' => [
         'scope' => 'global',
         'access' => 'any',
-        'commands' => ['listProjects', 'getActiveProject'],
+        'commands' => ['listProjects', 'getActiveProject', 'getMySpaceUsage'],
     ],
 
     // Any authenticated user may create a project (and becomes its sole owner).
@@ -336,23 +348,21 @@ return [
         'commands' => ['checkForUpdates'],
     ],
 
-    // INTERIM owner-only home for the operator commands pending relocation:
-    //   applyUpdate → operator/deploy in beta.11 (AUTH_REWORK §2.3 GAP A). Until then,
-    //   only a project owner may run it.
-    //   (The generateToken/listTokens/revokeToken trio was REMOVED in C5b —
-    //   sessions via login/refreshSession replace lifetime tokens.)
-    //   switchProject LEFT this category in C8 8.1 — "owns any project anywhere" is
-    //   the wrong gate for repointing the served main; it is now project-scoped
-    //   owner-only under project.serve.
-    'system.admin' => [
-        'scope' => 'global',
-        'access' => 'owner',
-        'commands' => [
-            'applyUpdate',
-        ],
-    ],
+    // NOTE — there is deliberately NO owner-gated global category. The former
+    // 'system.admin' (access 'owner') was retired in C8 8.5 along with the rule
+    // itself: hasPermission resolved it as "owns ANY project anywhere",
+    // target-independent, while projects.create is access 'any' — so any account
+    // minted that ownership in one call (the F-C8-8.1-1 mechanism). Its last member,
+    // applyUpdate, is now operator/CLI-side per AUTH_REWORK §2.3 GAP A: it is
+    // UNROUTED (absent from routes.php) and invoked from the deploy/CLI side, so no
+    // token can reach a command that git-pulls the installation. checkForUpdates
+    // stays routed under system.read, so the panel still reports available updates.
+    // (The generateToken/listTokens/revokeToken trio was REMOVED in C5b; switchProject
+    // moved to the project-scoped owner-only project.serve in C8 8.1.)
+    // Global categories may only declare an access in QS_GLOBAL_ACCESS_GRANTING
+    // ('any') or the explicit deny 'none' — see AuthManagement.php.
 
-    // DISABLED — denied to everyone (access neither 'any' nor 'owner' → hasPermission
+    // DISABLED — denied to everyone ('none' is not a granting rule → hasPermission
     // returns false). Custom-role management has no place in the fixed-role model
     // (L8); editRole additionally fatals on the category-based roles.php shape. These
     // are vestigial pending C8's command-surface decision (remove or reconceive).

@@ -65,11 +65,11 @@ quicksite/
 │   │       ├── translate/        # Translation files (en.json, fr.json, etc.)
 │   │       ├── data/             # Project data (aliases, asset metadata)
 │   │       ├── public/           # Project-specific public files
+│   │       ├── exports/          # This project's export ZIPs (generated)
 │   │       └── backups/          # Project backups (gitignored)
 │   ├── snippets/                 # Reusable component snippets (nav, cards, forms, etc.)
 │   ├── nginx/                    # Auto-generated nginx config (dynamic_routes.conf)
 │   ├── cron/                     # Optional cron scripts (nginx reload fallback)
-│   ├── exports/                  # Project export ZIPs (generated)
 │   └── logs/                     # Command execution logs (gitignored)
 │
 ├── docs/                         # Documentation (this folder)

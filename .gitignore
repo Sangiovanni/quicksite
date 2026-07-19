@@ -126,8 +126,16 @@ secure/projects/quicksite/config/members.json.lock
 # auto-clears on endpoint config change.
 secure/cache/resolver/
 
-# Exports folder (temporary export ZIPs)
+# Owner space-usage cache (beta.10 C8 8.5b). Measured per-project disk sizes
+# behind getMySpaceUsage. Per-deployment runtime state — never committed.
+# Entries expire on a TTL, are pruned when their project disappears, and
+# getMySpaceUsage's refresh=true rewrites them.
+secure/cache/space/
+
+# Exports folder — legacy shared location. Exports moved under each project in
+# beta.10 C8 8.5 (secure/projects/<id>/exports/); both are runtime artifacts.
 secure/exports/
+secure/projects/*/exports/
 
 # Nginx config (auto-generated per install)
 secure/nginx/

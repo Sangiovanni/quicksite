@@ -19,6 +19,66 @@ $baseUrl = rtrim(BASE_URL, '/');
     <p class="admin-page-header__subtitle"><?= __admin('dashboard.subtitle') ?></p>
 </div>
 
+<!-- Owner Space Usage — every project the caller OWNS, above the per-project view -->
+<section class="admin-section" id="owner-space-section" style="display: none;">
+    <div class="storage-overview owner-space">
+        <div class="storage-overview__header">
+            <h3 class="storage-overview__title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                </svg>
+                <?= __admin('dashboard.storage.ownerTitle', 'My total space') ?>
+                <span class="owner-space__count" id="owner-space-count"></span>
+            </h3>
+            <span class="storage-overview__total" id="owner-space-total">--</span>
+        </div>
+
+        <div class="storage-overview__bar" id="owner-space-bar">
+            <div class="storage-overview__segment storage-overview__segment--projects" id="owner-space-seg-content" style="width: 0%"></div>
+            <div class="storage-overview__segment storage-overview__segment--backups" id="owner-space-seg-backups" style="width: 0%"></div>
+            <div class="storage-overview__segment storage-overview__segment--builds" id="owner-space-seg-builds" style="width: 0%"></div>
+            <div class="storage-overview__segment storage-overview__segment--exports" id="owner-space-seg-exports" style="width: 0%"></div>
+        </div>
+
+        <div class="storage-overview__legend">
+            <div class="storage-overview__legend-item">
+                <span class="storage-overview__legend-color storage-overview__legend-color--projects"></span>
+                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.content', 'Content') ?></span>
+                <span class="storage-overview__legend-value" id="owner-space-val-content">--</span>
+            </div>
+            <div class="storage-overview__legend-item">
+                <span class="storage-overview__legend-color storage-overview__legend-color--backups"></span>
+                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.backups') ?></span>
+                <span class="storage-overview__legend-value" id="owner-space-val-backups">--</span>
+            </div>
+            <div class="storage-overview__legend-item">
+                <span class="storage-overview__legend-color storage-overview__legend-color--builds"></span>
+                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.builds') ?></span>
+                <span class="storage-overview__legend-value" id="owner-space-val-builds">--</span>
+            </div>
+            <div class="storage-overview__legend-item">
+                <span class="storage-overview__legend-color storage-overview__legend-color--exports"></span>
+                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.exports') ?></span>
+                <span class="storage-overview__legend-value" id="owner-space-val-exports">--</span>
+            </div>
+        </div>
+
+        <!-- Per-owned-project rows (built in JS: dynamic structure) -->
+        <div class="owner-space__projects" id="owner-space-projects"></div>
+
+        <div class="owner-space__footer">
+            <span class="owner-space__hint" id="owner-space-hint"></span>
+            <button type="button" class="owner-space__refresh" id="owner-space-refresh">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                    <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+                <?= __admin('dashboard.storage.refresh', 'Refresh') ?>
+            </button>
+        </div>
+    </div>
+</section>
+
 <!-- Storage Overview -->
 <section class="admin-section">
     <div class="storage-overview" id="storage-overview">
