@@ -987,42 +987,7 @@
         },
         "tagSelect": {
             "searchPlaceholder": "Type to search..."
-        },
-        "editor": {
-            "new": "New Spec",
-            "edit": "Edit Spec",
-            "title": {
-                "new": "Create Custom Spec",
-                "edit": "Edit Spec"
-            },
-            "info": {
-                "title": "Creating a Custom Spec",
-                "text": "Custom workflows are saved to the secure/admin/workflows/custom/ folder. They will appear alongside core workflows in the browser. Use the Translations tab to provide multilingual labels and descriptions for your workflow — they are saved as a sidecar file alongside your spec."
-            },
-            "notFound": {
-                "title": "Workflow Not Found",
-                "message": "The requested workflow could not be found for editing."
-            },
-            "definition": "Spec Definition (JSON)",
-            "template": "Prompt Template (Markdown)",
-            "tab": {
-                "template": "Template",
-                "preview": "Preview",
-                "schema": "Schema Reference"
-            },
-            "preview": "Preview",
-            "save": "Save Spec",
-            "valid": "Valid JSON",
-            "validJson": "Valid JSON - All required fields present",
-            "invalidJson": "Invalid JSON",
-            "validationErrors": "Validation Errors",
-            "fixErrors": "Please fix JSON errors before previewing",
-            "templateRequired": "Prompt template is required",
-            "previewEmpty": "Click \"Preview\" to see the rendered prompt",
-            "loading": "Loading...",
-            "saving": "Saving...",
-            "saved": "Spec saved successfully!"
-        },
+        },
         "categories": {
             "creation": {
                 "title": "Creation",

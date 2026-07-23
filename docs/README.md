@@ -8,7 +8,7 @@ _Last updated: 2026-04-23._
 - [ADMIN_PANEL.md](ADMIN_PANEL.md) — Admin panel internals: boot flow, page modules, visual editor, preview subsystem.
 - [COMMAND_API.md](COMMAND_API.md) — Management API surface and command catalogue (118 commands).
 - [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) — On-disk layout.
-- [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) — Workflow engine reference: JSON spec format, markdown templates, condition syntax, creating custom workflows.
+- [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) — Workflow engine reference: JSON spec format, markdown templates, condition syntax.
 
 ## Images
 

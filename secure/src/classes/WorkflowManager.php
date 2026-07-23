@@ -3,7 +3,7 @@
  * WorkflowManager - Manages workflow specification loading, validation, and rendering
  * 
  * This class handles:
- * - Loading workflow JSON files from core/ and custom/ directories
+ * - Loading workflow JSON files from the core/ directory
  * - Validating workflows against the JSON schema
  * - Fetching data requirements via CommandRunner
  * - Rendering prompt templates with variable substitution
@@ -99,14 +99,20 @@ class WorkflowManager {
     }
     
     /**
-     * Get all available workflows (core + custom)
-     * 
+     * Get all available workflows.
+     *
+     * Workflows are SHIPPED, not authored: only `core/` is read. The custom
+     * workflow feature (author-written specs in `custom/`, saved + deleted
+     * through the admin AJAX helper) was removed in beta.10 C8 — it was an
+     * unused artifact that had become a flaw vector: an ungated save arm let
+     * any authenticated caller author a spec whose `dataRequirements` named
+     * arbitrary CommandRunner-allowlisted commands, then execute it.
+     *
      * @return array List of workflow metadata
      */
     public function listWorkflows(): array {
         $workflows = [];
-        
-        // Load core workflows
+
         $coreDir = $this->workflowsBasePath . '/core';
         if (is_dir($coreDir)) {
             foreach (glob($coreDir . '/*.json') as $file) {
@@ -117,19 +123,7 @@ class WorkflowManager {
                 }
             }
         }
-        
-        // Load custom workflows
-        $customDir = $this->workflowsBasePath . '/custom';
-        if (is_dir($customDir)) {
-            foreach (glob($customDir . '/*.json') as $file) {
-                $workflow = $this->loadWorkflow(basename($file, '.json'));
-                if ($workflow) {
-                    $workflow['_source'] = 'custom';
-                    $workflows[] = $workflow;
-                }
-            }
-        }
-        
+
         return $workflows;
     }
     
@@ -172,28 +166,22 @@ class WorkflowManager {
             return $this->workflowsCache[$workflowId];
         }
         
-        // Try core first, then custom
+        // Shipped workflows only — `core/`. See listWorkflows() for why there is
+        // no longer a `custom/` lookup.
         $paths = [
             $this->workflowsBasePath . '/core/' . $workflowId . '.json',
-            $this->workflowsBasePath . '/custom/' . $workflowId . '.json'
         ];
-        
+
         foreach ($paths as $path) {
             if (file_exists($path)) {
                 $content = file_get_contents($path);
                 $workflow = json_decode($content, true);
-                
+
                 if ($workflow && isset($workflow['id'])) {
                     $workflow['_filePath'] = $path;
                     $workflow['_folder'] = dirname($path);
-                    $source = str_contains($path, '/custom/') ? 'custom' : 'core';
-                    $workflow['_source'] = $source;
-                    
-                    // Load sidecar translations for custom workflows
-                    if ($source === 'custom' && class_exists('AdminTranslation')) {
-                        AdminTranslation::getInstance()->loadWorkflowTranslations($workflowId, $source);
-                    }
-                    
+                    $workflow['_source'] = 'core';
+
                     $this->workflowsCache[$workflowId] = $workflow;
                     return $workflow;
                 }
@@ -1212,13 +1200,7 @@ class WorkflowManager {
             if (file_exists($mdPath)) {
                 $template = file_get_contents($mdPath);
             } else {
-                // Try custom folder
-                $customPath = $this->workflowsBasePath . '/custom/' . $template;
-                if (file_exists($customPath)) {
-                    $template = file_get_contents($customPath);
-                } else {
-                    return "Error: Template file not found: $template";
-                }
+                return "Error: Template file not found: $template";
             }
         }
         // Legacy support: Check for @file: syntax within template content
@@ -1681,9 +1663,6 @@ class WorkflowManager {
         if (isset($workflow['promptTemplate']) && preg_match('/\.md$/', (string)$workflow['promptTemplate'])) {
             $folder = $workflow['_folder'] ?? ($this->workflowsBasePath . '/core');
             $mdPath = $folder . '/' . $workflow['promptTemplate'];
-            if (!file_exists($mdPath)) {
-                $mdPath = $this->workflowsBasePath . '/custom/' . $workflow['promptTemplate'];
-            }
             if (file_exists($mdPath)) {
                 $tplContent = (string)@file_get_contents($mdPath);
                 if (preg_match_all('/\{\{>\s+([A-Za-z][\w.\-\$]*)\}\}/', $tplContent, $m)) {

@@ -760,7 +760,12 @@ const QuickSiteAdmin = {
             throw new Error('No authentication token');
         }
 
-        let url = `${this.config.adminBase}/api/${action}`;
+        // C8 8.X — same project marker core/api.js sends (see fetchHelper). This
+        // fallback only runs when core/api.js failed to load; without the marker
+        // every project-scoped arm would 400.
+        const project = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.currentProject) || null;
+        const marker = project ? `p/${encodeURIComponent(project)}/` : '';
+        let url = `${this.config.adminBase}/api/${marker}${action}`;
         if (params.length > 0) {
             url += '/' + params.join('/');
         }

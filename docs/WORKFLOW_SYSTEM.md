@@ -13,9 +13,8 @@
 5. [JSON Spec Reference](#json-spec-reference)
 6. [Markdown Template Reference](#markdown-template-reference)
 7. [Execution Flow](#execution-flow)
-8. [Creating a Custom Workflow](#creating-a-custom-workflow)
-9. [Condition Syntax](#condition-syntax)
-10. [Known Patterns & Gotchas](#known-patterns--gotchas)
+8. [Condition Syntax](#condition-syntax)
+9. [Known Patterns & Gotchas](#known-patterns--gotchas)
 
 ---
 
@@ -75,8 +74,6 @@ User fills parameters in admin UI
 | `secure/admin/workflows/schema.json` | JSON Schema defining the spec format |
 | `secure/admin/workflows/core/*.json` | Core workflow specs (shipped with QuickSite) |
 | `secure/admin/workflows/core/*.md` | Core markdown templates |
-| `secure/admin/workflows/custom/*.json` | User-created workflow specs |
-| `secure/admin/workflows/custom/*.md` | User-created markdown templates |
 | `secure/admin/workflows/blocks/*.md` | Reusable prompt blocks injected via `{{> name}}` (beta.7) |
 | `secure/admin/workflows/pins/*.md` | Pinned reminders auto-injected at top when listed in `pins: [...]` (beta.7) |
 | `secure/admin/workflows/warnings/*.md` | Warnings auto-injected at top when listed in `warnings: [...]` (beta.7) |
@@ -90,7 +87,6 @@ User fills parameters in admin UI
 | `secure/admin/templates/pages/workflows/spec.php` | Workflow executor — parameter form, prompt preview, execution |
 | `secure/admin/templates/pages/workflows/editor.php` | Workflow creator/editor — JSON + markdown side by side |
 | `public/admin/assets/js/pages/ai/ai-spec.js` (~1500 lines) | Client-side execution logic (parameter forms, streaming, batch execution) |
-| `public/admin/assets/js/pages/ai/ai-editor.js` | Editor page JS (validation, save, preview) |
 
 ### API Endpoints (via admin router)
 
@@ -98,7 +94,6 @@ User fills parameters in admin UI
 |----------|--------|---------|
 | `/admin/api/workflow/render-prompt` | POST | Render a markdown template with parameters + data |
 | `/admin/api/workflow/resolve` | POST | Resolve steps for manual workflow execution |
-| `/admin/api/workflow/save` | POST | Save a custom workflow (JSON + optional markdown) |
 | `/admin/api/batch/execute` | POST | Execute an array of commands (streaming) |
 
 ---
@@ -154,7 +149,7 @@ Sub-workflows are fully resolved (their own data requirements fetched, steps gen
     "version": "1.0.0",           // semver
     "meta": {
         "icon": "🎯",             // emoji for display
-        "name": "My Workflow",     // display name (custom workflows)
+        "name": "My Workflow",     // display name (alternative to titleKey)
         "category": "advanced"     // see categories below
     }
 }
@@ -184,8 +179,8 @@ User input form fields. Each parameter:
 {
     "id": "languages",                    // referenced as {{param.languages}}
     "type": "text",                       // see types below
-    "label": "Language",                  // direct text (custom workflows)
-    "labelKey": "specs.params.lang.label",// OR translation key (core workflows)
+    "label": "Language",                  // direct text
+    "labelKey": "specs.params.lang.label",// OR translation key
     "placeholderKey": "...",              // optional
     "helpKey": "...",                     // optional help text
     "default": "en",                     // optional default value
@@ -603,331 +598,6 @@ Fallback: checks `$fetchedData[key]`. Unknown placeholders are left as-is.
 
 ---
 
-## Creating a Custom Workflow
-
-### Minimal Manual Workflow
-
-```json
-{
-    "id": "cleanup-images",
-    "version": "1.0.0",
-    "meta": {
-        "icon": "🗑️",
-        "name": "Delete All Images",
-        "description": "Removes all images from the assets folder",
-        "category": "advanced",
-        "difficulty": "beginner"
-    },
-    "dataRequirements": [
-        {
-            "id": "assets",
-            "command": "listAssets",
-            "extract": "data.assets"
-        }
-    ],
-    "steps": [
-        {
-            "forEach": "assets.images",
-            "command": "deleteAsset",
-            "params": {
-                "filename": "{{$value.filename}}"
-            }
-        }
-    ]
-}
-```
-
-### Minimal AI Workflow
-
-**my-workflow.json:**
-```json
-{
-    "id": "my-workflow",
-    "version": "1.0.0",
-    "meta": {
-        "icon": "✨",
-        "name": "My AI Workflow",
-        "description": "AI-assisted page creation",
-        "category": "creation",
-        "difficulty": "intermediate"
-    },
-    "parameters": [
-        {
-            "id": "description",
-            "type": "textarea",
-            "labelKey": "Description",
-            "required": true
-        }
-    ],
-    "dataRequirements": [
-        {
-            "id": "helpAddRoute",
-            "command": "help",
-            "urlParams": ["addRoute"],
-            "extract": "data"
-        }
-    ],
-    "relatedCommands": ["addRoute", "editStructure"],
-    "promptTemplate": "my-workflow.md"
-}
-```
-
-**my-workflow.md:**
-```markdown
-# Create a Page
-
-Output JSON only. No explanations.
-
-## User Request
-{{param.description}}
-
-## Available Commands
-{{#each commands}}
-{{formatCommand @key this}}
----
-{{/each}}
-
-## Output Format
-```⁠json
-[{ "command": "addRoute", "params": { "route": "..." } }]
-```⁠
-```
-
-### Save Location
-
-Custom workflows are saved to `secure/admin/workflows/custom/`. The JSON and MD files must share the same base name as the workflow `id`.
-
----
-
-### Worked Example: "Add a Page" with the translation sidecar
-
-A complete custom workflow that asks the user for a page title, a route name,
-and an optional placement (menu / footer / none), then has the AI generate the
-JSON commands to create the page. The 3 files below are saved together in
-`secure/admin/workflows/custom/`.
-
-#### 1 — Spec: `add-a-page.json`
-
-```json
-{
-    "$schema": "../schema.json",
-    "id": "add-a-page",
-    "version": "1.0.0",
-    "meta": {
-        "icon": "📄",
-        "titleKey": "title",
-        "descriptionKey": "description",
-        "category": "creation",
-        "tags": ["page", "route", "content"],
-        "difficulty": "beginner"
-    },
-    "parameters": [
-        {
-            "id": "pageTitle",
-            "type": "text",
-            "labelKey": "params.pageTitle.label",
-            "placeholderKey": "params.pageTitle.placeholder",
-            "helpKey": "params.pageTitle.help",
-            "required": true
-        },
-        {
-            "id": "routeName",
-            "type": "text",
-            "labelKey": "params.routeName.label",
-            "placeholderKey": "params.routeName.placeholder",
-            "helpKey": "params.routeName.help",
-            "required": true
-        },
-        {
-            "id": "placement",
-            "type": "select",
-            "labelKey": "params.placement.label",
-            "helpKey": "params.placement.help",
-            "default": "none",
-            "options": [
-                { "value": "menu", "label": "Menu" },
-                { "value": "footer", "label": "Footer" },
-                { "value": "none", "label": "None (add link later)" }
-            ]
-        }
-    ],
-    "dataRequirements": [
-        {
-            "id": "helpAddRoute",
-            "command": "help",
-            "urlParams": ["addRoute"],
-            "extract": "data"
-        },
-        {
-            "id": "helpEditStructure",
-            "command": "help",
-            "urlParams": ["editStructure"],
-            "extract": "data"
-        },
-        {
-            "id": "currentMenu",
-            "command": "getStructure",
-            "urlParams": ["menu"],
-            "extract": "data.structure",
-            "condition": "placement === 'menu'"
-        },
-        {
-            "id": "currentFooter",
-            "command": "getStructure",
-            "urlParams": ["footer"],
-            "extract": "data.structure",
-            "condition": "placement === 'footer'"
-        }
-    ],
-    "relatedCommands": [
-        "addRoute",
-        "editStructure",
-        "setTranslationKeys"
-    ],
-    "promptTemplate": "add-a-page.md",
-    "outputFormat": "json-commands"
-}
-```
-
-Key points:
-
-- `titleKey: "title"` and `descriptionKey: "description"` are *short keys*. For custom workflows, `__workflow()` resolves them via the sidecar path `workflows.custom.add-a-page.title` — no entry needed in the global locale files.
-- Parameter `labelKey` / `helpKey` / `placeholderKey` follow the same pattern: `"params.pageTitle.label"` resolves to `workflows.custom.add-a-page.params.pageTitle.label`.
-- `select` options use plain `label` (not `labelKey`) here since the values are simple universal words. You could use `labelKey` for translatable option labels.
-- `dataRequirements` fetch the API help docs and current structures conditionally, so the AI prompt has full context.
-
-#### 2 — Translations sidecar: `add-a-page.translations.json`
-
-```json
-{
-    "en": {
-        "title": "Add a Page",
-        "description": "Create a new page with its route and optionally add a link in the menu or footer.",
-        "params": {
-            "pageTitle": {
-                "label": "Page Title",
-                "placeholder": "e.g. About Us",
-                "help": "The visible title shown on the page"
-            },
-            "routeName": {
-                "label": "Route Name",
-                "placeholder": "e.g. about",
-                "help": "URL slug — lowercase, no spaces (e.g. 'about' → /about)"
-            },
-            "placement": {
-                "label": "Add link to…",
-                "help": "Where to insert a navigation link for the new page"
-            }
-        }
-    },
-    "fr": {
-        "title": "Ajouter une page",
-        "description": "Crée une nouvelle page avec sa route et ajoute optionnellement un lien dans le menu ou le pied de page.",
-        "params": {
-            "pageTitle": {
-                "label": "Titre de la page",
-                "placeholder": "ex. À propos",
-                "help": "Le titre visible affiché sur la page"
-            },
-            "routeName": {
-                "label": "Nom de la route",
-                "placeholder": "ex. a-propos",
-                "help": "Slug URL — minuscules, sans espaces (ex. 'a-propos' → /a-propos)"
-            },
-            "placement": {
-                "label": "Ajouter un lien dans…",
-                "help": "Où insérer un lien de navigation pour la nouvelle page"
-            }
-        }
-    }
-}
-```
-
-Key points:
-
-- The sidecar is co-located with `add-a-page.json` in `custom/`.
-- The structure mirrors the short keys used in the spec (`title`, `description`, `params.pageTitle.label`, etc.).
-- Adding a new language is just adding a new top-level key (e.g. `"es": { ... }`).
-- If a translation is missing, the system falls back to English, then to the raw key.
-
-#### 3 — Prompt template: `add-a-page.md`
-
-````markdown
-You are a QuickSite assistant. Generate JSON commands to create a new page.
-
-## Task
-
-Create a page titled **"{{param.pageTitle}}"** at the route **`/{{param.routeName}}`**.
-
-## Step 1 — Add the route
-
-Use the `addRoute` command to register the route.
-
-**API reference:**
-```
-{{helpAddRoute}}
-```
-
-## Step 2 — Create the page structure
-
-Use `editStructure` with `type: "page"` and `name: "{{param.routeName}}"` to define the HTML structure.
-Build a simple, semantic page with:
-- A `<section>` hero area with an `<h1>` using the translation key `page.{{param.routeName}}.title`
-- A `<section>` for body content with a `<p>` using the translation key `page.{{param.routeName}}.intro`
-
-**API reference:**
-```
-{{helpEditStructure}}
-```
-
-## Step 3 — Set translation keys
-
-Use `setTranslationKeys` to register:
-- `page.titles.{{param.routeName}}` → "{{param.pageTitle}}"
-- `page.{{param.routeName}}.title` → "{{param.pageTitle}}"
-- `page.{{param.routeName}}.intro` → "Welcome to the {{param.pageTitle}} page."
-
-{{#if param.placement === 'menu'}}
-## Step 4 — Add to menu
-
-The current menu structure is:
-```json
-{{currentMenu}}
-```
-
-Use `editStructure` with `type: "menu"` to add a new `<li>` containing an `<a>`
-with `href="/{{param.routeName}}"` and `textKey: "page.titles.{{param.routeName}}"`.
-Insert it at the end of the existing navigation list.
-{{/if}}
-
-{{#if param.placement === 'footer'}}
-## Step 4 — Add to footer
-
-The current footer structure is:
-```json
-{{currentFooter}}
-```
-
-Use `editStructure` with `type: "footer"` to add a new `<a>` link
-with `href="/{{param.routeName}}"` and `textKey: "page.titles.{{param.routeName}}"`.
-Insert it in an appropriate links section of the footer.
-{{/if}}
-
-## Output
-
-Return ONLY a JSON array of commands. No explanation, no markdown outside the JSON.
-````
-
-Key points:
-
-- `{{param.X}}` references user-supplied parameter values.
-- `{{helpAddRoute}}` injects the live API help fetched by `dataRequirements`.
-- `{{#if ...}}` conditionals make the menu/footer step appear only when relevant.
-- `{{currentMenu}}` / `{{currentFooter}}` inject the live structure fetched conditionally.
-- The prompt asks the AI to produce `json-commands` output that the workflow runner executes.
-
----
-
 ## Condition Syntax
 
 Conditions are used in multiple places with slightly different capabilities:
@@ -995,9 +665,9 @@ Placeholders starting with `__` (like `{{__current_page;lang=en}}`) are preserve
 ```
 This generates an array of translation objects, one per language.
 
-### 9. Core vs Custom — naming convention
-- **Meta section:** Core workflows use `titleKey`/`descriptionKey` (translation keys). Custom workflows use `name`/`description` (direct strings).
-- **Parameters:** Use `label` (direct text) OR `labelKey` (translation key). Non-hidden parameters must have one or the other. `labelKey` is resolved through the translation sidecar first, then admin locale files, then returned as-is.
+### 9. Naming convention
+- **Meta section:** `titleKey`/`descriptionKey` (translation keys) are preferred; `name`/`description` (direct strings) are accepted.
+- **Parameters:** Use `label` (direct text) OR `labelKey` (translation key). Non-hidden parameters must have one or the other. `labelKey` is resolved through the admin locale files, then returned as-is.
 
 ### 10. Editor validation
 The editor page validates JSON on every keystroke and shows errors immediately. The validation in `WorkflowManager::validateWorkflow()` checks:

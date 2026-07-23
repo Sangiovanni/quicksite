@@ -1002,42 +1002,7 @@
         },
         "tagSelect": {
             "searchPlaceholder": "Tapez pour rechercher..."
-        },
-        "editor": {
-            "new": "Nouvelle Spec",
-            "edit": "Modifier la Spec",
-            "title": {
-                "new": "Créer une Spec Personnalisée",
-                "edit": "Modifier la Spec"
-            },
-            "info": {
-                "title": "Création d'une Spec Personnalisée",
-                "text": "Les workflows personnalisés sont enregistrés dans le dossier secure/admin/workflows/custom/. Ils apparaîtront aux côtés des workflows principaux dans le navigateur. Utilisez l'onglet Traductions pour fournir les libellés et descriptions multilingues — ils sont sauvegardés dans un fichier compagnon à côté de votre spec."
-            },
-            "notFound": {
-                "title": "Spec Introuvable",
-                "message": "La spécification IA demandée n'a pas pu être trouvée pour modification."
-            },
-            "definition": "Définition de la Spec (JSON)",
-            "template": "Modèle de Prompt (Markdown)",
-            "tab": {
-                "template": "Modèle",
-                "preview": "Aperçu",
-                "schema": "Référence du Schéma"
-            },
-            "preview": "Aperçu",
-            "save": "Enregistrer la Spec",
-            "valid": "JSON Valide",
-            "validJson": "JSON Valide - Tous les champs requis présents",
-            "invalidJson": "JSON Invalide",
-            "validationErrors": "Erreurs de Validation",
-            "fixErrors": "Veuillez corriger les erreurs JSON avant de prévisualiser",
-            "templateRequired": "Le modèle de prompt est requis",
-            "previewEmpty": "Cliquez sur \"Aperçu\" pour voir le prompt rendu",
-            "loading": "Chargement...",
-            "saving": "Enregistrement...",
-            "saved": "Spec enregistrée avec succès !"
-        },
+        },
         "categories": {
             "creation": {
                 "title": "Création",

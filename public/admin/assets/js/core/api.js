@@ -508,13 +508,35 @@ window.QuickSiteAPI = (function() {
      * const routes = await QuickSiteAPI.fetchHelper('routes');
      * const langKeys = await QuickSiteAPI.fetchHelper('translation-keys', ['en']);
      */
+    /**
+     * Build the /admin/api path segment for a helper ACTION, carrying the edited
+     * project as a URL marker the same way buildCommandPath() does for
+     * /management. THE single place that knows the helper marker convention —
+     * fetchHelper uses it, and the pages that hand-build a helper URL against
+     * their own base (preview AI tools, translations) call it too.
+     *
+     * C8 8.X: the helper endpoint authorizes each arm's underlying command
+     * against THIS project and binds its context, so a project-scoped arm reads
+     * the project you are EDITING rather than the one the site happens to serve.
+     * Emitted unconditionally when a project is known — arms that expose no
+     * project data ignore it, which keeps the scope decision on the server
+     * instead of duplicating the arm list on the client.
+     *
+     * @param {string} action - helper action, e.g. 'pages' or 'ai-spec'
+     * @returns {string} e.g. 'p/my-project/pages' or 'pages'
+     */
+    function helperPath(action) {
+        const marker = currentProject ? `p/${encodeURIComponent(currentProject)}/` : '';
+        return `${marker}${action}`;
+    }
+
     async function fetchHelper(action, params = []) {
         const token = getToken();
         if (!token) {
             throw new Error('No authentication token');
         }
 
-        let url = `${config.adminBase}/api/${action}`;
+        let url = `${config.adminBase}/api/${helperPath(action)}`;
         if (params.length > 0) {
             url += '/' + params.join('/');
         }
@@ -557,7 +579,8 @@ window.QuickSiteAPI = (function() {
         // API Methods
         request,
         upload,
-        fetchHelper
+        fetchHelper,
+        helperPath
     };
 
 })();

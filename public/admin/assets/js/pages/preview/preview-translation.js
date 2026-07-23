@@ -23,6 +23,17 @@
 window.PreviewTranslation = (function () {
     'use strict';
 
+    // C8 8.X — the /admin/api helper endpoint is project-scoped: it authorizes each
+    // arm against the marker project and binds that context. QuickSiteAPI.helperPath
+    // is the single owner of the marker convention; this delegates so the URL shape
+    // lives in ONE place. Falls back to the bare action if core/api.js is absent —
+    // the server then answers 400 rather than silently reading another project.
+    function _helperPath(action) {
+        return (window.QuickSiteAPI && typeof window.QuickSiteAPI.helperPath === 'function')
+            ? window.QuickSiteAPI.helperPath(action)
+            : action;
+    }
+
     // ──────────────────────────── State ─────────────────────────────────
 
     // Module-scope cache. Populated on enter(); cleared on language switch
@@ -328,7 +339,7 @@ window.PreviewTranslation = (function () {
      */
     async function _fetchGroupedSafe(lang) {
         var adminBase = (QuickSiteAdmin.config && QuickSiteAdmin.config.adminBase) || '/admin';
-        var url = adminBase + '/api/translation-keys-grouped/' + encodeURIComponent(lang);
+        var url = adminBase + '/api/' + _helperPath('translation-keys-grouped') + '/' + encodeURIComponent(lang);
         var token = QuickSiteAdmin.getToken && QuickSiteAdmin.getToken();
         try {
             var resp = await fetch(url, {

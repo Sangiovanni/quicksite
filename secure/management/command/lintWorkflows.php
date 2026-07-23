@@ -2,7 +2,7 @@
 /**
  * lintWorkflows - Find duplicated prose across workflow templates
  *
- * Scans every *.md template under secure/admin/workflows/{core,custom}/, hashes
+ * Scans every *.md template under secure/admin/workflows/core/, hashes
  * paragraphs (>= 3 lines), and reports paragraphs that occur in 3 or more workflows.
  * Each report includes a suggested block name and the list of workflows containing it,
  * so the developer can decide whether to extract the paragraph into
@@ -20,10 +20,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 
 function __command_lintWorkflows(array $params = [], array $urlParams = []): ApiResponse {
     $base = SECURE_FOLDER_PATH . '/admin/workflows';
-    $files = array_merge(
-        glob($base . '/core/*.md') ?: [],
-        glob($base . '/custom/*.md') ?: []
-    );
+    $files = glob($base . '/core/*.md') ?: [];
 
     // hash => ['text' => ..., 'workflows' => [...]]
     $byHash = [];

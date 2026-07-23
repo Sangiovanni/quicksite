@@ -683,22 +683,15 @@ class AdminRouter {
         // Determine which template to load
         $templatePath = SECURE_FOLDER_PATH . '/admin/templates/pages/' . $this->page . '.php';
         
-        // Workflows: only the editor (new + edit/*) is reachable here now.
-        // The browser (was: index.php) and per-spec runner (was: spec.php)
-        // are subsumed by the in-editor AI tools mode at /admin/preview.
-        // Bookmarks to the old URLs land on the editor via redirect.
+        // Workflows: nothing is authored here. The browser and per-spec runner are
+        // subsumed by the in-editor AI tools mode at /admin/preview, and the custom
+        // workflow EDITOR was removed in beta.10 C8 (the feature was an unused
+        // artifact whose ungated save/delete arms were a flaw vector — see
+        // WorkflowManager::listWorkflows). Every /admin/workflows* URL, including
+        // bookmarks to the old editor, lands on the AI tools panel.
         if ($this->page === 'workflows') {
-            if ($this->workflowId === 'new' || str_starts_with((string)$this->workflowId, 'edit/')) {
-                $editorPath = SECURE_FOLDER_PATH . '/admin/templates/pages/workflows/editor.php';
-                if (file_exists($editorPath)) {
-                    $templatePath = $editorPath;
-                }
-            } else {
-                // /admin/workflows  or  /admin/workflows/{specId}  (non-edit)
-                // → moved to the AI tools panel in the visual editor.
-                $this->redirect('preview');
-                return;
-            }
+            $this->redirect('preview');
+            return;
         }
         
         if (!file_exists($templatePath)) {

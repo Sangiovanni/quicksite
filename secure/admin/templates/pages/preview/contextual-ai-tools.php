@@ -14,16 +14,6 @@
             </button>
         </div>
 
-        <div class="preview-contextual-ai-tools__workflow-actions">
-            <label class="preview-contextual-ai-tools__small-btn preview-contextual-ai-tools__small-btn--label">
-                📥 <span><?= __admin('preview.aiToolsImportWorkflow', 'Import workflow') ?></span>
-                <input type="file" id="ai-tools-import-input" accept="application/json,.json" hidden>
-            </label>
-            <a class="preview-contextual-ai-tools__small-btn" href="<?= htmlspecialchars($router->url('workflows', 'new')) ?>">
-                ✚ <span><?= __admin('preview.aiToolsNewWorkflow', 'New workflow') ?></span>
-            </a>
-        </div>
-
         <div class="preview-contextual-ai-tools__search-row">
             <input type="search" class="preview-contextual-ai-tools__search" id="ai-tools-search"
                    placeholder="<?= __admin('preview.aiToolsSearchPlaceholder', 'Search AI tools…') ?>"

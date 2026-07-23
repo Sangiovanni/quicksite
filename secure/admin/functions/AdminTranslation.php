@@ -220,43 +220,6 @@ class AdminTranslation {
         return $value;
     }
 
-    /**
-     * Load translations from a workflow sidecar file and merge into current translations.
-     * Sidecar file format: { "en": { "title": "...", ... }, "fr": { ... } }
-     * Keys are merged under: workflows.custom.{workflowId}.*
-     * 
-     * @param string $workflowId The workflow ID
-     * @param string $source 'core' or 'custom' folder
-     */
-    public function loadWorkflowTranslations(string $workflowId, string $source = 'custom'): void {
-        $sidecarPath = SECURE_FOLDER_PATH . '/admin/workflows/' . $source . '/' . $workflowId . '.translations.json';
-        if (!file_exists($sidecarPath)) {
-            return;
-        }
-
-        $allTranslations = json_decode(file_get_contents($sidecarPath), true);
-        if (!is_array($allTranslations)) {
-            return;
-        }
-
-        // Get translations for current language, fallback to 'en'
-        $langTranslations = $allTranslations[$this->currentLang] 
-            ?? $allTranslations[$this->fallbackLang] 
-            ?? [];
-
-        if (empty($langTranslations)) {
-            return;
-        }
-
-        // Merge under workflows.custom.{workflowId}
-        if (!isset($this->translations['workflows'])) {
-            $this->translations['workflows'] = [];
-        }
-        if (!isset($this->translations['workflows']['custom'])) {
-            $this->translations['workflows']['custom'] = [];
-        }
-        $this->translations['workflows']['custom'][$workflowId] = $langTranslations;
-    }
 }
 
 /**
@@ -302,14 +265,13 @@ function __adminJs(string $key, array $params = []): string {
 }
 
 /**
- * Helper to resolve workflow translation keys with sidecar support.
- * 
- * For custom workflows, checks the sidecar translation path first
- * (workflows.custom.{id}.{key}), then falls back to global __admin().
- * For core workflows, resolves directly through __admin().
- * 
- * @param array $spec  The workflow spec (needs 'id' and '_source')
- * @param string $key  Translation key (short for custom, full for core)
+ * Helper to resolve workflow translation keys.
+ *
+ * Workflows are SHIPPED (core only) since the custom workflow feature was
+ * removed in beta.10 C8, so every key resolves directly through __admin().
+ *
+ * @param array $spec  The workflow spec (unused; kept for call-site stability)
+ * @param string $key  Translation key
  * @param string $fallback  Fallback if nothing resolves
  * @return string
  */
@@ -317,18 +279,5 @@ function __workflow(array $spec, string $key, string $fallback = ''): string {
     if ($key === '') {
         return $fallback;
     }
-    
-    $source = $spec['_source'] ?? 'core';
-    
-    // For custom workflows, try sidecar path first
-    if ($source === 'custom') {
-        $sidecarKey = 'workflows.custom.' . $spec['id'] . '.' . $key;
-        $instance = AdminTranslation::getInstance();
-        if ($instance->has($sidecarKey)) {
-            return $instance->t($sidecarKey);
-        }
-    }
-    
-    // Fall back to global translation (works for core full keys)
     return __admin($key, $fallback);
 }

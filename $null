@@ -1,0 +1,7 @@
+﻿php.exe : Failed loading E:/wamp64/bin/php/php8.4.0/zend_ext/php_xdebug-3.4.0beta1-8.4-x86_64.dll
+At line:1 char:302
++ ... 'PlainText' } catch {} } }; & C:\wamp64\bin\php\php8.4.0\php.exe -r "
++                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Failed loading ...-8.4-x86_64.dll:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

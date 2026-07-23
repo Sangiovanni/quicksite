@@ -124,7 +124,6 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | File | Purpose |
 |---|---|
 | `pages/ai/ai-index.js` | Workflow / spec listing, search, filters → `/admin/api/ai-spec/list`. |
-| `pages/ai/ai-editor.js` | Spec editor (validation, preview, save) → `/admin/api/ai-spec/{get,save,delete}`. |
 | `pages/ai/ai-connections.js` | BYOK connection wizard + connection list (cloud + local). Persists to the v3 store; no PHP roundtrip. |
 | `pages/ai/ai-spec.js` | Workflow execution: resolve → render-prompt → execute. AI dispatch goes browser-direct via `QSAiCall`. |
 | `pages/ai/lib/provider-catalog.js` | Pure data + per-provider HTTP helpers (URL / headers / body / parser). Used by `ai-connections.js` and `ai-call.js`. |
@@ -761,7 +760,6 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | **Sitemap** (`sitemap.js`) | Route tree, reachability, ordering. |
 | **Embed security** (`embed-security.js`) | `getEmbedSecurity` / `setEmbedSecurity`. |
 | **Optimize** (`optimize.js`) | UI for the CSS Refiner library; runs analyzers, presents diffs, applies edits via `editStyles` / `setRootVariables`. |
-| **Workflow editor** (`pages/ai/ai-editor.js`) | Authoring surface for custom workflows. The browser + per-spec runner pages were folded into the visual editor's AI tools mode (§8.12); only the editor (`/admin/workflows/new`, `/admin/workflows/edit/{id}`) remains. Reachable via the **New workflow** button at the top of the AI tools panel; bare `/admin/workflows` URLs redirect to the editor mode. |
 
 ### 9.1 API Registry (/admin/apis)
 

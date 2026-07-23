@@ -12,6 +12,52 @@
 // it must not 503 when no main project is served (see public/admin/index.php).
 define('QS_TOLERATE_NO_SERVED_PROJECT', true);
 
+// ============================================================================
+// C8 8.X — per-request project scoping (F-C8-8.X-1)
+// ============================================================================
+// This helper executes management commands IN-PROCESS. It used to inherit
+// init.php's GLOBAL served-project context, so every project-scoped arm read the
+// SERVED project's data no matter which project the caller was editing — and it
+// ran them with NO authorization at all (the resolved $tokenInfo was never used).
+//
+// It now mirrors the management dispatcher exactly (public/management/index.php):
+// defer the project context, peel the project from the URL marker
+// '/admin/api/p/<projectId>/<action>', then authorize the arm's underlying
+// command(s) against THAT project before binding it. Same discipline, same
+// no-oracle 403.
+define('QS_DEFER_PROJECT_CONTEXT', true);
+
+// Peel the marker BEFORE init.php so the project's own public/ can be bound as
+// PUBLIC_CONTENT_PATH — the assets / styles / builds arms read that constant, not
+// PROJECT_PATH, so binding PROJECT_PATH alone would still serve the served
+// project's files. Mirrors public/management/index.php's C9 pre-bind.
+$__qsApiProject = null;
+{
+    $__segs = array_values(array_filter(
+        explode('/', parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? ''),
+        static fn($s) => $s !== ''
+    ));
+    for ($__i = 0, $__n = count($__segs); $__i < $__n - 2; $__i++) {
+        if ($__segs[$__i] === 'admin' && $__segs[$__i + 1] === 'api' && $__segs[$__i + 2] === 'p'
+            && isset($__segs[$__i + 3])) {
+            $__cand = rawurldecode($__segs[$__i + 3]);
+            // F1 shape only — membership is checked after auth, below.
+            if (preg_match('/^[A-Za-z0-9_-]{1,64}$/', $__cand)) {
+                $__qsApiProject = $__cand;
+            }
+            break;
+        }
+    }
+    if ($__qsApiProject !== null && !defined('PUBLIC_CONTENT_PATH')) {
+        $__secure = dirname(__DIR__, 3) . '/secure';
+        require_once $__secure . '/src/functions/projectPublicArtifacts.php';
+        if ($__qsApiProject !== qs_served_project($__secure)
+            && is_dir($__secure . '/projects/' . $__qsApiProject)) {
+            define('PUBLIC_CONTENT_PATH', $__secure . '/projects/' . $__qsApiProject . '/public');
+        }
+    }
+}
+
 require_once __DIR__ . '/../../init.php';
 require_once SECURE_FOLDER_PATH . '/admin/AdminRouter.php';
 require_once SECURE_FOLDER_PATH . '/admin/functions/AdminHelper.php';
@@ -40,8 +86,17 @@ if (!$token) {
 
 // Resolve token to tokenInfo for role-based permission checks
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+// is_valid_project_name — the F1 shape gate for the URL marker (the management
+// dispatcher requires this the same way).
+require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 $tokenValidation = validateBearerToken('Bearer ' . $token);
 $tokenInfo = $tokenValidation['valid'] ? $tokenValidation['user'] : null;
+
+if ($tokenInfo === null) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Unauthorized']);
+    exit;
+}
 
 // Get the action from URL
 $requestUri = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
@@ -54,8 +109,93 @@ foreach ($spaceSegments as $_) {
 }
 array_shift($parts); // admin
 array_shift($parts); // api
+// C8 8.X — optional project marker 'p/<projectId>' (see the header note).
+if (($parts[0] ?? null) === 'p' && isset($parts[1])) {
+    array_shift($parts); // p
+    array_shift($parts); // <projectId>
+}
 $action = array_shift($parts) ?? '';
 $params = $parts;
+
+// ============================================================================
+// C8 8.X — authorize the arm, then bind its project (F-C8-8.X-1)
+// ============================================================================
+// Every arm that reads project data inherits the CATEGORY of the command it runs
+// — there is no parallel permission model here. An arm is authorized exactly as
+// the same command would be through /management/p/<id>/<cmd>.
+//
+// QS_API_ARM_COMMANDS maps arm => the management command(s) it executes. The
+// AI-spec arms run their workflow's declared dataRequirements through
+// CommandRunner (a documented hasPermission bypass, contained by its own
+// read-only allowlist); every command the shipped core specs pull is in
+// content.read, so gating those arms on the same category is coherent — see the
+// C8 §8 8.X entry.
+const QS_API_ARM_COMMANDS = [
+    'pages'                    => ['listPages'],
+    'components'               => ['listComponents'],
+    'component-variables'      => ['listComponents'],
+    'routes'                   => ['getRoutes'],
+    'languages'                => ['getLangList'],
+    'assets'                   => ['listAssets'],
+    'builds'                   => ['listBuilds'],
+    'aliases'                  => ['listAliases'],
+    'translation-keys'         => ['getTranslation'],
+    'translation-full'         => ['getTranslation'],
+    'page-title'               => ['getTranslation'],
+    'translation-keys-grouped' => ['getTranslation', 'getUnusedTranslationKeys', 'validateTranslations'],
+    'structure-nodes'          => ['getStructure'],
+    'current-styles'           => ['getStyles'],
+    'root-variables'           => ['getRootVariables'],
+    'keyframes'                => ['getKeyframes'],
+    'style-rules'              => ['listStyleRules'],
+    // Workflow arms — shipped core specs only; they pull project data via
+    // CommandRunner, so they are gated like any other project read.
+    'ai-spec'                  => ['getStructure'],
+    'ai-spec-raw'              => ['getStructure'],
+    'ai-spec-preview'          => ['getStructure'],
+    'workflow-generate-steps'  => ['getStructure'],
+];
+
+// Arms that expose NO project data: installation-wide schema/enum lookups
+// (asset categories + extensions from config, alias types, edit actions,
+// structure types). They leak nothing project-specific and need no project
+// binding — authenticated access is the gate, matching the global/'any'
+// categories. Listed explicitly so a NEW arm defaults to authorized-and-bound
+// rather than silently ungated.
+const QS_API_STATIC_ARMS = [
+    'structure-types', 'asset-categories', 'asset-extensions', 'alias-types', 'edit-actions',
+];
+
+if (isset(QS_API_ARM_COMMANDS[$action])) {
+    // A project-scoped arm MUST target a project.
+    if ($__qsApiProject === null) {
+        http_response_code(400);
+        echo json_encode(['error' => 'This action is project-scoped. Target a project with /admin/api/p/<projectId>/' . $action]);
+        exit;
+    }
+    if (!is_valid_project_name($__qsApiProject)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid project identifier']);
+        exit;
+    }
+    // Membership + role, against the project's AUTHORITATIVE members.json. A
+    // non-member, a stranger's projectId, a non-existent project and an
+    // under-privileged member all yield the SAME 403 — no oracle for existence,
+    // membership or role level (the dispatcher's rule).
+    foreach (QS_API_ARM_COMMANDS[$action] as $__cmd) {
+        if (!hasPermission($tokenInfo, $__cmd, $__qsApiProject)) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden']);
+            exit;
+        }
+    }
+    qs_load_project_context($__qsApiProject, true);
+} else {
+    // Static arm or unknown action: give it a benign, defined working context
+    // from the caller's UX-default project (never an authz input) so a
+    // zero-membership user still gets an empty context instead of a fatal.
+    qs_load_project_context(resolveDefaultProject($tokenInfo) ?? '', false);
+}
 
 // Handle different actions
 switch ($action) {
@@ -739,178 +879,6 @@ switch ($action) {
         ]);
         break;
     
-    case 'ai-spec-save':
-        // Save a custom spec to the custom folder
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            http_response_code(405);
-            echo json_encode(['error' => 'Method not allowed']);
-            break;
-        }
-        
-        $input = json_decode(file_get_contents('php://input'), true);
-        if (!$input || !isset($input['spec'])) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Missing spec data']);
-            break;
-        }
-        
-        require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
-        $manager = new WorkflowManager();
-        
-        $spec = $input['spec'];
-        $template = $input['template'] ?? '';
-        $translations = $input['translations'] ?? null;
-        $isNew = $input['isNew'] ?? true;
-        $originalSpecId = $input['originalSpecId'] ?? '';
-        $hasTemplate = !empty(trim($template));
-        
-        // Validate the spec
-        $validation = $manager->validateWorkflow($spec);
-        if (!$validation['valid']) {
-            http_response_code(400);
-            echo json_encode([
-                'error' => 'Invalid spec: ' . implode(', ', $validation['errors']),
-                'validationErrors' => $validation['errors']
-            ]);
-            break;
-        }
-        
-        $specId = $spec['id'];
-        $customFolder = SECURE_FOLDER_PATH . '/admin/workflows/custom';
-        
-        // Ensure custom folder exists
-        if (!is_dir($customFolder)) {
-            mkdir($customFolder, 0755, true);
-        }
-        
-        // Check if trying to overwrite a core spec
-        $coreFolder = SECURE_FOLDER_PATH . '/admin/workflows/core';
-        if (file_exists($coreFolder . '/' . $specId . '.json')) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Cannot overwrite core spec: ' . $specId]);
-            break;
-        }
-        
-        // Check for duplicate custom workflow ID
-        $customJsonPath = $customFolder . '/' . $specId . '.json';
-        $isEditingSameId = !$isNew && $originalSpecId === $specId;
-        if (file_exists($customJsonPath) && !$isEditingSameId) {
-            http_response_code(409);
-            echo json_encode(['error' => 'A custom workflow with ID "' . $specId . '" already exists']);
-            break;
-        }
-        
-        // If editing and ID changed, delete old files
-        if (!$isNew && $originalSpecId && $originalSpecId !== $specId) {
-            $oldJsonPath = $customFolder . '/' . $originalSpecId . '.json';
-            $oldMdPath = $customFolder . '/' . $originalSpecId . '.md';
-            $oldTransPath = $customFolder . '/' . $originalSpecId . '.translations.json';
-            if (file_exists($oldJsonPath)) unlink($oldJsonPath);
-            if (file_exists($oldMdPath)) unlink($oldMdPath);
-            if (file_exists($oldTransPath)) unlink($oldTransPath);
-        }
-        
-        // Set the promptTemplate reference only for AI workflows with template content
-        if ($hasTemplate) {
-            $spec['promptTemplate'] = $specId . '.md';
-        } else {
-            unset($spec['promptTemplate']);
-        }
-        
-        // Write JSON file
-        $jsonPath = $customFolder . '/' . $specId . '.json';
-        $jsonContent = json_encode($spec, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        if (file_put_contents($jsonPath, $jsonContent) === false) {
-            http_response_code(500);
-            echo json_encode(['error' => 'Failed to write spec JSON file']);
-            break;
-        }
-        
-        // Write MD file (only for AI workflows with template content)
-        $mdPath = $customFolder . '/' . $specId . '.md';
-        if ($hasTemplate) {
-            if (file_put_contents($mdPath, $template) === false) {
-                // Clean up JSON if MD write failed
-                unlink($jsonPath);
-                http_response_code(500);
-                echo json_encode(['error' => 'Failed to write template MD file']);
-                break;
-            }
-        } elseif (file_exists($mdPath)) {
-            // Clean up orphan .md from a previous version that had a template
-            unlink($mdPath);
-        }
-        
-        // Write translations sidecar file
-        $transPath = $customFolder . '/' . $specId . '.translations.json';
-        if ($translations && is_array($translations) && !empty($translations)) {
-            $transContent = json_encode($translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-            file_put_contents($transPath, $transContent);
-        } elseif ($translations === null && file_exists($transPath)) {
-            // Keep existing translations file if not provided in payload
-        } elseif (is_array($translations) && empty($translations) && file_exists($transPath)) {
-            // Empty object sent explicitly — remove the file
-            unlink($transPath);
-        }
-        
-        echo json_encode([
-            'success' => true,
-            'data' => [
-                'id' => $specId,
-                'jsonPath' => $jsonPath,
-                'mdPath' => $mdPath,
-                'translationsPath' => $transPath
-            ]
-        ]);
-        break;
-
-    case 'workflow-delete':
-        // Delete a custom workflow (and its sidecar md + translations).
-        // Core workflows can't be deleted.
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            http_response_code(405);
-            echo json_encode(['error' => 'Method not allowed']);
-            break;
-        }
-        $input = json_decode(file_get_contents('php://input'), true);
-        $deleteId = $input['id'] ?? '';
-        if (!$deleteId || !preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/', $deleteId)) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Invalid workflow ID']);
-            break;
-        }
-        $customFolder = SECURE_FOLDER_PATH . '/admin/workflows/custom';
-        $jsonPath = $customFolder . '/' . $deleteId . '.json';
-        if (!file_exists($jsonPath)) {
-            $coreFolder = SECURE_FOLDER_PATH . '/admin/workflows/core';
-            if (file_exists($coreFolder . '/' . $deleteId . '.json')) {
-                http_response_code(403);
-                echo json_encode(['error' => 'Cannot delete core workflows']);
-            } else {
-                http_response_code(404);
-                echo json_encode(['error' => 'Workflow not found']);
-            }
-            break;
-        }
-        $deleted = [];
-        unlink($jsonPath);
-        $deleted[] = $deleteId . '.json';
-        $mdPath = $customFolder . '/' . $deleteId . '.md';
-        if (file_exists($mdPath)) {
-            unlink($mdPath);
-            $deleted[] = $deleteId . '.md';
-        }
-        $transPath = $customFolder . '/' . $deleteId . '.translations.json';
-        if (file_exists($transPath)) {
-            unlink($transPath);
-            $deleted[] = $deleteId . '.translations.json';
-        }
-        echo json_encode([
-            'success' => true,
-            'data' => ['id' => $deleteId, 'deletedFiles' => $deleted]
-        ]);
-        break;
-
     case 'workflow-generate-steps':
         // Generate steps for a manual workflow
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

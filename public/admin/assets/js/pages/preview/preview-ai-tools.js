@@ -54,6 +54,17 @@ window.PreviewAiTools = (function () {
     var _aiResponseStatus = { type: 'idle' };  // 'idle'|'ok'|'error', + message + commandCount
 
     // DOM refs — bound on init().
+
+    // C8 8.X — the /admin/api helper endpoint is project-scoped: it authorizes each
+    // arm against the marker project and binds that context. QuickSiteAPI.helperPath
+    // is the single owner of the marker convention; this delegates so the URL shape
+    // lives in ONE place. Falls back to the bare action if core/api.js is absent —
+    // the server then answers 400 rather than silently reading another project.
+    function _helperPath(action) {
+        return (window.QuickSiteAPI && typeof window.QuickSiteAPI.helperPath === 'function')
+            ? window.QuickSiteAPI.helperPath(action)
+            : action;
+    }
     var _section = null;
     var _listView = null;
     var _runnerView = null;
@@ -67,7 +78,6 @@ window.PreviewAiTools = (function () {
     var _showMoreBtn = null;
     var _emptyEl = null;
     var _backupBtnEl = null;
-    var _importInputEl = null;
 
     // Live runner DOM refs (per-render).
     var _generalPromptTextarea = null;
@@ -116,7 +126,6 @@ window.PreviewAiTools = (function () {
         _showMoreBtn = document.getElementById('ai-tools-show-more');
         _emptyEl = document.getElementById('ai-tools-empty');
         _backupBtnEl = document.getElementById('ai-tools-backup-btn');
-        _importInputEl = document.getElementById('ai-tools-import-input');
 
         _bindEvents();
         _subscribeToSelectionChanges();
@@ -152,67 +161,6 @@ window.PreviewAiTools = (function () {
         if (_backupBtnEl) {
             _backupBtnEl.addEventListener('click', _onBackupClick);
         }
-        if (_importInputEl) {
-            _importInputEl.addEventListener('change', _onImportFileSelected);
-        }
-    }
-
-    function _onImportFileSelected(e) {
-        var file = e.target.files && e.target.files[0];
-        if (!file) return;
-        var toaster = (window.QuickSiteAdmin && typeof window.QuickSiteAdmin.showToast === 'function')
-            ? window.QuickSiteAdmin.showToast.bind(window.QuickSiteAdmin)
-            : null;
-        var reader = new FileReader();
-        reader.onload = function (ev) {
-            var text = String(ev.target.result || '');
-            var parsed;
-            try {
-                parsed = JSON.parse(text);
-            } catch (err) {
-                if (toaster) toaster(_t('importInvalid', "Selected file isn't a valid workflow JSON."), 'error');
-                _importInputEl.value = '';
-                return;
-            }
-            // Accept two shapes:
-            //   - bundle: { spec: {...}, template: "...", translations: {...} }
-            //   - bare spec: { id: "...", meta: {...}, ... }
-            var spec = parsed && parsed.spec ? parsed.spec : parsed;
-            var template = (parsed && typeof parsed.template === 'string') ? parsed.template : '';
-            var translations = (parsed && parsed.translations) ? parsed.translations : null;
-            if (!spec || typeof spec !== 'object' || !spec.id || !spec.meta) {
-                if (toaster) toaster(_t('importInvalid', "Selected file isn't a valid workflow JSON."), 'error');
-                _importInputEl.value = '';
-                return;
-            }
-            var cfg = window.PreviewConfig || {};
-            var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-            if (cfg.authToken) headers['Authorization'] = 'Bearer ' + cfg.authToken;
-            fetch((cfg.adminUrl || '') + 'api/ai-spec-save', {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify({ spec: spec, template: template, translations: translations, isNew: true })
-            }).then(function (res) {
-                return res.json().then(function (json) { return { ok: res.ok, json: json }; });
-            }).then(function (result) {
-                if (!result.ok || !result.json || !result.json.success) {
-                    var errMsg = (result.json && (result.json.error || result.json.message)) || 'HTTP error';
-                    throw new Error(errMsg);
-                }
-                if (toaster) toaster(_t('importSuccess', 'Imported "{id}"').replace('{id}', spec.id), 'success');
-                // Reload so the server-rendered workflow list picks up the new entry.
-                setTimeout(function () { window.location.reload(); }, 600);
-            }).catch(function (err) {
-                if (toaster) toaster(_t('importFailed', 'Import failed: {error}').replace('{error}', (err && err.message) || String(err)), 'error');
-            }).then(function () {
-                if (_importInputEl) _importInputEl.value = '';
-            });
-        };
-        reader.onerror = function () {
-            if (toaster) toaster(_t('importFailed', 'Import failed: {error}').replace('{error}', 'Read error'), 'error');
-            _importInputEl.value = '';
-        };
-        reader.readAsText(file);
     }
 
     function _onBackupClick() {
@@ -513,9 +461,6 @@ window.PreviewAiTools = (function () {
         header.appendChild(iconEl);
         header.appendChild(titleEl);
         if (badgeEl.textContent) header.appendChild(badgeEl);
-        if (workflow.source === 'custom') {
-            header.appendChild(_renderDeleteBtn(workflow));
-        }
         card.appendChild(header);
 
         if (workflow.description) {
@@ -532,11 +477,6 @@ window.PreviewAiTools = (function () {
             diff.classList.add('preview-contextual-ai-tools__tool-card-meta-chip--difficulty-' + workflow.difficulty);
             meta.appendChild(diff);
         }
-        if (workflow.source === 'custom') {
-            var custom = _renderMetaChip(_t('sourceCustom', 'custom'));
-            custom.classList.add('preview-contextual-ai-tools__tool-card-meta-chip--custom');
-            meta.appendChild(custom);
-        }
         if (meta.childNodes.length > 0) card.appendChild(meta);
 
         return card;
@@ -549,50 +489,6 @@ window.PreviewAiTools = (function () {
         return chip;
     }
 
-    function _renderDeleteBtn(workflow) {
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'preview-contextual-ai-tools__tool-card-delete';
-        btn.title = _t('deleteCustomTitle', 'Delete this custom workflow');
-        btn.textContent = '🗑';
-        btn.addEventListener('click', function (e) {
-            // Don't open the card's runner view.
-            e.stopPropagation();
-            e.preventDefault();
-            _onDeleteCustomClick(workflow);
-        });
-        return btn;
-    }
-
-    function _onDeleteCustomClick(workflow) {
-        var title = workflow.title || workflow.id;
-        var confirmTpl = _t('deleteCustomConfirm', 'Delete custom workflow "{title}"?');
-        if (!confirm(confirmTpl.replace('{title}', title))) return;
-
-        var cfg = window.PreviewConfig || {};
-        var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-        if (cfg.authToken) headers['Authorization'] = 'Bearer ' + cfg.authToken;
-        var toaster = (window.QuickSiteAdmin && typeof window.QuickSiteAdmin.showToast === 'function')
-            ? window.QuickSiteAdmin.showToast.bind(window.QuickSiteAdmin)
-            : null;
-        fetch((cfg.adminUrl || '') + 'api/workflow-delete', {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({ id: workflow.id })
-        }).then(function (res) {
-            return res.json().then(function (json) { return { ok: res.ok, json: json }; });
-        }).then(function (result) {
-            if (!result.ok || !result.json || !result.json.success) {
-                var errMsg = (result.json && (result.json.error || result.json.message)) || 'HTTP error';
-                throw new Error(errMsg);
-            }
-            if (toaster) toaster(_t('deleteCustomSuccess', 'Deleted "{id}"').replace('{id}', workflow.id), 'success');
-            // Reload so the server-rendered workflow list drops the entry.
-            setTimeout(function () { window.location.reload(); }, 600);
-        }).catch(function (err) {
-            if (toaster) toaster(_t('deleteCustomFailed', 'Delete failed: {error}').replace('{error}', (err && err.message) || String(err)), 'error');
-        });
-    }
 
     // ════════════════════════════════════════════════════════════════════
     //                          RUNNER VIEW
@@ -645,7 +541,7 @@ window.PreviewAiTools = (function () {
 
     function _fetchWorkflowDetail(id) {
         var cfg = window.PreviewConfig || {};
-        var url = (cfg.adminUrl || '') + 'api/ai-spec-raw/' + encodeURIComponent(id) + '?withData=1';
+        var url = (cfg.adminUrl || '') + 'api/' + _helperPath('ai-spec-raw') + '/' + encodeURIComponent(id) + '?withData=1';
         var headers = { 'Accept': 'application/json' };
         if (cfg.authToken) headers['Authorization'] = 'Bearer ' + cfg.authToken;
         return fetch(url, { headers: headers }).then(function (res) {
@@ -1901,7 +1797,7 @@ window.PreviewAiTools = (function () {
         var cfg = window.PreviewConfig || {};
         var id = _activeWorkflowSummary && _activeWorkflowSummary.id;
         if (!id) return [];
-        var url = (cfg.adminUrl || '') + 'api/workflow-generate-steps';
+        var url = (cfg.adminUrl || '') + 'api/' + _helperPath('workflow-generate-steps');
         var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
         if (cfg.authToken) headers['Authorization'] = 'Bearer ' + cfg.authToken;
         var res = await fetch(url, {
@@ -2208,7 +2104,7 @@ window.PreviewAiTools = (function () {
             return Promise.resolve();
         }
         var query = _buildParamQueryString();
-        var url = (cfg.adminUrl || '') + 'api/ai-spec/' + encodeURIComponent(id) + (query ? '?' + query : '');
+        var url = (cfg.adminUrl || '') + 'api/' + _helperPath('ai-spec') + '/' + encodeURIComponent(id) + (query ? '?' + query : '');
         var headers = { 'Accept': 'application/json' };
         if (cfg.authToken) headers['Authorization'] = 'Bearer ' + cfg.authToken;
         return fetch(url, { headers: headers }).then(function (res) {
