@@ -98,7 +98,9 @@ function __command_getBuild(array $params = [], array $urlParams = []): ApiRespo
     if (file_exists($zipPath)) {
         $buildData['zip_path'] = $zipPath;
         $buildData['zip_size_mb'] = round(filesize($zipPath) / 1024 / 1024, 2);
-        $buildData['download_url'] = BASE_URL . '/build/' . $buildName . '.zip';
+        // C15 15.4: through the /p/<id>/ passthrough (see qs_build_download_url).
+        require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+        $buildData['download_url'] = qs_build_download_url($buildName . '.zip');
         
         // Calculate compression ratio
         if ($folderSize > 0) {

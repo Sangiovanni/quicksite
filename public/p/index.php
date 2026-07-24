@@ -24,10 +24,10 @@ if (!defined('QS_SURFACE_B_PROJECT')) {
 qs_load_project_context(QS_SURFACE_B_PROJECT, true);
 qs_surface_b_finish();
 
-// C15 15.2 — tier-2 render bootstrap: the public-base resolution SEAM. Required ONLY by
-// this renderer (tier 1 = init.php's install-wide constants, shared by every entry point).
-// qs_resolve_public_base() returns today's value now; 15.4 wires R1's 3-tier public-base
-// resolution + root-relative default there, and migrates the render path's BASE_URL reads.
+// C15 15.4 — tier-2 render bootstrap. Required ONLY by this renderer (tier 1 = init.php's
+// install-wide constants, shared by every entry point). Resolves the PUBLIC BASE once
+// (QS_PUBLIC_BASE_URL env → request-derived) and defines QS_PUBLIC_BASE (root-relative
+// form every in-page URL composes against, R1) + QS_PUBLIC_BASE_ABS (sitemap/spec form).
 require_once __DIR__ . '/../../secure/src/functions/renderBootstrap.php';
 
 // --- Component Preview Mode (for Visual Editor) ---
@@ -45,7 +45,7 @@ if (isset($_GET['_component']) && isset($_GET['_editor']) && $_GET['_editor'] ==
     require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
     $renderer = new JsonToHtmlRenderer($translator, [
         'editorMode' => true,
-        'baseUrl' => BASE_URL,
+        'baseUrl' => QS_PUBLIC_BASE, // C15 15.4 (R1) — root-relative render base
         'lang' => $lang,
     ]);
     
@@ -76,7 +76,7 @@ if (isset($_GET['_component']) && isset($_GET['_editor']) && $_GET['_editor'] ==
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Component: <?= htmlspecialchars($componentName) ?></title>
     <?php $cssVersion = file_exists(PUBLIC_CONTENT_PATH . '/style/style.css') ? filemtime(PUBLIC_CONTENT_PATH . '/style/style.css') : time(); ?>
-    <link rel="stylesheet" href="<?= BASE_URL ?>/style/style.css?v=<?= $cssVersion ?>">
+    <link rel="stylesheet" href="<?= QS_PUBLIC_BASE ?>style/style.css?v=<?= $cssVersion ?>">
     <style>
         /* Component preview container */
         body {
@@ -114,7 +114,7 @@ if (isset($_GET['_component']) && isset($_GET['_editor']) && $_GET['_editor'] ==
         </div>
         <?= $componentHtml ?>
     </div>
-    <script src="<?= BASE_URL ?>/scripts/qs.js"></script>
+    <script src="<?= QS_PUBLIC_BASE ?>scripts/qs.js"></script>
 </body>
 </html><?php
     exit;

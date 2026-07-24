@@ -882,6 +882,8 @@ ApiResponse::create(201, 'operation.success')
         'scripts_copied' => file_exists($scriptsDir . '/qs.js'),
         'build_date' => date('Y-m-d H:i:s'),
         'readme_created' => true,
-        'download_url' => BASE_URL . '/build/' . $zipFilename
+        // C15 15.4: builds live in the project's own public/build/, reached through the
+        // /p/<id>/ passthrough (BASE_URL alone pointed at the freed webroot since 15.3).
+        'download_url' => qs_build_download_url($zipFilename)
     ])
     ->send();

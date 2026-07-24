@@ -332,7 +332,10 @@ class TrimParameters {
      */
     public function samePageUrl(?string $lang = null): string {
         $targetLang = $lang ?? $this->lang;
-        $url = defined('BASE_URL') ? BASE_URL : '/';
+        // C15 15.4 (R1): render-scoped public base first (root-relative form);
+        // BASE_URL fallback keeps non-render callers unchanged.
+        $url = defined('QS_PUBLIC_BASE') ? QS_PUBLIC_BASE
+            : (defined('BASE_URL') ? BASE_URL : '/');
         
         // Add language prefix if multilingual
         if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) {

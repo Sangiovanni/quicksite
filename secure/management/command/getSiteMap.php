@@ -15,6 +15,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/renderBootstrap.php'; // qs_resolve_public_base (C15 15.4)
 
 /**
  * Load sitemap config (custom URLs + excluded routes)
@@ -75,9 +76,12 @@ function __command_getSiteMap(array $params = [], array $urlParams = []): ApiRes
             ->withData(['requested_format' => $format, 'valid_formats' => ['text', 'json']]);
     }
 
-    // Get configuration
-    $baseUrl = rtrim(BASE_URL, '/');
-    // Allow custom base URL override (for sitemap.txt generation with production domain)
+    // The sitemap base — ABSOLUTE by spec (R1 keeps the absolute form exactly here).
+    // C15 15.4 chain, first non-empty wins: the per-call `baseUrl` param (the author's
+    // word at generation time, unchanged since beta.8) → QS_PUBLIC_BASE_URL server env →
+    // derived (install base + p/<id>/ — BASE_URL alone stopped being a project URL when
+    // the webroot mirror died in 15.3, which is why it is no longer the default).
+    $baseUrl = rtrim(qs_resolve_public_base()['abs'], '/');
     if (!empty($params['baseUrl'])) {
         $customBase = filter_var($params['baseUrl'], FILTER_VALIDATE_URL);
         if ($customBase) {

@@ -8,10 +8,11 @@
  * project any more, and the web root is free (the renderer lives at public/p/index.php).
  *
  * Two-part flow, wired into public/p/index.php:
- *   1. qs_surface_b_maybe_handle()  — runs FIRST, BEFORE init.php. Detects a /p/<id>/
- *      request (existence-based, so an optional PUBLIC_FOLDER_SPACE prefix that we
- *      cannot read pre-init does not matter), and sets BASE_URL to the /p/<id> URL before
- *      init.php would derive it. PUBLIC_CONTENT_PATH is NOT set here: C15 15.3 binds it
+ *   1. qs_surface_b_maybe_handle()  — runs FIRST, BEFORE init.php. Binds the project
+ *      from one of two entries: the vhost's QS_PROJECT env (a mapped production
+ *      domain — C15 15.4) or a detected /p/<id>/ request (the authoring hostname;
+ *      existence-based, so an optional PUBLIC_FOLDER_SPACE prefix that we cannot
+ *      read pre-init does not matter). Sets BASE_URL before init.php would derive it. PUBLIC_CONTENT_PATH is NOT set here: C15 15.3 binds it
  *      beside PROJECT_PATH in qs_load_project_context(), so there is no longer a competing
  *      definition to pre-empt.
  *   2. qs_surface_b_finish()        — runs AFTER init + qs_load_project_context(id).
@@ -27,6 +28,7 @@
  */
 
 require_once __DIR__ . '/projectPublicArtifacts.php'; // QS_RESERVED_BASE + regen helpers
+require_once __DIR__ . '/projectContext.php';         // qs_request_origin (R6) — pre-init-safe
 
 if (!defined('QS_SURFACE_B_RESERVED_WORDS')) {
     // Segment names that may NOT be a /p/ project id (and that createProject must also
@@ -92,6 +94,50 @@ function qs_surface_b_maybe_handle(): void {
     }
     $segs = array_values(array_filter(explode('/', $path), fn($s) => $s !== ''));
 
+    // ---- C15 15.4: ENV ENTRY MODE — a mapped production domain names its project --
+    // §15.1.3 mechanism (b): the vhost declares `SetEnv QS_PROJECT <id>` (Apache) /
+    // `fastcgi_param QS_PROJECT <id>` (nginx) and funnels every non-file request
+    // here (FallbackResource / try_files). No URL marker, no rewrite — the request
+    // path IS the route, and the domain root IS the site. REDIRECT_ fallback:
+    // FallbackResource's internal redirect re-prefixes environment variables (same
+    // reason the gate reads REDIRECT_HTTP_AUTHORIZATION). Never set on the
+    // authoring hostname, where /p/<id>/ URL detection below stays the entry.
+    $envId = $_SERVER['QS_PROJECT'] ?? $_SERVER['REDIRECT_QS_PROJECT'] ?? '';
+    if (is_string($envId) && $envId !== '') {
+        // R5 (Sangio 2026-07-24) — one domain, one site: a mapped domain answers
+        // 404 to any literal /p/… request, so a production domain cannot be used
+        // to reach or enumerate OTHER projects on the install. PHP-side belt to
+        // the vhost's own RewriteRule; also closes the /p/ existence oracle here.
+        if (($segs[0] ?? '') === 'p') {
+            qs_sb_deny(404, 'This site is not available.');
+        }
+        if (!qs_sb_valid_id($envId) || !is_dir($secure . '/projects/' . $envId)) {
+            // Deployment config error, not a visitor error: the vhost names a
+            // project that does not exist. Degrade to 404 with a log (R4 posture)
+            // — there is no fallback project by design (C15 15.3).
+            error_log(
+                "QuickSite: QS_PROJECT='{$envId}' names no existing project — "
+                . 'check the vhost SetEnv / fastcgi_param.'
+            );
+            qs_sb_deny(404, 'This site is not available.');
+        }
+        $denyStatus = qs_surface_b_gate($envId, $secure);
+        if ($denyStatus !== null) {
+            qs_sb_deny($denyStatus, 'This site is not available.');
+        }
+        $GLOBALS['__qs_sb'] = [
+            'id'         => $envId,
+            'secure'     => $secure,
+            'serverRoot' => $serverRoot,
+            'subpath'    => implode('/', $segs), // full path — the domain root IS the site
+            'projectDir' => $secure . '/projects/' . $envId,
+        ];
+        if (!defined('BASE_URL'))             define('BASE_URL', qs_request_origin() . '/');
+        if (!defined('QS_SURFACE_B_PROJECT')) define('QS_SURFACE_B_PROJECT', $envId);
+        if (!defined('QS_SURFACE_B'))         define('QS_SURFACE_B', true);
+        return;
+    }
+
     // Find the FIRST 'p' segment whose NEXT segment is an EXISTING, valid project.
     // Existence-based → robust to an optional space prefix; cannot hijack a served
     // route unless that route is literally p/<existing-project-id> ('p' is reserved).
@@ -131,9 +177,8 @@ function qs_surface_b_maybe_handle(): void {
     $subSegs    = array_slice($segs, $idIndex + 2);          // the rest (route or asset)
     $subpath    = implode('/', $subSegs);                    // RAW (kept encoded for the resolver)
 
-    $https  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ((int) ($_SERVER['SERVER_PORT'] ?? 0) === 443);
-    $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    $baseUrl = ($https ? 'https' : 'http') . '://' . $host . '/' . implode('/', $prefixSegs) . '/';
+    // C15 15.4 (R6): validated origin, never the raw Host header.
+    $baseUrl = qs_request_origin() . '/' . implode('/', $prefixSegs) . '/';
 
     $GLOBALS['__qs_sb'] = [
         'id'         => $id,
@@ -291,12 +336,74 @@ function qs_surface_b_send_headers(): void {
     }
 }
 
-/** Refuse a surface-B request with a minimal HTML page, then exit. */
+/**
+ * C15 15.4 (E3) — the DEPLOYMENT's own page for a given deny status, or null.
+ *
+ * `SetEnv QS_ERROR_PAGE_404 /404.html` (per-vhost, or .htaccess on shared
+ * hosting) lets a deployment back QuickSite's project-less status pages with
+ * its own root-level files — the same declare-and-obey mechanism as
+ * QS_PROJECT / QS_PUBLIC_BASE_URL. Constraints, deliberately tight:
+ *
+ *   - root-relative path only, realpath-jailed to the DOCUMENT ROOT (the L11
+ *     idiom) — a config value can never read outside the web root;
+ *   - .html / .htm only, served via readfile — NEVER an include, so a config
+ *     value can never become an execution or source-disclosure primitive;
+ *   - anything invalid → error_log + null, and the caller degrades to the
+ *     built-in generic page (R4 posture: a typo never breaks the deny).
+ *
+ * QuickSite ships NO files at the web root — "root stays free" holds; the
+ * built-in page below remains the default when the deployment declares nothing.
+ */
+function qs_sb_error_page_file(int $status): ?string {
+    $value = $_SERVER['QS_ERROR_PAGE_' . $status]
+        ?? $_SERVER['REDIRECT_QS_ERROR_PAGE_' . $status]
+        ?? '';
+    if (!is_string($value) || $value === '') {
+        return null;
+    }
+    $reject = static function (string $why) use ($value, $status): ?string {
+        error_log("QuickSite: ignoring QS_ERROR_PAGE_{$status}='{$value}' — {$why}. Serving the generic page.");
+        return null;
+    };
+    if ($value[0] !== '/' || strpos($value, "\0") !== false) {
+        return $reject('must be a root-relative path under the document root');
+    }
+    $ext = strtolower(pathinfo($value, PATHINFO_EXTENSION));
+    if ($ext !== 'html' && $ext !== 'htm') {
+        return $reject('only .html/.htm files are served');
+    }
+    $docRoot = realpath($_SERVER['DOCUMENT_ROOT'] ?? '');
+    if ($docRoot === false) {
+        return $reject('document root unresolvable');
+    }
+    $real = realpath($docRoot . $value);
+    if ($real === false || !is_file($real)) {
+        return $reject('file not found');
+    }
+    $jail = rtrim($docRoot, '/\\') . DIRECTORY_SEPARATOR;
+    $hay  = $real;
+    if (DIRECTORY_SEPARATOR === '\\') { $jail = strtolower($jail); $hay = strtolower($hay); }
+    if (strncmp($hay, $jail, strlen($jail)) !== 0) {
+        return $reject('resolves outside the document root');
+    }
+    return $real;
+}
+
+/**
+ * Refuse a surface-B request, then exit. The deployment's own page wins when
+ * declared and valid (QS_ERROR_PAGE_<status>, E3); the built-in minimal page
+ * is the default.
+ */
 function qs_sb_deny(int $status, string $message): void {
     if (!headers_sent()) {
         http_response_code($status);
         header('Content-Type: text/html; charset=utf-8');
         header('Cache-Control: no-store');
+    }
+    $custom = qs_sb_error_page_file($status);
+    if ($custom !== null) {
+        readfile($custom);
+        exit;
     }
     $safe = htmlspecialchars($message, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     echo "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"

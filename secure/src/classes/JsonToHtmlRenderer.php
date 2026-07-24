@@ -1058,7 +1058,10 @@ class JsonToHtmlRenderer {
         // Check if current page is valid (not 404)
         if ($trimParams->page() === '404') {
             // Invalid route - redirect to home in target language
-            $url = defined('BASE_URL') ? BASE_URL : '';
+            // C15 15.4 (R1): compose against the render-scoped public base;
+            // BASE_URL fallback keeps non-render callers unchanged.
+            $url = defined('QS_PUBLIC_BASE') ? QS_PUBLIC_BASE
+                : (defined('BASE_URL') ? BASE_URL : '');
             if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) {
                 $url .= $targetLang . '/';
             }
@@ -1100,7 +1103,8 @@ class JsonToHtmlRenderer {
         return [
             '__current_page' => $currentPage,
             '__lang' => $this->context['lang'] ?? (defined('LANGUAGE_DEFAULT') ? LANGUAGE_DEFAULT : 'en'),
-            '__base_url' => defined('BASE_URL') ? BASE_URL : '',
+            '__base_url' => defined('QS_PUBLIC_BASE') ? QS_PUBLIC_BASE
+                : (defined('BASE_URL') ? BASE_URL : ''),
             '__public_folder' => defined('PUBLIC_FOLDER_NAME') ? PUBLIC_FOLDER_NAME : 'public',
             '__current_route' => $this->context['page'] ?? 'home',
             '__space' => $space,
@@ -1130,8 +1134,12 @@ class JsonToHtmlRenderer {
             return $url;
         }
         
-        // It's a relative URL - build the full URL
-        $fullUrl = defined('BASE_URL') ? BASE_URL : '';
+        // It's a relative URL - build the full URL. C15 15.4 (R1): the render
+        // path supplies QS_PUBLIC_BASE (root-relative path form, one trailing
+        // slash), so links stay host- and scheme-agnostic; the BASE_URL
+        // fallback keeps non-render callers exactly as before.
+        $fullUrl = defined('QS_PUBLIC_BASE') ? QS_PUBLIC_BASE
+            : (defined('BASE_URL') ? BASE_URL : '');
         
         // Add language prefix if multilingual and not a static asset
         if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT && !empty($this->context['lang'])) {

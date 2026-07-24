@@ -4,6 +4,12 @@
 # own per-directory .htaccess: /p/ (the project renderer), /admin/, /admin/api/, /management/.
 RewriteEngine On
 
+# C15 15.4 (E6) — never expose an auto-generated directory listing at the free root.
+# Only forbids the AUTO-INDEX: a user index.php/index.html dropped at the root is served
+# normally by DirectoryIndex, and real files stay directly reachable. Without an index
+# file a bare "/" answers 403 instead of listing the install's folders.
+Options -Indexes
+
 # Security headers for static assets (CSS, JS, images, fonts, etc.)
 <IfModule mod_headers.c>
     Header set X-Content-Type-Options "nosniff"

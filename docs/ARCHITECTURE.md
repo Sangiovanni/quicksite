@@ -252,13 +252,15 @@ site at the domain root. A production deployment maps a domain onto one project 
 web-server config (§6) rather than QuickSite choosing a privileged project.
 
 ```
-GET /p/mysite/fr/about
+GET /p/mysite/fr/about            (or GET /fr/about on a mapped domain)
   │
-  ▼  Apache public/p/.htaccess → public/p/index.php
-  │
+  ▼  Apache public/p/.htaccess → public/p/index.php   (mapped domain: the
+  │                              vhost's FallbackResource /p/index.php)
 surfaceB  (runs first, before init.php)
-  ├── detects /p/<projectId>/ and gates it by visibility + membership
-  └── points PUBLIC_CONTENT_PATH + BASE_URL at that project's own public/
+  ├── binds the project: the vhost's QS_PROJECT env var (mapped domain),
+  │     else the /p/<projectId>/ URL marker (the install's own hostname)
+  ├── gates it by visibility + membership
+  └── sets BASE_URL from the validated request origin
   │
 init.php  (install-wide constants — shared by every entry point)
   ├── defines PUBLIC_FOLDER_ROOT, SECURE_FOLDER_PATH, ADMIN_ASSET_ROOT
@@ -266,12 +268,18 @@ init.php  (install-wide constants — shared by every entry point)
   │
 qs_load_project_context(<projectId>)
   ├── loads project config.php → CONFIG
-  └── loads project routes.php → ROUTES
+  ├── loads project routes.php → ROUTES
+  └── binds PUBLIC_CONTENT_PATH to that project's own public/
+  │
+renderBootstrap  (render path only)
+  └── resolves the PUBLIC BASE once — QS_PUBLIC_BASE_URL env var, else
+        derived from the request — into QS_PUBLIC_BASE (root-relative form
+        all in-page URLs compose against) + QS_PUBLIC_BASE_ABS (sitemap)
   │
 public/p/index.php
   ├── checks aliases (data/aliases.json) → may redirect
   ├── TrimParameters parses URL → (lang, route, params)  ── see §5.3
-  ├── validates route ∈ ROUTES (else 404)
+  ├── validates route ∈ ROUTES (else the project's own 404 page)
   └── includes templates/pages/{route}/{leaf}.php
   │
 Page template
@@ -280,6 +288,11 @@ Page template
   ├── renders structure → HTML body
   └── Page::render() emits <!doctype>, <head>, menu, body, footer
 ```
+
+Emitted URLs are **root-relative**: a page links to `/p/mysite/about` on the install's own
+hostname and to `/about` on a mapped domain — the same rendered HTML carries no scheme or
+host, so it survives domain moves, HTTPS switches, and reverse proxies. The absolute base
+exists only where a spec demands one (`sitemap.txt`).
 
 A request for a **static sub-resource** under `/p/<projectId>/` — an image, a stylesheet, or the
 shared `qs.js` runtime — is served by the same entry point through a prefix-checked passthrough
@@ -383,14 +396,38 @@ A project is reachable two ways — the **two surfaces**:
 - **Per-project live view — `/p/<projectId>/`.** Every project is live-rendered from its own `secure/projects/<id>/public/` folder under `/p/<projectId>/`. No project is privileged: they are all served the same way, from their own folder, with nothing materialised elsewhere. The HTML runs through the shared renderer; static sub-resources (style, scripts, images, fonts) are served through a canonicalised, prefix-checked passthrough that exposes **only** that project's `public/` subtree (§7). Access is gated by the project's visibility and the caller's membership — a private project answers the same refusal to a non-member as to a stranger, so membership is never leaked.
 - **Visual editor.** The admin panel edits one project at a time, previewing it through that project's `/p/<id>/` view in editor mode.
 
-The **web root carries no QuickSite fallback**: it serves real files only. Nothing is rendered there, so an operator can place their own hand-made site at the domain root without QuickSite squatting it.
+**Mapped domains — production serving.** Which project a real domain serves is a *deployment*
+decision, declared in web-server config and read per-request by the engine — QuickSite holds no
+serving state:
+
+- `QS_PROJECT` (per-vhost `SetEnv` / `fastcgi_param`) names the project; the domain root **is**
+  that site, with no `/p/` marker in any URL. The same visibility/membership gate and the same
+  passthrough jail apply as on the `/p/<id>/` surface.
+- `QS_PUBLIC_BASE_URL` declares the public base that absolute-by-spec artifacts (`sitemap.txt`)
+  are generated against; it also covers sub-path mounts and reverse proxies, where the
+  request-derived origin would be wrong. In-page links are root-relative and need no declaration.
+- `QS_TRUSTED_HOSTS` (optional) pins the Host header: a request presenting any other host has
+  its URLs composed against the first listed host instead.
+- On a mapped domain a literal `/p/…` request answers **404** — one domain, one site; other
+  projects on the install can be neither reached nor enumerated through it. `/p/<id>/` stays
+  open on the install's own hostname.
+
+Adding a domain touches server config only: no command, no PHP state. Copy-paste examples for
+both servers ship in `secure/deploy/apache-vhosts.conf.example` and
+`secure/deploy/nginx-vhosts.conf.example` (shared hosting can put the same `SetEnv` lines in a
+`.htaccess`). A misdeclared value never takes a site down: the engine logs it and degrades to
+the derived base (or a generic status page for an unresolvable `QS_PROJECT`).
+
+The **web root carries no QuickSite fallback**: it serves real files only. Nothing is rendered
+there, so an operator can place their own hand-made site at the domain root without QuickSite
+squatting it (the shipped `.htaccess` also disables directory listings there).
 
 **Project visibility.** Each project's `config/members.json` carries a `visibility` flag:
 
 - `public` — the `/p/<id>/` view is open to anonymous visitors (a shareable site).
 - `private` — the `/p/<id>/` view requires membership (owner / member / viewer). Membership is presented by a short-lived, HttpOnly `qs_preview` cookie the admin panel sets from the caller's access token (a bearer header is accepted too).
 
-A refused `/p/<id>/` request (no identity → `401`, identity but not a member → `403`) answers a plain, engine-owned status page with that status. It borrows no project's templates — rendering the requested project's own error page would hand a non-member that project's styling — and it names nothing, so a private project and a nonexistent one look the same.
+A refused `/p/<id>/` request (no identity → `401`, identity but not a member → `403`) answers a plain, engine-owned status page with that status. It borrows no project's templates — rendering the requested project's own error page would hand a non-member that project's styling — and it names nothing, so a private project and a nonexistent one look the same. A deployment can substitute its own static pages for these engine-owned statuses by declaring `QS_ERROR_PAGE_<status>` (e.g. `SetEnv QS_ERROR_PAGE_404 /404.html`): the value must be a root-relative `.html`/`.htm` file inside the document root, is served with the real status code, and an invalid value is logged and ignored. (A missing *page* inside a project that did resolve is different — that renders the project's own 404 template, no configuration involved.)
 
 **Per-user editing.** A user's `selected_project` (in `users.php`, set via `setSelectedProject`) names the project their admin panel edits. It is a per-user preference, **never an authorization input** — every request is re-authorized against the target project's `members.json`. Because each project is served *and* edited from its own folder, two users can edit two different projects at once without colliding, and nothing any user selects affects what a domain serves.
 

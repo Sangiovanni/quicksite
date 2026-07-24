@@ -1,0 +1,82 @@
+# =============================================================================
+# QuickSite — Apache vhost examples: one install, N projects, N domains.
+#
+# QuickSite has NO "served project" state. Which project a domain serves is a
+# DEPLOYMENT decision, declared here and read per-request by the engine:
+#
+#   SetEnv QS_PROJECT          <projectId>   which project this domain serves
+#   SetEnv QS_PUBLIC_BASE_URL  <base>        the public base the project's
+#                                            sitemap (and other absolute-by-spec
+#                                            artifacts) are generated against.
+#                                            In-page links are root-relative and
+#                                            do not need it; declare it anyway —
+#                                            it also covers sub-path mounts and
+#                                            reverse proxies where the request-
+#                                            derived origin would be wrong.
+#   SetEnv QS_TRUSTED_HOSTS    a,b           optional Host-header pin (comma-
+#                                            separated host[:port]); a request
+#                                            with any other Host composes URLs
+#                                            against the FIRST entry.
+#   SetEnv QS_ERROR_PAGE_401   /401.html     optional: your own static page for
+#   SetEnv QS_ERROR_PAGE_404   /404.html     QuickSite's project-less/refused
+#                                            statuses. Root-relative, inside the
+#                                            document root, .html/.htm only.
+#                                            (A missing PAGE inside a served
+#                                            project renders that project's own
+#                                            404 template — no config needed.)
+#
+# Shared hosting (no vhost access): every SetEnv above is also legal in a
+# .htaccess file at the document root.
+#
+# Copy what you need into your Apache configuration and adjust paths/domains.
+# This file is documentation — nothing in QuickSite reads or writes it.
+# =============================================================================
+
+# ---- example.com  ->  project "siteA" ---------------------------------------
+<VirtualHost *:443>
+    ServerName   example.com
+    DocumentRoot /srv/quicksite/public
+
+    SetEnv QS_PROJECT         "siteA"
+    SetEnv QS_PUBLIC_BASE_URL "https://example.com/"
+    SetEnv QS_TRUSTED_HOSTS   "example.com"
+    # SetEnv QS_ERROR_PAGE_401 "/401.html"
+    # SetEnv QS_ERROR_PAGE_404 "/404.html"
+
+    RewriteEngine On
+    # One domain, one site: a direct /p/... hit is not this domain's surface.
+    # (The engine also enforces this itself when QS_PROJECT is set.)
+    RewriteRule ^/p(/|$)  -  [R=404,L]
+
+    # This domain's root IS the project. /admin/ /admin/api/ /management/ keep
+    # their own per-directory FallbackResource and are unaffected by this one.
+    FallbackResource /p/index.php
+
+    # SSL directives, logs, etc. as usual for your setup.
+</VirtualHost>
+
+# ---- shop.example.net  ->  project "siteB" ----------------------------------
+<VirtualHost *:443>
+    ServerName   shop.example.net
+    DocumentRoot /srv/quicksite/public
+
+    SetEnv QS_PROJECT         "siteB"
+    SetEnv QS_PUBLIC_BASE_URL "https://shop.example.net/"
+    SetEnv QS_TRUSTED_HOSTS   "shop.example.net"
+
+    RewriteEngine On
+    RewriteRule ^/p(/|$)  -  [R=404,L]
+    FallbackResource /p/index.php
+</VirtualHost>
+
+# ---- the install's own hostname — the AUTHORING surface ---------------------
+<VirtualHost *:80>
+    ServerName   quicksite.example.internal
+    DocumentRoot /srv/quicksite/public
+    # No QS_PROJECT, no QS_PUBLIC_BASE_URL:
+    #   - every project is reachable at /p/<projectId>/ (visibility-gated),
+    #   - links compose against the request-derived /p/<projectId>/ base,
+    #   - the ROOT STAYS FREE for your own hand-made site (no FallbackResource).
+    # The shipped public/.htaccess already sets `Options -Indexes`, so a bare "/"
+    # without an index file answers 403 rather than listing the install's folders.
+</VirtualHost>

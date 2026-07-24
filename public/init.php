@@ -213,16 +213,17 @@ if (file_exists($nginxSetupPending) && stripos($serverSoftware, 'nginx') !== fal
 // This file only makes the loader reachable from all four.
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContext.php';
 
+// BASE_URL = where this INSTALL (panel + management API) is. C15 15.4 (R6): derived
+// through qs_request_origin() — validated Host, optional QS_TRUSTED_HOSTS pin — never
+// the raw attacker-controllable header. The PUBLIC base a rendered project's links
+// compose against is a SEPARATE render-scoped value (renderBootstrap.php).
 if (!defined('BASE_URL')) {
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
-    $host = $_SERVER['HTTP_HOST'];
-    if(PUBLIC_FOLDER_SPACE !== ''){
-        $host .= '/' . PUBLIC_FOLDER_SPACE . '/';
+    $origin = qs_request_origin();
+    if (PUBLIC_FOLDER_SPACE !== '') {
+        define('BASE_URL', $origin . '/' . PUBLIC_FOLDER_SPACE . '/');
+    } else {
+        define('BASE_URL', $origin . '/');
     }
-    else{
-        $host .= '/';
-    }
-    define('BASE_URL', $protocol . $host);
 }
 
 // ============================================================================

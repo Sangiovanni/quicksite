@@ -1,0 +1,94 @@
+# =============================================================================
+# QuickSite — nginx server-block examples: one install, N projects, N domains.
+#
+# Same model as the Apache twin (apache-vhosts.conf.example, which also
+# documents every QS_* variable): the DEPLOYMENT declares which project a
+# domain serves via fastcgi_param; QuickSite holds no serving state.
+#
+# NOTE: this is separate from secure/nginx/dynamic_routes.conf (the generated
+# routing include for the AUTHORING install). Copy what you need into your
+# site config and adjust paths/domains/php upstream. Nothing reads this file.
+#
+# nginx does not list directories unless `autoindex on` is set — the free root
+# needs no extra directive here.
+# =============================================================================
+
+# ---- example.com  ->  project "siteA" ---------------------------------------
+server {
+    listen      443 ssl;
+    server_name example.com;
+    root        /srv/quicksite/public;
+
+    # The engine's own namespaces keep working on every domain.
+    location ^~ /admin/      { try_files $uri $uri/ /admin/index.php$is_args$args; }
+    location ^~ /management/ { try_files $uri $uri/ /management/index.php$is_args$args; }
+
+    # One domain, one site: /p/ is not this domain's surface.
+    # (The engine also enforces this itself when QS_PROJECT is set.)
+    location ^~ /p/ { return 404; }
+
+    # Real files first (your own root files, project assets resolve inside the
+    # engine), everything else renders the mapped project.
+    location / { try_files $uri @site; }
+
+    location @site {
+        include        fastcgi_params;
+        fastcgi_param  QS_PROJECT          "siteA";
+        fastcgi_param  QS_PUBLIC_BASE_URL  "https://example.com/";
+        fastcgi_param  QS_TRUSTED_HOSTS    "example.com";
+        # fastcgi_param QS_ERROR_PAGE_401  "/401.html";
+        # fastcgi_param QS_ERROR_PAGE_404  "/404.html";
+        fastcgi_param  SCRIPT_FILENAME     $document_root/p/index.php;
+        fastcgi_pass   php;   # your php-fpm upstream
+    }
+
+    location ~ \.php$ {
+        include        fastcgi_params;
+        fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass   php;
+    }
+}
+
+# ---- shop.example.net  ->  project "siteB" ----------------------------------
+server {
+    listen      443 ssl;
+    server_name shop.example.net;
+    root        /srv/quicksite/public;
+
+    location ^~ /admin/      { try_files $uri $uri/ /admin/index.php$is_args$args; }
+    location ^~ /management/ { try_files $uri $uri/ /management/index.php$is_args$args; }
+    location ^~ /p/          { return 404; }
+    location /               { try_files $uri @site; }
+
+    location @site {
+        include        fastcgi_params;
+        fastcgi_param  QS_PROJECT          "siteB";
+        fastcgi_param  QS_PUBLIC_BASE_URL  "https://shop.example.net/";
+        fastcgi_param  QS_TRUSTED_HOSTS    "shop.example.net";
+        fastcgi_param  SCRIPT_FILENAME     $document_root/p/index.php;
+        fastcgi_pass   php;
+    }
+
+    location ~ \.php$ {
+        include        fastcgi_params;
+        fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass   php;
+    }
+}
+
+# ---- the install's own hostname — the AUTHORING surface ---------------------
+# No QS_PROJECT / QS_PUBLIC_BASE_URL: every project serves at /p/<projectId>/
+# (visibility-gated) and the root stays free. Use the generated include for the
+# routing (see secure/nginx/dynamic_routes.conf and the in-app setup notice):
+#
+# server {
+#     listen      80;
+#     server_name quicksite.example.internal;
+#     root        /srv/quicksite/public;
+#     include     /srv/quicksite/secure/nginx/dynamic_routes.conf;
+#     location ~ \.php$ {
+#         include        fastcgi_params;
+#         fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
+#         fastcgi_pass   php;
+#     }
+# }

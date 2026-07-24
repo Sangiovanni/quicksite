@@ -84,8 +84,9 @@ if (file_exists($manifestPath)) {
     }
 }
 
-// Build download URL
-$downloadUrl = rtrim(BASE_URL, '/') . '/build/' . $buildName . '.zip';
+// Build download URL — C15 15.4: through the /p/<id>/ passthrough (see qs_build_download_url).
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+$downloadUrl = qs_build_download_url($buildName . '.zip');
 
 ApiResponse::create(200, 'operation.success')
     ->withMessage('Download URL retrieved successfully')

@@ -11,6 +11,19 @@ require_once __DIR__ . '/routeHelpers.php';
 const SPECIAL_PAGES = ['404', '500', '403', '401'];
 
 /**
+ * C15 15.4 — the absolute download URL of a build zip in the bound project's
+ * own public/build/, reached through the /p/<id>/ passthrough (the visibility
+ * gate applies: a private project's builds need the panel's qs_preview cookie
+ * or a member bearer, a public project's are public). Shared by build /
+ * getBuild / downloadBuild — one derivation, not three.
+ */
+function qs_build_download_url(string $zipFilename): string
+{
+    require_once __DIR__ . '/renderBootstrap.php'; // qs_resolve_public_base
+    return qs_resolve_public_base()['abs'] . 'build/' . $zipFilename;
+}
+
+/**
  * Export array with proper formatting for nested routes.
  * Forces all keys to strings — PHP auto-casts numeric string keys to int.
  */

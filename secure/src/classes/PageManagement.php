@@ -54,25 +54,32 @@ class PageManagement {
         }
         // ─────────────────────────────────────────────────────────────────
 
+        // C15 15.4 (R1): the base every emitted URL composes against. On the render
+        // path this is QS_PUBLIC_BASE (root-relative path form, exactly one trailing
+        // slash — which is also what kills the old `//` in these joins); the BASE_URL
+        // fallback keeps non-render callers behaving exactly as before.
+        $base = defined('QS_PUBLIC_BASE') ? QS_PUBLIC_BASE
+            : ((defined('BASE_URL') ? rtrim(BASE_URL, '/') : '') . '/');
+
         $header = "<!DOCTYPE html>";
         $header .= '<html lang="' . htmlspecialchars($this->lang) . '"' . $themeAttr . '>';
         $header .="<head>";
         $header .= "<title>" . htmlspecialchars($this->title) . "</title>";
         // Favicon: prefer CONFIG['FAVICON_PATH'] (project-configurable).
         // Accepts an absolute URL (https?:// or data:) emitted as-is, or a
-        // root-relative path (joined with BASE_URL). Default falls back to
-        // the project's conventional assets path. Kept in sync with the
+        // root-relative path (joined with the public base). Default falls back
+        // to the project's conventional assets path. Kept in sync with the
         // built-page renderer in src/classes/Page.php.
         $faviconPath = (defined('CONFIG') && isset(CONFIG['FAVICON_PATH']) && CONFIG['FAVICON_PATH'] !== '')
             ? CONFIG['FAVICON_PATH']
             : '/assets/images/favicon.png';
         $faviconHref = preg_match('#^(https?:)?//|^data:#i', $faviconPath)
             ? $faviconPath
-            : (BASE_URL . '/' . ltrim($faviconPath, '/'));
+            : ($base . ltrim($faviconPath, '/'));
         $header .= '<link rel="icon" href="' . htmlspecialchars($faviconHref, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '">';
         $stylePath = PUBLIC_CONTENT_PATH . '/style/style.css';
         $cssVersion = file_exists($stylePath) ? filemtime($stylePath) : time();
-        $header .= '<link rel="stylesheet" href="' . BASE_URL . '/style/style.css?v=' . $cssVersion . '">';
+        $header .= '<link rel="stylesheet" href="' . $base . 'style/style.css?v=' . $cssVersion . '">';
         if (!empty($this->links)) {
             foreach ($this->links as $rel => $href) {
                 $header .= '<link rel="' . htmlspecialchars($rel) . '" href="' . htmlspecialchars($href) . '">';
@@ -101,7 +108,7 @@ class PageManagement {
 
         // Pass context with baseUrl, lang, and route info
         $context = [
-            'baseUrl' => BASE_URL,
+            'baseUrl' => $base,
             'lang' => MULTILINGUAL_SUPPORT ? $trimParameters->lang() : '',
             // New nested route properties
             'route' => $trimParameters->route(),           // ['guides', 'installation']
@@ -150,11 +157,11 @@ class PageManagement {
         // undefined and fall back to empty params.
         $routesMetaPath = PUBLIC_CONTENT_PATH . '/scripts/qs-route-schema.js';
         if (file_exists($routesMetaPath)) {
-            $body .= '<script src="' . BASE_URL . '/scripts/qs-route-schema.js"></script>';
+            $body .= '<script src="' . $base . 'scripts/qs-route-schema.js"></script>';
         }
 
         // Always include QuickSite core library for {{call:...}} interactions
-        $body .= '<script src="' . BASE_URL . '/scripts/qs.js"></script>';
+        $body .= '<script src="' . $base . 'scripts/qs.js"></script>';
 
         // Consent layer hydration (window.QS_CONSENT) — live site only. Drives
         // qs.js write-gating: emits the key→category map + version when the
@@ -196,7 +203,7 @@ class PageManagement {
         // Include API endpoint config if file exists and has real content
         $apiConfigPath = PUBLIC_CONTENT_PATH . '/scripts/qs-api-config.js';
         if (file_exists($apiConfigPath) && filesize($apiConfigPath) > 100) {
-            $body .= '<script src="' . BASE_URL . '/scripts/qs-api-config.js"></script>';
+            $body .= '<script src="' . $base . 'scripts/qs-api-config.js"></script>';
         }
 
         // Include enum registry alongside qs-api-config.js. Generated
@@ -206,7 +213,7 @@ class PageManagement {
         // from QS.enum at runtime.
         $enumsPath = PUBLIC_CONTENT_PATH . '/scripts/qs-enums.js';
         if (file_exists($enumsPath)) {
-            $body .= '<script src="' . BASE_URL . '/scripts/qs-enums.js"></script>';
+            $body .= '<script src="' . $base . 'scripts/qs-enums.js"></script>';
         }
 
         // Inject this page's state-store definitions for the client runtime
