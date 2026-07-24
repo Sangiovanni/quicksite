@@ -31,7 +31,7 @@ function __command_deleteSnippet(array $params = [], array $urlParams = []): Api
     // C8 8.5 CONTAINMENT: the project DELETED FROM is BOUND to the URL marker the
     // dispatcher authorized; a body `project` is an optional echo that must match
     // (F-C8-8.5-1 — it used to select the delete target freely, falling back to
-    // the SERVED main from target.php).
+    // an installation-wide default project).
     $bound = qs_bind_marker_project($params, 'deleteSnippet');
     if ($bound['refusal'] !== null) {
         return $bound['refusal'];

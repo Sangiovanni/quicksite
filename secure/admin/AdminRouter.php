@@ -396,16 +396,18 @@ class AdminRouter {
 
     /**
      * The project THIS user is EDITING = their per-user `selected_project`
-     * (resolveDefaultProject: selected_project when the membership is real, else first
-     * real membership, else the served project as a 0-membership fallback).
+     * (resolveDefaultProject: selected_project when the membership is real, else their
+     * first real membership).
      *
-     * C9 model (2026-07-10, after Sangio's browser tests): `quicksite` is the FIXED main
-     * project, always served at the site root (/); it does NOT change when you switch.
      * "Switching project" (header picker AND the dashboard) means switching which project
-     * you EDIT — this value — via `setSelectedProject`; it does NOT touch the served main.
-     * The editor marker, badge, and preview follow it: editing the main → the site root;
-     * editing any other project → surface B (/p/<id>/) from its own folder. A UX pointer
-     * only — the dispatcher re-authorizes every request against members.json (C7).
+     * you EDIT — this value — via `setSelectedProject`. The editor marker, badge and
+     * preview follow it; every project is authored and previewed at its own /p/<id>/.
+     * A UX pointer only — the dispatcher re-authorizes every request against members.json
+     * (C7).
+     *
+     * C15 R3: an account that is a member of NOTHING gets `null`, not a fallback project.
+     * There is no installation-wide project to fall back to, and inventing one would hand
+     * a non-member somebody else's project id. null means "show the empty state".
      *
      * @return string|null the edited project id, or null if none resolvable
      */
@@ -419,50 +421,66 @@ class AdminRouter {
                 if ($proj !== null && $proj !== '') return $proj;
             }
         }
-        return $this->getServedProject(); // 0-membership fallback: the main project
+        return null; // 0-membership: the panel's empty state (C15 R3)
     }
 
     /**
-     * The globally SERVED project (target.php). In the C9 UNIFIED model this is also the
-     * ACTIVE project, so getCurrentProject() delegates here — one project served + edited +
-     * previewed. Kept as its own method because the preview/back-to-site code (and future
-     * per-user editing) branch on "is the project I'm looking at the served one?".
+     * The absolute URL a project's own site is served at — its surface-B view `/p/<id>`.
      *
-     * @return string|null served project id, or null if target.php is missing/empty
+     * THE single answer to "where does this project live, as a URL?". Five places used to
+     * hand-roll this same concatenation (this method, the header's back-to-site link, the
+     * miniplayer, the preview iframe, and PreviewConfig.previewBase) — each with its own
+     * "…unless it is the served project, then the root" branch. The served project is gone
+     * and so are the branches; the derivation lives here once (CLAUDE.md: centralize).
+     *
+     * Returned WITHOUT a trailing slash so callers append '/assets/...' the way they do
+     * with baseUrl. Callers that navigate a browser there add the slash themselves.
+     *
+     * @param string|null $project project id; defaults to the EDITED project.
+     * @return string e.g. 'http://host/p/test', or the bare install base when no project.
      */
-    public function getServedProject(): ?string {
-        $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-        if (!is_file($targetFile)) return null;
-        $target = @include $targetFile;
-        if (is_array($target)) return $target['project'] ?? null;
-        if (is_string($target) && $target !== '') return $target;
-        return null;
-    }
-
-    /**
-     * The URL base at which the EDITED project's own `public/` is served (C8 8.1).
-     *
-     * The site ROOT when the edited project IS the served main (its public/ is the base
-     * live public/), otherwise its surface-B view `/p/<id>` — every non-served project
-     * is served live from its own folder and its assets are NOT at the root. Returned
-     * WITHOUT a trailing slash so callers append '/assets/...' like they do with baseUrl.
-     *
-     * This is the one place that answers "where do this project's public files live, as
-     * a URL?". The preview page computed the same thing as `previewBase`, but only
-     * there — which is why /admin/assets rendered every thumbnail against the root and
-     * showed the SERVED project's assets (or a broken image) while editing another
-     * project. Exposed to every admin page as QUICKSITE_CONFIG.projectContentBase.
-     *
-     * @return string e.g. 'http://host' or 'http://host/p/test'
-     */
-    public function getProjectContentBase(): string {
+    public function projectSiteBase(?string $project = null): string {
         $base    = rtrim(BASE_URL, '/');
-        $project = $this->getCurrentProject();
-        $served  = $this->getServedProject();
-        if ($project === null || $project === '' || $project === $served) {
+        $project = $project ?? $this->getCurrentProject();
+        if ($project === null || $project === '') {
             return $base;
         }
         return $base . '/p/' . rawurlencode($project);
+    }
+
+    /**
+     * Where the EDITED project's own `public/` (assets, styles, builds) is reachable as a
+     * URL — identical to its site base. Exposed to every admin page as
+     * QUICKSITE_CONFIG.projectContentBase so /admin/assets thumbnails resolve against the
+     * project on screen rather than against the web root.
+     *
+     * @return string e.g. 'http://host/p/test'
+     */
+    public function getProjectContentBase(): string {
+        return $this->projectSiteBase();
+    }
+
+    /**
+     * The management API base carrying the C7 project marker —
+     * `<base>/management/p/<id>/`, or a bare `<base>/management/` when no project is
+     * resolvable. A different URL family from projectSiteBase() (that one is where the
+     * SITE is; this one is where its COMMANDS are), and the second thing admin templates
+     * used to hand-roll.
+     *
+     * With no marker the dispatcher refuses project-scoped commands with
+     * `400 project.required`, which is the correct answer for a caller who has no project
+     * to edit — the URL is deliberately still well-formed rather than empty.
+     *
+     * @param string|null $project project id; defaults to the EDITED project.
+     * @return string WITH a trailing slash, so callers append the command name directly.
+     */
+    public function projectManagementBase(?string $project = null): string {
+        $base    = rtrim(BASE_URL, '/') . '/management/';
+        $project = $project ?? $this->getCurrentProject();
+        if ($project === null || $project === '') {
+            return $base;
+        }
+        return $base . 'p/' . rawurlencode($project) . '/';
     }
 
     /**

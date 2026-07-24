@@ -17,28 +17,19 @@ if(!defined('PUBLIC_FOLDER_SPACE')){
     define('PUBLIC_FOLDER_SPACE', '');
 }
 
-// PUBLIC_CONTENT_PATH = the live directory where the RENDERED site's content lives
-// (style/, assets/, scripts/). This is a RENDER-SCOPED value: surfaceB (a /p/<id>/ view),
-// the management dispatcher (/management/p/<id>/) and the admin-api dispatcher each
-// pre-define it to the targeted project's OWN public/ BEFORE this file runs. The
-// definition here is the FALLBACK base for requests that did NOT pre-scope it (a global
-// management command, an admin-panel page). C15 15.2: this tier-1 fallback stays for now;
-// it becomes redundant in 15.3 once every path pre-scopes unconditionally.
-// When a space is defined (e.g. 'quicksite'), content is at PUBLIC_FOLDER_ROOT/quicksite/
-// When no space is used, content is at PUBLIC_FOLDER_ROOT directly
-if (!defined('PUBLIC_CONTENT_PATH')) {
-    define('PUBLIC_CONTENT_PATH', PUBLIC_FOLDER_SPACE !== ''
-        ? PUBLIC_FOLDER_ROOT . '/' . PUBLIC_FOLDER_SPACE
-        : PUBLIC_FOLDER_ROOT);
-}
+// PUBLIC_CONTENT_PATH is deliberately NOT defined here. It is RENDER-SCOPED — the style/,
+// assets/ and scripts/ of ONE project — and every project serves from its own public/, so
+// there is no installation-wide value it could sensibly take. It is bound beside
+// PROJECT_PATH by qs_load_project_context(), which every entry point calls with the project
+// the request actually targets (secure/src/functions/projectContext.php).
 
 // ADMIN_ASSET_ROOT = where the admin panel's OWN chrome assets live (public/admin/assets/…).
-// C15 15.2: deliberately SEPARATE from PUBLIC_CONTENT_PATH. The panel filemtime()s its own
-// JS/CSS for cache-busting; those assets sit at the web root (public/admin/assets/) — always,
-// regardless of the content space AND regardless of which project the panel edits. Once the
-// panel binds the EDITED project (15.3), PUBLIC_CONTENT_PATH becomes that project's own
-// public/, so the panel must read its chrome from THIS install-scoped constant, not from the
-// render-scoped PUBLIC_CONTENT_PATH. Always the DOCUMENT_ROOT (public/), never space-prefixed.
+// Deliberately SEPARATE from the render-scoped PUBLIC_CONTENT_PATH. The panel filemtime()s
+// its own JS/CSS for cache-busting; those assets sit at the web root (public/admin/assets/) —
+// always, regardless of the content space AND regardless of which project the panel edits.
+// The panel binds the project it EDITS, so PUBLIC_CONTENT_PATH is that project's own public/
+// and would be the wrong place to look for the panel's own chrome.
+// Always the DOCUMENT_ROOT (public/), never space-prefixed.
 if (!defined('ADMIN_ASSET_ROOT')) {
     define('ADMIN_ASSET_ROOT', PUBLIC_FOLDER_ROOT);
 }
@@ -124,9 +115,6 @@ if (!is_dir(SECURE_FOLDER_PATH)) {
 // FIRST-INSTALL: Auto-create config files from .example templates
 // ============================================================================
 $configDir = SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'management' . DIRECTORY_SEPARATOR . 'config';
-// C15 15.2: 'target.php' (the served-project pointer) is being retired — a fresh install no
-// longer auto-creates it. The read of target.php still lives below (deleted in 15.3); existing
-// installs keep their file. auth.php + roles.php remain first-install essentials.
 foreach (['auth.php', 'roles.php'] as $configFile) {
     $configFilePath = $configDir . DIRECTORY_SEPARATOR . $configFile;
     $examplePath = $configFilePath . '.example';
@@ -211,77 +199,19 @@ if (file_exists($nginxSetupPending) && stripos($serverSoftware, 'nginx') !== fal
 }
 
 // ============================================================================
-// PROJECT CONTEXT - the active project under secure/projects/{name}/
+// PROJECT CONTEXT - bound per request, by whoever knows the project
 // ============================================================================
-// Served site + admin pages resolve the single GLOBAL served project from
-// target.php (L6, unchanged). The management dispatcher (C7) defines
-// QS_DEFER_PROJECT_CONTEXT before requiring init.php and calls
-// qs_load_project_context() itself, AFTER it has validated + membership-checked
-// the per-request projectId peeled from the URL — so PROJECT_PATH is scoped to
-// the project the request actually targets, not a global mutable pointer.
+// There is no installation-wide "current project". Nothing here reads a pointer:
+// each entry point calls qs_load_project_context() itself with the project the
+// request actually targets, AFTER validating it (F1) and checking membership.
+//
+//   - public/p/index.php           the project peeled from /p/<projectId>/
+//   - public/management/index.php  the projectId peeled from the URL marker
+//   - public/admin/api/index.php   the projectId peeled from the URL marker
+//   - public/admin/index.php       the caller's own EDITED project (selected_project)
+//
+// This file only makes the loader reachable from all four.
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContext.php';
-
-if (!defined('QS_DEFER_PROJECT_CONTEXT') && !defined('PROJECT_PATH')) {
-    $targetConfigPath = SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'management' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'target.php';
-    if (file_exists($targetConfigPath)) {
-        $targetConfig = require $targetConfigPath;
-        $projectName = $targetConfig['project'] ?? 'quicksite';
-
-        // C8 8.1 — "no served main" is a LEGITIMATE, RECOVERABLE state, not a broken
-        // install. deleteProject clears the pointer when the served project is removed
-        // (it never auto-promotes a project the operator did not choose), and a
-        // hand-edited target.php can name a project that no longer exists. Dying here
-        // used to take down the site AND the admin panel with a 500 that also printed
-        // an absolute server path — leaving recovery possible only by hand-crafted API
-        // call. Degrade instead:
-        //   - the ADMIN PANEL boots on an empty project context (it declares
-        //     QS_TOLERATE_NO_SERVED_PROJECT), so an owner can log in and choose a new
-        //     main with switchProject;
-        //   - the PUBLIC root answers a clean 503 that leaks no filesystem detail.
-        // A MISSING target.php is still a hard installation error (see below) — that
-        // one really is a broken install.
-        $servedProjectUsable = $projectName !== ''
-            && file_exists(SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'projects'
-                . DIRECTORY_SEPARATOR . $projectName . DIRECTORY_SEPARATOR . 'config.php');
-
-        if ($servedProjectUsable) {
-            qs_load_project_context($projectName);
-        } elseif (defined('QS_TOLERATE_NO_SERVED_PROJECT')) {
-            qs_load_project_context($projectName, false); // empty context — panel boots
-        } else {
-            http_response_code(503);
-            header('Retry-After: 3600');
-            die(
-                "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">"
-                . "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-                . "<title>No site published</title>"
-                . "<style>body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;"
-                . "max-width:34rem;margin:15vh auto;padding:0 1.5rem;line-height:1.6;color:#333}"
-                . "h1{font-size:1.5rem;margin:0 0 .5rem}p{margin:.5rem 0;color:#555}</style>"
-                . "</head><body><h1>No site is published yet</h1>"
-                . "<p>This installation does not currently serve a main project.</p>"
-                . "<p>An administrator can publish one from the admin panel.</p>"
-                . "</body></html>"
-            );
-        }
-    } else {
-        // target.php is required for multi-project architecture
-        http_response_code(500);
-        die(
-            "<h1>QuickSite Installation Error</h1>" .
-            "<p><strong>Missing file:</strong> <code>" . htmlspecialchars($targetConfigPath) . "</code></p>" .
-            "<p><strong>What this means:</strong> The management configuration file <code>target.php</code> is missing. " .
-            "This file tells QuickSite which project to load.</p>" .
-            "<p><strong>Expected structure:</strong><br><code>" . htmlspecialchars(SECURE_FOLDER_PATH) . "/management/config/target.php</code></p>" .
-            "<p><strong>Possible causes:</strong></p>" .
-            "<ul>" .
-            "<li>Incomplete installation - the <code>" . SECURE_FOLDER_NAME . "/management/config/</code> folder was not properly set up</li>" .
-            "<li>File was accidentally deleted</li>" .
-            "<li>If paths look wrong, check <code>PUBLIC_FOLDER_NAME</code> and <code>SECURE_FOLDER_NAME</code> constants in <code>" . PUBLIC_FOLDER_NAME . "/init.php</code></li>" .
-            "</ul>"
-        );
-    }
-}
 
 if (!defined('BASE_URL')) {
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";

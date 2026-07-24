@@ -13,12 +13,10 @@
 // Get auth token for API calls
 $token = $router->getToken();
 
-// C9/C5b — the editor edits getCurrentProject() (the per-user selected_project),
-// which can DIFFER from the served project that init.php bound the global
-// PROJECT_PATH / CONFIG constants to. Every server-side read on this page (and
-// in the partials + preview-config.php it includes) must come from the EDITED
-// project's own path + config, or the sidebar/toolbar shows the wrong
-// project's routes, components, languages and theme flags.
+// The editor edits getCurrentProject() (the per-user selected_project). Every server-side
+// read on this page (and in the partials + preview-config.php it includes) comes from the
+// EDITED project's own path + config, so the sidebar/toolbar always describe the project on
+// screen — its routes, components, languages and theme flags.
 $editProject     = $router->getCurrentProject() ?: (defined('PROJECT_NAME') ? PROJECT_NAME : '');
 $editProjectPath = SECURE_FOLDER_PATH . '/projects/' . $editProject;
 $editConfigFile  = $editProjectPath . '/config.php';
@@ -30,18 +28,14 @@ $defaultLang = $editConfig['LANGUAGE_DEFAULT'] ?? 'en';
 $languages = $isMultilingual ? ($editConfig['LANGUAGES_SUPPORTED'] ?? [$defaultLang]) : [$defaultLang];
 
 // Get site URL for iframe (start with default language) + ?_editor=1 for editor mode.
-// C15 15.2 — the project you EDIT is getCurrentProject() (per-user selected_project); every
-// project previews via surface B (/p/<id>/) from its own folder. The web root is free, so no
-// project previews at the root any more. The qs_preview cookie (emitted below, before the
-// iframe) carries the admin's token so a PRIVATE project's iframe — a plain browser
-// navigation with no Authorization header — authenticates against surface B (D3 seam;
-// HttpOnly hardening → C5b).
+// The project you EDIT is getCurrentProject() (per-user selected_project); every project
+// previews at its own /p/<id>/ from its own folder. The qs_preview cookie (emitted below,
+// before the iframe) carries the admin's token so a PRIVATE project's iframe — a plain
+// browser navigation with no Authorization header — authenticates against surface B
+// (D3 seam; HttpOnly hardening → C5b).
 $previewProject = $router->getCurrentProject();          // what you EDIT (selected_project)
 $previewAtRoot  = ($previewProject === null || $previewProject === '');
-$siteUrl = rtrim(BASE_URL, '/') . '/';
-if (!$previewAtRoot) {
-    $siteUrl .= 'p/' . rawurlencode($previewProject) . '/';
-}
+$siteUrl = $router->projectSiteBase($previewProject) . '/';
 if ($isMultilingual) {
     $siteUrl .= $defaultLang . '/';
 }

@@ -38,18 +38,17 @@ $currentPage = $router->getPage();
 // C8 (8.W) — client transport wiring. The admin client must (a) know which
 // commands are project-scoped (to prepend the C7 '/management/p/<id>/' marker) and
 // (b) know which project it is working with. Both come from the authoritative
-// server source: the scope set from categories.php, and the SERVED project
-// (target.php, via getCurrentProject) — the same project the preview iframe + the
-// dashboard already use, so editor/preview/badge/dashboard all agree (selected_project
-// as the per-user editing driver is C9). Emitted into QUICKSITE_CONFIG below + used
-// for the badge. currentProject is a UX default only — the server re-authorizes every call.
+// server source: the scope set from categories.php, and the EDITED project
+// (getCurrentProject = the caller's own selected_project) — the same project the
+// preview iframe + the dashboard use, so editor/preview/badge/dashboard all agree.
+// Emitted into QUICKSITE_CONFIG below + used for the badge. currentProject is a UX
+// default only — the server re-authorizes every call.
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 $globalCommands = getGlobalCommands();
 $currentProject = $isLoginPage ? null : $router->getCurrentProject();   // the project you EDIT (selected_project)
 
-// C15 15.2 — the header picker lists the caller's memberships so they can switch what they
-// edit. "Back to site" + the preview now always target /p/<id>/ (the root is free; there is
-// no served-vs-edited branch in the render/preview path any more).
+// The header picker lists the caller's memberships so they can switch what they edit.
+// "Back to site" + the preview always target /p/<id>/ — every project is reached that way.
 $myProjectIds = [];
 if (!$isLoginPage) {
     $__pkTok = $router->getToken();
@@ -382,9 +381,7 @@ $langNames = [
             <?php
             // EDITED-project picker: which project this user is authoring right now
             // (= getCurrentProject = their per-user selected_project). Changing it calls
-            // setSelectedProject — see the handler at the bottom of this file — NOT
-            // switchProject, which is the owner-only, project-scoped command that repoints
-            // the globally SERVED main (target.php) and is not wired to any panel control.
+            // setSelectedProject — see the handler at the bottom of this file.
             // Single-project users see a plain badge; multi-project users get the dropdown.
             $editingProject = $currentProject;
             ?>
@@ -408,15 +405,11 @@ $langNames = [
             </a>
             <?php endif; ?>
             <?php
-            // C15 15.2 — "back to site" opens the project you're EDITING at its surface-B
-            // view (/p/<id>/, which resolves its own default language). Every project is
-            // reached this way now; the root is free.
-            $siteUrl = rtrim($baseUrl, '/') . '/';
-            if ($editingProject) {
-                $siteUrl .= 'p/' . rawurlencode($editingProject) . '/';
-            } elseif (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) {
-                $siteUrl .= (CONFIG['LANGUAGE_DEFAULT'] ?? 'en') . '/';
-            }
+            // "Back to site" opens the project you're EDITING at its own /p/<id>/ view,
+            // which resolves that project's default language itself. With no edited
+            // project there is no site to go back to, so the link points at the install
+            // base (the web root is free — it belongs to whatever the deployment put there).
+            $siteUrl = $router->projectSiteBase() . '/';
             ?>
             <a href="<?= $siteUrl ?>" id="back-to-site-btn" class="admin-btn admin-btn--ghost" target="_blank">
                 <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -542,8 +535,8 @@ $langNames = [
             // later script block runs (the refresh token never reaches the page).
             token: '<?= adminEscape((string)$router->getToken()) ?>',
             tokenExpiresIn: <?= (int)$router->getTokenExpiresIn() ?>,
-            // C8 (8.W) — project transport. currentProject = the SERVED project
-            // (target.php), the same one preview + the dashboard use; globalCommands =
+            // C8 (8.W) — project transport. currentProject = the EDITED project
+            // (selected_project), the same one preview + the dashboard use; globalCommands =
             // the categories.php scope==='global' set. The client prepends the
             // '/management/p/<currentProject>/' marker for any command NOT in
             // globalCommands. Both are UX/plumbing — the server re-authorizes each call.

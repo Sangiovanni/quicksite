@@ -8,19 +8,10 @@
  * @version 1.0.0
  */
 
-// Get site URL for iframe — the project the user EDITS. C15 15.2: every project shows via
-// its surface-B view (/p/<id>/, which resolves its own default language). The miniplayer
-// auto-reloads after every command, so it must show the project the commands actually
-// target; the root is free, so no project shows at the root.
-$mpEditing = $router->getCurrentProject();
-$miniplayerSiteUrl = rtrim(BASE_URL, '/') . '/';
-if ($mpEditing !== null && $mpEditing !== '') {
-    $miniplayerSiteUrl .= 'p/' . rawurlencode($mpEditing) . '/';
-} elseif (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) {
-    $miniplayerDefaultLang = CONFIG['LANGUAGE_DEFAULT'] ?? 'en';
-    $miniplayerSiteUrl .= $miniplayerDefaultLang . '/';
-}
-$miniplayerSiteUrl .= '?_editor=1';
+// Site URL for the iframe — the project the user EDITS, at its own /p/<id>/ view (which
+// resolves that project's default language itself). The miniplayer auto-reloads after every
+// command, so it must show the project the commands actually target.
+$miniplayerSiteUrl = $router->projectSiteBase() . '/?_editor=1';
 ?>
 
 <!-- Global Miniplayer Container -->

@@ -197,19 +197,6 @@ return [
         'commands' => ['setProjectVisibility'],
     ],
 
-    // Owner-only "make THIS project the served main" (C8 8.1). switchProject rewrites
-    // target.php, the served-main pointer, publishing the project at the site ROOT.
-    // It used to live in the GLOBAL system.admin category, whose access 'owner' means
-    // "owns any project anywhere" — so any account could createProject (access 'any')
-    // and then promote a project it had NO membership on, publishing a private project
-    // and bypassing owner-only project.visibility (proven escalation, C8 §8 F-C8-8.1-1).
-    // Project-scoped + owner-only makes the gate "owner of the project you promote",
-    // enforced by the dispatcher against the URL marker.
-    'project.serve' => [
-        'scope' => 'project',
-        'commands' => ['switchProject'],
-    ],
-
     // Reduced roster for EVERY member rank (C8 8.3c): active members only —
     // {user_id, name, role} rows, NO pending queue (adjudication data stays
     // admin+ via project.members/listMembers). Exists so any member can see
@@ -307,7 +294,7 @@ return [
     ],
 
     // "My projects" surface (OUTPUT filtered to memberships by C7/C8; the command
-    // itself is any-auth). getActiveProject = "my current/last project".
+    // itself is any-auth).
     // getMySpaceUsage aggregates disk usage across the projects the caller OWNS —
     // global because an owner-wide total is not a fact about any one project and so
     // cannot carry a marker. It takes no project parameter (nothing to retarget)
@@ -317,7 +304,7 @@ return [
     'projects.list' => [
         'scope' => 'global',
         'access' => 'any',
-        'commands' => ['listProjects', 'getActiveProject', 'getMySpaceUsage'],
+        'commands' => ['listProjects', 'getMySpaceUsage'],
     ],
 
     // Any authenticated user may create a project (and becomes its sole owner).
@@ -358,7 +345,7 @@ return [
     // token can reach a command that git-pulls the installation. checkForUpdates
     // stays routed under system.read, so the panel still reports available updates.
     // (The generateToken/listTokens/revokeToken trio was REMOVED in C5b; switchProject
-    // moved to the project-scoped owner-only project.serve in C8 8.1.)
+    // was deleted in C15 along with the served-project concept it existed to repoint.)
     // Global categories may only declare an access in QS_GLOBAL_ACCESS_GRANTING
     // ('any') or the explicit deny 'none' — see AuthManagement.php.
 

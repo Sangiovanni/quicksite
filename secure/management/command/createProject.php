@@ -15,7 +15,7 @@
  * @param bool $switch_to Make the new project the CREATOR's editing target
  *                        (their per-user selected_project) after creation
  *                        (optional, default: false). Never changes the served
- *                        main project (target.php) — C9 fixed-main model.
+ *                        project served anywhere else.
  *
  * @return ApiResponse Creation result
  */
@@ -190,7 +190,7 @@ HTACCESS;
     // Update the creator's derived project index (users.php) — cache only, NO
     // role key (role is authoritative in members.json — L5/C5). With switch_to,
     // ONLY the creator's selected_project (their per-user EDITING target) moves
-    // to the new project — a command never repoints the served main (target.php);
+    // to the new project — a command never repoints what a deployment serves;
     // the site root keeps serving the fixed main and the new project is edited
     // at /p/<id>/ (C9 fixed-main model).
     $selectedProjectSet = false;

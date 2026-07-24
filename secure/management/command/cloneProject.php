@@ -171,8 +171,8 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     // Register the clone in the cloner's own project index (users.php cache) —
     // like createProject. With switch_to, ONLY the cloner's per-user editing
     // target (selected_project) moves to the new project; a command NEVER repoints
-    // the served main (target.php) — the C9 fixed-main model (the old switch_to
-    // tail here wrote target.php + synced live public: the same pre-C9 leftover
+    // any installation-wide pointer (the old switch_to tail here repointed one and
+    // synced the live public dir: the same pre-C9 leftover
     // that createProject dropped in 8.0). The new project is edited at /p/<id>/.
     if ($clonerId !== null) {
         $written = qs_users_mutate(function (array &$cfg) use ($clonerId, $newName, $newSiteName, $switchTo) {

@@ -8,17 +8,23 @@
  * @version 1.6.0
  */
 
-// C8 8.1 — the panel must boot even when NO main project is served (deleteProject
-// clears the pointer rather than auto-promoting one, and target.php can name a
-// project that no longer exists). Without this, init.php would refuse to bind a
-// project context and the operator would be locked out of the very UI they need to
-// publish a new main. init.php gives us an empty context instead; the panel already
-// copes with a user who has no project (the 0-membership empty state).
-define('QS_TOLERATE_NO_SERVED_PROJECT', true);
-
 require_once '../init.php';
 require_once SECURE_FOLDER_PATH . '/admin/AdminRouter.php';
 
 // Initialize the admin router
 $router = new AdminRouter();
+
+// C15 15.3 — bind the project THIS user is EDITING (their per-user selected_project).
+// The panel used to inherit an installation-wide served project, which is why every
+// page's CONFIG-derived value (languages, theme flags) described whatever project the
+// deployment happened to serve rather than the one on screen. There is no served project
+// any more, and the only project the panel has any business reading is the edited one.
+//
+// Non-strict on purpose: getCurrentProject() returns null for an account that is a member
+// of nothing (C15 R3), and a missing/blank project must give that account the panel's
+// empty state — never a die() and never somebody else's project. The router itself is
+// safe to construct first: its constructor only parses the URL.
+$__adminProject = $router->getCurrentProject();
+qs_load_project_context($__adminProject ?? '', false);
+
 $router->dispatch();

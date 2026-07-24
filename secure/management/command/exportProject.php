@@ -101,36 +101,11 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
             ->withData(['hint' => 'Install php-zip extension']);
     }
     
-    // Sync live public files into the project folder first, ONLY when exporting the
-    // SERVED main (target.php). PUBLIC_CONTENT_PATH is the served main's live dir
-    // (NOT rebound per-marker), so under the C8 8.4 marker bind — where PROJECT_NAME
-    // always equals $projectName — the old `PROJECT_NAME === $projectName` gate was
-    // always true and would contaminate any OTHER project's export with the served
-    // project's assets. Compare against the served main instead.
-    $servedMain = null;
-    $servedTargetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-    if (file_exists($servedTargetFile)) {
-        $servedTarget = include $servedTargetFile;
-        $servedMain = is_array($servedTarget) ? ($servedTarget['project'] ?? null) : $servedTarget;
-    }
-    $isActiveProject = ($servedMain !== null && $servedMain === $projectName);
-    if ($isActiveProject && defined('PUBLIC_CONTENT_PATH')) {
-        $projectPublicPath = $projectPath . '/public';
-        if (!is_dir($projectPublicPath)) {
-            mkdir($projectPublicPath, 0755, true);
-        }
-        foreach (['assets', 'style'] as $folder) {
-            $liveSrc = PUBLIC_CONTENT_PATH . '/' . $folder;
-            $projDst = $projectPublicPath . '/' . $folder;
-            if (is_dir($liveSrc)) {
-                // Clear stale project copy and replace with live version
-                if (is_dir($projDst)) {
-                    exportDeleteDirectory($projDst);
-                }
-                exportCopyDirectory($liveSrc, $projDst);
-            }
-        }
-    }
+    // C15 15.3 — no pre-export "pull the live public/ into the project folder" step. The
+    // project's own public/ IS its live dir, so the export below already carries the current
+    // styles and assets. The old step existed only for the served main, whose live copy sat
+    // at the web root; it was also the source of the 8.4 contamination bug (exporting any
+    // project could pick up the served project's assets).
 
     // Create temp directory for export
     $tempDir = sys_get_temp_dir();
@@ -552,56 +527,8 @@ function formatExportBytes(int $bytes): string {
     return round($bytes / pow(1024, $exp), 2) . ' ' . $units[$exp];
 }
 
-/**
- * Recursively copy a directory (used for syncing live public to project)
- */
-function exportCopyDirectory(string $source, string $destination): bool {
-    if (!is_dir($destination)) {
-        mkdir($destination, 0755, true);
-    }
-    
-    $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($source, RecursiveDirectoryIterator::SKIP_DOTS),
-        RecursiveIteratorIterator::SELF_FIRST
-    );
-    
-    foreach ($iterator as $item) {
-        $destPath = $destination . '/' . $iterator->getSubPathname();
-        if ($item->isDir()) {
-            if (!is_dir($destPath)) {
-                mkdir($destPath, 0755, true);
-            }
-        } else {
-            // Skip backup files (e.g. favicon.png~)
-            if (str_ends_with($item->getFilename(), '~')) {
-                continue;
-            }
-            copy($item->getPathname(), $destPath);
-        }
-    }
-    return true;
-}
-
-/**
- * Recursively delete a directory (used for clearing stale project public copy)
- */
-function exportDeleteDirectory(string $dir): bool {
-    if (!is_dir($dir)) {
-        return true;
-    }
-    $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
-        RecursiveIteratorIterator::CHILD_FIRST
-    );
-    foreach ($iterator as $file) {
-        if ($file->isDir()) {
-            rmdir($file->getRealPath());
-        } else {
-            unlink($file->getRealPath());
-        }
-    }
-    return rmdir($dir);
-}
+// (exportCopyDirectory / exportDeleteDirectory removed with the live-public sync they
+//  existed for — C15 15.3.)
 
 // Execute command if called directly via API (not internal call)
 if (!defined('COMMAND_INTERNAL_CALL')) {

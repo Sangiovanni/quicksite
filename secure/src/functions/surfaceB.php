@@ -10,9 +10,10 @@
  * Two-part flow, wired into public/p/index.php:
  *   1. qs_surface_b_maybe_handle()  — runs FIRST, BEFORE init.php. Detects a /p/<id>/
  *      request (existence-based, so an optional PUBLIC_FOLDER_SPACE prefix that we
- *      cannot read pre-init does not matter), and overrides the base-derived constants
- *      PUBLIC_CONTENT_PATH + BASE_URL to the project's own public/ + the /p/<id> URL,
- *      before init.php defines them. Defers project context (QS_DEFER_PROJECT_CONTEXT).
+ *      cannot read pre-init does not matter), and sets BASE_URL to the /p/<id> URL before
+ *      init.php would derive it. PUBLIC_CONTENT_PATH is NOT set here: C15 15.3 binds it
+ *      beside PROJECT_PATH in qs_load_project_context(), so there is no longer a competing
+ *      definition to pre-empt.
  *   2. qs_surface_b_finish()        — runs AFTER init + qs_load_project_context(id).
  *      Enforces visibility + membership (L11/§8.4), then either serves a static asset
  *      through the L11 canonicalise+prefix-checked passthrough (secrets UNREACHABLE),
@@ -106,36 +107,24 @@ function qs_surface_b_maybe_handle(): void {
         }
     }
     if ($idIndex < 0) {
-        return; // not a surface-B request → normal served site
+        // Not a resolvable /p/<id>/ request. The renderer answers a generic 404: there is
+        // no privileged project to fall back to (C15 15.3).
+        return;
     }
 
     $id = rawurldecode($segs[$idIndex + 1]);
 
-    // C15 15.2: the renderer no longer reads the served concept. Every project — including
-    // the (still-existing) target.php project — is rendered here at /p/<id>/; there is no
-    // special-case 301 to a root that is now free. The served pointer + qs_served_project()
-    // remain for the management/admin paths until 15.3 retires them, but the RENDER path
-    // is fully decoupled from "which project is served".
-
     // ---- visibility + membership gate (§8.4) — PRE-INIT deliberately ------------
-    // Denying BEFORE the constant overrides means a refused request falls through
-    // to the NORMAL pipeline: init.php binds the MAIN served project and the
-    // request renders ITS error page (styled, correct BASE_URL/assets) with the
-    // real 401/403 status — instead of a bare refusal. Same page for a private
-    // project and a nonexistent one (loadProjectMembers defaults to private) —
-    // no existence oracle. The gate only needs members.json + the session store,
-    // none of the init constants.
+    // A refused request answers a generic, engine-owned status page and stops here.
+    // It used to fall through to the NORMAL pipeline so the MAIN served project could
+    // render ITS error page; C15 15.3 deleted the served project, so there is no other
+    // project to borrow a template from — and borrowing the REQUESTED project's own
+    // template would hand a non-member that private project's styling and branding.
+    // The generic page is byte-identical whatever the reason, so it adds no oracle.
+    // The gate only needs members.json + the session store, none of the init constants.
     $denyStatus = qs_surface_b_gate($id, $secure);
     if ($denyStatus !== null) {
-        if (!defined('QS_SB_DENY_STATUS')) {
-            define('QS_SB_DENY_STATUS', $denyStatus);
-        }
-        // Rewrite to a never-matching route on the MAIN site (space prefix kept)
-        // → TrimParameters not-found → public/index.php's 404 branch, which
-        // honours QS_SB_DENY_STATUS (status + 401/403 special page preference).
-        $spaceSegs = array_slice($segs, 0, $idIndex);
-        $_SERVER['REQUEST_URI'] = '/' . implode('/', array_merge($spaceSegs, ['__qs_denied__']));
-        return; // NO overrides, NO $GLOBALS['__qs_sb'] — normal main-site boot
+        qs_sb_deny($denyStatus, 'This site is not available.');
     }
 
     $prefixSegs = array_slice($segs, 0, $idIndex + 2);       // [optional space] + p + id
@@ -154,12 +143,11 @@ function qs_surface_b_maybe_handle(): void {
         'projectDir' => $secure . '/projects/' . $id,
     ];
 
-    // Override base-derived constants BEFORE init.php defines them (all if(!defined())).
-    if (!defined('QS_DEFER_PROJECT_CONTEXT')) define('QS_DEFER_PROJECT_CONTEXT', true);
-    if (!defined('PUBLIC_CONTENT_PATH'))      define('PUBLIC_CONTENT_PATH', $secure . '/projects/' . $id . '/public');
-    if (!defined('BASE_URL'))                 define('BASE_URL', $baseUrl);
-    if (!defined('QS_SURFACE_B_PROJECT'))     define('QS_SURFACE_B_PROJECT', $id);
-    if (!defined('QS_SURFACE_B'))             define('QS_SURFACE_B', true);
+    // Override the base-derived URL BEFORE init.php derives it (all if(!defined())).
+    // PUBLIC_CONTENT_PATH is bound with the project by qs_load_project_context() (15.3).
+    if (!defined('BASE_URL'))             define('BASE_URL', $baseUrl);
+    if (!defined('QS_SURFACE_B_PROJECT')) define('QS_SURFACE_B_PROJECT', $id);
+    if (!defined('QS_SURFACE_B'))         define('QS_SURFACE_B', true);
 }
 
 /**

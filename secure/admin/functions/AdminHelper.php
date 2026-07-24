@@ -138,7 +138,7 @@ function getCommandCategories(): array {
         'project_management' => [
             'label' => 'Project Management',
             'icon' => 'folder-tree',
-            'commands' => ['listProjects', 'getActiveProject', 'getMySpaceUsage', 'setSelectedProject', 'switchProject', 'createProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'clearExports', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
+            'commands' => ['listProjects', 'getMySpaceUsage', 'setSelectedProject', 'createProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'clearExports', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
         ],
         // C8 8.3a/8.3b — membership consent model. Marker-scoped roster
         // management, request adjudication + the join-policy knob + the

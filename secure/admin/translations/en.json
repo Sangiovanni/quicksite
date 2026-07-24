@@ -355,7 +355,6 @@
             "activateAfterCreate": "Switch to this project after creation",
             "selectToDelete": "Select project to delete",
             "selectProject": "Select a project...",
-            "cannotDeleteActive": "Cannot delete the active project",
             "active": "Active",
             "error": "Failed to load project info"
         },
@@ -987,7 +986,7 @@
         },
         "tagSelect": {
             "searchPlaceholder": "Type to search..."
-        },
+        },
         "categories": {
             "creation": {
                 "title": "Creation",

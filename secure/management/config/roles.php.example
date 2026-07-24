@@ -77,7 +77,7 @@ return [
             'style.write', 'build', 'resolver.manage', 'deploy', 'api.manage',
             'oauth.manage', 'iframe.manage', 'project.data', 'history',
             'project.settings', 'project.members', 'project.delete', 'project.ownership',
-            'project.visibility', 'project.serve', 'project.propose', 'project.roster',
+            'project.visibility', 'project.propose', 'project.roster',
         ],
     ],
 ];

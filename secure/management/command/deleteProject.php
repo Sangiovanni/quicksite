@@ -13,8 +13,7 @@
  * 
  * @param string $name Project name (required)
  * @param bool $confirm Safety confirmation (required, must be true)
- * @param bool $force Force delete even if project is active (optional, default: false)
- * 
+ *
  * @return ApiResponse Deletion result
  */
 
@@ -73,36 +72,19 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
             ->withData(['warning' => 'This will permanently delete all project files including templates, translations, and assets']);
     }
     
-    // Force flag for active project
-    $force = filter_var($params['force'] ?? false, FILTER_VALIDATE_BOOLEAN);
-    
     // Check project exists
     $projectPath = SECURE_FOLDER_PATH . '/projects/' . $projectName;
-    
+
     if (!is_dir($projectPath)) {
         return ApiResponse::create(404, 'resource.not_found')
             ->withMessage("Project '$projectName' not found")
             ->withData(['searched_path' => 'secure/projects/' . $projectName]);
     }
-    
-    // Check if this is the active project
-    $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-    $activeProject = null;
-    
-    if (file_exists($targetFile)) {
-        $target = require $targetFile;
-        $activeProject = $target['project'] ?? null;
-    }
-    
-    if ($activeProject === $projectName && !$force) {
-        return ApiResponse::create(400, 'validation.active_project')
-            ->withMessage("Cannot delete active project '$projectName'")
-            ->withData([
-                'active_project' => $activeProject,
-                'hint' => 'Switch to another project first, or set force=true to delete anyway'
-            ]);
-    }
-    
+
+    // C15 15.3 — no project is "the active one" installation-wide any more, so there is no
+    // active-project guard and no `force` escape hatch for it. Deleting a project is gated
+    // by ownership of THAT project (project.delete) and by confirm=true, nothing else.
+
     // Count what we're about to delete
     $stats = countProjectFiles($projectPath);
 
@@ -128,25 +110,6 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
         return ApiResponse::create(500, 'server.delete_failed')
             ->withMessage('Failed to delete project directory')
             ->withData(['path' => $projectPath]);
-    }
-    
-    // If this was the SERVED main, clear the pointer — never auto-promote.
-    //
-    // C8 8.1: this used to promote `reset($projects)` — the first project in scandir
-    // order — to the world-facing root, regardless of the deleter's membership on it
-    // and regardless of its `visibility`. That silently published a stranger's PRIVATE
-    // project, the same exposure class as the switchProject escalation fixed in this
-    // slice (and it bypassed setProjectVisibility just as thoroughly). Promotion is a
-    // deliberate, owner-authorized act: it belongs to switchProject
-    // (project.serve, owner-only) and nowhere else. Leaving the root unserved is the
-    // safe, honest state — the deployer picks the next main explicitly.
-    if ($activeProject === $projectName) {
-        $targetContent = "<?php\n/**\n * Active Project Target Configuration\n * Updated: " . date('Y-m-d H:i:s') . "\n * WARNING: the served project was deleted — no main is served.\n * Set one with POST /management/p/<projectId>/switchProject (owner only).\n */\n\nreturn [\n    'project' => ''\n];\n";
-        file_put_contents($targetFile, $targetContent, LOCK_EX);
-        clearstatcache(true, $targetFile);
-        if (function_exists('opcache_invalidate')) {
-            opcache_invalidate($targetFile, true);
-        }
     }
     
     // C8 8.3a membership cascade — the project is gone; update every affected
@@ -214,12 +177,7 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
         'size_bytes' => $stats['size'],
         'membership_cascade' => $cascade
     ];
-    
-    if ($activeProject === $projectName) {
-        $result['served_main_cleared'] = true;
-        $result['warning'] = 'The deleted project was the served main. No project is served at the site root until an owner sets one with switchProject.';
-    }
-    
+
     return ApiResponse::create(200, 'resource.deleted')
         ->withMessage("Project '$projectName' deleted successfully")
         ->withData($result);

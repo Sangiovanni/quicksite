@@ -172,19 +172,14 @@ function loadSnippetFile(string $filePath, string $source = 'core'): ?array {
  * Searches: project → global → core (most specific first)
  * 
  * @param string $snippetId Snippet ID
- * @param string|null $projectName Project name (null for active project)
+ * @param string|null $projectName Project name. null = search global + core only.
+ *                    C15 15.3: there is no installation-wide project to fall back to, and
+ *                    guessing one let a caller authorized on project A read project B's
+ *                    snippets (flagged in C8 8.5 as a cross-project leak vector). All four
+ *                    callers pass the marker project explicitly.
  * @return array|null Full snippet data or null if not found
  */
 function getSnippetById(string $snippetId, ?string $projectName = null): ?array {
-    // Get project name if not provided
-    if ($projectName === null) {
-        $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-        if (file_exists($targetFile)) {
-            $target = include $targetFile;
-            $projectName = is_array($target) ? ($target['project'] ?? null) : $target;
-        }
-    }
-    
     // 1. Check project snippets first
     if ($projectName) {
         $projectSnippetsPath = getProjectSnippetsPath($projectName);

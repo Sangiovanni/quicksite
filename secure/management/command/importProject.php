@@ -272,7 +272,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
     
     // Register the import in the importer's project index + move ONLY their
     // per-user editing target with switch_to (C9 fixed-main — a command NEVER
-    // repoints the served main / target.php; the old tail here did, the same
+    // repoints what a deployment serves; the old tail here did, the same
     // pre-C9 leftover createProject dropped in 8.0). Edited at /p/<id>/.
     if ($importerId !== null) {
         $siteName = $projectInfo['site_name'] ?? $projectName;

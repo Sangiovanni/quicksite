@@ -35,7 +35,7 @@ function __command_duplicateSnippet(array $params = [], array $urlParams = []): 
     // C8 8.5 CONTAINMENT: both the source read and the duplicate WRITE are BOUND
     // to the URL marker the dispatcher authorized; a body `project` is an optional
     // echo that must match (F-C8-8.5-1 — it used to select the target freely,
-    // falling back to the SERVED main from target.php).
+    // falling back to an installation-wide default project).
     $bound = qs_bind_marker_project($params, 'duplicateSnippet');
     if ($bound['refusal'] !== null) {
         return $bound['refusal'];

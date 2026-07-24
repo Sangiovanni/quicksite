@@ -232,9 +232,11 @@ function __command_getSiteMap(array $params = [], array $urlParams = []): ApiRes
     if ($format === 'text' && !defined('COMMAND_INTERNAL_CALL')) {
         $content = implode("\n", $sitemapData['urls']) . "\n";
 
-        // If save=true, write sitemap.txt to project/public + live PUBLIC_CONTENT_PATH
+        // If save=true, write sitemap.txt into the project's own public/ — the one copy.
+        // C15 15.3: this used to write twice, to the project folder AND to the live public
+        // root, because the served project's live copy lived at the web root. Those two
+        // paths are now the same directory for every project, so the second write is gone.
         if (!empty($params['save'])) {
-            // 1. Save to project's public folder (synced by switchProject)
             $projectPublicDir = PROJECT_PATH . '/public';
             if (!is_dir($projectPublicDir)) mkdir($projectPublicDir, 0755, true);
             $projectSitemapPath = $projectPublicDir . '/sitemap.txt';
@@ -242,10 +244,6 @@ function __command_getSiteMap(array $params = [], array $urlParams = []): ApiRes
                 return ApiResponse::create(500, 'operation.write_failed')
                     ->withMessage('Failed to write sitemap.txt to project');
             }
-
-            // 2. Also deploy to live public root
-            $publicSitemapPath = PUBLIC_CONTENT_PATH . '/sitemap.txt';
-            file_put_contents($publicSitemapPath, $content);
 
             return ApiResponse::create(200, 'operation.success')
                 ->withMessage('sitemap.txt saved successfully')

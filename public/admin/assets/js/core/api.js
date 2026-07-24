@@ -201,7 +201,7 @@ window.QuickSiteAPI = (function() {
     // failed to emit QUICKSITE_CONFIG.globalCommands, so the panel can still
     // authenticate + list/create projects. The emitted set is authoritative.
     const FALLBACK_GLOBAL_COMMANDS = [
-        'help', 'getMyPermissions', 'listRoles', 'listProjects', 'getActiveProject',
+        'help', 'getMyPermissions', 'listRoles', 'listProjects',
         'createProject', 'checkForUpdates'
     ];
 

@@ -11,12 +11,18 @@ qs_surface_b_maybe_handle();
 
 require_once __DIR__ . '/../init.php';
 
-// C9 surface B — with the project context deferred above, bind it to the /p/ project
-// now, then finish (gate visibility, serve a static asset, or set up the HTML render).
-if (defined('QS_SURFACE_B_PROJECT')) {
-    qs_load_project_context(QS_SURFACE_B_PROJECT, true);
-    qs_surface_b_finish();
+// C15 15.3 — no project, no render. A request that reaches this file without resolving to
+// a project is either a bare /p/ or a /p/<id>/ naming nothing that exists. There is no
+// served project left to fall back on (that fallback WAS the served-project privilege),
+// and every constant below this line is project-scoped, so answer and stop.
+if (!defined('QS_SURFACE_B_PROJECT')) {
+    qs_sb_deny(404, 'This site is not available.');
 }
+
+// C9 surface B — bind the /p/ project (PROJECT_PATH + PUBLIC_CONTENT_PATH together), then
+// finish (serve a static asset, or set up the HTML render).
+qs_load_project_context(QS_SURFACE_B_PROJECT, true);
+qs_surface_b_finish();
 
 // C15 15.2 — tier-2 render bootstrap: the public-base resolution SEAM. Required ONLY by
 // this renderer (tier 1 = init.php's install-wide constants, shared by every entry point).
@@ -169,21 +175,16 @@ $route = $trimParameters->route();         // e.g., ['guides', 'installation']
 $routePath = $trimParameters->routePath(); // e.g., 'guides/installation'
 $routeFound = $trimParameters->routeFound();
 
-// Handle 404 — also the landing spot for a surface-B DENY (C9/C5b): a refused
-// /p/<id>/ request boots the MAIN site with QS_SB_DENY_STATUS (401|403) and a
-// never-matching route, so the visitor gets THIS project's styled error page
-// with the real status. A dedicated 401/403 special page wins when the author
-// created one (SPECIAL_PAGES reserves them); the 404 page is the fallback.
+// Handle 404 — a route that does not exist inside this project. Reaching here means the
+// project resolved AND the visitor passed surface B's visibility/membership gate, so the
+// project's own styled error page is the right thing to show. (A REFUSED /p/<id>/ never
+// gets this far: surface B answers a generic engine page and exits — C15 15.3.)
 if (!$routeFound || $routePath === '404') {
-    $errorStatus = defined('QS_SB_DENY_STATUS') ? (int) QS_SB_DENY_STATUS : 404;
-    http_response_code($errorStatus);
-    $candidates = [];
-    if ($errorStatus !== 404) {
-        $candidates[] = PROJECT_PATH . "/templates/pages/{$errorStatus}/{$errorStatus}.php";
-        $candidates[] = PROJECT_PATH . "/templates/pages/{$errorStatus}.php";
-    }
-    $candidates[] = PROJECT_PATH . '/templates/pages/404/404.php';
-    $candidates[] = PROJECT_PATH . '/templates/pages/404.php'; // flat fallback (migration)
+    http_response_code(404);
+    $candidates = [
+        PROJECT_PATH . '/templates/pages/404/404.php',
+        PROJECT_PATH . '/templates/pages/404.php', // flat fallback (migration)
+    ];
     $templateFile = null;
     foreach ($candidates as $candidate) {
         if (file_exists($candidate)) {
@@ -194,7 +195,7 @@ if (!$routeFound || $routePath === '404') {
     if ($templateFile !== null) {
         require_once $templateFile;
     } else {
-        echo '<h1>' . $errorStatus . ' - ' . ($errorStatus === 404 ? 'Page Not Found' : 'Access Denied') . '</h1>';
+        echo '<h1>404 - Page Not Found</h1>';
     }
     exit;
 }

@@ -1076,7 +1076,7 @@ What the runtime sees in `qs-api-config.js`:
 **Multi-language limitation**
 
 `qs-api-config.js` is project-scoped, not per-language. Translation
-happens once at `editApi` / `switchProject` / `build` time using
+happens once at `editApi` / `build` / regeneration time using
 whatever language is active in that request. Multi-language sites
 should re-trigger one of those after a language switch.
 

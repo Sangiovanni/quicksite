@@ -197,52 +197,10 @@ function __command_backupProject(array $params = [], array $urlParams = []): Api
             ->withMessage('Failed to create backup directory');
     }
 
-    // If this is the active project, sync live public files back to project first
-    // This ensures style changes, asset uploads etc. are included in the backup
-    $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-    $activeProject = null;
-    $publicSynced = false;
-    if (file_exists($targetFile)) {
-        $target = include $targetFile;
-        $activeProject = is_array($target) ? ($target['project'] ?? null) : $target;
-    }
-    
-    if ($activeProject === $projectName) {
-        $livePublicPath = PUBLIC_CONTENT_PATH;
-        $projectPublicPath = $projectPath . '/public';
-        
-        // Sync key folders from live to project before backup
-        $foldersToSync = ['assets', 'style'];
-        foreach ($foldersToSync as $folder) {
-            $src = $livePublicPath . '/' . $folder;
-            $dst = $projectPublicPath . '/' . $folder;
-            
-            if (is_dir($src)) {
-                // Ensure destination folder exists
-                if (!is_dir($projectPublicPath)) {
-                    mkdir($projectPublicPath, 0755, true);
-                }
-                // Delete existing and copy fresh from live
-                if (is_dir($dst)) {
-                    // Recursively delete destination first
-                    $iterator = new RecursiveIteratorIterator(
-                        new RecursiveDirectoryIterator($dst, RecursiveDirectoryIterator::SKIP_DOTS),
-                        RecursiveIteratorIterator::CHILD_FIRST
-                    );
-                    foreach ($iterator as $file) {
-                        if ($file->isDir()) {
-                            rmdir($file->getRealPath());
-                        } else {
-                            unlink($file->getRealPath());
-                        }
-                    }
-                    rmdir($dst);
-                }
-                backup_copyDirectory($src, $dst);
-            }
-        }
-        $publicSynced = true;
-    }
+    // C15 15.3 — no pre-backup "sync live public back into the project" step any more.
+    // A project's own public/ IS the live one it serves from, so style edits and asset
+    // uploads land there directly and are already in scope below. The old step existed
+    // only because the served project's live copy sat at the web root instead.
 
     // Copy project contents to backup (excluding backups folder itself)
     $itemsToCopy = ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'];
@@ -343,8 +301,7 @@ function __command_backupProject(array $params = [], array $urlParams = []): Api
                 'size_formatted' => backup_formatSize($backupSize),
                 'files' => $fileCount,
                 'items' => $copiedItems,
-                'created' => $timestamp,
-                'public_synced' => $publicSynced
+                'created' => $timestamp
             ],
             'total_backups' => count($backups),
             'max_backups' => $maxBackups,

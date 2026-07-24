@@ -60,7 +60,6 @@ class CommandRunner {
         'listAliases',
         // Read-only: project info (no mutations)
         'listProjects',
-        'getActiveProject',
         'listBackups',
     ];
     

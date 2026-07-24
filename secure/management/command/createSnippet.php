@@ -39,8 +39,8 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
     $translations = $params['translations'] ?? [];
     // C8 8.5 CONTAINMENT: the project WRITTEN TO is BOUND to the URL marker the
     // dispatcher authorized; a body `project` is an optional echo that must match.
-    // (F-C8-8.5-1: it used to select the write target freely and fall back to the
-    // SERVED main from target.php, so an editor authorized on one project could
+    // (F-C8-8.5-1: it used to select the write target freely and fall back to an
+    // installation-wide default project, so an editor authorized on one project could
     // plant, overwrite and delete snippets in a project they were not a member of.)
     $bound = qs_bind_marker_project($params, 'createSnippet');
     if ($bound['refusal'] !== null) {

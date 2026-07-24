@@ -4,7 +4,7 @@
  *
  * Sets the CALLER's per-user `selected_project` (users.php) — the project their panel
  * EDITS (drives the header picker/badge, the visual editor's C7 marker, and the preview).
- * Distinct from `switchProject`, which repoints the globally SERVED project (target.php).
+ * Which project a DEPLOYMENT serves is a web-server mapping, not a QuickSite command.
  *
  * selected_project is a UX default, NEVER an authz input (the dispatcher re-authorizes
  * every request against the URL project + members.json). But we still refuse selecting a

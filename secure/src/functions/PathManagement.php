@@ -70,8 +70,8 @@ function is_valid_relative_path(string $path, int $max_length = 255, int $max_de
 /**
  * Validate a PROJECT name — a single directory segment under secure/projects/.
  *
- * Mirrors the createProject / switchProject format that is already treated as
- * correct: must start with a letter, then alphanumerics / dash / underscore,
+ * Mirrors the createProject format that is already treated as correct:
+ * must start with a letter, then alphanumerics / dash / underscore,
  * max 50 chars. This rejects '', '.', '..', '/', '\', ':' (NTFS ADS), and any
  * other separator or device-name character, so the value can never traverse out
  * of the projects/ jail when concatenated into a path.
@@ -79,9 +79,8 @@ function is_valid_relative_path(string $path, int $max_length = 255, int $max_de
  * Use this for every request-supplied project name/source before it is used to
  * build a filesystem path (deleteProject, cloneProject source, backupProject,
  * restoreBackup, exportProject, clearExports filter, and the snippet family's
- * `project` param). The active-project value read from target.php is trusted and
- * always satisfies this shape, so validating the resolved value never regresses
- * a legitimate active-project fallback.
+ * `project` param). Every project name now reaches a command through the URL marker,
+ * so this is the single shape gate for all of them.
  */
 function is_valid_project_name(string $name): bool
 {

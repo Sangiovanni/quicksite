@@ -106,7 +106,7 @@ function __addOAuthProvider_validate(array $params): array {
         $errors[] = ['field' => 'scope', 'reason' => 'invalid_value', 'expected' => "'admin' or 'project'"];
     }
     if ($scope === 'project' && !defined('PROJECT_PATH')) {
-        $errors[] = ['field' => 'scope', 'reason' => 'no_active_project', 'hint' => "scope='project' requires an active project to be set in target.php"];
+        $errors[] = ['field' => 'scope', 'reason' => 'no_project', 'hint' => "scope='project' requires a project-scoped request: target one with /management/p/<projectId>/addOAuthProvider"];
     }
 
     $id = $params['id'] ?? null;

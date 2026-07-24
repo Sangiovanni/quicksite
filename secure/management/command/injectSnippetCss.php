@@ -34,7 +34,7 @@ function __command_injectSnippetCss(array $params = [], array $urlParams = []): 
     // C8 8.5 CONTAINMENT: this command REWRITES a project's live stylesheet, so
     // the target is BOUND to the URL marker the dispatcher authorized; a body
     // `project` is an optional echo that must match. (F-C8-8.5-1: it used to select
-    // the target freely and fall back to the SERVED main from target.php, so an
+    // the target freely and fall back to an installation-wide default project, so an
     // editor authorized on one project could overwrite another project's style.css.)
     $bound = qs_bind_marker_project($params, 'injectSnippetCss');
     if ($bound['refusal'] !== null) {

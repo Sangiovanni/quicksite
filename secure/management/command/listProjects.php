@@ -59,17 +59,8 @@ function __command_listProjects(array $params = [], array $urlParams = []): ApiR
             ->withMessage('No projects directory found')
             ->withData([
                 'projects' => [],
-                'count' => 0,
-                'active_project' => null
+                'count' => 0
             ]);
-    }
-    
-    // Get active project from target.php
-    $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-    $activeProject = null;
-    if (file_exists($targetFile)) {
-        $targetConfig = include $targetFile;
-        $activeProject = $targetConfig['project'] ?? null;
     }
     
     // Scan projects directory — MEMBERSHIP-FILTERED (C8/GAP A): only projects
@@ -88,24 +79,21 @@ function __command_listProjects(array $params = [], array $urlParams = []): ApiR
             continue; // not a member → not listed
         }
         $projectInfo = getProjectInfo($dir, $projectName);
-        $projectInfo['is_active'] = ($projectName === $activeProject);
         $projectInfo['my_role'] = $role;
         $projects[] = $projectInfo;
     }
     
-    // Sort: active first, then alphabetically
+    // C15 15.3 — no project is privileged, so there is no "active first" ordering left
+    // to apply: alphabetical is the only meaningful order.
     usort($projects, function($a, $b) {
-        if ($a['is_active'] && !$b['is_active']) return -1;
-        if (!$a['is_active'] && $b['is_active']) return 1;
         return strcasecmp($a['name'], $b['name']);
     });
-    
+
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('Projects listed successfully')
         ->withData([
             'projects' => $projects,
             'count' => count($projects),
-            'active_project' => $activeProject,
             'projects_path' => 'secure/projects/'
         ]);
 }

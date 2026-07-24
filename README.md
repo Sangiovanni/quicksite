@@ -205,7 +205,6 @@ Open `http://localhost:8000/admin/`. Clean URLs (`/about`, `/en/contact`) won't 
 On first load, QuickSite auto-creates sensitive config files from `.example` templates:
 - `secure/management/config/auth.php` — API tokens
 - `secure/management/config/roles.php` — role definitions
-- `secure/management/config/target.php` — active project selector
 
 > **⚠️ Token setup:** The default installation includes a placeholder token. On first login, the admin panel will prompt you to generate a new secure token. Follow the guided steps: generate a new token → log out → log back in with the new token → revoke the default placeholder. Do this before exposing the site publicly.
 

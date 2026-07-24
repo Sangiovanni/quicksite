@@ -1,34 +1,9 @@
 <?php
-// C7 — defer project context. A management request must NOT inherit PROJECT_PATH
-// from the global target.php: the action's project is the per-request projectId
-// peeled from the URL, resolved + validated + membership-checked below, then bound
-// via qs_load_project_context(). init.php still defines all the GLOBAL constants.
-define('QS_DEFER_PROJECT_CONTEXT', true);
-
-// C9 per-user editing — for a project-scoped request targeting a NON-reserved project
-// (/management/p/<id>/<cmd>), bind the live public/ to THAT project's own public/ BEFORE
-// init defines the base, so every command's PUBLIC_CONTENT_PATH read/write self-scopes to
-// the edited project (style/assets/scripts/sitemap). The reserved base 'quicksite' + global
-// commands keep the base public (D1/D2). PROJECT_PATH itself is still bound later, after F1
-// + membership, by qs_load_project_context — this only pre-points the public dir so the many
-// commands that read/write PUBLIC_CONTENT_PATH don't all need per-file re-scoping.
-if (!defined('PUBLIC_CONTENT_PATH')) {
-    $__c9secure = dirname(__DIR__, 2) . '/secure';
-    require_once $__c9secure . '/src/functions/projectPublicArtifacts.php';
-    $__c9served = qs_served_project($__c9secure);                          // dynamic base = target.php
-    $__c9segs = array_values(array_filter(explode('/', parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? ''), fn($s) => $s !== ''));
-    for ($__c9i = 0, $__c9n = count($__c9segs); $__c9i < $__c9n - 2; $__c9i++) {
-        if ($__c9segs[$__c9i] === 'management' && $__c9segs[$__c9i + 1] === 'p') {
-            $__c9pid = rawurldecode($__c9segs[$__c9i + 2]);
-            if ($__c9pid !== $__c9served                                    // the SERVED project keeps the base public
-                && preg_match('/^[A-Za-z0-9_-]{1,64}$/', $__c9pid)          // F1 shape
-                && is_dir($__c9secure . '/projects/' . $__c9pid)) {
-                define('PUBLIC_CONTENT_PATH', $__c9secure . '/projects/' . $__c9pid . '/public');
-            }
-            break;
-        }
-    }
-}
+// C7 — the action's project is the per-request projectId peeled from the URL, resolved
+// + validated + membership-checked below, then bound via qs_load_project_context() — which
+// binds PROJECT_PATH *and* PUBLIC_CONTENT_PATH together (C15 15.3). Nothing binds a project
+// before that point, so this file no longer needs to pre-empt init.php with an early
+// PUBLIC_CONTENT_PATH override: init.php defines only the install-wide constants.
 
 require_once '../init.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';

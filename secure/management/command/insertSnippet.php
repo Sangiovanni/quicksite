@@ -452,11 +452,11 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
     }
     
     // C8 8.5 CONTAINMENT (F-C8-8.5-5): source the snippet from the project this
-    // request is authorized for — the URL marker — NOT from the globally SERVED
-    // main in target.php. The insert itself already writes into the marker
+    // request is authorized for — the URL marker — NOT from an installation-wide
+    // default project. The insert itself already writes into the marker
     // (PROJECT_PATH), so reading the source from a different project made one
-    // operation straddle two: every editor on every project read the served main's
-    // snippet library, and the command silently misbehaved for non-served projects.
+    // operation straddle two: every editor on every project read the same snippet
+    // library, and the command silently misbehaved for every other project.
     $bound = qs_bind_marker_project($params, 'insertSnippet');
     if ($bound['refusal'] !== null) {
         return $bound['refusal'];

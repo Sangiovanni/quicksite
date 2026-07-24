@@ -13,7 +13,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
 | Layer | Folder | Audience | Purpose |
 |---|---|---|---|
 | **Project** | `secure/projects/{name}/` | Site owner | The actual website data: routes, page structures (JSON), translations, components, interactions, styles, assets. |
-| **Management** | `secure/management/` | API client (admin panel, scripts) | The 178 commands that read or mutate project data. Single entry point: `public/management/index.php`. Token + role enforced. AI calls bypass this layer entirely (browser-direct). |
+| **Management** | `secure/management/` | API client (admin panel, scripts) | The 176 commands that read or mutate project data. Single entry point: `public/management/index.php`. Token + role enforced. AI calls bypass this layer entirely (browser-direct). |
 | **Admin** | `public/admin/` + `secure/admin/` | Human operator | The browser UI that calls Management commands. Includes the visual editor, sitemap, theme editor, AI workspace, workflow runner. |
 
 ```
@@ -165,7 +165,7 @@ ApiResponse::create(201, 'route.created')
     ->send();
 ```
 
-The full list of 178 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
+The full list of 176 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
 
 ### Response shape
 
@@ -199,7 +199,7 @@ Authorization is **per project**. Each project's `config/members.json` assigns i
 
 > AI is not a permissioned column: AI calls happen in the browser via `QSAiCall` against per-user credentials in `aiConnectionsV3` (localStorage). Any authenticated admin can use the AI workspace; gating happens at the connection level, not the role level.
 
-Roles are **fixed** — there is no superadmin and no custom roles. A role is defined as a set of trust-coherent command **categories** in `secure/management/config/categories.php` (e.g. `content.read`, `style.write`, `deploy`, `project.delete`); `roles.php` grants each role a `rank` and its categories, which are expanded to a per-command allowlist at load time. Every command belongs to exactly one category, and its category also fixes its **scope**: *global* (a set any authenticated user may run — `createProject`, `importProject`, `listProjects`, `getMySpaceUsage`, `setSelectedProject`, `changePassword`, `deleteMyAccount`, `findUser`, the membership self-service commands, `listRoles`, `getMyPermissions`, `checkForUpdates`, `listWorkflowBlocks`, `lintWorkflows`) or *project* (requires membership). A global category is either open to any authenticated user or closed to everyone; there is no owner-gated global tier, because "owner" is a fact about one project and cannot authorize an action that has no project. Anything installation-wide — applying an engine update, choosing the served main — is therefore either operator-side or expressed as a project-scoped action on the project it affects. Global reads are still caller-relative: `listProjects` returns only the projects the caller is a member of (with their role on each) and `getMySpaceUsage` aggregates disk usage only across the projects the caller *owns* — there is no all-projects API view, and project-scoped reads report only the project targeted in the URL. `owner` is the top of each project; `rank` orders the roles and governs role management — a granter may only assign a role strictly below their own (the self-escalation guard). Permissions are checked before the command file is included.
+Roles are **fixed** — there is no superadmin and no custom roles. A role is defined as a set of trust-coherent command **categories** in `secure/management/config/categories.php` (e.g. `content.read`, `style.write`, `deploy`, `project.delete`); `roles.php` grants each role a `rank` and its categories, which are expanded to a per-command allowlist at load time. Every command belongs to exactly one category, and its category also fixes its **scope**: *global* (a set any authenticated user may run — `createProject`, `importProject`, `listProjects`, `getMySpaceUsage`, `setSelectedProject`, `changePassword`, `deleteMyAccount`, `findUser`, the membership self-service commands, `listRoles`, `getMyPermissions`, `checkForUpdates`, `listWorkflowBlocks`, `lintWorkflows`) or *project* (requires membership). A global category is either open to any authenticated user or closed to everyone; there is no owner-gated global tier, because "owner" is a fact about one project and cannot authorize an action that has no project. Anything installation-wide — applying an engine update, mapping a domain to a project — is therefore either operator-side or expressed as a project-scoped action on the project it affects. Global reads are still caller-relative: `listProjects` returns only the projects the caller is a member of (with their role on each) and `getMySpaceUsage` aggregates disk usage only across the projects the caller *owns* — there is no all-projects API view, and project-scoped reads report only the project targeted in the URL. `owner` is the top of each project; `rank` orders the roles and governs role management — a granter may only assign a role strictly below their own (the self-escalation guard). Permissions are checked before the command file is included.
 
 Membership itself changes on a **consent model**: an admin or owner *invites* an existing account to a role (rank-checked at send), the invitee sees the offer in their own invitation inbox, and the grant materializes only on `acceptInvitation` — where the inviter's authority is **re-validated** (a demoted or removed inviter's offer is void). Pending invitations live in a separate `invitations` block of `members.json`, so a pending entry is structurally unable to grant access — every permission check reads `members` only. Users are targeted by their opaque `user_id` (discovered by exact public-name lookup, `findUser`); membership output references people as `{user_id, name}` and never exposes the private login username. Ownership rotates atomically via `transferOwnership` (owner-only, member-only target, confirmation required); removals and project deletions leave a dismissable notice in the affected user's own project list, while self-initiated exits (leave, decline, withdraw) leave none.
 
@@ -306,7 +306,7 @@ addRoute.php
   └── ApiResponse::create(201, 'route.created')->send()
 ```
 
-The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 178 commands.
+The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 176 commands.
 
 ### 5.3 Routing — exact and parameterised routes
 
@@ -390,11 +390,11 @@ The **web root carries no QuickSite fallback**: it serves real files only. Nothi
 - `public` — the `/p/<id>/` view is open to anonymous visitors (a shareable site).
 - `private` — the `/p/<id>/` view requires membership (owner / member / viewer). Membership is presented by a short-lived, HttpOnly `qs_preview` cookie the admin panel sets from the caller's access token (a bearer header is accepted too).
 
-A refused `/p/<id>/` request (no identity → `401`, identity but not a member → `403`) renders the **main project's** error page with that status: a dedicated `401` / `403` page when the main project has one (the special-pages set is `404`, `500`, `403`, `401` — create `templates/model/json/pages/401/…` like any page), else its `404` page. The refusal page never names the project.
+A refused `/p/<id>/` request (no identity → `401`, identity but not a member → `403`) answers a plain, engine-owned status page with that status. It borrows no project's templates — rendering the requested project's own error page would hand a non-member that project's styling — and it names nothing, so a private project and a nonexistent one look the same.
 
-**Per-user editing.** A user's `selected_project` (in `users.php`, set via `setSelectedProject`) names the project their admin panel edits. It is a per-user preference, **never an authorization input** — every request is re-authorized against the target project's `members.json`. Because each project is served *and* edited from its own folder, two users can edit two different projects at once without colliding, and the main project (`target.php`) is independent of any user's `selected_project`.
+**Per-user editing.** A user's `selected_project` (in `users.php`, set via `setSelectedProject`) names the project their admin panel edits. It is a per-user preference, **never an authorization input** — every request is re-authorized against the target project's `members.json`. Because each project is served *and* edited from its own folder, two users can edit two different projects at once without colliding, and nothing any user selects affects what a domain serves.
 
-**Generated client artifacts are per-project.** The compiled `qs-api-config.js` / `qs-enums.js` / `qs-route-schema.js` are written into each project's own `public/scripts/` when its API / enums / routes change, plus a mirror into the live `public/` when the edited project is the main one (so the root site stays in sync). Serving `/p/<id>/` regenerates any missing artifact on demand.
+**Generated client artifacts are per-project.** The compiled `qs-api-config.js` / `qs-enums.js` / `qs-route-schema.js` are written into each project's own `public/scripts/` when its API / enums / routes change — one copy, in the folder that project is served from. Serving `/p/<id>/` regenerates any missing or stale artifact on demand.
 
 Tokens, role/category definitions, command code, interaction schemas, and the admin panel are shared across all projects.
 
@@ -577,11 +577,11 @@ the calling command can surface warnings in the API response.
 | Caller | When | Effect |
 |---|---|---|
 | `editApi` | after `writeCompiledJs` | Resyncs on every endpoint add/edit/delete. Response includes `enumSync` block. |
-| `switchProject` | after qs-api-config regeneration | Rebuilds the registry against the new project's components + bindings (the previous project's registry would be stale). |
+| serving `/p/<id>/` | when an artifact is missing or stale | Rebuilds that project's registry from its own components + bindings before the page renders. |
 | `build` | after `writeCompiledJs` to the build folder | Writes `qs-enums.js` into the build's `scripts/` so deployed sites have the registry. |
 
 No component CRUD commands exist today, so changes to a component's
-`__enums__` only refresh on the next binding edit / project switch.
+`__enums__` refresh on the next binding edit or on the next serve.
 Documented; not a blocker.
 
 **Naming convention**
@@ -811,7 +811,7 @@ CSS is modelled as four addressable layers, all manipulated through commands rat
 | `@keyframes` | `listKeyframes`, `getKeyframes`, `setKeyframes`, `deleteKeyframes` |
 | `@media` queries | `getStyleRule` / `setStyleRule` with a `mediaQuery` parameter (selectors and keyframes can be scoped) |
 
-`secure/src/classes/CssParser.php` parses the active project's CSS into an AST so any of those layers can be queried or mutated atomically.
+`secure/src/classes/CssParser.php` parses the targeted project's CSS into an AST so any of those layers can be queried or mutated atomically.
 
 ---
 

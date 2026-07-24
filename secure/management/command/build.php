@@ -26,20 +26,6 @@ require_once SECURE_FOLDER_PATH . '/src/functions/LockManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/ZipUtilities.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
-/**
- * Get active project name from target.php
- */
-if (!function_exists('getActiveProjectName')) {
-    function getActiveProjectName(): ?string {
-        $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-        if (file_exists($targetFile)) {
-            $target = include $targetFile;
-            return is_array($target) ? ($target['project'] ?? null) : $target;
-        }
-        return null;
-    }
-}
-
 // Get optional parameters for renaming folders in build
 // Defaults are standard names (public/secure/''), NOT the QuickSite installation's own folder names
 $params = $trimParametersManagement->params();
@@ -323,7 +309,7 @@ foreach ($publicFiles as $file) {
                 $content
             );
             
-            // Replace PROJECT_PATH block: production builds don't use target.php
+            // Replace PROJECT_PATH block: a production build pins its own project path
             // All project files are at SECURE_FOLDER_PATH root (config.php, routes.php, templates/, translate/)
             $content = preg_replace(
                 "/if\s*\(\s*!defined\('PROJECT_PATH'\)\s*\)\s*\{.*?\n\}/s",

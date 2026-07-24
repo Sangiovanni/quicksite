@@ -107,31 +107,27 @@ if (!empty($__previewRouteResolvers)) {
     }
 }
 
-// C8 (8.W) — the served project this panel works with (getCurrentProject = target.php,
-// same as the editor marker + the preview iframe, so edit and preview never diverge).
-// The visual-editor STYLE panels (preview-style-*/transition) hand-build
+// C8 (8.W) — the project this panel works with (getCurrentProject = the caller's own
+// selected_project, same as the editor marker + the preview iframe, so edit and preview
+// never diverge). The visual-editor STYLE panels (preview-style-*/transition) hand-build
 // fetch(managementUrl + cmd) for project-scoped commands, so the C7 '/management/p/<id>/'
 // marker is baked into managementUrl here (every command reached this way is
-// project-scoped). Empty marker → falls back to '/management/' when target.php is
-// missing. (Cleanup chip tracks routing those calls through QuickSiteAdmin.apiRequest.)
-$__previewProject = $router->getCurrentProject();
-$__previewMgmtBase = rtrim(BASE_URL, '/') . '/management/'
-    . ($__previewProject !== null && $__previewProject !== '' ? 'p/' . rawurlencode($__previewProject) . '/' : '');
+// project-scoped). No edited project → no marker, so those calls fall back to
+// '/management/' and the dispatcher refuses them as project-scoped, which is correct:
+// a caller with no project has nothing to edit. (Cleanup chip tracks routing those calls
+// through QuickSiteAdmin.apiRequest.)
+$__previewProject  = $router->getCurrentProject();
+$__previewMgmtBase = $router->projectManagementBase($__previewProject);
 ?>
 <!-- Preview Configuration (needed before preview.js) -->
 <script>
 window.PreviewConfig = {
     // URLs and settings
     baseUrl: <?= json_encode(rtrim(BASE_URL, '/')) ?>,
-    // C9/C5b — the base the preview IFRAME navigates under: the site root when
-    // editing the SERVED project, the surface-B '/p/<id>' view otherwise.
-    // buildUrl() must use THIS (not baseUrl) or picking a page in the toolbar
-    // silently navigates the iframe back to the main project.
-    previewBase: <?= json_encode(
-        (isset($previewAtRoot) && !$previewAtRoot && isset($previewProject))
-            ? rtrim(BASE_URL, '/') . '/p/' . rawurlencode($previewProject)
-            : rtrim(BASE_URL, '/')
-    ) ?>,
+    // C9/C5b — the base the preview IFRAME navigates under: the edited project's own
+    // '/p/<id>' view. buildUrl() must use THIS (not baseUrl) or picking a page in the
+    // toolbar silently navigates the iframe out of the project being edited.
+    previewBase: <?= json_encode($router->projectSiteBase($__previewProject)) ?>,
     adminUrl: <?= json_encode($router->url('')) ?>,
     managementUrl: <?= json_encode($__previewMgmtBase) ?>,
     currentProject: <?= json_encode($__previewProject) ?>,

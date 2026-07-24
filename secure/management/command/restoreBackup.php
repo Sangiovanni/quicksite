@@ -175,45 +175,9 @@ function __command_restoreBackup(array $params = [], array $urlParams = []): Api
                 ->withMessage('Failed to create pre-restore backup');
         }
 
-        // Sync live public to project before pre-restore backup (same as backupProject)
-        $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-        $activeProject = null;
-        if (file_exists($targetFile)) {
-            $target = include $targetFile;
-            $activeProject = is_array($target) ? ($target['project'] ?? null) : $target;
-        }
-        
-        if ($activeProject === $projectName) {
-            $livePublicPath = PUBLIC_CONTENT_PATH;
-            $projectPublicPath = $projectPath . '/public';
-            
-            $foldersToSync = ['assets', 'style'];
-            foreach ($foldersToSync as $folder) {
-                $src = $livePublicPath . '/' . $folder;
-                $dst = $projectPublicPath . '/' . $folder;
-                
-                if (is_dir($src)) {
-                    if (!is_dir($projectPublicPath)) {
-                        mkdir($projectPublicPath, 0755, true);
-                    }
-                    if (is_dir($dst)) {
-                        $iterator = new RecursiveIteratorIterator(
-                            new RecursiveDirectoryIterator($dst, RecursiveDirectoryIterator::SKIP_DOTS),
-                            RecursiveIteratorIterator::CHILD_FIRST
-                        );
-                        foreach ($iterator as $file) {
-                            if ($file->isDir()) {
-                                rmdir($file->getRealPath());
-                            } else {
-                                unlink($file->getRealPath());
-                            }
-                        }
-                        rmdir($dst);
-                    }
-                    restore_copyDirectory($src, $dst);
-                }
-            }
-        }
+        // C15 15.3 — no "sync live public into the project" step: the project's own public/
+        // IS the live one, so the current state below already includes it (same reasoning as
+        // backupProject).
 
         // Copy current state to pre-restore backup
         $itemsToCopy = ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'];
@@ -276,38 +240,9 @@ function __command_restoreBackup(array $params = [], array $urlParams = []): Api
         }
     }
 
-    // If this is the active project, also sync to public folder
-    $targetFile = SECURE_FOLDER_PATH . '/management/config/target.php';
-    $activeProject = null;
-    if (file_exists($targetFile)) {
-        $target = include $targetFile;
-        $activeProject = is_array($target) ? ($target['project'] ?? null) : $target;
-    }
-
-    $publicSynced = false;
-    if ($activeProject === $projectName) {
-        // Sync restored public folder to actual public folder
-        $projectPublicPath = $projectPath . '/public';
-        $livePublicPath = PUBLIC_CONTENT_PATH;
-        
-        if (is_dir($projectPublicPath)) {
-            // Copy public contents to live folder
-            $publicItems = ['assets', 'style', 'build'];
-            foreach ($publicItems as $item) {
-                $src = $projectPublicPath . '/' . $item;
-                $dst = $livePublicPath . '/' . $item;
-                
-                if (is_dir($src)) {
-                    // Delete existing and copy fresh
-                    if (is_dir($dst)) {
-                        restore_deleteDirectory($dst);
-                    }
-                    restore_copyDirectory($src, $dst);
-                }
-            }
-            $publicSynced = true;
-        }
-    }
+    // C15 15.3 — nothing to push out afterwards: restoring the project's public/ restores
+    // the very directory it serves from. The old post-restore copy pushed it to the web
+    // root, which was only ever the served project's live location.
 
     if (empty($restoredItems)) {
         return ApiResponse::create(500, 'restore.no_files_restored')
@@ -326,7 +261,6 @@ function __command_restoreBackup(array $params = [], array $urlParams = []): Api
             'pre_restore_backup' => $preRestoreName,
             'restored_items' => $restoredItems,
             'pre_restore_items' => $preRestoreItems,
-            'public_synced' => $publicSynced,
             'errors' => $errors
         ]);
 }

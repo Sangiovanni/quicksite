@@ -26,9 +26,9 @@ require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 function __command_listSnippets(array $params = [], array $urlParams = []): ApiResponse {
     // C8 8.5 CONTAINMENT: the project read is BOUND to the URL marker the
     // dispatcher authorized. A body `project` is an optional echo that must match.
-    // (Before: `project` selected the target freely and fell back to the SERVED
-    // main from target.php, so an authorized marker on one project could read
-    // another project's snippets — F-C8-8.5-1.)
+    // (Before: `project` selected the target freely and fell back to an
+    // installation-wide default project, so an authorized marker on one project could
+    // read another project's snippets — F-C8-8.5-1.)
     $bound = qs_bind_marker_project($params, 'listSnippets');
     if ($bound['refusal'] !== null) {
         return $bound['refusal'];

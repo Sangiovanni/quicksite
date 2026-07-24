@@ -200,7 +200,7 @@ class PageManagement {
         }
 
         // Include enum registry alongside qs-api-config.js. Generated
-        // by EnumSyncHelper on editApi / switchProject. Loaded
+        // by EnumSyncHelper on editApi / at serve time. Loaded
         // unconditionally when it exists — even an empty registry
         // (window.QS_ENUMS = {}) avoids "table not loaded" warnings
         // from QS.enum at runtime.

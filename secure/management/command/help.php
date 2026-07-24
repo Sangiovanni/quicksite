@@ -3241,40 +3241,17 @@ $GLOBALS['__help_commands'] = [
                         'languages' => ['en', 'fr'],
                         'size' => '2.5 MB',
                         'size_bytes' => 2621440,
-                        'is_active' => true,
                         'my_role' => 'owner'
                     ]
                 ],
                 'count' => 1,
-                'active_project' => 'quicksite'
+                'projects_path' => 'secure/projects/'
             ]
         ],
         'error_responses' => [],
-        'notes' => 'Projects you are not a member of are simply absent from the list. my_role is your role on that project (members.json). The is_active flag shows which project is currently being served; a user with no memberships gets an empty list.'
+        'notes' => 'Projects you are not a member of are simply absent from the list. my_role is your role on that project (members.json). A user with no memberships gets an empty list. No project is privileged, so the list is plain alphabetical.'
     ],
     
-    'getActiveProject' => [
-        'description' => 'Returns information about the currently active project',
-        'method' => 'GET',
-        'parameters' => [],
-        'example_get' => 'GET /management/getActiveProject',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Active project: quicksite',
-            'data' => [
-                'project' => 'quicksite',
-                'path' => 'secure/projects/quicksite',
-                'exists' => true,
-                'site_name' => 'QuickSite Demo'
-            ]
-        ],
-        'error_responses' => [
-            '500.config.target_missing' => 'target.php configuration not found'
-        ],
-        'notes' => 'Shows which project is currently being served by the website.'
-    ],
-
     'getMySpaceUsage' => [
         'description' => 'Disk footprint of the projects the CALLER OWNS — an owner-wide total plus a per-project breakdown. Global-scoped (no /management/p/<id>/ marker) and takes no project parameter: ownership is resolved per project from members.json, so the response describes only projects you own. Owning nothing returns an empty, zeroed report.',
         'method' => 'POST',
@@ -3320,7 +3297,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'setSelectedProject' => [
-        'description' => 'Sets the CALLER\'s per-user editing target (selected_project) — the project their admin panel edits (header picker/badge, visual editor, preview). Distinct from switchProject, which repoints the globally SERVED project (target.php). Global-scoped (no /management/p/<id>/ marker).',
+        'description' => 'Sets the CALLER\'s per-user editing target (selected_project) — the project their admin panel edits (header picker/badge, visual editor, preview). Global-scoped (no /management/p/<id>/ marker). Which project a DEPLOYMENT serves at a domain is a web-server mapping, not a QuickSite command.',
         'method' => 'POST',
         'parameters' => [
             'project' => 'string (required) — project id to edit; the caller MUST be a member of it',
@@ -3345,48 +3322,6 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'selected_project is a UX default, never an authz input — the dispatcher re-authorizes every request against the URL project + members.json. Refuses non-member projects so the panel never opens a project it cannot edit.'
     ],
 
-    'switchProject' => [
-        'description' => 'Makes the TARGETED project the globally served main — the one deployment served at the site root. Rewrites target.php (the served-main pointer) and materializes that project\'s static surface (assets, style, build, sitemap.txt) into the base live public folder, then regenerates the three client artifacts (qs-api-config.js, qs-enums.js, qs-route-schema.js) for it. Project-scoped and OWNER-ONLY: only an owner of project X may make X the served main. Distinct from setSelectedProject, which sets the CALLER\'s per-user editing target and is what the admin panel pickers use.',
-        'method' => 'POST',
-        'route' => '/management/p/<projectId>/switchProject',
-        'parameters' => [
-            'project' => [
-                'required' => false,
-                'type' => 'string',
-                'description' => 'Advisory echo of the target. The project promoted is ALWAYS the URL marker; if this is present it must match the marker, otherwise the request is refused with 400 project.mismatch.',
-                'example' => 'mysite'
-            ]
-        ],
-        'example_post' => 'POST /management/p/mysite/switchProject (no body needed)',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => "Served main switched to project 'mysite'",
-            'data' => [
-                'project' => 'mysite',
-                'previous_project' => 'quicksite',
-                'target_updated' => true,
-                'public_files_copied' => true,
-                'scripts_regenerated' => [
-                    'api_config' => true,
-                    'enums' => true,
-                    'route_schema' => true
-                ],
-                'scripts_placed_in_base' => ['qs-api-config.js', 'qs-enums.js', 'qs-route-schema.js']
-            ]
-        ],
-        'error_responses' => [
-            '400.project.required' => 'No project marker — target one with /management/p/<projectId>/switchProject',
-            '400.project.mismatch' => 'The body project does not match the targeted (URL marker) project',
-            '400.validation.invalid_format' => 'Invalid project identifier',
-            '400.validation.incomplete_project' => 'Project missing required files (config.php / routes.php)',
-            '403.authz.insufficient_rank' => 'Not an owner of the targeted project',
-            '200.operation.no_change' => 'Already the served main (returns success with was_already_active=true)',
-            '404.resource.not_found' => 'Project not found'
-        ],
-        'notes' => 'The site root immediately starts serving the new project. Every OTHER project is served live from its own folder at /p/<projectId>/ and needs no switch. Switching no longer syncs the live public folder back into the previous project: each project\'s own public folder is authoritative, and asset/style writes mirror into it at write time.'
-    ],
-    
     'createProject' => [
         'description' => 'Creates a new empty project with basic structure and templates',
         'method' => 'POST',
@@ -6593,7 +6528,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'css_animations' => ['getKeyframes', 'setKeyframes', 'deleteKeyframes'],
                 'site_customization' => ['editFavicon', 'editTitle'],
                 'build_deployment' => ['build', 'listBuilds', 'getBuild', 'deleteBuild', 'cleanBuilds', 'deployBuild', 'downloadBuild'],
-                'project_management' => ['listProjects', 'getActiveProject', 'setSelectedProject', 'switchProject', 'createProject', 'deleteProject'],
+                'project_management' => ['listProjects', 'setSelectedProject', 'createProject', 'deleteProject'],
                 'member_management' => ['listMembers', 'getProjectRoster', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership', 'approveJoinRequest', 'denyJoinRequest', 'proposeMember', 'setJoinPolicy', 'setProjectVisibility', 'reconcileMemberships'],
                 'my_memberships' => ['findUser', 'listMyInvitations', 'listMyProposals', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice', 'requestToJoin', 'withdrawJoinRequest'],
                 'backup_restore' => ['backupProject', 'listBackups', 'restoreBackup', 'deleteBackup'],
@@ -6650,7 +6585,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'alias_workflow' => '1) listAliases to see existing redirects, 2) createAlias to add URL redirects, 3) deleteAlias to remove redirects.',
                 'component_workflow' => '1) listComponents to see available reusable components, 2) getComponent?name=... to view full details with preview, 3) editStructure with type="component" to create/update/delete.',
                 'sitemap_workflow' => '1) getSiteMap for JSON data with route details and coverage, 2) getSiteMap/text to generate plain text sitemap.txt for SEO crawlers.',
-                'project_workflow' => '1) listProjects to see the projects you are a member of, 2) setSelectedProject to change which one you EDIT (your per-user target; every non-served project is edited and previewed at /p/<projectId>/), 3) getActiveProject to check which project is served at the site root, 4) createProject to start a new one, 5) switchProject (project-scoped, OWNER-only) to make a project the globally served main, 6) deleteProject to remove (requires confirm=true).',
+                'project_workflow' => '1) listProjects to see the projects you are a member of, 2) setSelectedProject to change which one you EDIT (your per-user target; every project is edited, previewed and served at /p/<projectId>/), 3) createProject to start a new one, 4) deleteProject to remove (requires confirm=true). No project is privileged: which project a production domain serves is a web-server mapping, not a command.',
                 'membership_workflow' => '1) findUser to confirm the {user_id, name} pair by public display name, 2) inviteMember (admin/owner, by user_id) to offer a role, 3) the invitee sees it in listMyInvitations and answers with acceptInvitation or declineInvitation, 4) manage the roster with listMembers / changeMemberRole / removeMember (cancelInvitation to withdraw an offer), 5) transferOwnership (owner-only, member target, confirm=true) to rotate the top role, 6) leaveProject to exit yourself, dismissProjectNotice to clear a refused/removed/deleted notice.',
                 'join_request_workflow' => 'Front door (setJoinPolicy open): an outsider runs requestToJoin {project, note} (mandatory note, fixed viewer ask) and tracks it in listMyInvitations requests[]; admins/owner see it in listMembers (direction "request") and answer with approveJoinRequest (member immediately) or denyJoinRequest {note} (dismissable refused notice; re-request blocked until dismissed); withdrawJoinRequest retracts your own ask silently. Sponsor lane (any member, policy-independent): proposeMember {user_id, role, note} - the person learns NOTHING until approveJoinRequest converts it into a real invitation (by = approver, sponsored_by = you), which they accept/decline as usual; denyJoinRequest removes it silently on their side.',
                 'backup_workflow' => '1) backupProject to create instant backup, 2) listBackups to see available backups with size/age info, 3) restoreBackup to restore from backup (optional pre-restore backup), 4) deleteBackup to free disk space.',

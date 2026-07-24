@@ -415,9 +415,8 @@
         const switchBtn = document.getElementById('btn-switch-project');
         const proj = t('dashboard.projects', {});
 
-        // C9 — the dashboard reflects the project you are EDITING (selected_project),
-        // NOT the served main. listProjects is membership-filtered (my_role); the
-        // is_active flag marks the SERVED project and must not drive the chip.
+        // The dashboard reflects the project you are EDITING (selected_project).
+        // listProjects is membership-filtered (my_role) and lists no privileged project.
         currentProject = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.currentProject) || null;
 
         let listResult;
@@ -875,17 +874,11 @@
         QSDom.clear(deleteSelector);
         deleteSelector.appendChild(QSDom.el('option', { value: '', text: proj.selectProject || 'Select a project...' }));
 
-        // The SERVED project (is_active) can't be deleted without force — omit it.
-        const deletable = allProjects.filter(p => !p.is_active);
-        deletable.forEach(p => {
+        // Every project you own is deletable: no project is privileged any more, so there
+        // is no "can't delete the active one" case to filter out.
+        allProjects.forEach(p => {
             deleteSelector.appendChild(QSDom.el('option', { value: p.name, text: p.name }));
         });
-
-        if (deletable.length === 0 && allProjects.length > 0) {
-            const opt = QSDom.el('option', { value: '', text: proj.cannotDeleteActive || 'Cannot delete active project' });
-            opt.disabled = true;
-            deleteSelector.appendChild(opt);
-        }
     }
 
     // ========================================================================

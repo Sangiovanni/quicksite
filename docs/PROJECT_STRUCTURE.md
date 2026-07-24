@@ -38,7 +38,6 @@ quicksite/
 │   ├── management/               # API engine (shared across all projects)
 │   │   ├── command/              # Command handler files (one per command; see COMMAND_API.md)
 │   │   ├── config/               # API configuration
-│   │   │   ├── target.php        # Active project selector (gitignored)
 │   │   │   ├── auth.php          # Session TTLs, registration policy (self-registration + flood controls), CORS (gitignored)
 │   │   │   ├── users.php         # User registry: name + username + password_hash + per-user project list (gitignored)
 │   │   │   ├── sessions.json     # Runtime sessions — access/refresh tokens, hashed (machine-written, gitignored)

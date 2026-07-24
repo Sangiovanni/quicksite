@@ -117,15 +117,6 @@
             "listProjects": {
                 "desc": "List all available projects with metadata including routes, pages, languages, and size."
             },
-            "getActiveProject": {
-                "desc": "Get information about the currently active project."
-            },
-            "switchProject": {
-                "desc": "Switch to a different project. Updates target.php and copies project files to public folder.",
-                "params": {
-                    "project": "Name of the project to switch to."
-                }
-            },
             "createProject": {
                 "desc": "Create a new project with default structure and configuration.",
                 "params": {
@@ -306,10 +297,10 @@
             "title": "Project Management",
             "intro": "Manage multiple projects from a single QuickSite installation. Switch between projects, create backups, and migrate data.",
             "architecture": {
-                "desc": "QuickSite uses a multi-project architecture where all project data lives in secure/projects/. Each project has its own templates, translations, routes, and configuration. The active project is determined by secure/config/target.php."
+                "desc": "QuickSite uses a multi-project architecture where all project data lives in secure/projects/. Each project has its own templates, translations, routes, and configuration, and is served from its own folder at /p/<projectId>/. No project is privileged: which project a production domain serves is a web-server mapping."
             },
             "working": {
-                "desc": "Use listProjects to see all available projects with metadata. Switch between projects with switchProject - this updates target.php and copies the project's public files. Create new projects with createProject for isolated testing environments."
+                "desc": "Use listProjects to see the projects you are a member of, with metadata. Change which one your admin panel edits with setSelectedProject. Create new projects with createProject for isolated testing environments."
             },
             "backup": {
                 "desc": "Export projects as ZIP archives for backup or migration. Use exportProject to create a timestamped ZIP in secure/exports/, then downloadExport to retrieve it. Import projects with importProject by uploading a ZIP file."

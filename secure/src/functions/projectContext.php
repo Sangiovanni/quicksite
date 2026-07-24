@@ -3,14 +3,15 @@
  * Project-context loader (beta.10 C7).
  *
  * Defines the per-request PROJECT_* / CONFIG / ROUTES constants for ONE project.
- * Extracted from init.php so the project can be selected PER REQUEST:
+ * There is no installation-wide "current project": every entry point names the
+ * project the request actually targets, and calls this with it.
  *
- *   - Served site + admin pages (init.php auto-run): the single GLOBAL served
- *     project from target.php (L6 — unchanged).
- *   - Management dispatcher (C7): the per-request projectId peeled from the URL,
- *     AFTER it has been validated (is_valid_project_name — F1) and membership-
- *     checked. The dispatcher defines QS_DEFER_PROJECT_CONTEXT so init.php skips
- *     its target.php read, then calls this itself.
+ *   - Renderer (`public/p/index.php`): the project peeled from `/p/<id>/`.
+ *   - Management dispatcher (C7) + admin-api dispatcher: the per-request projectId
+ *     peeled from the URL marker, AFTER it has been validated
+ *     (is_valid_project_name — F1) and membership-checked.
+ *   - Admin panel: the caller's own EDITED project (selected_project), non-strict
+ *     so an account that is a member of nothing still boots into the empty state.
  *
  * Every define is `if (!defined())`-guarded, so the FIRST caller wins and a
  * second call is a no-op — a request loads exactly one project context.
@@ -37,6 +38,18 @@ function qs_load_project_context(string $projectName, bool $strict = true): void
         define('PROJECT_NAME', $projectName);
     }
 
+    // C15 15.3 — PUBLIC_CONTENT_PATH is bound HERE, with the project, and nowhere else.
+    // Every project serves from its own public/; no project is privileged, so there is no
+    // installation-wide value left to fall back to. Binding it beside PROJECT_PATH is what
+    // let the three pre-init "override the base before init.php defines it" dances
+    // (management dispatcher, admin-api dispatcher, surfaceB) be deleted outright — there
+    // is no competing definition to pre-empt any more.
+    // Skipped for a blank project name (the tolerant path below): a caller with no
+    // resolvable project has no public dir, and no global command reads the constant.
+    if (!defined('PUBLIC_CONTENT_PATH') && $projectName !== '') {
+        define('PUBLIC_CONTENT_PATH', PROJECT_PATH . DIRECTORY_SEPARATOR . 'public');
+    }
+
     // --- config.php -----------------------------------------------------------
     if (!defined('CONFIG_PATH')) {
         define('CONFIG_PATH', PROJECT_PATH . DIRECTORY_SEPARATOR . 'config.php');
@@ -58,7 +71,7 @@ function qs_load_project_context(string $projectName, bool $strict = true): void
                 "<ul>" .
                 "<li>Project '<strong>" . htmlspecialchars(PROJECT_NAME) . "</strong>' does not exist in <code>" . SECURE_FOLDER_NAME . "/projects/</code></li>" .
                 "<li>Project folder exists but <code>config.php</code> was deleted</li>" .
-                "<li>Wrong project name in <code>" . SECURE_FOLDER_NAME . "/management/config/target.php</code></li>" .
+                "<li>Wrong project id in the request (the <code>/p/&lt;projectId&gt;/</code> path segment, or the server's <code>QS_PROJECT</code> mapping)</li>" .
                 "<li>If paths look wrong, check constants in <code>" . PUBLIC_FOLDER_NAME . "/init.php</code></li>" .
                 "</ul>"
             );

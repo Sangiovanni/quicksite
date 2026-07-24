@@ -284,7 +284,6 @@ if (!function_exists('updates_applyZip')) {
 
             // Protect user config files from being overwritten
             $protectedFiles = [
-                'secure/management/config/target.php',
                 'secure/management/config/auth.php',
                 'secure/management/config/roles.php',
             ];

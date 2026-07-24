@@ -8,10 +8,6 @@
  * @version 1.6.0
  */
 
-// C8 8.1 — same tolerance as the panel entry: this AJAX helper backs admin pages, so
-// it must not 503 when no main project is served (see public/admin/index.php).
-define('QS_TOLERATE_NO_SERVED_PROJECT', true);
-
 // ============================================================================
 // C8 8.X — per-request project scoping (F-C8-8.X-1)
 // ============================================================================
@@ -21,16 +17,11 @@ define('QS_TOLERATE_NO_SERVED_PROJECT', true);
 // ran them with NO authorization at all (the resolved $tokenInfo was never used).
 //
 // It now mirrors the management dispatcher exactly (public/management/index.php):
-// defer the project context, peel the project from the URL marker
-// '/admin/api/p/<projectId>/<action>', then authorize the arm's underlying
-// command(s) against THAT project before binding it. Same discipline, same
-// no-oracle 403.
-define('QS_DEFER_PROJECT_CONTEXT', true);
-
-// Peel the marker BEFORE init.php so the project's own public/ can be bound as
-// PUBLIC_CONTENT_PATH — the assets / styles / builds arms read that constant, not
-// PROJECT_PATH, so binding PROJECT_PATH alone would still serve the served
-// project's files. Mirrors public/management/index.php's C9 pre-bind.
+// peel the project from the URL marker '/admin/api/p/<projectId>/<action>', then
+// authorize the arm's underlying command(s) against THAT project before binding it
+// via qs_load_project_context() — which binds PROJECT_PATH *and* PUBLIC_CONTENT_PATH
+// together (C15 15.3), so the assets / styles / builds arms self-scope. Same
+// discipline, same no-oracle 403.
 $__qsApiProject = null;
 {
     $__segs = array_values(array_filter(
@@ -46,14 +37,6 @@ $__qsApiProject = null;
                 $__qsApiProject = $__cand;
             }
             break;
-        }
-    }
-    if ($__qsApiProject !== null && !defined('PUBLIC_CONTENT_PATH')) {
-        $__secure = dirname(__DIR__, 3) . '/secure';
-        require_once $__secure . '/src/functions/projectPublicArtifacts.php';
-        if ($__qsApiProject !== qs_served_project($__secure)
-            && is_dir($__secure . '/projects/' . $__qsApiProject)) {
-            define('PUBLIC_CONTENT_PATH', $__secure . '/projects/' . $__qsApiProject . '/public');
         }
     }
 }
