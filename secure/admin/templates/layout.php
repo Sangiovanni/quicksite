@@ -17,7 +17,7 @@ $assetVersion = '1.0.0';
 // Helper to get versioned asset URL
 $versionedAsset = function($path) use ($baseUrl, $assetVersion) {
     // In development, use filemtime for instant cache invalidation
-    $fullPath = PUBLIC_CONTENT_PATH . '/admin/assets' . $path;
+    $fullPath = ADMIN_ASSET_ROOT . '/admin/assets' . $path;
     if (file_exists($fullPath)) {
         $version = filemtime($fullPath);
     } else {
@@ -47,9 +47,9 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 $globalCommands = getGlobalCommands();
 $currentProject = $isLoginPage ? null : $router->getCurrentProject();   // the project you EDIT (selected_project)
 
-// C9 — the SERVED project (target.php) drives "back to site" + the preview's root-vs-/p/
-// decision; the header picker lists the caller's memberships so they can switch what they edit.
-$servedProject = $isLoginPage ? null : $router->getServedProject();
+// C15 15.2 — the header picker lists the caller's memberships so they can switch what they
+// edit. "Back to site" + the preview now always target /p/<id>/ (the root is free; there is
+// no served-vs-edited branch in the render/preview path any more).
 $myProjectIds = [];
 if (!$isLoginPage) {
     $__pkTok = $router->getToken();
@@ -408,12 +408,11 @@ $langNames = [
             </a>
             <?php endif; ?>
             <?php
-            // C9 — "back to site" shows the project you're EDITING: the site root when that
-            // is the SERVED project (target.php), else surface B (/p/<id>/) from its own
-            // folder. (Lang prefix only when it's the served project — surface B resolves the
-            // edited project's own default language itself.)
+            // C15 15.2 — "back to site" opens the project you're EDITING at its surface-B
+            // view (/p/<id>/, which resolves its own default language). Every project is
+            // reached this way now; the root is free.
             $siteUrl = rtrim($baseUrl, '/') . '/';
-            if ($editingProject && $editingProject !== $servedProject) {
+            if ($editingProject) {
                 $siteUrl .= 'p/' . rawurlencode($editingProject) . '/';
             } elseif (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) {
                 $siteUrl .= (CONFIG['LANGUAGE_DEFAULT'] ?? 'en') . '/';

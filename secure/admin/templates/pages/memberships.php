@@ -73,7 +73,7 @@ window.QS_MEMBERSHIPS_I18N = <?= json_encode([
     'errNoticePending'   => __admin('memberships.request.errNoticePending', 'A notice for this project is still in your inbox — dismiss it first.'),
 ]) ?>;
 </script>
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/memberships.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/memberships.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/memberships.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/memberships.js') ?>"></script>
 
 <div class="admin-page-header">
     <h1 class="admin-page-header__title">

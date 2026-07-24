@@ -30,15 +30,14 @@ $defaultLang = $editConfig['LANGUAGE_DEFAULT'] ?? 'en';
 $languages = $isMultilingual ? ($editConfig['LANGUAGES_SUPPORTED'] ?? [$defaultLang]) : [$defaultLang];
 
 // Get site URL for iframe (start with default language) + ?_editor=1 for editor mode.
-// C9 — the project you EDIT is getCurrentProject() (per-user selected_project). If it is
-// the SERVED project (target.php), preview at the site root (its base materialization);
-// otherwise preview via surface B (/p/<id>/) from that project's own folder. The
-// qs_preview cookie (emitted below, before the iframe) carries the admin's token so a
-// PRIVATE project's iframe — a plain browser navigation with no Authorization header —
-// authenticates against surface B (D3 seam; HttpOnly hardening → C5b).
+// C15 15.2 — the project you EDIT is getCurrentProject() (per-user selected_project); every
+// project previews via surface B (/p/<id>/) from its own folder. The web root is free, so no
+// project previews at the root any more. The qs_preview cookie (emitted below, before the
+// iframe) carries the admin's token so a PRIVATE project's iframe — a plain browser
+// navigation with no Authorization header — authenticates against surface B (D3 seam;
+// HttpOnly hardening → C5b).
 $previewProject = $router->getCurrentProject();          // what you EDIT (selected_project)
-$previewServed  = $router->getServedProject();           // what the site serves (target.php)
-$previewAtRoot  = ($previewProject === null || $previewProject === '' || $previewProject === $previewServed);
+$previewAtRoot  = ($previewProject === null || $previewProject === '');
 $siteUrl = rtrim(BASE_URL, '/') . '/';
 if (!$previewAtRoot) {
     $siteUrl .= 'p/' . rawurlencode($previewProject) . '/';
@@ -154,7 +153,7 @@ if (is_dir($componentsDir)) {
 <?php include __DIR__ . '/preview/modals/add-transition.php'; ?>
 <?php include __DIR__ . '/preview/modals/translate-csv.php'; ?>
 
-<script src="<?= $baseUrl ?>/admin/assets/js/components/colorpicker.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/components/colorpicker.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/components/colorpicker.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/components/colorpicker.js') ?>"></script>
 <?php include __DIR__ . '/preview-config.php'; ?>
 
 </div><!-- End preview-page wrapper -->

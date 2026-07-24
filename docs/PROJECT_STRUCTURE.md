@@ -11,9 +11,11 @@
 ```
 quicksite/
 ├── public/                       # Web root (Apache DocumentRoot points here)
-│   ├── index.php                 # Front controller — routes requests to pages
-│   ├── init.php                  # Bootstrap — defines all path constants
-│   ├── .htaccess                 # URL rewriting (FallbackResource → index.php)
+│   ├── init.php                  # Bootstrap — defines the install-wide path constants
+│   ├── .htaccess                 # No fallback — the web root serves real files only
+│   ├── p/                        # Per-project live views  (/p/<projectId>/)
+│   │   ├── index.php             # Front controller — renders a project from its own folder
+│   │   └── .htaccess             # Routes all /p/* to this index.php
 │   ├── admin/                    # Admin panel UI (HTML/JS/CSS)
 │   ├── management/               # API entry point
 │   │   ├── index.php             # API router — auth, dispatch, logging
@@ -23,9 +25,10 @@ quicksite/
 │   │   ├── font/                 # Font files
 │   │   ├── audio/                # Audio files
 │   │   └── videos/               # Video files
-│   ├── scripts/                  # Core front-end JS
-│   │   ├── qs.js                 # QuickSite runtime (show/hide, sort, routing)
+│   ├── scripts/                  # Generated client-side config (the qs-*.js trio)
 │   │   └── qs-api-config.js      # Client-side API endpoint configuration
+│   │                             # (the shared qs.js runtime is engine-owned —
+│   │                             #  secure/src/runtime/qs.js, served per project)
 │   ├── style/                    # Site styles
 │   │   ├── style.css             # Main stylesheet (editable via API)
 │   │   └── index.php             # Style route handler
@@ -87,7 +90,7 @@ quicksite/
 - **`public/management/`** is the API gateway. Any client (admin panel, curl, Flutter app, custom UI) talks to QuickSite through this endpoint.
 - **`public/scripts/`** contains the core JS runtime. `qs.js` handles front-end features like show/hide triggers, sorting, and dynamic behavior.
 - **`secure/management/config/`** holds sensitive files (tokens, auth) that are gitignored. They are auto-created from `.example` templates on first load.
-- **Projects** are fully isolated in `secure/projects/`. Each has its own pages, translations, routes, and assets. Change which one you are *editing* with `setSelectedProject` (the admin header picker); change which one is *served at the site root* with `switchProject` (owner-only).
+- **Projects** are fully isolated in `secure/projects/`. Each has its own pages, translations, routes, and assets, and each is served from its own folder under its own `/p/<projectId>/` view — no project is privileged. Change which one you are *editing* with `setSelectedProject` (the admin header picker).
 
 ## Folder customization
 

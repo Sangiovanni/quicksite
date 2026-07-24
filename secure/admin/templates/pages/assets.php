@@ -11,7 +11,7 @@
 $baseUrl = rtrim(BASE_URL, '/');
 ?>
 
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/assets.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/assets.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/assets.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/assets.js') ?>"></script>
 
 <div class="asset-page">
 

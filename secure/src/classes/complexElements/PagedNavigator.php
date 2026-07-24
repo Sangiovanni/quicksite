@@ -4,7 +4,7 @@
  *
  * Emits a numbered-page navigator bound to a state store — a `<nav>`
  * with no inner content at build time; the runtime
- * (`[data-state-pagenav]` binding in `public/scripts/qs.js`) populates
+ * (`[data-state-pagenav]` binding in `secure/src/runtime/qs.js`) populates
  * buttons whenever the bound store updates:
  *
  *   <nav class="paged-nav" [id="<navId>"]

@@ -222,9 +222,9 @@ The visual editor is the panel's flagship feature. It runs as a sidebar UI in th
 
 ### 8.0 Which project the editor edits
 
-The panel edits one project at a time — the user's **selected project** (a per-user preference; ARCHITECTURE §6). The header carries a **project picker** listing the projects the user is a member of; changing it calls `setSelectedProject` and does a cache-busted reload, so the header badge, the editor's command target, and the preview iframe all follow together. The dashboard's project switch calls the same command. Switching what you edit **never** changes the **main project** served at the site root — that is a separate deploy-level action (`switchProject`).
+The panel edits one project at a time — the user's **selected project** (a per-user preference; ARCHITECTURE §6). The header carries a **project picker** listing the projects the user is a member of; changing it calls `setSelectedProject` and does a cache-busted reload, so the header badge, the editor's command target, and the preview iframe all follow together. The dashboard's project switch calls the same command.
 
-The preview iframe loads the edited project in editor mode: the **main project** at the site root (`/?_editor=1`), any **other** project through its per-project live view (`/p/<id>/?_editor=1`). Private projects authenticate via a short-lived HttpOnly `qs_preview` cookie the panel sets from the caller's token. The iframe URL carries a per-load cache-buster so a switch always loads the new project fresh — the editor's command target and the iframe DOM can never drift onto different projects.
+The preview iframe loads the edited project in editor mode through its per-project live view (`/p/<id>/?_editor=1`) — the same way for every project, since none is privileged. "Back to site" and the floating miniplayer resolve to that same view. Private projects authenticate via a short-lived HttpOnly `qs_preview` cookie the panel sets from the caller's token. The iframe URL carries a per-load cache-buster so a switch always loads the new project fresh — the editor's command target and the iframe DOM can never drift onto different projects.
 
 ### 8.1 Modes
 
@@ -955,7 +955,7 @@ See `component-command-card.json` for a worked example.
 **Runtime flow**
 
 ```
-QS.fetch resolves the endpoint                  (public/scripts/qs.js)
+QS.fetch resolves the endpoint                  (secure/src/runtime/qs.js)
    ↓
 applyBindings(data, responseBindings)
    ↓  binding.renderMode === 'componentList'
@@ -1083,7 +1083,7 @@ should re-trigger one of those after a language switch.
 **Runtime flow**
 
 ```
-QS.fetch resolves                                (public/scripts/qs.js)
+QS.fetch resolves                                (secure/src/runtime/qs.js)
    ↓
 applyBindings(data, responseBindings)
    ↓  binding.renderMode === 'count'
@@ -1531,7 +1531,7 @@ Any additional languages your project ships need the same shape.
 
 | Concern | Where |
 |---|---|
-| Runtime verbs | `public/scripts/qs.js` (search for `QS.exchangeMagicLink`, `QS.requestMagicLink`, `QS.logoutServer`) |
+| Runtime verbs | `secure/src/runtime/qs.js` (search for `QS.exchangeMagicLink`, `QS.requestMagicLink`, `QS.logoutServer`) |
 | Catalog metadata | `secure/src/functions/qsVerbCatalog.php` |
 | Async-chain wrapping | `secure/src/classes/CallTransformer.php` `CHAIN_AWAITABLE` |
 | Lifecycle events | `qs:auth:exchange-started` / `qs:auth:exchange-failed` on `document`; cleared by `qs:auth:saved` / `qs:auth:cleared` |
@@ -1674,7 +1674,7 @@ guard.
 | Server-side handler | `secure/src/classes/OAuthHandler.php` |
 | State + session storage | `secure/src/functions/oauthStateStore.php` (PHP-session-backed; swappable abstraction) |
 | Resolver kind registration + validation | `secure/src/functions/resolverHelpers.php` (`oauth-start` / `oauth-callback` / `oauth-logout` in `RESOLVER_ALLOWED_KINDS`) |
-| Dispatcher | `public/index.php` OAuth branch (substitutes `{:routeParam}` placeholders, dispatches to handleStart / handleCallback / handleLogout) |
+| Dispatcher | `public/p/index.php` OAuth branch (substitutes `{:routeParam}` placeholders, dispatches to handleStart / handleCallback / handleLogout) |
 | Provider presets | `secure/admin/config/oauth-presets.json` (admin catalogue) + per-project `data/oauth-presets.json` (override) |
 | Provider credentials | `secure/admin/config/oauth-secrets.php` (admin fallback) + per-project `data/oauth-secrets.json` (primary) |
 | Provider listing | `secure/management/command/listOAuthProviders.php` (union of admin + per-project, with per-provider setup status) |

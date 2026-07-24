@@ -1,0 +1,7 @@
+# C15 15.2 — the QuickSite project renderer namespace. Every /p/<projectId>/... request
+# that is not a real static file is funnelled to the relocated renderer (public/p/index.php),
+# which scopes the view to that project's own secure/projects/<id>/public/ folder (surface B).
+# A self-contained namespace, exactly like /admin/, /admin/api/ and /management/.
+RewriteEngine On
+
+FallbackResource /p/index.php

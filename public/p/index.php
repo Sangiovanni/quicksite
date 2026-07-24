@@ -1,11 +1,15 @@
 <?php
-// C9 surface B — intercept `/p/<projectId>/` BEFORE init.php binds the GLOBAL served
-// project, so a project view is scoped to its own secure/projects/<id>/public/ folder.
-// No-op for every non-/p/ request. (secure/src/functions/surfaceB.php)
-require_once __DIR__ . '/../secure/src/functions/surfaceB.php';
+// C15 15.2 — QuickSite project RENDERER, relocated to public/p/ so it owns ONLY the
+// /p/<projectId>/ namespace (public/p/.htaccess funnels /p/ here). The web ROOT is now
+// free — no FallbackResource — so a user's own hand-made site can live there and
+// QuickSite never squats the domain root.
+//
+// C9 surface B — intercept `/p/<projectId>/` BEFORE init.php, so a project view is scoped
+// to its own secure/projects/<id>/public/ folder. (secure/src/functions/surfaceB.php)
+require_once __DIR__ . '/../../secure/src/functions/surfaceB.php';
 qs_surface_b_maybe_handle();
 
-require_once 'init.php';
+require_once __DIR__ . '/../init.php';
 
 // C9 surface B — with the project context deferred above, bind it to the /p/ project
 // now, then finish (gate visibility, serve a static asset, or set up the HTML render).
@@ -13,6 +17,12 @@ if (defined('QS_SURFACE_B_PROJECT')) {
     qs_load_project_context(QS_SURFACE_B_PROJECT, true);
     qs_surface_b_finish();
 }
+
+// C15 15.2 — tier-2 render bootstrap: the public-base resolution SEAM. Required ONLY by
+// this renderer (tier 1 = init.php's install-wide constants, shared by every entry point).
+// qs_resolve_public_base() returns today's value now; 15.4 wires R1's 3-tier public-base
+// resolution + root-relative default there, and migrates the render path's BASE_URL reads.
+require_once __DIR__ . '/../../secure/src/functions/renderBootstrap.php';
 
 // --- Component Preview Mode (for Visual Editor) ---
 // If ?_component={name}&_editor=1 is present, render just the component in isolation

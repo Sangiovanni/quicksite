@@ -1,5 +1,8 @@
+# C15 15.2 — the web ROOT is deliberately FREE: no FallbackResource, so a request that is
+# not a real file is NOT funnelled into QuickSite. A user's own hand-made site can live at
+# the root and QuickSite never squats the domain. The engine's namespaces each keep their
+# own per-directory .htaccess: /p/ (the project renderer), /admin/, /admin/api/, /management/.
 RewriteEngine On
-FallbackResource /index.php
 
 # Security headers for static assets (CSS, JS, images, fonts, etc.)
 <IfModule mod_headers.c>

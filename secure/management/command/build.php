@@ -603,8 +603,12 @@ if (!($enumsSyncResult['ok'] ?? false)) {
         ->send();
 }
 
-// Copy qs.js (required for all interaction/event functionality)
-$qsJsSource = PUBLIC_CONTENT_PATH . '/scripts/qs.js';
+// Copy qs.js (required for all interaction/event functionality).
+// C15 15.2: read the shared ENGINE runtime from its engine-owned home, NOT from the
+// project's own public/ (PUBLIC_CONTENT_PATH). A non-served project's PUBLIC_CONTENT_PATH
+// is its own public/, which has no qs.js — so building a non-served project silently
+// shipped a build with no qs.js. Sourcing the engine copy fixes that.
+$qsJsSource = SECURE_FOLDER_PATH . '/src/runtime/qs.js';
 if (file_exists($qsJsSource)) {
     if (!copy($qsJsSource, $scriptsDir . '/qs.js')) {
         release_build_lock();

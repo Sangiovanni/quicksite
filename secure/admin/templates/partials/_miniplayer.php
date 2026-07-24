@@ -8,15 +8,13 @@
  * @version 1.0.0
  */
 
-// Get site URL for iframe — the project the user EDITS (same rule as the main
-// editor preview): the site root when it is the SERVED project, else its
-// surface-B view (/p/<id>/, which resolves its own default language). The
-// miniplayer auto-reloads after every command, so it must show the project the
-// commands actually target, not the served one.
+// Get site URL for iframe — the project the user EDITS. C15 15.2: every project shows via
+// its surface-B view (/p/<id>/, which resolves its own default language). The miniplayer
+// auto-reloads after every command, so it must show the project the commands actually
+// target; the root is free, so no project shows at the root.
 $mpEditing = $router->getCurrentProject();
-$mpServed  = $router->getServedProject();
 $miniplayerSiteUrl = rtrim(BASE_URL, '/') . '/';
-if ($mpEditing !== null && $mpEditing !== '' && $mpEditing !== $mpServed) {
+if ($mpEditing !== null && $mpEditing !== '') {
     $miniplayerSiteUrl .= 'p/' . rawurlencode($mpEditing) . '/';
 } elseif (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) {
     $miniplayerDefaultLang = CONFIG['LANGUAGE_DEFAULT'] ?? 'en';
@@ -75,4 +73,4 @@ $miniplayerSiteUrl .= '?_editor=1';
 </div>
 
 <!-- Miniplayer JavaScript -->
-<script src="<?= $baseUrl ?>/admin/assets/js/components/miniplayer.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/components/miniplayer.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/components/miniplayer.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/components/miniplayer.js') ?>"></script>

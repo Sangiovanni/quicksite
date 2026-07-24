@@ -11,8 +11,8 @@
 $baseUrl = rtrim(BASE_URL, '/');
 ?>
 
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/dashboard.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/dashboard.js') ?>"></script>
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/dashboard-memberships.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/dashboard-memberships.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/dashboard.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/dashboard.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/dashboard-memberships.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/dashboard-memberships.js') ?>"></script>
 
 <div class="admin-page-header">
     <h1 class="admin-page-header__title"><?= __admin('dashboard.title') ?></h1>

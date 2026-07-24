@@ -2,7 +2,7 @@
  * Paged navigator wizard — kind 'paged-navigator'.
  *
  * Emits a <nav class="paged-nav"> bound to a state store; the runtime
- * (`[data-state-pagenav]` binding in `public/scripts/qs.js`) populates
+ * (`[data-state-pagenav]` binding in `secure/src/runtime/qs.js`) populates
  * the numbered buttons + Prev/Next chevrons every time the store
  * updates. Hides itself when totalPages is missing or ≤ 1.
  *

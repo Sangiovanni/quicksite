@@ -12,7 +12,7 @@
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
-$libBase = PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/lib/';
+$libBase = ADMIN_ASSET_ROOT . '/admin/assets/js/pages/ai/lib/';
 ?>
 
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/ai/lib/provider-catalog.js?v=<?= filemtime($libBase . 'provider-catalog.js') ?>"></script>
@@ -21,7 +21,7 @@ $libBase = PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/lib/';
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/ai/lib/stream-parsers.js?v=<?= filemtime($libBase . 'stream-parsers.js') ?>"></script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/ai/lib/ai-call.js?v=<?= filemtime($libBase . 'ai-call.js') ?>"></script>
 
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/ai/ai-connections.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/ai-connections.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/ai/ai-connections.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/ai/ai-connections.js') ?>"></script>
 
 <div class="admin-page-header">
     <h1 class="admin-page-header__title">

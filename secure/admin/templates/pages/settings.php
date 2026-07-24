@@ -8,7 +8,7 @@
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
-$versionFile = dirname(PUBLIC_CONTENT_PATH) . '/VERSION';
+$versionFile = dirname(ADMIN_ASSET_ROOT) . '/VERSION';
 $version = file_exists($versionFile) ? trim(file_get_contents($versionFile)) : 'unknown';
 ?>
 
@@ -20,7 +20,7 @@ window.QUICKSITE_CONFIG.commandUrl = '<?= $router->getBaseUrl() ?>/command';
 window.QUICKSITE_CONFIG.aiSettingsUrl = '<?= $router->url('ai-settings') ?>';
 window.QUICKSITE_CONFIG.quicksiteVersion = '<?= htmlspecialchars($version, ENT_QUOTES) ?>';
 </script>
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/settings.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/settings.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/settings.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/settings.js') ?>"></script>
 
 <div class="admin-page-header">
     <h1 class="admin-page-header__title"><?= __admin('settings.title') ?></h1>

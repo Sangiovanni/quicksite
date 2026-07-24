@@ -102,7 +102,7 @@ $baseUrl = rtrim(BASE_URL, '/');
 </div>
 
 <!-- Command page JavaScript -->
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/command.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/command.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/command.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/command.js') ?>"></script>
 
 <?php elseif ($currentTab === 'history'): ?>
 <!-- ==================== HISTORY TAB ==================== -->
@@ -112,7 +112,7 @@ $baseUrl = rtrim(BASE_URL, '/');
 window.QUICKSITE_CONFIG = window.QUICKSITE_CONFIG || {};
 window.QUICKSITE_CONFIG.commandUrl = '<?= $router->url('command') ?>';
 </script>
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/history.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/history.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/history.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/history.js') ?>"></script>
 
 <!-- Filters -->
 <div class="admin-card" style="margin-bottom: var(--space-lg);">

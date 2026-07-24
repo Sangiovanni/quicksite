@@ -14,7 +14,7 @@ $baseUrl = rtrim(BASE_URL, '/');
 window.QUICKSITE_CONFIG = window.QUICKSITE_CONFIG || {};
 window.QUICKSITE_CONFIG.baseUrl = '<?= $baseUrl ?>/management';
 </script>
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/embed-security.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/embed-security.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/embed-security.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/embed-security.js') ?>"></script>
 
 <div class="admin-page-header">
     <h1><?= __admin('embedSecurity.title') ?></h1>

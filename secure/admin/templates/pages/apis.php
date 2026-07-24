@@ -11,8 +11,8 @@
 $baseUrl = rtrim(BASE_URL, '/');
 ?>
 
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/api-import/openapi-converter.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/api-import/openapi-converter.js') ?>"></script>
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/apis.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/apis.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/api-import/openapi-converter.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/api-import/openapi-converter.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/apis.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/apis.js') ?>"></script>
 
 <div class="admin-page-header">
     <h1 class="admin-page-header__title">

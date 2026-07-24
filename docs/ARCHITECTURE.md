@@ -32,7 +32,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
                            ▼
                ┌──────────────────────┐
                │      public/         │  Apache DocumentRoot only
-               │  index.php · init.php│
+               │init.php · p/index.php│
                │  admin/ · style/ · …│
                └──────────┬───────────┘
                           │ require_once
@@ -53,7 +53,7 @@ The split between `public/` and `secure/` is the **security boundary** (see §7)
 
 ## 2. Project layer — data model
 
-A project is a self-contained website on disk. One QuickSite installation can host multiple projects; one is "active" at any time, pointed to by `secure/management/config/target.php`.
+A project is a self-contained website on disk. One QuickSite installation can host multiple projects; each is served independently from its own folder under its own `/p/<projectId>/` view (§6), and the admin panel edits one of them at a time (§7).
 
 ```
 secure/projects/{name}/
@@ -246,18 +246,29 @@ Components are inlined at parse time. `{{var}}` placeholders inside a component 
 
 ### 5.1 Public site request
 
+Every project is served under `/p/<projectId>/`, from its own folder. The web root is
+deliberately **free**: QuickSite installs no fallback there, so an operator can put their own
+site at the domain root. A production deployment maps a domain onto one project in its own
+web-server config (§6) rather than QuickSite choosing a privileged project.
+
 ```
-GET /fr/about
+GET /p/mysite/fr/about
   │
-  ▼  Apache .htaccess → public/index.php
+  ▼  Apache public/p/.htaccess → public/p/index.php
   │
-init.php
-  ├── defines PUBLIC_FOLDER_ROOT, SECURE_FOLDER_PATH
-  ├── reads target.php → active project name
+surfaceB  (runs first, before init.php)
+  ├── detects /p/<projectId>/ and gates it by visibility + membership
+  └── points PUBLIC_CONTENT_PATH + BASE_URL at that project's own public/
+  │
+init.php  (install-wide constants — shared by every entry point)
+  ├── defines PUBLIC_FOLDER_ROOT, SECURE_FOLDER_PATH, ADMIN_ASSET_ROOT
+  └── project context is deferred; the request binds its own project
+  │
+qs_load_project_context(<projectId>)
   ├── loads project config.php → CONFIG
   └── loads project routes.php → ROUTES
   │
-index.php
+public/p/index.php
   ├── checks aliases (data/aliases.json) → may redirect
   ├── TrimParameters parses URL → (lang, route, params)  ── see §5.3
   ├── validates route ∈ ROUTES (else 404)
@@ -270,7 +281,9 @@ Page template
   └── Page::render() emits <!doctype>, <head>, menu, body, footer
 ```
 
-A request under `/p/<projectId>/` (the per-project live view, §6) is intercepted at the top of `public/index.php` — before `init.php` binds the main project — and scoped to that project's own folder: it gates access by visibility + membership, then either live-renders the page through the same pipeline above or serves a static sub-resource through the prefix-checked passthrough (§7). The main project keeps rendering exactly as shown.
+A request for a **static sub-resource** under `/p/<projectId>/` — an image, a stylesheet, or the
+shared `qs.js` runtime — is served by the same entry point through a prefix-checked passthrough
+that cannot escape that project's `public/` folder (§7).
 
 ### 5.2 Management API request
 
@@ -365,11 +378,12 @@ secure/projects/
 └── documentation/
 ```
 
-A project is reachable three ways — the **three surfaces**:
+A project is reachable two ways — the **two surfaces**:
 
-- **Main site (root).** `secure/management/config/target.php` names one **main project**, served at the site root (`/`, or under a configured URL space). Its `assets/`, `style/`, `build/` and `sitemap.txt` are materialised into the live `public/` folder so the root site matches — the only surface that materialises anything. Setting the main project is `switchProject`, which is **owner-only and project-scoped**: it is targeted as `/management/p/<projectId>/switchProject`, so only an owner of that project may make it the served main. Deleting the project that is currently served clears the pointer rather than promoting another project — the next main is always chosen deliberately.
-- **Per-project live view — `/p/<projectId>/`.** Every *other* project is live-rendered from its own `secure/projects/<id>/public/` folder under `/p/<projectId>/`, with no materialisation. The HTML runs through the same renderer as the main site; static sub-resources (style, scripts, images, fonts) are served through a canonicalised, prefix-checked passthrough that exposes **only** that project's `public/` subtree (§7). `/p/<mainProject>/` redirects to the root. The `/p/` prefix keeps a project view from ever shadowing a main-site route.
-- **Visual editor.** The admin panel edits one project at a time — the main project at the root, any other via its `/p/<id>/` view in editor mode.
+- **Per-project live view — `/p/<projectId>/`.** Every project is live-rendered from its own `secure/projects/<id>/public/` folder under `/p/<projectId>/`. No project is privileged: they are all served the same way, from their own folder, with nothing materialised elsewhere. The HTML runs through the shared renderer; static sub-resources (style, scripts, images, fonts) are served through a canonicalised, prefix-checked passthrough that exposes **only** that project's `public/` subtree (§7). Access is gated by the project's visibility and the caller's membership — a private project answers the same refusal to a non-member as to a stranger, so membership is never leaked.
+- **Visual editor.** The admin panel edits one project at a time, previewing it through that project's `/p/<id>/` view in editor mode.
+
+The **web root carries no QuickSite fallback**: it serves real files only. Nothing is rendered there, so an operator can place their own hand-made site at the domain root without QuickSite squatting it.
 
 **Project visibility.** Each project's `config/members.json` carries a `visibility` flag:
 
@@ -489,7 +503,7 @@ server-side from per-project `data/api-endpoints.json`.
 | Storage (per project) | `secure/projects/<project>/data/api-endpoints.json` |
 | Server class | `secure/src/classes/ApiEndpointManager.php` |
 | Public bundle | `public/scripts/qs-api-config.js` (auto-regenerated on every `addApi` / `editApi` / `deleteApi`) |
-| Runtime | `public/scripts/qs.js` → `QS.fetch` |
+| Runtime | `secure/src/runtime/qs.js` → `QS.fetch` |
 | Admin UI | `/admin/apis` — see [ADMIN_PANEL.md §9.1](ADMIN_PANEL.md). |
 
 **Path templating**: endpoint `path` may contain `:placeholder`
@@ -603,7 +617,7 @@ infinite scroll, and is the client half of the server-side data resolver
 | Storage (per project, keyed by route then store id) | `secure/projects/<project>/data/state-stores.json` |
 | Server class | `secure/src/classes/StateStoreManager.php` |
 | Read / write commands | `getStateStores` (read) / `setStateStores` (editStructure) |
-| Runtime | `public/scripts/qs.js` → `QS._stores`, `QS.setState`, `QS.getState`, `QS.fetchState` |
+| Runtime | `secure/src/runtime/qs.js` → `QS._stores`, `QS.setState`, `QS.getState`, `QS.fetchState` |
 | Page emit — live | `secure/src/classes/PageManagement.php` → `window.QS_STATE_STORES` |
 | Page emit — built | `secure/src/classes/JsonToPhpCompiler.php` → `Page.php` (baked inline at build) |
 | Admin UI | `/admin` visual editor → JS mode → "State stores" — see [ADMIN_PANEL.md §9.6](ADMIN_PANEL.md). |
@@ -714,7 +728,7 @@ crawlers are even more conservative about running JS).
 | Storage + validation helpers | `secure/src/functions/resolverHelpers.php` |
 | File-based cache + observability | `secure/src/functions/resolverCache.php` + `X-QS-Resolver-Cache` header |
 | Commands | `setRouteResolver` (set / clear / patch / append / remove), `cleanResolverCache` |
-| Lifecycle position | `public/index.php` — AFTER auth gate (yes/no), BEFORE template render (`DataResolver::resolveMany()` fires once per request) |
+| Lifecycle position | `public/p/index.php` — AFTER auth gate (yes/no), BEFORE template render (`DataResolver::resolveMany()` fires once per request) |
 | Hydration handoff | `secure/src/classes/PageManagement.php` → `window.QS_RESOLVED` (store-keyed for state-store skip-fetch) + `window.QS_RESOLVED_BY_INDEX` (resolver-index-keyed mirror of PHP `$r0` / `$r1`) |
 | Admin UI | `/admin/sitemap` context menu — list view + per-config modal — see [ADMIN_PANEL.md §9.7](ADMIN_PANEL.md). |
 

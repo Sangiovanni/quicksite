@@ -12,7 +12,7 @@ $baseUrl = rtrim(BASE_URL, '/');
 
 // CSS Refiner JS lib files (loaded order matters)
 $libBase = $baseUrl . '/admin/assets/js/lib/css-refiner';
-$libPath  = PUBLIC_CONTENT_PATH . '/admin/assets/js/lib/css-refiner';
+$libPath  = ADMIN_ASSET_ROOT . '/admin/assets/js/lib/css-refiner';
 
 $libFiles = [
     'constants.js',         // CSSRefiner.CONST — must load first
@@ -46,7 +46,7 @@ $libReady = file_exists($libPath . '/css-parser.js');
     <?php endforeach; ?>
 <?php endif; ?>
 
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/optimize.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/optimize.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/optimize.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/optimize.js') ?>"></script>
 
 <div class="optimize-page" data-lib-ready="<?= $libReady ? 'true' : 'false' ?>">
 

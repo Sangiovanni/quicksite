@@ -12,11 +12,12 @@
 /**
  * Generate nginx location block content for QuickSite routing
  * 
- * Creates 4 location blocks in order of specificity:
+ * Creates 5 location blocks in order of specificity:
  *   1. /prefix/admin/api/    — Admin panel AJAX helper
- *   2. /prefix/management/   — Management API (108 commands)
+ *   2. /prefix/management/   — Management API
  *   3. /prefix/admin/        — Admin panel
- *   4. /prefix/              — Public site (catch-all)
+ *   4. /prefix/p/            — Project renderer (surface B, /p/<id>/)
+ *   5. /prefix/              — Public root (FREE — no QuickSite fallback; C15 15.2)
  * 
  * @param string $publicFolderSpace URL prefix (e.g., 'quicksite/test' or '')
  * @return string Nginx configuration content
@@ -60,11 +61,22 @@ function generate_nginx_config(string $publicFolderSpace): string {
     $config .= "    try_files \$uri \$uri/ {$prefix}/admin/index.php\$is_args\$args;\n";
     $config .= "}\n\n";
 
-    // Public site catch-all
+    // Project renderer (surface B) — C15 15.2. Each project is served from its own
+    // folder at /p/<projectId>/. Longer prefix than the root block below, so nginx
+    // routes /p/... here.
+    $config .= "# Project renderer (/p/<projectId>/ — each project served from its own folder)\n";
+    $config .= "location {$prefix}/p/ {\n";
+    $config .= "    try_files \$uri \$uri/ {$prefix}/p/index.php\$is_args\$args;\n";
+    $config .= "}\n\n";
+
+    // Public root — DELIBERATELY FREE (C15 15.2). No fallback into QuickSite: the root
+    // serves real static files only (a user's own hand-made site), 404 otherwise. The
+    // renderer lives at /p/ above; a mapped production domain adds its OWN root fallback
+    // in its vhost (never in this shared, install-wide file).
     $locationPath = $prefix !== '' ? "{$prefix}/" : '/';
-    $config .= "# Public site (catch-all for QuickSite routes)\n";
+    $config .= "# Public root — free for the user's own site (no QuickSite fallback)\n";
     $config .= "location {$locationPath} {\n";
-    $config .= "    try_files \$uri \$uri/ {$prefix}/index.php\$is_args\$args;\n";
+    $config .= "    try_files \$uri \$uri/ =404;\n";
     $config .= "}\n";
 
     return $config;

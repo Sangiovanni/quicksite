@@ -17,13 +17,30 @@ if(!defined('PUBLIC_FOLDER_SPACE')){
     define('PUBLIC_FOLDER_SPACE', '');
 }
 
-// PUBLIC_CONTENT_PATH = the live directory where site content lives (style/, assets/, scripts/)
+// PUBLIC_CONTENT_PATH = the live directory where the RENDERED site's content lives
+// (style/, assets/, scripts/). This is a RENDER-SCOPED value: surfaceB (a /p/<id>/ view),
+// the management dispatcher (/management/p/<id>/) and the admin-api dispatcher each
+// pre-define it to the targeted project's OWN public/ BEFORE this file runs. The
+// definition here is the FALLBACK base for requests that did NOT pre-scope it (a global
+// management command, an admin-panel page). C15 15.2: this tier-1 fallback stays for now;
+// it becomes redundant in 15.3 once every path pre-scopes unconditionally.
 // When a space is defined (e.g. 'quicksite'), content is at PUBLIC_FOLDER_ROOT/quicksite/
 // When no space is used, content is at PUBLIC_FOLDER_ROOT directly
 if (!defined('PUBLIC_CONTENT_PATH')) {
-    define('PUBLIC_CONTENT_PATH', PUBLIC_FOLDER_SPACE !== '' 
-        ? PUBLIC_FOLDER_ROOT . '/' . PUBLIC_FOLDER_SPACE 
+    define('PUBLIC_CONTENT_PATH', PUBLIC_FOLDER_SPACE !== ''
+        ? PUBLIC_FOLDER_ROOT . '/' . PUBLIC_FOLDER_SPACE
         : PUBLIC_FOLDER_ROOT);
+}
+
+// ADMIN_ASSET_ROOT = where the admin panel's OWN chrome assets live (public/admin/assets/…).
+// C15 15.2: deliberately SEPARATE from PUBLIC_CONTENT_PATH. The panel filemtime()s its own
+// JS/CSS for cache-busting; those assets sit at the web root (public/admin/assets/) — always,
+// regardless of the content space AND regardless of which project the panel edits. Once the
+// panel binds the EDITED project (15.3), PUBLIC_CONTENT_PATH becomes that project's own
+// public/, so the panel must read its chrome from THIS install-scoped constant, not from the
+// render-scoped PUBLIC_CONTENT_PATH. Always the DOCUMENT_ROOT (public/), never space-prefixed.
+if (!defined('ADMIN_ASSET_ROOT')) {
+    define('ADMIN_ASSET_ROOT', PUBLIC_FOLDER_ROOT);
 }
 
 if(!defined('SERVER_ROOT')){
@@ -107,7 +124,10 @@ if (!is_dir(SECURE_FOLDER_PATH)) {
 // FIRST-INSTALL: Auto-create config files from .example templates
 // ============================================================================
 $configDir = SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'management' . DIRECTORY_SEPARATOR . 'config';
-foreach (['target.php', 'auth.php', 'roles.php'] as $configFile) {
+// C15 15.2: 'target.php' (the served-project pointer) is being retired — a fresh install no
+// longer auto-creates it. The read of target.php still lives below (deleted in 15.3); existing
+// installs keep their file. auth.php + roles.php remain first-install essentials.
+foreach (['auth.php', 'roles.php'] as $configFile) {
     $configFilePath = $configDir . DIRECTORY_SEPARATOR . $configFile;
     $examplePath = $configFilePath . '.example';
     if (!file_exists($configFilePath) && file_exists($examplePath)) {

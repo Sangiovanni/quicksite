@@ -2,12 +2,12 @@
 /**
  * surfaceB.php (beta.10 C9) — `/p/<projectId>/` live project view + static passthrough.
  *
- * Surface B (AUTH_REWORK §5.5): the WIP site of a NON-reserved project, live-rendered
- * from `secure/projects/<id>/public/` + templates by the existing engine, and served
- * under `/p/<id>/`. The reserved base project `quicksite` is served at the site ROOT
- * (BASE_URL/) instead — `/p/quicksite/` 301-redirects there (D6).
+ * Surface B (AUTH_REWORK §5.5): the live WIP site of a project, rendered from
+ * `secure/projects/<id>/public/` + templates by the existing engine, and served under
+ * `/p/<id>/`. C15 15.2: EVERY project is reached this way — there is no privileged root
+ * project any more, and the web root is free (the renderer lives at public/p/index.php).
  *
- * Two-part flow, wired into public/index.php:
+ * Two-part flow, wired into public/p/index.php:
  *   1. qs_surface_b_maybe_handle()  — runs FIRST, BEFORE init.php. Detects a /p/<id>/
  *      request (existence-based, so an optional PUBLIC_FOLDER_SPACE prefix that we
  *      cannot read pre-init does not matter), and overrides the base-derived constants
@@ -17,7 +17,7 @@
  *      Enforces visibility + membership (L11/§8.4), then either serves a static asset
  *      through the L11 canonicalise+prefix-checked passthrough (secrets UNREACHABLE),
  *      or sets up the HTML live-render (freshness/backfill of qs-*.js, CSP header,
- *      REQUEST_URI rewrite) and returns so public/index.php's normal pipeline renders.
+ *      REQUEST_URI rewrite) and returns so public/p/index.php's normal pipeline renders.
  *
  * L11: the static passthrough serves ONLY files inside `…/public/`; `config/`
  * (members.json), `data/` (api-endpoints.json), `routes.php`, `config.php`,
@@ -111,16 +111,11 @@ function qs_surface_b_maybe_handle(): void {
 
     $id = rawurldecode($segs[$idIndex + 1]);
 
-    // The SERVED project (target.php, dynamic) is served at the ROOT, not /p/ — 301 to the
-    // root-equivalent path (strip the optional-space + p + id marker, keep the rest). D6.
-    if ($id === qs_served_project($secure)) {
-        $spaceSegs = array_slice($segs, 0, $idIndex);       // whatever preceded 'p' (space)
-        $rest      = array_slice($segs, $idIndex + 2);       // after the id
-        $target    = '/' . implode('/', array_merge($spaceSegs, $rest));
-        $query     = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_QUERY);
-        header('Location: ' . $target . ($query ? '?' . $query : ''), true, 301);
-        exit;
-    }
+    // C15 15.2: the renderer no longer reads the served concept. Every project — including
+    // the (still-existing) target.php project — is rendered here at /p/<id>/; there is no
+    // special-case 301 to a root that is now free. The served pointer + qs_served_project()
+    // remain for the management/admin paths until 15.3 retires them, but the RENDER path
+    // is fully decoupled from "which project is served".
 
     // ---- visibility + membership gate (§8.4) — PRE-INIT deliberately ------------
     // Denying BEFORE the constant overrides means a refused request falls through
@@ -188,9 +183,11 @@ function qs_surface_b_finish(): void {
     // ---- static passthrough (L11) ------------------------------------------------
     if ($subpath !== '') {
         // qs.js is the shared ENGINE runtime, identical for every project — serve the
-        // canonical copy, never a per-project file (D4).
+        // canonical copy, never a per-project file (D4). C15 15.2: the canonical copy
+        // is engine-owned at secure/src/runtime/qs.js (unshadowable by a user file at
+        // the now-free web root); it is reachable ONLY through this passthrough.
         if ($subpath === 'scripts/qs.js') {
-            qs_sb_send_file($sb['serverRoot'] . '/public/scripts/qs.js');
+            qs_sb_send_file($sb['serverRoot'] . '/secure/src/runtime/qs.js');
         }
         $resolved = qs_surface_b_resolve_static($projectDir . '/public', $subpath);
         if (isset($resolved['file'])) {

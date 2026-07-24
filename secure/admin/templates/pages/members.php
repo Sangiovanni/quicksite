@@ -115,7 +115,7 @@ window.QS_MEMBERS_I18N = <?= json_encode([
     'transferredMsg'   => __admin('members.transfer.doneMsg', 'Ownership transferred'),
 ]) ?>;
 </script>
-<script src="<?= $baseUrl ?>/admin/assets/js/pages/members.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/members.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/members.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/members.js') ?>"></script>
 
 <div class="admin-page-header">
     <h1 class="admin-page-header__title">

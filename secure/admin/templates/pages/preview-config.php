@@ -735,46 +735,46 @@ window.PreviewConfig = {
 </script>
 
 <!-- Preview JavaScript Modules (load order matters) -->
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-state.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-state.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-navigation.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-navigation.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-theme.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-theme.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-motion.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-motion.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-selectors.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-selectors.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-editor.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-editor.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-state.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-state.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-navigation.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-navigation.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-theme.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-style-theme.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-motion.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-style-motion.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-selectors.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-style-selectors.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-editor.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-style-editor.js') ?>"></script>
 <!-- A3 lib/code-editor — order matters: core widget first, tokenizers register on top -->
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/lib/code-editor/code-editor.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/lib/code-editor/code-editor.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/lib/code-editor/css-tokenizer.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/lib/code-editor/css-tokenizer.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/lib/code-editor/code-editor.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/lib/code-editor/code-editor.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/lib/code-editor/css-tokenizer.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/lib/code-editor/css-tokenizer.js') ?>"></script>
 <!-- A3-companion Motion Slice 3 lib — cubic-bezier easing picker -->
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/lib/easing-picker/easing-picker.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/lib/easing-picker/easing-picker.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-source.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-style-source.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-js-interactions.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-js-interactions.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-translation.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-translation.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/lib/easing-picker/easing-picker.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/lib/easing-picker/easing-picker.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-source.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-style-source.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-js-interactions.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-js-interactions.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-translation.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-translation.js') ?>"></script>
 <!-- AI libs: BYOK connection store + provider catalog + caller. Read-only
      here (full management UI lives on /admin/ai-connections). Load order
      matters: catalog + presets before store; store + catalog before caller. -->
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/provider-catalog.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/lib/provider-catalog.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/local-presets.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/lib/local-presets.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/connections-store.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/lib/connections-store.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/stream-parsers.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/lib/stream-parsers.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/ai-call.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/ai/lib/ai-call.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-ai-tools.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-ai-tools.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-transition-editor.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-transition-editor.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-miniplayer.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-miniplayer.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-sidebar-resize.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-sidebar-resize.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-drag.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview-drag.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/provider-catalog.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/ai/lib/provider-catalog.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/local-presets.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/ai/lib/local-presets.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/connections-store.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/ai/lib/connections-store.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/stream-parsers.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/ai/lib/stream-parsers.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/ai-call.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/ai/lib/ai-call.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-ai-tools.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-ai-tools.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-transition-editor.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-transition-editor.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-miniplayer.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-miniplayer.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-sidebar-resize.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-sidebar-resize.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-drag.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-drag.js') ?>"></script>
 
 <!-- Complex Element wizards (Add Element → Complex tab).
      Loaded BEFORE preview.js so the Complex-tab handler can call into
      window.QSComplexWizard during init.
      Order matters: shared helpers (row editor + textKey picker) before
      the per-kind `complex-*.js` files (each kind may use them on parse). -->
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/wizard-row-editor.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/contextual-complex/wizard-row-editor.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/text-key-picker.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/contextual-complex/text-key-picker.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/route-input.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/contextual-complex/route-input.js') ?>"></script>
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/data-attr-picker.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/contextual-complex/data-attr-picker.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/wizard-row-editor.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/wizard-row-editor.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/text-key-picker.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/text-key-picker.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/route-input.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/route-input.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/data-attr-picker.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/data-attr-picker.js') ?>"></script>
 <?php
     // Auto-include every complex-*.js so adding a new kind is one file drop.
-    foreach (glob(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/contextual-complex/complex-*.js') as $_ceJs) {
+    foreach (glob(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/complex-*.js') as $_ceJs) {
         $_ceBase = basename($_ceJs);
         echo '<script src="' . rtrim(BASE_URL, '/') . '/admin/assets/js/pages/preview/contextual-complex/' . $_ceBase
             . '?v=' . filemtime($_ceJs) . '"></script>' . "\n";
@@ -782,4 +782,4 @@ window.PreviewConfig = {
 ?>
 
 <!-- Preview JavaScript (Main) -->
-<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview.js?v=<?= filemtime(PUBLIC_CONTENT_PATH . '/admin/assets/js/pages/preview/preview.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview.js') ?>"></script>

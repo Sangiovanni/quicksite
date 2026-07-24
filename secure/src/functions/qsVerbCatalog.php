@@ -10,7 +10,7 @@
  * Each entry: name, signature, args, description, example, events.
  *
  * To add a new QS.* verb:
- *   1. Implement it in public/scripts/qs.js
+ *   1. Implement it in secure/src/runtime/qs.js
  *   2. Add a catalog entry here — picker, renderer allowlist, and build
  *      allowlist all pick it up automatically.
  *
