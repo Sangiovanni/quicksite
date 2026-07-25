@@ -753,7 +753,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. |
 | **Command** (`command.js`) | Permission-filtered command index. |
 | **Command form** (`command-form.js`) | Renders a dynamic form for any command from `help` metadata, then executes it. The escape hatch into raw API. |
-| **History** (`history.js`) | Browses `getCommandHistory`; modal with full request/response. |
+| **History** (`history.js`) | Browses `getCommandHistory` for the **currently edited project** — the command history is per-project, so switching projects switches the trail. Modal with full request/response. Actions that belong to no project (signing in, creating a project, membership self-service) are recorded server-side but are not shown here; see *Command history storage* in `COMMAND_API.md`. |
 | **Settings** (`settings.js`) | User profile, language, theme, AI provider config status. |
 | **APIs** (`apis.js`) | External API registry — see §9.1. Commands: `listApiEndpoints`, `addApi`, `editApi`, `deleteApi`, `getApiEndpoint`, `testApiEndpoint`. |
 | **Assets** (`assets.js`) | Asset browser + uploader: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`. |

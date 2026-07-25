@@ -111,7 +111,23 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
             ->withMessage('Failed to delete project directory')
             ->withData(['path' => $projectPath]);
     }
-    
+
+    // C10 10.1b — destroy this project's command log with it. The log lives in
+    // secure/logs/p/<id>/ (deliberately OUTSIDE the project folder, so exports,
+    // clones and backups never carry it). A project id is a folder NAME and can
+    // therefore be re-used: without this purge, a newly created project of the
+    // same name would inherit the previous project's audit trail.
+    require_once SECURE_FOLDER_PATH . '/src/functions/LoggingManagement.php';
+    $logDir = qs_log_dir($projectName);
+    $logsPurged = 0;
+    if ($logDir !== null && is_dir($logDir)) {
+        foreach (glob($logDir . '/*') ?: [] as $logFile) {
+            if (is_file($logFile) && @unlink($logFile)) { $logsPurged++; }
+        }
+        @rmdir($logDir);
+    }
+
+
     // C8 8.3a membership cascade — the project is gone; update every affected
     // user's status-mirror cache in ONE users.php write. The DELETING owner's
     // own entry is plainly removed (self-initiated exits leave no tombstone);
@@ -175,6 +191,7 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
         'directories_deleted' => $stats['directories'],
         'size_freed' => formatBytes($stats['size']),
         'size_bytes' => $stats['size'],
+        'log_files_purged' => $logsPurged,
         'membership_cascade' => $cascade
     ];
 

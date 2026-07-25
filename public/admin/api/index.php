@@ -135,7 +135,6 @@ const QS_API_ARM_COMMANDS = [
     // CommandRunner, so they are gated like any other project read.
     'ai-spec'                  => ['getStructure'],
     'ai-spec-raw'              => ['getStructure'],
-    'ai-spec-preview'          => ['getStructure'],
     'workflow-generate-steps'  => ['getStructure'],
 ];
 
@@ -692,6 +691,10 @@ switch ($action) {
         
         require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
         $manager = new WorkflowManager();
+        // C10 F-C10-1(b): arm the per-command re-gate. fetchDataRequirements()
+        // re-checks every data command with hasPermission ONLY when tokenInfo is
+        // set; without this the CommandRunner allowlist would run unchecked.
+        $manager->setTokenInfo($tokenInfo);
         $specId = $params[0];
         
         // Load the spec
@@ -765,6 +768,7 @@ switch ($action) {
         
         require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
         $manager = new WorkflowManager();
+        $manager->setTokenInfo($tokenInfo); // C10 F-C10-1(b): arm the per-command re-gate
         $spec = $manager->loadWorkflow($params[0]);
         
         if (!$spec) {
@@ -808,60 +812,17 @@ switch ($action) {
         echo json_encode(['success' => true, 'data' => $response]);
         break;
     
-    case 'ai-spec-preview':
-        // Preview a spec with custom JSON and template
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            http_response_code(405);
-            echo json_encode(['error' => 'Method not allowed']);
-            break;
-        }
-        
-        $input = json_decode(file_get_contents('php://input'), true);
-        if (!$input || !isset($input['spec']) || !isset($input['template'])) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Missing spec or template data']);
-            break;
-        }
-        
-        require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
-        $manager = new WorkflowManager();
-        
-        $spec = $input['spec'];
-        $template = $input['template'];
-        
-        // Validate the spec
-        $validation = $manager->validateWorkflow($spec);
-        if (!$validation['valid']) {
-            http_response_code(400);
-            echo json_encode([
-                'error' => 'Invalid spec',
-                'validationErrors' => $validation['errors']
-            ]);
-            break;
-        }
-        
-        // Fetch data requirements (if any exist and are valid)
-        $data = [];
-        try {
-            $data = $manager->fetchDataRequirements($spec);
-        } catch (Exception $e) {
-            // If data fetching fails, continue with empty data for preview
-            $data = ['_error' => $e->getMessage()];
-        }
-        
-        // Render the prompt using the provided template
-        $prompt = $manager->renderTemplateString($template, $data);
-        
-        echo json_encode([
-            'success' => true,
-            'data' => [
-                'prompt' => $prompt,
-                'dataFetched' => array_keys($data),
-                'validation' => $validation
-            ]
-        ]);
-        break;
-    
+    // NOTE: the 'ai-spec-preview' arm was DELETED in beta.10 C10 (10.1b, F-C10-1).
+    // It was the last surface that accepted a CALLER-AUTHORED spec in the request
+    // body and ran its dataRequirements; validateWorkflow() only checks shape, so
+    // a spec could name any CommandRunner-allowlisted command. It was broken for
+    // every input (it called WorkflowManager::renderTemplateString(), a method
+    // that never existed — an Error, which the catch(Exception) here would not
+    // even have caught), and that missing method was the ONLY thing preventing
+    // unauthorized execution. Deleted rather than repaired so the next developer
+    // implementing that method cannot silently reopen the hole. It is the sibling
+    // of the custom-workflow feature removed in C8 8.X part 1. No client called it.
+
     case 'workflow-generate-steps':
         // Generate steps for a manual workflow
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -879,7 +840,8 @@ switch ($action) {
         
         require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
         $manager = new WorkflowManager();
-        
+        $manager->setTokenInfo($tokenInfo); // C10 F-C10-1(b): arm the per-command re-gate
+
         $workflow = $manager->loadWorkflow($input['workflowId']);
         if (!$workflow) {
             http_response_code(404);

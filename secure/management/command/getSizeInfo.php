@@ -202,7 +202,11 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
         // Exports moved under each project in C8 8.5, so this reports THIS
         // project's archives rather than an installation-wide shared folder.
         'exports' => sizeinfo_getFolderInfo($secureRoot . '/projects/' . $markerProject . '/exports', 'exports'),
-        'logs' => sizeinfo_getFolderInfo($secureRoot . '/logs', 'logs'),
+        // C10 10.1b — the command log is per-project (secure/logs/p/<id>/), so this
+        // reports THIS project's audit trail, not the installation's. The `_global`
+        // bucket (account/membership actions, which belong to no project) is
+        // deliberately excluded: it is not this project's consumption.
+        'logs' => sizeinfo_getFolderInfo($secureRoot . '/logs/p/' . $markerProject, 'logs'),
         'management' => sizeinfo_getFolderInfo($secureRoot . '/management', 'management'),
         'src' => sizeinfo_getFolderInfo($secureRoot . '/src', 'src'),
     ];
@@ -314,15 +318,19 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
     $managementSpace = $publicFolders['management']['size'] 
                      + $secureFolders['management']['size'];
     
-    // Core/System: secure/src + secure/config + secure/logs + root files
-    $coreSpace = $secureFolders['src']['size'] 
-               + $secureFolders['config']['size'] 
-               + $secureFolders['logs']['size']
+    // Core/System: secure/src + secure/config + root files. The command log left
+    // this bucket in C10 10.1b — it is per-project now, so it is the PROJECT's
+    // consumption, not the installation's core.
+    $coreSpace = $secureFolders['src']['size']
+               + $secureFolders['config']['size']
                + $publicRootFilesSize
                + $secureRootFilesSize;
-    
+
     // Exports: this project's exports folder (zip archives)
     $exportsSpace = $secureFolders['exports']['size'];
+
+    // Command log: this project's audit trail (secure/logs/p/<id>/)
+    $logsSpace = $secureFolders['logs']['size'];
 
     // Backups for THIS project (the report is single-project since C8 8.5)
     $totalBackupsSize = 0;
@@ -362,6 +370,11 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
                 'size_formatted' => sizeinfo_formatSize($exportsSpace),
                 'description' => 'Export ZIP archives'
             ],
+            'logs' => [
+                'size' => $logsSpace,
+                'size_formatted' => sizeinfo_formatSize($logsSpace),
+                'description' => "This project's command history"
+            ],
             'admin' => [
                 'size' => $adminSpace,
                 'size_formatted' => sizeinfo_formatSize($adminSpace),
@@ -375,7 +388,7 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
             'core' => [
                 'size' => $coreSpace,
                 'size_formatted' => sizeinfo_formatSize($coreSpace),
-                'description' => 'Core system files (src, config, logs)'
+                'description' => 'Core system files (src, config)'
             ]
         ],
         // Was 'active_project' — the globally SERVED main, which named a project the

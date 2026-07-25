@@ -23,8 +23,17 @@ class CommandRunner {
      * Destructive commands (deleteProject, deleteBackup, restoreBackup, etc.)
      * are NOT allowed — they must go through the Management API which enforces
      * per-user role permissions via the Bearer token.
-     * 
-     * If you need to add a command, verify it cannot cause data loss or side effects.
+     *
+     * TIER RULE (beta.10 C10 F-C10-1): because this list bypasses hasPermission,
+     * a command here is reachable by the LOWEST membership tier (viewer). So it
+     * must be inside the viewer grant (content.read) or a global 'any' category —
+     * NOTHING admin-tier. getCommandHistory (history) + listBackups (project.data)
+     * were removed for exactly this reason: their data is admin+ and was reachable
+     * through WorkflowManager without a role check. The matrix suite
+     * (10_1_authz_matrix.php) asserts this invariant on every run.
+     *
+     * If you need to add a command, verify it (1) cannot cause data loss or side
+     * effects AND (2) is not above the viewer tier.
      */
     private static array $allowedCommands = [
         // Read-only: translations
@@ -56,11 +65,9 @@ class CommandRunner {
         'getBuild',
         // Read-only: system info
         'help',
-        'getCommandHistory',
         'listAliases',
         // Read-only: project info (no mutations)
         'listProjects',
-        'listBackups',
     ];
     
     /**

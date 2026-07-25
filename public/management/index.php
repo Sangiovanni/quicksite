@@ -242,8 +242,16 @@ if ($commandScope === 'project') {
 // Parse request body for logging
 $requestBody = json_decode(REQUEST_BODY_RAW, true) ?? [];
 
+// The command log is PER-PROJECT (C10 10.1b). The bucket comes from the command's
+// SCOPE, never from PROJECT_NAME: a global command is given a benign working
+// context from the caller's UX-default project above, so PROJECT_NAME would
+// mis-file global actions into whichever project the user happens to have
+// selected. Project-scoped => the authorized marker project; global => null,
+// which logCommand routes to the write-only `_global` bucket.
+$logProject = ($commandScope === 'project') ? $requestedProject : null;
+
 // Set up logging callback
-ApiResponse::setBeforeSendCallback(function($status, $responseCode) use ($command, $currentUser, $commandStartTime, $requestBody) {
+ApiResponse::setBeforeSendCallback(function($status, $responseCode) use ($command, $currentUser, $commandStartTime, $requestBody, $logProject) {
     logCommand(
         $command,
         $_SERVER['REQUEST_METHOD'],
@@ -251,7 +259,8 @@ ApiResponse::setBeforeSendCallback(function($status, $responseCode) use ($comman
         $currentUser,
         $status,
         $responseCode,
-        $commandStartTime
+        $commandStartTime,
+        $logProject
     );
 });
 

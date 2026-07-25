@@ -32,16 +32,27 @@ require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
  * @return ApiResponse
  */
 function __command_getCommandHistory(array $params = [], array $urlParams = []): ApiResponse {
+    // C10 10.1b — history is PER-PROJECT. The project is the dispatcher's
+    // authorized URL marker (PROJECT_NAME), never a body parameter: the caller
+    // passed the `history` category check for exactly this project. Without a
+    // bound project there is nothing to show — there is no installation-wide view.
+    $project = defined('PROJECT_NAME') ? (string)PROJECT_NAME : '';
+    if ($project === '') {
+        return ApiResponse::create(400, 'project.required')
+            ->withMessage('This command is project-scoped. Target a project with /management/p/<projectId>/getCommandHistory');
+    }
+
     // Check if user only wants list of dates
     if (isset($params['dates_only']) && ($params['dates_only'] === 'true' || $params['dates_only'] === '1' || $params['dates_only'] === true)) {
-        $dates = getLogDates();
-        
+        $dates = getLogDates($project);
+
         $totalEntries = array_sum(array_column($dates, 'entries'));
         $totalSize = array_sum(array_column($dates, 'size_bytes'));
         
         return ApiResponse::create(200, 'operation.success')
             ->withMessage('Log dates retrieved successfully')
             ->withData([
+                'project' => $project,
                 'dates' => $dates,
                 'summary' => [
                     'total_days' => count($dates),
@@ -79,12 +90,13 @@ function __command_getCommandHistory(array $params = [], array $urlParams = []):
             ->withErrors([RegexPatterns::validationError('date_iso', 'end_date', $filters['end_date'])]);
     }
 
-    // Get command history
-    $result = getCommandHistory($filters);
+    // Get command history — scoped to the authorized project
+    $result = getCommandHistory($filters, $project);
 
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('Command history retrieved successfully')
         ->withData([
+            'project' => $project,
             'entries' => $result['entries'],
             'pagination' => $result['pagination'],
             'filters_applied' => $filters

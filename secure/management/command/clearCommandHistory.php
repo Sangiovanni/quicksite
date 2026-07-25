@@ -17,6 +17,16 @@
 require_once SECURE_FOLDER_PATH . '/src/functions/LoggingManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
+// C10 10.1b — clearing is PER-PROJECT. The project is the dispatcher's authorized
+// URL marker (PROJECT_NAME), never a body parameter. Scoped by directory, so this
+// deletion can only ever reach the caller's own project (F-C10-3).
+$project = defined('PROJECT_NAME') ? (string)PROJECT_NAME : '';
+if ($project === '') {
+    ApiResponse::create(400, 'project.required')
+        ->withMessage('This command is project-scoped. Target a project with /management/p/<projectId>/clearCommandHistory')
+        ->send();
+}
+
 // Get request body (use pre-captured if available)
 $rawBody = defined('REQUEST_BODY_RAW') ? REQUEST_BODY_RAW : file_get_contents('php://input');
 $body = json_decode($rawBody, true) ?? [];
@@ -55,8 +65,8 @@ if ($beforeDate > $today) {
 
 // Require confirmation
 if (empty($body['confirm']) || $body['confirm'] !== true) {
-    // Preview mode - show what would be deleted
-    $dates = getLogDates();
+    // Preview mode - show what would be deleted (this project only)
+    $dates = getLogDates($project);
     $toDelete = array_filter($dates, fn($d) => $d['date'] < $body['before']);
     
     $totalEntries = array_sum(array_column($toDelete, 'entries'));
@@ -65,6 +75,7 @@ if (empty($body['confirm']) || $body['confirm'] !== true) {
     ApiResponse::create(200, 'operation.preview')
         ->withMessage('Preview: Add "confirm": true to execute deletion')
         ->withData([
+            'project' => $project,
             'would_delete' => [
                 'files' => count($toDelete),
                 'entries' => $totalEntries,
@@ -76,12 +87,13 @@ if (empty($body['confirm']) || $body['confirm'] !== true) {
         ->send();
 }
 
-// Execute deletion
-$result = clearCommandHistory($body['before']);
+// Execute deletion — this project's log directory only
+$result = clearCommandHistory($body['before'], $project);
 
 ApiResponse::create(200, 'operation.success')
     ->withMessage('Command history cleared successfully')
     ->withData([
+        'project' => $project,
         'deleted' => $result,
         'before_date' => $body['before']
     ])

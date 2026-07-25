@@ -529,11 +529,11 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.invalid_date' => 'Invalid date format (expected YYYY-MM-DD)'
         ],
-        'notes' => 'Logs are stored in daily files. By default returns last 7 days. The getCommandHistory command itself is not logged to prevent recursion. Request bodies are sanitized (uploadAsset files redacted; the public session commands - login/refreshSession/logoutSession - are not logged at all).'
+        'notes' => 'PROJECT-SCOPED: returns the history of the project named by the URL marker (/management/p/<projectId>/getCommandHistory) and nothing else - there is no installation-wide view. Logs are stored in daily files under secure/logs/p/<projectId>/. By default returns last 7 days. The getCommandHistory command itself is not logged to prevent recursion. Commands that target no project (registration, login, project creation, membership self-service) are recorded separately in secure/logs/_global/, which no command reads. Request bodies are sanitized DENY-BY-DEFAULT: any key that looks like a credential (password/secret/token/credential/key/auth/authorization/signature/salt) has its value replaced with [redacted] at every depth, for every command including ones added later; the authentication commands (login/register/refreshSession/logoutSession/changePassword/deleteMyAccount) log no body at all; uploadAsset logs file metadata only and editStyles truncates stylesheets over 5KB.'
     ],
-    
+
     'clearCommandHistory' => [
-        'description' => 'Deletes command log files older than a specified date. Requires confirmation to execute.',
+        'description' => 'Deletes command log files older than a specified date, for the project named by the URL marker only. Requires confirmation to execute.',
         'method' => 'DELETE',
         'parameters' => [
             'before' => [
@@ -582,9 +582,9 @@ $GLOBALS['__help_commands'] = [
             '400.validation.missing_parameter' => 'Missing required parameter: before',
             '400.validation.invalid_date' => 'Invalid date format or future date'
         ],
-        'notes' => 'Without confirm=true, returns a preview showing what would be deleted. Requires admin permission.'
+        'notes' => 'PROJECT-SCOPED: deletes only inside secure/logs/p/<projectId>/ for the project named by the URL marker, so clearing one project\'s history can never affect another\'s. Without confirm=true, returns a preview showing what would be deleted. A future "before" date is refused. Requires admin permission ON THAT PROJECT.'
     ],
-    
+
     'editFavicon' => [
         'description' => 'Updates the site favicon with a new image from assets/images folder (PNG only)',
         'method' => 'PATCH',

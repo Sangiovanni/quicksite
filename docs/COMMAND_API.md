@@ -111,7 +111,7 @@ Each row enumerates the commands in that category — comma-separated, alphabeti
 | **State stores** | `getStateStores`, `setStateStores` — per-page named client state bound to one API endpoint; fields with direction (request/response/both), init source, and response path. Gives interactions memory (pagination, search, filters, infinite scroll). |
 | **Server-side data resolvers** | `setRouteResolver`, `cleanResolverCache` — per-route declaration that fires a server-side fetch BEFORE template render and exposes the response as template variables (SEO/AEO/first-paint payoff). `setRouteResolver` is idempotent six-shape (set / clear / patch / append / remove single slot). File-based cache with TTL + auth-cacheable gating; manual invalidation via `cleanResolverCache`. Read via `getSiteMap` (per-route subset under `routeResolvers`). See [ADMIN_PANEL.md §9.7](ADMIN_PANEL.md). |
 | **System updates** | `checkForUpdates` — inspect the engine version and report whether a newer release exists. Applying an update is an operator/CLI action, not an API command. |
-| **System** | `getCommandHistory`, `clearCommandHistory`, `getSizeInfo`, `getIframeSandbox`, `setIframeSandbox`, `removeIframeSandbox` — engine-level state (audit log of executed commands, project size info, iframe sandbox config for the visual editor). |
+| **System** | `getCommandHistory`, `clearCommandHistory`, `getSizeInfo`, `getIframeSandbox`, `setIframeSandbox`, `removeIframeSandbox` — engine-level state (audit log of executed commands, project size info, iframe sandbox config for the visual editor). The command history is **per project**: both commands act only on the project named by the URL marker, and there is no installation-wide view. See *Command history storage* below. |
 | **Workflow tooling** | `listWorkflowBlocks`, `lintWorkflows` — enumerate reusable prompt blocks in `secure/admin/workflows/{blocks,pins,warnings,examples}/` for the editor's multi-select dropdowns; report paragraphs that occur in 3+ workflow templates as candidates for extraction. Both read QuickSite's own shipped catalogue rather than any project's data, so both are global (any authenticated user) and take no project marker. |
 
 ## Calling the API
@@ -190,8 +190,70 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 - Command handlers live in `secure/management/command/<command>.php`, one file per command.
 - The whitelist of valid commands is `secure/management/routes.php` (176 entries — this file is the single source of truth for which commands exist).
 - Shared helpers live in `secure/src/functions/utilsManagement.php` (e.g., `varExportNested()`, `SPECIAL_PAGES`, role helpers).
-- Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `secure/src/classes/CommandRunner.php`. CommandRunner carries a **hardcoded read-only allowlist** (~35 `get*` / `list*` commands) it will execute internally; membership and other mutating commands are not on it.
-- Workflow execution adds its own role check via `WorkflowManager::setTokenInfo()` so steps respect the calling token's permissions.
+- Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `secure/src/classes/CommandRunner.php`. CommandRunner carries a **hardcoded read-only allowlist** (26 `get*` / `list*` commands) it will execute internally; membership and other mutating commands are not on it.
+- Because that allowlist bypasses the permission check, it **is** the boundary: every command on it is reachable by the lowest membership tier, so it holds only commands inside the `viewer` grant (`content.read`) or a global any-authenticated category. Admin-tier reads — command history, backup listings — are deliberately absent and must go through the HTTP layer, where the role check applies.
+- Workflow execution adds a second, per-command role check via `WorkflowManager::setTokenInfo()`, so a workflow's declared data commands are authorized against the calling user and the targeted project before they run.
+
+## Command history storage
+
+Every successful command (plus authentication failures) is appended to a daily
+JSON file. The store is **partitioned by project**, so a project's audit trail is
+readable only by someone who holds the `history` category **on that project**:
+
+```
+secure/logs/p/<projectId>/commands_<YYYY-MM-DD>.json   one directory per project
+secure/logs/_global/commands_<YYYY-MM-DD>.json         commands that target no project
+```
+
+- `getCommandHistory` and `clearCommandHistory` read and delete **only** inside the
+  directory of the project named by the URL marker. Clearing one project's history
+  can never touch another's, and there is no query that spans projects.
+- **Deleting a project deletes its history with it.** A project id is a folder name
+  and can be re-used, so the directory is purged on `deleteProject` — a new project
+  reusing an old name starts with an empty trail. The deletion event itself is
+  recorded in `_global`, since the project it refers to no longer exists.
+- A project's history counts toward that project's disk usage in `getSizeInfo`
+  (category `logs`), not toward installation core files.
+
+### What is recorded, and what is stripped
+
+Each entry holds the command, the HTTP method, the caller (user id + display name),
+the response status and code, the duration, and the request body. **Credentials are
+never stored.** Sanitization is deny-by-default and command-independent:
+
+- Any body key whose name looks like a credential — `password`, `secret`, `token`,
+  `credential`, `key` / `apiKey`, `auth`, `authorization`, `signature`, `salt` — has
+  its **value** replaced with `[redacted]`, at every depth of a nested body. A
+  matching key discards its entire value, so an `auth` or `credentials` object is
+  removed whole rather than walked into. The key itself is kept, so the trail still
+  records *that* a credential was submitted.
+- Authentication commands (`login`, `register`, `refreshSession`, `logoutSession`,
+  `changePassword`, `deleteMyAccount`) log **no body at all**. The entry still
+  records who acted, when, and with what result.
+- `uploadAsset` records file metadata instead of file content, and `editStyles`
+  truncates stylesheets over 5 KB.
+
+Because the rule keys on the *shape of the body* rather than on a list of known
+commands, a newly added command carrying a credential is protected automatically —
+no change to the logging layer is required. Keys that merely resemble the pattern
+are redacted too (a `tokenSource` pointer, for instance); erring toward redaction is
+deliberate.
+
+### The `_global` bucket — operators should manage this directly
+
+Commands that belong to no project — account registration and deletion, password
+changes, project creation, invitation and membership self-service — are recorded in
+`secure/logs/_global/`. **No API command reads this directory.** It exists so that
+account-level and membership-level actions leave a forensic trail rather than going
+unrecorded; there is no installation-wide administrator role to expose it to.
+
+Because nothing serves or rotates it, `_global` grows without bound and is the
+operator's to manage. Treat it like any other server-side log: archive or delete
+files on whatever schedule your retention policy requires (a scheduled task, a
+logrotate rule, or manual deletion are all fine — the files are plain JSON and
+nothing references them). Credentials are stripped before writing (see above), but
+the entries still describe who did what and when, so treat them like any other
+server log containing operational detail.
 
 ## Update detection
 

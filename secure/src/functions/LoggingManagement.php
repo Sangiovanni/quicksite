@@ -6,26 +6,82 @@
  * Handles logging API commands to daily JSON files
  */
 
+require_once __DIR__ . '/PathManagement.php'; // is_valid_project_name (F1 gate)
+
 if (!defined('LOGS_PATH')) {
     define('LOGS_PATH', SECURE_FOLDER_PATH . '/logs');
 }
 
 /**
- * Ensure logs directory exists
+ * The command log is PER-PROJECT (beta.10 C10 10.1b, Sangio's ruling).
+ *
+ *   secure/logs/p/<projectId>/commands_<date>.json   project-scoped commands
+ *   secure/logs/_global/commands_<date>.json         global-scoped commands
+ *
+ * WHY DIRECTORIES, NOT A `project` FIELD PER ENTRY (F-C10-2 / F-C10-3):
+ * the store previously had no project dimension at all while `history` was
+ * DECLARED project-scoped in categories.php. Since any authenticated user can
+ * create a project and is its owner, that mismatch let anyone read — and clear —
+ * the whole installation's audit log. A per-entry field would fix the read but
+ * make `clearCommandHistory` rewrite day-files that hold OTHER projects' records:
+ * a containment fix that introduces a cross-project write. With directories,
+ * clearing is an unlink inside the caller's own directory, and a reader must
+ * construct another project's path to see another project's data — structural,
+ * not filter-dependent (the same fail-closed idiom as the L11 serving jail).
+ *
+ * The `_global` bucket is WRITTEN but served to nobody in beta.10: global
+ * commands (account + membership self-service) belong to no project, and there
+ * is no operator tier to show them to (superadmin was retired). Recording them
+ * keeps the forensic trail for account deletion / invitation acceptance instead
+ * of leaving those actions unaudited. Operators manage that directory directly
+ * on disk — see docs/ARCHITECTURE.md.
+ *
+ * `_global` and `p` cannot collide with a project id: is_valid_project_name
+ * requires a leading LETTER, so a project can never be named `_global`, and the
+ * literal `p` segment separates the project tree from it.
  */
-function ensureLogsDirectory(): bool {
-    if (!is_dir(LOGS_PATH)) {
-        return mkdir(LOGS_PATH, 0755, true);
+const QS_LOG_GLOBAL_BUCKET = '_global';
+
+/**
+ * Resolve the log directory for a project, or the global bucket.
+ *
+ * @param string|null $project Validated projectId, or null/'' for global.
+ * @return string|null Absolute directory path, or NULL when the projectId fails
+ *                     the F1 shape gate (fail-closed: the caller must not log
+ *                     rather than log to a guessed location).
+ */
+function qs_log_dir(?string $project = null): ?string {
+    if ($project === null || $project === '') {
+        return LOGS_PATH . '/' . QS_LOG_GLOBAL_BUCKET;
+    }
+    // Defence in depth: the dispatcher already validated this, but the value
+    // becomes a directory selector here (F1). No separators can survive.
+    if (!is_valid_project_name($project)) {
+        return null;
+    }
+    return LOGS_PATH . '/p/' . $project;
+}
+
+/**
+ * Ensure a log directory exists
+ */
+function ensureLogsDirectory(?string $dir = null): bool {
+    $dir = $dir ?? LOGS_PATH;
+    if (!is_dir($dir)) {
+        return mkdir($dir, 0755, true);
     }
     return true;
 }
 
 /**
- * Get the log file path for a specific date
+ * Get the log file path for a specific date, within a project (or global).
+ *
+ * @return string|null NULL when the projectId fails the F1 gate.
  */
-function getLogFilePath(?string $date = null): string {
+function getLogFilePath(?string $date = null, ?string $project = null): ?string {
     $date = $date ?? date('Y-m-d');
-    return LOGS_PATH . '/commands_' . $date . '.json';
+    $dir  = qs_log_dir($project);
+    return $dir === null ? null : $dir . '/commands_' . $date . '.json';
 }
 
 /**
@@ -36,50 +92,106 @@ function generateLogId(): string {
 }
 
 /**
- * Sanitize body for logging (remove sensitive data, handle special cases)
+ * Commands whose request body is NEVER logged, in any form (beta.10 C10 10.1b).
+ * The entry itself still records the command, the publisher and the result — so
+ * "this user changed their password at 14:02" stays auditable — but the body
+ * carries only credentials and adds nothing an auditor needs.
+ *
+ * The public session commands (login/register/refreshSession/logoutSession) run
+ * before the dispatcher installs its logging callback and are therefore not
+ * logged at all today; they are listed anyway so the guarantee does not depend on
+ * that dispatch detail staying true.
+ */
+const QS_LOG_SKIP_BODY_COMMANDS = [
+    'login', 'register', 'refreshSession', 'logoutSession',
+    'changePassword', 'deleteMyAccount',
+];
+
+/**
+ * Key names whose VALUE is a credential. Matched case-insensitively against every
+ * key at every depth of a request body.
+ *
+ * Deliberate boundary choices, verified against the live command surface:
+ *   \bkey\b     matches a bare `key` but NOT the translation commands' `keys`
+ *               (setTranslationKeys / deleteTranslationKeys), whose body IS the
+ *               content being audited.
+ *   \bauth\b    matches setRouteResolver's `auth` block but NOT `author`.
+ *   api[_-]?key catches apiKey / api_key / api-key, which \bkey\b cannot see
+ *               (no word boundary inside "apiKey").
+ */
+const QS_LOG_SECRET_KEY_PATTERN =
+    '/pass|secret|token|credential|\bkey\b|api[_-]?key|private[_-]?key|\bauth\b|authoriz|signature|\bsalt\b/i';
+
+/**
+ * Recursively redact credential-shaped keys anywhere in a body.
+ *
+ * A matching key has its ENTIRE value replaced — including a whole sub-array, so
+ * `credentials: {client_secret: …}` and `auth: {token: …}` are removed wholesale
+ * rather than walked into and half-missed. The key itself is KEPT so the audit
+ * trail still records that a credential was submitted, only never what it was.
+ *
+ * @param int $depth Recursion guard for pathological nesting.
+ */
+function qs_log_redact_secrets(array $body, int $depth = 0): array {
+    if ($depth > 8) {
+        return ['_note' => 'Nesting too deep to sanitize — body omitted'];
+    }
+    $out = [];
+    foreach ($body as $key => $value) {
+        if (preg_match(QS_LOG_SECRET_KEY_PATTERN, (string)$key) === 1) {
+            $out[$key] = '[redacted]';
+            continue;
+        }
+        $out[$key] = is_array($value) ? qs_log_redact_secrets($value, $depth + 1) : $value;
+    }
+    return $out;
+}
+
+/**
+ * Sanitize a request body for logging — DENY BY DEFAULT (beta.10 C10 10.1b).
+ *
+ * This used to be an allowlist keyed by COMMAND with `default: return $body`, so
+ * every command not explicitly named logged its body verbatim and a NEW command
+ * carrying a credential was exposed the moment it shipped — no edit here, no
+ * warning. That is how cleartext passwords reached the command log (C10 §8).
+ *
+ * The rule is now inverted and command-independent: credential-shaped keys are
+ * redacted for EVERY command, always, at every depth. The per-command cases below
+ * only RESHAPE bulky bodies; the universal redaction runs last, so no case can
+ * bypass it — including any case added later.
  */
 function sanitizeLogBody(string $command, array $body): ?array {
-    // Commands that should not log body at all
-    $skipBodyCommands = [];
-    
-    if (in_array($command, $skipBodyCommands)) {
+    if (in_array($command, QS_LOG_SKIP_BODY_COMMANDS, true)) {
         return null;
     }
-    
-    // Special handling for specific commands
+
+    // Per-command RESHAPING only (size, not sensitivity). Never the last word.
     switch ($command) {
         case 'uploadAsset':
             // Only log metadata, not file contents
-            return [
+            $body = [
                 'filename' => $body['filename'] ?? null,
                 'category' => $body['category'] ?? null,
                 'size_logged' => isset($body['file']) ? (is_string($body['file']) ? strlen($body['file']) : 'file_upload') : null,
                 '_note' => 'File content omitted from log'
             ];
-            
-        case 'generateToken':
-            // Never log generated token, only request params
-            return [
-                'name' => $body['name'] ?? null,
-                'permissions' => $body['permissions'] ?? null,
-                '_note' => 'Generated token omitted from log'
-            ];
-            
+            break;
+
         case 'editStyles':
             // Log summary for large style changes
             $css = $body['css'] ?? '';
-            if (strlen($css) > 5000) {
-                return [
+            if (is_string($css) && strlen($css) > 5000) {
+                $body = [
                     'css_length' => strlen($css),
                     'css_preview' => substr($css, 0, 500) . '...',
                     '_note' => 'Full CSS truncated (> 5KB)'
                 ];
             }
-            return $body;
-            
-        default:
-            return $body;
+            break;
     }
+
+    // The gate every body passes through, whatever the command.
+    return qs_log_redact_secrets($body);
 }
 
 /**
@@ -120,12 +232,26 @@ function createLogEntry(
  * Write a log entry to the daily log file
  * Uses file locking to prevent concurrent access issues on Windows
  */
-function writeLogEntry(array $entry): bool {
-    if (!ensureLogsDirectory()) {
+function writeLogEntry(array $entry, ?string $project = null): bool {
+    // If the project ceased to exist during this very request (deleteProject),
+    // its bucket was just purged — writing here would RESURRECT an orphan
+    // directory that no live project owns and no one can ever read (the reader
+    // requires an authorized membership, and the project is gone). Route the
+    // record to `_global` instead: the deletion stays audited, and the audit of
+    // a project's death correctly outlives the project.
+    if ($project !== null && $project !== ''
+        && !is_dir(SECURE_FOLDER_PATH . '/projects/' . $project)) {
+        $project = null;
+    }
+
+    $logFile = getLogFilePath(null, $project);
+    if ($logFile === null) {
+        return false; // invalid projectId — fail closed, never log to a guessed path
+    }
+    if (!ensureLogsDirectory(dirname($logFile))) {
         return false;
     }
-    
-    $logFile = getLogFilePath();
+
     $lockFile = $logFile . '.lock';
     
     // Acquire exclusive lock using a separate lock file
@@ -188,7 +314,8 @@ function logCommand(
     array $tokenInfo,
     int $httpStatus,
     string $responseCode,
-    float $startTime
+    float $startTime,
+    ?string $project = null
 ): bool {
     // Skip logging for read-only GET commands that don't modify anything
     // We still log them if they're successful for audit trail
@@ -210,27 +337,39 @@ function logCommand(
     }
     
     $entry = createLogEntry($command, $method, $body, $tokenInfo, $httpStatus, $responseCode, $startTime);
-    return writeLogEntry($entry);
+    return writeLogEntry($entry, $project);
 }
 
 /**
- * Get command history with optional filters
+ * Get command history for ONE project, with optional filters.
+ *
+ * @param string $project The AUTHORIZED projectId (the caller has already passed
+ *                        the `history` category check for it). Empty → no
+ *                        history at all: there is no installation-wide view.
  */
-function getCommandHistory(array $filters = []): array {
+function getCommandHistory(array $filters = [], string $project = ''): array {
     $logs = [];
-    
+
+    // Fail closed. A missing project must never widen into "every project".
+    if ($project === '' || qs_log_dir($project) === null) {
+        return [
+            'entries'    => [],
+            'pagination' => ['page' => 1, 'limit' => 0, 'total' => 0, 'pages' => 0],
+        ];
+    }
+
     // Date range
     $startDate = $filters['start_date'] ?? date('Y-m-d', strtotime('-7 days'));
     $endDate = $filters['end_date'] ?? date('Y-m-d');
-    
+
     // Iterate through date range
     $current = new DateTime($startDate);
     $end = new DateTime($endDate);
     $end->modify('+1 day'); // Include end date
-    
+
     while ($current < $end) {
-        $logFile = getLogFilePath($current->format('Y-m-d'));
-        if (file_exists($logFile)) {
+        $logFile = getLogFilePath($current->format('Y-m-d'), $project);
+        if ($logFile !== null && file_exists($logFile)) {
             $content = file_get_contents($logFile);
             $dayLogs = json_decode($content, true) ?? [];
             $logs = array_merge($logs, $dayLogs);
@@ -294,24 +433,35 @@ function getCommandHistory(array $filters = []): array {
 }
 
 /**
- * Clear command history before a specific date
+ * Clear ONE project's command history before a specific date.
+ *
+ * Scoped by DIRECTORY, so the deletion can only ever touch the caller's own
+ * project (F-C10-3: this used to unlink across the whole installation, letting
+ * any self-minted project owner erase the entire audit log).
+ *
+ * @param string $project The AUTHORIZED projectId. Empty → deletes nothing.
  */
-function clearCommandHistory(string $beforeDate): array {
-    if (!is_dir(LOGS_PATH)) {
-        return [
-            'deleted_files' => 0,
-            'deleted_entries' => 0,
-            'space_freed_bytes' => 0
-        ];
+function clearCommandHistory(string $beforeDate, string $project = ''): array {
+    $empty = [
+        'deleted_files' => 0,
+        'deleted_entries' => 0,
+        'space_freed_bytes' => 0,
+        'space_freed_kb' => 0.0,
+    ];
+
+    // Fail closed — never fall back to the installation-wide sweep.
+    $dir = ($project === '') ? null : qs_log_dir($project);
+    if ($dir === null || !is_dir($dir)) {
+        return $empty;
     }
-    
+
     $deleted = 0;
     $entries = 0;
     $bytes = 0;
-    
+
     $cutoff = new DateTime($beforeDate);
-    
-    $files = glob(LOGS_PATH . '/commands_*.json');
+
+    $files = glob($dir . '/commands_*.json');
     foreach ($files as $file) {
         // Extract date from filename
         if (preg_match('/commands_(\d{4}-\d{2}-\d{2})\.json$/', $file, $matches)) {
@@ -325,6 +475,7 @@ function clearCommandHistory(string $beforeDate): array {
                     $deleted++;
                     $entries += $entryCount;
                     $bytes += $size;
+                    @unlink($file . '.lock'); // the sidecar writeLogEntry created
                 }
             }
         }
@@ -339,16 +490,19 @@ function clearCommandHistory(string $beforeDate): array {
 }
 
 /**
- * Get list of available log dates
+ * Get list of available log dates for ONE project.
+ *
+ * @param string $project The AUTHORIZED projectId. Empty → no dates.
  */
-function getLogDates(): array {
-    if (!is_dir(LOGS_PATH)) {
+function getLogDates(string $project = ''): array {
+    $dir = ($project === '') ? null : qs_log_dir($project);
+    if ($dir === null || !is_dir($dir)) {
         return [];
     }
-    
+
     $dates = [];
-    $files = glob(LOGS_PATH . '/commands_*.json');
-    
+    $files = glob($dir . '/commands_*.json');
+
     foreach ($files as $file) {
         if (preg_match('/commands_(\d{4}-\d{2}-\d{2})\.json$/', $file, $matches)) {
             $content = json_decode(file_get_contents($file), true);
