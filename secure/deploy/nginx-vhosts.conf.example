@@ -36,8 +36,8 @@ server {
         fastcgi_param  QS_PROJECT          "siteA";
         fastcgi_param  QS_PUBLIC_BASE_URL  "https://example.com/";
         fastcgi_param  QS_TRUSTED_HOSTS    "example.com";
-        # fastcgi_param QS_ERROR_PAGE_401  "/401.html";
         # fastcgi_param QS_ERROR_PAGE_404  "/404.html";
+        # fastcgi_param QS_ERROR_PAGE_403  "/403.html";
         fastcgi_param  SCRIPT_FILENAME     $document_root/p/index.php;
         fastcgi_pass   php;   # your php-fpm upstream
     }

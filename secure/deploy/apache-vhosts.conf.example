@@ -17,10 +17,15 @@
 #                                            separated host[:port]); a request
 #                                            with any other Host composes URLs
 #                                            against the FIRST entry.
-#   SetEnv QS_ERROR_PAGE_401   /401.html     optional: your own static page for
-#   SetEnv QS_ERROR_PAGE_404   /404.html     QuickSite's project-less/refused
-#                                            statuses. Root-relative, inside the
+#   SetEnv QS_ERROR_PAGE_404   /404.html     optional: your own static pages for
+#   SetEnv QS_ERROR_PAGE_403   /403.html     QuickSite's project-less/refused
+#   SetEnv QS_ERROR_PAGE_400   /400.html     statuses. Root-relative, inside the
 #                                            document root, .html/.htm only.
+#                                            404 covers "no such project" AND
+#                                            every refused project view (they are
+#                                            deliberately indistinguishable);
+#                                            403/400 cover malformed or forbidden
+#                                            asset requests.
 #                                            (A missing PAGE inside a served
 #                                            project renders that project's own
 #                                            404 template — no config needed.)
@@ -40,8 +45,8 @@
     SetEnv QS_PROJECT         "siteA"
     SetEnv QS_PUBLIC_BASE_URL "https://example.com/"
     SetEnv QS_TRUSTED_HOSTS   "example.com"
-    # SetEnv QS_ERROR_PAGE_401 "/401.html"
     # SetEnv QS_ERROR_PAGE_404 "/404.html"
+    # SetEnv QS_ERROR_PAGE_403 "/403.html"
 
     RewriteEngine On
     # One domain, one site: a direct /p/... hit is not this domain's surface.

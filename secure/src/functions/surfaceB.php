@@ -46,9 +46,18 @@ function qs_sb_valid_id(string $id): bool {
  * SECURE_FOLDER_PATH (defined here from the computed secure root when init.php
  * has not run yet) + members.json + the C5b session store.
  *
+ * EXISTENCE POSTURE: every refusal is 404, the SAME status an id that names no
+ * project gets. A private project is therefore indistinguishable from one that
+ * does not exist — for an anonymous visitor and for an authenticated
+ * non-member alike. `/management` already answers a uniform 403 for both cases
+ * on every project-scoped command, so surface B was the install's only
+ * project-existence oracle; answering 401 (no identity) or 403 (identity, not a
+ * member) here would confirm "this id is a real private project" to anyone who
+ * asked. The cost is accepted and deliberate: a signed-out member of a private
+ * project sees 404 rather than a prompt to sign in.
+ *
  * @return int|null null = allowed (public project, or authenticated member);
- *                  401 = private + no valid identity; 403 = valid identity,
- *                  not a member (same refusal for a nonexistent project).
+ *                  404 = refused, reason deliberately not distinguished.
  */
 function qs_surface_b_gate(string $id, string $secure): ?int {
     if (!defined('SECURE_FOLDER_PATH')) {
@@ -69,11 +78,11 @@ function qs_surface_b_gate(string $id, string $secure): ?int {
         : ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null);
     $auth = validateBearerToken($authHeader);
     if (empty($auth['valid'])) {
-        return 401;
+        return 404; // no identity — indistinguishable from "no such project"
     }
     $userId = $auth['user']['id'] ?? '';
     if ($userId === '' || getUserRoleForProject($userId, $id) === null) {
-        return 403; // same for non-member / stranger project — no membership oracle
+        return 404; // identity, but not a member — same answer, no oracle
     }
     return null;
 }
@@ -393,10 +402,24 @@ function qs_sb_error_page_file(int $status): ?string {
  * Refuse a surface-B request, then exit. The deployment's own page wins when
  * declared and valid (QS_ERROR_PAGE_<status>, E3); the built-in minimal page
  * is the default.
+ *
+ * The visibility/membership refusal happens PRE-init, an id naming no project
+ * refuses POST-init — so this function emits init.php's two baseline security
+ * headers itself. Without them the pre-init deny would be missing headers the
+ * post-init deny carries, and the header set alone would tell a visitor which
+ * of the two refusals they hit: an existence oracle the unified 404 status
+ * otherwise closes. (init.php's own header() calls are idempotent.)
  */
 function qs_sb_deny(int $status, string $message): void {
     if (!headers_sent()) {
         http_response_code($status);
+        // Baseline headers FIRST, in init.php's own order: re-setting a header
+        // keeps its original position, so a post-init deny (where init.php
+        // already sent these two) ends up with the same header ORDER as a
+        // pre-init deny that sends them here. Same status, same body, same
+        // headers, same order — nothing left to tell the two refusals apart.
+        header('X-Content-Type-Options: nosniff');
+        header('X-Frame-Options: SAMEORIGIN');
         header('Content-Type: text/html; charset=utf-8');
         header('Cache-Control: no-store');
     }
