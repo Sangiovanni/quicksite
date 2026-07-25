@@ -11,8 +11,7 @@ REM   2. Renames "secure/" for obscurity (e.g. backend, app)
 REM   3. Sets a URL prefix/space (e.g. "web" -> http://domain/web/)
 REM   - Updates init.php constants and .htaccess files
 REM
-REM Config files (target.php, auth.php, roles.php) are auto-created from
-REM .example templates on first page load - no action needed.
+REM Config files are auto-created from .example templates on first page load.
 REM On nginx, a first-load instructions page will guide you through
 REM including the generated dynamic_routes.conf.
 REM
@@ -478,9 +477,7 @@ echo     4. On nginx: follow the setup page to include the routing config,
 echo        then reload nginx. On Apache: you're done.
 echo     5. Open http://your-domain/admin/
 echo.
-echo   Default API token: CHANGE_ME_superadmin_token
-echo   Config files (auth.php, target.php, roles.php) are auto-created
-echo   on first page load from .example templates.
+echo   Config files are auto-created on first page load from .example templates.
 echo.
 
 pause
