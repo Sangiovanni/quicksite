@@ -458,6 +458,32 @@ REM Save config for re-run detection
     echo PUBLIC_SPACE=%PUBLIC_SPACE%
 ) > "%CONF_FILE%"
 
+REM ==========================================================
+REM Admin account
+REM ==========================================================
+REM QuickSite ships NO default credential. The only account that ever exists is
+REM the one created here, from a username and password the deployer chooses.
+REM
+REM The prompt lives in PowerShell (create-account.ps1) because `set /p` always
+REM echoes what is typed — a password must not appear on screen. PowerShell also
+REM pipes it to the PHP helper on STDIN, so it never reaches a command line.
+
+set "ACCOUNT_USERNAME="
+set "ACCOUNT_MANUAL=no"
+set "ACCOUNT_PS1=%SECURE_DIR%\setup\create-account.ps1"
+
+if not exist "%ACCOUNT_PS1%" (
+    set "ACCOUNT_MANUAL=yes"
+) else (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%ACCOUNT_PS1%" -SecureDir "%SECURE_DIR%"
+    if errorlevel 6 (
+        echo   PHP CLI not found - skipping account creation.
+        set "ACCOUNT_MANUAL=yes"
+    ) else if errorlevel 4 (
+        set "ACCOUNT_MANUAL=yes"
+    )
+)
+
 echo.
 echo ========================================
 echo   Setup complete
@@ -469,13 +495,28 @@ if not "%PUBLIC_SPACE%"=="" (
     echo   URL space:      %PUBLIC_SPACE%
 )
 echo.
+if "%ACCOUNT_MANUAL%"=="yes" (
+    echo   ^^! Create your admin account manually
+    echo   No account was created, so the admin panel cannot be logged into yet.
+    echo   Either re-run this script, or do it by hand:
+    echo.
+    echo     1. copy %SECURE_FOLDER_NAME%\management\config\users.php.example
+    echo             %SECURE_FOLDER_NAME%\management\config\users.php
+    echo     2. Generate a password hash:
+    echo          php -r "echo password_hash('your-password', PASSWORD_DEFAULT);"
+    echo     3. In users.php set 'username', paste the hash into 'password_hash',
+    echo        and replace the 'usr_...' key with a fresh id:
+    echo          php -r "echo 'usr_' . bin2hex(random_bytes(16));"
+    echo.
+)
+
 echo   Next steps:
 echo     1. Ensure your vhost DocumentRoot points to the public folder
 echo     2. Restart your web server
 echo     3. Visit http://your-domain/ once (generates config files)
 echo     4. On nginx: follow the setup page to include the routing config,
 echo        then reload nginx. On Apache: you're done.
-echo     5. Open http://your-domain/admin/
+echo     5. Open http://your-domain/admin/ and log in with the account you created
 echo.
 echo   Config files are auto-created on first page load from .example templates.
 echo.

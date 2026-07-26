@@ -63,6 +63,15 @@
         "privacyNote": "En cochant 'Rester connecté', vous consentez à un cookie d'authentification persistant sur cet appareil.",
         "registerLink": "Pas encore de compte ? Créez-en un",
         "registerSuccess": "Compte créé — connectez-vous avec votre nom d'utilisateur et votre mot de passe",
+        "noAccounts": {
+            "title": "Aucun compte n'existe encore",
+            "intro": "Cette installation n'a aucun compte : il n'y a donc rien avec quoi se connecter. QuickSite ne fournit aucun mot de passe par défaut — vous créez vous-même le premier compte.",
+            "registerOpen": "L'inscription est activée sur cette installation : vous pouvez créer le premier compte maintenant :",
+            "runSetup": "Sinon, lancez le script d'installation dans le dossier QuickSite — il demande un nom d'utilisateur et un mot de passe, puis crée le compte :",
+            "onLinux": "(Linux / macOS)",
+            "onWindows": "(Windows)",
+            "manual": "Si vous ne pouvez pas lancer le script, copiez secure/management/config/users.php.example vers users.php et renseignez un nom d'utilisateur et une empreinte de mot de passe — les instructions sont dans ce fichier."
+        },
         "help": {
             "title": "Pas de compte ?",
             "text": "Les comptes sont créés par un administrateur (ou par la plateforme qui héberge ce site). Mot de passe perdu ? Demandez à votre administrateur de le réinitialiser.",

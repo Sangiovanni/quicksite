@@ -77,7 +77,10 @@ return [
     // Routes + aliases. editor+.
     'route.write' => [
         'scope' => 'project',
-        'commands' => ['addRoute', 'deleteRoute', 'setRouteLayout', 'createAlias', 'deleteAlias'],
+        // setSiteMapConfig writes the sitemap sidecar AND publishes sitemap.txt —
+        // it decides which routes the world sees, so it belongs with the route
+        // writers, not with the read-only getSiteMap.
+        'commands' => ['addRoute', 'deleteRoute', 'setRouteLayout', 'createAlias', 'deleteAlias', 'setSiteMapConfig'],
     ],
 
     // Server-side data source wiring — a developer capability, split out of route.write. developer+.

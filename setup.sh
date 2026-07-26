@@ -430,6 +430,95 @@ fi
 echo ""
 
 # ==========================================================
+# Admin account
+# ==========================================================
+# QuickSite ships NO default credential. The only account that ever exists is
+# the one created here, from a username and password the deployer chooses.
+# Runs after the folder renames, so it writes into the final secure/ path.
+#
+# The password is typed hidden (read -s) and handed to the PHP helper on STDIN
+# via a shell builtin — never as an argument, so it cannot appear in `ps` or in
+# a shell history file.
+
+ACCOUNT_USERNAME=""
+ACCOUNT_MANUAL="no"
+ACCOUNT_HELPER="$SECURE_DIR/setup/create-account.php"
+
+# Locate a PHP CLI. Not being on PATH is normal on plenty of stacks, so probe
+# the usual places before giving up — and giving up is not fatal.
+PHP_BIN=""
+if command -v php >/dev/null 2>&1; then
+    PHP_BIN="$(command -v php)"
+else
+    for candidate in /usr/bin/php /usr/local/bin/php /opt/homebrew/bin/php \
+                     /opt/plesk/php/*/bin/php /usr/local/lsws/lsphp*/bin/php; do
+        if [ -x "$candidate" ]; then PHP_BIN="$candidate"; break; fi
+    done
+fi
+
+if [ ! -f "$ACCOUNT_HELPER" ]; then
+    ACCOUNT_MANUAL="yes"
+elif [ -z "$PHP_BIN" ]; then
+    echo -e "  ${YELLOW}PHP CLI not found${NC} — skipping account creation."
+    ACCOUNT_MANUAL="yes"
+else
+    ACCOUNT_STATUS=0
+    "$PHP_BIN" "$ACCOUNT_HELPER" --status >/dev/null 2>&1 || ACCOUNT_STATUS=$?
+    if [ "$ACCOUNT_STATUS" -eq 3 ]; then
+        echo -e "  ${GREEN}✓${NC} Accounts already exist — leaving the registry untouched."
+    else
+        # Ask the app for its own rules so this prompt can never describe
+        # something the application would then reject.
+        MIN_PW=12
+        USER_RULE="3-32 characters: lowercase letters, digits, - or _"
+        while IFS= read -r rule_line; do
+            case "$rule_line" in
+                MINPW=*)    MIN_PW="${rule_line#MINPW=}" ;;
+                USERRULE=*) USER_RULE="${rule_line#USERRULE=}" ;;
+            esac
+        done < <("$PHP_BIN" "$ACCOUNT_HELPER" --rules 2>/dev/null || true)
+
+        echo -e "  ${BOLD}Create your admin account.${NC}"
+        echo "    Username: $USER_RULE"
+        echo "    Password: at least $MIN_PW characters"
+        echo ""
+
+        for attempt in 1 2 3; do
+            read -r -p "  Username: " ACC_USER
+            read -r -s -p "  Password: " ACC_PASS; echo ""
+            read -r -s -p "  Confirm password: " ACC_PASS2; echo ""
+
+            if [ "$ACC_PASS" != "$ACC_PASS2" ]; then
+                echo -e "  ${RED}✗${NC} The two passwords do not match."
+                echo ""
+                unset ACC_PASS ACC_PASS2
+                continue
+            fi
+
+            ACC_RESULT=0
+            ACC_OUTPUT="$(printf '%s\n%s\n' "$ACC_USER" "$ACC_PASS" \
+                | "$PHP_BIN" "$ACCOUNT_HELPER" 2>&1)" || ACC_RESULT=$?
+            unset ACC_PASS ACC_PASS2
+
+            if [ "$ACC_RESULT" -eq 0 ]; then
+                ACCOUNT_USERNAME="$ACC_USER"
+                echo -e "  ${GREEN}✓${NC} Account created: ${BOLD}$ACC_USER${NC}"
+                break
+            fi
+            if [ "$ACC_RESULT" -eq 3 ]; then
+                echo -e "  ${GREEN}✓${NC} Accounts already exist — leaving the registry untouched."
+                break
+            fi
+            echo -e "  ${RED}✗${NC} $ACC_OUTPUT"
+            echo ""
+            [ "$attempt" -eq 3 ] && ACCOUNT_MANUAL="yes"
+        done
+    fi
+fi
+
+echo ""
+
+# ==========================================================
 # File ownership check
 # ==========================================================
 # PHP (via Apache/nginx + php-fpm) needs write access to secure/
@@ -490,13 +579,32 @@ if [ -n "$OWNERSHIP_WARNING" ]; then
     echo ""
 fi
 
+if [ "$ACCOUNT_MANUAL" = "yes" ]; then
+    echo -e "  ${YELLOW}${BOLD}⚠ Create your admin account manually${NC}"
+    echo "  No account was created, so the admin panel cannot be logged into yet."
+    echo "  Either re-run this script, or do it by hand:"
+    echo ""
+    echo "    1. cp $SECURE_FOLDER_NAME/management/config/users.php.example \\"
+    echo "          $SECURE_FOLDER_NAME/management/config/users.php"
+    echo "    2. Generate a password hash:"
+    echo "         php -r \"echo password_hash('your-password', PASSWORD_DEFAULT);\""
+    echo "    3. In users.php set 'username' and paste the hash into"
+    echo "       'password_hash', and replace the 'usr_...' key with a fresh id:"
+    echo "         php -r \"echo 'usr_' . bin2hex(random_bytes(16));\""
+    echo ""
+fi
+
 echo "  Next steps:"
 echo "    1. Point your vhost DocumentRoot to the public folder"
 echo "    2. Restart your web server"
 echo "    3. Visit http://your-domain/ once (generates config files)"
 echo "    4. On nginx: follow the setup page to include the routing config,"
 echo "       then reload nginx. On Apache: you're done."
-echo "    5. Open http://your-domain/admin/"
+if [ -n "$ACCOUNT_USERNAME" ]; then
+    echo "    5. Open http://your-domain/admin/ and log in as '$ACCOUNT_USERNAME'"
+else
+    echo "    5. Open http://your-domain/admin/ and log in with the account you created"
+fi
 echo ""
 echo "  Config files are auto-created on first page load."
 echo ""

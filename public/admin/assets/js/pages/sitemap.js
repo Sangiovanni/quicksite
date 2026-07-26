@@ -3518,12 +3518,14 @@
 
         btn.disabled = true;
         try {
-            // Save config + generate file in one call
-            const result = await QuickSiteAdmin.apiRequest('getSiteMap', 'POST', {
+            // setSiteMapConfig owns both sitemap writes (the config sidecar and the
+            // published sitemap.txt) — getSiteMap is read-only, so saving goes here.
+            const result = await QuickSiteAdmin.apiRequest('setSiteMapConfig', 'POST', {
                 baseUrl,
                 save: true,
-                saveConfig: { excludedRoutes, customUrls }
-            }, ['text']);
+                excludedRoutes,
+                customUrls
+            });
 
             if (result.ok) {
                 const data = result.data?.data || {};

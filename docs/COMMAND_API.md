@@ -20,7 +20,7 @@ The API documents itself. Once installed:
 GET /management/help
 ```
 
-returns full documentation for **all 176 commands** — parameters, examples, validation rules, and error codes. For a specific command:
+returns full documentation for **all 177 commands** — parameters, examples, validation rules, and error codes. For a specific command:
 
 ```
 GET /management/help/addRoute
@@ -46,7 +46,7 @@ The `help` endpoint is publicly accessible and is the canonical source of truth 
 - `deleteMyAccount` (authenticated) permanently deletes the caller's **own** account: it requires the current password plus `confirm=true`, and ends every session. There is no command that deletes someone else's account — authorization in QuickSite is per project, so the ways to part with a person are `removeMember` (evict them from one project) and, for the operator, editing `users.php` directly. Deletion is **refused** while the caller is the sole owner of any project: the response lists them, and each must be handed over with `transferOwnership` or destroyed with `deleteProject` first. On success the caller is removed from every project they belong to, along with any invitation addressed to them and any join request they filed. References to them *inside other people's* pending entries (who invited or sponsored whom) are deliberately kept so a third party never loses an invitation, and render with a `null` name.
 - Session TTLs (`access_ttl`, `refresh_ttl`, `reuse_grace`) and the registration policy (`allow_self_registration`, `min_password_length`, `max_users`, `throttle.per_ip_per_minute`, `throttle.global_per_hour` — 0 disables a limit) live in `secure/management/config/auth.php` (gitignored, auto-created from `.example`); runtime session state lives in `sessions.json` next to it (machine-written, hashed at rest — never edit).
 - Authorization is **per project**: a user's role comes from the target project's `config/members.json`. The six fixed roles (`viewer` … `owner`) are defined by trust-coherent command **categories** in `categories.php`; `roles.php` grants each role a `rank` and its categories, expanded to a per-command allowlist at load time. There is no superadmin and no custom roles.
-- Default install ships with a placeholder account whose default password is documented in `users.php.example`; the admin panel warns until you change its password and id.
+- There is **no default account and no default password**. `setup.sh` / `setup.bat` ask for a username and password and create the first account; until one exists the admin login page says so and cannot be submitted. To create it by hand instead, copy `users.php.example` to `users.php` and follow the instructions in that file.
 
 ## Response shape
 
@@ -73,7 +73,7 @@ There is **no separate error envelope**. A failed call uses the same four fields
 
 ## Command catalogue
 
-The 176 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
+The 177 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
 
 > **AI is browser-direct (BYOK).** There is no `callAi` / `testAiKey` / `detectProvider` / `listAiProviders` server command — the admin panel calls AI providers directly from the browser using credentials stored in `aiConnectionsV3` (localStorage). The Management API only handles workflow specs and command execution.
 
@@ -84,7 +84,7 @@ Each row enumerates the commands in that category — comma-separated, alphabeti
 | **Meta** | `help` — self-documenting endpoint, callable without authentication. |
 | **Session & account** | `login`, `refreshSession`, `logoutSession`, `register`, `changePassword`, `deleteMyAccount` — username+password login → access + refresh pair; refresh rotation with reuse-detection (family revoke); explicit logout; flag-gated flood-controlled self-registration (public); self-service password change and account deletion (authenticated — both require the current password; deletion also needs `confirm=true`, is refused while the caller solely owns a project, and ends every session). See *Authentication* above. |
 | **Pages** | `listPages`, `createAlias`, `deleteAlias`, `listAliases`, `editFavicon`, `editTitle` — page metadata, title, favicon, alias routes. |
-| **Routes & sitemap** | `addRoute`, `deleteRoute`, `getRoutes`, `getSiteMap`, `setRouteLayout`, `analyzeReachability` — URL routing tree CRUD, sitemap export, dead-route audit. `getSiteMap` URLs are absolute: a `baseUrl` body param (validated URL) wins; otherwise the deployment's `QS_PUBLIC_BASE_URL` env var, else the project's own `/p/<id>/` URL on the install. `setRouteResolver` is under "Server-side data resolvers" below since the route layer just hosts the resolver config. |
+| **Routes & sitemap** | `addRoute`, `deleteRoute`, `getRoutes`, `getSiteMap`, `setSiteMapConfig`, `setRouteLayout`, `analyzeReachability` — URL routing tree CRUD, sitemap export, dead-route audit. `getSiteMap` is **read-only**; `setSiteMapConfig` owns the two sitemap writes (the excluded-routes / custom-URLs sidecar, and publishing `public/sitemap.txt`) and needs a write role, because both decide what the published sitemap contains. `getSiteMap` URLs are absolute: a `baseUrl` body param (validated URL) wins; otherwise the deployment's `QS_PUBLIC_BASE_URL` env var, else the project's own `/p/<id>/` URL on the install. `setRouteResolver` is under "Server-side data resolvers" below since the route layer just hosts the resolver config. |
 | **Structure** | `getStructure`, `editStructure`, `addNode`, `addComplexElement`, `addComponentToNode`, `editComponentToNode`, `editNode`, `moveNode`, `deleteNode`, `duplicateNode` — edit nodes inside a page tree. |
 | **Components** | `listComponents`, `getComponent`, `findComponentUsages`, `renameComponent`, `duplicateComponent` — reusable component definitions (NOT the in-tree snippet shortcuts below). |
 | **Translations** | `getTranslation`, `getTranslations`, `getTranslationKeys`, `setTranslationKeys`, `deleteTranslationKeys`, `cleanOrphanTranslations`, `validateTranslations`, `getUnusedTranslationKeys`, `analyzeTranslations`, `importStructureTranslations` — translation keys per language; audits + structure-aware bulk operations. |
@@ -188,7 +188,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 ## Internals
 
 - Command handlers live in `secure/management/command/<command>.php`, one file per command.
-- The whitelist of valid commands is `secure/management/routes.php` (176 entries — this file is the single source of truth for which commands exist).
+- The whitelist of valid commands is `secure/management/routes.php` (177 entries — this file is the single source of truth for which commands exist).
 - Shared helpers live in `secure/src/functions/utilsManagement.php` (e.g., `varExportNested()`, `SPECIAL_PAGES`, role helpers).
 - Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `secure/src/classes/CommandRunner.php`. CommandRunner carries a **hardcoded read-only allowlist** (26 `get*` / `list*` commands) it will execute internally; membership and other mutating commands are not on it.
 - Because that allowlist bypasses the permission check, it **is** the boundary: every command on it is reachable by the lowest membership tier, so it holds only commands inside the `viewer` grant (`content.read`) or a global any-authenticated category. Admin-tier reads — command history, backup listings — are deliberately absent and must go through the HTTP layer, where the role check applies.

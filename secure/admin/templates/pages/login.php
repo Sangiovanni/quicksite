@@ -19,6 +19,19 @@ $loginRetryAfter = 0;
 $registerFlash = !empty($_SESSION['qs_register_flash']);
 unset($_SESSION['qs_register_flash']);
 
+// UNCONFIGURED INSTALL: no account exists, so no credential can ever succeed here.
+// Show the deployer what to do instead of a form that cannot work.
+//
+// The check is on the REGISTRY BEING EMPTY, not on users.php existing: a file that
+// is present but holds no users is the same dead end, and loadUsersConfig() answers
+// both cases identically (it returns ['users' => []] for a missing file too).
+require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+$noAccounts = (loadUsersConfig()['users'] ?? []) === [];
+// A disabled control is a hint to the human, never a gate: the POST branch below is
+// what actually refuses, and it refuses for the ordinary reason (no such user), so
+// the failure stays uniform with every other bad credential.
+$disabledAttr = $noAccounts ? ' disabled' : '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = (string)($_POST['username'] ?? '');
     $password = (string)($_POST['password'] ?? '');
@@ -64,6 +77,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="admin-alert admin-alert--error"><?= __admin('login.invalidCredentials') ?></div>
             <?php endif; ?>
 
+            <?php if ($noAccounts): ?>
+            <div class="admin-alert admin-alert--warning">
+                <strong><?= __admin('login.noAccounts.title', 'No account exists yet') ?></strong>
+                <p><?= __admin('login.noAccounts.intro', 'This install has no accounts, so there is nothing to log in as. QuickSite ships no default password — you create the first account yourself.') ?></p>
+                <?php if ($router->isRegistrationOpen()): ?>
+                <p>
+                    <?= __admin('login.noAccounts.registerOpen', 'Self-registration is enabled on this install, so you can create the first account now:') ?>
+                    <a href="<?= adminAttr($router->url('register')) ?>"><?= __admin('login.registerLink') ?></a>
+                </p>
+                <?php endif; ?>
+                <p><?= __admin('login.noAccounts.runSetup', 'Otherwise, run the setup script in the QuickSite folder — it asks for a username and password and creates the account for you:') ?></p>
+                <ul>
+                    <li><code>setup.sh</code> <?= __admin('login.noAccounts.onLinux', '(Linux / macOS)') ?></li>
+                    <li><code>setup.bat</code> <?= __admin('login.noAccounts.onWindows', '(Windows)') ?></li>
+                </ul>
+                <p><?= __admin('login.noAccounts.manual', 'If you cannot run the script, copy secure/management/config/users.php.example to users.php and fill in a username and a password hash — the instructions are in that file.') ?></p>
+            </div>
+            <?php endif; ?>
+
             <form id="admin-login-form" method="POST" action="">
                 <div class="admin-form-group">
                     <label class="admin-label admin-label--required" for="username">
@@ -79,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         autocomplete="username"
                         autocapitalize="none"
                         spellcheck="false"
-                        required
+                        required<?= $disabledAttr ?>
                     >
                 </div>
 
@@ -95,7 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             class="admin-input"
                             style="padding-right: 2.75rem;"
                             autocomplete="current-password"
-                            required
+                            required<?= $disabledAttr ?>
                         >
                         <button
                             type="button"
@@ -134,7 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <p class="admin-hint"><?= __admin('login.rememberHint') ?></p>
                 </div>
 
-                <button type="submit" class="admin-btn admin-btn--primary admin-btn--lg admin-btn--block">
+                <button type="submit" class="admin-btn admin-btn--primary admin-btn--lg admin-btn--block"<?= $disabledAttr ?>>
                     <?= __admin('login.submit') ?>
                 </button>
 

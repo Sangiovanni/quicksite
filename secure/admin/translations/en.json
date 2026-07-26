@@ -63,6 +63,15 @@
         "privacyNote": "By checking 'Keep me signed in', you consent to a persistent authentication cookie on this device.",
         "registerLink": "No account yet? Create one",
         "registerSuccess": "Account created — sign in with your username and password",
+        "noAccounts": {
+            "title": "No account exists yet",
+            "intro": "This install has no accounts, so there is nothing to log in as. QuickSite ships no default password — you create the first account yourself.",
+            "registerOpen": "Self-registration is enabled on this install, so you can create the first account now:",
+            "runSetup": "Otherwise, run the setup script in the QuickSite folder — it asks for a username and password and creates the account for you:",
+            "onLinux": "(Linux / macOS)",
+            "onWindows": "(Windows)",
+            "manual": "If you cannot run the script, copy secure/management/config/users.php.example to users.php and fill in a username and a password hash — the instructions are in that file."
+        },
         "help": {
             "title": "No account?",
             "text": "Accounts are created by an administrator (or the platform hosting this site). If you lost your password, ask your administrator to reset it.",

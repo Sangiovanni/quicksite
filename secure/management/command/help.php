@@ -732,9 +732,65 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.invalid_format' => 'Invalid format parameter (must be text or json)'
         ],
-        'notes' => 'Use format=json (default) for programmatic access and Dashboard. Use format=text to generate sitemap.txt for SEO. Coverage data includes translation key counts per language to help identify incomplete translations.'
+        'notes' => 'Read-only. Use format=json (default) for programmatic access and Dashboard. Use format=text to preview or download sitemap.txt for SEO. Persisting exclusions/custom URLs and publishing sitemap.txt are setSiteMapConfig (route.write). Coverage data includes translation key counts per language to help identify incomplete translations.'
     ],
-    
+
+    'setSiteMapConfig' => [
+        'description' => 'Persists the sitemap configuration (routes excluded from the sitemap, extra custom URLs appended to it) and optionally publishes public/sitemap.txt. Split out of getSiteMap because both writes decide what the published sitemap contains, which is an authoring capability rather than a read.',
+        'method' => 'POST',
+        'url_structure' => '/management/p/<projectId>/setSiteMapConfig',
+        'parameters' => [
+            'excludedRoutes' => [
+                'required' => false,
+                'type' => 'array',
+                'description' => 'Route names to keep OUT of the sitemap. Omit to leave the stored value unchanged.',
+                'example' => ['legal', 'internal-preview']
+            ],
+            'customUrls' => [
+                'required' => false,
+                'type' => 'array',
+                'description' => 'Extra absolute URLs to append. Values that are not valid absolute URLs are dropped and reported in rejectedUrls. Omit to leave the stored value unchanged.',
+                'example' => ['https://example.com/landing']
+            ],
+            'save' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Also write public/sitemap.txt from the current routes plus this configuration',
+                'example' => true
+            ],
+            'baseUrl' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Base URL for the generated entries when save is true (defaults to the resolved public base)',
+                'example' => 'https://example.com'
+            ]
+        ],
+        'example_post' => 'POST /management/p/mysite/setSiteMapConfig with body: {"excludedRoutes":["legal"],"customUrls":["https://example.com/landing"],"save":true}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Sitemap configuration saved and sitemap.txt published',
+            'data' => [
+                'project' => 'mysite',
+                'excludedRoutes' => ['legal'],
+                'customUrls' => ['https://example.com/landing'],
+                'saved' => true,
+                'published' => true,
+                'path' => '/…/secure/projects/mysite/public/sitemap.txt',
+                'urlCount' => 5
+            ]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'called without the /p/<projectId>/ marker',
+            '400.validation.missing_field' => 'neither excludedRoutes nor customUrls was provided',
+            '400.validation.invalid_type' => 'excludedRoutes or customUrls is not an array',
+            '403.auth.forbidden' => 'the caller\'s role does not grant route.write (viewer cannot write sitemap data)',
+            '500.server.file_write_failed' => 'could not persist sitemap-config.json',
+            '500.operation.write_failed' => 'configuration saved, but sitemap.txt could not be generated or written'
+        ],
+        'notes' => 'Sending only one of excludedRoutes / customUrls merges onto the stored value rather than clearing the other. Requires route.write (editor and above) — getSiteMap remains readable by viewers but can no longer write anything.'
+    ],
+
     'analyzeReachability' => [
         'description' => 'Analyzes route reachability via BFS from the home page. Follows internal links in page structures, menu, and footer to find orphan routes that are not reachable through any navigation path.',
         'method' => 'GET',

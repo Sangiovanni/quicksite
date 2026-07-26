@@ -40,16 +40,26 @@
  *                    (reconcileMemberships) must merge-preserve them.
  */
 
+// QuickSite ships NO working credential — this file is a SHAPE REFERENCE, not a
+// usable account. `setup.sh` / `setup.bat` ask for a username and password and
+// write a real users.php for you; the account you get is the one you chose.
+//
+// To do it by hand instead: copy this file to users.php, then
+//   - replace the 'usr_CHANGE_ME_default' key with a fresh id:
+//       php -r "echo 'usr_' . bin2hex(random_bytes(16));"
+//   - set 'username' to your login name (see the rule above)
+//   - set 'password_hash' to a real hash:
+//       php -r "echo password_hash('your-password', PASSWORD_DEFAULT);"
+// Until password_hash is a real hash the entry cannot log in at all: null means
+// "externally managed account" (see the field notes above), and the admin panel
+// keeps showing a security warning while any 'CHANGE_ME' id exists.
 return [
     'users' => [
-        // Default account — password is 'CHANGE_ME_admin' (public knowledge!).
-        // Change the password_hash AND the userId before deploying; the admin
-        // panel shows a security warning as long as this account exists.
         'usr_CHANGE_ME_default' => [
             'name'             => 'Default Admin',
             'username'         => 'admin',
             'status'           => 'active',
-            'password_hash'    => '$2y$10$v8pm2uxDZ.qdwA5LgF.Yt.96LYs9svgaAsJ2c//X4P0X4BTVig4QO',
+            'password_hash'    => null,
             'selected_project' => null,
             'projects'         => [],
         ],

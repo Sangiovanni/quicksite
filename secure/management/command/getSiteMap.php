@@ -16,32 +16,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/renderBootstrap.php'; // qs_resolve_public_base (C15 15.4)
-
-/**
- * Load sitemap config (custom URLs + excluded routes)
- */
-function loadSitemapConfig(): array {
-    $configPath = PROJECT_PATH . '/config/sitemap-config.json';
-    $default = ['excludedRoutes' => [], 'customUrls' => []];
-    if (!file_exists($configPath)) return $default;
-    $data = json_decode(file_get_contents($configPath), true);
-    return is_array($data) ? array_merge($default, $data) : $default;
-}
-
-/**
- * Save sitemap config
- */
-function saveSitemapConfig(array $config): bool {
-    $configDir = PROJECT_PATH . '/config';
-    if (!is_dir($configDir)) mkdir($configDir, 0755, true);
-    $data = [
-        'excludedRoutes' => array_values(array_unique($config['excludedRoutes'] ?? [])),
-        'customUrls' => array_values(array_filter(array_unique($config['customUrls'] ?? []), function($u) {
-            return is_string($u) && trim($u) !== '';
-        }))
-    ];
-    return file_put_contents($configDir . '/sitemap-config.json', json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) !== false;
-}
+require_once SECURE_FOLDER_PATH . '/src/functions/sitemapHelpers.php';  // shared config read/apply
 
 /**
  * Recursively count non-empty translation values
@@ -190,78 +165,25 @@ function __command_getSiteMap(array $params = [], array $urlParams = []): ApiRes
     require_once SECURE_FOLDER_PATH . '/src/functions/resolverHelpers.php';
     $sitemapData['routeResolvers'] = loadResolversSidecar();
 
-    // Load sitemap config (exclusions + custom URLs)
-    $sitemapConfig = loadSitemapConfig();
+    // Load sitemap config (exclusions + custom URLs). READ ONLY — persisting it, and
+    // publishing sitemap.txt, belong to setSiteMapConfig (route.write). This command
+    // is inside content.read, the viewer grant, so it must not write anything.
+    $sitemapConfig = qs_sitemap_config_load(PROJECT_PATH);
     $sitemapData['sitemapConfig'] = $sitemapConfig;
 
-    // Handle saveConfig action (persist custom URLs / exclusions)
-    if (isset($params['saveConfig']) && is_array($params['saveConfig'])) {
-        $sitemapConfig = $params['saveConfig'];
-        saveSitemapConfig($sitemapConfig);
-        $sitemapData['sitemapConfig'] = loadSitemapConfig(); // re-read to return clean data
-        $sitemapConfig = $sitemapData['sitemapConfig'];
-    }
-
-    // Apply exclusions and custom URLs only for text format (save/download)
-    // JSON format returns all routes so the UI can show toggles
+    // Apply exclusions and custom URLs only for text format (the download preview).
+    // JSON format returns all routes so the UI can show toggles.
     if ($format === 'text') {
-        $excludedRoutes = $sitemapConfig['excludedRoutes'] ?? [];
-        if (!empty($excludedRoutes)) {
-            // Remove URLs belonging to excluded routes
-            $filteredRoutes = [];
-            $filteredUrls = [];
-            foreach ($sitemapData['routes'] as $routeData) {
-                if (in_array($routeData['name'], $excludedRoutes)) continue;
-                $filteredRoutes[] = $routeData;
-                foreach ($routeData['urls'] as $url) {
-                    $filteredUrls[] = $url;
-                }
-            }
-            $sitemapData['routes'] = $filteredRoutes;
-            $sitemapData['urls'] = $filteredUrls;
-        }
-
-        // Append custom URLs
-        $customUrls = $sitemapConfig['customUrls'] ?? [];
-        foreach ($customUrls as $customUrl) {
-            if (filter_var($customUrl, FILTER_VALIDATE_URL)) {
-                $sitemapData['urls'][] = $customUrl;
-            }
-        }
-        $sitemapData['totalUrls'] = count($sitemapData['urls']);
+        $sitemapData = qs_sitemap_apply_config($sitemapData, $sitemapConfig);
     }
 
     // For internal calls and JSON format, return ApiResponse
     // Note: text format requires direct output, handled only via HTTP
     if ($format === 'text' && !defined('COMMAND_INTERNAL_CALL')) {
-        $content = implode("\n", $sitemapData['urls']) . "\n";
-
-        // If save=true, write sitemap.txt into the project's own public/ — the one copy.
-        // C15 15.3: this used to write twice, to the project folder AND to the live public
-        // root, because the served project's live copy lived at the web root. Those two
-        // paths are now the same directory for every project, so the second write is gone.
-        if (!empty($params['save'])) {
-            $projectPublicDir = PROJECT_PATH . '/public';
-            if (!is_dir($projectPublicDir)) mkdir($projectPublicDir, 0755, true);
-            $projectSitemapPath = $projectPublicDir . '/sitemap.txt';
-            if (file_put_contents($projectSitemapPath, $content) === false) {
-                return ApiResponse::create(500, 'operation.write_failed')
-                    ->withMessage('Failed to write sitemap.txt to project');
-            }
-
-            return ApiResponse::create(200, 'operation.success')
-                ->withMessage('sitemap.txt saved successfully')
-                ->withData([
-                    'path' => $projectSitemapPath,
-                    'urlCount' => count($sitemapData['urls']),
-                    'content' => $content
-                ]);
-        }
-
-        // Return plain text sitemap (HTTP only)
+        // Preview / download only. Publishing the file is setSiteMapConfig's job.
         header('Content-Type: text/plain; charset=utf-8');
         header('Content-Disposition: inline; filename="sitemap.txt"');
-        echo $content;
+        echo implode("\n", $sitemapData['urls']) . "\n";
         exit;
     }
     
