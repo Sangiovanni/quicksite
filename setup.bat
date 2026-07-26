@@ -470,16 +470,28 @@ REM pipes it to the PHP helper on STDIN, so it never reaches a command line.
 
 set "ACCOUNT_USERNAME="
 set "ACCOUNT_MANUAL=no"
+set "ACCOUNT_EXISTED=no"
 set "ACCOUNT_PS1=%SECURE_DIR%\setup\create-account.ps1"
 
 if not exist "%ACCOUNT_PS1%" (
     set "ACCOUNT_MANUAL=yes"
 ) else (
     powershell -NoProfile -ExecutionPolicy Bypass -File "%ACCOUNT_PS1%" -SecureDir "%SECURE_DIR%"
+    REM FAIL CLOSED. Only exit 0 means an account was created. `if errorlevel N` is
+    REM "N or higher", so the branches run high to low and the final catch-all covers
+    REM 1 and 2 — a PowerShell crash exits 1, and without that branch it fell through
+    REM every test and the summary told the deployer to log in to an account that was
+    REM never created.
     if errorlevel 6 (
         echo   PHP CLI not found - skipping account creation.
         set "ACCOUNT_MANUAL=yes"
     ) else if errorlevel 4 (
+        set "ACCOUNT_MANUAL=yes"
+    ) else if errorlevel 3 (
+        echo   An account registry already exists - leaving it untouched.
+        set "ACCOUNT_EXISTED=yes"
+    ) else if errorlevel 1 (
+        echo   Account creation did not complete.
         set "ACCOUNT_MANUAL=yes"
     )
 )
@@ -510,13 +522,19 @@ if "%ACCOUNT_MANUAL%"=="yes" (
     echo.
 )
 
+REM Step 5 must describe what actually happened. It used to say "the account you
+REM created" unconditionally, so a failed creation still ended in a success message.
+set "ACCOUNT_LOGIN_HINT=log in with the account you created"
+if "%ACCOUNT_EXISTED%"=="yes" set "ACCOUNT_LOGIN_HINT=log in with your existing account"
+if "%ACCOUNT_MANUAL%"=="yes" set "ACCOUNT_LOGIN_HINT=log in once you have created your account (see above)"
+
 echo   Next steps:
 echo     1. Ensure your vhost DocumentRoot points to the public folder
 echo     2. Restart your web server
 echo     3. Visit http://your-domain/ once (generates config files)
 echo     4. On nginx: follow the setup page to include the routing config,
 echo        then reload nginx. On Apache: you're done.
-echo     5. Open http://your-domain/admin/ and log in with the account you created
+echo     5. Open http://your-domain/admin/ and %ACCOUNT_LOGIN_HINT%
 echo.
 echo   Config files are auto-created on first page load from .example templates.
 echo.

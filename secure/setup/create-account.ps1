@@ -88,8 +88,22 @@ for ($attempt = 1; $attempt -le 3; $attempt++) {
         }
 
         # Two lines on STDIN: username, then password. Never argv.
-        $output = @($username, $plain1) | & $php $helper 2>&1
-        $code = $LASTEXITCODE
+        #
+        # The preference is relaxed for exactly this call. Windows PowerShell wraps a
+        # native command's stderr into ErrorRecords when it is merged with 2>&1, and
+        # under $ErrorActionPreference='Stop' that becomes TERMINATING — so any noise
+        # PHP writes at startup (a missing extension, a deprecation notice) would abort
+        # the script here, leaving the account uncreated. The exit code stays the only
+        # thing we judge success by; stderr is captured for the message, not the verdict.
+        $prevEap = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $output = @($username, $plain1) | & $php $helper 2>&1
+            $code = $LASTEXITCODE
+        }
+        finally {
+            $ErrorActionPreference = $prevEap
+        }
     }
     finally {
         # Zero the plaintext and the unmanaged buffers regardless of outcome.
