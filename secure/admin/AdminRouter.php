@@ -16,6 +16,7 @@ class AdminRouter {
     private array $validPages = [
         'login',       // Authentication page
         'register',    // Self-registration page (C8; renders only when auth.php allows it)
+        'setup',       // First-run page (C14; renders only while the user registry is empty)
         'dashboard',   // Main admin panel after login
         'command',     // Individual command pages
         'settings',    // Settings and configuration
@@ -304,6 +305,54 @@ class AdminRouter {
     public function isRegistrationOpen(): bool {
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
         return qs_registration_config()['allow_self_registration'];
+    }
+
+    /**
+     * Has this install been bootstrapped — i.e. does ANY account exist? (C14)
+     *
+     * The test is the REGISTRY BEING EMPTY, not users.php existing: a file that
+     * is present but holds no users is the same dead end, and loadUsersConfig()
+     * answers both cases identically. While this returns false there is nobody
+     * to log in as, so every admin URL renders the first-run page.
+     */
+    public function needsFirstRun(): bool {
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+        return (loadUsersConfig()['users'] ?? []) === [];
+    }
+
+    /**
+     * Attempt the FIRST-RUN account creation (C14) — the page's entry into the
+     * shared bootstrap gate (qs_auth_attempt_setup). Authorisation is the setup
+     * token the deployer reads off disk; the flag governing public
+     * self-registration is deliberately not consulted (creating the first
+     * account is an installation step, and must work on a default install).
+     *
+     * On success a one-shot flash is set for the login page's banner. No
+     * auto-login: the login page stays the single session-establishing point.
+     *
+     * @return string|null null on success, else an error key:
+     *                     'setup_complete' | 'missing_fields' | 'invalid_token' |
+     *                     'invalid_username' | 'name_equals_username' |
+     *                     'password_too_short:<min>' | 'throttled:<seconds>' | 'server'
+     */
+    public function attemptSetup(string $name, string $username, string $password, string $token): ?string {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+
+        $attempt = qs_auth_attempt_setup($name, $username, $password, $token);
+        if ($attempt['ok']) {
+            $_SESSION['qs_register_flash'] = true;
+            return null;
+        }
+        if ($attempt['error'] === 'throttled') {
+            return 'throttled:' . (int)($attempt['retry_after'] ?? 60);
+        }
+        if ($attempt['error'] === 'password_too_short') {
+            return 'password_too_short:' . (int)($attempt['min_length'] ?? 12);
+        }
+        return $attempt['error'];
     }
 
     /**
@@ -650,14 +699,27 @@ class AdminRouter {
         if ($this->page === 'ai-settings') {
             $this->redirect('ai-connections');
         }
-        
+
+        // C14 — FIRST RUN. With an empty user registry there is nobody to log in
+        // as, so every admin URL lands on the first-run page instead of a login
+        // form that cannot work. The moment an account exists the page is dead:
+        // /admin/setup redirects to login, and the underlying gate refuses
+        // independently (this redirect is navigation, never the security check).
+        if ($this->needsFirstRun()) {
+            if ($this->page !== 'setup') {
+                $this->redirect('setup');
+            }
+        } elseif ($this->page === 'setup') {
+            $this->redirect('login');
+        }
+
         // Check authentication for protected pages
-        if (!in_array($this->page, ['login', 'register']) && !$this->isAuthenticated()) {
+        if (!in_array($this->page, ['login', 'register', 'setup']) && !$this->isAuthenticated()) {
             $this->redirect('login');
         }
 
         // If already authenticated and trying to access login/register, go to dashboard
-        if (in_array($this->page, ['login', 'register']) && $this->isAuthenticated()) {
+        if (in_array($this->page, ['login', 'register', 'setup']) && $this->isAuthenticated()) {
             $this->redirect('dashboard');
         }
 

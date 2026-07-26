@@ -15,6 +15,11 @@
  * oracle. No session and no user id are returned; the new user signs in
  * through `login`.
  *
+ * This command CANNOT create the first account on an install. While the user
+ * registry is empty, the shared mint path requires the first-run setup token
+ * (which this command never supplies) and the response is
+ * `auth.setup_required` — see the first-run page at /admin/.
+ *
  * @method POST
  * @route /management/register
  * @auth none (self-gating via the registration flag)
@@ -45,6 +50,13 @@ function __command_register(array $params = [], array $urlParams = []): ApiRespo
             case 'registration_closed':
                 return ApiResponse::create(403, 'auth.registration_closed')
                     ->withMessage('Registration is closed (account limit reached)');
+            case 'setup_required':
+                // The install has no accounts at all. Registration is not the
+                // way in: the first account is created on the first-run page,
+                // authorised by a setup token that only somebody with
+                // filesystem access to secure/ can read.
+                return ApiResponse::create(403, 'auth.setup_required')
+                    ->withMessage('This installation has no accounts yet — create the first one at /admin/');
             case 'throttled':
                 return ApiResponse::create(429, 'auth.throttled')
                     ->withMessage('Too many registration attempts — try again later')

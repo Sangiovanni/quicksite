@@ -458,44 +458,6 @@ REM Save config for re-run detection
     echo PUBLIC_SPACE=%PUBLIC_SPACE%
 ) > "%CONF_FILE%"
 
-REM ==========================================================
-REM Admin account
-REM ==========================================================
-REM QuickSite ships NO default credential. The only account that ever exists is
-REM the one created here, from a username and password the deployer chooses.
-REM
-REM The prompt lives in PowerShell (create-account.ps1) because `set /p` always
-REM echoes what is typed — a password must not appear on screen. PowerShell also
-REM pipes it to the PHP helper on STDIN, so it never reaches a command line.
-
-set "ACCOUNT_USERNAME="
-set "ACCOUNT_MANUAL=no"
-set "ACCOUNT_EXISTED=no"
-set "ACCOUNT_PS1=%SECURE_DIR%\setup\create-account.ps1"
-
-if not exist "%ACCOUNT_PS1%" (
-    set "ACCOUNT_MANUAL=yes"
-) else (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%ACCOUNT_PS1%" -SecureDir "%SECURE_DIR%"
-    REM FAIL CLOSED. Only exit 0 means an account was created. `if errorlevel N` is
-    REM "N or higher", so the branches run high to low and the final catch-all covers
-    REM 1 and 2 — a PowerShell crash exits 1, and without that branch it fell through
-    REM every test and the summary told the deployer to log in to an account that was
-    REM never created.
-    if errorlevel 6 (
-        echo   PHP CLI not found - skipping account creation.
-        set "ACCOUNT_MANUAL=yes"
-    ) else if errorlevel 4 (
-        set "ACCOUNT_MANUAL=yes"
-    ) else if errorlevel 3 (
-        echo   An account registry already exists - leaving it untouched.
-        set "ACCOUNT_EXISTED=yes"
-    ) else if errorlevel 1 (
-        echo   Account creation did not complete.
-        set "ACCOUNT_MANUAL=yes"
-    )
-)
-
 echo.
 echo ========================================
 echo   Setup complete
@@ -507,34 +469,15 @@ if not "%PUBLIC_SPACE%"=="" (
     echo   URL space:      %PUBLIC_SPACE%
 )
 echo.
-if "%ACCOUNT_MANUAL%"=="yes" (
-    echo   ^^! Create your admin account manually
-    echo   No account was created, so the admin panel cannot be logged into yet.
-    echo   Either re-run this script, or do it by hand:
-    echo.
-    echo     1. copy %SECURE_FOLDER_NAME%\management\config\users.php.example
-    echo             %SECURE_FOLDER_NAME%\management\config\users.php
-    echo     2. Generate a password hash:
-    echo          php -r "echo password_hash('your-password', PASSWORD_DEFAULT);"
-    echo     3. In users.php set 'username', paste the hash into 'password_hash',
-    echo        and replace the 'usr_...' key with a fresh id:
-    echo          php -r "echo 'usr_' . bin2hex(random_bytes(16));"
-    echo.
-)
-
-REM Step 5 must describe what actually happened. It used to say "the account you
-REM created" unconditionally, so a failed creation still ended in a success message.
-set "ACCOUNT_LOGIN_HINT=log in with the account you created"
-if "%ACCOUNT_EXISTED%"=="yes" set "ACCOUNT_LOGIN_HINT=log in with your existing account"
-if "%ACCOUNT_MANUAL%"=="yes" set "ACCOUNT_LOGIN_HINT=log in once you have created your account (see above)"
-
 echo   Next steps:
 echo     1. Ensure your vhost DocumentRoot points to the public folder
 echo     2. Restart your web server
 echo     3. Visit http://your-domain/ once (generates config files)
 echo     4. On nginx: follow the setup page to include the routing config,
 echo        then reload nginx. On Apache: you're done.
-echo     5. Open http://your-domain/admin/ and %ACCOUNT_LOGIN_HINT%
+echo     5. Open http://your-domain/admin/ and create your first account.
+echo        QuickSite ships no default password: the page asks for a setup
+echo        token, and tells you which file on the server to read it from.
 echo.
 echo   Config files are auto-created on first page load from .example templates.
 echo.

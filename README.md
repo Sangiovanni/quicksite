@@ -108,6 +108,20 @@ setup.bat www.example.com
 
 **Don't want to use scripts?** Rename folders manually and edit `init.php` to match (`PUBLIC_FOLDER_NAME`, `SECURE_FOLDER_NAME`, `PUBLIC_FOLDER_SPACE`). On nginx, you'll see a first-load setup page with the exact `include` directive you need.
 
+### Create your first account
+
+QuickSite ships **no default account and no default password**. Open `http://your-domain/admin/` and you get a first-run page instead of a login form.
+
+It asks for a **setup token**. The token is written on the server, and the page tells you which file to read it from:
+
+```
+secure/management/config/setup-token.txt
+```
+
+Open that file, copy its single line into the form along with a display name, a username and a password, and the account is created. Being able to read a file inside `secure/` is what proves the installation is yours — so you need no command-line access and no password ever ships in the repository.
+
+The token is destroyed as soon as it is used, and the page is gone for good once an account exists.
+
 ### Manual setup
 
 <details>

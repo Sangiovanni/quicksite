@@ -63,15 +63,6 @@
         "privacyNote": "En cochant 'Rester connecté', vous consentez à un cookie d'authentification persistant sur cet appareil.",
         "registerLink": "Pas encore de compte ? Créez-en un",
         "registerSuccess": "Compte créé — connectez-vous avec votre nom d'utilisateur et votre mot de passe",
-        "noAccounts": {
-            "title": "Aucun compte n'existe encore",
-            "intro": "Cette installation n'a aucun compte : il n'y a donc rien avec quoi se connecter. QuickSite ne fournit aucun mot de passe par défaut — vous créez vous-même le premier compte.",
-            "registerOpen": "L'inscription est activée sur cette installation : vous pouvez créer le premier compte maintenant :",
-            "runSetup": "Sinon, lancez le script d'installation dans le dossier QuickSite — il demande un nom d'utilisateur et un mot de passe, puis crée le compte :",
-            "onLinux": "(Linux / macOS)",
-            "onWindows": "(Windows)",
-            "manual": "Si vous ne pouvez pas lancer le script, copiez secure/management/config/users.php.example vers users.php et renseignez un nom d'utilisateur et une empreinte de mot de passe — les instructions sont dans ce fichier."
-        },
         "help": {
             "title": "Pas de compte ?",
             "text": "Les comptes sont créés par un administrateur (ou par la plateforme qui héberge ce site). Mot de passe perdu ? Demandez à votre administrateur de le réinitialiser.",
@@ -99,6 +90,40 @@
         "closed": "Les inscriptions sont fermées sur cette installation (limite de comptes atteinte)",
         "disabled": "L'auto-inscription est désactivée sur cette installation",
         "serverError": "Impossible de créer le compte — réessayez"
+    },
+    "setup": {
+        "title": "Créez votre premier compte",
+        "subtitle": "Cette installation ne contient encore aucun compte",
+        "tokenWhere": {
+            "title": "Étape 1 — lisez le jeton d'installation",
+            "body": "Il a été écrit sur le serveur, dans votre dossier QuickSite. Ouvrez ce fichier et copiez son unique ligne :",
+            "why": "Pouvoir lire ce fichier prouve que cette installation vous appartient. Le jeton ne sert qu'une fois, puis il est détruit."
+        },
+        "tokenWriteFailed": {
+            "title": "Le jeton d'installation n'a pas pu être créé",
+            "body": "QuickSite doit écrire ce fichier dans votre dossier QuickSite, et l'utilisateur du serveur web n'y parvient pas :",
+            "fix": "Donnez à l'utilisateur du serveur web le droit d'écrire dans ce dossier, puis rechargez cette page. Sous Linux, cela consiste généralement à changer le propriétaire pour www-data, nginx ou l'utilisateur de votre site."
+        },
+        "tokenLabel": "Jeton d'installation",
+        "nameLabel": "Nom affiché",
+        "nameHint": "Visible par les autres utilisateurs. Doit être différent de votre identifiant.",
+        "usernameLabel": "Identifiant",
+        "usernameHint": "Privé — il sert à vous connecter et personne d'autre ne le voit. 3 à 32 caractères : lettres, chiffres, tirets ou tirets bas.",
+        "passwordLabel": "Mot de passe",
+        "passwordHint": "Au moins :min caractères — la longueur compte plus que les symboles.",
+        "submit": "Créer le compte",
+        "invalidToken": "Ce jeton d'installation n'est pas valide. Ouvrez le fichier indiqué ci-dessous et copiez la ligne entière.",
+        "invalidUsername": "Cet identifiant n'est pas valide — utilisez 3 à 32 caractères : lettres, chiffres, tirets ou tirets bas",
+        "nameEqualsUsername": "Votre nom affiché doit être différent de votre identifiant (votre identifiant reste privé)",
+        "passwordTooShort": "Mot de passe trop court — au moins :min caractères",
+        "missingFields": "Tous les champs sont obligatoires — complétez-les puis réessayez",
+        "throttled": "Trop de tentatives — réessayez dans :seconds secondes",
+        "alreadyDone": "Un compte existe déjà sur cette installation — connectez-vous à la place",
+        "serverError": "Le compte n'a pas pu être créé — réessayez",
+        "help": {
+            "title": "Pourquoi un jeton ?",
+            "text": "Cette page peut créer un compte sans que personne ne soit connecté : il faut donc prouver que vous êtes bien la personne qui a installé QuickSite, et non un visiteur qui a trouvé l'adresse. Lire un fichier sur le serveur est cette preuve. Cette page disparaît définitivement dès que le premier compte existe."
+        }
     },
     "logout": {
         "title": "Déconnexion",

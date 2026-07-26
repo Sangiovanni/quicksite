@@ -10,6 +10,7 @@
  */
 
 require_once __DIR__ . '/SessionManagement.php';
+require_once __DIR__ . '/setupToken.php';
 
 /**
  * Load authentication configuration
@@ -887,13 +888,26 @@ function qs_users_mutate(callable $fn) {
  * burns the same time as a real creation (anti-enumeration timing, the same
  * discipline as qs_auth_attempt_login's dummy verify).
  *
- * @param string|null $password null/'' = externally managed (password_hash null)
- * @param int         $maxUsers 0 = unlimited; refused as 'full' under the lock
+ * THE FIRST ACCOUNT NEEDS A SETUP TOKEN (C14). While the registry is EMPTY,
+ * creating a user requires the install's first-run token (setupToken.php) —
+ * proof that the caller can read a file under secure/. Enforced HERE, at the
+ * single mint path, for the same reason name_equals_username is: every creation
+ * route inherits it, so the public `register` command, an internal call, or any
+ * future caller is gated identically and cannot bypass the first-run page.
+ * $setupToken defaults to null so a caller that knows nothing about tokens
+ * FAILS CLOSED on an empty registry rather than quietly minting an account.
+ * The check runs INSIDE the users.php write lock, in the same critical section
+ * as the creation, so two concurrent bootstrap attempts cannot both succeed.
+ *
+ * @param string|null $password   null/'' = externally managed (password_hash null)
+ * @param int         $maxUsers   0 = unlimited; refused as 'full' under the lock
+ * @param string|null $setupToken required while the registry is empty; must be
+ *                                null once an account exists (bootstrap is over)
  * @return array {ok:true, userId:string}
  *             | {ok:false, error:'invalid_username'|'name_equals_username'
- *                |'duplicate'|'full'|'store'}
+ *                |'duplicate'|'full'|'store'|'setup_token'|'setup_complete'}
  */
-function qs_user_create(string $name, string $username, ?string $password, int $maxUsers = 0): array {
+function qs_user_create(string $name, string $username, ?string $password, int $maxUsers = 0, ?string $setupToken = null): array {
     $username = strtolower(trim($username));
     if (!qs_valid_username($username)) {
         return ['ok' => false, 'error' => 'invalid_username'];
@@ -914,7 +928,25 @@ function qs_user_create(string $name, string $username, ?string $password, int $
     $userId = 'usr_' . bin2hex(random_bytes(16));
 
     $error = null;
-    $result = qs_users_mutate(function (array &$cfg) use ($name, $username, $hash, $userId, $maxUsers, &$error) {
+    $bootstrap = false;
+    $result = qs_users_mutate(function (array &$cfg) use ($name, $username, $hash, $userId, $maxUsers, $setupToken, &$error, &$bootstrap) {
+        // THE BOOTSTRAP GATE — both conditions read under the write lock.
+        $bootstrap = ($cfg['users'] ?? []) === [];
+        if ($bootstrap) {
+            // No account exists: the ONLY authorisation is the first-run token.
+            // Absent, wrong, malformed and already-consumed all land here — the
+            // caller must report them identically (no oracle on which it was).
+            if ($setupToken === null || !qs_setup_token_verify($setupToken)) {
+                $error = 'setup_token';
+                return false;
+            }
+        } elseif ($setupToken !== null) {
+            // An account already exists, so bootstrap is over. Refusing a token
+            // here is what makes a lingering token file inert AND closes the
+            // race where two concurrent first-run submissions both pass.
+            $error = 'setup_complete';
+            return false;
+        }
         if ($maxUsers > 0 && count($cfg['users'] ?? []) >= $maxUsers) {
             $error = 'full';
             return false;
@@ -938,9 +970,103 @@ function qs_user_create(string $name, string $username, ?string $password, int $
     });
 
     if ($result === true) {
+        // Consumed only AFTER users.php is on disk. Burning it inside the
+        // callback would strand the deployer permanently if the write then
+        // failed: token gone, still no account. The window this leaves is
+        // harmless — the registry is no longer empty, so the token is already
+        // refused by the 'setup_complete' branch above.
+        if ($bootstrap) {
+            qs_setup_token_consume();
+        }
         return ['ok' => true, 'userId' => $userId];
     }
     return ['ok' => false, 'error' => $error ?? 'store'];
+}
+
+/**
+ * THE FIRST-RUN GATE (C14) — the bootstrap sibling of qs_auth_attempt_login /
+ * qs_auth_attempt_register, so the first-run page holds no rules of its own.
+ *
+ * Reached ONLY while the user registry is empty. Authorisation is the install's
+ * setup token, which the deployer obtains by reading a file under secure/ —
+ * see setupToken.php. This gate does the throttling and the friendly
+ * validation; qs_user_create() re-verifies the token under the write lock as
+ * the authoritative check (the same gate-then-mint-path pattern the project
+ * already uses for name_equals_username).
+ *
+ * Order matters: the token is checked BEFORE the password policy, so someone
+ * guessing tokens learns nothing about the install's rules; and it is checked
+ * AFTER the throttle, so guessing costs budget.
+ *
+ * Public self-registration is NOT consulted here. Creating the first account is
+ * an installation step, not self-registration, and it must work on a default
+ * install where allow_self_registration is false.
+ *
+ * @return array {ok:true, userId:string}
+ *             | {ok:false, error:'setup_complete'|'throttled'|'missing_fields'
+ *                |'invalid_token'|'invalid_username'|'name_equals_username'
+ *                |'password_too_short'|'server',
+ *                retry_after?:int, min_length?:int}
+ */
+function qs_auth_attempt_setup(string $name, string $username, string $password, string $token): array {
+    if ((loadUsersConfig()['users'] ?? []) !== []) {
+        return ['ok' => false, 'error' => 'setup_complete'];
+    }
+
+    // Keyed per CALLER, not per install: a single throttle key would let any
+    // stranger lock the deployer out of their own first-run page. Brute force is
+    // not the defence here (256 bits of entropy is) — this is a noise damper.
+    $throttleKey = 'setup:' . qs_client_ip();
+    $wait = qs_login_throttle_check($throttleKey);
+    if ($wait > 0) {
+        return ['ok' => false, 'error' => 'throttled', 'retry_after' => $wait];
+    }
+
+    $name = trim($name);
+    $username = strtolower(trim($username));
+    if ($name === '' || $username === '' || $password === '' || trim($token) === '') {
+        return ['ok' => false, 'error' => 'missing_fields'];
+    }
+
+    if (!qs_setup_token_verify($token)) {
+        qs_login_throttle_fail($throttleKey);
+        return ['ok' => false, 'error' => 'invalid_token'];
+    }
+
+    $cfg = qs_registration_config();
+    if (!qs_valid_username($username)) {
+        return ['ok' => false, 'error' => 'invalid_username'];
+    }
+    // The public display name must differ from the private login identifier
+    // (see qs_user_create — the mint path re-checks after control-strip).
+    if (strtolower($name) === $username) {
+        return ['ok' => false, 'error' => 'name_equals_username'];
+    }
+    if (mb_strlen($password) < $cfg['min_password_length']) {
+        return ['ok' => false, 'error' => 'password_too_short', 'min_length' => $cfg['min_password_length']];
+    }
+
+    $created = qs_user_create($name, $username, $password, $cfg['max_users'], $token);
+    if ($created['ok']) {
+        qs_login_throttle_clear($throttleKey);
+        return ['ok' => true, 'userId' => $created['userId']];
+    }
+    switch ($created['error']) {
+        case 'setup_token':
+            // Lost a race with a concurrent consumer, or the file vanished
+            // between this gate and the lock. Same uniform answer.
+            qs_login_throttle_fail($throttleKey);
+            return ['ok' => false, 'error' => 'invalid_token'];
+        case 'setup_complete':
+        case 'duplicate':
+            // Someone else finished the bootstrap first.
+            return ['ok' => false, 'error' => 'setup_complete'];
+        case 'invalid_username':
+        case 'name_equals_username':
+            return ['ok' => false, 'error' => $created['error']];
+        default:
+            return ['ok' => false, 'error' => 'server'];
+    }
 }
 
 /**
@@ -956,11 +1082,19 @@ function qs_user_create(string $name, string $username, ?string $password, int $
  * (disabled / closed / throttled / validation) is independent of whether the
  * username exists.
  *
+ * Self-registration NEVER bootstraps an install (C14). It passes no setup
+ * token, so on an EMPTY registry the mint path refuses it and this gate reports
+ * 'setup_required' — the first account is created only through the first-run
+ * page, whose authorisation is a file under secure/. That keeps
+ * allow_self_registration meaning exactly what it says ("the public register
+ * endpoint is open") and leaves ONE unauthenticated account-creating surface
+ * during bootstrap instead of two.
+ *
  * @return array {ok:true, created:bool, userId:?string}
  *             | {ok:false, error:'registration_disabled'|'registration_closed'
- *                |'missing_fields'|'invalid_username'|'name_equals_username'
- *                |'password_too_short'|'throttled'|'server',
- *                retry_after?:int, min_length?:int}
+ *                |'setup_required'|'missing_fields'|'invalid_username'
+ *                |'name_equals_username'|'password_too_short'|'throttled'
+ *                |'server', retry_after?:int, min_length?:int}
  */
 function qs_auth_attempt_register(string $name, string $username, string $password): array {
     $cfg = qs_registration_config();
@@ -1002,6 +1136,11 @@ function qs_auth_attempt_register(string $name, string $username, string $passwo
     }
     if ($created['error'] === 'full') {
         return ['ok' => false, 'error' => 'registration_closed'];
+    }
+    if ($created['error'] === 'setup_token') {
+        // Empty registry: this install has not been bootstrapped yet, and
+        // registration is not the way to do it (see the note above).
+        return ['ok' => false, 'error' => 'setup_required'];
     }
     if ($created['error'] === 'invalid_username') {
         return ['ok' => false, 'error' => 'invalid_username'];

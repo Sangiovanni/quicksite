@@ -5357,9 +5357,23 @@ kbd {
     padding: var(--space-md);
     border-radius: var(--radius-md);
     margin-bottom: var(--space-lg);
+}
+
+/* The flex row exists to seat an icon beside the text, so it belongs to alerts
+   that HAVE an icon — not to every alert. On the base rule it laid the children
+   of any multi-part alert (heading + paragraphs) side by side instead of
+   stacking them. Pair with .admin-alert__icon. */
+.admin-alert--icon {
     display: flex;
     align-items: flex-start;
     gap: var(--space-sm);
+}
+
+/* Alerts routinely carry a filesystem path or an identifier with no break
+   opportunity; without this it sets the alert's minimum width and overflows the
+   card instead of wrapping. */
+.admin-alert code {
+    overflow-wrap: anywhere;
 }
 
 .admin-alert--error {

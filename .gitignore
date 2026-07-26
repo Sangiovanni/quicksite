@@ -91,6 +91,12 @@ secure/management/config/environment.php
 secure/management/config/sessions.json
 secure/management/config/login-throttle.json
 secure/management/config/registration-throttle.json
+
+# First-run setup token (C14) - the bootstrap credential for creating the very
+# first account, written by the engine when the user registry is empty and
+# destroyed the moment it is used. Per-install and secret by construction:
+# reading it IS the authorisation, so it must never be committed.
+secure/management/config/setup-token.txt
 secure/management/config/*.json.lock
 secure/management/config/*.tmp*
 secure/management/config/users.php.lock

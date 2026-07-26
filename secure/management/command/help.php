@@ -2332,12 +2332,13 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '403.auth.registration_disabled' => 'Self-registration is disabled on this installation (auth.php registration.allow_self_registration)',
             '403.auth.registration_closed' => 'Registration is closed - the account limit (registration.max_users) is reached',
+            '403.auth.setup_required' => 'The installation has no accounts at all. Registration cannot create the first one - open /admin/ and use the first-run page, which requires the setup token written to secure/management/config/setup-token.txt',
             '429.auth.throttled' => 'Too many registration attempts - retry_after gives the wait in seconds (per-IP rate or install-wide hourly cap)',
             '400.validation.required' => 'name, username and password are required',
             '400.validation.invalid_format' => 'Invalid username (3-32 chars: lowercase letters, digits, dash, underscore); OR the public name equals the username (they must differ - the username is private); OR password shorter than the configured minimum (data.min_length)',
             '500.server.registration_failed' => 'Could not register the account'
         ],
-        'notes' => 'No session and no user id are returned - the new account signs in through the login command. The success response is identical whether the account was created or the username already existed; if the username belonged to someone else, the subsequent login simply fails - pick another username and register again. Flood-control knobs live in auth.php authentication.registration (throttle.per_ip_per_minute, throttle.global_per_hour, max_users; 0 disables a limit).'
+        'notes' => 'No session and no user id are returned - the new account signs in through the login command. The success response is identical whether the account was created or the username already existed; if the username belonged to someone else, the subsequent login simply fails - pick another username and register again. Flood-control knobs live in auth.php authentication.registration (throttle.per_ip_per_minute, throttle.global_per_hour, max_users; 0 disables a limit). This command can never create the FIRST account on an install: while the user registry is empty the shared mint path requires the first-run setup token, which registration does not carry, so the answer is 403 auth.setup_required regardless of the allow_self_registration flag.'
     ],
 
     'changePassword' => [

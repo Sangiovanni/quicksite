@@ -465,7 +465,7 @@ $baseUrl = rtrim(BASE_URL, '/');
             <button type="button" class="admin-modal__close" data-dismiss="modal">&times;</button>
         </div>
         <div class="admin-modal__body">
-            <div class="admin-alert admin-alert--warning apis-import-warning">
+            <div class="admin-alert admin-alert--icon admin-alert--warning apis-import-warning">
                 <svg class="admin-alert__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                     <line x1="12" y1="9" x2="12" y2="13"/>

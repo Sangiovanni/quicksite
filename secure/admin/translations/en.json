@@ -63,15 +63,6 @@
         "privacyNote": "By checking 'Keep me signed in', you consent to a persistent authentication cookie on this device.",
         "registerLink": "No account yet? Create one",
         "registerSuccess": "Account created — sign in with your username and password",
-        "noAccounts": {
-            "title": "No account exists yet",
-            "intro": "This install has no accounts, so there is nothing to log in as. QuickSite ships no default password — you create the first account yourself.",
-            "registerOpen": "Self-registration is enabled on this install, so you can create the first account now:",
-            "runSetup": "Otherwise, run the setup script in the QuickSite folder — it asks for a username and password and creates the account for you:",
-            "onLinux": "(Linux / macOS)",
-            "onWindows": "(Windows)",
-            "manual": "If you cannot run the script, copy secure/management/config/users.php.example to users.php and fill in a username and a password hash — the instructions are in that file."
-        },
         "help": {
             "title": "No account?",
             "text": "Accounts are created by an administrator (or the platform hosting this site). If you lost your password, ask your administrator to reset it.",
@@ -99,6 +90,40 @@
         "closed": "Registration is closed on this installation (account limit reached)",
         "disabled": "Self-registration is disabled on this installation",
         "serverError": "Could not create the account — try again"
+    },
+    "setup": {
+        "title": "Create your first account",
+        "subtitle": "This installation has no accounts yet",
+        "tokenWhere": {
+            "title": "Step 1 — read the setup token",
+            "body": "It was written on the server, inside your QuickSite folder. Open this file and copy its single line:",
+            "why": "Being able to read that file is what proves you own this installation. The token is used once and then destroyed."
+        },
+        "tokenWriteFailed": {
+            "title": "The setup token could not be created",
+            "body": "QuickSite needs to write this file inside your QuickSite folder, and the web server user cannot:",
+            "fix": "Give the web server user write access to that folder and reload this page. On Linux this usually means changing the owner to www-data, nginx or your site user."
+        },
+        "tokenLabel": "Setup token",
+        "nameLabel": "Display name",
+        "nameHint": "Shown to other users. Must be different from your username.",
+        "usernameLabel": "Username",
+        "usernameHint": "Private — you sign in with it and nobody else sees it. 3–32 characters: letters, numbers, dashes or underscores.",
+        "passwordLabel": "Password",
+        "passwordHint": "At least :min characters — length matters more than symbols.",
+        "submit": "Create account",
+        "invalidToken": "That setup token is not valid. Open the file named below and copy the whole line.",
+        "invalidUsername": "This username is not valid — use 3–32 characters: letters, numbers, dashes or underscores",
+        "nameEqualsUsername": "Your display name must be different from your username (your username stays private)",
+        "passwordTooShort": "Password is too short — at least :min characters",
+        "missingFields": "Every field is required — fill them all in and try again",
+        "throttled": "Too many attempts — try again in :seconds seconds",
+        "alreadyDone": "An account already exists on this installation — sign in instead",
+        "serverError": "Could not create the account — try again",
+        "help": {
+            "title": "Why a token?",
+            "text": "This page can create an account without anyone signing in first, so it must be proven that you are the person who installed QuickSite — not a passer-by who found the address. Reading a file on the server is that proof. This page disappears for good once the first account exists."
+        }
     },
     "logout": {
         "title": "Logout",

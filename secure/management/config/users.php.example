@@ -41,8 +41,12 @@
  */
 
 // QuickSite ships NO working credential — this file is a SHAPE REFERENCE, not a
-// usable account. `setup.sh` / `setup.bat` ask for a username and password and
-// write a real users.php for you; the account you get is the one you chose.
+// usable account. You do not normally copy it: while no account exists, opening
+// /admin/ shows a first-run page that creates the first account for you. It asks
+// for a setup token, which the engine writes to
+// `secure/management/config/setup-token.txt` — being able to read that file is
+// what proves the installation is yours. The token is destroyed once used, and
+// the page disappears for good as soon as an account exists.
 //
 // To do it by hand instead: copy this file to users.php, then
 //   - replace the 'usr_CHANGE_ME_default' key with a fresh id:
